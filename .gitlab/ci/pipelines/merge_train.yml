@@ -584,7 +584,7 @@ oc.build_x86_64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_high_cpu
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -681,12 +681,17 @@ oc.build_x86_64-released:
     - _build/default/contrib/octez_injector_server/octez_injector_server.exe
     - etherlink-governance-observer
     when: on_success
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.build_x86_64-exp-dev-extra:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_high_cpu
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -794,6 +799,11 @@ oc.build_x86_64-exp-dev-extra:
     - _build/default/contrib/octez_injector_server/octez_injector_server.exe
     - etherlink-governance-observer
     when: on_success
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 wasm-runtime-check:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -859,7 +869,7 @@ ocaml-check:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_high_cpu
   rules:
   - changes:
     - '**/*.ml'
@@ -927,6 +937,11 @@ ocaml-check:
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.build_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -3518,7 +3533,7 @@ oc.unit:other-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_high_cpu
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -3604,7 +3619,7 @@ oc.unit:proto-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_high_cpu
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -3811,7 +3826,7 @@ oc.unit:protocol_compiles:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_high_cpu
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -3868,6 +3883,11 @@ oc.unit:protocol_compiles:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 de.unit:x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}

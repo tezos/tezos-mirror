@@ -737,6 +737,8 @@ type tag =
   | Gcp_tezt_memory_3k_dev
   | Gcp_tezt_memory_4k
   | Gcp_tezt_memory_4k_dev
+  | Gcp_high_cpu
+  | Gcp_high_cpu_dev
   | Aws_specific
   | Dynamic
 
@@ -751,6 +753,8 @@ let string_of_tag = function
   | Gcp_tezt_memory_3k_dev -> "gcp_tezt_memory_3k_dev"
   | Gcp_tezt_memory_4k -> "gcp_tezt_memory_4k"
   | Gcp_tezt_memory_4k_dev -> "gcp_tezt_memory_4k_dev"
+  | Gcp_high_cpu -> "gcp_high_cpu"
+  | Gcp_high_cpu_dev -> "gcp_high_cpu_dev"
   | Aws_specific -> "aws_specific"
   | Dynamic -> Gitlab_ci.Var.encode dynamic_tag_var
 
@@ -759,7 +763,7 @@ let arch_of_tag = function
   | Gcp_arm64 | Gcp_dev_arm64 -> Some Arm64
   | Gcp | Gcp_dev | Gcp_tezt | Gcp_tezt_dev | Gcp_tezt_memory_3k
   | Gcp_tezt_memory_3k_dev | Gcp_tezt_memory_4k | Gcp_tezt_memory_4k_dev
-  | Aws_specific ->
+  | Gcp_high_cpu | Gcp_high_cpu_dev | Aws_specific ->
       Some Amd64
   | Dynamic -> None
 
@@ -823,18 +827,24 @@ let enc_git_strategy = function
 let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
     ?id_tokens ?interruptible ?(dependencies = Staged [])
     ?(image_dependencies = []) ?services ?variables ?rules
-    ?(timeout = Gitlab_ci.Types.Minutes 60) ?tag ?git_strategy ?coverage ?retry
-    ?parallel ?description ~__POS__ ?image ?template ~stage ~name script :
-    tezos_job =
+    ?(timeout = Gitlab_ci.Types.Minutes 60) ?tag ?(high_cpu = false)
+    ?git_strategy ?coverage ?retry ?parallel ?description ~__POS__ ?image
+    ?template ~stage ~name script : tezos_job =
   (* The tezos/tezos CI uses singleton tags for its runners. *)
   let tag =
-    match (arch, tag) with
-    | Some arch, None -> ( match arch with Amd64 -> Gcp | Arm64 -> Gcp_arm64)
-    | None, Some tag -> tag
-    | None, None ->
+    match (arch, tag, high_cpu) with
+    | Some _, Some _, true
+    | None, Some _, true
+    | Some _, None, true
+    | None, None, true ->
+        Gcp_high_cpu
+    | Some arch, None, false -> (
+        match arch with Amd64 -> Gcp | Arm64 -> Gcp_arm64)
+    | None, Some tag, false -> tag
+    | None, None, false ->
         (* By default, we assume Amd64 runners as given by the [gcp] tag. *)
         Gcp
-    | Some _, Some _ ->
+    | Some _, Some _, false ->
         failwith
           "[job] cannot specify both [arch] and [tags] at the same time in job \
            '%s'."

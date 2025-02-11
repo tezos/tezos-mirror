@@ -259,6 +259,10 @@ type tag =
       (** GCP prod AMD64 runner, suitable for tezt memory 4k jobs (more RAM and CPU) *)
   | Gcp_tezt_memory_4k_dev
       (** GCP dev AMD64 runner, suitable for tezt memory 4k jobs (more RAM and CPU) *)
+  | Gcp_high_cpu
+      (** GCP prod AMD64 runner, suitable for jobs needing high CPU. *)
+  | Gcp_high_cpu_dev
+      (** GCP dev AMD64 runner, suitable for jobs needing high CPU. *)
   | Aws_specific
       (** AWS runners, in cases where a CI is legacy or not suitable for GCP. *)
   | Dynamic
@@ -360,7 +364,11 @@ val enc_git_strategy : git_strategy -> string
     - If the [image] used is {!Internal} and [tag] is set to
     {!Dynamic} then a run-time error is generated as the required
     architecture for the internal image cannot be statically
-    deduced. *)
+    deduced.
+
+    - The [high_cpu] parameter allocates the job to run on top of a GCP GitLab runner with a 1:1 ratio between CPU and RAM.
+      For more information, see [e2-highcpu-16](https://gcloud-compute.com/e2-highcpu-16.html). *)
+
 val job :
   ?arch:arch ->
   ?after_script:string list ->
@@ -377,6 +385,7 @@ val job :
   ?rules:Gitlab_ci.Types.job_rule list ->
   ?timeout:Gitlab_ci.Types.time_interval ->
   ?tag:tag ->
+  ?high_cpu:bool ->
   ?git_strategy:git_strategy ->
   ?coverage:string ->
   ?retry:Gitlab_ci.Types.retry ->
