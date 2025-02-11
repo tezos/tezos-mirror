@@ -161,7 +161,15 @@
              "ping_timeout":
                number
                /* Timeout in seconds after which the connection will be
-                  considered dead and closed. */ } },
+                  considered dead and closed. */ },
+      "l2_chains"?:
+        /* Configuration of l2_chains for multisequencing.
+                            If not set, the node will adopt a single chain
+           behaviour. */
+        [ { "chain_id": $bignum /* The id of the l2 chain */ } ... ]
+        /* Some */
+        || null
+        /* None */ },
   "proxy"?:
     { "finalized_view"?:
         boolean
@@ -274,6 +282,10 @@
     /* When enabled, the node only expose blocks that are finalized, i.e.,
        the `latest` block parameter becomes a synonym for `finalized`. */,
   "history"?: $history_mode /* History mode of the EVM node */ }
+$bignum:
+  /* Big number
+     Decimal representation of a big number */
+  string
 $history_mode:
   /* Compact notation for the history mode. Can either be `archive` and
      `rolling:N` with `N` being the number of days to use as the retention
