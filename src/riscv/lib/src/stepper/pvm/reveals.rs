@@ -22,7 +22,18 @@ impl RevealRequestResponseMap {
         let mut reveal_request_response_map = RevealRequestResponseMap::default();
 
         // Entry for returning dummy data to generic reveal request
-        reveal_request_response_map.add_static([1u8; 100], [2u8; 100]);
+        reveal_request_response_map.add_static(
+            [
+                0, 1, 10, 20, 30, 40, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 100, 120, 140, 160,
+            ],
+            [
+                150, 160, 170, 180, 190, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 50, 60, 70, 80, 90,
+            ],
+        );
 
         // Entry for responding to reveal_metadata request
         let mut metadata_response_buffer = [0u8; METADATA_LENGTH];

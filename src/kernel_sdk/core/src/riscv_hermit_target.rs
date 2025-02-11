@@ -17,9 +17,11 @@
 //! - Once the PVM returns to us, the results are stored in a0 and/or a1 in addition to the
 //!   out-parameters passed via a0-a5
 
+extern crate alloc;
 extern crate std;
 
 use crate::smart_rollup_core::ReadInputMessageInfo;
+use alloc::vec;
 use std::{
     io::{self, Write},
     slice::from_raw_parts,
@@ -152,12 +154,15 @@ pub(super) unsafe fn store_copy(
 
 #[inline]
 pub(super) unsafe fn reveal_preimage(
-    _hash_addr: *const u8,
-    _hash_len: usize,
-    _destination_addr: *mut u8,
-    _max_bytes: usize,
+    hash_addr: *const u8,
+    hash_len: usize,
+    destination_addr: *mut u8,
+    max_bytes: usize,
 ) -> i32 {
-    unimplemented!()
+    let mut payload = vec![0u8; hash_len + 1];
+    hash_addr.copy_to_nonoverlapping(payload.as_mut_ptr().add(1), hash_len);
+
+    reveal(payload.as_ptr(), payload.len(), destination_addr, max_bytes)
 }
 
 #[inline]
