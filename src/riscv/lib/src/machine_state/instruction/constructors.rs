@@ -231,6 +231,25 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`ArgsShape`] for the [`OpCode::Xor`].
+    pub(crate) fn new_xor(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Xor,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {
@@ -378,6 +397,33 @@ impl Instruction {
             (X::X0, _) | (_, X::X0) => Instruction::new_nop(InstrWidth::Compressed),
             (X::NonZero(rd_rs1), X::NonZero(rs2)) => {
                 Instruction::new_or(rd_rs1, rd_rs1, rs2, InstrWidth::Compressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::XOR`] according to whether register is non-zero.
+    pub(super) fn from_ic_xor(args: &NonZeroRdRTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rs1), split_x0(args.rs2)) {
+            (X::X0, X::X0) => Instruction::new_li(args.rd, 0, InstrWidth::Uncompressed),
+            (X::NonZero(rs1), X::X0) | (X::X0, X::NonZero(rs1)) => {
+                Instruction::new_mv(args.rd, rs1, InstrWidth::Uncompressed)
+            }
+            (X::NonZero(rs1), X::NonZero(rs2)) => {
+                Instruction::new_xor(args.rd, rs1, rs2, InstrWidth::Uncompressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::CXor`] according to whether register is non-zero.
+    pub(super) fn from_ic_cxor(args: &CRTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rd_rs1), split_x0(args.rs2)) {
+            // if rd is 0, then the instruction is a NOP.
+            // if rs2 is 0, it is the same as moving rs1 to rd, which are the same register.
+            (X::X0, _) | (_, X::X0) => Instruction::new_nop(InstrWidth::Compressed),
+            (X::NonZero(rd_rs1), X::NonZero(rs2)) => {
+                Instruction::new_xor(rd_rs1, rd_rs1, rs2, InstrWidth::Compressed)
             }
         }
     }

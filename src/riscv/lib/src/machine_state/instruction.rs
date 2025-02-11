@@ -335,7 +335,6 @@ pub enum OpCode {
     CJr,
     CJalr,
     CLui,
-    CXor,
     CSub,
     CAddw,
     CSubw,
@@ -538,7 +537,6 @@ impl OpCode {
             Self::Li => Args::run_li,
             Self::CLui => Args::run_clui,
             Self::Mv => Args::run_mv,
-            Self::CXor => Args::run_cxor,
             Self::CSub => Args::run_csub,
             Self::CAddw => Args::run_caddw,
             Self::CSubw => Args::run_csubw,
@@ -1076,7 +1074,7 @@ impl Args {
     // RV64I R-type instructions
     impl_r_type!(i::run_add, run_add, non_zero);
     impl_r_type!(run_sub, non_zero_rd);
-    impl_r_type!(run_xor, non_zero_rd);
+    impl_r_type!(run_xor, non_zero);
     impl_r_type!(run_or, non_zero);
     impl_r_type!(run_and, non_zero);
     impl_r_type!(run_sll, non_zero_rd);
@@ -1290,7 +1288,6 @@ impl Args {
     impl_cb_type!(run_bnez);
     impl_ci_type!(run_li, non_zero);
     impl_ci_type!(run_clui, non_zero);
-    impl_cr_type!(run_cxor);
     impl_cr_type!(run_csub);
     impl_css_type!(run_cswsp);
 
@@ -1357,10 +1354,7 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Sub,
                 args: args.into(),
             },
-            InstrCacheable::Xor(args) => Instruction {
-                opcode: OpCode::Xor,
-                args: args.into(),
-            },
+            InstrCacheable::Xor(args) => Instruction::from_ic_xor(args),
             InstrCacheable::Or(args) => Instruction::from_ic_or(args),
             InstrCacheable::And(args) => Instruction::from_ic_and(args),
             InstrCacheable::Sll(args) => Instruction {
@@ -2029,10 +2023,7 @@ impl From<&InstrCacheable> for Instruction {
                 Instruction::new_add(args.rd_rs1, args.rd_rs1, args.rs2, InstrWidth::Compressed)
             }
             InstrCacheable::CAnd(args) => Instruction::from_ic_cand(args),
-            InstrCacheable::CXor(args) => Instruction {
-                opcode: OpCode::CXor,
-                args: args.into(),
-            },
+            InstrCacheable::CXor(args) => Instruction::from_ic_cxor(args),
             InstrCacheable::COr(args) => Instruction::from_ic_cor(args),
             InstrCacheable::CSub(args) => Instruction {
                 opcode: OpCode::CSub,

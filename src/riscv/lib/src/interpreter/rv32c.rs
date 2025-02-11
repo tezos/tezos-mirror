@@ -103,24 +103,6 @@ impl<M> XRegisters<M>
 where
     M: backend::ManagerReadWrite,
 {
-    /// `C.AND` CA-type compressed instruction
-    ///
-    /// Computes the bitwise AND of the values in registers `rd_rs1` and `rs2`,
-    /// then writes the result back to register rd `rd_rs1`.
-    pub fn run_cand(&mut self, rd_rs1: XRegister, rs2: XRegister) {
-        let result = self.read(rd_rs1) & self.read(rs2);
-        self.write(rd_rs1, result)
-    }
-
-    /// `C.XOR` CA-type compressed instruction
-    ///
-    /// Computes the bitwise XOR of the values in registers `rd_rs1` and `rs2`,
-    /// then writes the result back to register rd `rd_rs1`.
-    pub fn run_cxor(&mut self, rd_rs1: XRegister, rs2: XRegister) {
-        let result = self.read(rd_rs1) ^ self.read(rs2);
-        self.write(rd_rs1, result)
-    }
-
     /// `C.SUB` CA-type compressed instruction
     ///
     /// Subtracts the value in register `rs2` from the value in register `rd_rs1`,
