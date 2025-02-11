@@ -20,6 +20,7 @@ module EIP_1559 = struct
          (req "storageKeys" (list hex_encoding)))
 
   type t = {
+    chain_id : quantity;
     hash : hash;
     nonce : quantity;
     block_hash : block_hash option;
@@ -42,6 +43,7 @@ module EIP_1559 = struct
     let open Data_encoding in
     conv
       (fun {
+             chain_id;
              hash;
              nonce;
              block_hash;
@@ -59,7 +61,8 @@ module EIP_1559 = struct
              r;
              s;
            } ->
-        ( ( hash,
+        ( ( chain_id,
+            hash,
             nonce,
             block_hash,
             block_number,
@@ -67,10 +70,16 @@ module EIP_1559 = struct
             from,
             to_,
             value,
-            gas,
-            max_fee_per_gas ),
-          (max_priority_fee_per_gas, access_list, input, v, r, s) ))
-      (fun ( ( hash,
+            gas ),
+          ( max_fee_per_gas,
+            max_priority_fee_per_gas,
+            access_list,
+            input,
+            v,
+            r,
+            s ) ))
+      (fun ( ( chain_id,
+               hash,
                nonce,
                block_hash,
                block_number,
@@ -78,10 +87,16 @@ module EIP_1559 = struct
                from,
                to_,
                value,
-               gas,
-               max_fee_per_gas ),
-             (max_priority_fee_per_gas, access_list, input, v, r, s) ) ->
+               gas ),
+             ( max_fee_per_gas,
+               max_priority_fee_per_gas,
+               access_list,
+               input,
+               v,
+               r,
+               s ) ) ->
         {
+          chain_id;
           hash;
           nonce;
           block_hash;
@@ -101,6 +116,7 @@ module EIP_1559 = struct
         })
       (merge_objs
          (obj10
+            (req "chainId" quantity_encoding)
             (req "hash" hash_encoding)
             (req "nonce" quantity_encoding)
             (req "blockHash" (option block_hash_encoding))
@@ -109,9 +125,9 @@ module EIP_1559 = struct
             (req "from" address_encoding)
             (req "to" (option address_encoding))
             (req "value" quantity_encoding)
-            (req "gas" quantity_encoding)
-            (req "maxFeePerGas" quantity_encoding))
-         (obj6
+            (req "gas" quantity_encoding))
+         (obj7
+            (req "maxFeePerGas" quantity_encoding)
             (req "maxPriorityFeePerGas" quantity_encoding)
             (dft "access_list" (list access_encoding) [])
             (req "input" hex_encoding)
@@ -161,7 +177,7 @@ let reconstruct_from_eip_1559_transaction (obj : legacy_transaction_object)
   | Ok
       (List
         [
-          _chain_id;
+          Value chain_id;
           _nonce;
           Value max_priority_fee_per_gas;
           Value max_fee_per_gas;
@@ -174,6 +190,7 @@ let reconstruct_from_eip_1559_transaction (obj : legacy_transaction_object)
           _r;
           _s;
         ]) ->
+      let chain_id = decode_number_be chain_id in
       let max_fee_per_gas = decode_number_be max_fee_per_gas in
       let max_priority_fee_per_gas =
         decode_number_be max_priority_fee_per_gas
@@ -182,6 +199,7 @@ let reconstruct_from_eip_1559_transaction (obj : legacy_transaction_object)
 
       EIP_1559
         {
+          chain_id;
           hash = obj.hash;
           nonce = obj.nonce;
           block_hash = obj.blockHash;
