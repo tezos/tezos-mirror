@@ -127,3 +127,24 @@ build-layer1-profiling:
     expire_in: never
     paths:
     - ./octez-binaries/x86_64/octez-node
+
+build_teztale:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  script:
+  - make teztale
+  artifacts:
+    name: teztale-binaries
+    expire_in: never
+    paths:
+    - octez-teztale-*
+    when: on_success
