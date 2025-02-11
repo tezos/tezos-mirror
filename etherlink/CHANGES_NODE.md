@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+### Bug fixes
+
+### Internals
+
 ## Version 0.17 (2025-02-14)
 
 This release addresses several bugs reported by partners, notably around the
