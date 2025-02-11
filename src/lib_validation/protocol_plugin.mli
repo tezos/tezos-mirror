@@ -217,7 +217,8 @@ end
 module type AGNOSTIC_BAKER_PLUGIN = sig
   val hash : Protocol_hash.t
 
-  val run_baker_binary : cancel_promise:int Lwt.t -> int Lwt.t
+  val run_baker_binary :
+    baker_args:string array -> cancel_promise:int Lwt.t -> int Lwt.t
 end
 
 (** Register a validation plugin for a specific protocol

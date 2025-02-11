@@ -35,11 +35,18 @@ module Agnostic_baker_plugin = struct
     let default_daily_logs_path = Some ("octez-baker-" ^ Protocol.name)
   end
 
-  let run_baker_binary ~cancel_promise =
+  let run_baker_binary ~baker_args ~cancel_promise =
     register_commands () ;
     init_sapling_params () ;
     Lwt.pick
-      [Client_main_run.lwt_run (module Config) ~select_commands; cancel_promise]
+      [
+        Client_main_run.lwt_run
+          (module Config)
+          ~select_commands
+          ~cmd_args:baker_args
+          ();
+        cancel_promise;
+      ]
 end
 
 let () =

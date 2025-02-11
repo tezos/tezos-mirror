@@ -73,13 +73,13 @@ module MakeBaker (Name : Lwt_process_watchdog.NAME) : BAKER = struct
     in
     let binary_path = baker_path ?user_path:binaries_directory protocol_hash in
     let baker_args = binary_path :: baker_args in
-    let _baker_args = Array.of_list baker_args in
-    (* TODO: Use baker_args in agnostic baker plugin. *)
+    let baker_args = Array.of_list baker_args in
     let cancel_promise, canceller = Lwt.wait () in
     let* thread =
       match Protocol_plugin.find_agnostic_baker_plugin protocol_hash with
       | Some (module Agnostic_baker_plugin) ->
-          return @@ Agnostic_baker_plugin.run_baker_binary ~cancel_promise
+          return
+          @@ Agnostic_baker_plugin.run_baker_binary ~baker_args ~cancel_promise
       | None ->
           tzfail
             (Missing_agnostic_baker_plugin
