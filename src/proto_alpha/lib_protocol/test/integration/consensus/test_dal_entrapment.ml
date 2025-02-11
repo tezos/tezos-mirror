@@ -84,6 +84,7 @@ let test_accusation_injection ?(initial_blocks_to_bake = 2) ?expect_failure
     else None
   in
   let* attestation = Op.raw_attestation blk ?dal_content in
+  let attestation_level = blk.header.shell.level in
   let (shard, proof), _ = Seq.uncons shards_with_proofs |> Stdlib.Option.get in
   let shard_with_proof = Dal.Shard_with_proof.{shard; proof} in
   let operation =
@@ -94,19 +95,19 @@ let test_accusation_injection ?(initial_blocks_to_bake = 2) ?expect_failure
       let* _blk_final = Block.bake ~operation blk in
       return_unit
   | Some f ->
-      let expect_failure = f blk in
+      let expect_failure = f attestation_level in
       let* ctxt = Incremental.begin_construction blk in
       let* _ = Incremental.add_operation ctxt operation ~expect_failure in
       return_unit
 
 let test_invalid_accusation_too_close_to_migration =
-  let expect_failure blk = function
+  let expect_failure attestation_level = function
     | [
         Environment.Ecoproto_error
           (Validate_errors.Anonymous
            .Denunciations_not_allowed_just_after_migration {level; _});
       ]
-      when Raw_level.to_int32 level = blk.Block.header.shell.level ->
+      when Raw_level.to_int32 level = attestation_level ->
         Lwt_result_syntax.return_unit
     | errs ->
         Test.fail
@@ -118,13 +119,13 @@ let test_invalid_accusation_too_close_to_migration =
   test_accusation_injection ~initial_blocks_to_bake:1 ~expect_failure
 
 let test_invalid_accusation_no_dal_content =
-  let expect_failure blk = function
+  let expect_failure attestation_level = function
     | [
         Environment.Ecoproto_error
           (Validate_errors.Anonymous.Invalid_accusation_no_dal_content
             {level; _});
       ]
-      when Raw_level.to_int32 level = blk.Block.header.shell.level ->
+      when Raw_level.to_int32 level = attestation_level ->
         Lwt_result_syntax.return_unit
     | errs ->
         Test.fail
@@ -136,13 +137,13 @@ let test_invalid_accusation_no_dal_content =
   test_accusation_injection ~with_dal_content:false ~expect_failure
 
 let test_invalid_accusation_slot_not_attested =
-  let expect_failure blk = function
+  let expect_failure attestation_level = function
     | [
         Environment.Ecoproto_error
           (Validate_errors.Anonymous.Invalid_accusation_slot_not_attested
             {level; _});
       ]
-      when Raw_level.to_int32 level = blk.Block.header.shell.level ->
+      when Raw_level.to_int32 level = attestation_level ->
         Lwt_result_syntax.return_unit
     | errs ->
         Test.fail
@@ -154,13 +155,13 @@ let test_invalid_accusation_slot_not_attested =
   test_accusation_injection ~attest_slot:false ~expect_failure
 
 let test_invalid_accusation_slot_not_published =
-  let expect_failure blk = function
+  let expect_failure attestation_level = function
     | [
         Environment.Ecoproto_error
           (Validate_errors.Anonymous.Invalid_accusation_slot_not_published
             {level; _});
       ]
-      when Raw_level.to_int32 level = blk.Block.header.shell.level ->
+      when Raw_level.to_int32 level = attestation_level ->
         Lwt_result_syntax.return_unit
     | errs ->
         Test.fail
