@@ -7,6 +7,15 @@
 - Adds `full` history mode, where the EVM node keeps all the blocks and transactions,
   but still prunes state data. (!16584)
 
+#### Experimental
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- Added possibility of configuring multiple l2_chains. The first admissable configuration is their `chain_id` (!16587)
+
 ### Bug Fixes
 
 - Advertises the correct history mode on start-up when it is not explicitely

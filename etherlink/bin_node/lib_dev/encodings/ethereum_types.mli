@@ -53,6 +53,10 @@ val hex_of_utf8 : string -> hex
 (** [hex_of_bytes] transforms the [bytes] to hexadecimal. *)
 val hex_of_bytes : bytes -> hex
 
+type chain_id = Chain_id of Z.t
+
+val chain_id_encoding : chain_id Data_encoding.t
+
 (** Ethereum block hash (32 bytes) *)
 type block_hash = Block_hash of hex [@@unboxed]
 

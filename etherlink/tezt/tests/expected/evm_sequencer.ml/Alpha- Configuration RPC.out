@@ -21,7 +21,8 @@
     "monitor_websocket_heartbeat": {
       "ping_interval": 5,
       "ping_timeout": 30
-    }
+    },
+    "l2_chains": null
   },
   "proxy": {
     "ignore_block_param": false
@@ -78,7 +79,8 @@
     "monitor_websocket_heartbeat": {
       "ping_interval": 5,
       "ping_timeout": 30
-    }
+    },
+    "l2_chains": null
   },
   "proxy": {
     "ignore_block_param": false
@@ -128,7 +130,8 @@
     "monitor_websocket_heartbeat": {
       "ping_interval": 5,
       "ping_timeout": 30
-    }
+    },
+    "l2_chains": null
   },
   "proxy": {
     "evm_node_endpoint": "hidden",

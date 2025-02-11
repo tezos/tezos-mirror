@@ -53,6 +53,12 @@ type rpc_server = Resto | Dream
 
 type monitor_websocket_heartbeat = {ping_interval : float; ping_timeout : float}
 
+let chain_id network =
+  Ethereum_types.Chain_id
+    (Z.of_int (match network with Mainnet -> 0xa729 | Testnet -> 0x1f47b))
+
+type l2_chain = {chain_id : Ethereum_types.chain_id}
+
 type experimental_features = {
   drop_duplicate_on_injection : bool;
   blueprints_publisher_order_enabled : bool;
@@ -62,6 +68,7 @@ type experimental_features = {
   enable_websocket : bool;
   max_websocket_message_length : int;
   monitor_websocket_heartbeat : monitor_websocket_heartbeat option;
+  l2_chains : l2_chain list option;
 }
 
 type sequencer = {
@@ -190,6 +197,8 @@ let default_max_socket_message_length = 4096 * 1024
 let default_monitor_websocket_heartbeat =
   Some {ping_interval = 5.; ping_timeout = 30.}
 
+let default_l2_chains = None
+
 let default_experimental_features =
   {
     enable_send_raw_transaction = default_enable_send_raw_transaction;
@@ -200,6 +209,7 @@ let default_experimental_features =
     enable_websocket = false;
     max_websocket_message_length = default_max_socket_message_length;
     monitor_websocket_heartbeat = default_monitor_websocket_heartbeat;
+    l2_chains = default_l2_chains;
   }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".octez-evm-node"
@@ -810,6 +820,16 @@ let opt_monitor_websocket_heartbeat_encoding =
         Option.some;
     ]
 
+let l2_chain_encoding : l2_chain Data_encoding.t =
+  let open Data_encoding in
+  let open Evm_node_lib_dev_encoding in
+  conv (fun {chain_id} -> chain_id) (fun chain_id -> {chain_id})
+  @@ obj1
+       (req
+          "chain_id"
+          ~description:"The id of the l2 chain"
+          Ethereum_types.chain_id_encoding)
+
 let experimental_features_encoding =
   let open Data_encoding in
   conv
@@ -822,6 +842,7 @@ let experimental_features_encoding =
            enable_websocket;
            max_websocket_message_length;
            monitor_websocket_heartbeat;
+           l2_chains : l2_chain list option;
          } ->
       ( ( drop_duplicate_on_injection,
           blueprints_publisher_order_enabled,
@@ -832,7 +853,8 @@ let experimental_features_encoding =
         ( rpc_server,
           enable_websocket,
           max_websocket_message_length,
-          monitor_websocket_heartbeat ) ))
+          monitor_websocket_heartbeat,
+          l2_chains ) ))
     (fun ( ( drop_duplicate_on_injection,
              blueprints_publisher_order_enabled,
              enable_send_raw_transaction,
@@ -842,7 +864,8 @@ let experimental_features_encoding =
            ( rpc_server,
              enable_websocket,
              max_websocket_message_length,
-             monitor_websocket_heartbeat ) ) ->
+             monitor_websocket_heartbeat,
+             l2_chains ) ) ->
       {
         drop_duplicate_on_injection;
         blueprints_publisher_order_enabled;
@@ -852,6 +875,7 @@ let experimental_features_encoding =
         enable_websocket;
         max_websocket_message_length;
         monitor_websocket_heartbeat;
+        l2_chains;
       })
     (merge_objs
        (obj6
@@ -902,7 +926,7 @@ let experimental_features_encoding =
                 DEPRECATED: You should remove this option from your \
                 configuration file."
              bool))
-       (obj4
+       (obj5
           (dft
              "rpc_server"
              ~description:
@@ -926,7 +950,15 @@ let experimental_features_encoding =
              "monitor_websocket_heartbeat"
              ~description:"Parameters to monitor websocket connections"
              opt_monitor_websocket_heartbeat_encoding
-             default_monitor_websocket_heartbeat)))
+             default_monitor_websocket_heartbeat)
+          (dft
+             "l2_chains"
+             ~description:
+               "Configuration of l2_chains for multisequencing.\n\
+               \                 If not set, the node will adopt a single \
+                chain behaviour."
+             (option (list l2_chain_encoding))
+             default_l2_chains)))
 
 let proxy_encoding =
   let open Data_encoding in
@@ -1550,6 +1582,13 @@ module Cli = struct
         ?native_execution_policy
         ()
     in
+    let experimental_features =
+      match network with
+      | None -> default_experimental_features
+      | Some network ->
+          let l2_chains = Some [{chain_id = chain_id network}] in
+          {default_experimental_features with l2_chains}
+    in
     {
       public_rpc;
       private_rpc;
@@ -1574,7 +1613,7 @@ module Cli = struct
       verbose =
         (if Option.value verbose ~default:default_verbose then Debug
          else Internal_event.Notice);
-      experimental_features = default_experimental_features;
+      experimental_features;
       fee_history = default_fee_history;
       finalized_view =
         Option.value ~default:default_finalized_view finalized_view;

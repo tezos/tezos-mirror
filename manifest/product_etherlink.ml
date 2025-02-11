@@ -115,21 +115,6 @@ let evm_node_rust_deps =
 
 let tezt ?(deps = []) = tezt ~deps:(bls12_381_archive :: deps)
 
-let evm_node_config =
-  octez_evm_node_lib
-    "evm_node_config"
-    ~path:"etherlink/bin_node/config"
-    ~synopsis:"Configuration for the EVM node"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_base_unix;
-        octez_client_base |> open_;
-        octez_rpc_http |> open_;
-        octez_rpc_http_server;
-        octez_stdlib_unix |> open_;
-      ]
-
 let wasm_runtime_callbacks =
   octez_evm_node_lib
     "wasm_runtime_callbacks"
@@ -253,6 +238,22 @@ let evm_node_lib_dev_encoding =
         octez_scoru_wasm_debugger_plugin;
         re;
         uuidm;
+      ]
+
+let evm_node_config =
+  octez_evm_node_lib
+    "evm_node_config"
+    ~path:"etherlink/bin_node/config"
+    ~synopsis:"Configuration for the EVM node"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_client_base |> open_;
+        octez_rpc_http |> open_;
+        octez_rpc_http_server;
+        octez_stdlib_unix |> open_;
+        evm_node_lib_dev_encoding |> open_;
       ]
 
 let evm_node_lib_dev =
