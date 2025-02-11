@@ -3774,7 +3774,8 @@ let ( packages_dir,
       manifezt,
       dep_graph,
       dep_graph_source,
-      dep_graph_without ) =
+      dep_graph_without,
+      opam_dep_graph ) =
   let packages_dir = ref "packages" in
   let url = ref "" in
   let sha256 = ref "" in
@@ -3783,6 +3784,7 @@ let ( packages_dir,
   let version = ref "" in
   let manifezt = ref false in
   let dep_graph = ref None in
+  let opam_dep_graph = ref None in
   let dep_graph_source = ref [] in
   let dep_graph_without = ref [] in
   let anonymous_args = ref [] in
@@ -3812,19 +3814,23 @@ let ( packages_dir,
           Arg.String (fun file -> dep_graph := Some file),
           "<FILE> Output the dune library dependency graph in FILE using dot \
            syntax." );
+        ( "--opam-dep-graph",
+          Arg.String (fun file -> opam_dep_graph := Some file),
+          "<FILE> Output the Opam package dependency graph in FILE using dot \
+           syntax." );
         ( "--dep-graph-source",
           Arg.String
             (fun pattern -> dep_graph_source := pattern :: !dep_graph_source),
-          "<PATTERN> Restrict the --dep-graph to nodes that are dependencies \
-           of the unique node whose identifier contains PATTERN. If this \
-           argument is repeated, the result is the union of each subgraph thus \
-           selected." );
+          "<PATTERN> Restrict the --dep-graph and --opam-dep-graph to nodes \
+           that are dependencies of the unique node whose identifier contains \
+           PATTERN. If this argument is repeated, the result is the union of \
+           each subgraph thus selected." );
         ( "--dep-graph-without",
           Arg.String
             (fun pattern -> dep_graph_without := pattern :: !dep_graph_without),
-          "<PATTERN> Restrict the --dep-graph to nodes whose identifier \
-           contains PATTERN. This argument can be repeated to restrict the \
-           graph further." );
+          "<PATTERN> Restrict the --dep-graph and --opam-dep-graph to nodes \
+           whose identifier contains PATTERN. This argument can be repeated to \
+           restrict the graph further." );
         ( "--",
           Arg.Rest anon_fun,
           " Assume the remaining arguments are anonymous arguments." );
@@ -3868,7 +3874,8 @@ let ( packages_dir,
     manifezt,
     !dep_graph,
     !dep_graph_source,
-    !dep_graph_without )
+    !dep_graph_without,
+    !opam_dep_graph )
 
 let generate_opam_ci_input opam_release_graph =
   (* We only need to test released packages, since those are the only one
@@ -4389,6 +4396,17 @@ let precheck () =
   check_opam_with_test_consistency () ;
   if !has_error then exit 1
 
+let string_contains sub str =
+  (* Not the most efficient implementation but oh well. *)
+  let sub_len = String.length sub in
+  let str_len = String.length str in
+  let rec find ofs =
+    if str_len < ofs + sub_len then false
+    else if String.equal sub (String.sub str ofs sub_len) then true
+    else find (ofs + 1)
+  in
+  find 0
+
 let generate_dependency_graph ?(source = []) ?(without = []) filename =
   let module Node = struct
     type t = {target : Target.internal; size : int}
@@ -4456,19 +4474,7 @@ let generate_dependency_graph ?(source = []) ?(without = []) filename =
       | None -> ""
       | Some percent -> "\\nrecompile " ^ string_of_int percent ^ "%"
 
-    let id_matches pattern node =
-      let string_contains sub str =
-        (* Not the most efficient implementation but oh well. *)
-        let sub_len = String.length sub in
-        let str_len = String.length str in
-        let rec find ofs =
-          if str_len < ofs + sub_len then false
-          else if String.equal sub (String.sub str ofs sub_len) then true
-          else find (ofs + 1)
-        in
-        find 0
-      in
-      string_contains pattern (id node)
+    let id_matches pattern node = string_contains pattern (id node)
 
     let attributes (node : t) =
       ("label", label node)
@@ -4539,6 +4545,77 @@ let generate_dependency_graph ?(source = []) ?(without = []) filename =
      Some (rev_dep_size * 100 / total_size)) ;
   write_raw filename @@ fun fmt -> G.output_dot_file fmt graph
 
+let generate_opam_dependency_graph ?(source = []) ?(without = [])
+    (opam_release_graph : opam_dependency_graph_node String_map.t) filename =
+  (* Apply the [Dgraph.Make] functor. First, define its argument [Node]. *)
+  let module Node = struct
+    type t = {
+      package : string;
+      opam_dependency_graph_node : opam_dependency_graph_node;
+    }
+
+    let make package =
+      match String_map.find_opt package opam_release_graph with
+      | None ->
+          failwith ("no package with name " ^ package ^ " in dependency graph")
+      | Some opam_dependency_graph_node -> {package; opam_dependency_graph_node}
+
+    let id node = node.package
+
+    let compare a b = String.compare (id a) (id b)
+
+    let label node = node.package
+
+    let id_matches pattern node = string_contains pattern (id node)
+
+    let attributes node = [("label", label node)]
+
+    let cluster _node = None
+  end in
+  let module G = Dgraph.Make (Node) in
+  (* Convert [opam_release_graph] into a [G.t]. *)
+  let graph = ref G.empty in
+  ( Fun.flip String_map.iter opam_release_graph
+  @@ fun package opam_dependency_graph_node ->
+    let source = Node.make package in
+    let targets =
+      String_set.elements opam_dependency_graph_node.dependencies
+      |> List.map Node.make
+    in
+    Fun.flip List.iter targets @@ fun target ->
+    graph := G.add source target !graph ) ;
+  let graph = !graph in
+  (* Restrict it to dependencies of [source]. *)
+  let graph =
+    match source with
+    | [] -> graph
+    | _ :: _ ->
+        let matching_nodes =
+          G.nodes graph
+          |> G.Nodes.filter (fun node ->
+                 List.exists
+                   (fun pattern -> Node.id_matches pattern node)
+                   source)
+        in
+        G.sourced_at matching_nodes graph
+  in
+  (* Remove unwanted nodes. *)
+  let graph =
+    let remove graph pattern =
+      let graph =
+        G.filter graph @@ fun node _ -> not (Node.id_matches pattern node)
+      in
+      G.map graph @@ fun _ edges ->
+      Fun.flip G.Nodes.filter edges @@ fun edge ->
+      not (Node.id_matches pattern edge)
+    in
+    List.fold_left remove graph without
+  in
+  (* Remove redundant edges. *)
+  let graph = G.simplify graph in
+  (* Output the DOT file. *)
+  write_raw filename @@ fun fmt -> G.output_dot_file fmt graph
+
 let generate ~make_tezt_exe ~tezt_exe_deps ~default_profile ~add_to_meta_package
     =
   Printexc.record_backtrace true ;
@@ -4560,6 +4637,12 @@ let generate ~make_tezt_exe ~tezt_exe_deps ~default_profile ~add_to_meta_package
     generate_opam_files () ;
     generate_dune_project_files () ;
     let opam_release_graph = compute_opam_release_graph () in
+    Option.iter
+      (generate_opam_dependency_graph
+         ~source:dep_graph_source
+         ~without:dep_graph_without
+         opam_release_graph)
+      opam_dep_graph ;
     generate_opam_ci_input opam_release_graph ;
     generate_executable_list "script-inputs/released-executables" Released ;
     generate_executable_list
