@@ -9,7 +9,7 @@
 ### Internal
 
 - Rework block production to simplify data flow and remove unnecessary
-  IO. (!16661 !16684 !16685)
+  IO. (!16661 !16684 !16685 !16618)
 
 ## Next proposal
 
