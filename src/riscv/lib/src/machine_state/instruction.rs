@@ -335,7 +335,6 @@ pub enum OpCode {
     CJr,
     CJalr,
     CLui,
-    COr,
     CXor,
     CSub,
     CAddw,
@@ -539,7 +538,6 @@ impl OpCode {
             Self::Li => Args::run_li,
             Self::CLui => Args::run_clui,
             Self::Mv => Args::run_mv,
-            Self::COr => Args::run_cor,
             Self::CXor => Args::run_cxor,
             Self::CSub => Args::run_csub,
             Self::CAddw => Args::run_caddw,
@@ -1079,7 +1077,7 @@ impl Args {
     impl_r_type!(i::run_add, run_add, non_zero);
     impl_r_type!(run_sub, non_zero_rd);
     impl_r_type!(run_xor, non_zero_rd);
-    impl_r_type!(run_or, non_zero_rd);
+    impl_r_type!(run_or, non_zero);
     impl_r_type!(run_and, non_zero);
     impl_r_type!(run_sll, non_zero_rd);
     impl_r_type!(run_srl, non_zero_rd);
@@ -1293,7 +1291,6 @@ impl Args {
     impl_ci_type!(run_li, non_zero);
     impl_ci_type!(run_clui, non_zero);
     impl_cr_type!(run_cxor);
-    impl_cr_type!(run_cor);
     impl_cr_type!(run_csub);
     impl_css_type!(run_cswsp);
 
@@ -1364,10 +1361,7 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Xor,
                 args: args.into(),
             },
-            InstrCacheable::Or(args) => Instruction {
-                opcode: OpCode::Or,
-                args: args.into(),
-            },
+            InstrCacheable::Or(args) => Instruction::from_ic_or(args),
             InstrCacheable::And(args) => Instruction::from_ic_and(args),
             InstrCacheable::Sll(args) => Instruction {
                 opcode: OpCode::Sll,
@@ -2039,10 +2033,7 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::CXor,
                 args: args.into(),
             },
-            InstrCacheable::COr(args) => Instruction {
-                opcode: OpCode::COr,
-                args: args.into(),
-            },
+            InstrCacheable::COr(args) => Instruction::from_ic_cor(args),
             InstrCacheable::CSub(args) => Instruction {
                 opcode: OpCode::CSub,
                 args: args.into(),

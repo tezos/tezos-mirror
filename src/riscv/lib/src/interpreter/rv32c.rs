@@ -121,15 +121,6 @@ where
         self.write(rd_rs1, result)
     }
 
-    /// `C.OR` CA-type compressed instruction
-    ///
-    /// Computes the bitwise OR of the values in registers `rd_rs1` and `rs2`,
-    /// then writes the result back to register rd `rd_rs1`.
-    pub fn run_cor(&mut self, rd_rs1: XRegister, rs2: XRegister) {
-        let result = self.read(rd_rs1) | self.read(rs2);
-        self.write(rd_rs1, result)
-    }
-
     /// `C.SUB` CA-type compressed instruction
     ///
     /// Subtracts the value in register `rs2` from the value in register `rd_rs1`,

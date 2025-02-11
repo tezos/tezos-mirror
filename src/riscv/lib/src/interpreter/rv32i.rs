@@ -96,11 +96,13 @@ where
         self.write_nz(rd, result)
     }
 
-    /// `OR` R-type instruction
+    /// Saves in `rd` the bitwise OR between the value in `rs1` and `rs2`
     ///
-    /// Saves in `rd` the bitwise OR between the value in `rs1` and `imm`
-    pub fn run_or(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
-        let result = self.read(rs1) | self.read(rs2);
+    /// Relevant RISC-V opcodes:
+    /// - `OR`
+    /// - `C.OR`
+    pub fn run_or(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
+        let result = self.read_nz(rs1) | self.read_nz(rs2);
         self.write_nz(rd, result)
     }
 
@@ -634,7 +636,7 @@ mod tests {
 
             state.write(a0, v1);
             state.write(t3, v2);
-            state.run_or(t3, a0, nz::a0);
+            state.run_or(nz::t3, nz::a0, nz::a0);
             prop_assert_eq!(state.read(a0), v1 | v2);
 
             state.write(t2, v1);
@@ -646,7 +648,7 @@ mod tests {
             state.write(a0, v1);
             state.run_and(nz::a0, nz::a0, nz::a1);
             prop_assert_eq!(state.read(a1), v1);
-            state.run_or(a0, a0, nz::a1);
+            state.run_or(nz::a0, nz::a0, nz::a1);
             prop_assert_eq!(state.read(a1), v1);
             state.run_xor(a0, a0, nz::a0);
             prop_assert_eq!(state.read(a0), 0);
