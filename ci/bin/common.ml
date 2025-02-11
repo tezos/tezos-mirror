@@ -638,7 +638,7 @@ let changeset_mir_tzt =
      (no need to test that we pass the -static flag twice)
    - released variants exist, that are used in release tag pipelines
      (they do not build experimental executables) *)
-let job_build_static_binaries ~__POS__ ~arch
+let job_build_static_binaries ~__POS__ ~arch ?(high_cpu = false)
     ?(executable_files = "script-inputs/released-executables")
     ?version_executable ?(release = false) ?rules ?dependencies () : tezos_job =
   let arch_string = arch_to_string arch in
@@ -663,6 +663,7 @@ let job_build_static_binaries ~__POS__ ~arch
     ~__POS__
     ~stage:Stages.build
     ~arch
+    ~high_cpu
     ~name
     ~image:Images.CI.build
     ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
@@ -869,8 +870,8 @@ let job_build_rpm_amd64 : unit -> tezos_job =
     ~arch:Amd64
     ~dependencies:(Dependent [])
 
-let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
-    ?dependencies () =
+let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?high_cpu
+    ?(release = false) ?dependencies () =
   let arch_string = arch_to_string arch in
   let name =
     sf
@@ -930,6 +931,8 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
       ~__POS__
       ~stage:Stages.build
       ~arch
+      ?retry
+      ?high_cpu
       ~name
       ~image:Images.CI.build
       ~before_script:

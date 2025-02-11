@@ -53,7 +53,12 @@ let jobs =
     job_build_static_binaries ~__POS__ ~arch:Arm64 ~rules:rules_always ()
   in
   let job_static_x86_64 =
-    job_build_static_binaries ~__POS__ ~arch:Amd64 ~rules:rules_always ()
+    job_build_static_binaries
+      ~__POS__
+      ~arch:Amd64
+      ~high_cpu:false
+      ~rules:rules_always
+      ()
   in
   let job_unified_coverage_default : tezos_job =
     job
