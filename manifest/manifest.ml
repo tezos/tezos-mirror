@@ -4568,7 +4568,18 @@ let generate_opam_dependency_graph ?(source = []) ?(without = [])
 
     let id_matches pattern node = string_contains pattern (id node)
 
-    let attributes node = [("label", label node)]
+    let attributes node =
+      ("label", label node)
+      ::
+      (let color rgb = [("color", rgb); ("fontcolor", rgb)] in
+       match node.opam_dependency_graph_node.release_status with
+       | Explicitly_unreleased _ | Auto -> color "#aaaaaa"
+       | Explicitly_released _ -> color "#000080"
+       | Transitively_released _ -> [])
+      @
+      if node.opam_dependency_graph_node.contain_executables then
+        [("penwidth", "2")]
+      else []
 
     let cluster _node = None
   end in
