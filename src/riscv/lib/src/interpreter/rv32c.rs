@@ -23,12 +23,12 @@ impl<M> HartState<M>
 where
     M: backend::ManagerReadWrite,
 {
-    /// J-type instruction
-    ///
     /// Performs an unconditional control transfer. The immediate is added to
     /// the pc to form the jump target address.
     ///
-    /// Primarily implementing C.J instruction. Can be used for uncompressed formats too.
+    /// Relevant RISC-V opcodes:
+    /// - C.J
+    /// - JAL
     pub fn run_j(&mut self, imm: i64) -> Address {
         let current_pc = self.pc.read();
         current_pc.wrapping_add(imm as u64)

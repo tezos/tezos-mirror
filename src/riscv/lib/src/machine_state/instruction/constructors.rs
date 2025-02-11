@@ -10,7 +10,7 @@ use crate::{
         XRegisterParsed,
         instruction::{
             CIBTypeArgs, CRTypeArgs, InstrWidth, NonZeroRdITypeArgs, NonZeroRdRTypeArgs,
-            SplitITypeArgs,
+            SplitITypeArgs, UJTypeArgs,
         },
         split_x0,
     },
@@ -352,6 +352,40 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::J`].
+    pub(crate) fn new_j(imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::J,
+            args: Args {
+                // We are adding default values for rd, rs1 and rs2 as NonZeroXRegister::x1
+                // to be explicit that they are of NonZeroXRegister type.
+                rd: NonZeroXRegister::x1.into(),
+                rs1: NonZeroXRegister::x1.into(),
+                rs2: NonZeroXRegister::x1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Jal`].
+    pub(crate) fn new_jal(rd: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Jal,
+            args: Args {
+                rd: rd.into(),
+                // We are adding default values for rs1 and rs2 as NonZeroXRegister::x1
+                // to be explicit that they are of NonZeroXRegister type.
+                rs1: NonZeroXRegister::x1.into(),
+                rs2: NonZeroXRegister::x1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {
@@ -657,6 +691,18 @@ impl Instruction {
             (X::NonZero(rs1), X::NonZero(rs2)) => {
                 Instruction::new_sra(args.rd, rs1, rs2, InstrWidth::Uncompressed)
             }
+        }
+    }
+
+    /// Convert ['InstrCacheable::Jal'] according to whether register is non-zero.
+    ///
+    /// ['InstrCacheable::Jal']: crate::parser::instruction::InstrCacheable::Jal
+    pub(super) fn from_ic_jal(args: &UJTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match split_x0(args.rd) {
+            // If rd is 0, we are just doing an unconditional jump and not storing the current pc.
+            X::X0 => Instruction::new_j(args.imm, InstrWidth::Uncompressed),
+            X::NonZero(rd) => Instruction::new_jal(rd, args.imm, InstrWidth::Uncompressed),
         }
     }
 }

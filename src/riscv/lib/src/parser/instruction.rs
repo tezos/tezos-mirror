@@ -359,6 +359,10 @@ pub enum InstrCacheable {
     Auipc(NonZeroRdUJTypeArgs),
 
     // RV64I jump instructions
+    /// `JAL` (note: uncompressed variant) - Instruction mis-aligned will
+    /// never be thrown because we allow C extension
+    ///
+    /// Always returns the target address (current program counter + imm)
     Jal(UJTypeArgs),
     Jalr(ITypeArgs),
 
@@ -480,6 +484,8 @@ pub enum InstrCacheable {
     CLwsp(CIBNZTypeArgs),
     CSw(SBTypeArgs),
     CSwsp(CSSTypeArgs),
+    /// `C.J` - Performs an unconditional control transfer. The immediate is added to
+    /// the pc to form the jump target address.
     CJ(CJTypeArgs),
     CJr(CRJTypeArgs),
     CJalr(CRJTypeArgs),

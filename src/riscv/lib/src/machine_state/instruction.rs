@@ -1154,7 +1154,7 @@ impl Args {
         &self,
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
-        Ok(Set(core.hart.run_jal(self.imm, self.rd.x)))
+        Ok(Set(core.hart.run_jal(self.imm, self.rd.nzx, self.width)))
     }
 
     /// SAFETY: This function must only be called on an `Args` belonging
@@ -1504,10 +1504,7 @@ impl From<&InstrCacheable> for Instruction {
             },
 
             // RV64I jump instructions
-            InstrCacheable::Jal(args) => Instruction {
-                opcode: OpCode::Jal,
-                args: args.into(),
-            },
+            InstrCacheable::Jal(args) => Instruction::from_ic_jal(args),
             InstrCacheable::Jalr(args) => Instruction {
                 opcode: OpCode::Jalr,
                 args: args.to_args(InstrWidth::Uncompressed),
@@ -1952,10 +1949,7 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::CSwsp,
                 args: args.into(),
             },
-            InstrCacheable::CJ(args) => Instruction {
-                opcode: OpCode::J,
-                args: args.into(),
-            },
+            InstrCacheable::CJ(args) => Instruction::new_j(args.imm, InstrWidth::Compressed),
             InstrCacheable::CJr(args) => Instruction {
                 opcode: OpCode::CJr,
                 args: args.into(),

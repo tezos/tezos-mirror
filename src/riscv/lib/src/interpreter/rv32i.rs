@@ -205,17 +205,14 @@ where
         target_address
     }
 
-    /// `JAL` J-type instruction (note: uncompressed variant)
-    ///
-    /// Instruction mis-aligned will never be thrown because we allow C extension
-    ///
+    /// Store the next instruction address in `rd` and jump to the target address.
     /// Always returns the target address (current program counter + imm)
-    pub fn run_jal(&mut self, imm: i64, rd: XRegister) -> Address {
+    pub fn run_jal(&mut self, imm: i64, rd: NonZeroXRegister, width: InstrWidth) -> Address {
         let current_pc = self.pc.read();
 
         // Save the address after jump instruction into rd
-        let return_address = current_pc.wrapping_add(InstrWidth::Uncompressed as u64);
-        self.xregisters.write(rd, return_address);
+        let return_address = current_pc.wrapping_add(width as u64);
+        self.xregisters.write_nz(rd, return_address);
 
         current_pc.wrapping_add(imm as u64)
     }
@@ -793,14 +790,14 @@ mod tests {
 
     backend_test!(test_jal, F, {
         let ipc_imm_rd_fpc_frd = [
-            (42, 42, t1, 84, 46),
-            (0, 1000, t1, 1000, 4),
-            (50, -100, t1, -50_i64 as u64, 54),
-            (u64::MAX - 1, 100, t1, 98_i64 as u64, 2),
+            (42, 42, nz::t1, 84, 46),
+            (0, 1000, nz::t1, 1000, 4),
+            (50, -100, nz::t1, -50_i64 as u64, 54),
+            (u64::MAX - 1, 100, nz::t1, 98_i64 as u64, 2),
             (
                 1_000_000_000_000,
                 (u64::MAX - 1_000_000_000_000 + 1) as i64,
-                t2,
+                nz::t2,
                 0,
                 1_000_000_000_004,
             ),
@@ -809,11 +806,11 @@ mod tests {
             let mut state = create_state!(HartState, F);
 
             state.pc.write(init_pc);
-            let new_pc = state.run_jal(imm, rd);
+            let new_pc = state.run_jal(imm, rd, InstrWidth::Uncompressed);
 
             assert_eq!(state.pc.read(), init_pc);
             assert_eq!(new_pc, res_pc);
-            assert_eq!(state.xregisters.read(rd), res_rd);
+            assert_eq!(state.xregisters.read_nz(rd), res_rd);
         }
     });
 
