@@ -40,7 +40,7 @@ let network_sanity_check ~network ctxt =
 
   let* () =
     match chain_id with
-    | Ok (Qty chain_id) ->
+    | Ok (Chain_id chain_id) ->
         unless Compare.Z.(chain_id = expected_chain_id) @@ fun () ->
         failwith
           "Local state is inconsistent with selected network %a: incorrect \

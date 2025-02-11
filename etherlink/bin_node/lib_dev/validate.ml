@@ -24,7 +24,7 @@ let validate_chain_id (module Backend_rpc : Services_backend_sig.S)
   match transaction.chain_id with
   | None -> return (Ok ())
   | Some transaction_chain_id ->
-      let* (Qty chain_id) = Backend_rpc.chain_id () in
+      let* (Chain_id chain_id) = Backend_rpc.chain_id () in
       if Z.equal transaction_chain_id chain_id then return (Ok ())
       else return (Error "Invalid chain id")
 

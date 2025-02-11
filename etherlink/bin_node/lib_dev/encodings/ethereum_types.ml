@@ -127,6 +127,18 @@ let decode_z_be bytes =
 
 type chain_id = Chain_id of Z.t [@@ocaml.unboxed]
 
+module Chain_id = struct
+  let encoding =
+    Data_encoding.conv
+      (fun (Chain_id c) -> z_to_hexa c)
+      (fun c -> Chain_id (Z.of_string c))
+      Data_encoding.string
+
+  let decode_le bytes = Chain_id (decode_z_le bytes)
+
+  let decode_be bytes = Chain_id (decode_z_be bytes)
+end
+
 type block_hash = Block_hash of hex [@@ocaml.unboxed]
 
 let pp_block_hash fmt (Block_hash (Hex h)) = Format.pp_print_string fmt h

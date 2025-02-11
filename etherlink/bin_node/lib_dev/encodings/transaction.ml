@@ -93,7 +93,7 @@ let decode_transaction ?chain_id ~tx_type ~nonce ~max_priority_fee_per_gas
         else if v = of_int 27 || v = of_int 28 then return None
         else fail "Chain ID cannot be decoded"
     | Some chain_id ->
-        let (Qty chain_id) = decode_number_be chain_id in
+        let (Chain_id chain_id) = Chain_id.decode_be chain_id in
         return (Some chain_id)
   in
   return

@@ -55,6 +55,14 @@ val hex_of_bytes : bytes -> hex
 
 type chain_id = Chain_id of Z.t [@@unboxed]
 
+module Chain_id : sig
+  val encoding : chain_id Data_encoding.t
+
+  val decode_le : bytes -> chain_id
+
+  val decode_be : bytes -> chain_id
+end
+
 (** Ethereum block hash (32 bytes) *)
 type block_hash = Block_hash of hex [@@unboxed]
 

@@ -8,7 +8,7 @@
 
 (** [is_ready chain_id base_fee_per_gas] advertises that Floodgate has started
     and is ready to spam. *)
-val is_ready : Ethereum_types.quantity -> Z.t -> unit Lwt.t
+val is_ready : Ethereum_types.chain_id -> Z.t -> unit Lwt.t
 
 (** [tx_queue_is_ready ()] advertises that the [Tx_queue] is ready to receive
     transactions. *)
@@ -48,11 +48,11 @@ val reimbursed_controller : Account.t -> unit Lwt.t
     has been funded and is now used to spam the Etherlink network. *)
 val setup_completed : unit -> unit Lwt.t
 
-(** [injecting_transactions nb] advertises [nb] transactions are about to be 
+(** [injecting_transactions nb] advertises [nb] transactions are about to be
     injected to the relay endpoint with a batch of [eth_sendRawTransaction]. *)
 val injecting_transactions : int -> unit Lwt.t
 
-(** [deploy_erc20 address] advertises an ERC20 contract as been deployed at 
+(** [deploy_erc20 address] advertises an ERC20 contract as been deployed at
     address [address]. *)
 val deploy_erc20 : string -> unit Lwt.t
 
