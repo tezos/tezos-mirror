@@ -1582,6 +1582,13 @@ module Cli = struct
         ?native_execution_policy
         ()
     in
+    let experimental_features =
+      match network with
+      | None -> default_experimental_features
+      | Some network ->
+          let l2_chains = Some [{chain_id = chain_id network}] in
+          {default_experimental_features with l2_chains}
+    in
     {
       public_rpc;
       private_rpc;
@@ -1606,7 +1613,7 @@ module Cli = struct
       verbose =
         (if Option.value verbose ~default:default_verbose then Debug
          else Internal_event.Notice);
-      experimental_features = default_experimental_features;
+      experimental_features;
       fee_history = default_fee_history;
       finalized_view =
         Option.value ~default:default_finalized_view finalized_view;
