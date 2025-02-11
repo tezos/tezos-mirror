@@ -64,6 +64,7 @@ let _ci_bin_main =
         ci_lib_gitlab_ci_main |> open_ ~m:"Base";
         ci_lib_tezos_ci;
         ci_grafazos;
+        ci_teztale;
         yaml;
         unix;
         tezt_core_lib;
