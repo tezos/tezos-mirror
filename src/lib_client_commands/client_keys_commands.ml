@@ -40,7 +40,7 @@ let algo_param () =
       | "ed25519" -> return Signature.Ed25519
       | "secp256k1" -> return Signature.Secp256k1
       | "p256" -> return Signature.P256
-      | "bls" -> return Signature.Bls
+      | "bls" -> return Signature.Bls_aug
       | name ->
           failwith
             "Unknown signature algorithm (%s). Available: 'ed25519', \

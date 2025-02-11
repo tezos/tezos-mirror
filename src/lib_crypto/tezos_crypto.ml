@@ -47,7 +47,7 @@ module Hashed = struct
 end
 
 module Signature = struct
-  module Bls = Bls
+  module Bls_aug = Bls_aug
   module Ed25519 = Ed25519
   module P256 = P256
   module Secp256k1 = Secp256k1

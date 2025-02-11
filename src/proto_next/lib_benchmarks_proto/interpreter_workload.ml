@@ -1460,8 +1460,8 @@ let extract_ir_sized_step :
           let message = Size.bytes message in
           Instructions.check_signature_p256 pk signature message
       | Signature.Bls pk ->
-          let pk = Size.of_int (Signature.Bls.Public_key.size pk) in
-          let signature = Size.of_int Signature.Bls.size in
+          let pk = Size.of_int (Signature.Bls_aug.Public_key.size pk) in
+          let signature = Size.of_int Signature.Bls_aug.size in
           let message = Size.bytes message in
           Instructions.check_signature_bls pk signature message)
   | IHash_key (_, _), _ -> Instructions.hash_key

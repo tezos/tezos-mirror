@@ -635,10 +635,10 @@ let signature_size_of_algo : Tezos_crypto.Signature.algo -> int = function
   | Ed25519 -> Tezos_crypto.Signature.Ed25519.size
   | Secp256k1 -> Tezos_crypto.Signature.Secp256k1.size
   | P256 -> Tezos_crypto.Signature.P256.size
-  | Bls ->
+  | Bls_aug ->
       (* BLS signatures in operations are encoded with 2 extra bytes: a [ff]
          prefix and a tag [03]. *)
-      Tezos_crypto.Signature.Bls.size + 2
+      Tezos_crypto.Signature.Bls_aug.size + 2
 
 (* This value is used as a safety guard for gas limit. *)
 let safety_guard = Gas.Arith.(integral_of_int_exn 100)
@@ -1410,7 +1410,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
     | Ed25519 _ -> Tezos_crypto.Signature.Ed25519
     | Secp256k1 _ -> Secp256k1
     | P256 _ -> P256
-    | Bls _ -> Bls
+    | Bls _ -> Bls_aug
   in
   let apply_specified_options counter op =
     Annotated_manager_operation.set_source source op >>? fun op ->

@@ -161,7 +161,7 @@ let () =
         let name = "Bls12_381"
       end)
       (struct
-        include Signature.Bls
+        include Signature.Bls_aug
 
         let watermark_of_bytes b = b
       end)
@@ -191,6 +191,6 @@ let () =
         (Ed25519, "Ed25519");
         (Secp256k1, "Secp256k1");
         (P256, "P256");
-        (Bls, "Bls");
+        (Bls_aug, "Bls");
       ]
   |> Alcotest.run ~__FILE__ "tezos-crypto-prop-signature"

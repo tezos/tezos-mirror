@@ -877,7 +877,7 @@ module V0 = Make (struct
         Tezos_crypto.Signature.Public_key_hash.t -> Public_key_hash.t tzresult =
       let open Result_syntax in
       function
-      | Bls _ ->
+      | Bls_aug _ ->
           tzfail (Exn (Failure "BLS public key hash not supported by V0"))
       | Ed25519 k -> return (Ed25519 k : Public_key_hash.t)
       | Secp256k1 k -> return (Secp256k1 k : Public_key_hash.t)
@@ -887,7 +887,7 @@ module V0 = Make (struct
         Tezos_crypto.Signature.Public_key.t -> Public_key.t tzresult =
       let open Result_syntax in
       function
-      | Bls _ -> tzfail (Exn (Failure "BLS public key not supported by V0"))
+      | Bls_aug _ -> tzfail (Exn (Failure "BLS public key not supported by V0"))
       | Ed25519 k -> return (Ed25519 k : Public_key.t)
       | Secp256k1 k -> return (Secp256k1 k : Public_key.t)
       | P256 k -> return (P256 k : Public_key.t)
@@ -895,7 +895,7 @@ module V0 = Make (struct
     let signature : Tezos_crypto.Signature.t -> t tzresult =
       let open Result_syntax in
       function
-      | Bls _ -> tzfail (Exn (Failure "BLS signature not supported by V0"))
+      | Bls_aug _ -> tzfail (Exn (Failure "BLS signature not supported by V0"))
       | Ed25519 k -> return (Ed25519 k : t)
       | Secp256k1 k -> return (Secp256k1 k : t)
       | P256 k -> return (P256 k : t)
@@ -913,7 +913,7 @@ module V1 = Make (struct
         Tezos_crypto.Signature.Public_key_hash.t -> Public_key_hash.t tzresult =
       let open Result_syntax in
       function
-      | Bls k -> return (Bls k : Public_key_hash.t)
+      | Bls_aug k -> return (Bls k : Public_key_hash.t)
       | Ed25519 k -> return (Ed25519 k : Public_key_hash.t)
       | Secp256k1 k -> return (Secp256k1 k : Public_key_hash.t)
       | P256 k -> return (P256 k : Public_key_hash.t)
@@ -922,7 +922,7 @@ module V1 = Make (struct
         Tezos_crypto.Signature.Public_key.t -> Public_key.t tzresult =
       let open Result_syntax in
       function
-      | Bls k -> return (Bls k : Public_key.t)
+      | Bls_aug k -> return (Bls k : Public_key.t)
       | Ed25519 k -> return (Ed25519 k : Public_key.t)
       | Secp256k1 k -> return (Secp256k1 k : Public_key.t)
       | P256 k -> return (P256 k : Public_key.t)
@@ -930,7 +930,7 @@ module V1 = Make (struct
     let signature : Tezos_crypto.Signature.t -> t tzresult =
       let open Result_syntax in
       function
-      | Bls k -> return (Bls k : t)
+      | Bls_aug k -> return (Bls k : t)
       | Ed25519 k -> return (Ed25519 k : t)
       | Secp256k1 k -> return (Secp256k1 k : t)
       | P256 k -> return (P256 k : t)
