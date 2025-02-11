@@ -334,10 +334,8 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | Amominw | Amomaxw | Amominuw | Amomaxuw | Lrd | Scd | Amoswapd | Amoaddd | Amoxord
         | Amoandd | Amoord | Amomind | Amomaxd | Amominud | Amomaxud | Rem | Remu | Remw
         | Remuw | Div | Divu | Divw | Divuw | Mul | Mulh | Mulhsu | Mulhu | Mulw | Csrrw
-        | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci | CLw | CSw | CSwsp | CAnd | COr | CXor
-        | CSub | CAddw | CSubw | CLd | CSd | CSdsp | Unknown | Beqz | Bnez | J => {
-            ArgsShape::XSrcXDest
-        }
+        | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci | CLw | CSw | CSwsp | COr | CXor | CSub
+        | CAddw | CSubw | CLd | CSd | CSdsp | Unknown | Beqz | Bnez | J => ArgsShape::XSrcXDest,
 
         Fadds | Fsubs | Fmuls | Fdivs | Fsqrts | Fmins | Fmaxs | Fsgnjs | Fsgnjns | Fsgnjxs
         | Fmadds | Fmsubs | Fnmsubs | Fnmadds | Faddd | Fsubd | Fmuld | Fdivd | Fsqrtd | Fmind
@@ -352,11 +350,11 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
 
         Fsw | Fsd | CFsd | CFsdsp => ArgsShape::XSrcFSrc,
 
-        Addi | Andi | Ori | Xori | Slli | Add | Mv | CJr | CJalr | CAddiw | Li | CLui | CLdsp
-        | CLwsp | Nop => ArgsShape::NZXSrcNZXDest,
+        Addi | Andi | Ori | Xori | Slli | Add | Mv | And | CJr | CJalr | CAddiw | Li | CLui
+        | CLdsp | CLwsp | Nop => ArgsShape::NZXSrcNZXDest,
 
-        Addiw | Sub | And | Or | Xor | Sll | Srl | Sra | Addw | Subw | Sllw | Srlw | Sraw
-        | Slti | Sltiu | Srli | Srai | Slliw | Srliw | Sraiw | Slt | Sltu | Lui | Auipc => {
+        Addiw | Sub | Or | Xor | Sll | Srl | Sra | Addw | Subw | Sllw | Srlw | Sraw | Slti
+        | Sltiu | Srli | Srai | Slliw | Srliw | Sraiw | Slt | Sltu | Lui | Auipc => {
             ArgsShape::XSrcNZXDest
         }
     }

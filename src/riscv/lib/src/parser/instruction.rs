@@ -283,6 +283,7 @@ pub enum InstrCacheable {
     Sub(NonZeroRdRTypeArgs),
     Xor(NonZeroRdRTypeArgs),
     Or(NonZeroRdRTypeArgs),
+    /// `AND` - Saves in `rd` the bitwise AND between the value in `rs1` and `rs2`
     And(NonZeroRdRTypeArgs),
     Sll(NonZeroRdRTypeArgs),
     Srl(NonZeroRdRTypeArgs),
@@ -496,6 +497,8 @@ pub enum InstrCacheable {
     /// `C.ADD` - Adds the values in registers `rd_rs1` and `rs2` and writes the result
     /// back to register `rd_rs1`.
     CAdd(CNZRTypeArgs),
+    /// `C.AND` - Computes the bitwise AND of the values in registers `rd_rs1` and `rs2`,
+    /// then writes the result back to register rd `rd_rs1`.
     CAnd(CRTypeArgs),
     COr(CRTypeArgs),
     CXor(CRTypeArgs),
