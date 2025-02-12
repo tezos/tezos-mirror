@@ -158,3 +158,142 @@ impl FileDescriptorCount {
         self.0
     }
 }
+
+/// Definitely zero
+pub struct Zero;
+
+impl TryFrom<u64> for Zero {
+    type Error = Error;
+
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        if value != 0 {
+            return Err(Error::InvalidArgument);
+        }
+
+        Ok(Zero)
+    }
+}
+
+/// Special file descriptor meaning no file descriptor
+pub struct NoFileDescriptor;
+
+impl TryFrom<u64> for NoFileDescriptor {
+    type Error = Error;
+
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        if value != -1i64 as u64 {
+            return Err(Error::BadFileDescriptor);
+        }
+
+        Ok(NoFileDescriptor)
+    }
+}
+
+/// Visibility of a memory mapping
+pub enum Visibility {
+    /// Only visible to the current task
+    Private,
+
+    // Shared with other tasks
+    Shared,
+}
+
+/// Backing of a memory mapping
+pub enum Backend {
+    /// Just memory
+    None,
+
+    /// File-backend memory
+    File,
+}
+
+/// Hint on how to interpret the address argument when memory mapping
+pub enum AddressHint {
+    /// May ignore the address hint
+    Hint,
+
+    /// Fixed address
+    Fixed { allow_replace: bool },
+}
+
+/// Memory mapping request flags
+pub struct Flags {
+    /// Visibility of the memory mapping
+    pub visibility: Visibility,
+
+    /// Memory backing
+    pub backend: Backend,
+
+    /// How to interpret the address hint
+    pub addr_hint: AddressHint,
+}
+
+impl TryFrom<u64> for Flags {
+    type Error = Error;
+
+    fn try_from(mut flags: u64) -> Result<Self, Self::Error> {
+        // Check if a bit is set, and clear it if it is
+        let mut probe_and_clear = |mask: u64| {
+            let r = flags & mask == mask;
+            flags &= !mask;
+            r
+        };
+
+        let visibility = {
+            const MAP_SHARED: u64 = 0x1;
+            const MAP_PRIVATE: u64 = 0x2;
+
+            let shared = probe_and_clear(MAP_SHARED);
+
+            // `MAP_SHARED_VALIDATE` translates to `MAP_PRIVATE | MAP_SHARED` for some reason. We
+            // must make sure that private is requested only when `MAP_SHARED` is not set.
+            let private = probe_and_clear(MAP_PRIVATE) && !shared;
+
+            if private {
+                Visibility::Private
+            } else if shared {
+                Visibility::Shared
+            } else {
+                return Err(Error::InvalidArgument);
+            }
+        };
+
+        let backend = {
+            const MAP_ANON: u64 = 0x20;
+
+            if probe_and_clear(MAP_ANON) {
+                Backend::None
+            } else {
+                Backend::File
+            }
+        };
+
+        let addr_hint = {
+            const MAP_FIXED: u64 = 0x10;
+            const MAP_FIXED_NOREPLACE: u64 = 0x100000;
+
+            if probe_and_clear(MAP_FIXED) {
+                AddressHint::Fixed {
+                    allow_replace: !probe_and_clear(MAP_FIXED_NOREPLACE),
+                }
+            } else if probe_and_clear(MAP_FIXED_NOREPLACE) {
+                AddressHint::Fixed {
+                    allow_replace: false,
+                }
+            } else {
+                AddressHint::Hint
+            }
+        };
+
+        // If there are other bits set, that means we likely don't support them
+        if flags != 0 {
+            return Err(Error::InvalidArgument);
+        }
+
+        Ok(Self {
+            visibility,
+            backend,
+            addr_hint,
+        })
+    }
+}

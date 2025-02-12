@@ -30,6 +30,9 @@ use crate::state_backend::Ref;
 /// Number of bits needed so you can address every byte in a page
 pub const OFFSET_BITS: u64 = 12;
 
+/// Bit mask to keep only the page offset
+pub const OFFSET_MASK: u64 = (1 << OFFSET_BITS) - 1;
+
 /// Size of a page
 pub const PAGE_SIZE: NonZeroU64 = {
     const PAGE_SIZE: u64 = 1 << OFFSET_BITS;
@@ -88,6 +91,31 @@ impl Permissions {
         match self {
             Self::None | Self::Read | Self::ReadWrite | Self::Write => false,
             Self::ReadExec => true,
+        }
+    }
+}
+
+#[cfg(feature = "supervisor")]
+impl TryFrom<XValue> for Permissions {
+    type Error = crate::pvm::linux::error::Error;
+
+    fn try_from(value: XValue) -> Result<Self, Self::Error> {
+        const READ: u64 = 0b1;
+        const WRITE: u64 = 0b10;
+        const EXEC: u64 = 0b100;
+        const READ_WRITE: u64 = READ | WRITE;
+        const READ_EXEC: u64 = READ | EXEC;
+        const NONE: u64 = 0;
+
+        match value {
+            READ_WRITE => Ok(Self::ReadWrite),
+            READ_EXEC => Ok(Self::ReadExec),
+            READ => Ok(Self::Read),
+            WRITE => Ok(Self::Write),
+            NONE => Ok(Self::None),
+
+            // Unknown protections value
+            _ => Err(crate::pvm::linux::error::Error::InvalidArgument),
         }
     }
 }

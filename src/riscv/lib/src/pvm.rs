@@ -8,6 +8,6 @@ mod reveals;
 mod sbi;
 
 #[cfg(feature = "supervisor")]
-mod linux;
+pub mod linux;
 
 pub use common::*;
