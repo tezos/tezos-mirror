@@ -9917,7 +9917,6 @@ let register ~protocols =
     test_slot_management_logic
     protocols ;
   scenario_with_layer1_node
-    ~tags:[Tag.flaky]
     "attesters receive expected DAL rewards depending on participation"
     test_dal_rewards_distribution
     (List.filter (fun p -> Protocol.number p >= 022) protocols)
