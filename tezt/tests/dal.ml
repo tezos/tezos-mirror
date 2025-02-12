@@ -4483,10 +4483,12 @@ let test_peers_reconnection _protocol _parameters _cryptobox node client
   unit
 
 (* Adapted from sc_rollup.ml *)
-let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
-    ~migration_level ~scenario ~description ?producer_profiles ?attestation_lag
-    ?number_of_slots ?number_of_shards ?slot_size ?page_size ?redundancy_factor
-    ?consensus_committee_size () =
+let test_l1_migration_scenario ?(tags = []) ?(uses = []) ~migrate_from
+    ~migrate_to ~migration_level ~scenario ~description ?producer_profiles
+    ?attestation_lag ?attestation_threshold ?number_of_slots ?number_of_shards
+    ?slot_size ?page_size ?redundancy_factor ?traps_fraction
+    ?consensus_committee_size ?blocks_per_cycle ?minimal_block_delay
+    ?activation_timestamp () =
   let tags =
     Tag.tezos2 :: "dal" :: Protocol.tag migrate_from :: Protocol.tag migrate_to
     :: "migration" :: tags
@@ -4494,7 +4496,7 @@ let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
   Test.register
     ~__FILE__
     ~tags
-    ~uses:[Constant.octez_dal_node]
+    ~uses:(Constant.octez_dal_node :: uses)
     ~title:
       (sf
          "%s->%s: %s"
@@ -4504,7 +4506,12 @@ let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
   @@ fun () ->
   let parameter_overrides =
     make_int_parameter ["consensus_committee_size"] consensus_committee_size
+    @ make_int_parameter ["blocks_per_cycle"] blocks_per_cycle
+    @ make_string_parameter ["minimal_block_delay"] minimal_block_delay
     @ make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
+    @ make_int_parameter
+        ["dal_parametric"; "attestation_threshold"]
+        attestation_threshold
     @ make_int_parameter ["dal_parametric"; "number_of_slots"] number_of_slots
     @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
     @ make_int_parameter
@@ -4512,12 +4519,14 @@ let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
         redundancy_factor
     @ make_int_parameter ["dal_parametric"; "slot_size"] slot_size
     @ make_int_parameter ["dal_parametric"; "page_size"] page_size
+    @ make_q_parameter ["dal_parametric"; "traps_fraction"] traps_fraction
   in
   let* node, client, dal_parameters =
     setup_node
       ~parameter_overrides
       ~protocol:migrate_from
       ~l1_history_mode:Default_with_refutation
+      ?activation_timestamp
       ()
   in
 
