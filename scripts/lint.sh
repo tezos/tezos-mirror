@@ -22,6 +22,8 @@ Where <action> can be:
 EOF
 }
 
+shopt -s extglob
+
 ## Testing for dependencies
 if ! type find > /dev/null 2>&-; then
   echo "find is required but could not be found. Aborting."
@@ -164,7 +166,7 @@ check_scripts() {
 }
 
 check_redirects() {
-  if [[ ! -f docs/_build/_redirects ]]; then
+  if [[ ! -f docs/_build/_redirects.s3 ]]; then
     say "check-redirects should be run after building the full documentation,"
     say "i.e. by running 'make all && make -C docs all'"
     exit 1
@@ -180,12 +182,13 @@ check_redirects() {
       exit_code=1
     fi
     re='^https?://'
+    re2=':splat'
     dest_local=docs/_build${new}
-    if [[ ! $new =~ $re && ! -f $dest_local ]]; then
+    if [[ ! $new =~ $re && ! $new =~ $re2 && ! -f $dest_local ]]; then
       say "in docs/_redirects: redirect $old -> $new, $dest_local does not exist"
       exit_code=1
     fi
-  done < docs/_build/_redirects
+  done < docs/_build/_redirects.s3
   exit $exit_code
 }
 
