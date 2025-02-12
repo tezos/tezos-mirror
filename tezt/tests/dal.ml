@@ -9656,7 +9656,9 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
             client
         in
         let* () = inject_attestations () in
-        bake_for ~delegates:(`For [baker.Account.public_key_hash]) client)
+        (* Do not use [bake_for] because it also injects an attestation
+           operation for [baker]. *)
+        Client.propose_for_and_wait ~key:[baker.Account.public_key_hash] client)
   in
 
   (* After this first round of blocks, we snapshot the balances of our delegates
