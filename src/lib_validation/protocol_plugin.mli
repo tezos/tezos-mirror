@@ -3,7 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2018 Nomadic Development. <contact@tezcore.com>             *)
 (* Copyright (c) 2018-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
-(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2024-2025 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (*****************************************************************************)
 

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2025 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
