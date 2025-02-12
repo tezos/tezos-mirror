@@ -2,10 +2,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-#[cfg(test)]
-use crate::state_backend::ManagerRead;
 use crate::state_backend::{
-    AllocatedOf, Atom, Cell, DynArray, DynCells, FnManager, ManagerBase, ManagerClone, Ref,
+    AllocatedOf, Atom, Cell, DynArray, DynCells, FnManager, ManagerBase, ManagerClone, ManagerRead,
+    Ref,
 };
 use tezos_smart_rollup_constants::riscv::REVEAL_REQUEST_MAX_SIZE;
 
@@ -38,7 +37,6 @@ impl<M: ManagerBase> RevealRequest<M> {
         (self.bytes.struct_ref::<F>(), self.size.struct_ref::<F>())
     }
 
-    #[cfg(test)]
     pub fn to_vec(&self) -> Vec<u8>
     where
         M: ManagerRead,
