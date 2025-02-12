@@ -473,5 +473,6 @@ let _floodgate_bin =
         octez_clic;
         evm_node_lib_dev |> open_;
         evm_node_lib_dev_encoding |> open_;
+        evm_node_config |> open_;
         octez_workers;
       ]
