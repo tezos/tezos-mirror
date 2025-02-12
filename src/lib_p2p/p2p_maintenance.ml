@@ -60,6 +60,7 @@ type ('msg, 'meta, 'meta_conn) t = {
   mutable maintain_worker : unit Lwt.t;
   triggers : P2p_trigger.t;
   log : P2p_connection.P2p_event.t -> unit;
+  rng : Random.State.t;
 }
 
 let pool t = P2p_connect_handler.get_pool t.connect_handler
@@ -241,24 +242,24 @@ let random_connections ~rng pool n =
     1. trigger greylist gc
     2. tries *forever* to achieve a number of connections
        between `min_threshold` and `max_threshold`. *)
-let rec do_maintain ~rng t =
+let rec do_maintain t =
   let open Lwt_result_syntax in
   t.log P2p_connection.P2p_event.Maintenance_started ;
   let n_connected = P2p_pool.active_connections (pool t) in
   if n_connected < t.bounds.min_threshold then
     match t.debug_config with
     | Some {trigger_too_few_connections = false; _} -> return_unit
-    | _ -> too_few_connections ~rng t n_connected
+    | _ -> too_few_connections t n_connected
   else if t.bounds.max_threshold < n_connected then
     match t.debug_config with
     | Some {trigger_too_many_connections = false; _} -> return_unit
-    | _ -> too_many_connections ~rng t n_connected
+    | _ -> too_many_connections t n_connected
   else (
     (* end of maintenance when enough users have been reached *)
     Lwt_condition.broadcast t.just_maintained () ;
     return_unit)
 
-and too_few_connections ~rng t n_connected =
+and too_few_connections t n_connected =
   let open Lwt_result_syntax in
   (* try and contact new peers *)
   t.log Too_few_connections ;
@@ -273,9 +274,9 @@ and too_few_connections ~rng t n_connected =
   let max_to_contact = t.bounds.max_target - n_connected in
   let*! success = try_to_contact t min_to_contact max_to_contact in
   let* () = if success then return_unit else ask_for_more_contacts t in
-  do_maintain ~rng t
+  do_maintain t
 
-and too_many_connections ~rng t n_connected =
+and too_many_connections t n_connected =
   let open Lwt_syntax in
   (* kill random connections *)
   t.log Too_many_connections ;
@@ -287,13 +288,13 @@ and too_many_connections ~rng t n_connected =
         t.config.expected_connections,
         t.config.max_connections )
   in
-  let connections = random_connections ~rng (pool t) n in
+  let connections = random_connections ~rng:t.rng (pool t) n in
   let* () =
     List.iter_p (P2p_conn.disconnect ~reason:Maintenance_too_many) connections
   in
-  do_maintain ~rng t
+  do_maintain t
 
-let rec maintain ~rng t motive =
+let rec maintain t motive =
   let open Lwt_result_syntax in
   let n_connected = P2p_pool.active_connections (pool t) in
   if
@@ -301,13 +302,13 @@ let rec maintain ~rng t motive =
   then (
     let*! () = Events.(emit maintenance_started) motive in
     let maintenance_start = Time.System.now () in
-    let* () = do_maintain ~rng t in
+    let* () = do_maintain t in
     let maintenance_duration =
       Ptime.diff (Time.System.now ()) maintenance_start
     in
     let*! () = Events.(emit maintenance_ended) maintenance_duration in
     t.log P2p_connection.P2p_event.Maintenance_ended ;
-    maintain ~rng t Events.Last_maintenance)
+    maintain t Events.Last_maintenance)
   else
     let () =
       if not t.config.private_mode then
@@ -317,10 +318,10 @@ let rec maintain ~rng t motive =
     in
     return_unit
 
-let rec worker_loop ~rng ~motive t =
+let rec worker_loop ~motive t =
   let open Lwt_result_syntax in
   let*! r =
-    let* () = maintain ~rng t motive in
+    let* () = maintain t motive in
     protect ~canceler:t.canceler (fun () ->
         let timer_promise =
           let idle_time = t.config.maintenance_idle_time in
@@ -348,7 +349,7 @@ let rec worker_loop ~rng ~motive t =
           ])
   in
   match r with
-  | Ok motive -> worker_loop ~rng ~motive t
+  | Ok motive -> worker_loop ~motive t
   | Error (Canceled :: _) -> Lwt.return_unit
   | Error _ -> Lwt.return_unit
 
@@ -370,7 +371,8 @@ module Internal = struct
     trigger_too_many_connections : bool;
   }
 
-  let create ?discovery config ?debug_config connect_handler triggers ~log =
+  let create ?(rng = Random.State.make_self_init ()) ?discovery config
+      ?debug_config connect_handler triggers ~log =
     let bounds =
       bounds
         ~min:config.min_connections
@@ -389,14 +391,15 @@ module Internal = struct
       maintain_worker = Lwt.return_unit;
       triggers;
       log;
+      rng;
     }
 
-  let activate ?(rng = Random.State.make_self_init ()) t =
+  let activate t =
     t.maintain_worker <-
       Lwt_utils.worker
         "maintenance"
         ~on_event:Internal_event.Lwt_worker_logger.on_event
-        ~run:(fun () -> worker_loop ~rng ~motive:Events.Activation t)
+        ~run:(fun () -> worker_loop ~motive:Events.Activation t)
         ~cancel:(fun () -> Error_monad.cancel_with_exceptions t.canceler) ;
     Option.iter P2p_discovery.activate t.discovery
 end

@@ -100,6 +100,7 @@ module Internal_for_tests : sig
   }
 
   val create :
+    ?rng:Random.State.t ->
     ?discovery:P2p_discovery.t ->
     config ->
     ?debug_config:test_config ->
@@ -108,5 +109,5 @@ module Internal_for_tests : sig
     log:(P2p_connection.P2p_event.t -> unit) ->
     ('msg, 'meta, 'meta_conn) t
 
-  val activate : ?rng:Random.State.t -> ('msg, 'meta, 'meta_conn) t -> unit
+  val activate : ('msg, 'meta, 'meta_conn) t -> unit
 end
