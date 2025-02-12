@@ -70,6 +70,13 @@ pub fn allow_path_not_found(res: Result<(), RuntimeError>) -> Result<(), Runtime
 const TMP_NEXT_BLUEPRINT_PATH: RefPath =
     RefPath::assert_from(b"/__tmp_next_blueprint_path");
 
+mod legacy {
+    // This module contains copies of old implementations of some
+    // functions. The legacy semantics of these functions is needed in
+    // some migration step to access the storage using the fields
+    // which were present at the time.
+}
+
 fn migrate_to<Host: Runtime>(
     host: &mut Host,
     version: StorageVersion,
