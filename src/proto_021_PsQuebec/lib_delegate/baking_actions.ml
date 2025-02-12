@@ -461,8 +461,8 @@ let only_if_dal_feature_enabled =
       | None ->
           incr no_dal_node_warning_counter ;
           let* () =
-            if !no_dal_node_warning_counter mod 10 = 1 then
-              Events.(emit no_dal_node_running ())
+            if !no_dal_node_warning_counter mod 50 = 1 then
+              Events.(emit no_dal_node_provided ())
             else return_unit
           in
           return default_value

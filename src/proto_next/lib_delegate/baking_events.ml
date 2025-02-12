@@ -72,15 +72,16 @@ module Commands = struct
         Data_encoding.option
           Tezos_version.Octez_node_version.commit_info_encoding )
 
-  let no_dal_node_running =
+  let no_dal_node_provided =
     declare_0
       ~section
-      ~name:"no_dal_node_running"
+      ~name:"no_dal_node_provided"
       ~level:Warning
       ~msg:
         "No DAL node endpoint has been provided.\n\
-         It will soon be required to launch a DAL node before running the \
-         baker. For instructions on running a DAL node, please visit \
+         Not running a DAL node might result in losing a share of the \
+         participation rewards.\n\
+         For instructions on how to run a DAL node, please visit \
          https://docs.tezos.com/tutorials/join-dal-baker."
       ()
 
@@ -1125,7 +1126,7 @@ module Actions = struct
       ~pp2:pp_int32
       ("level", Data_encoding.int32)
 
-  let no_dal_node_running = Commands.no_dal_node_running
+  let no_dal_node_provided = Commands.no_dal_node_provided
 end
 
 module VDF = struct
