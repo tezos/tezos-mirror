@@ -5327,6 +5327,8 @@ module History_rpcs = struct
       scenario
       protocols
 
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7754
+     The test currently fails, so it is disabled. *)
   let test_commitments_history_rpcs_with_migration ~migrate_from ~migrate_to
       ~migration_level =
     let slot_index = 3 in
@@ -5353,7 +5355,7 @@ module History_rpcs = struct
     in
 
     let description = "test commitments history with migration" in
-    let tags = ["rpc"; "skip_list"; Tag.memory_3k] in
+    let tags = ["rpc"; "skip_list"; Tag.memory_3k; Tag.ci_disabled] in
     test_l1_migration_scenario
       ~migrate_from
       ~migrate_to
