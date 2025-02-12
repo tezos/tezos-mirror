@@ -29,28 +29,28 @@ macro_rules! bits_builtin {
                 }
             }
 
-            /// Returns the [bit] of [v] as a boolean.
+            /// Returns the [bit] of `v` as a boolean.
             #[inline(always)]
             pub const fn bit(v: $t, bit: usize) -> bool {
                 ((v >> bit) & 1) != 0
             }
 
-            /// Returns a strict subset of bits of [v].
+            /// Returns a strict subset of bits of `v`.
             /// Panics if the range covers the whole value.
             #[inline(always)]
             pub const fn bits_subset(v: $t, start: usize, end: usize) -> $t {
                 (v & mask_subset(start, end)) >> end
             }
 
-            /// Sets [bit] in [v] to [value].
+            /// Sets [bit] in `v` to `value`.
             #[inline(always)]
             pub const fn set_bit(v: $t, bit: usize, value: bool) -> $t {
                 let mask = 1 << bit;
                 (v & !mask) | (if value { 1 } else { 0 } << bit)
             }
 
-            /// Replaces a strict subset of bits of [v] with [bits].
-            /// If [bits] is larger than the range, the highest bits will be truncated.
+            /// Replaces a strict subset of bits of `v` with `bits`.
+            /// If `bits` is larger than the range, the highest bits will be truncated.
             /// Panics if the range covers the whole value.
             #[inline(always)]
             pub const fn replace_subset(v: $t, start: usize, end: usize, bits: $t) -> $t {
@@ -64,14 +64,14 @@ macro_rules! bits_builtin {
 bits_builtin!(u16, 16);
 bits_builtin!(u64, 64);
 
-/// Implementations can be converted to and from a binary [u64] representation
+/// Implementations can be converted to and from a binary [prim@u64] representation
 pub trait Bits64 {
     const WIDTH: usize;
 
-    /// Convert from the [u64] binary representation.
+    /// Convert from the [prim@u64] binary representation.
     fn from_bits(value: u64) -> Self;
 
-    /// Serialise to the [u64] binary representation.
+    /// Serialise to the [prim@u64] binary representation.
     fn to_bits(&self) -> u64;
 }
 
@@ -143,7 +143,7 @@ impl<const WIDTH: usize, const VALUE: u64> fmt::Debug for ConstantBits<WIDTH, VA
     }
 }
 
-/// Like [u64] but limited in width
+/// Like [prim@u64] but limited in width
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FixedWidthBits<const WIDTH: usize>(u64);
 

@@ -110,7 +110,8 @@ impl BenchStats {
         Ok(instr_stats)
     }
 
-    /// Fails with [`Err`] if for an instruction the corresponding [`InstructionStats`] can not be created.
+    /// Fails with [`Err`] if for an instruction the corresponding
+    /// instruction's [`NamedStats`] can not be created.
     pub(super) fn from_data(data: BenchData) -> Result<Self, String> {
         let instr_stats = Self::compute_instr_stats(data.instr_count.into_iter())?;
         let bench_duration_stats =
@@ -124,7 +125,8 @@ impl BenchStats {
         })
     }
 
-    /// Fails with [`Err`] if for an instruction the corresponding [`InstructionStats`] can not be created.
+    /// Fails with [`Err`] if for an instruction the corresponding
+    /// instruction's [`NamedStats`] can not be created.
     pub(super) fn from_data_list(data: Vec<BenchData>) -> Result<Self, String> {
         let bench_times = data.iter().map(|bench| bench.duration).collect::<Vec<_>>();
         let bench_duration_stats =

@@ -80,7 +80,7 @@ pub struct TestStepper<ML: MainMemoryLayout = M1G, CL: CacheLayouts = TestCacheL
 }
 
 impl<ML: MainMemoryLayout> TestStepper<ML> {
-    /// Initialise an interpreter with a given [program], starting execution in [mode].
+    /// Initialise an interpreter with a given `program`, starting execution in [mode].
     /// An initial ramdisk can also optionally be passed.
     #[inline]
     pub fn new(
@@ -91,7 +91,7 @@ impl<ML: MainMemoryLayout> TestStepper<ML> {
         Ok(Self::new_with_parsed_program(program, initrd, mode)?.0)
     }
 
-    /// Initialise an interpreter with a given [program], starting execution in [mode].
+    /// Initialise an interpreter with a given `program`, starting execution in [mode::Mode].
     /// An initial ramdisk can also optionally be passed. Returns both the interpreter
     /// and the fully parsed program.
     #[inline]

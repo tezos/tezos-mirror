@@ -559,6 +559,8 @@ impl ConstDefault for InstrCacheable {
 /// Any of these can result in breaking the 'default flow of execution',
 /// invalidating the assumptions that are required for the [`BlockCache`] to
 /// function.
+///
+/// [`BlockCache`]: crate::machine_state::block_cache::BlockCache
 #[derive(Debug, PartialEq, Eq, Clone, Copy, EnumTag, Hash)]
 pub enum InstrUncacheable {
     Fence(FenceArgs),

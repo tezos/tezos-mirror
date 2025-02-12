@@ -32,10 +32,12 @@ pub trait BCall<'a, ML: MainMemoryLayout, M: ManagerBase> {
     /// Run a block against the machine state.
     ///
     /// When calling this function, there must be no partial block in progress. To ensure
-    /// this, you must always run [`BlockCache::complete_current_block`] prior to fetching
+    /// this, you must always run [`complete_current_block`] prior to fetching
     /// and running a new block.
     ///
     /// There _must_ also be sufficient steps remaining, to execute the block in full.
+    ///
+    /// [`complete_current_block`]: super::BlockCache::complete_current_block
     fn run_block(
         &mut self,
         core: &mut MachineCoreState<ML, M>,

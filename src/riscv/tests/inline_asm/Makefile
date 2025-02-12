@@ -14,6 +14,7 @@ build:
 
 .PHONY: check
 check:
+	@cargo doc --all-features --document-private-items --no-deps
 
 .PHONY: clean
 clean:

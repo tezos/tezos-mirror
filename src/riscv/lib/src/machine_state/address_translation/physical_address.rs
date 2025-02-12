@@ -21,8 +21,6 @@ use crate::{
 ///
 /// The page offset is ignored when computing the ranges.
 /// (i.e., the PPN field starts at bit 0).
-///
-/// Example: `raw_range_PPN[0] = 8..=0`. This is because [`Twiddle`] expects the range in reverse
 #[inline(always)]
 pub(super) fn get_raw_ppn_i_range(sv_length: SvLength, index: usize) -> Option<(usize, usize)> {
     // We use a jump table instead of a match statement to improve performance.

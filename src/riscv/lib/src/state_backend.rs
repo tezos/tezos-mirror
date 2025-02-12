@@ -36,25 +36,39 @@
 //! );
 //! ```
 //!
-//! # [Locations] placement through a [Choreographer]
+//! # Managers
 //!
-//! Once a [Layout] has been defined, the [Choreographer] can be used to
-//! generate static offsets into the backend storage in the form of [Locations].
-//! All offsets shall be generated in a deterministic way.
+//! Different backends have different capabilities and they are described as `Manager<Capability>`.
+//! Some of these capabilities are:
+//! - [ManagerBase]
+//! - [ManagerAlloc]
+//! - [ManagerRead]
+//! - [ManagerWrite]
+//! - [ManagerReadWrite]
 //!
-//! All offsets when added to the state storage root address shall also build
-//! correctly aligned addresses as long as the state backend storage has been
-//! aligned with the requirements requested in [Placed].
+//! # Backends
 //!
-//! # Allocation of [Regions] using a [Manager]
+//! Backends are ZST implementing these traits.
+//! The main difference between them is the top-level functionality it provides
+//! and management of the underlying state memory.
 //!
-//! A [Manager], given [Locations], assigns [Regions] in the backend. Those
-//! [Regions] are then used by the state type to manipulate the backend storage
-//! where the state ultimately exists.
+//! These backends can be:
 //!
-//! [Regions]: Region
-//! [Layouts]: Layout
-//! [Locations]: Location
+//! - [Owned]
+//!     Backend which has the full state allocated in memory. It can execute one step
+//!     or multiple steps at a time faster.
+//! - [Verifier]
+//!     Backend capable of partially allocating a state and verify a given proof.
+//!     Needs to be light on memory usage since it runs in the protocol.
+//! - [ProofGen]
+//!     Backend capable of generating a proof for running one step.
+//! - [Ref]
+//!     Helper backend to wrap another backend through a reference to it.
+//!
+//! [Layouts]: layout::Layout
+//! [Owned]: owned_backend::Owned
+//! [Verifier]: verify_backend::Verifier
+//! [ProofGen]: proof_backend::ProofGen
 
 mod commitment_layout;
 mod effects;

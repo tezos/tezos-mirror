@@ -81,7 +81,7 @@ pub struct GdbServerOptions {
     #[arg(long)]
     pub initrd: Option<Box<Path>>,
 
-    /// Port to listen on for gdb client (on localhost:<PORT>).
+    /// Port to listen on for gdb client (on `localhost:<PORT>`).
     #[arg(long, short)]
     pub port: u16,
 }

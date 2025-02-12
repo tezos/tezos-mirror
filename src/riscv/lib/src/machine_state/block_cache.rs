@@ -164,13 +164,15 @@ impl<ML: MainMemoryLayout> EnrichedValue for ICallPlaced<ML> {
     type D<M: ManagerBase> = ICall<ML, M>;
 }
 
-/// A function derived from an [`OpCode`] that can be directly run over the [`MachineCoreState`].
+/// A function derived from an [OpCode] that can be directly run over the [MachineCoreState].
 ///
 /// This allows static dispatch of this function during block construction,
 /// rather than for each instruction, during each block execution.
+///
+/// [OpCode]: super::instruction::OpCode
 pub struct ICall<ML: MainMemoryLayout, M: ManagerBase> {
-    // SAFETY: This function must be called with an `Args` belonging to the same `OpCode` as
-    // the one used to dispatch this function.
+    /// SAFETY: This function must be called with an `Args` belonging to the same `OpCode` as
+    /// the one used to dispatch this function.
     run_instr:
         unsafe fn(&Args, &mut MachineCoreState<ML, M>) -> Result<ProgramCounterUpdate, Exception>,
 }

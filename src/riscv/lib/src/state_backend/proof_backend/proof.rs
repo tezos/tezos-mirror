@@ -12,7 +12,7 @@
 //!   * Tags which dictate the shape of the proof (a partial Merkle tree)
 //!   * Leaf contents
 //!
-//! - Convert [`MerkleTree`] to [`MerkleProof`]
+//! - Convert [`super::merkle::MerkleTree`] to [`MerkleProof`]
 
 use super::tree::{impl_modify_map_collect, ModifyResult, Tree};
 use crate::{
@@ -82,6 +82,8 @@ const TAG_MASK: u8 = 0b11;
 /// The structure of the full [`MerkleTree`] is known statically (since it represents the whole state of the PVM)
 /// so the number of children of a node and the sizes of the leaves
 /// do not need to be stored in either the proof or its encoding.
+///
+/// [`MerkleTree`]: super::merkle::MerkleTree
 pub type MerkleProof = Tree<MerkleProofLeaf>;
 
 /// Type used to describe the leaves of a [`MerkleProof`].
@@ -91,7 +93,8 @@ pub enum MerkleProofLeaf {
     /// A leaf that is not read. It may be written.
     /// Contains the hash of the contents from initial state.
     ///
-    /// Note: a blinded leaf can correspond to a blinded subtree in a [`MerkleTree`] (due to compression)
+    /// Note: a blinded leaf can correspond to a blinded subtree
+    /// in a [`super::merkle::MerkleTree`] due to compression.
     Blind(Hash),
     /// A leaf that is read. It may also be written.
     /// Contains the read data from the initial state.

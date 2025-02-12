@@ -7,6 +7,9 @@ edition = "2021"
 name = "riscv-sandbox"
 path = "src/main.rs"
 
+[lints]
+workspace = true
+
 [dependencies]
 clap.workspace = true
 color-eyre.workspace = true

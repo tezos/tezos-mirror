@@ -18,7 +18,7 @@ use crate::{
 
 /// RISCV CSRegister.mstatus register state.
 /// Accounts for CSR rules like WPRI, WARL, WLRL.
-/// Contains only real fields (no shadows) hence it is a public field in [`super::CSRegisterValues`]
+/// Contains only real fields (no shadows) hence it is a public field in [`super::CSRValues`]
 pub struct MStatusValue<M: ManagerBase> {
     // Individual fields can be public since they are well typed and respect the WPRI, WARL, WLRL rules.
     // Except for fields which have side-effects. These ones have custom read/write/replace methods

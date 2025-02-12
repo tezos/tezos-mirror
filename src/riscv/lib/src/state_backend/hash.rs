@@ -29,7 +29,7 @@ pub enum HashError {
 /// Size of digest produced by the underlying hash function
 pub const DIGEST_SIZE: usize = 32;
 
-/// A value of type [Hash] indicates that the enclosed array is a digest
+/// A value of type [struct@Hash] indicates that the enclosed array is a digest
 /// produced by a preset hash function, currently BLAKE2b. It can be obtained
 /// by either hashing data directly or after hashing by converting from
 /// a suitably sized byte slice or vector.
@@ -49,7 +49,7 @@ impl Hash {
         Self::blake2b_hash_bytes(&bincode::serialize(&data)?)
     }
 
-    /// Combine multiple [`Hash`] values into a single one.
+    /// Combine multiple [`struct@Hash`] values into a single one.
     ///
     /// The hashes are combined by concatenating them, then hashing the result.
     /// Pre-image resistance is not compromised because the concatenation is not

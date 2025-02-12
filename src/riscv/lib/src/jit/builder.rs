@@ -49,7 +49,7 @@ pub(super) struct Builder<'a, ML: MainMemoryLayout, JSA: JitStateAccess> {
 impl<'a, ML: MainMemoryLayout, JSA: JitStateAccess> Builder<'a, ML, JSA> {
     /// Consume the builder, allowing for the function under construction to be [`finalised`].
     ///
-    /// [`finalised`]: JIT::finalise
+    /// [`finalised`]: super::JIT::finalise
     pub(super) fn end(mut self) {
         // flush steps
         let steps = self

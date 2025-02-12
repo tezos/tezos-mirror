@@ -103,7 +103,7 @@ impl<T> MutableState<T> {
     }
 
     /// Apply a mutable function `f` mutating the state in place. May perform a copy if
-    /// the underlying state is [`MutableState::Borrowed()`].
+    /// the underlying state is [`MutableState::Borrowed`].
     #[inline]
     pub fn apply<R>(&mut self, f: impl FnOnce(&mut T) -> R) -> R
     where
