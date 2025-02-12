@@ -51,6 +51,8 @@ module type T = sig
 
   type dropbox
 
+  type callback
+
   type scope
 
   type metadata = {scope : scope option}
@@ -69,6 +71,7 @@ module type T = sig
           dropbox t -> any_request -> any_request option -> any_request option;
       }
         -> dropbox buffer_kind
+    | Callback : (unit -> any_request Lwt.t) -> callback buffer_kind
 
   and any_request = Any_request : _ Request.t * metadata -> any_request
 
@@ -270,6 +273,8 @@ struct
 
   type dropbox
 
+  type callback
+
   type _ buffer_kind =
     | Queue : infinite queue buffer_kind
     | Bounded : {size : int} -> bounded queue buffer_kind
@@ -278,6 +283,7 @@ struct
           dropbox t -> any_request -> any_request option -> any_request option;
       }
         -> dropbox buffer_kind
+    | Callback : (unit -> any_request Lwt.t) -> callback buffer_kind
 
   and any_request = Any_request : _ Request.t * metadata -> any_request
 
@@ -289,6 +295,7 @@ struct
         (Time.System.t * message) Lwt_pipe.Bounded.t
         -> bounded queue buffer
     | Dropbox_buffer : (Time.System.t * message) Lwt_dropbox.t -> dropbox buffer
+    | Callback_buffer : (unit -> any_request Lwt.t) -> callback buffer
 
   and 'kind t = {
     timeout : Time.System.Span.t option;
@@ -478,6 +485,7 @@ struct
         | Queue_buffer queue -> Lwt_pipe.Unbounded.length queue
         | Bounded_buffer queue -> Lwt_pipe.Bounded.length queue
         | Dropbox_buffer _ -> 1
+        | Callback_buffer _ -> 1
       in
       pipe_length w.buffer
   end
@@ -505,6 +513,7 @@ struct
         (try Option.iter wakeup (Lwt_dropbox.peek message_box)
          with Lwt_dropbox.Closed -> ()) ;
         Lwt_dropbox.close message_box
+    | Callback_buffer _ -> ()
 
   let pop (type a) (w : a t) =
     let open Lwt_syntax in
@@ -528,6 +537,21 @@ struct
             (Systime_os.sleep timeout)
             message_queue
     in
+    let pop_from_callback (read : unit -> any_request Lwt.t) =
+      let take () =
+        let* (Any_request (request, metadata)) = read () in
+        let time = Time.System.now () in
+        return_some (time, Message (request, metadata, None))
+      in
+      match w.timeout with
+      | None -> take ()
+      | Some timeout ->
+          let sleeper =
+            let* () = Systime_os.sleep timeout in
+            Lwt.return_none
+          in
+          Lwt.pick [sleeper; take ()]
+    in
     match w.buffer with
     | Queue_buffer message_queue -> pop_unbounded_queue message_queue
     | Bounded_buffer message_queue -> pop_queue message_queue
@@ -539,6 +563,7 @@ struct
         | Some timeout ->
             Lwt_dropbox.take_with_timeout (Systime_os.sleep timeout) message_box
         )
+    | Callback_buffer read -> pop_from_callback read
 
   let trigger_shutdown w = Lwt.ignore_result (Lwt_canceler.cancel w.canceler)
 
@@ -728,6 +753,7 @@ struct
                  ~compute_size:(fun _ -> 1)
                  ())
         | Dropbox _ -> Dropbox_buffer (Lwt_dropbox.create ())
+        | Callback read -> Callback_buffer read
       in
       let w =
         {
@@ -810,7 +836,8 @@ struct
         (match w.buffer with
         | Queue_buffer pipe -> Lwt_pipe.Unbounded.length pipe
         | Bounded_buffer pipe -> Lwt_pipe.Bounded.length pipe
-        | Dropbox_buffer _ -> 1);
+        | Dropbox_buffer _ -> 1
+        | Callback_buffer _ -> 1);
     }
 
   let list {instances; _} =

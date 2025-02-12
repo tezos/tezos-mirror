@@ -129,6 +129,17 @@ let create_dropbox ?on_completion =
   in
   create table (create_handlers ?on_completion ())
 
+(* Simulates a stream of data with a blocking `pop` function. *)
+let make_stream () =
+  let stream = Lwt_condition.create () in
+  let push = Lwt_condition.broadcast stream in
+  let read () = Lwt_condition.wait stream in
+  (push, read)
+
+let create_callback_worker ?on_completion read =
+  let table = Worker.create_table (Callback read) in
+  create table (create_handlers ?on_completion ())
+
 open Mocked_worker.Request
 
 type abs
@@ -318,6 +329,45 @@ let test_async_dropbox () =
   assert_history actual expected ;
   return_unit
 
+let test_callback_worker () =
+  let open Lwt_result_syntax in
+  let nb_requests = 10 in
+  let nb_completions = ref 0 in
+  (* To ensure the worker has handled all the requests before testing its
+     history, we start a promise that will be resolved only once all the
+     requests have been completed. *)
+  let t_end, u_end = Lwt.task () in
+  (* The worker doesn't have a request buffer: it will take a function that
+     tries to read a value from somewhere, and is expected to block until
+     something is read. *)
+  let push_to_stream, read_from_stream = make_stream () in
+  let* w =
+    create_callback_worker
+      ~on_completion:(fun () ->
+        incr nb_completions ;
+        if !nb_completions = nb_requests then Lwt.wakeup u_end () ;
+        Lwt.return_unit)
+      read_from_stream
+      "stream_worker"
+  in
+  (* Initially the history should be empty. *)
+  let initial_history = get_history w in
+  assert_history initial_history [] ;
+  (* Now, we prepare a set of request that is pushed to a queue that is not
+     handled by the worker. It will only access to the `read` function. *)
+  let requests = Stdlib.List.init nb_requests (fun i -> RqA i) in
+  List.iter
+    (fun req -> push_to_stream Worker.(Any_request (req, {scope = None})))
+    requests ;
+  (* Wait for all the requests to be handled. *)
+  let*! () = t_end in
+  let expected =
+    build_expected_history @@ List.map (fun req -> Box req) requests
+  in
+  let actual = get_history w in
+  assert_history actual expected ;
+  return_unit
+
 let wrap_qcheck test () =
   let _ = QCheck_alcotest.to_alcotest test in
   Lwt_result_syntax.return_unit
@@ -345,9 +395,12 @@ let tests_status =
 let tests_buffer =
   ("Buffer handling", [Tztest.tztest "Dropbox/Async" `Quick test_async_dropbox])
 
+let tests_external_message =
+  ("External messages", [Tztest.tztest "Callback" `Quick test_callback_worker])
+
 let () =
   Alcotest_lwt.run
     ~__FILE__
     "Workers"
-    [tests_history; tests_status; tests_buffer]
+    [tests_history; tests_status; tests_buffer; tests_external_message]
   |> Lwt_main.run

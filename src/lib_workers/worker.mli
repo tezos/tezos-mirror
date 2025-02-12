@@ -57,6 +57,8 @@ module type T = sig
 
   type dropbox
 
+  type callback
+
   type scope
 
   type metadata = {scope : scope option}
@@ -80,6 +82,7 @@ module type T = sig
           dropbox t -> any_request -> any_request option -> any_request option;
       }
         -> dropbox buffer_kind
+    | Callback : (unit -> any_request Lwt.t) -> callback buffer_kind
 
   and any_request = Any_request : _ Request.t * metadata -> any_request
 
