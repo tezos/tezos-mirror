@@ -246,57 +246,23 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::default::ConstDefault;
-    use crate::machine_state::block_cache::BCall;
-    use crate::machine_state::block_cache::{Block, ICallLayout, ICallPlaced, CACHE_INSTR};
+    use crate::machine_state::block_cache::bcall::{BCall, Block, BlockLayout, Interpreted};
     use crate::machine_state::main_memory::tests::T1K;
     use crate::machine_state::{MachineCoreState, MachineCoreStateLayout};
     use crate::parser::instruction::InstrWidth::*;
     use crate::state_backend::test_helpers::assert_eq_struct;
-    use crate::state_backend::{
-        AllocatedOf, EnrichedCell, FnManagerIdent, ManagerBase, ManagerReadWrite,
-    };
+    use crate::state_backend::{FnManagerIdent, ManagerRead};
     use crate::{backend_test, create_state};
 
-    type BlockLayout<ML> = [ICallLayout<ML>; CACHE_INSTR];
+    fn instructions<ML: MainMemoryLayout, M>(block: &Interpreted<ML, M>) -> Vec<Instruction>
+    where
+        M: ManagerRead,
+    {
+        let instr = block.instr();
+        instr.iter().map(|cell| cell.read_stored()).collect()
+    }
 
     // Simplified variant of the `Cached` structure in the block cache.
-    struct BlockState<ML: MainMemoryLayout, M: ManagerBase> {
-        instr: [EnrichedCell<ICallPlaced<ML>, M>; CACHE_INSTR],
-        buff: [Instruction; CACHE_INSTR],
-        len: usize,
-    }
-
-    impl<ML: MainMemoryLayout, M: ManagerBase> BlockState<ML, M> {
-        fn bind(space: AllocatedOf<BlockLayout<ML>, M>) -> Self {
-            Self {
-                instr: space,
-                buff: [Instruction::DEFAULT; CACHE_INSTR],
-                len: 0,
-            }
-        }
-
-        fn interpreted_block(&mut self) -> Block<'_, ML, M> {
-            Block::from(&mut self.instr[..self.len])
-        }
-
-        fn as_slice(&self) -> &[Instruction] {
-            &self.buff[..self.len]
-        }
-
-        fn construct(&mut self, instr: &[Instruction])
-        where
-            M: ManagerReadWrite,
-        {
-            self.len = 0;
-            for i in instr.iter() {
-                self.instr[self.len].write(*i);
-                self.buff[self.len] = *i;
-                self.len += 1;
-            }
-        }
-    }
-
     backend_test!(test_cnop, F, {
         use Instruction as I;
 
@@ -317,9 +283,12 @@ mod tests {
             let mut interpreted =
                 create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
             let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
-            let mut block = create_state!(BlockState, BlockLayout<T1K>, F, T1K);
+            let mut block = create_state!(Interpreted, BlockLayout<T1K>, F, T1K);
 
-            block.construct(scenario);
+            block.start_block();
+            for instr in scenario.iter() {
+                block.push_instr(*instr);
+            }
 
             let mut interpreted_steps = 0;
             let mut jitted_steps = 0;
@@ -330,12 +299,14 @@ mod tests {
 
             // Act
             let fun = jit
-                .compile(block.as_slice())
+                .compile(instructions(&block).as_slice())
                 .expect("Compilation of CNop should succeed");
-            let mut block = block.interpreted_block();
 
-            let interpreted_res =
-                block.run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
+            let interpreted_res = block.callable().unwrap().run_block(
+                &mut interpreted,
+                initial_pc,
+                &mut interpreted_steps,
+            );
             let jitted_res = unsafe {
                 // # Safety - the jit is not dropped until after we
                 //            exit the for loop
@@ -378,9 +349,12 @@ mod tests {
             let mut interpreted =
                 create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
             let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
-            let mut block = create_state!(BlockState, BlockLayout<T1K>, F, T1K);
+            let mut block = create_state!(Interpreted, BlockLayout<T1K>, F, T1K);
 
-            block.construct(scenario);
+            block.start_block();
+            for instr in scenario.iter() {
+                block.push_instr(*instr);
+            }
 
             let mut interpreted_steps = 0;
             let mut jitted_steps = 0;
@@ -394,12 +368,14 @@ mod tests {
 
             // Act
             let fun = jit
-                .compile(block.as_slice())
-                .expect("Compilation of Mv should succeed");
-            let mut block = block.interpreted_block();
+                .compile(instructions(&block).as_slice())
+                .expect("Compilation of CNop should succeed");
 
-            let interpreted_res =
-                block.run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
+            let interpreted_res = block.callable().unwrap().run_block(
+                &mut interpreted,
+                initial_pc,
+                &mut interpreted_steps,
+            );
             let jitted_res = unsafe {
                 // # Safety - the jit is not dropped until after we
                 //            exit the for loop
@@ -444,9 +420,12 @@ mod tests {
 
         let mut interpreted = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
         let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
-        let mut block = create_state!(BlockState, BlockLayout<T1K>, F, T1K);
+        let mut block = create_state!(Interpreted, BlockLayout<T1K>, F, T1K);
 
-        block.construct(scenario);
+        block.start_block();
+        for instr in scenario.iter() {
+            block.push_instr(*instr);
+        }
 
         let mut interpreted_steps = 0;
         let mut jitted_steps = 0;
@@ -460,14 +439,17 @@ mod tests {
 
         // Act
         let fun = jit
-            .compile(block.as_slice())
-            .expect("Compilation of Mv should succeed");
-        let mut block = block.interpreted_block();
+            .compile(instructions(&block).as_slice())
+            .expect("Compilation of CNop should succeed");
 
-        let interpreted_res = block.run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
+        let interpreted_res = block.callable().unwrap().run_block(
+            &mut interpreted,
+            initial_pc,
+            &mut interpreted_steps,
+        );
         let jitted_res = unsafe {
             // # Safety - the jit is not dropped until after we
-            //            exit the block.
+            //            exit the block
             fun.call(&mut jitted, initial_pc, &mut jitted_steps)
         };
 
@@ -505,9 +487,12 @@ mod tests {
         let mut jit = JIT::<T1K, F::Manager>::new().unwrap();
 
         let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
-        let mut block = create_state!(BlockState, BlockLayout<T1K>, F, T1K);
+        let mut block = create_state!(Interpreted, BlockLayout<T1K>, F, T1K);
 
-        block.construct(failure);
+        block.start_block();
+        for instr in failure.iter() {
+            block.push_instr(*instr);
+        }
 
         let mut jitted_steps = 0;
 
@@ -517,15 +502,20 @@ mod tests {
         jitted.hart.xregisters.write_nz(x1, 1);
 
         // Act
-        let res = jit.compile(block.as_slice());
+        let res = jit.compile(instructions(&block).as_slice());
+
         assert!(
             res.is_none(),
             "Compilation of unsupported instruction should fail"
         );
 
-        block.construct(success);
+        block.start_block();
+        for instr in success.iter() {
+            block.push_instr(*instr);
+        }
+
         let fun = jit
-            .compile(block.as_slice())
+            .compile(instructions(&block).as_slice())
             .expect("Compilation of subsequent functions should succeed");
         let jitted_res = unsafe {
             // # Safety - the jit is not dropped until after we

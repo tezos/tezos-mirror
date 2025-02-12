@@ -7,25 +7,31 @@
 //!
 //! Currently just for interperation only, but will expand to cover JIT.
 
-use super::{run_instr, Cached, ICallPlaced};
+use super::{run_instr, ICallLayout, ICallPlaced, CACHE_INSTR};
 use crate::{
+    default::ConstDefault,
     machine_state::{
+        instruction::Instruction,
         main_memory::{Address, MainMemoryLayout},
         MachineCoreState, ProgramCounterUpdate,
     },
-    state_backend::{EnrichedCell, ManagerBase, ManagerRead, ManagerReadWrite},
+    state_backend::{
+        AllocatedOf, Atom, Cell, EnrichedCell, FnManager, ManagerBase, ManagerClone, ManagerRead,
+        ManagerReadWrite, ManagerWrite, Ref,
+    },
     traps::{EnvironException, Exception},
 };
 
-/// Functionality required to execute blocks.
+/// A block derived from a sequence of [`Instruction`] that can be directly run
+/// over the [`MachineCoreState`].
 ///
-/// In future, will also cover 'construction' of blocks.
-pub trait BCall<'a, ML: MainMemoryLayout, M: ManagerBase> {
+/// This allows static dispatch of this block, via different strategies. Namely:
+/// interpretation and Just-In-Time compilation.
+pub trait BCall<ML: MainMemoryLayout, M: ManagerBase> {
     /// The number of instructions contained in the block.
-    fn num_instr(&self) -> usize;
-
-    /// Get a callable block from an entry. The entry must contain a valid block.
-    fn callable(entry: &'a mut Cached<ML, M>) -> Self
+    ///
+    /// Executing a block will consume up to `num_instr` steps.
+    fn num_instr(&self) -> usize
     where
         M: ManagerRead;
 
@@ -39,7 +45,7 @@ pub trait BCall<'a, ML: MainMemoryLayout, M: ManagerBase> {
     ///
     /// [`complete_current_block`]: super::BlockCache::complete_current_block
     fn run_block(
-        &mut self,
+        &self,
         core: &mut MachineCoreState<ML, M>,
         instr_pc: Address,
         steps: &mut usize,
@@ -48,63 +54,89 @@ pub trait BCall<'a, ML: MainMemoryLayout, M: ManagerBase> {
         M: ManagerReadWrite;
 }
 
-/// A block fetched from the block cache, that can be executed against the machine state.
-pub struct Block<'a, ML: MainMemoryLayout, M: ManagerBase> {
-    pub(super) instr: &'a mut [EnrichedCell<ICallPlaced<ML>, M>],
-}
+/// State Layout for Blocks
+pub type BlockLayout<ML> = (Atom<u8>, [ICallLayout<ML>; CACHE_INSTR]);
 
-impl<'a, ML: MainMemoryLayout, M: ManagerRead> Block<'a, ML, M> {
-    fn run_block_inner(
-        &mut self,
-        core: &mut MachineCoreState<ML, M>,
-        instr_pc: &mut Address,
-        steps: &mut usize,
-    ) -> Result<(), Exception>
+/// Functionality required to construct & execute blocks.
+///
+/// A block is a sequence of at least one instruction, which may be executed sequentially.
+/// Blocks will never contain more than [`CACHE_INSTR`] instructions.
+pub trait Block<ML: MainMemoryLayout, M: ManagerBase> {
+    /// Block construction may require additional state not kept in storage,
+    /// this can be passed through as an additional parameter in `bind`.
+    type BindState: Clone;
+
+    /// Bind the block to the given allocated state.
+    fn bind(allocated: AllocatedOf<BlockLayout<ML>, M>) -> Self;
+
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
+        &'a self,
+    ) -> AllocatedOf<BlockLayout<ML>, F::Output>;
+
+    /// Ready a block for construction.
+    ///
+    /// Previous instructions are removed.
+    fn start_block(&mut self)
     where
-        M: ManagerReadWrite,
-    {
-        for instr in self.instr.iter() {
-            match run_instr(instr, core) {
-                Ok(ProgramCounterUpdate::Next(width)) => {
-                    *instr_pc += width as u64;
-                    core.hart.pc.write(*instr_pc);
-                    *steps += 1;
-                }
-                Ok(ProgramCounterUpdate::Set(instr_pc)) => {
-                    // Setting the instr_pc implies execution continuing
-                    // elsewhere - and no longer within the current block.
-                    core.hart.pc.write(instr_pc);
-                    *steps += 1;
-                    break;
-                }
-                Err(e) => {
-                    // Exceptions lead to a new address being set to handle it,
-                    // with no guarantee of it being the next instruction.
-                    return Err(e);
-                }
-            }
-        }
+        M: ManagerWrite;
 
-        Ok(())
-    }
+    /// Push an instruction to the block.
+    fn push_instr(&mut self, instr: Instruction)
+    where
+        M: ManagerReadWrite;
+
+    fn num_instr(&self) -> usize
+    where
+        M: ManagerRead;
+
+    /// Mark a block as complete.
+    ///
+    /// This may trigger effects such as JIT-compilation.
+    fn complete_block(&mut self)
+    where
+        M: ManagerReadWrite;
+
+    /// Invalidate a block, it will no longer be callable.
+    fn invalidate(&mut self)
+    where
+        M: ManagerWrite;
+
+    /// Reset a block to the default state, it will no longer be callable.
+    fn reset(&mut self)
+    where
+        M: ManagerReadWrite;
+
+    /// Returns the underlying slice of instructions stored in the block.
+    fn instr(&self) -> &[EnrichedCell<ICallPlaced<ML>, M>]
+    where
+        M: ManagerRead;
+
+    /// Get a callable block from an entry. The entry must have passed the address and fence
+    /// checks.
+    fn callable(&mut self) -> Option<&mut (impl BCall<ML, M> + ?Sized)>
+    where
+        M: ManagerRead;
 }
 
-impl<'a, ML: MainMemoryLayout, M: ManagerBase> BCall<'a, ML, M> for Block<'a, ML, M> {
-    fn num_instr(&self) -> usize {
-        self.instr.len()
-    }
+/// Blocks that are executed via intepreting the individual instructions.
+pub struct Interpreted<ML: MainMemoryLayout, M: ManagerBase> {
+    instr: [EnrichedCell<ICallPlaced<ML>, M>; CACHE_INSTR],
+    len_instr: Cell<u8, M>,
+}
 
-    fn callable(entry: &'a mut Cached<ML, M>) -> Self
+impl<ML: MainMemoryLayout, M: ManagerBase> BCall<ML, M> for [EnrichedCell<ICallPlaced<ML>, M>] {
+    #[inline]
+    fn num_instr(&self) -> usize
     where
         M: ManagerRead,
     {
-        Block {
-            instr: &mut entry.instr[..entry.len_instr.read() as usize],
-        }
+        self.len()
     }
 
     fn run_block(
-        &mut self,
+        &self,
         core: &mut MachineCoreState<ML, M>,
         mut instr_pc: Address,
         steps: &mut usize,
@@ -112,7 +144,7 @@ impl<'a, ML: MainMemoryLayout, M: ManagerBase> BCall<'a, ML, M> for Block<'a, ML
     where
         M: ManagerReadWrite,
     {
-        if let Err(e) = self.run_block_inner(core, &mut instr_pc, steps) {
+        if let Err(e) = run_block_inner(self, core, &mut instr_pc, steps) {
             core.handle_step_result(instr_pc, Err(e))?;
             // If we succesfully handled an error, need to increment steps one more.
             *steps += 1;
@@ -122,10 +154,131 @@ impl<'a, ML: MainMemoryLayout, M: ManagerBase> BCall<'a, ML, M> for Block<'a, ML
     }
 }
 
-impl<'a, ML: MainMemoryLayout, M: ManagerBase> From<&'a mut [EnrichedCell<ICallPlaced<ML>, M>]>
-    for Block<'a, ML, M>
-{
-    fn from(value: &'a mut [EnrichedCell<ICallPlaced<ML>, M>]) -> Self {
-        Self { instr: value }
+impl<ML: MainMemoryLayout, M: ManagerBase> Block<ML, M> for Interpreted<ML, M> {
+    type BindState = ();
+
+    fn num_instr(&self) -> usize
+    where
+        M: ManagerRead,
+    {
+        self.len_instr.read() as usize
     }
+
+    fn complete_block(&mut self)
+    where
+        M: ManagerReadWrite,
+    {
+        // This does nothing in the interpreted world, but will e.g. under JIT
+        // (compilation gets triggered)
+    }
+
+    #[inline]
+    fn instr(&self) -> &[EnrichedCell<ICallPlaced<ML>, M>]
+    where
+        M: ManagerRead,
+    {
+        &self.instr[..self.num_instr()]
+    }
+
+    fn invalidate(&mut self)
+    where
+        M: ManagerWrite,
+    {
+        self.len_instr.write(0);
+    }
+
+    fn push_instr(&mut self, instr: Instruction)
+    where
+        M: ManagerReadWrite,
+    {
+        let len = self.len_instr.read();
+        self.instr[len as usize].write(instr);
+        self.len_instr.write(len + 1);
+    }
+
+    fn reset(&mut self)
+    where
+        M: ManagerReadWrite,
+    {
+        self.len_instr.write(0);
+        self.instr
+            .iter_mut()
+            .for_each(|lc| lc.write(Instruction::DEFAULT));
+    }
+
+    fn start_block(&mut self)
+    where
+        M: ManagerWrite,
+    {
+        self.len_instr.write(0);
+    }
+
+    fn bind((len_instr, instr): AllocatedOf<BlockLayout<ML>, M>) -> Self {
+        Self { len_instr, instr }
+    }
+
+    fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
+        &'a self,
+    ) -> AllocatedOf<BlockLayout<ML>, F::Output> {
+        (
+            self.len_instr.struct_ref::<F>(),
+            self.instr.each_ref().map(|entry| entry.struct_ref::<F>()),
+        )
+    }
+
+    #[inline]
+    fn callable(&mut self) -> Option<&mut (impl BCall<ML, M> + ?Sized)>
+    where
+        M: ManagerRead,
+    {
+        let len = self.len_instr.read();
+        if len > 0 {
+            Some(&mut self.instr[0..len as usize])
+        } else {
+            None
+        }
+    }
+}
+
+impl<ML: MainMemoryLayout, M: ManagerClone> Clone for Interpreted<ML, M> {
+    fn clone(&self) -> Self {
+        Self {
+            len_instr: self.len_instr.clone(),
+            instr: self.instr.clone(),
+        }
+    }
+}
+
+fn run_block_inner<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    instr: &[EnrichedCell<ICallPlaced<ML>, M>],
+    core: &mut MachineCoreState<ML, M>,
+    instr_pc: &mut Address,
+    steps: &mut usize,
+) -> Result<(), Exception>
+where
+    M: ManagerReadWrite,
+{
+    for instr in instr.iter() {
+        match run_instr(instr, core) {
+            Ok(ProgramCounterUpdate::Next(width)) => {
+                *instr_pc += width as u64;
+                core.hart.pc.write(*instr_pc);
+                *steps += 1;
+            }
+            Ok(ProgramCounterUpdate::Set(instr_pc)) => {
+                // Setting the instr_pc implies execution continuing
+                // elsewhere - and no longer within the current block.
+                core.hart.pc.write(instr_pc);
+                *steps += 1;
+                break;
+            }
+            Err(e) => {
+                // Exceptions lead to a new address being set to handle it,
+                // with no guarantee of it being the next instruction.
+                return Err(e);
+            }
+        }
+    }
+
+    Ok(())
 }
