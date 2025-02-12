@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use octez_riscv::{
-    machine_state::{main_memory::M100M, DefaultCacheLayouts},
+    machine_state::{main_memory::M64M, DefaultCacheLayouts},
     pvm::PvmHooks,
     stepper::pvm::PvmStepper,
 };
@@ -11,7 +11,7 @@ use rand::{seq::SliceRandom, Rng};
 use std::fs;
 use tezos_smart_rollup_utils::inbox::InboxBuilder;
 
-pub fn make_stepper_factory() -> impl Fn() -> PvmStepper<'static, M100M, DefaultCacheLayouts> {
+pub fn make_stepper_factory() -> impl Fn() -> PvmStepper<'static, M64M, DefaultCacheLayouts> {
     const BOOT_PROGRAM_PATH: &str = "../assets/hermit-loader";
     let boot_program = fs::read(BOOT_PROGRAM_PATH).unwrap();
 
@@ -28,7 +28,7 @@ pub fn make_stepper_factory() -> impl Fn() -> PvmStepper<'static, M100M, Default
 
     move || {
         let hooks = PvmHooks::none();
-        PvmStepper::<'_, M100M, _>::new(
+        PvmStepper::<'_, M64M, _>::new(
             &boot_program,
             Some(&main_program),
             inbox.clone(),

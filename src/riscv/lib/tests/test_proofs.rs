@@ -7,7 +7,7 @@ mod common;
 
 use common::*;
 use octez_riscv::{
-    machine_state::{main_memory::M100M, DefaultCacheLayouts},
+    machine_state::{main_memory::M64M, DefaultCacheLayouts},
     state_backend::hash,
     stepper::{pvm::PvmStepper, Stepper, StepperStatus},
 };
@@ -33,7 +33,7 @@ fn test_jstz_proofs() {
 
 fn run_steps_ladder<F>(make_stepper: F, ladder: &[usize], expected_hash: hash::Hash)
 where
-    F: Fn() -> PvmStepper<'static, M100M, DefaultCacheLayouts>,
+    F: Fn() -> PvmStepper<'static, M64M, DefaultCacheLayouts>,
 {
     let expected_steps = ladder.iter().sum::<usize>();
     let mut stepper = make_stepper();
