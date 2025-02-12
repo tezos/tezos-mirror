@@ -258,19 +258,6 @@ type slot_header = {
       whether we also compute shards' proofs or not. *)
 type with_proof = {with_proof : bool}
 
-val slot_id_query : (level option * shard_index option) Resto.Query.t
-
-val slot_query :
-  < padding : char ; slot_index : slot_index option > Resto.Query.t
-
-val wait_query : < wait : bool > Resto.Query.t
-
-val connected_query : < connected : bool > Resto.Query.t
-
-val all_query : < all : bool > Resto.Query.t
-
-val opt_header_status_query : header_status option Resto.Query.t
-
 val slot_encoding : Cryptobox.slot Data_encoding.t
 
 val slot_header_encoding : slot_header Data_encoding.t
