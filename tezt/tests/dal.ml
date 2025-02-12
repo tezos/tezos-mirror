@@ -1056,6 +1056,50 @@ let publish_commitment ?dont_wait ?counter ?force ~source ?(fee = 1200) ~index
     ~proof
     client
 
+(* Produce a slot, store it in the DAL node, and then (try to) publish the same
+   commitment for each level between [from] and [into]. *)
+let simple_slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node
+    l1_client =
+  (* This is the account used to sign injected slot headers on L1. *)
+  let source = Constant.bootstrap2 in
+  let slot =
+    Helpers.generate_slot ~slot_size
+    |> Bytes.to_string
+    |> Helpers.make_slot ~slot_size
+  in
+  let* commitment, proof = Helpers.store_slot ~slot_index dal_node slot in
+  let rec loop current_level =
+    if current_level > into then unit
+    else
+      let* level = Node.wait_for_level l1_node current_level in
+      (* Warn when we don't advance level by level, because this means we
+         couldn't publish at each level. Also, we force the injection because
+         when a level is missed then probably there will be two injection
+         attempts at the same level later. *)
+      if current_level < level then
+        Log.warn
+          "[slot_producer] missed some levels (expected level is %d, got %d)"
+          current_level
+          level ;
+      Log.info
+        "[slot_producer] publish at slot index %d at level %d"
+        slot_index
+        level ;
+      let* _op_hash =
+        publish_commitment
+          ~force:true
+          ~source
+          ~index:slot_index
+          ~commitment
+          ~proof
+          l1_client
+      in
+      loop (level + 1)
+  in
+  let* () = loop from in
+  Log.info "[slot_producer] will terminate" ;
+  unit
+
 type status = Applied | Failed of {error_id : string}
 
 let pp fmt = function
@@ -7947,46 +7991,6 @@ let rollup_batches_and_publishes_optimal_dal_slots _protocol parameters dal_node
     | [], _ | _, [] -> Test.fail "Unreachable case"
   in
   check_packs published_slots annotated_messages ;
-  unit
-
-(* Produce a slot, store it in the DAL node, and then (try to) publish the same
-   commitment for each level between [from] and [into]. *)
-let slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node l1_client
-    =
-  (* This is the account used to sign injected slot headers on L1. *)
-  let source = Constant.bootstrap2 in
-  let slot = Helpers.make_slot ~slot_size "some data" in
-  let* commitment, proof = Helpers.store_slot ~slot_index dal_node slot in
-  let rec loop current_level =
-    if current_level > into then unit
-    else
-      let* level = Node.wait_for_level l1_node current_level in
-      (* Warn when we don't advance level by level, because this means we
-         couldn't publish at each level. Also, we force the injection because
-         when a level is missed then probably there will be two injection
-         attempts at the same level later. *)
-      if current_level < level then
-        Log.warn
-          "[slot_producer] missed some levels (expected level is %d, got %d)"
-          current_level
-          level ;
-      Log.info
-        "[slot_producer] publish at slot index %d at level %d"
-        slot_index
-        level ;
-      let* _op_hash =
-        publish_commitment
-          ~force:true
-          ~source
-          ~index:slot_index
-          ~commitment
-          ~proof
-          l1_client
-      in
-      loop (level + 1)
-  in
-  let* () = loop from in
-  Log.info "[slot_producer] will terminate" ;
   unit
 
 (* We have a bootstrap node, a producer node and an attester node for a new
