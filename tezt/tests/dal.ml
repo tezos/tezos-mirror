@@ -9508,6 +9508,7 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
   let* () = bake_for client in
   let* level = Node.get_level node in
   assert (level < blocks_per_cycle) ;
+  let level = ref level in
   let nb_slots = dal_parameters.Dal.Parameters.number_of_slots in
   let all_slots = List.init nb_slots Fun.id in
 
@@ -9568,12 +9569,16 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
      delegates depending on their profiles. *)
   let inject_attestations () =
     let* level = Node.get_level node in
+    let count_dal_attesting_bakers = ref 0 in
     (* 1. Baker always attests TB and all DAL slots *)
     let* (_ : (Operation_core.t * [`OpHash of peer_id]) list) =
       (* The baker delegate will miss 1/10 of its DAL attestations and will send
          [No_dal_attestation] in this case. *)
       let baker_attestation =
-        if level mod 10 = 0 then No_dal_attestation else Slots all_slots
+        if level mod 10 = 0 then No_dal_attestation
+        else (
+          incr count_dal_attesting_bakers ;
+          Slots all_slots)
       in
       inject_dal_attestations
         ~signers:[baker]
@@ -9586,7 +9591,12 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
       (* The attesting_dal_slot_10 delegate misses 1/11th of its DAL
          attestations and will send Slots [], but it should be fine for its
          rewards. *)
-      let attestation = if level mod 11 = 0 then Slots [] else Slots [10] in
+      let attestation =
+        if level mod 11 = 0 then Slots []
+        else (
+          incr count_dal_attesting_bakers ;
+          Slots [10])
+      in
       inject_dal_attestations
         ~signers:[attesting_dal_slot_10]
         ~nb_slots
@@ -9610,7 +9620,10 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
     let* (_ : (Operation_core.t * [`OpHash of peer_id]) list) =
       let* level = Node.get_level node in
       let slots_to_attest =
-        if level mod 4 = 0 then Slots [10] else No_dal_attestation
+        if level mod 4 = 0 then (
+          incr count_dal_attesting_bakers ;
+          Slots [10])
+        else No_dal_attestation
       in
       inject_dal_attestations
         ~signers:[not_sufficiently_attesting_dal_slot_10]
@@ -9618,6 +9631,10 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
         slots_to_attest
         client
     in
+    Log.info
+      "At level %d, there are %d bakers that DAL attested"
+      level
+      !count_dal_attesting_bakers ;
     unit
   in
 
@@ -9632,6 +9649,10 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
     let block_dal_attestation_bitset =
       JSON.(block_json |-> "dal_attestation" |> as_int)
     in
+    Log.info
+      "At level %d, dal_attestation = %d"
+      !level
+      block_dal_attestation_bitset ;
     (* count when slot 10 is attested *)
     if block_dal_attestation_bitset = 1024 then
       incr count_set_dal_attestation_bitset ;
@@ -9644,7 +9665,7 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
      where DAL rewards are distributed. *)
   let* () =
     repeat
-      (blocks_per_cycle - level - 1)
+      (blocks_per_cycle - !level - 1)
       (fun () ->
         let* () = count_slot_10_if_attested () in
         let* (`OpHash _oph1) =
@@ -9656,9 +9677,37 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
             client
         in
         let* () = inject_attestations () in
-        (* Do not use [bake_for] because it also injects an attestation
-           operation for [baker]. *)
-        Client.propose_for_and_wait ~key:[baker.Account.public_key_hash] client)
+        let* () =
+          (* Do not use [bake_for] because it also injects an attestation
+             operation for [baker]. *)
+          Client.propose_for_and_wait
+            ~key:[baker.Account.public_key_hash]
+            client
+        in
+        incr level ;
+        let* manager_ops =
+          Node.RPC.call node
+          @@ RPC.get_chain_block_operations_validation_pass
+               ~validation_pass:3
+               ()
+        in
+        Check.(
+          (List.length @@ JSON.as_list manager_ops = 1)
+            int
+            ~__LOC__
+            ~error_msg:"expected 1 manager operation in block, got %L") ;
+        let* attestations =
+          Node.RPC.call node
+          @@ RPC.get_chain_block_operations_validation_pass
+               ~validation_pass:0
+               ()
+        in
+        Check.(
+          (List.length @@ JSON.as_list attestations = 4)
+            int
+            ~__LOC__
+            ~error_msg:"expected 4 attestations in block, got %L") ;
+        unit)
   in
 
   (* After this first round of blocks, we snapshot the balances of our delegates
@@ -9675,8 +9724,7 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
 
   let* bootstrap_accounts_participation =
     Lwt_list.map_s
-      (fun (account, account_role) ->
-        Log.info "Get DAL participation info of %s" account_role ;
+      (fun (account, _account_role) ->
         let* dal_participation =
           get_dal_participation node account.Account.public_key_hash
         in
@@ -9687,6 +9735,7 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
   (* We now bake the last block of the cycle, which should trigger TB and DAL
      rewards distribution. TB rewards are actually set to 0. *)
   let* () = bake_for ~delegates:(`For [baker.Account.public_key_hash]) client in
+  incr level ;
 
   (* We snapshot the balances of the delegates at the end of the cycle. *)
   let* ( _baker_bal2,
@@ -9707,7 +9756,8 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
         ^ ", expected balance to be unchanged. Got %R, expecting %L"
       else
         "account " ^ account.Account.public_key_hash
-        ^ ", expected balance b1 to increase. Got %R, expecting %L"
+        ^ ", unexpected balance: got %R, expecting %L = "
+        ^ Int64.to_string bal_before ^ " + " ^ string_of_int delta
     in
     Check.(Int64.(add bal_before (of_int delta)) = bal_after)
       ~__LOC__
