@@ -236,6 +236,14 @@ impl<M: state_backend::ManagerBase> NodePvm<M> {
         self.with_backend(|state| state.message_counter.read())
     }
 
+    /// Get the reveal request from the PVM state
+    pub fn get_reveal_request(&self) -> Vec<u8>
+    where
+        M: state_backend::ManagerRead,
+    {
+        self.with_backend(|state| state.pvm.reveal_request())
+    }
+
     pub fn install_boot_sector(&mut self, loader: &[u8], kernel: &[u8])
     where
         M: state_backend::ManagerReadWrite,

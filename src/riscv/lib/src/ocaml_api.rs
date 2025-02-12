@@ -597,3 +597,17 @@ pub fn octez_riscv_serialise_output_proof(_output_proof: Pointer<OutputProof>) -
 pub fn octez_riscv_deserialise_output_proof(_bytes: &[u8]) -> Result<Pointer<OutputProof>, String> {
     todo!()
 }
+
+#[ocaml::func]
+#[ocaml::sig("state -> bytes")]
+pub unsafe fn octez_riscv_get_reveal_request(state: Pointer<State>) -> ocaml::Value {
+    let serialised_reveal_request: Vec<u8> = state.apply_ro(NodePvm::get_reveal_request);
+    ocaml::Value::bytes(serialised_reveal_request)
+}
+
+#[ocaml::func]
+#[ocaml::sig("mut_state -> bytes")]
+pub unsafe fn octez_riscv_mut_get_reveal_request(state: Pointer<MutState>) -> ocaml::Value {
+    let serialised_reveal_request: Vec<u8> = state.apply_ro(NodePvm::get_reveal_request);
+    ocaml::Value::bytes(serialised_reveal_request)
+}
