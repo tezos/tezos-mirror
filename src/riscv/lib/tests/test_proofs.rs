@@ -11,11 +11,21 @@ use octez_riscv::{
     state_backend::hash,
     stepper::{pvm::PvmStepper, Stepper, StepperStatus},
 };
+use rand::Rng;
 use std::ops::Bound;
 
 #[test]
+fn test_jstz_proofs_one_step() {
+    test_jstz_proofs(false)
+}
+
+#[test]
 #[ignore]
-fn test_jstz_proofs() {
+fn test_jstz_proofs_full() {
+    test_jstz_proofs(true)
+}
+
+fn test_jstz_proofs(full: bool) {
     let make_stepper = make_stepper_factory();
 
     let mut base_stepper = make_stepper();
@@ -25,13 +35,20 @@ fn test_jstz_proofs() {
     let steps = base_result.steps();
     let base_hash = base_stepper.hash();
 
-    // For each step `s`, the stepper will initially step `s-1` steps, then
-    // produce a proof of the `s` step. The minimum step size thus needs to be 1.
-    let ladder = dissect_steps(steps, 1);
-    run_steps_ladder(&make_stepper, &ladder, base_hash);
+    if full {
+        // For each step `s`, the stepper will initially step `s-1` steps, then
+        // produce a proof of the `s` step. The minimum step size thus needs to be 1.
+        let ladder = dissect_steps(steps, 1);
+        run_steps_ladder(&make_stepper, &ladder, Some(base_hash));
+    } else {
+        // Run a number of steps `s` and produce a proof
+        let mut rng = rand::thread_rng();
+        let step = [rng.gen_range(1..steps)];
+        run_steps_ladder(&make_stepper, &step, None)
+    }
 }
 
-fn run_steps_ladder<F>(make_stepper: F, ladder: &[usize], expected_hash: hash::Hash)
+fn run_steps_ladder<F>(make_stepper: F, ladder: &[usize], expected_hash: Option<hash::Hash>)
 where
     F: Fn() -> PvmStepper<'static, M64M, DefaultCacheLayouts>,
 {
@@ -78,5 +95,7 @@ where
         );
     }
 
-    assert_eq!(stepper.hash(), expected_hash);
+    if let Some(hash) = expected_hash {
+        assert_eq!(stepper.hash(), hash)
+    }
 }
