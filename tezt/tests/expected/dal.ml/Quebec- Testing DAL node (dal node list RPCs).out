@@ -96,6 +96,9 @@ Available services:
       published at level [l - attestation_lag] and *all* the shards assigned
       at level [l] to the given public key hash are available in the DAL
       node's store. 
+  - GET /protocol_parameters
+      Returns the protocol parameters as known by the DAL node. An optional
+      'level' argument can specify for which level to retrieve them. 
   - POST /slots
       Post a slot to the DAL node, computes its commitment and commitment
       proof, then computes the correspoding shards with their proof. The
