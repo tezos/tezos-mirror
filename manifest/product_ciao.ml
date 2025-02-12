@@ -44,6 +44,15 @@ let ci_grafazos =
     ~deps:[ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci]
     ~release_status:Unreleased
 
+let ci_teztale =
+  private_lib
+    "teztale"
+    ~opam:""
+    ~path:"teztale/ci"
+    ~bisect_ppx:No
+    ~deps:[ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci]
+    ~release_status:Unreleased
+
 let _ci_bin_main =
   private_exe
     "main"
@@ -55,6 +64,7 @@ let _ci_bin_main =
         ci_lib_gitlab_ci_main |> open_ ~m:"Base";
         ci_lib_tezos_ci;
         ci_grafazos;
+        ci_teztale;
         yaml;
         unix;
         tezt_core_lib;
