@@ -77,7 +77,7 @@ module Helpers : sig
      are smaller than the expected size of a slot. *)
   type slot
 
-  (** [make_slot ?paddming ~slot_size content] produces a slot. If [padding=true]
+  (** [make_slot ?padding ~slot_size content] produces a slot. If [padding=true]
       (which is the default), then the content is padded to reach the expected
       size given by [slot_size] (which is usually obtained from
       {!type:Cryptobox.parameters}). *)
