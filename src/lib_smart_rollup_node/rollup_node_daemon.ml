@@ -351,6 +351,7 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
     Node_context.get_tezos_reorg_for_new_head node_ctxt old_head stripped_head
   in
   let*? reorg = report_missing_data reorg in
+  let*! () = Daemon_event.reorg reorg.old_chain in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3348
      Rollback state information on reorganization, i.e. for
      reorg.old_chain. *)
