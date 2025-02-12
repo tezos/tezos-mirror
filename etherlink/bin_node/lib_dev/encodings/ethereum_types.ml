@@ -143,6 +143,21 @@ module Chain_id = struct
   let decode_be bytes = Chain_id (decode_z_be bytes)
 end
 
+type chain_family = EVM | Michelson
+
+module Chain_family = struct
+  let to_string = function EVM -> "EVM" | Michelson -> "Michelson"
+
+  let of_string_exn s =
+    match String.lowercase_ascii s with
+    | "evm" -> EVM
+    | "michelson" -> Michelson
+    | _ -> invalid_arg "Chain_family.of_string"
+
+  let encoding =
+    Data_encoding.string_enum [("EVM", EVM); ("Michelson", Michelson)]
+end
+
 type block_hash = Block_hash of hex [@@ocaml.unboxed]
 
 let pp_block_hash fmt (Block_hash (Hex h)) = Format.pp_print_string fmt h
