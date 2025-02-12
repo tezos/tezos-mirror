@@ -41,6 +41,7 @@ val craft_tx :
   gas:int ->
   gas_price:int ->
   ?legacy:bool ->
+  ?access_list:(string * string list) list ->
   address:string ->
   ?signature:string ->
   ?arguments:string list ->
@@ -71,6 +72,7 @@ val craft_deploy_tx :
   gas:int ->
   gas_price:int ->
   ?legacy:bool ->
+  ?access_list:(string * string list) list ->
   data:string ->
   unit ->
   string Lwt.t
