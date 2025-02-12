@@ -9827,28 +9827,21 @@ let test_estimate_gas_with_block_param =
       unit
   | _ -> Test.fail "Test contract deployment failed"
 
-let test_eip1559_transaction_object =
+let test_transaction_object expected_type_ name make_transaction =
   register_all
-    ~tags:["eip1559"; "transaction_object"]
+    ~tags:[name; "transaction_object"]
     ~time_between_blocks:Nothing
+    ~kernels:[Latest]
+    ~use_threshold_encryption:Register_without_feature
+    ~use_dal:Register_without_feature
     ~title:
-      "RPC returns the correct transaction object for EIP-1559 transactions"
+      (sf "RPC returns the correct transaction object for %s transactions" name)
   @@ fun {sequencer; _} _protocol ->
   let* hash =
     send_transaction_to_sequencer
       (fun () ->
-        let* raw_tx =
-          Cast.craft_tx
-            ~legacy:false
-            ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-            ~chain_id:1337
-            ~nonce:0
-            ~gas_price:1_000_000_000
-            ~gas:23_300
-            ~value:Wei.zero
-            ~address:Eth_account.bootstrap_accounts.(1).address
-            ()
-        in
+        let* raw_tx = make_transaction () in
+
         let*@ hash = Rpc.send_raw_transaction ~raw_tx sequencer in
         return hash)
       sequencer
@@ -9860,11 +9853,44 @@ let test_eip1559_transaction_object =
   in
   let type_ = JSON.(json |-> "result" |-> "type" |> as_string) in
   Check.(
-    (type_ = "0x02")
+    (type_ = expected_type_)
       string
       ~error_msg:
-        "Type was expected to be %L, (EIP-1559) but the RPC returned %R") ;
+        ("Type was expected to be %L (" ^ name ^ "), but the RPC returned %R")) ;
   unit
+
+let test_eip2930_transaction_object =
+  test_transaction_object
+    "0x01"
+    "eip2930"
+    (Cast.craft_tx
+       ~legacy:true
+       ~access_list:
+         [
+           ( Eth_account.bootstrap_accounts.(0).address,
+             ["0x" ^ String.make 64 '0'] );
+         ]
+       ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+       ~chain_id:1337
+       ~nonce:0
+       ~gas_price:1_000_000_000
+       ~gas:23_300
+       ~value:Wei.zero
+       ~address:Eth_account.bootstrap_accounts.(1).address)
+
+let test_eip1559_transaction_object =
+  test_transaction_object
+    "0x02"
+    "eip1559"
+    (Cast.craft_tx
+       ~legacy:false
+       ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+       ~chain_id:1337
+       ~nonce:0
+       ~gas_price:1_000_000_000
+       ~gas:23_300
+       ~value:Wei.zero
+       ~address:Eth_account.bootstrap_accounts.(1).address)
 
 let test_apply_from_full_history_mode =
   let genesis_time = Client.Time.of_notation_exn "2020-01-01T00:00:00Z" in
@@ -10047,5 +10073,6 @@ let () =
   test_estimate_gas_with_block_param protocols ;
   test_filling_max_slots_cant_lead_to_out_of_memory protocols ;
   test_rpc_getLogs_with_earliest_fail protocols ;
-  test_eip1559_transaction_object protocols ;
+  test_eip2930_transaction_object [Alpha] ;
+  test_eip1559_transaction_object [Alpha] ;
   test_apply_from_full_history_mode protocols

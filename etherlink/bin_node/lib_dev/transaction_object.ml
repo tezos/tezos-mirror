@@ -9,16 +9,119 @@ open Ethereum_types
 
 type access = {address : address; storage_keys : hex list}
 
-module EIP_1559 = struct
-  let access_encoding =
+let access_encoding =
+  let open Data_encoding in
+  conv
+    (fun {address; storage_keys} -> (address, storage_keys))
+    (fun (address, storage_keys) -> {address; storage_keys})
+    (obj2
+       (req "address" address_encoding)
+       (req "storageKeys" (list hex_encoding)))
+
+module EIP_2930 = struct
+  type t = {
+    chain_id : quantity;
+    block_hash : block_hash option;
+    block_number : quantity option;
+    from : address;
+    gas : quantity;
+    gas_price : quantity;
+    hash : hash;
+    input : hex;
+    nonce : quantity;
+    to_ : address option;
+    transaction_index : quantity option;
+    value : quantity;
+    access_list : access list;
+    v : quantity;
+    r : hex;
+    s : hex;
+  }
+
+  let encoding =
     let open Data_encoding in
     conv
-      (fun {address; storage_keys} -> (address, storage_keys))
-      (fun (address, storage_keys) -> {address; storage_keys})
-      (obj2
-         (req "address" address_encoding)
-         (req "storageKeys" (list hex_encoding)))
+      (function
+        | {
+            chain_id;
+            block_hash;
+            block_number;
+            from;
+            gas;
+            gas_price;
+            hash;
+            input;
+            nonce;
+            to_;
+            transaction_index;
+            value;
+            access_list;
+            v;
+            r;
+            s;
+          } ->
+            ( ( chain_id,
+                block_hash,
+                block_number,
+                from,
+                gas,
+                gas_price,
+                hash,
+                input,
+                nonce,
+                to_ ),
+              (transaction_index, value, access_list, v, r, s) ))
+      (fun ( ( chain_id,
+               block_hash,
+               block_number,
+               from,
+               gas,
+               gas_price,
+               hash,
+               input,
+               nonce,
+               to_ ),
+             (transaction_index, value, access_list, v, r, s) ) ->
+        {
+          chain_id;
+          block_hash;
+          block_number;
+          from;
+          gas;
+          gas_price;
+          hash;
+          input;
+          nonce;
+          to_;
+          transaction_index;
+          value;
+          access_list;
+          v;
+          r;
+          s;
+        })
+      (merge_objs
+         (obj10
+            (req "chainId" quantity_encoding)
+            (req "blockHash" (option block_hash_encoding))
+            (req "blockNumber" (option quantity_encoding))
+            (req "from" address_encoding)
+            (req "gas" quantity_encoding)
+            (req "gasPrice" quantity_encoding)
+            (req "hash" hash_encoding)
+            (req "input" hex_encoding)
+            (req "nonce" quantity_encoding)
+            (req "to" (option address_encoding)))
+         (obj6
+            (req "transactionIndex" (option quantity_encoding))
+            (req "value" quantity_encoding)
+            (dft "access_list" (list access_encoding) [])
+            (req "v" quantity_encoding)
+            (req "r" hex_encoding)
+            (req "s" hex_encoding)))
+end
 
+module EIP_1559 = struct
   type t = {
     chain_id : quantity;
     hash : hash;
@@ -140,6 +243,7 @@ type t =
   | Kernel of legacy_transaction_object
       (** Transaction object read from the durable storage. *)
   | Legacy of legacy_transaction_object
+  | EIP_2930 of EIP_2930.t
   | EIP_1559 of EIP_1559.t
 
 let unhash (Hash h) = h
@@ -164,11 +268,53 @@ let decode_access_list =
             Rlp.decode_list
               (function
                 | Value x -> Ok (Ethereum_types.decode_hex x)
-                | _ -> Error [error_of_fmt "Invalid storage key"])
+                | _ -> error_with "Invalid storage key")
               storage_keys
           in
           Ok {address; storage_keys}
-      | _ -> error_with "failed to decode access list from EIP-1559 transaction")
+      | _ -> error_with "failed to decode access list from raw transaction")
+
+let reconstruct_from_eip_2930_transaction (obj : legacy_transaction_object)
+    raw_txn =
+  let open Result_syntax in
+  match Rlp.decode (Bytes.unsafe_of_string raw_txn) with
+  | Ok
+      (List
+        [
+          Value chain_id;
+          Value _nonce;
+          Value _gas_price;
+          Value _gas_limit;
+          Value _to_;
+          Value _value;
+          Value _data;
+          access_list;
+          Value _v;
+          Value _r;
+          Value _s;
+        ]) ->
+      let chain_id = decode_number_be chain_id in
+      let+ access_list = decode_access_list access_list in
+      EIP_2930
+        {
+          chain_id;
+          hash = obj.hash;
+          nonce = obj.nonce;
+          block_hash = obj.blockHash;
+          block_number = obj.blockNumber;
+          transaction_index = obj.transactionIndex;
+          from = obj.from;
+          to_ = obj.to_;
+          value = obj.value;
+          gas = obj.gas;
+          gas_price = obj.gasPrice;
+          access_list;
+          input = unhash obj.input;
+          v = obj.v;
+          r = unhash obj.r;
+          s = unhash obj.s;
+        }
+  | _ -> error_with "failed to decode EIP-2930 transaction"
 
 let reconstruct_from_eip_1559_transaction (obj : legacy_transaction_object)
     raw_txn =
@@ -228,10 +374,12 @@ let reconstruct_from_raw_transaction (obj : legacy_transaction_object) raw_txn =
       reconstruct_from_eip_1559_transaction
         obj
         (String.sub raw_txn 1 (String.length raw_txn - 1))
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7748
-     We should support 0x01 transaction properly, right now we default to
-     legacy. *)
-  | '\x01' | _ -> Ok (Legacy obj)
+  | '\x01' ->
+      (* EIP 2930 *)
+      reconstruct_from_eip_2930_transaction
+        obj
+        (String.sub raw_txn 1 (String.length raw_txn - 1))
+  | _ -> Ok (Legacy obj)
 
 let reconstruct_from_transactions_list transactions
     (obj : legacy_transaction_object) =
@@ -290,11 +438,13 @@ let rereconstruct_block payload block =
 let hash = function
   | Kernel obj -> obj.hash
   | Legacy obj -> obj.hash
+  | EIP_2930 obj -> obj.hash
   | EIP_1559 obj -> obj.hash
 
 let block_number = function
   | Kernel obj -> obj.blockNumber
   | Legacy obj -> obj.blockNumber
+  | EIP_2930 obj -> obj.block_number
   | EIP_1559 obj -> obj.block_number
 
 let encoding =
@@ -307,6 +457,12 @@ let encoding =
         Ethereum_types.legacy_transaction_object_encoding
         (function Legacy o -> Some o | _ -> None)
         (fun o -> Legacy o);
+      case
+        ~title:"eip-2930"
+        (Tag 1)
+        (merge_objs (obj1 (req "type" (constant "0x01"))) EIP_2930.encoding)
+        (function EIP_2930 o -> Some ((), o) | _ -> None)
+        (fun ((), o) -> EIP_2930 o);
       case
         ~title:"eip-1559"
         (Tag 2)
