@@ -314,7 +314,7 @@ let () =
     ~title:"TCP connection failed"
     ~description:"TCP connection failed (refused or no route to host)."
     ~pp:(fun ppf () ->
-      Format.fprintf ppf "TCP connection failed (refused or no route to host.")
+      Format.fprintf ppf "TCP connection failed (refused or no route to host).")
     Data_encoding.empty
     (function Connection_failed -> Some () | _ -> None)
     (fun () -> Connection_failed) ;
