@@ -6,8 +6,7 @@
 
 use crate::block_storage;
 use crate::blueprint_storage::{
-    blueprint_path, clear_all_blueprints, read_next_blueprint_number,
-    store_current_block_header,
+    blueprint_path, clear_all_blueprints, store_current_block_header,
 };
 use crate::error::Error;
 use crate::error::StorageError;
@@ -75,6 +74,23 @@ mod legacy {
     // functions. The legacy semantics of these functions is needed in
     // some migration step to access the storage using the fields
     // which were present at the time.
+
+    use super::*;
+    use tezos_storage::error::Error as GenStorageError;
+
+    pub fn read_next_blueprint_number<Host: Runtime>(
+        host: &Host,
+    ) -> anyhow::Result<U256> {
+        match block_storage::read_current_number(host) {
+            Err(err) => match err.downcast_ref() {
+                Some(GenStorageError::Runtime(RuntimeError::PathNotFound)) => {
+                    Ok(U256::zero())
+                }
+                _ => Err(err),
+            },
+            Ok(block_number) => Ok(block_number.saturating_add(U256::one())),
+        }
+    }
 }
 
 fn migrate_to<Host: Runtime>(
@@ -208,7 +224,7 @@ fn migrate_to<Host: Runtime>(
             // However we need to keep the next blueprint as it
             // trigerred the upgrade.
 
-            let next_blueprint_number = read_next_blueprint_number(host)?;
+            let next_blueprint_number = legacy::read_next_blueprint_number(host)?;
             let blueprint_path = blueprint_path(next_blueprint_number)?;
             allow_path_not_found(
                 host.store_move(&blueprint_path, &TMP_NEXT_BLUEPRINT_PATH),
