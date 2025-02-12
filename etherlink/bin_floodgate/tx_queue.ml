@@ -262,8 +262,8 @@ module Handlers = struct
       }
 
   let on_error (type a b) _self _status_request (_r : (a, b) Request.t)
-      (_errs : b) : unit tzresult Lwt.t =
-    Lwt_result_syntax.return_unit
+      (_errs : b) : [`Continue | `Shutdown] tzresult Lwt.t =
+    Lwt_result_syntax.return `Continue
 
   let on_completion _ _ _ _ = Lwt.return_unit
 

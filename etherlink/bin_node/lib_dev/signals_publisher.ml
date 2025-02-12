@@ -188,8 +188,8 @@ module Handlers = struct
     Types.of_parameters parameters
 
   let on_error (type a b) _w _st (_r : (a, b) Request.t) (_errs : b) :
-      unit tzresult Lwt.t =
-    Lwt_result_syntax.return_unit
+      [`Continue | `Shutdown] tzresult Lwt.t =
+    Lwt_result_syntax.return `Continue
 
   let on_completion _ _ _ _ = Lwt.return_unit
 

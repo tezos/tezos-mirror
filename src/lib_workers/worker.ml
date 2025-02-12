@@ -108,18 +108,19 @@ module type T = sig
     (** A function called when terminating a worker. *)
     val on_close : self -> unit Lwt.t
 
-    (** A function called at the end of the worker loop in case of an
-        abnormal error. This function can handle the error by
-        returning [Ok ()], or leave the default unexpected error
-        behaviour by returning its parameter. A possibility is to
-        handle the error for ad-hoc logging, and still use
+    (** A function called at the end of the worker loop in case of an abnormal
+        error. This function can handle the error by returning [Ok `Continue]
+        for the worker loop to continue and take the next request, [Ok
+        `Shutdown] and stop the worker loop without crashing, or leave the
+        default unexpected error behaviour by returning its parameter. A
+        possibility is to handle the error for ad-hoc logging, and still use
         {!trigger_shutdown} to kill the worker. *)
     val on_error :
       self ->
       Worker_types.request_status ->
       ('a, 'request_error) Request.t ->
       'request_error ->
-      unit tzresult Lwt.t
+      [`Continue | `Shutdown] tzresult Lwt.t
 
     (** A function called at the end of the worker loop in case of a
         successful treatment of the current request. *)
@@ -594,7 +595,7 @@ struct
       Worker_types.request_status ->
       ('a, 'request_error) Request.t ->
       'request_error ->
-      unit tzresult Lwt.t
+      [`Shutdown | `Continue] tzresult Lwt.t
 
     val on_completion :
       self ->
@@ -696,7 +697,10 @@ struct
                  | None -> assert false
                in
                match r with
-               | Ok () -> loop ()
+               | Ok `Continue -> loop ()
+               | Ok `Shutdown ->
+                   let* () = Worker_events.(emit terminated) () in
+                   close handlers w None
                | Error errs ->
                    let* () = Worker_events.(emit crashed) errs in
                    close handlers w (Some errs)))

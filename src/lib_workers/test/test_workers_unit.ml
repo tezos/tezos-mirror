@@ -55,6 +55,7 @@ let create_handlers (type a) ?on_completion () =
       | Request.RqErr Crash -> Lwt.return_error `CrashError
       | Request.RqErr Simple -> Lwt.return_error `SimpleError
       | Request.RqErr RaiseExn -> raise RaisedExn
+      | Request.RqErr Shutdown -> Lwt.return_error `Shutdown
 
     type launch_error = error trace
 
@@ -63,18 +64,20 @@ let create_handlers (type a) ?on_completion () =
       return (ref [])
 
     let on_error (type a b) w _st (r : (a, b) Request.t) (errs : b) :
-        unit tzresult Lwt.t =
+        [`Continue | `Shutdown] tzresult Lwt.t =
       let open Lwt_result_syntax in
       let history = Worker.state w in
+      let return_continue = return `Continue in
       match r with
-      | Request.RqA _ -> return_unit
-      | Request.RqB -> return_unit
+      | Request.RqA _ -> return_continue
+      | Request.RqB -> return_continue
       | Request.RqErr _ -> (
           match errs with
           | `CrashError -> Lwt.return_error [TzCrashError]
           | `SimpleError ->
               history := "RqErr" :: !history ;
-              return_unit)
+              return_continue
+          | `Shutdown -> return `Shutdown)
 
     let on_completion w r _ _st =
       let open Lwt_syntax in
@@ -283,6 +286,16 @@ let test_cancel_worker () =
   assert_status w "Closed" ;
   return_unit
 
+let test_shutdown_on_error () =
+  let open Lwt_result_syntax in
+  let* w = create_queue "shutdown_worker" in
+  assert_status w "Running" ;
+  let*! () =
+    push_and_assert_history w [Box RqB; Box RqB; Box (RqErr Shutdown); Box RqB]
+  in
+  assert_status w "Closed" ;
+  return_unit
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/3004
    in follow-up MR: fix the handling of exceptions and
    integrate this test *)
@@ -390,6 +403,7 @@ let tests_status =
     [
       Tztest.tztest "Canceled worker" `Quick test_cancel_worker;
       Tztest.tztest "Crashing requests" `Quick test_push_crashing_request;
+      Tztest.tztest "Shutdown on error" `Quick test_shutdown_on_error;
     ] )
 
 let tests_buffer =

@@ -624,14 +624,14 @@ module Handlers = struct
   let on_launch _w () Types.{node_ctxt} = Lwt_result.return node_ctxt
 
   let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
-      unit tzresult Lwt.t =
+      [`Continue | `Shutdown] tzresult Lwt.t =
     let open Lwt_result_syntax in
     let request_view = Request.view r in
     let emit_and_return_errors errs =
       let*! () =
         Commitment_event.Publisher.request_failed request_view st errs
       in
-      return_unit
+      return `Continue
     in
     match r with
     | Request.Publish -> emit_and_return_errors errs

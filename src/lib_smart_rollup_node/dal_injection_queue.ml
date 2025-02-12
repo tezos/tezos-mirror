@@ -501,18 +501,18 @@ module Handlers = struct
     init_dal_worker_state node_ctxt dal_node_ctxt
 
   let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
-      unit tzresult Lwt.t =
+      [`Continue | `Shutdown] tzresult Lwt.t =
     let open Lwt_result_syntax in
     match r with
     | Request.Register _ ->
         let*! () = Events.(emit request_failed) (Request.view r, st, errs) in
-        return_unit
+        return `Continue
     | Request.Produce_dal_slots _ ->
         let*! () = Events.(emit request_failed) (Request.view r, st, errs) in
-        return_unit
+        return `Continue
     | Request.Set_dal_slot_indices _ ->
         let*! () = Events.(emit request_failed) (Request.view r, st, errs) in
-        return_unit
+        return `Continue
 
   let on_completion _w r _ st =
     match Request.view r with

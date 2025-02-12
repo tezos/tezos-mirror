@@ -1714,7 +1714,7 @@ module Handlers = struct
   end
 
   let on_error (type a b) _self _st (req : (a, b) Request.t) (errs : b) :
-      unit tzresult Lwt.t =
+      [`Continue | `Shutdown] tzresult Lwt.t =
     let open Lwt_result_syntax in
     match (req, errs) with
     | Apply_evm_events _, [Node_error.Diverged {must_exit = true; _}]
@@ -1732,7 +1732,7 @@ module Handlers = struct
         let Eq = Eq.request req in
         let request_view = Request.view req in
         let*! () = Evm_context_events.worker_request_failed request_view errs in
-        return_unit
+        return `Continue
 end
 
 let table = Worker.create_table Queue

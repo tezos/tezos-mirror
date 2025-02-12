@@ -103,14 +103,14 @@ module Handlers = struct
         }
 
   let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
-      unit tzresult Lwt.t =
+      [`Continue | `Shutdown] tzresult Lwt.t =
     let open Lwt_result_syntax in
     let request_view = Request.view r in
     let emit_and_return_errors errs =
       let*! () =
         Refutation_game_event.Player.request_failed request_view st errs
       in
-      return_unit
+      return `Continue
     in
     match r with
     | Request.Play _ -> emit_and_return_errors errs
