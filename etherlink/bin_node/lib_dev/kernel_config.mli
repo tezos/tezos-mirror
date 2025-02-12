@@ -43,7 +43,7 @@ val make :
   unit tzresult Lwt.t
 
 (** [make_l2 ~boostrap_balance ?bootstrap_accounts ... ~l2_chain_id ~output ()]
-    generates a configuration file located at [output] for the chain [l2_chain_id], 
+    generates a configuration file located at [output] for the chain [l2_chain_id],
     where [bootstrap_accounts] are provisioned with [bootstrap_balance]. *)
 val make_l2 :
   boostrap_balance:Z.t ->
@@ -55,6 +55,7 @@ val make_l2 :
   ?set_account_code:(string * string) list ->
   ?world_state_path:string * string ->
   l2_chain_id:string ->
+  l2_chain_family:Ethereum_types.chain_family ->
   output:string ->
   unit ->
   unit tzresult Lwt.t

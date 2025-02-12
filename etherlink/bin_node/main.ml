@@ -1858,7 +1858,7 @@ let make_l2_kernel_config_command =
     ~desc:
       "Produce a file containing the part of the kernel configuration \
        instructions related to a particular L2 chain."
-    (args9
+    (args10
        (config_key_arg ~name:"minimum_base_fee_per_gas" ~placeholder:"111...")
        (config_key_arg ~name:"da_fee_per_byte" ~placeholder:"111...")
        (config_key_arg ~name:"sequencer_pool_address" ~placeholder:"0x...")
@@ -1880,7 +1880,14 @@ let make_l2_kernel_config_command =
           ~long:"l2-chain-id"
           ~doc:"L2 chain id"
           ~placeholder:"1"
-          (Tezos_clic.parameter (fun _ s -> return @@ Chain_id.of_string_exn s))))
+          (Tezos_clic.parameter (fun _ s -> return @@ Chain_id.of_string_exn s)))
+       (Tezos_clic.default_arg
+          ~long:"l2-chain-family"
+          ~doc:"Configure the family (either EVM or Michelson) of the L2 chain."
+          ~default:"EVM"
+          ~placeholder:"EVM"
+          (Tezos_clic.parameter (fun _ s ->
+               return @@ Chain_family.of_string_exn s))))
     (prefixes ["make"; "l2"; "kernel"; "installer"; "config"]
     @@ param
          ~name:"kernel config file"
@@ -1895,7 +1902,8 @@ let make_l2_kernel_config_command =
            bootstrap_accounts,
            set_account_code,
            world_state_path,
-           l2_chain_id )
+           l2_chain_id,
+           l2_chain_family )
          output
          () ->
       let* l2_chain_id =
@@ -1916,6 +1924,7 @@ let make_l2_kernel_config_command =
         ?set_account_code
         ?world_state_path
         ~l2_chain_id
+        ~l2_chain_family
         ~output
         ())
 

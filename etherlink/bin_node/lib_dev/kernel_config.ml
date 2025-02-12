@@ -48,7 +48,8 @@ let clean_path path =
 
 let make_l2 ~boostrap_balance ?bootstrap_accounts ?minimum_base_fee_per_gas
     ?da_fee_per_byte ?sequencer_pool_address ?maximum_gas_per_transaction
-    ?set_account_code ?world_state_path ~l2_chain_id ~output () =
+    ?set_account_code ?world_state_path ~l2_chain_id ~l2_chain_family ~output ()
+    =
   let world_state_prefix =
     match world_state_path with
     | None -> ["evm"; "world_state"; l2_chain_id]
@@ -95,6 +96,11 @@ let make_l2 ~boostrap_balance ?bootstrap_accounts ?minimum_base_fee_per_gas
         ~l2_chain_id
         ~convert:le_int64_bytes
         maximum_gas_per_transaction
+    @ make_l2_config_instr
+        ~l2_chain_id
+        (Some
+           ( "chain_family",
+             l2_chain_family |> Ethereum_types.Chain_family.to_string ))
     @ make_l2_config_instr ~l2_chain_id world_state_path
   in
   let world_state_instrs =
