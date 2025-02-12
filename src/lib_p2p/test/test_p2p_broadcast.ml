@@ -82,12 +82,13 @@ module Simple = struct
 
   let peer_table = P2p_peer.Table.create 100
 
-  let rec connect ~timeout connect_handler pool point =
+  let rec connect ~timeout connect_handler point =
     let open Lwt_syntax in
     let () = Tezt.Log.debug "Connect to %a" P2p_point.Id.pp point in
     let* r = P2p_connect_handler.connect connect_handler point ~timeout in
     match r with
     | Error (Tezos_p2p_services.P2p_errors.Connected :: _) -> (
+        let pool = P2p_connect_handler.get_pool connect_handler in
         match P2p_pool.Connection.find_by_point pool point with
         | Some conn -> return_ok conn
         | None -> failwith "Woops...")
@@ -133,14 +134,14 @@ module Simple = struct
             | _ -> assert false)
           head_err ;
         let* () = Lwt_unix.sleep (0.5 +. Random.float 2.) in
-        connect ~timeout connect_handler pool point
+        connect ~timeout connect_handler point
     | Ok res ->
         P2p_peer.Table.add peer_table (P2p_conn.peer_id res) res ;
         Lwt.return (Ok res)
     | Error _ as res -> Lwt.return res
 
-  let connect_all ~timeout connect_handler pool points =
-    List.map_ep (connect ~timeout connect_handler pool) points
+  let connect_all ~timeout connect_handler points =
+    List.map_ep (connect ~timeout connect_handler) points
 
   let write_all msg = P2p.Internal_for_tests.raw_broadcast peer_table msg
 
@@ -206,7 +207,6 @@ module Simple = struct
       connect_all
         ~timeout:(Time.System.Span.of_seconds_exn 2.)
         node.connect_handler
-        node.pool
         node.points
     in
     Tezt.Log.debug "Bootstrap OK@." ;
@@ -246,7 +246,8 @@ module Simple = struct
         (median ftimes)
         (stddev ftimes)
     in
-    let*! () = close_all node.pool in
+    let pool = P2p_connect_handler.get_pool node.connect_handler in
+    let*! () = close_all pool in
     Tezt.Log.debug "All connections successfully closed.@." ;
     Tezt.Log.debug "type; max; min; avg; median; std_dev" ;
     print_stat times "broadcasting" ;
@@ -265,7 +266,8 @@ module Simple = struct
         | ref_msg :: next ->
             Tezt.Log.debug "Wait broadcaster.@." ;
             let* () = Node.sync node in
-            let* _msgs = read_all node.pool ref_msg in
+            let pool = P2p_connect_handler.get_pool node.connect_handler in
+            let* _msgs = read_all pool ref_msg in
             Tezt.Log.debug "Read message.@." ;
             let* () = Node.sync node in
             loop (n - 1) (if no_check then next @ [ref_msg] else next)

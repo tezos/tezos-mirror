@@ -144,6 +144,8 @@ let create ?(p2p_versions = P2p_version.supported) config pool message_config
 
 let config t = t.config
 
+let get_pool t = t.pool
+
 let create_connection t p2p_conn id_point point_info peer_info
     negotiated_version =
   let open Lwt_syntax in

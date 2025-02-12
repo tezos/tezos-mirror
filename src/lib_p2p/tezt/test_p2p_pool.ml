@@ -40,12 +40,13 @@ type error += Connect | Write | Read
     other node, then await for reading one from each other node.
 *)
 module Simple = struct
-  let rec connect ~timeout connect_handler pool point =
+  let rec connect ~timeout connect_handler point =
     let open Lwt_syntax in
     Tezt.Log.debug "Connect to %a" P2p_point.Id.pp point ;
     let* r = P2p_connect_handler.connect connect_handler point ~timeout in
     match r with
     | Error (Tezos_p2p_services.P2p_errors.Connected :: _) -> (
+        let pool = P2p_connect_handler.get_pool connect_handler in
         match P2p_pool.Connection.find_by_point pool point with
         | Some conn -> return_ok conn
         | None -> failwith "Woops...")
@@ -93,11 +94,11 @@ module Simple = struct
             head_err
         in
         let* () = Lwt_unix.sleep (0.5 +. Random.float 2.) in
-        connect ~timeout connect_handler pool point
+        connect ~timeout connect_handler point
     | (Ok _ | Error _) as res -> Lwt.return res
 
-  let connect_all ~timeout connect_handler pool points =
-    List.map_ep (connect ~timeout connect_handler pool) points
+  let connect_all ~timeout connect_handler points =
+    List.map_ep (connect ~timeout connect_handler) points
 
   let write_all conns msg =
     List.iter_ep (fun conn -> trace Write @@ P2p_conn.write_sync conn msg) conns
@@ -120,7 +121,6 @@ module Simple = struct
       connect_all
         ~timeout:(Time.System.Span.of_seconds_exn 2.)
         node.connect_handler
-        node.pool
         node.points
     in
     Tezt.Log.debug "Bootstrap OK@." ;
@@ -144,7 +144,7 @@ end
     repeated [repeat] times.
 *)
 module Random_connections = struct
-  let rec connect_random connect_handler pool total rem point n =
+  let rec connect_random connect_handler total rem point n =
     let open Lwt_result_syntax in
     let*! () = Lwt_unix.sleep (0.2 +. Random.float 1.0) in
     let* conn =
@@ -152,7 +152,6 @@ module Random_connections = struct
       @@ Simple.connect
            ~timeout:(Time.System.Span.of_seconds_exn 2.)
            connect_handler
-           pool
            point
     in
     let*! _ = trace Write @@ P2p_conn.write conn Node.Ping in
@@ -163,22 +162,20 @@ module Random_connections = struct
     in
     decr rem ;
     if !rem mod total = 0 then Tezt.Log.debug "Remaining: %d.@." (!rem / total) ;
-    if n > 1 then connect_random connect_handler pool total rem point (pred n)
+    if n > 1 then connect_random connect_handler total rem point (pred n)
     else return_unit
 
-  let connect_random_all connect_handler pool points n =
+  let connect_random_all connect_handler points n =
     let total = List.length points in
     let rem = ref (n * total) in
     List.iter_ep
-      (fun point -> connect_random connect_handler pool total rem point n)
+      (fun point -> connect_random connect_handler total rem point n)
       points
 
   let node repeat (node : Node.t) =
     let open Lwt_result_syntax in
     Tezt.Log.debug "Begin random connections.@." ;
-    let* () =
-      connect_random_all node.connect_handler node.pool node.points repeat
-    in
+    let* () = connect_random_all node.connect_handler node.points repeat in
     Tezt.Log.debug "Random connections OK.@." ;
     return_unit
 
@@ -215,7 +212,6 @@ module Garbled = struct
       Simple.connect_all
         ~timeout:(Time.System.Span.of_seconds_exn 2.)
         node.connect_handler
-        node.pool
         node.points
     in
     let* () = Node.sync node in
@@ -250,7 +246,7 @@ module Overcrowded = struct
       (function Advertisement_failure l -> Some l | _ -> None)
       (fun l -> Advertisement_failure l)
 
-  let rec connect ?iter_count ~timeout connect_handler pool point =
+  let rec connect ?iter_count ~timeout connect_handler point =
     let open Lwt_syntax in
     Tezt.Log.debug
       "Connect%a to %a@."
@@ -262,6 +258,7 @@ module Overcrowded = struct
     let* r = P2p_connect_handler.connect connect_handler point ~timeout in
     match r with
     | Error [Tezos_p2p_services.P2p_errors.Connected] -> (
+        let pool = P2p_connect_handler.get_pool connect_handler in
         match P2p_pool.Connection.find_by_point pool point with
         | Some conn -> return_ok conn
         | None -> failwith "Woops...")
@@ -300,13 +297,13 @@ module Overcrowded = struct
             | _ -> assert false)
           err ;
         let* () = Lwt_unix.sleep (0.5 +. Random.float 2.) in
-        connect ~timeout connect_handler pool point
+        connect ~timeout connect_handler point
     | (Ok _ | Error _) as res -> Lwt.return res
 
   (** Node code of nodes that will connect to the target,
       and either get a list of pairs or have an established connection.
   *)
-  let client_connect connect_handler pool legacy trusted_points all_points =
+  let client_connect connect_handler legacy trusted_points all_points =
     let open Lwt_result_syntax in
     Tezt.Log.debug
       "@[<v 2>client connects to %a in the universe @[%a@]@]@."
@@ -327,7 +324,6 @@ module Overcrowded = struct
         ~iter_count:0
         ~timeout:(Time.System.Span.of_seconds_exn 2.)
         connect_handler
-        pool
         target
     in
     match r with
@@ -426,26 +422,17 @@ module Overcrowded = struct
     (*   *)
     (* first connection: let advertise us as public nodes *)
     let* () =
-      client_connect
-        node.connect_handler
-        node.pool
-        legacy
-        node.trusted_points
-        node.points
+      client_connect node.connect_handler legacy node.trusted_points node.points
     in
     let* () = Node.sync node in
     (* sync 2 *)
     let* () =
-      client_connect
-        node.connect_handler
-        node.pool
-        legacy
-        node.trusted_points
-        node.points
+      client_connect node.connect_handler legacy node.trusted_points node.points
     in
     let* () = Node.sync node in
     (* sync 3 *)
-    let* () = client_check node.pool node.points legacy in
+    let pool = P2p_connect_handler.get_pool node.connect_handler in
+    let* () = client_check pool node.points legacy in
     let* () = Node.sync node in
     (* sync 4 *)
     Tezt.Log.debug "client closing.@." ;
@@ -455,8 +442,9 @@ module Overcrowded = struct
   let target (node : Node.t) =
     let open Lwt_result_syntax in
     let unknowns_knowns () =
+      let pool = P2p_connect_handler.get_pool node.connect_handler in
       P2p_pool.Points.fold_known
-        node.pool
+        pool
         ~init:(node.points, [])
         ~f:(fun id _ (unknown_points, knowns) ->
           let unknown_points =
@@ -554,7 +542,7 @@ end
     network.
 *)
 module No_common_network = struct
-  let rec connect ?iter_count ~timeout connect_handler pool point =
+  let rec connect ?iter_count ~timeout connect_handler point =
     let open Lwt_syntax in
     Tezt.Log.debug
       "Connect%a to @[%a@]@."
@@ -566,6 +554,7 @@ module No_common_network = struct
     let* r = P2p_connect_handler.connect connect_handler point ~timeout in
     match r with
     | Error [Tezos_p2p_services.P2p_errors.Connected] -> (
+        let pool = P2p_connect_handler.get_pool connect_handler in
         match P2p_pool.Connection.find_by_point pool point with
         | Some conn -> return_ok conn
         | None -> failwith "Woops...")
@@ -604,13 +593,13 @@ module No_common_network = struct
             | _ -> assert false)
           err ;
         let* () = Lwt_unix.sleep (0.5 +. Random.float 2.) in
-        connect ~timeout connect_handler pool point
+        connect ~timeout connect_handler point
     | (Ok _ | Error _) as res -> Lwt.return res
 
   (** Node code of nodes that will connect to the target,
       and either get a list of pairs or have an established connection.
   *)
-  let client_connect connect_handler pool trusted_points all_points =
+  let client_connect connect_handler trusted_points all_points =
     let open Lwt_result_syntax in
     Tezt.Log.debug
       "@[<v 2>client connects to %a in the universe @[%a@]@]@."
@@ -623,7 +612,6 @@ module No_common_network = struct
         ~iter_count:0
         ~timeout:(Time.System.Span.of_seconds_exn 2.)
         connect_handler
-        pool
         (WithExceptions.Option.get ~loc:__LOC__ @@ List.hd trusted_points)
     in
     match r with
@@ -650,11 +638,7 @@ module No_common_network = struct
   let client (node : Node.t) =
     let open Lwt_result_syntax in
     let* () =
-      client_connect
-        node.connect_handler
-        node.pool
-        node.trusted_points
-        node.points
+      client_connect node.connect_handler node.trusted_points node.points
     in
     let* () = Node.sync node in
     (* sync 2 *)
