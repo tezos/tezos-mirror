@@ -505,6 +505,11 @@ build-floodgate:
 	@dune build ./etherlink/bin_floodgate
 	@cp -f ./_build/default/etherlink/bin_floodgate/main.exe floodgate
 
+.PHONY: etherlink-outbox-monitor
+etherlink-outbox-monitor:
+	@dune build ./etherlink/bin_outbox_monitor
+	@cp -f ./_build/default/etherlink/bin_outbox_monitor/main.exe $@
+
 .PHONY: build-unreleased
 build-unreleased: all
 	@echo 'Note: "make build-unreleased" is deprecated. Just use "make".'

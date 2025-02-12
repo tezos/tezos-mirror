@@ -477,3 +477,52 @@ let _floodgate_bin =
         evm_node_config |> open_;
         octez_workers;
       ]
+
+let _outbox_monitor =
+  public_exe
+    "etherlink-outbox-monitor"
+    ~internal_name:"main"
+    ~path:"etherlink/bin_outbox_monitor"
+    ~opam:"etherlink-outbox-monitor"
+    ~release_status:Unreleased
+    ~synopsis:
+      "A binary to monitor withdrawals in the outbox and their execution"
+    ~deps:
+      [
+        bls12_381_archive;
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_version_value;
+        octez_clic;
+        octez_rpc_http |> open_;
+        octez_rpc_http_client_unix;
+        caqti_lwt;
+        crunch;
+        re;
+        octez_sqlite |> open_;
+        evm_node_lib_dev_encoding |> open_;
+      ]
+    ~dune:
+      Dune.
+        [
+          [
+            S "rule";
+            [S "target"; S "migrations.ml"];
+            [S "deps"; [S "glob_files"; S "migrations/*.sql"]];
+            [
+              S "action";
+              [
+                S "run";
+                S "ocaml-crunch";
+                S "-e";
+                S "sql";
+                S "-m";
+                S "plain";
+                S "-o";
+                S "%{target}";
+                S "-s";
+                S ".";
+              ];
+            ];
+          ];
+        ]
