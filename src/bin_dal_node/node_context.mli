@@ -34,7 +34,7 @@ val init :
   Profile_manager.t ->
   Cryptobox.t ->
   Cryptobox.shards_proofs_precomputation option ->
-  Dal_plugin.proto_parameters ->
+  Types.proto_parameters ->
   Proto_plugins.t ->
   Store.t ->
   Gossipsub.Worker.t ->
@@ -104,7 +104,7 @@ val get_cryptobox : t -> Cryptobox.t
     is provided, then the protocol parameters for that level are fetched via the
     relevant plugin. *)
 val get_proto_parameters :
-  ?level:int32 -> t -> Dal_plugin.proto_parameters tzresult Lwt.t
+  ?level:int32 -> t -> Types.proto_parameters tzresult Lwt.t
 
 (** Update the node's last finalized level. *)
 val set_last_finalized_level : t -> int32 -> unit
@@ -141,8 +141,7 @@ val set_ongoing_amplifications : t -> Types.Slot_id.Set.t -> unit
 (** [storage_period ctxt proto_parameters] returns for how many levels should
     the node store data about attested slots. This depends on the node's profile
     and its history mode.  *)
-val storage_period :
-  t -> Dal_plugin.proto_parameters -> [`Always | `Finite of int]
+val storage_period : t -> Types.proto_parameters -> [`Always | `Finite of int]
 
 (** [level_to_gc ctxt proto_parameters ~current_level] returns the oldest level
     that should have attested data (like shards and slots, skip list cells)
@@ -151,7 +150,7 @@ val storage_period :
     no removal is needed (either because the node is thus configured, or the
     current_level is not big enough), the function returns [None]. *)
 val level_to_gc :
-  t -> Dal_plugin.proto_parameters -> current_level:int32 -> int32 option
+  t -> Types.proto_parameters -> current_level:int32 -> int32 option
 
 (** [fetch_assigned_shard_indices ctxt ~level ~pkh] fetches from L1 the shard
     indices assigned to [pkh] at [level].  It internally caches the DAL

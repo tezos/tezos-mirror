@@ -258,6 +258,20 @@ type slot_header = {
       whether we also compute shards' proofs or not. *)
 type with_proof = {with_proof : bool}
 
+type proto_parameters = {
+  feature_enable : bool;
+  incentives_enable : bool;
+  number_of_slots : int;
+  attestation_lag : int;
+  attestation_threshold : int;
+  traps_fraction : Q.t;
+  cryptobox_parameters : Cryptobox.Verifier.parameters;
+  sc_rollup_challenge_window_in_blocks : int;
+  commitment_period_in_blocks : int;
+  dal_attested_slots_validity_lag : int;
+  blocks_per_cycle : int32;
+}
+
 val slot_encoding : Cryptobox.slot Data_encoding.t
 
 val slot_header_encoding : slot_header Data_encoding.t
@@ -271,6 +285,8 @@ val profile_encoding : profile Data_encoding.t
 val with_proof_encoding : with_proof Data_encoding.t
 
 val attestable_slots_encoding : attestable_slots Data_encoding.t
+
+val proto_parameters_encoding : proto_parameters Data_encoding.t
 
 val pp_header_status : Format.formatter -> header_status -> unit
 

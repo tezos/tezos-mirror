@@ -56,7 +56,7 @@ module Plugin = struct
     in
     return
       {
-        Dal_plugin.feature_enable;
+        Tezos_dal_node_services.Types.feature_enable;
         incentives_enable;
         number_of_slots;
         attestation_lag;
@@ -262,7 +262,8 @@ module Plugin = struct
       let published_level =
         Int32.sub
           attested_level
-          (Int32.of_int dal_constants.Dal_plugin.attestation_lag)
+          (Int32.of_int
+             dal_constants.Tezos_dal_node_services.Types.attestation_lag)
       in
       (* 1. There are no cells for [published_level = 0]. *)
       if published_level <= 0l then return []
@@ -277,7 +278,7 @@ module Plugin = struct
               Lazy.force pred_publication_level_dal_constants
             in
             return
-              ( prev_constants.Dal_plugin.feature_enable,
+              ( prev_constants.Tezos_dal_node_services.Types.feature_enable,
                 prev_constants.number_of_slots )
         in
         let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in

@@ -42,22 +42,6 @@ type slot_header = {
   commitment : Cryptobox.Verifier.commitment;
 }
 
-type proto_parameters = {
-  feature_enable : bool;
-  incentives_enable : bool;
-  number_of_slots : int;
-  attestation_lag : int;
-  attestation_threshold : int;
-  traps_fraction : Q.t;
-  cryptobox_parameters : Cryptobox.Verifier.parameters;
-  sc_rollup_challenge_window_in_blocks : int;
-  commitment_period_in_blocks : int;
-  dal_attested_slots_validity_lag : int;
-  blocks_per_cycle : int32;
-}
-
-val proto_parameters_encoding : proto_parameters Data_encoding.t
-
 module type T = sig
   module Proto : Registered_protocol.T
 
@@ -82,7 +66,7 @@ module type T = sig
     Tezos_shell_services.Chain_services.chain ->
     Tezos_shell_services.Block_services.block ->
     Tezos_rpc.Context.generic ->
-    proto_parameters tzresult Lwt.t
+    Tezos_dal_node_services.Types.proto_parameters tzresult Lwt.t
 
   val get_published_slot_headers :
     block_info ->
@@ -180,9 +164,9 @@ module type T = sig
     val cells_of_level :
       block_info ->
       Tezos_rpc.Context.generic ->
-      dal_constants:proto_parameters ->
+      dal_constants:Tezos_dal_node_services.Types.proto_parameters ->
       pred_publication_level_dal_constants:
-        proto_parameters tzresult Lwt.t Lazy.t ->
+        Tezos_dal_node_services.Types.proto_parameters tzresult Lwt.t Lazy.t ->
       (hash * cell) list tzresult Lwt.t
   end
 

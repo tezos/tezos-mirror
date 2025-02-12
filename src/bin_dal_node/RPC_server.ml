@@ -287,7 +287,7 @@ module Profile_handlers = struct
           Node_context.get_proto_parameters ctxt
           |> lwt_map_error (fun e -> `Other e)
         in
-        let number_of_slots = proto_parameters.Dal_plugin.number_of_slots in
+        let number_of_slots = proto_parameters.Types.number_of_slots in
         match
           Profile_manager.add_and_register_operator_profile
             (Node_context.get_profile_ctxt ctxt)
@@ -442,9 +442,7 @@ module Profile_handlers = struct
              Correctly compute [published_level] in case of protocol changes, in
              particular a change of the value of [attestation_lag]. *)
           Int32.(
-            sub
-              attested_level
-              (of_int proto_parameters.Dal_plugin.attestation_lag))
+            sub attested_level (of_int proto_parameters.Types.attestation_lag))
         in
         if published_level < 1l then
           let slots =

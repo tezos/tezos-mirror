@@ -54,7 +54,7 @@ let fetch_dal_config cctxt =
   in
   retry delay
 
-let init_cryptobox config (proto_parameters : Dal_plugin.proto_parameters) =
+let init_cryptobox config proto_parameters =
   let open Lwt_result_syntax in
   let prover_srs =
     Profile_manager.is_prover_profile config.Configuration_file.profile
@@ -68,7 +68,7 @@ let init_cryptobox config (proto_parameters : Dal_plugin.proto_parameters) =
         ()
     else return_unit
   in
-  match Cryptobox.make proto_parameters.cryptobox_parameters with
+  match Cryptobox.make proto_parameters.Types.cryptobox_parameters with
   | Ok cryptobox ->
       if prover_srs then
         match Cryptobox.precompute_shards_proofs cryptobox with
@@ -155,8 +155,7 @@ module Handler = struct
         else `Invalid
     | None ->
         if
-          slot_index >= 0
-          && slot_index < proto_parameters.Dal_plugin.number_of_slots
+          slot_index >= 0 && slot_index < proto_parameters.Types.number_of_slots
         then
           (* We know the message is not [Outdated], because this has already
              been checked in {!gossipsub_app_messages_validation}. *)
@@ -169,7 +168,7 @@ module Handler = struct
         pred
         @@ add
              message_id.Types.Message_id.level
-             (of_int proto_parameters.Dal_plugin.attestation_lag))
+             (of_int proto_parameters.Types.attestation_lag))
     in
     let shard_indices_opt =
       Node_context.get_fetched_assigned_shard_indices
@@ -227,7 +226,7 @@ module Handler = struct
       if
         Int32.(
           sub head_level message_id.Types.Message_id.level
-          > of_int (proto_parameters.Dal_plugin.attestation_lag + slack))
+          > of_int (proto_parameters.Types.attestation_lag + slack))
       then
         (* 2. Nodes don't care about messages whose ids are too old.  Gossipsub
            should only be used for the dissemination of fresh data. Old data could
@@ -333,9 +332,7 @@ module Handler = struct
                      ~error
              else return_unit
            in
-           let number_of_slots =
-             Dal_plugin.(proto_parameters.number_of_slots)
-           in
+           let number_of_slots = proto_parameters.Types.number_of_slots in
            let* () =
              let* res =
                Store.Statuses.remove_level_status
@@ -366,7 +363,7 @@ module Handler = struct
   let remove_unattested_slots_and_shards proto_parameters ctxt ~published_level
       attested =
     let open Lwt_syntax in
-    let number_of_slots = proto_parameters.Dal_plugin.number_of_slots in
+    let number_of_slots = proto_parameters.Types.number_of_slots in
     let slot_size = proto_parameters.cryptobox_parameters.slot_size in
     let store = Node_context.get_store ctxt in
     List.iter_s
@@ -401,7 +398,7 @@ module Handler = struct
       let level =
         Int32.add
           block_level
-          (Int32.of_int proto_parameters.Dal_plugin.attestation_lag)
+          (Int32.of_int proto_parameters.Types.attestation_lag)
       in
       Node_context.fetch_committee ctxt ~level
     in
@@ -419,7 +416,7 @@ module Handler = struct
       let pred_published_level =
         Int32.sub
           block_level
-          (Int32.of_int (1 + dal_constants.Dal_plugin.attestation_lag))
+          (Int32.of_int (1 + dal_constants.Types.attestation_lag))
       in
       Plugin.Skip_list.cells_of_level
         block_info
@@ -486,7 +483,7 @@ module Handler = struct
         get_attestable_slots
           attestations
           committee
-          ~number_of_slots:parameters.Dal_plugin.number_of_slots
+          ~number_of_slots:parameters.Types.number_of_slots
           is_attested
       in
       let threshold =
@@ -556,7 +553,7 @@ module Handler = struct
       Node_context.get_proto_parameters ctxt ~level:block_level
     in
     let* () =
-      if dal_constants.Dal_plugin.feature_enable then
+      if dal_constants.Types.feature_enable then
         let* slot_headers = Plugin.get_published_slot_headers block_info in
         let* () =
           if supports_refutations ctxt then
@@ -573,7 +570,7 @@ module Handler = struct
         let* () =
           if not (is_bootstrap_node ctxt) then
             Slot_manager.store_slot_headers
-              ~number_of_slots:proto_parameters.Dal_plugin.number_of_slots
+              ~number_of_slots:proto_parameters.Types.number_of_slots
               ~block_level
               slot_headers
               store
@@ -704,9 +701,7 @@ module Handler = struct
               let attestation_level =
                 Int32.(
                   pred
-                  @@ add
-                       level
-                       (of_int proto_parameters.Dal_plugin.attestation_lag))
+                  @@ add level (of_int proto_parameters.Types.attestation_lag))
               in
               let* _committee =
                 Node_context.fetch_committee ctxt ~level:attestation_level
@@ -815,7 +810,7 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
     node_store node_ctxt amplificator =
   let open Gossipsub in
   let timing_table_size =
-    2 * proto_parameters.Dal_plugin.attestation_lag
+    2 * proto_parameters.Types.attestation_lag
     * proto_parameters.cryptobox_parameters.number_of_shards
     * proto_parameters.number_of_slots
   in
@@ -967,7 +962,7 @@ let check_history_mode config profile_ctxt proto_parameters =
    {!get_storage_period} refers to published levels (not attested levels). The
    plus one comes from the technical details of {!store_skip_list_cells}. *)
 let skip_list_offset proto_parameters =
-  proto_parameters.Dal_plugin.attestation_lag + 1
+  proto_parameters.Types.attestation_lag + 1
 
 (* This function determines the storage period taking into account the node's
    [first_seen_level]. Indeed, if the node started for the first time, we do not
@@ -1030,7 +1025,7 @@ let check_l1_history_mode profile_ctxt cctxt proto_parameters head_level
   in
   let check ~dal_blocks ~l1_cycles =
     let blocks_per_cycle =
-      Int32.to_int proto_parameters.Dal_plugin.blocks_per_cycle
+      Int32.to_int proto_parameters.Types.blocks_per_cycle
     in
     let dal_cycles = dal_blocks / blocks_per_cycle in
     let minimal_cycles =

@@ -200,7 +200,7 @@ let supports_refutations t =
 (* Returns the period relevant for a refutation game. With a block time of 10
    seconds, this corresponds to about 42 days. *)
 let get_refutation_game_period proto_parameters =
-  proto_parameters.Dal_plugin.sc_rollup_challenge_window_in_blocks
+  proto_parameters.Types.sc_rollup_challenge_window_in_blocks
   + proto_parameters.commitment_period_in_blocks
   + proto_parameters.dal_attested_slots_validity_lag
 

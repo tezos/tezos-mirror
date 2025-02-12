@@ -118,8 +118,7 @@ val get_profiles : t -> Types.profile
 (** Returns the number of previous blocks for which the node should keep the
     shards in the storage, depending on the profile of the node (3 months for
     observer & slot producer, twice attestation lag for attester) *)
-val get_attested_data_default_store_period :
-  t -> Dal_plugin.proto_parameters -> int
+val get_attested_data_default_store_period : t -> Types.proto_parameters -> int
 
 (** Resolves a profile by either returning it unchanged (for bootstrap
     and operator profiles) or generating a new observer profile for

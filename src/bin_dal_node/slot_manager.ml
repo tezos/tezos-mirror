@@ -275,9 +275,7 @@ let publish_proved_shards ctxt (slot_id : Types.slot_id) ~level_committee
   let attestation_level =
     Int32.(
       pred
-      @@ add
-           slot_id.slot_level
-           (of_int proto_parameters.Dal_plugin.attestation_lag))
+      @@ add slot_id.slot_level (of_int proto_parameters.Types.attestation_lag))
   in
   let* committee = level_committee ~level:attestation_level in
   let attester_of_shard = shards_to_attesters committee in
