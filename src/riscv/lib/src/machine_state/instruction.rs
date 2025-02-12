@@ -359,6 +359,7 @@ pub enum OpCode {
     Mv,
     Li,
     Nop,
+    Neg,
 }
 
 impl OpCode {
@@ -375,6 +376,7 @@ impl OpCode {
         match self {
             Self::Add => Args::run_add,
             Self::Sub => Args::run_sub,
+            Self::Neg => Args::run_neg,
             Self::Xor => Args::run_xor,
             Self::Or => Args::run_or,
             Self::And => Args::run_and,
@@ -891,6 +893,18 @@ macro_rules! impl_cr_type {
             Ok(ProgramCounterUpdate::Next(self.width))
         }
     };
+
+    ($fn: ident, non_zero) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+            &self,
+            core: &mut MachineCoreState<ML, M>,
+        ) -> Result<ProgramCounterUpdate, Exception> {
+            core.hart.xregisters.$fn(self.rd.nzx, self.rs2.nzx);
+            Ok(ProgramCounterUpdate::Next(self.width))
+        }
+    };
 }
 
 macro_rules! impl_cr_nz_type {
@@ -1301,6 +1315,7 @@ impl Args {
     impl_cb_type!(run_bnez);
     impl_ci_type!(run_li, non_zero);
     impl_ci_type!(run_clui, non_zero);
+    impl_cr_type!(run_neg, non_zero);
     impl_cr_type!(run_csub);
     impl_css_type!(run_cswsp);
 
