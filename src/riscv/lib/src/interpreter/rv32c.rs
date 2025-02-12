@@ -12,7 +12,7 @@ use crate::{
         MachineCoreState, ProgramCounterUpdate,
         hart_state::HartState,
         main_memory::{Address, MainMemoryLayout},
-        registers::{NonZeroXRegister, XRegister, XRegisters, sp, x0},
+        registers::{NonZeroXRegister, XRegister, XRegisters, sp},
     },
     parser::instruction::InstrWidth,
     state_backend as backend,
@@ -83,20 +83,28 @@ where
         }
     }
 
-    /// `BNEZ` B-type instruction
-    ///
     /// Performs a conditional ( val(`rs1`) != 0 ) control transfer.
     /// If condition met, the offset is sign-extended and added to the pc to form the branch
     /// target address that is then set, otherwise indicates to proceed to the next instruction.
     ///
-    /// Primarily implementing C.BNEZ instruction. Can be used for uncompressed formats too.
+    /// Relevant RISC-V opcodes:
+    /// - C.BNEZ
+    /// - BNE
     pub fn run_bnez(
         &mut self,
         imm: i64,
-        rs1: XRegister,
+        rs1: NonZeroXRegister,
         width: InstrWidth,
     ) -> ProgramCounterUpdate {
-        self.run_bne_impl(imm, rs1, x0, width)
+        let current_pc = self.pc.read();
+
+        // Branch if `val(rs1) != val(rs2)`, jumping `imm` bytes ahead.
+        // Otherwise, jump the width of current instruction
+        if self.xregisters.read_nz(rs1) != 0 {
+            ProgramCounterUpdate::Set(current_pc.wrapping_add(imm as u64))
+        } else {
+            ProgramCounterUpdate::Next(width)
+        }
     }
 
     /// `C.EBREAK` compressed instruction
@@ -127,6 +135,21 @@ where
     ///
     /// Relevant RISC-V opcodes:
     /// - C.LI
+    /// - ADD
+    /// - ADDI
+    /// - ANDI
+    /// - ORI
+    /// - XORI
+    /// - SLLI
+    /// - SRLI
+    /// - SRAI
+    /// - AND
+    /// - C.AND
+    /// - OR
+    /// - XOR
+    /// - SLL
+    /// - SRL
+    /// - SRA
     pub fn run_li(&mut self, imm: i64, rd_rs1: NonZeroXRegister) {
         self.write_nz(rd_rs1, imm as u64)
     }
@@ -341,7 +364,7 @@ mod tests {
         };
     }
 
-    backend_test!(test_beqz, F, {
+    backend_test!(test_beqz_bnez, F, {
         proptest!(|(
             init_pc in any::<u64>(),
             imm in any::<i64>(),
@@ -359,15 +382,19 @@ mod tests {
             // BEQZ
             if r1_val == 0 {
                 test_branch_instr!(state, run_beqz, imm, t1, r1_val, width, init_pc, &branch_pcu);
+                test_branch_instr!(state, run_bnez, imm, t1, r1_val, width, init_pc, &next_pcu);
             } else {
                 test_branch_instr!(state, run_beqz, imm, t1, r1_val, width, init_pc, &next_pcu);
+                test_branch_instr!(state, run_bnez, imm, t1, r1_val, width, init_pc, &branch_pcu);
             }
 
             // BEQZ when imm = 0
             if r1_val == 0 {
                 test_branch_instr!(state, run_beqz, 0, t1, r1_val, width, init_pc, &init_pcu);
+                test_branch_instr!(state, run_bnez, 0, t1, r1_val, width, init_pc, &next_pcu);
             } else {
                 test_branch_instr!(state, run_beqz, 0, t1, r1_val, width, init_pc, &next_pcu);
+                test_branch_instr!(state, run_bnez, 0, t1, r1_val, width, init_pc, &init_pcu);
             }
         });
     });

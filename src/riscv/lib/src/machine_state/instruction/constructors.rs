@@ -425,6 +425,45 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Bne`].
+    pub(crate) fn new_bne(
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Bne,
+            args: Args {
+                // We are adding a default values for rd as NonZeroXRegister::x1
+                // to be explicit that it is of NonZeroXRegister type.
+                rd: NonZeroXRegister::x1.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Bnez`].
+    pub(crate) fn new_bnez(rs1: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Bnez,
+            args: Args {
+                // We are adding default values for rd, rs1 and rs2 as NonZeroXRegister::x1
+                // to be explicit that they are of NonZeroXRegister type.
+                rd: NonZeroXRegister::x1.into(),
+                rs1: rs1.into(),
+                rs2: NonZeroXRegister::x1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {
@@ -776,6 +815,40 @@ impl Instruction {
             // If `rd_rs1` is zero, the result is an unconditional jump
             X::X0 => Instruction::new_j(args.imm, InstrWidth::Compressed),
             X::NonZero(rd_rs1) => Instruction::new_beqz(rd_rs1, args.imm, InstrWidth::Compressed),
+        }
+    }
+
+    /// Convert [`InstrCacheable::Bne`] according to whether registers are non-zero.
+    ///
+    /// [`InstrCacheable::Bne`]: crate::parser::instruction::InstrCacheable::Bne
+    pub(super) fn from_ic_bne(args: &SBTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rs1), split_x0(args.rs2)) {
+            // If both registers are x0, they are equal so we don't branch.
+            (X::X0, X::X0) => Instruction::new_nop(InstrWidth::Uncompressed),
+            // If either register is x0, then the condition to branch is whether the other register doesn't store 0.
+            (X::NonZero(rs1), X::X0) | (X::X0, X::NonZero(rs1)) => {
+                Instruction::new_bnez(rs1, args.imm, InstrWidth::Uncompressed)
+            }
+            (X::NonZero(rs1), X::NonZero(rs2)) if rs1 == rs2 => {
+                // If the registers are the same, they are equal so we don't branch.
+                Instruction::new_nop(InstrWidth::Uncompressed)
+            }
+            (X::NonZero(rs1), X::NonZero(rs2)) => {
+                Instruction::new_bne(rs1, rs2, args.imm, InstrWidth::Uncompressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::CBnez`] according to whether register is non-zero.
+    ///
+    /// [`InstrCacheable::CBnez`]: crate::parser::instruction::InstrCacheable::CBnez
+    pub(super) fn from_ic_cbnez(args: &CIBTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match split_x0(args.rd_rs1) {
+            // If `rd_rs1 == x0`, this will never branch.
+            X::X0 => Instruction::new_nop(InstrWidth::Compressed),
+            X::NonZero(rd_rs1) => Instruction::new_bnez(rd_rs1, args.imm, InstrWidth::Compressed),
         }
     }
 }

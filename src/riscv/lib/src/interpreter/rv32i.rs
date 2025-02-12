@@ -240,38 +240,27 @@ where
         }
     }
 
-    /// `BNE` w.r.t. instruction width argument
-    #[inline(always)]
-    pub(super) fn run_bne_impl(
+    /// Performs a conditional ( `val(rs1) != val(rs2)` ) control transfer.
+    /// If condition met, the offset is sign-extended and added to the pc to form the branch
+    /// target address that is then set, otherwise indicates to proceed to the next instruction.
+    ///
+    /// Relevant RISC-V opcodes:
+    /// - `BNE`
+    /// - `C.BNEZ`
+    pub fn run_bne(
         &mut self,
         imm: i64,
-        rs1: XRegister,
-        rs2: XRegister,
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
         width: InstrWidth,
     ) -> ProgramCounterUpdate {
         let current_pc = self.pc.read();
 
-        // Branch if `val(rs1) != val(rs2)`, jumping `imm` bytes ahead.
-        // Otherwise, jump the width of current instruction
-        if self.xregisters.read(rs1) != self.xregisters.read(rs2) {
+        if self.xregisters.read_nz(rs1) != self.xregisters.read_nz(rs2) {
             ProgramCounterUpdate::Set(current_pc.wrapping_add(imm as u64))
         } else {
             ProgramCounterUpdate::Next(width)
         }
-    }
-
-    /// `BNE` B-type instruction
-    ///
-    /// Sets the target address if registers contain different values,
-    /// otherwise proceeds to the next instruction address
-    pub fn run_bne(
-        &mut self,
-        imm: i64,
-        rs1: XRegister,
-        rs2: XRegister,
-        width: InstrWidth,
-    ) -> ProgramCounterUpdate {
-        self.run_bne_impl(imm, rs1, rs2, width)
     }
 
     /// `BGE` B-type instruction
@@ -526,9 +515,9 @@ mod tests {
             test_nz_branch_instr!(state, run_beq, imm, t1, r1_val, t2, r1_val, width, init_pc, &branch_pcu);
 
             // BNE - different
-            test_branch_instr!(state, run_bne, imm, t1, r1_val, t2, r2_val, width, init_pc, &branch_pcu);
+            test_nz_branch_instr!(state, run_bne, imm, t1, r1_val, t2, r2_val, width, init_pc, &branch_pcu);
             // BNE - equal
-            test_branch_instr!(state, run_bne, imm, t1, r1_val, t2, r1_val, width, init_pc, &next_pcu);
+            test_nz_branch_instr!(state, run_bne, imm, t1, r1_val, t2, r1_val, width, init_pc, &next_pcu);
 
             // BEQ - different - imm = 0
             test_nz_branch_instr!(state, run_beq, 0, t1, r1_val, t2, r2_val, width, init_pc, &next_pcu);
@@ -536,9 +525,9 @@ mod tests {
             test_nz_branch_instr!(state, run_beq, 0, t1, r1_val, t2, r1_val, width, init_pc, &init_pcu);
 
             // BNE - different - imm = 0
-            test_branch_instr!(state, run_bne, 0, t1, r1_val, t2, r2_val, width, init_pc, &init_pcu);
+            test_nz_branch_instr!(state, run_bne, 0, t1, r1_val, t2, r2_val, width, init_pc, &init_pcu);
             // BNE - equal - imm = 0
-            test_branch_instr!(state, run_bne, 0, t1, r1_val, t2, r1_val, width, init_pc, &next_pcu);
+            test_nz_branch_instr!(state, run_bne, 0, t1, r1_val, t2, r1_val, width, init_pc, &next_pcu);
 
             // BEQ - same register - imm = 0
             test_nz_branch_instr!(state, run_beq, 0, t1, r1_val, t1, r2_val, width, init_pc, &init_pcu);
@@ -546,9 +535,9 @@ mod tests {
             test_nz_branch_instr!(state, run_beq, imm, t1, r1_val, t1, r2_val, width, init_pc, &branch_pcu);
 
             // BNE - same register - imm = 0
-            test_branch_instr!(state, run_bne, 0, t1, r1_val, t1, r2_val, width, init_pc, &next_pcu);
+            test_nz_branch_instr!(state, run_bne, 0, t1, r1_val, t1, r2_val, width, init_pc, &next_pcu);
             // BNE - same register
-            test_branch_instr!(state, run_bne, imm, t1, r1_val, t1, r2_val, width, init_pc, &next_pcu);
+            test_nz_branch_instr!(state, run_bne, imm, t1, r1_val, t1, r2_val, width, init_pc, &next_pcu);
         });
     });
 

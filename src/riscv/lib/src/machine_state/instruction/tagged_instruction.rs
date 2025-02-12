@@ -331,13 +331,13 @@ pub enum ArgsShape {
 pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
     use OpCode::*;
     match opcode {
-        Lb | Lh | Lw | Lbu | Lhu | Lwu | Ld | Sb | Sh | Sw | Sd | Bne | Blt | Bge | Bltu | Bgeu
+        Lb | Lh | Lw | Lbu | Lhu | Lwu | Ld | Sb | Sh | Sw | Sd | Blt | Bge | Bltu | Bgeu
         | Jalr | Lrw | Scw | Amoswapw | Amoaddw | Amoxorw | Amoandw | Amoorw | Amominw
         | Amomaxw | Amominuw | Amomaxuw | Lrd | Scd | Amoswapd | Amoaddd | Amoxord | Amoandd
         | Amoord | Amomind | Amomaxd | Amominud | Amomaxud | Rem | Remu | Remw | Remuw | Div
         | Divu | Divw | Divuw | Mul | Mulh | Mulhsu | Mulhu | Mulw | Csrrw | Csrrs | Csrrc
         | Csrrwi | Csrrsi | Csrrci | CLw | CSw | CSwsp | CSub | CAddw | CSubw | CLd | CSd
-        | CSdsp | Unknown | Bnez => ArgsShape::XSrcXDest,
+        | CSdsp | Unknown => ArgsShape::XSrcXDest,
 
         Fadds | Fsubs | Fmuls | Fdivs | Fsqrts | Fmins | Fmaxs | Fsgnjs | Fsgnjns | Fsgnjxs
         | Fmadds | Fmsubs | Fnmsubs | Fnmadds | Faddd | Fsubd | Fmuld | Fdivd | Fsqrtd | Fmind
@@ -353,9 +353,8 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         Fsw | Fsd | CFsd | CFsdsp => ArgsShape::XSrcFSrc,
 
         Addi | Andi | Ori | Xori | Slli | Srli | Srai | Add | Mv | And | Or | Xor | Sll | Srl
-        | Sra | Jal | J | CJr | CJalr | CAddiw | Li | CLui | CLdsp | CLwsp | Nop | Beq | Beqz => {
-            ArgsShape::NZXSrcNZXDest
-        }
+        | Sra | Jal | J | CJr | CJalr | CAddiw | Li | CLui | CLdsp | CLwsp | Nop | Beq | Beqz
+        | Bne | Bnez => ArgsShape::NZXSrcNZXDest,
 
         Addiw | Sub | Addw | Subw | Sllw | Srlw | Sraw | Slti | Sltiu | Slliw | Srliw | Sraiw
         | Slt | Sltu | Lui | Auipc => ArgsShape::XSrcNZXDest,
