@@ -9568,15 +9568,6 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
      delegates depending on their profiles. *)
   let inject_attestations () =
     let* level = Node.get_level node in
-    let* rights =
-      Node.RPC.call node
-      @@ RPC.get_chain_block_helper_baking_rights
-           ~level
-           ~delegate:baker.public_key_hash
-           ()
-    in
-    let round = JSON.(List.hd (as_list rights) |-> "round" |> as_int) in
-
     (* 1. Baker always attests TB and all DAL slots *)
     let* (_ : (Operation_core.t * [`OpHash of peer_id]) list) =
       (* The baker delegate will miss 1/10 of its DAL attestations and will send
@@ -9585,7 +9576,6 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
         if level mod 10 = 0 then No_dal_attestation else Slots all_slots
       in
       inject_dal_attestations
-        ~round
         ~signers:[baker]
         ~nb_slots
         baker_attestation
@@ -9598,7 +9588,6 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
          rewards. *)
       let attestation = if level mod 11 = 0 then Slots [] else Slots [10] in
       inject_dal_attestations
-        ~round
         ~signers:[attesting_dal_slot_10]
         ~nb_slots
         attestation
@@ -9611,7 +9600,6 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
         if level mod 2 = 0 then No_dal_attestation else Slots []
       in
       inject_dal_attestations
-        ~round
         ~signers:[not_attesting_dal]
         ~nb_slots
         dal_attestation
@@ -9625,7 +9613,6 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
         if level mod 4 = 0 then Slots [10] else No_dal_attestation
       in
       inject_dal_attestations
-        ~round
         ~signers:[not_sufficiently_attesting_dal_slot_10]
         ~nb_slots
         slots_to_attest
