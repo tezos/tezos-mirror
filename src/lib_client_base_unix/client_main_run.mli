@@ -109,6 +109,6 @@ val lwt_run :
     (RPC_client_unix.http_ctxt ->
     Client_config.cli_args ->
     Client_context.full Tezos_clic.command list tzresult Lwt.t) ->
-  ?cmd_args:string array ->
+  ?cmd_args:string list ->
   unit ->
   int Lwt.t

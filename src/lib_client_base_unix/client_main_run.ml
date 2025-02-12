@@ -418,7 +418,7 @@ let main (module C : M) ~select_commands ?cmd_args () =
       | x :: rest -> move_autocomplete_token_upfront (x :: acc) rest
       | [] -> (List.rev acc, None)
     in
-    match Array.to_list (Option.value ~default:Sys.argv cmd_args) with
+    match Option.value ~default:(Array.to_list Sys.argv) cmd_args with
     | _ :: args -> move_autocomplete_token_upfront [] args
     | [] -> ([], None)
   in

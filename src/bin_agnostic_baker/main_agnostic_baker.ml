@@ -7,7 +7,7 @@
 
 let run () =
   let open Lwt_result_syntax in
-  let Run_args.{node_endpoint; base_dir; binaries_directory; baker_args} =
+  let Run_args.{node_endpoint; base_dir; baker_args} =
     Run_args.parse_args Sys.argv
   in
   let*! () =
@@ -15,7 +15,7 @@ let run () =
       ~config:(Parameters.log_config ~base_dir)
       ()
   in
-  let daemon = Daemon.create ~binaries_directory ~node_endpoint ~baker_args in
+  let daemon = Daemon.create ~node_endpoint ~baker_args in
   let* (_ : unit) = Daemon.run daemon in
   let*! () = Lwt_utils.never_ending () in
   return_unit

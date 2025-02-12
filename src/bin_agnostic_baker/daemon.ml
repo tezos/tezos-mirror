@@ -9,93 +9,52 @@ open Agnostic_baker_errors
 
 type baker = {
   protocol_hash : Protocol_hash.t;
-  binary_path : string;
   thread : int Lwt.t;
   canceller : int Lwt.u;
 }
 
-module type BAKER = sig
-  module Event : sig
-    val emit : 'a Agnostic_baker_events.t -> 'a -> unit Lwt.t
+let shutdown baker =
+  let open Lwt_syntax in
+  let* () = Agnostic_baker_events.(emit stopping_baker) baker.protocol_hash in
+  Lwt.wakeup baker.canceller 0 ;
+  return_unit
 
-    val shutting_down_process : unit Agnostic_baker_events.t
-
-    val process_started : int Agnostic_baker_events.t
-
-    val process_exited_abnormally :
-      (int * Unix.process_status) Agnostic_baker_events.t
-
-    val cannot_start_process : string Agnostic_baker_events.t
-
-    val waiting_for_process_restart : float Agnostic_baker_events.t
-  end
-
-  val baker_path : ?user_path:string -> Protocol_hash.t -> string
-
-  val shutdown : baker -> unit Lwt.t
-
-  val spawn_baker :
-    Protocol_hash.t ->
-    binaries_directory:string option ->
-    baker_args:string trace ->
-    (baker, tztrace) result Lwt.t
-end
-
-module MakeBaker (Name : Lwt_process_watchdog.NAME) : BAKER = struct
-  module Event = Lwt_process_watchdog.MakeEvent (Name)
-  module Watchdog = Lwt_process_watchdog.Daemon (Event)
-
-  let baker_path ?(user_path = "./") proto_hash =
-    let short_name = Parameters.protocol_short_hash proto_hash in
-    Format.sprintf "%soctez-baker-%s" user_path short_name
-
-  let shutdown baker =
-    let open Lwt_syntax in
-    let* () = Agnostic_baker_events.(emit stopping_baker) baker.protocol_hash in
-    Lwt.wakeup baker.canceller 0 ;
-    return_unit
-
-  (** [spawn_baker protocol_hash ~binaries_directory ~baker_args] spawns a baker
-      for the given [protocol_hash] using the [~binaries_directory] as path for
-      the baker binary and with [~baker_args] as command line arguments. *)
-  let spawn_baker protocol_hash ~binaries_directory ~baker_args =
-    let open Lwt_result_syntax in
-    let args_as_string =
-      Format.asprintf
-        "%a"
-        (Format.pp_print_list
-           ~pp_sep:Format.pp_print_space
-           Format.pp_print_string)
-        baker_args
-    in
-    let*! () =
-      Agnostic_baker_events.(emit starting_baker) (protocol_hash, args_as_string)
-    in
-    let binary_path = baker_path ?user_path:binaries_directory protocol_hash in
-    let baker_args = binary_path :: baker_args in
-    let baker_args = Array.of_list baker_args in
-    let cancel_promise, canceller = Lwt.wait () in
-    let* thread =
-      match Protocol_plugin.find_agnostic_baker_plugin protocol_hash with
-      | Some (module Agnostic_baker_plugin) ->
-          return
-          @@ Agnostic_baker_plugin.run_baker_binary ~baker_args ~cancel_promise
-      | None ->
-          tzfail
-            (Missing_agnostic_baker_plugin
-               (Protocol_hash.to_short_b58check protocol_hash))
-    in
-    let*! () = Agnostic_baker_events.(emit baker_running) protocol_hash in
-    return {protocol_hash; binary_path; thread; canceller}
-end
-
-type baker_instance = Baker : (module BAKER) -> baker_instance
+(** [spawn_baker protocol_hash ~baker_args] spawns a baker for the given [protocol_hash]
+    with [~baker_args] as command line arguments. *)
+let spawn_baker protocol_hash ~baker_args =
+  let open Lwt_result_syntax in
+  let args_as_string =
+    Format.asprintf
+      "%a"
+      (Format.pp_print_list
+         ~pp_sep:Format.pp_print_space
+         Format.pp_print_string)
+      baker_args
+  in
+  let*! () =
+    Agnostic_baker_events.(emit starting_baker) (protocol_hash, args_as_string)
+  in
+  (* The mocked binary argument is necessary for command line parsing done in the running
+     baker function below. It will be discarded, so its value is not important. *)
+  let baker_args = "./mock-binary" :: baker_args in
+  let cancel_promise, canceller = Lwt.wait () in
+  let* thread =
+    match Protocol_plugin.find_agnostic_baker_plugin protocol_hash with
+    | Some (module Agnostic_baker_plugin) ->
+        return
+        @@ Agnostic_baker_plugin.run_baker_binary ~baker_args ~cancel_promise
+    | None ->
+        tzfail
+          (Missing_agnostic_baker_plugin
+             (Protocol_hash.to_short_b58check protocol_hash))
+  in
+  let*! () = Agnostic_baker_events.(emit baker_running) protocol_hash in
+  return {protocol_hash; thread; canceller}
 
 type 'a state = {
-  binaries_directory : string option;
   node_endpoint : string;
   baker_args : string list;
-  mutable current_baker : (baker_instance * baker) option;
+  mutable current_baker : baker option;
 }
 
 type 'a t = 'a state
@@ -129,14 +88,13 @@ let monitor_heads ~node_addr =
 
 (** [hot_swap_baker ~state ~next_protocol_hash] performs a swap in the current
     [~state] of the agnostic baker, exchanging the current baker with the one
-    corresponding to [~next_protocol_hash]. This is done by shutting down the
-    current baking binary and generating the new binary instead. *)
+    corresponding to [~next_protocol_hash]. This is done by stopping the
+    current baking process and spawning a new process instead. *)
 let hot_swap_baker ~state ~next_protocol_hash =
   let open Lwt_result_syntax in
-  let* (module CurrentBaker : BAKER), current_baker =
+  let* current_baker =
     match state.current_baker with
-    | Some (Baker (module Baker), baker) ->
-        return ((module Baker : BAKER), baker)
+    | Some baker -> return baker
     | None -> tzfail Missing_current_baker
   in
   let next_proto_status = Parameters.protocol_status next_protocol_hash in
@@ -145,28 +103,10 @@ let hot_swap_baker ~state ~next_protocol_hash =
       (next_proto_status, next_protocol_hash)
   in
   (* Shutdown previous baker *)
-  let*! () =
-    let*! () = CurrentBaker.shutdown current_baker in
-    state.current_baker <- None ;
-    Lwt.return_unit
-  in
+  let*! () = shutdown current_baker in
+  state.current_baker <- None ;
   let* new_baker =
-    let module Name = struct
-      let base = ["agnostic"; "baker"]
-
-      let component =
-        [
-          "baker"; Format.asprintf "%a" Protocol_hash.pp_short next_protocol_hash;
-        ]
-    end in
-    let module NewBaker = MakeBaker (Name) in
-    let* new_baker =
-      NewBaker.spawn_baker
-        next_protocol_hash
-        ~binaries_directory:state.binaries_directory
-        ~baker_args:state.baker_args
-    in
-    return (Baker (module NewBaker), new_baker)
+    spawn_baker next_protocol_hash ~baker_args:state.baker_args
   in
   state.current_baker <- Some new_baker ;
   return_unit
@@ -194,7 +134,7 @@ let monitor_voting_periods ~state head_stream =
         let* current_protocol_hash =
           match state.current_baker with
           | None -> tzfail Missing_current_baker
-          | Some (_, v) -> return v.protocol_hash
+          | Some v -> return v.protocol_hash
         in
         let* () =
           if not (Protocol_hash.equal current_protocol_hash next_protocol_hash)
@@ -232,23 +172,7 @@ let may_start_initial_baker state =
     match proto_status with
     | Active ->
         let* current_baker =
-          let module Name = struct
-            let base = ["agnostic"; "baker"]
-
-            let component =
-              [
-                "baker";
-                Format.asprintf "%a" Protocol_hash.pp_short protocol_hash;
-              ]
-          end in
-          let module NewBaker = MakeBaker (Name) in
-          let* new_baker =
-            NewBaker.spawn_baker
-              protocol_hash
-              ~binaries_directory:state.binaries_directory
-              ~baker_args:state.baker_args
-          in
-          return (Baker (module NewBaker), new_baker)
+          spawn_baker protocol_hash ~baker_args:state.baker_args
         in
         state.current_baker <- Some current_baker ;
         return_unit
@@ -277,8 +201,8 @@ let may_start_initial_baker state =
   in
   may_start ~head_stream:None ()
 
-let create ~binaries_directory ~node_endpoint ~baker_args =
-  {binaries_directory; node_endpoint; baker_args; current_baker = None}
+let create ~node_endpoint ~baker_args =
+  {node_endpoint; baker_args; current_baker = None}
 
 let run state =
   let open Lwt_result_syntax in
