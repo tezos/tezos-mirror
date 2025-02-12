@@ -3,7 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -57,6 +57,13 @@ type chain_id = Chain_id of Z.t [@@unboxed]
 
 module Chain_id : sig
   val encoding : chain_id Data_encoding.t
+
+  (** [of_string_exn hex] transforms a string to a chain id.
+  It raises an exception if the string is not an number
+  (base 10, hexa, binary, octal ...) *)
+  val of_string_exn : string -> chain_id
+
+  val to_string : chain_id -> string
 
   val decode_le : bytes -> chain_id
 

@@ -3,7 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -128,10 +128,14 @@ let decode_z_be bytes =
 type chain_id = Chain_id of Z.t [@@ocaml.unboxed]
 
 module Chain_id = struct
+  let of_string_exn s = Chain_id (Z.of_string s)
+
+  let to_string (Chain_id s) = Z.to_string s
+
   let encoding =
     Data_encoding.conv
       (fun (Chain_id c) -> z_to_hexa c)
-      (fun c -> Chain_id (Z.of_string c))
+      of_string_exn
       Data_encoding.string
 
   let decode_le bytes = Chain_id (decode_z_le bytes)
