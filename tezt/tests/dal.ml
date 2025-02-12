@@ -860,7 +860,7 @@ type attestation_availability =
   | Bitset of bool array
   | No_dal_attestation
 
-let craft_dal_attestation ?level ?(round = 0) ?payload_level ~signer ~nb_slots
+let craft_dal_attestation ?level ?round ?payload_level ~signer ~nb_slots
     availability client =
   let dal_attestation =
     match availability with
@@ -885,11 +885,20 @@ let craft_dal_attestation ?level ?(round = 0) ?payload_level ~signer ~nb_slots
     JSON.(List.hd JSON.(slots |> as_list) |-> "slots" |> as_list)
     |> List.hd |> JSON.as_int
   in
-  let* block_payload_hash =
+  let* block_payload_hash, round =
     let block =
       (match payload_level with None -> level | Some l -> l) |> string_of_int
     in
-    Operation.Consensus.get_block_payload_hash ~block client
+    let* block_payload_hash =
+      Operation.Consensus.get_block_payload_hash ~block client
+    in
+    let* round =
+      match round with
+      | None ->
+          Client.RPC.call client @@ RPC.get_chain_block_helper_round ~block ()
+      | Some round -> return round
+    in
+    return (block_payload_hash, round)
   in
   Operation.Consensus.operation
     ~with_dal:true
@@ -903,12 +912,12 @@ let craft_dal_attestation ?level ?(round = 0) ?payload_level ~signer ~nb_slots
        ())
     client
 
-let inject_dal_attestation ?level ?(round = 0) ?payload_level ?force ?error
-    ?request ~signer ~nb_slots availability client =
+let inject_dal_attestation ?level ?round ?payload_level ?force ?error ?request
+    ~signer ~nb_slots availability client =
   let* op =
     craft_dal_attestation
       ?level
-      ~round
+      ?round
       ?payload_level
       ~signer
       ~nb_slots
