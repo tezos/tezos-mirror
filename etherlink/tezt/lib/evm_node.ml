@@ -1690,7 +1690,7 @@ let make_kernel_installer_config ?max_delayed_inbox_blueprint_length
   let process = Process.spawn (Uses.path Constant.octez_evm_node) cmd in
   Runnable.{value = process; run = Process.check}
 
-let make_l2_kernel_installer_config ?chain_id ?bootstrap_balance
+let make_l2_kernel_installer_config ?chain_id ?chain_family ?bootstrap_balance
     ?bootstrap_accounts ?minimum_base_fee_per_gas ?(da_fee_per_byte = Wei.zero)
     ?sequencer_pool_address ?maximum_gas_per_transaction
     ?(set_account_code = []) ?world_state_path ~output () =
@@ -1704,6 +1704,7 @@ let make_l2_kernel_installer_config ?chain_id ?bootstrap_balance
   let cmd =
     ["make"; "l2"; "kernel"; "installer"; "config"; output]
     @ Cli_arg.optional_arg "l2-chain-id" string_of_int chain_id
+    @ Cli_arg.optional_arg "l2-chain-family" Fun.id chain_family
     @ Cli_arg.optional_arg
         "minimum-base-fee-per-gas"
         Wei.to_string
