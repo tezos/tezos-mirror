@@ -13,8 +13,7 @@ use super::{
     },
     verify_backend, Array, Atom, DynArray, Layout, Many, RefProofGenOwnedAlloc,
 };
-use crate::{default::ConstDefault, storage::binary};
-use serde::de::Error;
+use crate::{array_utils::boxed_array, default::ConstDefault, storage::binary};
 
 /// Errors that may occur when parsing a Merkle proof
 #[derive(Debug, thiserror::Error)]
@@ -30,6 +29,9 @@ pub enum FromProofError {
 
     #[error("Encountered a node with a bad number of branches: expected {expected}, got {got}")]
     BadNumberOfBranches { expected: usize, got: usize },
+
+    #[error("Expected a leaf of size {expected}, got {got}")]
+    UnexpectedLeafSize { expected: usize, got: usize },
 
     #[error("Encountered a leaf where a node was expected")]
     UnexpectedLeaf,
@@ -65,11 +67,11 @@ pub type ProofTree<'a> = ProofPart<'a, MerkleProof>;
 
 impl<'a> ProofTree<'a> {
     /// Interpret this part of the Merkle proof as a node with `LEN` branches.
-    pub fn into_branches<const LEN: usize>(self) -> Result<[Self; LEN]> {
+    pub fn into_branches<const LEN: usize>(self) -> Result<Box<[Self; LEN]>> {
         let ProofTree::Present(proof) = self else {
             // The requested branches are not represented in the Merkle proof at all, not even
             // through a blinded node.
-            return Ok([ProofTree::Absent; LEN]);
+            return Ok(boxed_array![ProofTree::Absent; LEN]);
         };
 
         match proof {
@@ -81,11 +83,21 @@ impl<'a> ProofTree<'a> {
                             expected: LEN,
                         }
                     })?;
-                Ok(branches.each_ref().map(ProofTree::Present))
+                Ok(branches
+                    .iter()
+                    .map(ProofTree::Present)
+                    .collect::<Vec<_>>()
+                    .try_into()
+                    .map_err(|_| {
+                        unreachable!(
+                            "Converting a vector to an array of the same size always succeeds"
+                        )
+                    })
+                    .unwrap())
             }
 
             Tree::Leaf(leaf) => match leaf {
-                MerkleProofLeaf::Blind(_hash) => Ok([ProofTree::Absent; LEN]),
+                MerkleProofLeaf::Blind(_hash) => Ok(boxed_array![ProofTree::Absent; LEN]),
                 _ => Err(FromProofError::UnexpectedLeaf)?,
             },
         }
@@ -189,35 +201,31 @@ impl<const LEN: usize> ProofLayout for DynArray<LEN> {
         while let Some((start, length, tree)) = pipeline.pop() {
             if length <= MERKLE_LEAF_SIZE.get() {
                 // Must be a leaf.
-
                 let super::ProofPart::Present(data) = tree.into_leaf()? else {
                     // No point in doing anything if the leaf isn't present.
                     continue;
                 };
 
-                let data: Box<[u8; MERKLE_LEAF_SIZE.get()]> = {
-                    let data: Box<[u8]> = binary::deserialise(data)?;
-                    data.try_into().map_err(|err: Box<[u8]>| {
-                        bincode::Error::custom(format!(
-                            "Invalid Merkle leaf: expected {} bytes, got {}",
-                            MERKLE_LEAF_SIZE.get(),
-                            err.len()
-                        ))
-                    })?
-                };
-
                 let start = verify_backend::PageId::from_address(start);
 
+                // TODO RV-463: Leaves smaller than `MERKLE_LEAF_SIZE` should also be accepted.
+                let data: Box<[u8; MERKLE_LEAF_SIZE.get()]> =
+                    Box::new(data.to_vec().try_into().map_err(|_| {
+                        FromProofError::UnexpectedLeafSize {
+                            got: data.len(),
+                            expected: MERKLE_LEAF_SIZE.get(),
+                        }
+                    })?);
                 pages.push((start, data));
             } else {
                 // Expecting a branching point.
-
+                // TODO RV-463: Nodes with fewer than `MERKLE_ARITY` children should also be accepted.
                 let branches = tree.into_branches::<{ MERKLE_ARITY }>()?;
                 let branch_max_length = length.div_ceil(MERKLE_ARITY);
 
                 let mut branch_start = start;
                 let mut length_left = length;
-                for branch in branches {
+                for branch in branches.into_iter() {
                     let this_branch_length = branch_max_length.min(length_left);
 
                     if this_branch_length > 0 {
@@ -247,7 +255,7 @@ where
     }
 
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
-        let [left, right] = proof.into_branches()?;
+        let [left, right] = *proof.into_branches()?;
         Ok((A::from_proof(left)?, B::from_proof(right)?))
     }
 }
@@ -268,7 +276,7 @@ where
     }
 
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
-        let [a, b, c] = proof.into_branches()?;
+        let [a, b, c] = *proof.into_branches()?;
         Ok((A::from_proof(a)?, B::from_proof(b)?, C::from_proof(c)?))
     }
 }
@@ -291,7 +299,7 @@ where
     }
 
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
-        let [a, b, c, d] = proof.into_branches()?;
+        let [a, b, c, d] = *proof.into_branches()?;
         Ok((
             A::from_proof(a)?,
             B::from_proof(b)?,
@@ -321,7 +329,7 @@ where
     }
 
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
-        let [a, b, c, d, e] = proof.into_branches()?;
+        let [a, b, c, d, e] = *proof.into_branches()?;
         Ok((
             A::from_proof(a)?,
             B::from_proof(b)?,
@@ -354,7 +362,7 @@ where
     }
 
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
-        let [a, b, c, d, e, f] = proof.into_branches()?;
+        let [a, b, c, d, e, f] = *proof.into_branches()?;
         Ok((
             A::from_proof(a)?,
             B::from_proof(b)?,
@@ -399,7 +407,8 @@ where
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
         proof
             .into_branches::<LEN>()?
-            .into_iter()
+            .iter()
+            .copied()
             .map(T::from_proof)
             .collect::<Result<Vec<_>, _>>()
     }
