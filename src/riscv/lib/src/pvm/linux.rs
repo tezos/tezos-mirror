@@ -37,6 +37,9 @@ const PPOLL: u64 = 73;
 /// System call number for `set_tid_address` on RISC-V
 const SET_TID_ADDRESS: u64 = 96;
 
+/// System call number for `sigaltstack` on RISC-V
+const SIGALTSTACK: u64 = 132;
+
 /// System call number for `rt_sigaction` on RISC-V
 const RT_SIGACTION: u64 = 134;
 
@@ -243,6 +246,7 @@ impl<M: ManagerBase> SupervisorState<M> {
         match system_call_no {
             PPOLL => return self.handle_ppoll(core),
             SET_TID_ADDRESS => return self.handle_set_tid_address(core),
+            SIGALTSTACK => return self.handle_sigaltstack(core),
             RT_SIGACTION => return self.handle_rt_sigaction(core),
             _ => {}
         }
@@ -359,6 +363,30 @@ impl<M: ManagerBase> SupervisorState<M> {
         }
 
         // Indicate success by returning 0
+        core.hart.xregisters.write(registers::a0, 0);
+
+        true
+    }
+
+    /// Handle `sigaltstack` system call. The new signal stack configuration is discarded. If the
+    /// old signal stack configuration is requested, it will be zeroed out.
+    fn handle_sigaltstack(&mut self, core: &mut MachineCoreState<impl MainMemoryLayout, M>) -> bool
+    where
+        M: ManagerRead + ManagerWrite,
+    {
+        let old = core.hart.xregisters.read(registers::a1);
+
+        /// `sizeof(struct sigaltstack)` on the Kernel side
+        const SIZE_SIGALTSTACK: usize = 24;
+
+        if let Some(old) = NonZeroU64::new(old) {
+            let Ok(()) = core.main_memory.write(old.get(), [0u8; SIZE_SIGALTSTACK]) else {
+                core.hart.xregisters.write(registers::a0, -EFAULT as u64);
+                return true;
+            };
+        }
+
+        // Return 0 as an indicator of success
         core.hart.xregisters.write(registers::a0, 0);
 
         true
