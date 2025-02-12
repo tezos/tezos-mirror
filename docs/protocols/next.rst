@@ -31,6 +31,12 @@ Data Availability Layer
   similar to Tenderbake's ``/participation`` RPC to track bakers' DAL activity
   (MR :gl:`!16168`)
 
+- **Change** The RPC ``/chains/main/blocks/head/context/delegates/<pkh>``'s
+  result now contains a new field ``"dal_participation"`` providing DAL
+  participation information when the DAL incentives flag is set. This introduces
+  a breaking change for applications using the binary encoding format. (MR
+  :gl:`!16430`)
+
 - A new anonymous operation "DAL entrapment evidence" was added. Bakers that
   attest trapped DAL slots lose their DAL rewards. (MRs :gl:`!15677`,
   :gl:`!15832`, :gl:`!15836`, :gl:`!16253`, :gl:`!16224`, :gl:`!16322`)
@@ -179,7 +185,7 @@ Minor Changes
 Internal
 --------
 
-- Added a stub RISC-V module for the protocol environment 
+- Added a stub RISC-V module for the protocol environment
   and used it in the protocol implementation for the RISC-V PVM. (MRs :gl:`!15921`)
 
 - Removed dead code related to autostaking, old slashing, and Adaptive
