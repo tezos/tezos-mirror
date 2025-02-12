@@ -90,6 +90,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
       ~evm_services:
         Evm_ro_context.(evm_services_methods ctxt time_between_blocks)
       ~data_dir
+      Stateless
       config
       (rpc_backend, ctxt.smart_rollup_address)
   in

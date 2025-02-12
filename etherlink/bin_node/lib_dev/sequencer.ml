@@ -193,6 +193,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
         Evm_ro_context.(
           evm_services_methods ro_ctxt sequencer_config.time_between_blocks)
       ~data_dir
+      Full
       configuration
       (backend, smart_rollup_address_typed)
   in

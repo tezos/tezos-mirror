@@ -58,19 +58,20 @@ let main
 
     let ignore_block_param = config.proxy.ignore_block_param
   end) in
-  let mode =
+  let pool_mode, validation_mode =
     match config.proxy.evm_node_endpoint with
-    | None -> Tx_pool.Proxy
+    | None -> (Tx_pool.Proxy, Validate.Full)
     | Some evm_node_endpoint ->
-        Tx_pool.Forward
-          {
-            injector =
-              (fun _ raw_tx ->
-                Injector.send_raw_transaction
-                  ~keep_alive:config.keep_alive
-                  ~base:evm_node_endpoint
-                  ~raw_tx);
-          }
+        ( Tx_pool.Forward
+            {
+              injector =
+                (fun _ raw_tx ->
+                  Injector.send_raw_transaction
+                    ~keep_alive:config.keep_alive
+                    ~base:evm_node_endpoint
+                    ~raw_tx);
+            },
+          Validate.Stateless )
   in
   let* () =
     if not config.experimental_features.enable_send_raw_transaction then
@@ -80,7 +81,7 @@ let main
         {
           backend = (module Rollup_node_rpc);
           smart_rollup_address;
-          mode;
+          mode = pool_mode;
           tx_timeout_limit = config.tx_pool_timeout_limit;
           tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
           tx_pool_tx_per_addr_limit =
@@ -97,6 +98,7 @@ let main
   in
   let* server_finalizer =
     Rpc_server.start_public_server
+      validation_mode
       config
       ((module Rollup_node_rpc), smart_rollup_address)
   in

@@ -95,3 +95,6 @@ val find :
   Ethereum_types.legacy_transaction_object option tzresult Lwt.t
 
 val clear_popped_transactions : unit -> unit tzresult Lwt.t
+
+(** [mode] retrieves the current pool mode *)
+val mode : unit -> mode tzresult Lwt.t
