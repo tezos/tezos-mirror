@@ -16,7 +16,7 @@ use crate::{
 };
 
 impl Instruction {
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the `Add` [`OpCode`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the [`OpCode::Add`].
     pub(crate) fn new_add(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
@@ -35,7 +35,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the `Mv` [`OpCode`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Mv`].
     pub(crate) fn new_mv(rd: NonZeroXRegister, rs2: NonZeroXRegister, width: InstrWidth) -> Self {
         Self {
             opcode: OpCode::Mv,
@@ -51,7 +51,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the `Li` [`OpCode`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Li`].
     pub(crate) fn new_li(rd: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
         Self {
             opcode: OpCode::Li,
@@ -68,7 +68,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the `Nop` [`OpCode`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for  [`OpCode::Nop`].
     pub(crate) fn new_nop(width: InstrWidth) -> Self {
         Self {
             opcode: OpCode::Nop,
@@ -84,7 +84,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the `Addi` [`OpCode`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Addi`].
     pub(crate) fn new_addi(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
@@ -106,7 +106,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the `Andi` [`OpCode`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Andi`].
     pub(crate) fn new_andi(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
@@ -128,7 +128,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the `Ori` [`OpCode`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Ori`].
     pub(crate) fn new_ori(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
@@ -150,7 +150,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the `Xori` [`OpCode`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Xori`].
     pub(crate) fn new_xori(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
@@ -172,7 +172,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the  [`OpCode::Slli`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Slli`].
     pub(crate) fn new_slli(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
@@ -194,7 +194,51 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for  [`OpCode::And`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Srli`].
+    pub(crate) fn new_srli(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Srli,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                // We are adding a default value for rs2 as NonZeroXRegister::x1
+                // to be explicit that it is of NonZeroXRegister type.
+                rs2: NonZeroXRegister::x1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Srai`].
+    pub(crate) fn new_srai(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Srai,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                // We are adding a default value for rs2 as NonZeroXRegister::x1
+                // to be explicit that it is of NonZeroXRegister type.
+                rs2: NonZeroXRegister::x1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::And`].
     pub(crate) fn new_and(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
@@ -213,7 +257,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the [`OpCode::Or`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Or`].
     pub(crate) fn new_or(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
@@ -232,7 +276,7 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the [`OpCode::Xor`].
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Xor`].
     pub(crate) fn new_xor(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
@@ -361,6 +405,60 @@ impl Instruction {
             X::X0 => Instruction::new_li(args.rd, 0, InstrWidth::Uncompressed),
             X::NonZero(rs1) => {
                 Instruction::new_slli(args.rd, rs1, args.imm, InstrWidth::Uncompressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::Srli`] according to whether registers are non-zero.
+    ///
+    /// [`InstrCacheable::Srli`]: crate::parser::instruction::InstrCacheable::Srli
+    pub(super) fn from_ic_srli(args: &NonZeroRdITypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match split_x0(args.rs1) {
+            // shifting 0 by any amount is 0.
+            X::X0 => Instruction::new_li(args.rd, 0, InstrWidth::Uncompressed),
+            X::NonZero(rs1) => {
+                Instruction::new_srli(args.rd, rs1, args.imm, InstrWidth::Uncompressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::CSrli`] according to whether register is non-zero.
+    ///
+    /// [`InstrCacheable::CSrli`]: crate::parser::instruction::InstrCacheable::CSrli
+    pub(super) fn from_ic_csrli(args: &CIBTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match split_x0(args.rd_rs1) {
+            X::X0 => Instruction::new_nop(InstrWidth::Compressed),
+            X::NonZero(rd_rs1) => {
+                Instruction::new_srli(rd_rs1, rd_rs1, args.imm, InstrWidth::Compressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::Srai`] according to whether registers are non-zero.
+    ///
+    /// [`InstrCacheable::Srai`]: crate::parser::instruction::InstrCacheable::Srai
+    pub(super) fn from_ic_srai(args: &NonZeroRdITypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match split_x0(args.rs1) {
+            // shifting 0 by any amount is 0.
+            X::X0 => Instruction::new_li(args.rd, 0, InstrWidth::Uncompressed),
+            X::NonZero(rs1) => {
+                Instruction::new_srai(args.rd, rs1, args.imm, InstrWidth::Uncompressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::CSrai`] according to whether registers are non-zero.
+    ///
+    /// [`InstrCacheable::CSrai`]: crate::parser::instruction::InstrCacheable::CSrai
+    pub(super) fn from_ic_csrai(args: &CIBTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match split_x0(args.rd_rs1) {
+            X::X0 => Instruction::new_nop(InstrWidth::Compressed),
+            X::NonZero(rd_rs1) => {
+                Instruction::new_srai(rd_rs1, rd_rs1, args.imm, InstrWidth::Compressed)
             }
         }
     }

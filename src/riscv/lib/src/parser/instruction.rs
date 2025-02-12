@@ -313,7 +313,13 @@ pub enum InstrCacheable {
     ///
     /// NOTE: RV64I makes the shift amount (shamt) be 6 bits wide for SLLI
     Slli(NonZeroRdITypeArgs),
+    /// `SRLI`- Shift right logically (zeros are shifted in the upper bits)
+    ///
+    /// NOTE: RV64I makes the shift amount (shamt) be 6 bits wide for SRLI
     Srli(NonZeroRdITypeArgs),
+    /// `SRAI` - Shift right arithmetically (sign-bits are shifted in the upper bits)
+    ///
+    /// NOTE: RV64I makes the shift amount (shamt) be 6 bits wide for SRAI
     Srai(NonZeroRdITypeArgs),
     Slliw(NonZeroRdITypeArgs),
     Srliw(NonZeroRdITypeArgs),
@@ -488,9 +494,16 @@ pub enum InstrCacheable {
     /// encoded in the instruction (see U:C-16.5).
     CAddi4spn(CIBTypeArgs),
     /// `C.SLLI` - Performs a logical left shift of the value in register `rd_rs1`
-    /// then writes the result back to `rd_rs1`.
+    /// by `imm` bits (referred to as `shamt` or `shift-amount`), then writes the result
+    /// back to `rd_rs1`.
     CSlli(CIBNZTypeArgs),
+    /// `C.SRLI` -  Performs a logical right shift of the value in register `rd_rs1`
+    /// by `imm` bits (referred to as `shamt` or `shift-amount`), then writes the result
+    /// back to `rd_rs1`.
     CSrli(CIBTypeArgs),
+    /// `C.SRAI` - Performs an arithmetic right shift of the value in register `rd_rs1`
+    /// by `imm` bits (referred to as `shamt` or `shift-amount`), then writes the result
+    /// back to `rd_rs1`.
     CSrai(CIBTypeArgs),
     /// `C.ANDI` - Computes the bitwise AND of the value in register `rd_rs1` and
     /// the sign-extended 6-bit immediate, then writes the result back to `rd_rs1`.
