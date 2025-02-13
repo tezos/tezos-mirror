@@ -145,9 +145,6 @@ type block_info = {
 
 type cache = {
   known_timestamps : Timestamp.time Baking_cache.Timestamp_of_round_cache.t;
-  round_timestamps :
-    (Timestamp.time * Round.t * Delegate.t)
-    Baking_cache.Round_timestamp_interval_cache.t;
 }
 
 let prequorum_encoding =
@@ -1129,10 +1126,7 @@ let cache_size_limit = 100
 
 let create_cache () =
   let open Baking_cache in
-  {
-    known_timestamps = Timestamp_of_round_cache.create cache_size_limit;
-    round_timestamps = Round_timestamp_interval_cache.create cache_size_limit;
-  }
+  {known_timestamps = Timestamp_of_round_cache.create cache_size_limit}
 
 (** Memoization wrapper for [Round.timestamp_of_round]. *)
 let timestamp_of_round state ~predecessor_timestamp ~predecessor_round ~round =

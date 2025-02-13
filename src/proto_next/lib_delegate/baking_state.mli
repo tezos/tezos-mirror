@@ -482,9 +482,6 @@ val pp_validation_mode : Format.formatter -> validation_mode -> unit
 (** Caches of timestamps *)
 type cache = {
   known_timestamps : Timestamp.time Baking_cache.Timestamp_of_round_cache.t;
-  round_timestamps :
-    (Timestamp.time * Round.t * Delegate.t)
-    Baking_cache.Round_timestamp_interval_cache.t;
 }
 
 val create_cache : unit -> cache
