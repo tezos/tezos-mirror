@@ -1312,6 +1312,11 @@ let current_cycle b =
   let current_level = b.header.shell.level in
   current_cycle_of_level ~blocks_per_cycle ~current_level
 
+let cycle_position b =
+  let blocks_per_cycle = b.constants.blocks_per_cycle in
+  let level = b.header.shell.level in
+  Int32.rem level blocks_per_cycle
+
 let first_level_of_cycle (constants : Constants.Parametric.t) ~level =
   let blocks_per_cycle = constants.blocks_per_cycle in
   Int32.(equal (rem level blocks_per_cycle) zero)

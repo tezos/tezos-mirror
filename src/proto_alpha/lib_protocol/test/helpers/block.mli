@@ -366,6 +366,8 @@ val current_level : block -> int32
 
 val current_cycle : block -> Cycle.t
 
+val cycle_position : block -> int32
+
 val first_level_of_cycle : Constants.Parametric.t -> level:int32 -> bool
 
 val first_block_of_cycle : block -> bool
