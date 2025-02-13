@@ -17,6 +17,7 @@ depends: [
   "cohttp" { >= "5.3.1" }
   "mirage-crypto-rng" { >= "1.0.0" }
   "octez-libs"
+  "lwt_log"
   "octez-l2-libs"
   "crunch" { >= "3.3.0" }
   "caqti-lwt" { >= "2.0.1" }

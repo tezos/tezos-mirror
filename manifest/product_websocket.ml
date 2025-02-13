@@ -33,3 +33,11 @@ let websocket_cohttp_lwt =
     ~path:"websocket/lwt"
     ~modules:["websocket_cohttp_lwt"]
     ~deps:[cohttp_lwt_unix; websocket]
+
+let websocket_lwt_unix =
+  public_lib
+    "octez-evm-node-libs.websocket_lwt_unix"
+    ~internal_name:"websocket_lwt_unix"
+    ~path:"websocket/lwt"
+    ~modules:["websocket_lwt_unix"]
+    ~deps:[lwt_log; cohttp_lwt_unix; websocket]
