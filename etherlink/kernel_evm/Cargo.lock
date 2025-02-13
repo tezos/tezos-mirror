@@ -671,7 +671,7 @@ name = "evm-evaluation"
 version = "0.1.0"
 dependencies = [
  "bytes",
- "evm-execution",
+ "evm-execution-latest",
  "hex",
  "hex-literal",
  "primitive-types",
@@ -680,18 +680,18 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "structopt",
- "tezos-evm-logging",
- "tezos-evm-runtime",
+ "tezos-evm-logging-latest",
+ "tezos-evm-runtime-latest",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-mock",
- "tezos_ethereum",
+ "tezos_ethereum_latest",
  "thiserror",
  "walkdir",
 ]
 
 [[package]]
-name = "evm-execution"
+name = "evm-execution-latest"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives",
@@ -712,19 +712,19 @@ dependencies = [
  "sha2 0.10.6",
  "sha3",
  "substrate-bn",
- "tezos-evm-logging",
- "tezos-evm-runtime",
- "tezos-indexable-storage",
+ "tezos-evm-logging-latest",
+ "tezos-evm-runtime-latest",
+ "tezos-indexable-storage-latest",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-mock",
  "tezos-smart-rollup-storage",
- "tezos-storage",
+ "tezos-storage-latest",
  "tezos_crypto_rs",
  "tezos_data_encoding",
- "tezos_ethereum",
+ "tezos_ethereum_latest",
  "thiserror",
 ]
 
@@ -758,7 +758,7 @@ dependencies = [
  "ethbloom",
  "ethereum",
  "evm",
- "evm-execution",
+ "evm-execution-latest",
  "getrandom",
  "hex",
  "libsecp256k1",
@@ -770,9 +770,9 @@ dependencies = [
  "rlp",
  "sha3",
  "softfloat",
- "tezos-evm-logging",
- "tezos-evm-runtime",
- "tezos-indexable-storage",
+ "tezos-evm-logging-latest",
+ "tezos-evm-runtime-latest",
+ "tezos-indexable-storage-latest",
  "tezos-smart-rollup",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
@@ -783,10 +783,10 @@ dependencies = [
  "tezos-smart-rollup-mock",
  "tezos-smart-rollup-panic-hook",
  "tezos-smart-rollup-storage",
- "tezos-storage",
+ "tezos-storage-latest",
  "tezos_crypto_rs",
  "tezos_data_encoding",
- "tezos_ethereum",
+ "tezos_ethereum_latest",
  "thiserror",
 ]
 
@@ -2182,7 +2182,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos-evm-logging"
+name = "tezos-evm-logging-latest"
 version = "0.1.0"
 dependencies = [
  "num-derive",
@@ -2191,11 +2191,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos-evm-runtime"
+name = "tezos-evm-runtime-latest"
 version = "0.1.0"
 dependencies = [
  "sha3",
- "tezos-evm-logging",
+ "tezos-evm-logging-latest",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",
@@ -2204,16 +2204,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos-indexable-storage"
+name = "tezos-indexable-storage-latest"
 version = "0.1.0"
 dependencies = [
  "rlp",
- "tezos-evm-logging",
- "tezos-evm-runtime",
+ "tezos-evm-logging-latest",
+ "tezos-evm-runtime-latest",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-mock",
  "tezos-smart-rollup-storage",
- "tezos-storage",
+ "tezos-storage-latest",
  "thiserror",
 ]
 
@@ -2367,7 +2367,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos-storage"
+name = "tezos-storage-latest"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -2375,11 +2375,11 @@ dependencies = [
  "primitive-types",
  "rlp",
  "sha3",
- "tezos-evm-runtime",
+ "tezos-evm-runtime-latest",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-storage",
  "tezos_crypto_rs",
- "tezos_ethereum",
+ "tezos_ethereum_latest",
  "thiserror",
 ]
 
@@ -2436,7 +2436,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos_ethereum"
+name = "tezos_ethereum_latest"
 version = "0.1.0"
 dependencies = [
  "anyhow",
