@@ -7,16 +7,14 @@
 
 open Agnostic_baker_errors
 
-type baker = {
-  protocol_hash : Protocol_hash.t;
-  thread : int Lwt.t;
-  canceller : int Lwt.u;
-}
+type process = {thread : int Lwt.t; canceller : int Lwt.u}
+
+type baker = {protocol_hash : Protocol_hash.t; process : process}
 
 let shutdown baker =
   let open Lwt_syntax in
   let* () = Agnostic_baker_events.(emit stopping_baker) baker.protocol_hash in
-  Lwt.wakeup baker.canceller 0 ;
+  Lwt.wakeup baker.process.canceller 0 ;
   return_unit
 
 (** [spawn_baker protocol_hash ~baker_args] spawns a baker for the given [protocol_hash]
@@ -49,7 +47,7 @@ let spawn_baker protocol_hash ~baker_args =
              (Protocol_hash.to_short_b58check protocol_hash))
   in
   let*! () = Agnostic_baker_events.(emit baker_running) protocol_hash in
-  return {protocol_hash; thread; canceller}
+  return {protocol_hash; process = {thread; canceller}}
 
 type 'a state = {
   node_endpoint : string;
