@@ -1162,7 +1162,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "evm-execution"
+name = "evm-execution-bifrost"
 version = "0.1.0"
 dependencies = [
  "aurora-engine-modexp",
@@ -1178,18 +1178,18 @@ dependencies = [
  "sha2 0.10.8",
  "sha3",
  "substrate-bn",
- "tezos-evm-logging",
- "tezos-evm-runtime",
- "tezos-indexable-storage",
+ "tezos-evm-logging-bifrost",
+ "tezos-evm-runtime-bifrost",
+ "tezos-indexable-storage-bifrost",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-storage",
- "tezos-storage",
+ "tezos-storage-bifrost",
  "tezos_crypto_rs",
  "tezos_data_encoding",
- "tezos_ethereum",
+ "tezos_ethereum_bifrost",
  "thiserror",
 ]
 
@@ -1213,7 +1213,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "evm_kernel"
+name = "evm_kernel_bifrost"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1221,7 +1221,7 @@ dependencies = [
  "ethbloom",
  "ethereum",
  "evm",
- "evm-execution",
+ "evm-execution-bifrost",
  "hex",
  "libsecp256k1",
  "num-derive",
@@ -1230,9 +1230,9 @@ dependencies = [
  "rlp",
  "sha3",
  "softfloat",
- "tezos-evm-logging",
- "tezos-evm-runtime",
- "tezos-indexable-storage",
+ "tezos-evm-logging-bifrost",
+ "tezos-evm-runtime-bifrost",
+ "tezos-indexable-storage-bifrost",
  "tezos-smart-rollup",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
@@ -1241,10 +1241,10 @@ dependencies = [
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-installer-config",
  "tezos-smart-rollup-storage",
- "tezos-storage",
+ "tezos-storage-bifrost",
  "tezos_crypto_rs",
  "tezos_data_encoding",
- "tezos_ethereum",
+ "tezos_ethereum_bifrost",
  "thiserror",
 ]
 
@@ -2513,13 +2513,13 @@ name = "octez-evm-node-wasm-runtime"
 version = "0.0.0-dev"
 dependencies = [
  "env_logger",
- "evm_kernel",
+ "evm_kernel_bifrost",
  "hex",
  "librustzcash",
  "log",
  "ocaml",
  "ocaml-build",
- "tezos-evm-runtime",
+ "tezos-evm-runtime-bifrost",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-host",
  "tezos_crypto_rs",
@@ -3714,7 +3714,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos-evm-logging"
+name = "tezos-evm-logging-bifrost"
 version = "0.1.0"
 dependencies = [
  "num-derive",
@@ -3723,11 +3723,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos-evm-runtime"
+name = "tezos-evm-runtime-bifrost"
 version = "0.1.0"
 dependencies = [
  "sha3",
- "tezos-evm-logging",
+ "tezos-evm-logging-bifrost",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",
@@ -3736,16 +3736,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos-indexable-storage"
+name = "tezos-indexable-storage-bifrost"
 version = "0.1.0"
 dependencies = [
  "rlp",
- "tezos-evm-logging",
- "tezos-evm-runtime",
+ "tezos-evm-logging-bifrost",
+ "tezos-evm-runtime-bifrost",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-mock",
  "tezos-smart-rollup-storage",
- "tezos-storage",
+ "tezos-storage-bifrost",
  "thiserror",
 ]
 
@@ -3899,7 +3899,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos-storage"
+name = "tezos-storage-bifrost"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -3907,11 +3907,11 @@ dependencies = [
  "primitive-types 0.12.2",
  "rlp",
  "sha3",
- "tezos-evm-runtime",
+ "tezos-evm-runtime-bifrost",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-storage",
  "tezos_crypto_rs",
- "tezos_ethereum",
+ "tezos_ethereum_bifrost",
  "thiserror",
 ]
 
@@ -3968,7 +3968,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos_ethereum"
+name = "tezos_ethereum_bifrost"
 version = "0.1.0"
 dependencies = [
  "anyhow",
