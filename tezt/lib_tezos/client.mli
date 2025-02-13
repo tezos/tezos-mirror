@@ -760,6 +760,17 @@ val propose_for :
   t ->
   unit Lwt.t
 
+(** [propose_for_and_wait] is the analogous of {!bake_for_and_wait} for
+    {!propose_for}. *)
+val propose_for_and_wait :
+  ?endpoint:endpoint ->
+  ?minimal_timestamp:bool ->
+  ?protocol:Protocol.t ->
+  ?key:string list ->
+  ?force:bool ->
+  t ->
+  unit Lwt.t
+
 (** Run [octez-client show address <alias> --show-secret] and parse
     the output into an [Account.key].
     E.g. for [~alias:"bootstrap1"] the command yields:
