@@ -24,6 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Force linking for having Simple_profiler to init few backends by itself *)
+let () = ignore Simple_profiler.headless
+
 let () =
   Client_commands.register Protocol.hash @@ fun _network ->
   List.map (Tezos_clic.map_command (new Protocol_client_context.wrap_full))
