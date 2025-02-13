@@ -16,6 +16,7 @@ type t = {
   media : Media_type.t;
   conn : Websocket_lwt_unix.conn;
   response_stream : response Lwt_stream.t;
+  binary : bool;
   mutable id : int;
 }
 
@@ -23,6 +24,81 @@ type 'a subscription = {
   stream : 'a Lwt_stream.t;
   unsubscribe : unit -> bool tzresult Lwt.t;
 }
+
+module Event = struct
+  include Internal_event.Simple
+
+  let section = ["evm"; "client"; "websocket"]
+
+  let exn =
+    let open Data_encoding in
+    conv Printexc.to_string (fun s -> Failure s) string
+
+  let pp_exn fmt e = Format.pp_print_string fmt (Printexc.to_string e)
+
+  let disconnecting =
+    declare_0
+      ~section
+      ~name:"websocket_client_disconnecting"
+      ~msg:"disconnecting websocket client"
+      ~level:Debug
+      ()
+
+  let disconnected =
+    declare_0
+      ~section
+      ~name:"websocket_client_disconnected"
+      ~msg:"websocket client disconnected"
+      ~level:Debug
+      ()
+
+  let disconnection_error =
+    declare_1
+      ~section
+      ~name:"websocket_client_disconnection_error"
+      ~msg:"websocket client disconnection error {exn}"
+      ~level:Debug
+      ("exn", exn)
+      ~pp1:pp_exn
+
+  let decoding_error =
+    declare_2
+      ~section
+      ~name:"websocket_client_decoding_error"
+      ~msg:"websocket client decoding error {error1}, {error2}"
+      ~level:Error
+      ("error1", Data_encoding.string)
+      ("error2", Data_encoding.string)
+      ~pp1:Format.pp_print_string
+      ~pp2:Format.pp_print_string
+
+  let connection_closed =
+    declare_1
+      ~section
+      ~name:"websocket_client_connection_closed"
+      ~msg:"websocket client connection was closed because {exn}"
+      ~level:Notice
+      ("exn", exn)
+      ~pp1:pp_exn
+
+  let received_frame =
+    declare_1
+      ~section
+      ~name:"websocket_client_received_frame"
+      ~msg:"websocket client received {frame}"
+      ~level:Debug
+      ("frame", Websocket_encodings.frame_encoding)
+      ~pp1:Websocket.Frame.pp
+
+  let send_frame =
+    declare_1
+      ~section
+      ~name:"websocket_client_send_frame"
+      ~msg:"websocket client sending {frame}"
+      ~level:Debug
+      ("frame", Websocket_encodings.frame_encoding)
+      ~pp1:Websocket.Frame.pp
+end
 
 type error +=
   | No_response of JSONRPC.request
@@ -63,10 +139,25 @@ let () =
     (function Request_failed (r, e) -> Some (r, e) | _ -> None)
     (fun (r, e) -> Request_failed (r, e))
 
-let opcode_of_media media =
+module Websocket_lwt_unix = struct
+  include Websocket_lwt_unix
+
+  let write conn fr =
+    let open Lwt_syntax in
+    let* () = Event.(emit send_frame) fr in
+    Websocket_lwt_unix.write conn fr
+
+  let read conn =
+    let open Lwt_syntax in
+    let* fr = Websocket_lwt_unix.read conn in
+    let* () = Event.(emit received_frame) fr in
+    return fr
+end
+
+let is_binary media =
   match Media_type.name media with
-  | "application/octet-stream" -> Websocket.Frame.Opcode.Binary
-  | _ -> Websocket.Frame.Opcode.Text
+  | "application/octet-stream" -> true
+  | _ -> false
 
 let new_id client =
   let id = client.id in
@@ -74,28 +165,27 @@ let new_id client =
   JSONRPC.Id_float (float_of_int id)
 
 let handle_message (media : Media_type.t) message =
+  let open Lwt_syntax in
   match media.destruct JSONRPC.response_encoding message with
-  | Ok resp -> Lwt.return_some (Response resp)
-  | Error _ -> (
+  | Ok resp -> return_some (Response resp)
+  | Error e1 -> (
       match media.destruct Subscription.notification_encoding message with
-      | Ok notif -> Lwt.return_some (Notification notif)
-      | Error _ ->
-          (* TODO: log *)
-          Lwt.return_none)
+      | Ok notif -> return_some (Notification notif)
+      | Error e2 ->
+          let* () = Event.(emit decoding_error) (e1, e2) in
+          return_none)
 
 let disconnect conn =
   let open Lwt_syntax in
   Lwt.catch
     (fun () ->
-      (* TODO: log *)
+      let* () = Event.(emit disconnecting) () in
       let* () = Websocket_lwt_unix.write conn (Websocket.Frame.close 1000) in
       let* () = Websocket_lwt_unix.close_transport conn in
-      (* TODO: log *)
-      Format.eprintf "Closed websocket connection@." ;
+      let* () = Event.(emit disconnected) () in
       return_unit)
     (fun e ->
-      (* TODO: log *)
-      Format.eprintf "Disconnection failed: %s@." (Printexc.to_string e) ;
+      let* () = Event.(emit disconnection_error) e in
       return_unit)
 
 let connect media uri =
@@ -122,8 +212,7 @@ let connect media uri =
                 return_none
             | _ -> return_some frame)
           (fun e ->
-            (* TODO: Log eof *)
-            Format.eprintf "Read: %s@." (Printexc.to_string e) ;
+            let* () = Event.(emit connection_closed) e in
             let* () = disconnect conn in
             return_none))
   in
@@ -167,14 +256,14 @@ let connect media uri =
             return_none)
       frame_stream
   in
-  return {media; conn; response_stream; id = 0}
+  return {media; conn; response_stream; id = 0; binary = is_binary media}
 
 let disconnect {conn; _} = disconnect conn
 
 let send_jsonrpc_request_helper client (request : JSONRPC.request) =
   let open Lwt_result_syntax in
   let message = client.media.construct JSONRPC.request_encoding request in
-  let opcode = opcode_of_media client.media in
+  let opcode = if client.binary then Websocket.Frame.Opcode.Binary else Text in
   let*! () =
     Websocket_lwt_unix.write
       client.conn
@@ -227,7 +316,7 @@ let subscribe client (kind : Ethereum_types.Subscription.kind) =
       }
   in
   let message = client.media.construct JSONRPC.request_encoding request in
-  let opcode = opcode_of_media client.media in
+  let opcode = if client.binary then Websocket.Frame.Opcode.Binary else Text in
   let*! () =
     Websocket_lwt_unix.write
       client.conn
