@@ -34,7 +34,7 @@ let name_of = function
   | Etherlink_operator -> "etherlink-operator"
   | Etherlink_dal_operator -> "etherlink-dal-operator"
   | Etherlink_dal_observer {slot_index} ->
-      Format.asprintf "etherlink-dal-observer-%d" slot_index
+      Format.asprintf "etherlink-dal-operator-%d" slot_index
   | Etherlink_producer i -> Format.asprintf "etherlink-producer-%d" i
 
 module Disconnect = struct
@@ -1870,7 +1870,11 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
                let* node =
                  Node.init
                    ~name
-                   ~arguments:[Peer bootstrap.node_p2p_endpoint]
+                   ~arguments:
+                     [
+                       Peer bootstrap.node_p2p_endpoint;
+                       History_mode (Rolling (Some 79));
+                     ]
                    network
                    agent
                in
