@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 mod atomics;
+pub mod branching;
 pub mod c;
 mod common_memory;
 pub mod float;

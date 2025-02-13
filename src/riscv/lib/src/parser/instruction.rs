@@ -377,6 +377,10 @@ pub enum InstrCacheable {
     ///
     /// Always returns the target address (current program counter + imm)
     Jal(UJTypeArgs),
+    /// `JALR` (note: uncompressed variant) - Instruction mis-aligned will
+    /// never be thrown because we allow C extension
+    ///
+    /// Always returns the target address (val(rs1) + imm)
     Jalr(ITypeArgs),
 
     // RV64A R-type atomic instructions
@@ -500,7 +504,10 @@ pub enum InstrCacheable {
     /// `C.J` - Performs an unconditional control transfer. The immediate is added to
     /// the pc to form the jump target address.
     CJ(CJTypeArgs),
+    /// `C.JR` - Performs an unconditional control transfer to the address in register `rs1`.
     CJr(CRJTypeArgs),
+    /// `C.JALR` - Performs the same operation as `C.JR`, but additionally writes the
+    /// address of the instruction following the jump (pc+2) to the link register (`x1`).
     CJalr(CRJTypeArgs),
     /// `C.BEQZ` - Performs a conditional ( `val(rs1) == 0` ) control transfer.
     /// The offset is sign-extended and added to the pc to form the branch

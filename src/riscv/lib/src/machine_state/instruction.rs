@@ -213,7 +213,8 @@ pub enum OpCode {
 
     // RV64I jump instructions
     Jal,
-    Jalr,
+    /// Previous `Jalr`. Same as current `Jalr` except jump to `val(rs1) + imm`.
+    JalrImm,
 
     // RV64A R-type atomic instructions
     Lrw,
@@ -359,6 +360,14 @@ pub enum OpCode {
     Li,
     Nop,
     Neg,
+    /// Jump to absolute address (internal `J` opcode jumps to `val(rs1) + imm`,
+    /// whilst this just jumps to `imm`).
+    JAbsolute,
+    /// Jump to absolute address `imm` and link register.
+    /// Same as `JAbsolute` but also stores next instr address in rd.
+    JalrAbsolute,
+    /// Same as `Jr` but jumps to `val(rs1) + imm`.
+    JrImm,
 }
 
 impl OpCode {
@@ -421,7 +430,9 @@ impl OpCode {
             Self::Bgeu => Args::run_bgeu,
             Self::Auipc => Args::run_auipc,
             Self::Jal => Args::run_jal,
-            Self::Jalr => Args::run_jalr,
+            Self::JalrImm => Args::run_jalr_imm,
+            Self::JrImm => Args::run_jr_imm,
+            Self::JalrAbsolute => Args::run_jalr_absolute,
             Self::Lrw => Args::run_lrw,
             Self::Scw => Args::run_scw,
             Self::Amoswapw => Args::run_amoswapw,
@@ -530,6 +541,7 @@ impl OpCode {
             Self::CSw => Args::run_csw,
             Self::CSwsp => Args::run_cswsp,
             Self::J => Args::run_j,
+            Self::JAbsolute => Args::run_j_absolute,
             Self::CJr => Args::run_cjr,
             Self::CJalr => Args::run_cjalr,
             Self::Beqz => Args::run_beqz,
@@ -1187,11 +1199,25 @@ impl Args {
 
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
-    unsafe fn run_jalr<MC: MemoryConfig, M: ManagerReadWrite>(
+    unsafe fn run_jalr_imm<MC: MemoryConfig, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<MC, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
-        Ok(Set(core.hart.run_jalr(self.imm, self.rs1.x, self.rd.x)))
+        Ok(Set(core.hart.run_jalr_imm(
+            self.imm,
+            self.rs1.nzx,
+            self.rd.nzx,
+            self.width,
+        )))
+    }
+
+    /// SAFETY: This function must only be called on an `Args` belonging
+    /// to the same OpCode as the OpCode used to derive this function.
+    unsafe fn run_jr_imm<MC: MemoryConfig, M: ManagerReadWrite>(
+        &self,
+        core: &mut MachineCoreState<MC, M>,
+    ) -> Result<ProgramCounterUpdate, Exception> {
+        Ok(Set(core.hart.run_jr_imm(self.imm, self.rs1.nzx)))
     }
 
     // RV64A atomic instructions
@@ -1323,6 +1349,24 @@ impl Args {
         core: &mut MachineCoreState<MC, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
         Ok(Set(core.hart.run_j(self.imm)))
+    }
+
+    fn run_j_absolute<MC: MemoryConfig, M: ManagerReadWrite>(
+        &self,
+        core: &mut MachineCoreState<MC, M>,
+    ) -> Result<ProgramCounterUpdate, Exception> {
+        Ok(Set(core.hart.run_j_absolute(self.imm)))
+    }
+
+    unsafe fn run_jalr_absolute<MC: MemoryConfig, M: ManagerReadWrite>(
+        &self,
+        core: &mut MachineCoreState<MC, M>,
+    ) -> Result<ProgramCounterUpdate, Exception> {
+        Ok(Set(core.hart.run_jalr_absolute(
+            self.imm,
+            self.rd.nzx,
+            self.width,
+        )))
     }
 
     /// SAFETY: This function must only be called on an `Args` belonging
@@ -1522,10 +1566,7 @@ impl From<&InstrCacheable> for Instruction {
 
             // RV64I jump instructions
             InstrCacheable::Jal(args) => Instruction::from_ic_jal(args),
-            InstrCacheable::Jalr(args) => Instruction {
-                opcode: OpCode::Jalr,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
+            InstrCacheable::Jalr(args) => Instruction::from_ic_jalr(args),
 
             // RV64A atomic instructions
             InstrCacheable::Lrw(args) => Instruction {

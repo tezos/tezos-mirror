@@ -9,7 +9,7 @@ use crate::{
     parser::{
         XRegisterParsed,
         instruction::{
-            CIBTypeArgs, CRTypeArgs, InstrWidth, NonZeroRdITypeArgs, NonZeroRdRTypeArgs,
+            CIBTypeArgs, CRTypeArgs, ITypeArgs, InstrWidth, NonZeroRdITypeArgs, NonZeroRdRTypeArgs,
             SBTypeArgs, SplitITypeArgs, UJTypeArgs,
         },
         split_x0,
@@ -440,6 +440,63 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::JAbsolute`].
+    pub(crate) fn new_j_absolute(imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::JAbsolute,
+            args: Args {
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::JalrImm`].
+    pub(crate) fn new_jalr_imm(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::JalrImm,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::JalrAbsolute`].
+    pub(crate) fn new_jalr_absolute(rd: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::JalrAbsolute,
+            args: Args {
+                rd: rd.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::JrImm`].
+    pub(crate) fn new_jr_imm(rs1: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::JrImm,
+            args: Args {
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {
@@ -858,6 +915,25 @@ impl Instruction {
             // If `rd_rs1 == x0`, this will never branch.
             X::X0 => Instruction::new_nop(InstrWidth::Compressed),
             X::NonZero(rd_rs1) => Instruction::new_bnez(rd_rs1, args.imm, InstrWidth::Compressed),
+        }
+    }
+
+    /// Convert [`InstrCacheable::Jalr`] according to whether registers are non-zero.
+    ///
+    /// [`InstrCacheable::Jalr`]: crate::parser::instruction::InstrCacheable::Jalr
+    pub(super) fn from_ic_jalr(args: &ITypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rd), split_x0(args.rs1)) {
+            (X::X0, X::X0) => Instruction::new_j_absolute(args.imm, InstrWidth::Uncompressed),
+            (X::X0, X::NonZero(rs1)) => {
+                Instruction::new_jr_imm(rs1, args.imm, InstrWidth::Uncompressed)
+            }
+            (X::NonZero(rd), X::X0) => {
+                Instruction::new_jalr_absolute(rd, args.imm, InstrWidth::Uncompressed)
+            }
+            (X::NonZero(rd), X::NonZero(rs1)) => {
+                Instruction::new_jalr_imm(rd, rs1, args.imm, InstrWidth::Uncompressed)
+            }
         }
     }
 }
