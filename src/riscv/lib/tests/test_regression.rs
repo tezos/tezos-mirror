@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use octez_riscv::{
-    machine_state::{main_memory::M100M, DefaultCacheLayouts},
+    machine_state::{main_memory::M64M, DefaultCacheLayouts},
     pvm::PvmHooks,
     stepper::{pvm::PvmStepper, Stepper, StepperStatus},
 };
@@ -39,7 +39,7 @@ fn test_jstz_regression() {
         const ROLLUP_ADDRESS: [u8; 20] = [0; 20];
         const ORIGINATION_LEVEL: u32 = 1;
 
-        let mut stepper = PvmStepper::<'_, M100M, DefaultCacheLayouts>::new(
+        let mut stepper = PvmStepper::<'_, M64M, DefaultCacheLayouts>::new(
             &boot_program,
             Some(&main_program),
             inbox,

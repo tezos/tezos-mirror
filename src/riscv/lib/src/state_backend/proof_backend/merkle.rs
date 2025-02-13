@@ -26,7 +26,7 @@ pub const MERKLE_LEAF_SIZE: NonZeroUsize =
 /// Arity of the Merkle tree used for Merkleising [`DynArrays`].
 ///
 /// [`DynArrays`]: [`crate::state_backend::layout::DynArray`]
-pub const MERKLE_ARITY: usize = 3;
+pub const MERKLE_ARITY: usize = 4;
 
 /// A variable-width Merkle tree with [`AccessInfo`] metadata for leaves.
 ///

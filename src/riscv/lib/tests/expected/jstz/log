@@ -11,20 +11,20 @@
     },
 )
 [0][INFO] Model: riscv-virtio
-[0][INFO] Total memory size: 100 MB
+[0][INFO] Total memory size: 64 MB
 [0][INFO] Kernel region: [1200000 - 1c00000]
 [0][INFO] A pure Rust application is running on top of Hermit!
-[0][INFO] Heap: size 58 MB, start address 40000000
-[0][INFO] Heap is located at 0x40000000..0x43a00000 (0 Bytes unmapped)
+[0][INFO] Heap: size 26 MB, start address 40000000
+[0][INFO] Heap is located at 0x40000000..0x41a00000 (0 Bytes unmapped)
 [0][INFO] 
 [0][INFO] ===================== PHYSICAL MEMORY FREE LIST ======================
 [0][INFO] 0x00000001E01000 - 0x00000002000000
-[0][INFO] 0x00000005800000 - 0x00000006400000
+[0][INFO] 0x00000003800000 - 0x00000004000000
 [0][INFO] ======================================================================
 [0][INFO] 
 [0][INFO] 
 [0][INFO] ================== KERNEL VIRTUAL MEMORY FREE LIST ===================
-[0][INFO] 0x00000043A00000 - 0x00004000000000
+[0][INFO] 0x00000041A00000 - 0x00004000000000
 [0][INFO] ======================================================================
 [0][INFO] 
 [0][INFO] Initialized CPU with hart_id 0

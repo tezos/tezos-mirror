@@ -114,19 +114,21 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL, 
     pub fn produce_proof(&mut self) -> Option<Proof> {
         // Step using the proof mode stepper in order to obtain the proof
         let mut proof_stepper = self.start_proof_mode();
-        proof_stepper.eval_one();
-        let refs = proof_stepper
-            .pvm
-            .struct_ref::<crate::state_backend::FnManagerIdent>();
-        let merkle_proof = PvmLayout::<ML, CL>::to_merkle_tree(refs)
-            .expect("Obtaining the Merkle tree of a proof-gen state should not fail")
-            .to_merkle_proof()
-            .expect("Converting a Merkle tree to a compressed Merkle proof should not fail");
 
-        // TODO RV-373 : Proof-generating backend should also compute final state hash
-        // Currently, the proof and the initial state hash are valid,
-        // but the final state hash is not.
-        Some(Proof::new(merkle_proof, self.hash()))
+        proof_stepper.try_step().then(|| {
+            let refs = proof_stepper
+                .pvm
+                .struct_ref::<crate::state_backend::FnManagerIdent>();
+            let merkle_proof = PvmLayout::<ML, CL>::to_merkle_tree(refs)
+                .expect("Obtaining the Merkle tree of a proof-gen state should not fail")
+                .to_merkle_proof()
+                .expect("Converting a Merkle tree to a compressed Merkle proof should not fail");
+
+            // TODO RV-373 : Proof-generating backend should also compute final state hash
+            // Currently, the proof and the initial state hash are valid,
+            // but the final state hash is not.
+            Proof::new(merkle_proof, self.hash())
+        })
     }
 }
 
@@ -232,6 +234,17 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
         }
     }
 
+    /// Try to take one step and return true if the PVM is not in an errored state.
+    fn try_step(&mut self) -> bool {
+        match self.step_max_once(Bound::Included(1)) {
+            // We don't include errors in this case because errors count as 0 steps. That means if
+            // we receive a [`StepperStatus::Errored`] with `steps: 1` then it tried to run 2 steps
+            // but failed at the second.
+            StepperStatus::Running { steps: 1 } | StepperStatus::Exited { steps: 1, .. } => true,
+            _ => false,
+        }
+    }
+
     /// Create a new stepper in which the existing PVM is managed by
     /// the proof-generating backend.
     pub fn start_proof_mode<'a>(&'a self) -> PvmStepper<'hooks, ML, CL, ProofGen<Ref<'a, M>>> {
@@ -281,19 +294,11 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
             reveal_request_response_map: self.reveal_request_response_map.clone(),
         };
 
-        match stepper.step_max_once(Bound::Included(1)) {
-            // We don't include errors in this case because errors count as 0 steps. That means if
-            // we receive a [`StepperStatus::Errored`] with `steps: 1` then it tried to run 2 steps
-            // but failed at the second.
-            StepperStatus::Running { steps: 1 } | StepperStatus::Exited { steps: 1, .. } => {}
-            _ => return false,
-        }
-
+        stepper.try_step()
         // TODO: RV-362: Check the final state
-        let _refs = stepper.pvm.struct_ref::<FnManagerIdent>();
-        let hash: Hash = todo!("Can't obtain the hash of a verification state yet");
-
-        &hash == proof.final_state_hash()
+        // let _refs = stepper.pvm.struct_ref::<FnManagerIdent>();
+        // let hash: Hash = todo!("Can't obtain the hash of a verification state yet");
+        // &hash == proof.final_state_hash()
     }
 
     /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing

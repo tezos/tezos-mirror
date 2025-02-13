@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    machine_state::{main_memory::M100M, mode::Mode, TestCacheLayouts},
+    machine_state::{main_memory::M64M, mode::Mode, TestCacheLayouts},
     program::Program,
     pvm::common::{Pvm, PvmHooks, PvmLayout, PvmStatus},
     state_backend::{
@@ -22,7 +22,7 @@ use std::{fmt, ops::Bound, path::Path};
 use thiserror::Error;
 
 pub type StateLayout = (
-    PvmLayout<M100M, TestCacheLayouts>,
+    PvmLayout<M64M, TestCacheLayouts>,
     state_backend::Atom<bool>,
     state_backend::Atom<u32>,
     state_backend::Atom<u64>,
@@ -30,7 +30,7 @@ pub type StateLayout = (
 );
 
 pub struct State<M: state_backend::ManagerBase> {
-    pvm: Pvm<M100M, TestCacheLayouts, M>,
+    pvm: Pvm<M64M, TestCacheLayouts, M>,
     level_is_set: state_backend::Cell<bool, M>,
     level: state_backend::Cell<u32, M>,
     message_counter: state_backend::Cell<u64, M>,
@@ -40,7 +40,7 @@ pub struct State<M: state_backend::ManagerBase> {
 impl<M: state_backend::ManagerBase> State<M> {
     pub fn bind(space: state_backend::AllocatedOf<StateLayout, M>) -> Self {
         Self {
-            pvm: Pvm::<M100M, _, M>::bind(space.0),
+            pvm: Pvm::<M64M, _, M>::bind(space.0),
             level_is_set: space.1,
             level: space.2,
             message_counter: space.3,
@@ -235,8 +235,7 @@ impl<M: state_backend::ManagerBase> NodePvm<M> {
         M: state_backend::ManagerReadWrite,
     {
         self.with_backend_mut(|state| {
-            let program =
-                Program::<M100M>::from_elf(loader).expect("Could not parse Hermit loader");
+            let program = Program::<M64M>::from_elf(loader).expect("Could not parse Hermit loader");
             state
                 .pvm
                 .machine_state
