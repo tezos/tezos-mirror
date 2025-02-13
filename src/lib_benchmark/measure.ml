@@ -418,18 +418,6 @@ let compute_empirical_timing_distribution :
 let seed_init_from_options (options : options) =
   Random.State.make [|options.seed|]
 
-let gc_init_from_options (options : options) =
-  match options.minor_heap_size with
-  | `words words -> Gc.set {(Gc.get ()) with minor_heap_size = words}
-
-let set_gc_increment () =
-  let stats = Gc.stat () in
-  let words = stats.Gc.heap_words in
-  let minimal_increment = 8 * 1024 * 1024 in
-  let ratio = float minimal_increment /. float words in
-  if ratio < 0.15 then Gc.set {(Gc.get ()) with major_heap_increment = 15}
-  else Gc.set {(Gc.get ()) with major_heap_increment = minimal_increment}
-
 let perform_benchmark (type c t) (options : options)
     (bench : (c, t) Benchmark.poly) : t workload_data =
   Time.check_timer_resolution () ;
@@ -449,7 +437,6 @@ let perform_benchmark (type c t) (options : options)
   let benchmarks =
     Bench.create_benchmarks ~rng_state ~bench_num:options.bench_number config
   in
-  gc_init_from_options options ;
   let progress =
     Benchmark_helpers.make_progress_printer
       Format.err_formatter
@@ -461,14 +448,6 @@ let perform_benchmark (type c t) (options : options)
       (fun workload_data benchmark_fun ->
         progress () ;
         let bench = benchmark_fun () in
-        (match bench with
-        | Generator.Calculated _ ->
-            (* Calculated already gets its measures.
-               No need to perform GC. *)
-            ()
-        | _ ->
-            set_gc_increment () ;
-            Gc.compact ()) ;
         let measure_plain_benchmark workload closure =
           let measures =
             compute_empirical_timing_distribution
