@@ -42,6 +42,7 @@ where
     ///
     /// Relevant RISC-V opcodes:
     /// - SUB
+    /// - C.SUB
     pub fn run_sub(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
         let lhs = self.read_nz(rs1);
         let rhs = self.read_nz(rs2);

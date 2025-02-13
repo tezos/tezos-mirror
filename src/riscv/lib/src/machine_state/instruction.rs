@@ -335,7 +335,6 @@ pub enum OpCode {
     CJr,
     CJalr,
     CLui,
-    CSub,
     CAddw,
     CSubw,
 
@@ -539,7 +538,6 @@ impl OpCode {
             Self::Li => Args::run_li,
             Self::CLui => Args::run_clui,
             Self::Mv => Args::run_mv,
-            Self::CSub => Args::run_csub,
             Self::CAddw => Args::run_caddw,
             Self::CSubw => Args::run_csubw,
             Self::Nop => Args::run_nop,
@@ -1316,7 +1314,6 @@ impl Args {
     impl_ci_type!(run_li, non_zero);
     impl_ci_type!(run_clui, non_zero);
     impl_cr_type!(run_neg, non_zero);
-    impl_cr_type!(run_csub);
     impl_css_type!(run_cswsp);
 
     fn run_j<ML: MainMemoryLayout, M: ManagerReadWrite>(
@@ -2011,10 +2008,7 @@ impl From<&InstrCacheable> for Instruction {
             InstrCacheable::CAnd(args) => Instruction::from_ic_cand(args),
             InstrCacheable::CXor(args) => Instruction::from_ic_cxor(args),
             InstrCacheable::COr(args) => Instruction::from_ic_cor(args),
-            InstrCacheable::CSub(args) => Instruction {
-                opcode: OpCode::CSub,
-                args: args.into(),
-            },
+            InstrCacheable::CSub(args) => Instruction::from_ic_csub(args),
             InstrCacheable::CNop => Instruction::new_nop(InstrWidth::Compressed),
 
             // RV64C compressed instructions

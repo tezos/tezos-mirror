@@ -13,6 +13,7 @@ use crate::{instruction_context::ICB, machine_state::registers::NonZeroXRegister
 /// Relevant RISC-V opcodes:
 /// - C.MV
 /// - ADD
+/// - SUB
 /// - OR
 /// - XOR
 /// - SLL
@@ -37,6 +38,7 @@ pub fn run_mv(icb: &mut impl ICB, rd_rs1: NonZeroXRegister, rs2: NonZeroXRegiste
 /// - C.XOR
 /// - BNE
 /// - C.BNEZ
+/// - C.SUB
 pub fn run_nop(_icb: &mut impl ICB) {}
 
 #[cfg(test)]

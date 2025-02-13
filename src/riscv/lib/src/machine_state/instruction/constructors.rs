@@ -537,6 +537,20 @@ impl Instruction {
         }
     }
 
+    /// Convert [`InstrCacheable::Csub`] according to whether registers are non-zero.
+    ///
+    /// [`InstrCacheable::CSub`]: crate::parser::instruction::InstrCacheable::CSub
+    pub(super) fn from_ic_csub(args: &CRTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rd_rs1), split_x0(args.rs2)) {
+            // Storing anything in x0 or Subtracting 0 from anything is a NOP.
+            (X::X0, _) | (_, X::X0) => Instruction::new_nop(InstrWidth::Compressed),
+            (X::NonZero(rd_rs1), X::NonZero(rs2)) => {
+                Instruction::new_sub(rd_rs1, rd_rs1, rs2, InstrWidth::Compressed)
+            }
+        }
+    }
+
     /// Convert [`InstrCacheable::Addi`] according to whether registers are non-zero.
     ///
     /// [`InstrCacheable::Addi`]: crate::parser::instruction::InstrCacheable::Addi
