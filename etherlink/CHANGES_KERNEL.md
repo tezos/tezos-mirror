@@ -6,6 +6,8 @@
 
 ### Bug fixes
 
+- Improves call trace of `DELEGATECALL` and `CALLCODE`. (!16588)
+
 ### Internal
 
 - Rework block production to simplify data flow and remove unnecessary

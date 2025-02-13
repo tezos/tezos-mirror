@@ -420,3 +420,17 @@ let slot_filler () =
     ~label:"slot_filler"
     ~contract:"SlotFiller"
     ~evm_version:"shanghai"
+
+let delegatecall_delegator () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/delegatecall.sol")
+    ~label:"delegatecall_delegator"
+    ~contract:"Delegator"
+    ~evm_version:"shanghai"
+
+let delegatecall_delegated () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/delegatecall.sol")
+    ~label:"delegatecall_delegated"
+    ~contract:"Delegated"
+    ~evm_version:"shanghai"
