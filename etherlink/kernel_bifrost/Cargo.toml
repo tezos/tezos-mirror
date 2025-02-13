@@ -13,7 +13,6 @@ members = [
   "ethereum",
   "kernel",
   "evm_execution",
-  "evm_evaluation",
   "indexable_storage",
   "logging",
   "storage",
