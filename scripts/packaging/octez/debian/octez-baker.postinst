@@ -21,7 +21,7 @@ for file in /usr/bin/octez-baker-*; do
 done
 
 db_subst octez-baker/baker-active-protocol choices "$PROTO_CHOICES"
-db_subst octez-baker/baker-next-protocol choices "$PROTO_CHOICES"
+db_subst octez-baker/baker-next-protocol choices "none, $PROTO_CHOICES"
 
 case "${1}" in
 configure)
