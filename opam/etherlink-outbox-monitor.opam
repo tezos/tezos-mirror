@@ -11,13 +11,13 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "bls12-381"
+  "octez-evm-node-libs" { = version }
   "octez-libs"
   "octez-version"
   "caqti-lwt" { >= "2.0.1" }
   "crunch" { >= "3.3.0" }
   "re" { >= "1.10.0" }
   "octez-l2-libs"
-  "octez-evm-node-libs" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

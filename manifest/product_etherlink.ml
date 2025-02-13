@@ -299,7 +299,7 @@ let evm_node_lib_dev =
         performance_metrics;
       ]
 
-let _evm_node_lib_dev_client =
+let evm_node_lib_dev_client =
   octez_evm_node_lib
     "evm_node_lib_dev_client"
     ~path:"etherlink/bin_node/lib_dev/client"
@@ -499,11 +499,13 @@ let _outbox_monitor =
     ~path:"etherlink/bin_outbox_monitor"
     ~opam:"etherlink-outbox-monitor"
     ~release_status:Unreleased
+    ~with_macos_security_framework:true
     ~synopsis:
       "A binary to monitor withdrawals in the outbox and their execution"
     ~deps:
       [
         bls12_381_archive;
+        evm_node_rust_deps;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_version_value;
@@ -515,6 +517,7 @@ let _outbox_monitor =
         re;
         octez_sqlite |> open_;
         evm_node_lib_dev_encoding |> open_;
+        evm_node_lib_dev_client |> open_;
       ]
     ~dune:
       Dune.

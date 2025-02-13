@@ -12,6 +12,11 @@ let default_data_dir = Filename.concat (Sys.getenv "HOME") ".outbox-monitor"
 
 let default_global = {data_dir = default_data_dir; verbosity = Notice}
 
+module Parameter = struct
+  let endpoint =
+    Tezos_clic.parameter (fun _ uri -> Lwt.return_ok (Uri.of_string uri))
+end
+
 module Arg = struct
   let verbose =
     Tezos_clic.switch
@@ -22,6 +27,20 @@ module Arg = struct
 
   let debug =
     Tezos_clic.switch ~long:"debug" ~doc:"Sets logging level to debug" ()
+
+  let endpoint ~default ~long ~doc =
+    Tezos_clic.default_arg
+      ~default
+      ~long
+      ~doc
+      ~placeholder:"URL"
+      Parameter.endpoint
+
+  let evm_node_endpoint =
+    endpoint
+      ~default:"http://127.0.0.1:8545/ws"
+      ~long:"evm-node"
+      ~doc:"Websocket endpoint to reach EVM node"
 
   let data_dir =
     Tezos_clic.arg
@@ -77,12 +96,28 @@ let run_command =
   let open Tezos_clic in
   om_command
     ~desc:"Start monitoring outbox"
-    no_options
+    (args1 Arg.evm_node_endpoint)
     (prefixes ["run"] @@ stop)
-    (fun {data_dir; verbosity} () _ ->
+    (fun {data_dir; verbosity} evm_node_endpoint _ ->
       let open Lwt_result_syntax in
       let*! () = log_config ~verbosity () in
       let* _db = Db.init ~data_dir `Read_write in
+      let*! ws_client =
+        Websocket_client.connect Media_type.json evm_node_endpoint
+      in
+      let* heads_subscription = Websocket_client.subscribe_newHeads ws_client in
+      let cpt = ref 0 in
+      let*! () =
+        Lwt_stream.iter_s
+          (fun (head : _ Ethereum_types.block) ->
+            incr cpt ;
+            Format.eprintf "Block %a@." Ethereum_types.pp_quantity head.number ;
+            if !cpt = 10 then
+              let*! _ = heads_subscription.unsubscribe () in
+              Lwt.return_unit
+            else Lwt.return_unit)
+          heads_subscription.stream
+      in
       return_unit)
 
 let commands = [run_command]
