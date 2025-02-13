@@ -19,7 +19,10 @@ tezos_crypto_rs = { version = "0.6", path = "../../sdk/rust/crypto", default-fea
 log = "0.4"
 env_logger = "0.11"
 librustzcash = { path = "../../src/rustzcash_deps" }
-kernel-bifrost = { package = "evm_kernel_bifrost", path = "../kernel_bifrost/kernel", default-features = false }
-runtime-bifrost = { package = "tezos-evm-runtime-bifrost", path = "../kernel_bifrost/runtime", default-features = false }
 tezos-smart-rollup-core = { path = "../../src/kernel_sdk/core" }
 tezos-smart-rollup-host = { path = "../../src/kernel_sdk/host" }
+# Bifrost kernel
+kernel-bifrost = { package = "evm_kernel_bifrost", path = "../kernel_bifrost/kernel", default-features = false }
+runtime-bifrost = { package = "tezos-evm-runtime-bifrost", path = "../kernel_bifrost/runtime", default-features = false }
+# Calypso
+kernel-calypso = { package = "evm_kernel_calypso", path = "../kernel_calypso/kernel", default-features = false }
