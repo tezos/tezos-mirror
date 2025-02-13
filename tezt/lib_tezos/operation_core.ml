@@ -44,7 +44,7 @@ type t = {
 
 let get_branch ?(offset = 2) client =
   let block = sf "head~%d" offset in
-  Client.RPC.call client @@ RPC.get_chain_block_hash ~block ()
+  Client.RPC.call_via_endpoint client @@ RPC.get_chain_block_hash ~block ()
 
 let make ~branch ?signer ~kind contents =
   {branch; contents; kind; signer; raw = None}
@@ -59,7 +59,7 @@ let raw ?protocol t client =
       match protocol with
       | None ->
           let* raw =
-            Client.RPC.call client
+            Client.RPC.call_via_endpoint client
             @@ RPC.post_chain_block_helpers_forge_operations
                  ~data:(Data (json t))
                  ()
@@ -93,7 +93,7 @@ let hex ?protocol ?signature t client =
 
 let bls_mode_raw t client : Hex.t Lwt.t =
   let* json =
-    Client.RPC.call client
+    Client.RPC.call_via_endpoint client
     @@ RPC.post_chain_block_helpers_forge_bls_consensus_operations
          ~data:(Data (json t))
          ()
@@ -126,7 +126,7 @@ let sign ?protocol ({kind; signer; _} as t) client =
             | Some p
               when Protocol.number p >= 023 && is_tz4 signer.public_key_hash ->
                 let* constants =
-                  Client.RPC.call client
+                  Client.RPC.call_via_endpoint client
                   @@ RPC.get_chain_block_context_constants ()
                 in
                 if JSON.(constants |-> "aggregate_attestation" |> as_bool) then
@@ -230,21 +230,21 @@ let inject_operations ?protocol ?(request = `Inject) ?(force = false) ?error
     hex ?protocol ~signature op client
   in
   let* ops = Lwt_list.map_s forge t in
-  let waiter =
+  let node, waiter =
     let mode = Client.get_mode client in
     match Client.mode_to_endpoint mode with
     | None -> Test.fail "Operation.inject: Endpoint expected"
     | Some (Foreign_endpoint _) ->
         Test.fail
           "Operation.inject: Node endpoint expected instead of foreign endpoint"
-    | Some (Node node) -> Node.wait_for_request ~request node
+    | Some (Node node) -> (node, Node.wait_for_request ~request node)
   in
   let rpc =
     RPC.post_private_injection_operations ?use_tmp_file ~force ~ops ()
   in
   match error with
   | None ->
-      let* ophs = Client.RPC.call client rpc in
+      let* ophs = Node.RPC.call node rpc in
       let* () = waiter in
       return ophs
   | Some msg ->
@@ -256,7 +256,7 @@ let make_run_operation_input ?chain_id t client =
   let* chain_id =
     match chain_id with
     | Some chain_id -> return chain_id
-    | None -> Client.RPC.call client (RPC.get_chain_chain_id ())
+    | None -> Client.RPC.call_via_endpoint client (RPC.get_chain_chain_id ())
   in
   (* The [run_operation] RPC does not check the signature. *)
   let signature = Tezos_crypto.Signature.zero in
@@ -370,7 +370,7 @@ module Consensus = struct
     in
     let* chain_id =
       match chain_id with
-      | None -> Client.RPC.call client @@ RPC.get_chain_chain_id ()
+      | None -> Client.RPC.call_via_endpoint client @@ RPC.get_chain_chain_id ()
       | Some branch -> return branch
     in
     let kind =
@@ -386,7 +386,8 @@ module Consensus = struct
     inject ?request ?force ?error ~protocol op client
 
   let get_slots ~level client =
-    Client.RPC.call client @@ RPC.get_chain_block_helper_validators ~level ()
+    Client.RPC.call_via_endpoint client
+    @@ RPC.get_chain_block_helper_validators ~level ()
 
   let first_slot ~slots_json (delegate : Account.key) =
     let open JSON in
@@ -407,7 +408,8 @@ module Consensus = struct
 
   let get_block_payload_hash ?block client =
     let* block_header =
-      Client.RPC.call client @@ RPC.get_chain_block_header ?block ()
+      Client.RPC.call_via_endpoint client
+      @@ RPC.get_chain_block_header ?block ()
     in
     return JSON.(block_header |-> "payload_hash" |> as_string)
 end
@@ -532,7 +534,7 @@ module Anonymous = struct
   let make_double_consensus_evidence_with_distinct_bph ~kind ~misbehaviour_level
       ~misbehaviour_round ~culprit client =
     let* slots =
-      Client.RPC.call client
+      Client.RPC.call_via_endpoint client
       @@ RPC.get_chain_block_helper_validators
            ~delegate:culprit.Account.public_key_hash
            ~level:misbehaviour_level
@@ -628,7 +630,7 @@ module Manager = struct
 
   let get_next_counter ?(source = Constant.bootstrap1) client =
     let* counter_json =
-      Client.RPC.call client
+      Client.RPC.call_via_endpoint client
       @@ RPC.get_chain_block_context_contract_counter
            ~id:source.Account.public_key_hash
            ()
@@ -881,7 +883,8 @@ module Manager = struct
 
   let get_branch ?chain ?(offset = 2) client =
     let block = sf "head~%d" offset in
-    Client.RPC.call client @@ RPC.get_chain_block_hash ?chain ~block ()
+    Client.RPC.call_via_endpoint client
+    @@ RPC.get_chain_block_hash ?chain ~block ()
 
   let mk_single_transfer ?source ?counter ?fee ?gas_limit ?storage_limit ?dest
       ?amount ?branch ?signer client =

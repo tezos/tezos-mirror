@@ -26,6 +26,7 @@
 
 module Cryptobox = Tezos_crypto_dal.Cryptobox
 
+(* Use the node for RPC call when possible because it is much faster *)
 module Parameters = struct
   type t = {
     feature_enabled : bool;
@@ -77,7 +78,8 @@ module Parameters = struct
 
   let from_client client =
     let* json =
-      Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
+      Client.RPC.call_via_endpoint client
+      @@ RPC.get_chain_block_context_constants ()
     in
     from_protocol_parameters json |> return
 
