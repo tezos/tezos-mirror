@@ -2515,7 +2515,7 @@ let update_bakers_infos t =
   t.versions <- versions ;
   Lwt.return_unit
 
-let on_new_level t ?etherlink level =
+let on_new_level t level =
   let* () = wait_for_level t level in
   toplog "Start process level %d" level ;
   clean_up t (level - t.configuration.blocks_history) ;
@@ -2528,7 +2528,7 @@ let on_new_level t ?etherlink level =
       ~endpoint:t.bootstrap.node_rpc_endpoint
       ~level
       ~etherlink_operators:
-        (match etherlink with
+        (match t.etherlink with
         | None -> []
         | Some setup ->
             setup.operator.account :: setup.operator.batching_operators)
