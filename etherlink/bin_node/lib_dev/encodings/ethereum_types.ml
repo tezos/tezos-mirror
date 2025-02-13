@@ -141,6 +141,8 @@ module Chain_id = struct
   let decode_le bytes = Chain_id (decode_z_le bytes)
 
   let decode_be bytes = Chain_id (decode_z_be bytes)
+
+  let compare (Chain_id c1) (Chain_id c2) = Z.compare c1 c2
 end
 
 type chain_family = EVM | Michelson

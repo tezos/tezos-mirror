@@ -68,6 +68,8 @@ module Chain_id : sig
   val decode_le : bytes -> chain_id
 
   val decode_be : bytes -> chain_id
+
+  val compare : chain_id -> chain_id -> int
 end
 
 type chain_family = EVM | Michelson

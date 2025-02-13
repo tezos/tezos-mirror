@@ -37,6 +37,40 @@ let le_int64_bytes i =
   Bytes.set_int64_le b 0 (Int64.of_string i) ;
   String.of_bytes b
 
+module ChainSet = Set.Make (struct
+  type t = Ethereum_types.chain_id
+
+  let compare = Ethereum_types.Chain_id.compare
+end)
+
+let all_duplicate_chain_ids ~l2_chain_ids =
+  let rec aux_same answer seen = function
+    | [] -> answer
+    | chain_id :: tl when ChainSet.mem chain_id seen ->
+        aux_same (ChainSet.add chain_id answer) seen tl
+    | chain_id :: tl -> aux_same answer (ChainSet.add chain_id seen) tl
+  in
+  aux_same ChainSet.empty ChainSet.empty l2_chain_ids
+
+(* This code comes from etherlink/bin_node/config/configuration.ml *)
+let warn =
+  Format.kasprintf @@ fun s ->
+  let reset = Pretty_printing.add_ansi_marking Format.err_formatter in
+  Format.eprintf "@{<fg_yellow>[Warning] %s@}@." s ;
+  reset ()
+
+let check_for_duplicate ~l2_chain_ids =
+  let duplicate_chain_ids = all_duplicate_chain_ids ~l2_chain_ids in
+  if not (ChainSet.is_empty duplicate_chain_ids) then
+    warn
+      "The following chain ids have been provided more than once: %a. Chain \
+       IDs must be unique."
+      (Format.pp_print_list
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+         (fun ppf chain_id ->
+           Format.fprintf ppf "%s" (Ethereum_types.Chain_id.to_string chain_id)))
+      (ChainSet.elements duplicate_chain_ids)
+
 (* When splitting the path given in argument,
    their should be empty string at the start/end of
    the list *)
@@ -114,14 +148,15 @@ let make_l2 ~boostrap_balance ?bootstrap_accounts ?minimum_base_fee_per_gas
   in
   Installer_config.to_file (config_instrs @ world_state_instrs) ~output
 
-let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
-    ?chain_id ?sequencer ?delayed_bridge ?ticketer ?admin ?sequencer_governance
-    ?kernel_governance ?kernel_security_governance ?minimum_base_fee_per_gas
-    ?da_fee_per_byte ?delayed_inbox_timeout ?delayed_inbox_min_levels
-    ?sequencer_pool_address ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?remove_whitelist ?enable_fa_bridge
-    ?enable_dal ?dal_slots ?enable_fast_withdrawal ?enable_multichain
-    ?set_account_code ?max_delayed_inbox_blueprint_length ~output () =
+let make ~mainnet_compat ~boostrap_balance ?l2_chain_ids ?bootstrap_accounts
+    ?kernel_root_hash ?chain_id ?sequencer ?delayed_bridge ?ticketer ?admin
+    ?sequencer_governance ?kernel_governance ?kernel_security_governance
+    ?minimum_base_fee_per_gas ?da_fee_per_byte ?delayed_inbox_timeout
+    ?delayed_inbox_min_levels ?sequencer_pool_address ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
+    ?remove_whitelist ?enable_fa_bridge ?enable_dal ?dal_slots
+    ?enable_fast_withdrawal ?enable_multichain ?set_account_code
+    ?max_delayed_inbox_blueprint_length ~output () =
   let bootstrap_accounts =
     match bootstrap_accounts with
     | None -> []
@@ -154,6 +189,24 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
     l |> String.split ',' |> List.to_seq
     |> Seq.map (fun s -> Char.chr (int_of_string s))
     |> String.of_seq
+  in
+  let chain_ids_instr =
+    match l2_chain_ids with
+    | None -> []
+    | Some l2_chain_ids ->
+        let open Rlp in
+        check_for_duplicate ~l2_chain_ids ;
+        let chain_ids =
+          List.map
+            (fun chain_id ->
+              let chain_id = Ethereum_types.Chain_id.to_string chain_id in
+              Value (Bytes.of_string chain_id))
+            l2_chain_ids
+        in
+        let encoded_chain_ids =
+          Rlp.encode (List chain_ids) |> Bytes.to_string
+        in
+        make_instr (Some ("chain_ids", encoded_chain_ids))
   in
   let instrs =
     (if mainnet_compat then make_instr ticketer
@@ -198,5 +251,6 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
     @ make_instr
         ~convert:(fun s -> Ethereum_types.u16_to_bytes (int_of_string s))
         max_delayed_inbox_blueprint_length
+    @ chain_ids_instr
   in
   Installer_config.to_file instrs ~output
