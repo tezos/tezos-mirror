@@ -33,93 +33,6 @@ type slot_header = {
   commitment : Cryptobox.Verifier.commitment;
 }
 
-type proto_parameters = {
-  feature_enable : bool;
-  incentives_enable : bool;
-  number_of_slots : int;
-  attestation_lag : int;
-  attestation_threshold : int;
-  traps_fraction : Q.t;
-  cryptobox_parameters : Cryptobox.Verifier.parameters;
-  sc_rollup_challenge_window_in_blocks : int;
-  commitment_period_in_blocks : int;
-  dal_attested_slots_validity_lag : int;
-  blocks_per_cycle : int32;
-}
-
-let q_encoding =
-  Data_encoding.(
-    conv
-      (fun Q.{num; den} -> (num, den))
-      (fun (num, den) -> Q.make num den)
-      (obj2 (req "numerator" z) (req "denominator" z)))
-
-let proto_parameters_encoding : proto_parameters Data_encoding.t =
-  let open Data_encoding in
-  conv
-    (fun {
-           feature_enable;
-           incentives_enable;
-           number_of_slots;
-           attestation_lag;
-           attestation_threshold;
-           traps_fraction;
-           cryptobox_parameters;
-           sc_rollup_challenge_window_in_blocks;
-           commitment_period_in_blocks;
-           dal_attested_slots_validity_lag;
-           blocks_per_cycle;
-         } ->
-      ( ( feature_enable,
-          incentives_enable,
-          number_of_slots,
-          attestation_lag,
-          attestation_threshold,
-          traps_fraction ),
-        ( cryptobox_parameters,
-          sc_rollup_challenge_window_in_blocks,
-          commitment_period_in_blocks,
-          dal_attested_slots_validity_lag,
-          blocks_per_cycle ) ))
-    (fun ( ( feature_enable,
-             incentives_enable,
-             number_of_slots,
-             attestation_lag,
-             attestation_threshold,
-             traps_fraction ),
-           ( cryptobox_parameters,
-             sc_rollup_challenge_window_in_blocks,
-             commitment_period_in_blocks,
-             dal_attested_slots_validity_lag,
-             blocks_per_cycle ) ) ->
-      {
-        feature_enable;
-        incentives_enable;
-        number_of_slots;
-        attestation_lag;
-        attestation_threshold;
-        traps_fraction;
-        cryptobox_parameters;
-        sc_rollup_challenge_window_in_blocks;
-        commitment_period_in_blocks;
-        dal_attested_slots_validity_lag;
-        blocks_per_cycle;
-      })
-    (merge_objs
-       (obj6
-          (req "feature_enable" bool)
-          (req "incentives_enable" bool)
-          (req "number_of_slots" int31)
-          (req "attestation_lag" int31)
-          (req "attestation_threshold" int31)
-          (req "traps_fraction" q_encoding))
-       (obj5
-          (req "cryptobox_parameters" Cryptobox.Verifier.parameters_encoding)
-          (req "sc_rollup_challenge_window_in_blocks" int31)
-          (req "commitment_period_in_blocks" int31)
-          (req "dal_attested_slots_validity_lag" int31)
-          (req "blocks_per_cycle" int32)))
-
 module type T = sig
   module Proto : Registered_protocol.T
 
@@ -140,7 +53,7 @@ module type T = sig
     Tezos_shell_services.Chain_services.chain ->
     Tezos_shell_services.Block_services.block ->
     Tezos_rpc.Context.generic ->
-    proto_parameters tzresult Lwt.t
+    Tezos_dal_node_services.Types.proto_parameters tzresult Lwt.t
 
   val get_published_slot_headers :
     block_info ->
@@ -201,9 +114,9 @@ module type T = sig
     val cells_of_level :
       block_info ->
       Tezos_rpc.Context.generic ->
-      dal_constants:proto_parameters ->
+      dal_constants:Tezos_dal_node_services.Types.proto_parameters ->
       pred_publication_level_dal_constants:
-        proto_parameters tzresult Lwt.t Lazy.t ->
+        Tezos_dal_node_services.Types.proto_parameters tzresult Lwt.t Lazy.t ->
       (hash * cell) list tzresult Lwt.t
   end
 

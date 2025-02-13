@@ -49,21 +49,6 @@ Node
   ``/chain/{chain_id}/protocols/{protocol_hash}``) to retrieve protocol
   activation levels of the chain. (MR :gl:`!15447`)
 
-- A new RPC
-  ``/chains/main/blocks/head/context/delegates/<pkh>/dal_participation`` has
-  been added, similar to Tenderbake's ``../participation`` RPC to track bakers'
-  DAL activity. (MR :gl:`!16168`)
-
-- **Breaking change** The RPC
-  ``/chains/main/blocks/head/context/delegates/<pkh>``'s result now contains a
-  new field ``"dal_participation"`` providing DAL participation information when
-  the DAL incentives flag is set. This introduces a breaking change for
-  applications using the binary encoding format. (MR :gl:`!16430`)
-
-- **Breaking change** The output of the RPC
-  ``/chains/main/blocks/head/context/issuance/expected_issuance`` has a new
-  field ``"dal_attesting_reward_per_shard"``. (MR :gl:`!15614`)
-
 Client
 ------
 
@@ -319,6 +304,10 @@ DAL node
   ``--operator-profile`` flag enabled, the node now uses SQLite
   specifically for managing skip list cells (MR :gl:`!15780`),
   preventing inode exhaustion. All other stores remain unchanged.
+
+- Added a new RPC ``GET /protocol_parameters/`` that retrieve the protocol
+  parameters that the DAL node uses for a given level, which by default is the
+  last finalized level the node is aware of. (MR :gl:`!16704`)
 
 Protocol
 ~~~~~~~~

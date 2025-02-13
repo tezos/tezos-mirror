@@ -28,7 +28,7 @@ type t = {
   config : Configuration_file.t;
   cryptobox : Cryptobox.t;
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
-  proto_parameters : Dal_plugin.proto_parameters;
+  proto_parameters : Types.proto_parameters;
   mutable proto_plugins : Proto_plugins.t;
   mutable ongoing_amplifications : Types.Slot_id.Set.t;
   mutable slots_under_reconstruction :

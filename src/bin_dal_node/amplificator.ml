@@ -13,7 +13,7 @@ type query =
   | Query of {
       slot_id : Types.slot_id;
       commitment : Cryptobox.commitment;
-      proto_parameters : Dal_plugin.proto_parameters;
+      proto_parameters : Types.proto_parameters;
           (* Used, but not really necessary as long as parameters don't change. *)
       reconstruction_start_time : float;
     }

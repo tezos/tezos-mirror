@@ -59,7 +59,7 @@ module Plugin = struct
     in
     return
       {
-        Dal_plugin.feature_enable;
+        Tezos_dal_node_services.Types.feature_enable;
         incentives_enable;
         number_of_slots;
         attestation_lag;
@@ -300,7 +300,8 @@ module Plugin = struct
       let published_level =
         Int32.sub
           attested_level
-          (Int32.of_int dal_constants.Dal_plugin.attestation_lag)
+          (Int32.of_int
+             dal_constants.Tezos_dal_node_services.Types.attestation_lag)
       in
       (* 1. There are no cells for [published_level = 0]. *)
       if published_level <= 0l then return []

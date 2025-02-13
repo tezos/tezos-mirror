@@ -25,6 +25,74 @@
 
 open Types
 
+(* String parameters queries. *)
+
+let char =
+  Resto.Arg.make
+    ~name:"char"
+    ~destruct:(fun str ->
+      if String.length str = 1 then Ok (String.get str 0)
+      else Error "A single character string is expected")
+    ~construct:(fun c -> String.make 1 c)
+    ()
+
+let option_int =
+  Resto.Arg.make
+    ~name:"optional int"
+    ~destruct:(function
+      | "" -> Ok None
+      | str -> (
+          try Ok (Some (int_of_string str))
+          with Failure _ -> Error "int expected"))
+    ~construct:(function None -> "" | Some i -> string_of_int i)
+    ()
+
+let slot_query =
+  let open Tezos_rpc.Query in
+  query (fun padding slot_index ->
+      object
+        method padding = padding
+
+        method slot_index = slot_index
+      end)
+  |+ field "padding" char '\x00' (fun obj -> obj#padding)
+  |+ field "slot_index" option_int None (fun obj -> obj#slot_index)
+  |> seal
+
+let wait_query =
+  let open Tezos_rpc.Query in
+  query (fun wait ->
+      object
+        method wait = wait
+      end)
+  |+ flag "wait" (fun t -> t#wait)
+  |> seal
+
+let connected_query =
+  let open Tezos_rpc.Query in
+  query (fun connected ->
+      object
+        method connected = connected
+      end)
+  |+ flag "connected" (fun t -> t#connected)
+  |> seal
+
+let all_query =
+  let open Tezos_rpc.Query in
+  query (fun all ->
+      object
+        method all = all
+      end)
+  |+ flag "all" (fun t -> t#all)
+  |> seal
+
+let level_query =
+  let open Tezos_rpc in
+  let open Query in
+  query (fun level -> level) |+ opt_field "level" Arg.int32 (fun t -> t) |> seal
+
+(* Service declarations *)
+
 type 'rpc service =
   ('meth, 'prefix, 'params, 'query, 'input, 'output) Tezos_rpc.Service.service
   constraint
@@ -194,6 +262,22 @@ let get_last_processed_level :
     ~query:Tezos_rpc.Query.empty
     ~output:Data_encoding.int32
     Tezos_rpc.Path.(open_root / "last_processed_level")
+
+let get_protocol_parameters :
+    < meth : [`GET]
+    ; input : unit
+    ; output : proto_parameters
+    ; prefix : unit
+    ; params : unit
+    ; query : int32 option >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:
+      "Returns the protocol parameters as known by the DAL node. An optional \
+       'level' argument can specify for which level to retrieve them."
+    ~query:level_query
+    ~output:proto_parameters_encoding
+    Tezos_rpc.Path.(open_root / "protocol_parameters")
 
 let patch_profiles :
     < meth : [`PATCH]
