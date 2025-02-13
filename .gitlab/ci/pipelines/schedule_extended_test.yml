@@ -902,59 +902,6 @@ build-layer1-profiling:
     paths:
     - ./octez-binaries/x86_64/octez-node
 
-oc.build:rpm:amd64:
-  image: $DISTRIBUTION
-  stage: build
-  tags:
-  - gcp
-  needs: []
-  dependencies: []
-  timeout: 90 minutes
-  interruptible: false
-  before_script:
-  - . ./scripts/version.sh
-  - ./scripts/ci/bin_packages_rpm_dependencies.sh
-  script:
-  - wget https://sh.rustup.rs/rustup-init.sh
-  - chmod +x rustup-init.sh
-  - ./rustup-init.sh --profile minimal --default-toolchain  $recommended_rust_version
-    -y
-  - . $HOME/.cargo/env
-  - export OPAMYES="true"
-  - opam init --bare --disable-sandboxing
-  - make build-deps
-  - eval $(opam env)
-  - make all
-  - export TIMESTAMP=$(date -d "$CI_PIPELINE_CREATED_AT" '+%Y%m%d%H%M')
-  - ./scripts/rpm/make_rpm.sh
-  - DISTRO=$(echo "$DISTRIBUTION" | cut -d':' -f1)
-  - RELEASE=$(echo "$DISTRIBUTION" | cut -d':' -f2)
-  - mkdir -p packages/$DISTRO/$RELEASE
-  - mv octez-*.* packages/$DISTRO/$RELEASE/
-  variables:
-    TARGET: rpm
-    GROUP: A
-    OCTEZ_PKGMAINTAINER: nomadic-labs
-    BLST_PORTABLE: "yes"
-    ARCH: amd64
-    CARGO_HOME: /root/.cargo
-    CARGO_NET_OFFLINE: "false"
-  artifacts:
-    name: ${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG
-    expire_in: 1 day
-    paths:
-    - packages/
-    when: on_success
-  retry:
-    max: 1
-    when:
-    - stuck_or_timeout_failure
-  parallel:
-    matrix:
-    - DISTRIBUTION:
-      - fedora:39
-      - rockylinux:9.3
-
 opam:prepare:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging

@@ -167,7 +167,6 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
         | _ -> "");
       ]
   in
-  let job_build_rpm_amd64 = job_build_rpm_amd64 () in
   let ( jobs_debian_repository,
         job_build_ubuntu_package_current_a,
         job_build_debian_package_current_a,
@@ -183,7 +182,6 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
           Artifacts job_static_x86_64_release;
           Artifacts job_static_arm64_release;
           Artifacts job_build_homebrew_release;
-          Artifacts job_build_rpm_amd64;
           Artifacts job_build_ubuntu_package_current_a;
           Artifacts job_build_debian_package_current_a;
           Artifacts job_build_ubuntu_package_current_b;
@@ -212,7 +210,6 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
            [
              Artifacts job_static_x86_64_release;
              Artifacts job_static_arm64_release;
-             Artifacts job_build_rpm_amd64;
            ])
       ~variables:[("S3_BUCKET", "release-page-test.nomadic-labs.com")]
       ["./scripts/releases/publish_release_page.sh"]
@@ -255,7 +252,6 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
     job_static_arm64_release;
     job_docker_amd64;
     job_docker_arm64;
-    job_build_rpm_amd64;
     job_build_homebrew_release;
     job_docker_merge;
     job_gitlab_release_or_publish;
