@@ -14,6 +14,9 @@ where
     M: backend::ManagerReadWrite,
 {
     /// Moves the two's complement representation of `rs1` into `rd`.
+    ///
+    /// Relevant RISC-V opcodes:
+    /// - SUB
     pub fn run_neg(&mut self, rd_rs1: NonZeroXRegister, rs2: NonZeroXRegister) {
         let result = 0_u64.wrapping_sub(self.read_nz(rs2));
         self.write_nz(rd_rs1, result)

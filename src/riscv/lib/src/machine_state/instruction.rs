@@ -1100,7 +1100,7 @@ macro_rules! impl_f_r_type {
 impl Args {
     // RV64I R-type instructions
     impl_r_type!(i::run_add, run_add, non_zero);
-    impl_r_type!(run_sub, non_zero_rd);
+    impl_r_type!(run_sub, non_zero);
     impl_r_type!(run_xor, non_zero);
     impl_r_type!(run_or, non_zero);
     impl_r_type!(run_and, non_zero);
@@ -1378,10 +1378,7 @@ impl From<&InstrCacheable> for Instruction {
         match value {
             // RV64I R-type instructions
             InstrCacheable::Add(args) => Instruction::from_ic_add(args),
-            InstrCacheable::Sub(args) => Instruction {
-                opcode: OpCode::Sub,
-                args: args.into(),
-            },
+            InstrCacheable::Sub(args) => Instruction::from_ic_sub(args),
             InstrCacheable::Xor(args) => Instruction::from_ic_xor(args),
             InstrCacheable::Or(args) => Instruction::from_ic_or(args),
             InstrCacheable::And(args) => Instruction::from_ic_and(args),

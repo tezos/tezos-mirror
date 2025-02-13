@@ -36,6 +36,41 @@ impl Instruction {
         }
     }
 
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the [`OpCode::Sub`].
+    pub(crate) fn new_sub(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Sub,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the [`OpCode::Neg`].
+    pub(crate) fn new_neg(rd: NonZeroXRegister, rs2: NonZeroXRegister, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Neg,
+            args: Args {
+                rd: rd.into(),
+                // We are adding a default value for rs1 as NonZeroXRegister::x1
+                // to be explicit that it is of NonZeroXRegister type.
+                rs1: NonZeroXRegister::x1.into(),
+                rs2: rs2.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
     /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Mv`].
     pub(crate) fn new_mv(rd: NonZeroXRegister, rs2: NonZeroXRegister, width: InstrWidth) -> Self {
         Self {
@@ -479,6 +514,25 @@ impl Instruction {
             }
             (X::NonZero(rs1), X::NonZero(rs2)) => {
                 Instruction::new_add(args.rd, rs1, rs2, InstrWidth::Uncompressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::Sub`] according to whether registers are non-zero.
+    ///
+    /// [`InstrCacheable::Sub`]: crate::parser::instruction::InstrCacheable::Sub
+    pub(super) fn from_ic_sub(args: &NonZeroRdRTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rs1), split_x0(args.rs2)) {
+            (X::X0, X::X0) => Instruction::new_li(args.rd, 0, InstrWidth::Uncompressed),
+            // `rd = rs1 - 0` is equivalent to moving rs1 to rd.
+            (X::NonZero(rs2), X::X0) => Instruction::new_mv(args.rd, rs2, InstrWidth::Uncompressed),
+            // `rd = 0 - rs2` is equivalent to negating rs2 and moving to rd.
+            (X::X0, X::NonZero(rs2)) => {
+                Instruction::new_neg(args.rd, rs2, InstrWidth::Uncompressed)
+            }
+            (X::NonZero(rs1), X::NonZero(rs2)) => {
+                Instruction::new_sub(args.rd, rs1, rs2, InstrWidth::Uncompressed)
             }
         }
     }
