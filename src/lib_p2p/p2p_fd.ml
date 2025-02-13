@@ -108,12 +108,18 @@ type accept_error =
 type t = {
   fd : Lwt_unix.file_descr;
   id : int;
+  wakener : unit Lwt.u option;
+      (** Used to put the token back in the fd_pool after closing the file descriptor. *)
   mutable point : P2p_point.Id.t option;
   mutable peer_id : P2p_peer.Id.t option;
   mutable nread : int;
   mutable nwrit : int;
   mutable closing_reasons : P2p_disconnection_reason.t list;
 }
+
+type fd_pool = unit Lwt_pool.t
+
+let create_fd_pool ~capacity = Lwt_pool.create capacity Lwt.return
 
 let set_point ~point t = t.point <- Some point
 
@@ -138,8 +144,19 @@ let pp_read_write_error fmt = function
 
 let create =
   let counter = ref 0 in
-  fun fd ->
+  fun ?fd_pool fd ->
     let open Lwt_syntax in
+    let* wakener =
+      match fd_pool with
+      | None -> return None
+      | Some fd_pool ->
+          let p, u = Lwt.task () in
+          (* We grab an element of the pool, which will be freed only when [u] will be waken up. *)
+          let _ : unit Lwt.t = Lwt_pool.use fd_pool (fun () -> p) in
+          (* We wait until the pool is not full. *)
+          let* () = Lwt_pool.use fd_pool return in
+          return (Some u)
+    in
     incr counter ;
     let t =
       {
@@ -150,6 +167,7 @@ let create =
         nread = 0;
         nwrit = 0;
         closing_reasons = [];
+        wakener;
       }
     in
     let* () = Events.(emit create_fd) t.id in
@@ -258,10 +276,10 @@ let raw_socket () =
   let* sock = socket_setopt_user_timeout sock in
   socket_setopt_keepalive sock
 
-let socket () =
+let socket ?fd_pool () =
   let open Lwt_syntax in
   let* socket = raw_socket () in
-  create socket
+  create ?fd_pool socket
 
 let create_listening_socket ?(reuse_port = false) ~backlog
     ?(addr = Ipaddr.V6.unspecified) port =
@@ -326,7 +344,12 @@ let close ?reason t =
   Lwt.catch
     (fun () ->
       (* Guarantee idempotency. *)
-      if Lwt_unix.state t.fd = Closed then return_unit else close_socket t.fd)
+      if Lwt_unix.state t.fd = Closed then return_unit
+      else
+        let open Lwt_syntax in
+        let* () = close_socket t.fd in
+        Option.iter (fun wakener -> Lwt.wakeup wakener ()) t.wakener ;
+        return_unit)
     (function
       (* From [man 2 close] [close] can fail with [EBADF, EINTR, EIO, ENOSPC,
          EDQUOT] Unix errors.
@@ -439,7 +462,7 @@ let connect t saddr =
           in
           Lwt.return_error (`Unexpected_error ex))
 
-let accept listening_socket =
+let accept ?fd_pool listening_socket =
   let open Lwt_result_syntax in
   let* fd, saddr =
     Lwt.catch
@@ -482,7 +505,7 @@ let accept listening_socket =
             Lwt.return_error @@ `Socket_error e
         | ex -> Lwt.return_error @@ `Unexpected_error ex)
   in
-  let*! t = create fd in
+  let*! t = create ?fd_pool fd in
   let*! () = Events.(emit accept_fd) (t.id, string_of_sockaddr saddr) in
   return (t, saddr)
 

@@ -66,7 +66,7 @@ type read_write_error =
   | `Connection_locally_closed
   | unexpected_error ]
 
-(** 
+(**
 
    - Unreachable can be issued when we don't know how to reach to this address
 
@@ -77,7 +77,7 @@ type read_write_error =
    the behaviour of the firewall: If the firewall drops packets, it
    will be canceled because of a timeout, otherwise it can refuse the
    connection and we get this error.
-   
+
 *)
 
 type connect_error =
@@ -136,8 +136,19 @@ val read : t -> Bytes.t -> int -> int -> (int, read_write_error) result Lwt.t
     underlying socket has been closed. *)
 val write : t -> Bytes.t -> (unit, read_write_error) result Lwt.t
 
-(** Returns a fresh fd. This call always succeed. *)
-val socket : unit -> t Lwt.t
+(** [fd_pool] is the type of file descriptors pool used to control the number
+    of connections opened simultaneously. *)
+type fd_pool
+
+(** [create_fd_pool capacity] creates a file descriptors pool accepting at most
+    [capacity] connections. *)
+val create_fd_pool : capacity:int -> fd_pool
+
+(** [socket ?fd_pool ()] returns a fresh fd.
+    If [fd_pool] is [None], this call succeeds immediatly.
+    If [fd_pool] is [Some p], it waits until [p] has a free element which
+    can be taken, and succeds. *)
+val socket : ?fd_pool:fd_pool -> unit -> t tzresult Lwt.t
 
 (** [create_listening_socket ?reuse_port ~backlog ?addr port] creates
     a socket that listens on [addr] or [Ipaddr.V6.unspecified] if
@@ -159,8 +170,13 @@ val create_listening_socket :
     closed. *)
 val connect : t -> Lwt_unix.sockaddr -> (unit, connect_error) result Lwt.t
 
-(** [accept sock] accepts connections on socket [sock]. *)
+(** [accept ?fd_pool sock] accepts connections on socket [sock].
+    If [fd_pool] is [None], it does not perform more checks.
+    If [fd_pool] is [Some p], it waits until [p] has a free element which
+    can be taken, and succeeds. *)
 val accept :
-  Lwt_unix.file_descr -> (t * Lwt_unix.sockaddr, accept_error) result Lwt.t
+  ?fd_pool:fd_pool ->
+  Lwt_unix.file_descr ->
+  (t * Lwt_unix.sockaddr, accept_error) result Lwt.t
 
 module Table : Hashtbl.S with type key = t

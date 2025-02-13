@@ -54,7 +54,7 @@ let create_scheduler limits =
     ?write_queue_size:limits.write_queue_size
     ()
 
-let create_connection_pool config limits meta_cfg log triggers =
+let create_connection_pool ?fd_pool config limits meta_cfg log triggers =
   let open P2p_limits in
   let pool_cfg =
     {
@@ -69,7 +69,7 @@ let create_connection_pool config limits meta_cfg log triggers =
       ip_greylist_cleanup_delay = limits.ip_greylist_cleanup_delay;
     }
   in
-  P2p_pool.create pool_cfg meta_cfg ~log triggers
+  P2p_pool.create ?fd_pool pool_cfg meta_cfg ~log triggers
 
 let create_connect_handler config limits pool msg_cfg conn_meta_cfg io_sched
     triggers log answerer =
@@ -188,14 +188,16 @@ module Real = struct
 
   let pool net = P2p_connect_handler.get_pool net.connect_handler
 
-  let create ~config ~limits ?received_msg_hook ?sent_msg_hook
+  let create ?fd_pool ~config ~limits ?received_msg_hook ?sent_msg_hook
       ?broadcasted_msg_hook meta_cfg msg_cfg conn_meta_cfg =
     let open Lwt_result_syntax in
     let io_sched = create_scheduler limits in
     let watcher = Lwt_watcher.create_input () in
     let log event = Lwt_watcher.notify watcher event in
     let triggers = P2p_trigger.create () in
-    let*! pool = create_connection_pool config limits meta_cfg log triggers in
+    let*! pool =
+      create_connection_pool ?fd_pool config limits meta_cfg log triggers
+    in
     (* There is a mutual recursion between an answerer and connect_handler,
        for the default answerer. Because of the swap request mechanism, the
        default answerer needs to initiate new connections using the
@@ -601,12 +603,13 @@ let check_limits =
     in
     return_unit
 
-let create ~config ~limits ?received_msg_hook ?sent_msg_hook
+let create ?fd_pool ~config ~limits ?received_msg_hook ?sent_msg_hook
     ?broadcasted_msg_hook peer_cfg conn_cfg msg_cfg =
   let open Lwt_result_syntax in
   let*? () = check_limits limits in
   let* net =
     Real.create
+      ?fd_pool
       ~config
       ~limits
       ?received_msg_hook

@@ -47,7 +47,10 @@ let accept st =
   let* () = Lwt_mutex.lock accept_lock in
   let* res =
     protect @@ fun () ->
-    let* r = P2p_fd.accept st.socket in
+    let fd_pool =
+      P2p_pool.get_fd_pool @@ P2p_connect_handler.get_pool connect_handler
+    in
+    let* r = P2p_fd.accept ?fd_pool st.socket in
     Result.fold
       ~ok:(fun (fd, addr) ->
         let point =
