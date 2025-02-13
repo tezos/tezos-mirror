@@ -184,7 +184,7 @@ pub(super) unsafe fn reveal(
     );
 
     match check_sbi_result(result) {
-        Err(err) => return err,
+        Err(err) => err,
         Ok(result) => result as i32,
     }
 }
@@ -196,10 +196,10 @@ pub(super) unsafe fn store_value_size(_path: *const u8, _path_len: usize) -> i32
 
 #[inline]
 pub(super) unsafe fn reveal_metadata(buffer: *mut u8, max_bytes: usize) -> i32 {
-    let mut request_payload = [1u8]; // reveal request tag
+    let request_payload = [1u8]; // reveal request tag
 
     reveal(
-        request_payload.as_mut_ptr(),
+        request_payload.as_ptr(),
         std::mem::size_of_val(&request_payload),
         buffer,
         max_bytes,
