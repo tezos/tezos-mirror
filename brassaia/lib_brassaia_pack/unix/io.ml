@@ -15,6 +15,7 @@
  *)
 
 open! Import
+open Brassaia_index
 module Syscalls = Brassaia_index_unix.Index_unix.Syscalls
 
 (* File utils, taken from index.unix package.

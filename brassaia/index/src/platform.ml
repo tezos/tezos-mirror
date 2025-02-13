@@ -1,7 +1,7 @@
 module type IO = Io.S
 
 module type CLOCK = sig
-  (** A monotonic time source. See {!Mtime_clock} for an OS-dependent
+  (** A monotonic time source. See [Mtime_clock] for an OS-dependent
       implementation. *)
 
   type counter
