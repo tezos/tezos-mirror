@@ -3057,7 +3057,7 @@ let check_history_mode_consistency chain_dir history_mode =
 
 let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
     ?block_cache_limit ?(disable_context_pruning = false)
-    ?(maintenance_delay = Storage_maintenance.Disabled) ~store_dir ~context_dir
+    ?(maintenance_delay = Storage_maintenance.Auto) ~store_dir ~context_dir
     ~allow_testchains genesis =
   let open Lwt_result_syntax in
   let*! () =
