@@ -225,3 +225,20 @@ module Trace = struct
   let call_trace ~transaction_hash i =
     call_trace_root ~transaction_hash ^ "/" ^ string_of_int i
 end
+
+module Chain_configuration = struct
+  let root chain_id =
+    EVM.make "/chain_configurations/" ^ Chain_id.to_string chain_id
+
+  let minimum_base_fee_per_gas chain_id =
+    root chain_id ^ "/minimum_base_fee_per_gas"
+
+  let da_fee_per_byte chain_id = root chain_id ^ "/da_fee_per_byte"
+
+  let maximum_gas_per_transaction chain_id =
+    root chain_id ^ "/maximum_gas_per_transaction"
+
+  let chain_family chain_id = root chain_id ^ "/chain_family"
+
+  let world_state chain_id = root chain_id ^ "/world_state"
+end
