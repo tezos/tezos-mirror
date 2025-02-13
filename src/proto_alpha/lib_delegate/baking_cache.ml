@@ -46,39 +46,3 @@ module Timestamp_of_round_cache =
       let equal (ts, r1, r2) (ts', r1', r2') =
         Timestamp.(ts = ts') && Round.(r1 = r1') && Round.(r2 = r2')
     end)
-
-module Round_cache_key = struct
-  type ts_interval = Timestamp.time * Timestamp.time
-
-  (** The values that are intended to be used here are the
-          arguments are: predecessor_timestamp * predecessor_round *
-          timestamp_interval *)
-  type t = {
-    predecessor_timestamp : Timestamp.time;
-    predecessor_round : round;
-    time_interval : ts_interval;
-  }
-
-  let hash {predecessor_timestamp; predecessor_round; _} =
-    Stdlib.Hashtbl.hash (predecessor_timestamp, predecessor_round)
-
-  let equal
-      {
-        predecessor_timestamp = pred_t;
-        predecessor_round = pred_r;
-        time_interval = t_beg, t_end;
-      }
-      {
-        predecessor_timestamp = pred_t';
-        predecessor_round = pred_r';
-        time_interval = t_beg', t_end';
-      } =
-    Timestamp.(pred_t = pred_t')
-    && Round.(pred_r = pred_r')
-    && Timestamp.(t_beg' <= t_beg)
-    && Timestamp.(t_end < t_end')
-end
-
-module Round_timestamp_interval_cache =
-  Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
-    (Round_cache_key)
