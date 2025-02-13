@@ -35,11 +35,6 @@ zcash() {
     ln -s "$OPAM_SWITCH_PREFIX/share/zcash-params" scripts/packaging/octez-data/
   fi
 
-  if [ ! -e scripts/packaging/octez-data/dal-trusted-setup ]; then
-    scripts/install_dal_trusted_setup.sh
-    ln -s "$OPAM_SWITCH_PREFIX/share/dal-trusted-setup" scripts/packaging/octez-data/
-  fi
-
   cd scripts/packaging/octez-data
   DEB_BUILD_OPTIONS=noautodbgsym dpkg-buildpackage -tc -b --no-sign -sa
   cd -
@@ -187,5 +182,8 @@ echo "All packages are available in ./scripts/packaging"
 # On the CI we have a specific job for it
 if [ -z "${CI:-}" ] && [ ${DEVEL} != "1" ]; then
   echo "Running lintian scripts/packaging/octez-*.deb"
-  lintian scripts/packaging/octez-*.deb --tag-display-limit 0 --verbose --fail-on warning
+  for p in scripts/packaging/octez-*.deb; do
+    lintian "$p" --tag-display-limit 0 --verbose --fail-on warning &
+  done
+  wait
 fi

@@ -6,7 +6,7 @@ Epoch: %{epoch}
 Release: 1%{?dist}
 Summary: Octez distribution Availability Layer (DAL) node
 License: MIT
-Requires: octez-zcash-dal-params systemd
+Requires: systemd
 Suggests: octez-baker
 %description
  The DAL node is responsible for temporarily storing data and providing it to
