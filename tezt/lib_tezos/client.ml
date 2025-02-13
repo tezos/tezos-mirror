@@ -1002,6 +1002,20 @@ let propose_for ?endpoint ?(minimal_timestamp = true) ?protocol ?key ?force
   spawn_propose_for ?endpoint ?protocol ?key ?force ~minimal_timestamp client
   |> Process.check
 
+let propose_for_and_wait ?endpoint ?minimal_timestamp ?protocol ?key ?force
+    client =
+  let node =
+    match node_of_client_mode client.mode with
+    | Some n -> n
+    | None -> Test.fail "No node found for propose_for_and_wait"
+  in
+  let actual_level_before = Node.get_last_seen_level node in
+  let* () =
+    propose_for ?endpoint ?minimal_timestamp ?protocol ?key ?force client
+  in
+  let* _level = Node.wait_for_level node (actual_level_before + 1) in
+  unit
+
 let id = ref 0
 
 let spawn_gen_keys ?(force = false) ?alias ?sig_alg client =
