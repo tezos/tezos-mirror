@@ -7021,6 +7021,7 @@ let hash = Protocol.hash
             baking_commands |> if_some |> open_;
             octez_stdlib_unix |> open_;
             octez_client_base_unix |> open_;
+            octez_profiler_backends |> open_;
           ]
     in
     let _baker = daemon "baker" in
