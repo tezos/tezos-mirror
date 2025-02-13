@@ -118,15 +118,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ansi_term"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d52a9bb7ec0cf484c551830a7ce27bd20d67eac647e1befb56b0be4ee39a55d2"
-dependencies = [
- "winapi",
-]
-
-[[package]]
 name = "anyhow"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -143,17 +134,6 @@ name = "arrayvec"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8da52d66c7071e2e3fa2a1e5c6d088fec47b593032b254f5e980de8ea54454d6"
-
-[[package]]
-name = "atty"
-version = "0.2.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9b39be18770d11421cdb1b9947a45dd3f37e93092cbf377614828a319d5fee8"
-dependencies = [
- "hermit-abi 0.1.19",
- "libc",
- "winapi",
-]
 
 [[package]]
 name = "aurora-engine-modexp"
@@ -296,21 +276,6 @@ name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
-
-[[package]]
-name = "clap"
-version = "2.34.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0610544180c38b88101fecf2dd634b174a62eef6946f84dfc6a7127512b381c"
-dependencies = [
- "ansi_term",
- "atty",
- "bitflags 1.3.2",
- "strsim",
- "textwrap",
- "unicode-width",
- "vec_map",
-]
 
 [[package]]
 name = "const-decoder"
@@ -667,31 +632,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "evm-evaluation"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "evm-execution",
- "hex",
- "hex-literal",
- "primitive-types",
- "regex",
- "serde",
- "serde_json",
- "serde_yaml",
- "structopt",
- "tezos-evm-logging",
- "tezos-evm-runtime",
- "tezos-smart-rollup-core",
- "tezos-smart-rollup-host",
- "tezos-smart-rollup-mock",
- "tezos_ethereum",
- "thiserror",
- "walkdir",
-]
-
-[[package]]
-name = "evm-execution"
+name = "evm-execution-calypso"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives",
@@ -712,19 +653,19 @@ dependencies = [
  "sha2 0.10.6",
  "sha3",
  "substrate-bn",
- "tezos-evm-logging",
- "tezos-evm-runtime",
- "tezos-indexable-storage",
+ "tezos-evm-logging-calypso",
+ "tezos-evm-runtime-calypso",
+ "tezos-indexable-storage-calypso",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-mock",
  "tezos-smart-rollup-storage",
- "tezos-storage",
+ "tezos-storage-calypso",
  "tezos_crypto_rs",
  "tezos_data_encoding",
- "tezos_ethereum",
+ "tezos_ethereum_calypso",
  "thiserror",
 ]
 
@@ -748,7 +689,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "evm_kernel"
+name = "evm_kernel_calypso"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives",
@@ -758,7 +699,7 @@ dependencies = [
  "ethbloom",
  "ethereum",
  "evm",
- "evm-execution",
+ "evm-execution-calypso",
  "getrandom",
  "hex",
  "libsecp256k1",
@@ -770,9 +711,9 @@ dependencies = [
  "rlp",
  "sha3",
  "softfloat",
- "tezos-evm-logging",
- "tezos-evm-runtime",
- "tezos-indexable-storage",
+ "tezos-evm-logging-calypso",
+ "tezos-evm-runtime-calypso",
+ "tezos-indexable-storage-calypso",
  "tezos-smart-rollup",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
@@ -783,10 +724,10 @@ dependencies = [
  "tezos-smart-rollup-mock",
  "tezos-smart-rollup-panic-hook",
  "tezos-smart-rollup-storage",
- "tezos-storage",
+ "tezos-storage-calypso",
  "tezos_crypto_rs",
  "tezos_data_encoding",
- "tezos_ethereum",
+ "tezos_ethereum_calypso",
  "thiserror",
 ]
 
@@ -834,7 +775,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "835c052cb0c08c1acf6ffd71c022172e18723949c8282f2b9f27efbc51e64534"
 dependencies = [
  "byteorder",
- "rand 0.8.5",
  "rustc-hex",
  "static_assertions",
 ]
@@ -956,15 +896,6 @@ dependencies = [
 
 [[package]]
 name = "hermit-abi"
-version = "0.1.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62b467343b94ba476dcb2500d242dadbb39557df889310ac77c5d99100aaac33"
-dependencies = [
- "libc",
-]
-
-[[package]]
-name = "hermit-abi"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d231dfb89cfffdbc30e7fc41579ed6066ad03abda9e567ccafae602b97ec5024"
@@ -1044,15 +975,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "impl-serde"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebc88fc67028ae3db0c853baa36269d398d5f45b6982f95549ff5def78c935cd"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "impl-trait-for-tuples"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1098,7 +1020,7 @@ version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09270fd4fa1111bc614ed2246c7ef56239a3063d5be0d1ec3b589c505d400aeb"
 dependencies = [
- "hermit-abi 0.3.9",
+ "hermit-abi",
  "libc",
  "windows-sys 0.45.0",
 ]
@@ -1374,11 +1296,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "637935964ff85a605d114591d4d2c13c5d1ba2806dae97cea6bf180238a749ac"
 dependencies = [
  "arrayvec",
- "bitvec",
  "byte-slice-cast",
  "impl-trait-for-tuples",
  "parity-scale-codec-derive",
- "serde",
 ]
 
 [[package]]
@@ -1455,7 +1375,6 @@ dependencies = [
  "fixed-hash",
  "impl-codec",
  "impl-rlp",
- "impl-serde",
  "scale-info",
  "uint",
 ]
@@ -1859,15 +1778,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b4b9743ed687d4b4bcedf9ff5eaa7398495ae14e61cba0a295704edbc7decde"
 
 [[package]]
-name = "same-file"
-version = "1.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
-dependencies = [
- "winapi-util",
-]
-
-[[package]]
 name = "scale-info"
 version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1933,7 +1843,6 @@ version = "1.0.115"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12dc5c46daa8e9fdf4f5e71b6cf9a53f2487da0e86e55808e2d35539666497dd"
 dependencies = [
- "indexmap 2.7.1",
  "itoa",
  "ryu",
  "serde",
@@ -2042,36 +1951,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
-name = "strsim"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ea5119cdb4c55b55d432abb513a0429384878c15dde60cc77b1c99de1a95a6a"
-
-[[package]]
-name = "structopt"
-version = "0.3.26"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c6b5c64445ba8094a6ab0c3cd2ad323e07171012d9c98b0b15651daf1787a10"
-dependencies = [
- "clap",
- "lazy_static",
- "structopt-derive",
-]
-
-[[package]]
-name = "structopt-derive"
-version = "0.4.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcb5ae327f9cc13b68763b5749770cb9e048a99bd9dfdfa58d0cf05d5f64afe0"
-dependencies = [
- "heck 0.3.3",
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "strum"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2173,16 +2052,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "textwrap"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d326610f408c7a4eb6f51c37c330e496b08506c9457c9d34287ecc38809fb060"
-dependencies = [
- "unicode-width",
-]
-
-[[package]]
-name = "tezos-evm-logging"
+name = "tezos-evm-logging-calypso"
 version = "0.1.0"
 dependencies = [
  "num-derive",
@@ -2191,11 +2061,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos-evm-runtime"
+name = "tezos-evm-runtime-calypso"
 version = "0.1.0"
 dependencies = [
  "sha3",
- "tezos-evm-logging",
+ "tezos-evm-logging-calypso",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",
@@ -2204,16 +2074,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos-indexable-storage"
+name = "tezos-indexable-storage-calypso"
 version = "0.1.0"
 dependencies = [
  "rlp",
- "tezos-evm-logging",
- "tezos-evm-runtime",
+ "tezos-evm-logging-calypso",
+ "tezos-evm-runtime-calypso",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-mock",
  "tezos-smart-rollup-storage",
- "tezos-storage",
+ "tezos-storage-calypso",
  "thiserror",
 ]
 
@@ -2367,7 +2237,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos-storage"
+name = "tezos-storage-calypso"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -2375,11 +2245,11 @@ dependencies = [
  "primitive-types",
  "rlp",
  "sha3",
- "tezos-evm-runtime",
+ "tezos-evm-runtime-calypso",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-storage",
  "tezos_crypto_rs",
- "tezos_ethereum",
+ "tezos_ethereum_calypso",
  "thiserror",
 ]
 
@@ -2436,7 +2306,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos_ethereum"
+name = "tezos_ethereum_calypso"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -2603,12 +2473,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1dd624098567895118886609431a7c3b8f516e41d30e0643f03d94592a147e36"
 
 [[package]]
-name = "unicode-width"
-version = "0.1.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e51733f11c9c4f72aa0c160008246859e340b00807569a0da0e7a1079b27ba85"
-
-[[package]]
 name = "unsafe-libyaml"
 version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2654,12 +2518,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
 
 [[package]]
-name = "vec_map"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
-
-[[package]]
 name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2672,16 +2530,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f200f5b12eb75f8c1ed65abd4b2db8a6e1b138a20de009dacee265a2498f3f6"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "walkdir"
-version = "2.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d71d857dc86794ca4c280d616f7da00d2dbfd8cd788846559a6813e6aa4b54ee"
-dependencies = [
- "same-file",
- "winapi-util",
 ]
 
 [[package]]
@@ -2711,15 +2559,6 @@ name = "winapi-i686-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac3b87c63620426dd9b991e5ce0329eff545bccbbb34f3be09ff6fb6ab51b7b6"
-
-[[package]]
-name = "winapi-util"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f29e6f9198ba0d26b4c9f07dbe6f9ed633e1f3d5b8b414090084349e46a52596"
-dependencies = [
- "winapi",
-]
 
 [[package]]
 name = "winapi-x86_64-pc-windows-gnu"
