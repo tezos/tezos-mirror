@@ -21,6 +21,8 @@ If the ``octez-node`` binary was not started with the ``--network <network>`` ar
 Running the DAL node
 --------------------
 
+Before anything else, make sure your machine satisfies the hardware requirements at :doc:`dal_node`.
+
 Follow these steps to run a DAL node along with a layer 1 node and a baker.
 
 #. **If** you plan to run the DAL node in **operator or observer** :ref:`profiles <dal_profiles>`, install the DAL trusted setup as described in section :ref:`setup_dal_crypto_params` (**NB:** just that section, not the rest of the page such as compiling sources, etc.).

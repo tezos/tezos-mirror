@@ -168,7 +168,7 @@ Check :ref:`the documentation <new_packages>` for more details.
 Changelog
 ---------
 
-- `Version 21.3 <../CHANGES.html#version-21-2>`_
+- `Version 21.3 <../CHANGES.html#version-21-3>`_
 - `Version 21.2 <../CHANGES.html#version-21-2>`_
 - `Version 21.1 <../CHANGES.html#version-21-1>`_
 - `Version 21.0 <../CHANGES.html#version-21-0>`_
