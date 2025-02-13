@@ -3063,6 +3063,7 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
   let*! () =
     Store_events.(emit init_store) (readonly, disable_context_pruning)
   in
+  let*! () = Store_events.(emit maintenance_status maintenance_delay) in
   let store_dir = Naming.store_dir ~dir_path:store_dir in
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
   let chain_dir = Naming.chain_dir store_dir chain_id in
