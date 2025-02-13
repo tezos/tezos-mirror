@@ -2023,8 +2023,8 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
         time_between_blocks;
         sequencer = account.alias;
         genesis_timestamp = None;
-        max_blueprints_lag = None;
-        max_blueprints_ahead = None;
+        max_blueprints_lag = Some 300;
+        max_blueprints_ahead = Some 2000;
         max_blueprints_catchup = None;
         catchup_cooldown = None;
         max_number_of_chunks = None;
