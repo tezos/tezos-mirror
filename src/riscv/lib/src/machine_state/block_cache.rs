@@ -900,11 +900,11 @@ mod tests {
             block_cache::bcall::Interpreted,
             instruction::{
                 Instruction, OpCode,
-                tagged_instruction::{TaggedArgs, TaggedInstruction},
+                tagged_instruction::{TaggedArgs, TaggedInstruction, TaggedRegister},
             },
             main_memory::{self, tests::T1K},
             mode::Mode,
-            registers::{a1, nz, t0, t1},
+            registers::{XRegister, a1, nz, t0, t1},
         },
         state_backend::{CommitmentLayout, owned_backend::Owned},
     };
@@ -920,6 +920,7 @@ mod tests {
             args: TaggedArgs {
                 rs1: t1.into(),
                 rs2: t0.into(),
+                rd: TaggedRegister::X(XRegister::x1),
                 imm: 8,
                 ..TaggedArgs::DEFAULT
             },
@@ -1065,6 +1066,7 @@ mod tests {
                 rd: nz::a1.into(),
                 rs1: a1.into(),
                 imm: 257,
+                rs2: TaggedRegister::X(XRegister::x1),
                 ..TaggedArgs::DEFAULT
             },
         })
@@ -1135,6 +1137,7 @@ mod tests {
             args: TaggedArgs {
                 rs1: t1.into(),
                 rs2: t0.into(),
+                rd: TaggedRegister::X(XRegister::x1),
                 imm: 8,
                 ..TaggedArgs::DEFAULT
             },
@@ -1172,6 +1175,7 @@ mod tests {
             args: TaggedArgs {
                 rs1: t1.into(),
                 rs2: t0.into(),
+                rd: TaggedRegister::X(XRegister::x1),
                 imm: 8,
                 ..TaggedArgs::DEFAULT
             },

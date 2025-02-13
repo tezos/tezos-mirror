@@ -61,9 +61,6 @@ impl Instruction {
             opcode: OpCode::Neg,
             args: Args {
                 rd: rd.into(),
-                // We are adding a default value for rs1 as NonZeroXRegister::x1
-                // to be explicit that it is of NonZeroXRegister type.
-                rs1: NonZeroXRegister::x1.into(),
                 rs2: rs2.into(),
                 width,
                 ..Args::DEFAULT
@@ -77,9 +74,6 @@ impl Instruction {
             opcode: OpCode::Mv,
             args: Args {
                 rd: rd.into(),
-                // We are adding a default value for rs1 as NonZeroXRegister::x1
-                // to be explicit that it is of NonZeroXRegister type.
-                rs1: NonZeroXRegister::x1.into(),
                 rs2: rs2.into(),
                 width,
                 ..Args::DEFAULT
@@ -93,10 +87,6 @@ impl Instruction {
             opcode: OpCode::Li,
             args: Args {
                 rd: rd.into(),
-                // We are adding default values for rs1 and rs2 as NonZeroXRegister::x1
-                // to be explicit that it is of NonZeroXRegister type.
-                rs1: NonZeroXRegister::x1.into(),
-                rs2: NonZeroXRegister::x1.into(),
                 imm,
                 width,
                 ..Args::DEFAULT
@@ -109,11 +99,6 @@ impl Instruction {
         Self {
             opcode: OpCode::Nop,
             args: Args {
-                // We are adding default values for rd, rs1 and rs2 as NonZeroXRegister::x1
-                // to be explicit that they are of NonZeroXRegister type.
-                rd: NonZeroXRegister::x1.into(),
-                rs1: NonZeroXRegister::x1.into(),
-                rs2: NonZeroXRegister::x1.into(),
                 width,
                 ..Args::DEFAULT
             },
@@ -132,9 +117,6 @@ impl Instruction {
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
-                // We are adding a default value for rs2 as NonZeroXRegister::x1
-                // to be explicit that it is of NonZeroXRegister type.
-                rs2: NonZeroXRegister::x1.into(),
                 imm,
                 width,
                 ..Args::DEFAULT
@@ -154,9 +136,6 @@ impl Instruction {
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
-                // We are adding a default value for rs2 as NonZeroXRegister::x1
-                // to be explicit that it is of NonZeroXRegister type.
-                rs2: NonZeroXRegister::x1.into(),
                 imm,
                 width,
                 ..Args::DEFAULT
@@ -176,9 +155,6 @@ impl Instruction {
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
-                // We are adding a default value for rs2 as NonZeroXRegister::x1
-                // to be explicit that it is of NonZeroXRegister type.
-                rs2: NonZeroXRegister::x1.into(),
                 imm,
                 width,
                 ..Args::DEFAULT
@@ -198,9 +174,6 @@ impl Instruction {
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
-                // We are adding a default value for rs2 as NonZeroXRegister::x1
-                // to be explicit that it is of NonZeroXRegister type.
-                rs2: NonZeroXRegister::x1.into(),
                 imm,
                 width,
                 ..Args::DEFAULT
@@ -220,9 +193,6 @@ impl Instruction {
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
-                // We are adding a default value for rs2 as NonZeroXRegister::x1
-                // to be explicit that it is of NonZeroXRegister type.
-                rs2: NonZeroXRegister::x1.into(),
                 imm,
                 width,
                 ..Args::DEFAULT
@@ -242,9 +212,6 @@ impl Instruction {
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
-                // We are adding a default value for rs2 as NonZeroXRegister::x1
-                // to be explicit that it is of NonZeroXRegister type.
-                rs2: NonZeroXRegister::x1.into(),
                 imm,
                 width,
                 ..Args::DEFAULT
@@ -264,9 +231,6 @@ impl Instruction {
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
-                // We are adding a default value for rs2 as NonZeroXRegister::x1
-                // to be explicit that it is of NonZeroXRegister type.
-                rs2: NonZeroXRegister::x1.into(),
                 imm,
                 width,
                 ..Args::DEFAULT
@@ -393,11 +357,6 @@ impl Instruction {
         Self {
             opcode: OpCode::J,
             args: Args {
-                // We are adding default values for rd, rs1 and rs2 as NonZeroXRegister::x1
-                // to be explicit that they are of NonZeroXRegister type.
-                rd: NonZeroXRegister::x1.into(),
-                rs1: NonZeroXRegister::x1.into(),
-                rs2: NonZeroXRegister::x1.into(),
                 imm,
                 width,
                 ..Args::DEFAULT
@@ -411,10 +370,6 @@ impl Instruction {
             opcode: OpCode::Jal,
             args: Args {
                 rd: rd.into(),
-                // We are adding default values for rs1 and rs2 as NonZeroXRegister::x1
-                // to be explicit that they are of NonZeroXRegister type.
-                rs1: NonZeroXRegister::x1.into(),
-                rs2: NonZeroXRegister::x1.into(),
                 imm,
                 width,
                 ..Args::DEFAULT
@@ -432,9 +387,6 @@ impl Instruction {
         Self {
             opcode: OpCode::Beq,
             args: Args {
-                // We are adding a default values for rd as NonZeroXRegister::x1
-                // to be explicit that it is of NonZeroXRegister type.
-                rd: NonZeroXRegister::x1.into(),
                 rs1: rs1.into(),
                 rs2: rs2.into(),
                 imm,
@@ -449,11 +401,7 @@ impl Instruction {
         Self {
             opcode: OpCode::Beqz,
             args: Args {
-                // We are adding default values for rd, rs1 and rs2 as NonZeroXRegister::x1
-                // to be explicit that they are of NonZeroXRegister type.
-                rd: NonZeroXRegister::x1.into(),
                 rs1: rs1.into(),
-                rs2: NonZeroXRegister::x1.into(),
                 imm,
                 width,
                 ..Args::DEFAULT
@@ -471,9 +419,6 @@ impl Instruction {
         Self {
             opcode: OpCode::Bne,
             args: Args {
-                // We are adding a default values for rd as NonZeroXRegister::x1
-                // to be explicit that it is of NonZeroXRegister type.
-                rd: NonZeroXRegister::x1.into(),
                 rs1: rs1.into(),
                 rs2: rs2.into(),
                 imm,
@@ -488,11 +433,7 @@ impl Instruction {
         Self {
             opcode: OpCode::Bnez,
             args: Args {
-                // We are adding default values for rd, rs1 and rs2 as NonZeroXRegister::x1
-                // to be explicit that they are of NonZeroXRegister type.
-                rd: NonZeroXRegister::x1.into(),
                 rs1: rs1.into(),
-                rs2: NonZeroXRegister::x1.into(),
                 imm,
                 width,
                 ..Args::DEFAULT
