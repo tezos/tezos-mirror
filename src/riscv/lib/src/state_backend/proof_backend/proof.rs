@@ -57,8 +57,8 @@ impl Proof {
     }
 
     /// Get the final state hash of the proof.
-    pub fn final_state_hash(&self) -> &Hash {
-        &self.final_state_hash
+    pub fn final_state_hash(&self) -> Hash {
+        self.final_state_hash
     }
 }
 

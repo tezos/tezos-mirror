@@ -73,6 +73,8 @@ where
             eprintln!("> Checking initial proof hash ...");
             assert_eq!(proof.initial_state_hash(), stepper.hash());
 
+            let final_state_hash = proof.final_state_hash();
+
             eprintln!("> Verifying ...");
             assert!(stepper.verify_proof(proof));
 
@@ -82,8 +84,8 @@ where
             stepper.eval_one();
             steps_done += 1;
 
-            // TODO RV-373 : Proof-generating backend should also compute final state hash
-            //assert_eq!(proof.final_state_hash(), &stepper.hash());
+            eprintln!("> Checking final proof hash ...");
+            assert_eq!(final_state_hash, stepper.hash());
         } else {
             // Can't generate a proof on the next step if execution has ended
             assert!(matches!(result, StepperStatus::Exited { .. }));

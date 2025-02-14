@@ -131,10 +131,10 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL, 
                 .to_merkle_proof()
                 .expect("Converting a Merkle tree to a compressed Merkle proof should not fail");
 
-            // TODO RV-373 : Proof-generating backend should also compute final state hash
-            // Currently, the proof and the initial state hash are valid,
-            // but the final state hash is not.
-            Proof::new(merkle_proof, self.hash())
+            let refs = proof_stepper.struct_ref();
+            let final_hash = PvmLayout::<ML, CL>::state_hash(refs)
+                .expect("Obtaining the final hash of the proof-gen state should not fail");
+            Proof::new(merkle_proof, final_hash)
         })
     }
 }
