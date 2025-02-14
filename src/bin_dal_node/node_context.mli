@@ -282,6 +282,9 @@ module P2P : sig
     val get_topics_peers :
       subscribed:bool -> t -> (Types.Topic.t * Types.Peer.t list) list
 
+    val get_fanout :
+      t -> (Types.Topic.t * Types.Peer.t list * Types.Time.t) list
+
     (** [get_slot_indexes_peers ~subscribed t] returns an association list
         between the slot_indexes of topics of connected peers and the connected
         peers subscribed to those topics, when [subscribed = false]. When
