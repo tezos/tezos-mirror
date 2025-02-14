@@ -52,17 +52,11 @@ for release in "${releases[@]}"; do
     echo -e "For installation instructions, refer to the [Octez Debian Packages Guide](https://tezos.gitlab.io/introduction/howtoget.html#new-set-of-debian-packages)\n"
   } >> index.md
 
-  echo -e "### RPM packages\n" >> index.md
+  {
+    echo -e "### RPM Packages\n"
+    echo -e "For installation instructions, refer to the [Octez RPM Packages Guide](https://tezos.gitlab.io/introduction/howtoget.html#fedora-octez-packages)\n"
+  } >> index.md
 
-  for distribution in fedora:39 rockylinux:9.3; do
-
-    echo "#### $distribution" >> index.md
-
-    for package in $(aws s3 ls "s3://${S3_BUCKET}/${release}/rpm/${distribution}/" --recursive | awk '{print $NF}'); do
-      echo "- [$(basename "$package")](https://${S3_BUCKET}/${package})" >> index.md
-    done
-    echo -e "\n" >> index.md
-  done
 done
 
 echo "Generating html file."

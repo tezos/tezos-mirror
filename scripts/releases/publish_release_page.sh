@@ -43,11 +43,6 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
     aws s3 sync "./octez-binaries/x86_64/" "s3://${S3_BUCKET}/${gitlab_release}/binaries/x86_64/" --region "${REGION}"
     aws s3 sync "./octez-binaries/arm64/" "s3://${S3_BUCKET}/${gitlab_release}/binaries/arm64/" --region "${REGION}"
 
-    # Upload rpm packages to S3 bucket
-    echo "Uploading rpm packages..."
-    aws s3 sync "./packages/rockylinux/9.3" "s3://${S3_BUCKET}/${gitlab_release}/rpm/rockylinux:9.3/" --region "${REGION}"
-    aws s3 sync "./packages/fedora/39" "s3://${S3_BUCKET}/${gitlab_release}/rpm/fedora:39/" --region "${REGION}"
-
     # Push checksums for x86_64 binaries
     echo "Generating checksums for x86_64 binaries"
     for binary in ./octez-binaries/x86_64/*; do
