@@ -188,6 +188,61 @@ let test_switch_history_mode () =
   let* () = Evm_node.run sequencer and* _ = wait_for_rolling in
   unit
 
+let test_switch_history_mode_shorter_retention_period () =
+  let genesis_time = Client.Time.of_notation_exn "2020-01-01T00:00:00Z" in
+  let genesis_timestamp = Client.At genesis_time in
+  let get_timestamp i =
+    (* Move one day every block *)
+    Ptime.add_span genesis_time (days (i + 1))
+    |> Option.get |> Client.Time.to_notation
+  in
+  let initial_retention_period = 5 in
+  let new_retention_period = 2 in
+  let blocks_to_produce = initial_retention_period + 1 in
+  register
+    ~genesis_timestamp
+    ~title:"Switch history mode with shorter retention period"
+    ~history_mode:(Rolling initial_retention_period)
+    ~tags:["history_mode"]
+  @@ fun sequencer ->
+  let wait_for_gc = Evm_node.wait_for_gc_finished sequencer in
+  let* _ =
+    fold blocks_to_produce () (fun i () ->
+        let timestamp = get_timestamp i in
+        let* _ = Rpc.produce_block ~timestamp sequencer in
+        unit)
+  and* _ = wait_for_gc in
+
+  let*@ earliest_block = Rpc.get_block_by_number ~block:"earliest" sequencer in
+  Check.(
+    (earliest_block.number
+    = Int32.of_int (blocks_to_produce - initial_retention_period))
+      int32
+      ~error_msg:"Expected the head to be %R after GC, got %L") ;
+
+  let* () = Evm_node.terminate sequencer in
+  let*! () =
+    Evm_node.switch_history_mode sequencer (Rolling new_retention_period)
+  in
+  let* () = Evm_node.run sequencer in
+
+  (* Create one block, that will be enough to trigger a new gc *)
+  let wait_for_gc = Evm_node.wait_for_gc_finished sequencer in
+  let* _ =
+    let timestamp = get_timestamp blocks_to_produce in
+    let* _ = Rpc.produce_block ~timestamp sequencer in
+    unit
+  and* _ = wait_for_gc in
+
+  let*@ earliest_block = Rpc.get_block_by_number ~block:"earliest" sequencer in
+  Check.(
+    (earliest_block.number
+    = Int32.of_int (blocks_to_produce + 1 - new_retention_period))
+      int32
+      ~error_msg:"Expected the head to be %R after second GC, got %L") ;
+
+  unit
+
 let test_invalid_switch_history_mode () =
   register
     ~history_mode:(Rolling 2)
@@ -267,5 +322,6 @@ let test_full_history_mode_gc () =
 let () =
   test_gc_boundaries () ;
   test_switch_history_mode () ;
+  test_switch_history_mode_shorter_retention_period () ;
   test_invalid_switch_history_mode () ;
   test_full_history_mode_gc ()

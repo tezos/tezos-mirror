@@ -198,13 +198,13 @@ module Irmin_chunks : sig
     Time.Protocol.t ->
     unit Error_monad.tzresult Lwt.t
 
-  val oldest :
-    conn -> (Ethereum_types.quantity * Time.Protocol.t) tzresult Lwt.t
+  val nth :
+    conn ->
+    int ->
+    (Ethereum_types.quantity * Time.Protocol.t) option tzresult Lwt.t
 
   val latest :
     conn -> (Ethereum_types.quantity * Time.Protocol.t) option tzresult Lwt.t
-
-  val count : conn -> int tzresult Lwt.t
 
   val clear : conn -> unit tzresult Lwt.t
 end
