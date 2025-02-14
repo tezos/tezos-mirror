@@ -213,17 +213,23 @@ let get_attested_data_default_store_period t proto_parameters =
   let refutation_game_period =
     2 * get_refutation_game_period proto_parameters
   in
-  let attestation_period = 2 * proto_parameters.attestation_lag in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7772
+     This period should be zero. *)
+  let bootstrap_node_period = 2 * proto_parameters.attestation_lag in
+  (* For observability purpose, we aim for a non-slot producer profile
+     to keep shards for about 10 minutes.
+     150 blocks is 10 minutes on Ghostnet, 20 minutes on Mainnet. *)
+  let default_period = 150 in
   let supports_refutations_bis, period =
     match get_profiles t with
-    | Random_observer -> (false, attestation_period)
+    | Random_observer -> (false, default_period)
     | Operator op ->
         let has_producer = Operator_profile.(has_producer op) in
         let period =
-          if has_producer then refutation_game_period else attestation_period
+          if has_producer then refutation_game_period else default_period
         in
         (has_producer, period)
-    | Bootstrap -> (false, attestation_period)
+    | Bootstrap -> (false, bootstrap_node_period)
   in
   (* This is just to keep this function synced with {!supports_refutations}. *)
   assert (supports_refutations_bis = supports_refutations t) ;
