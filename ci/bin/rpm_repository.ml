@@ -43,6 +43,28 @@ let fedora_package_release_matrix = function
   | Full | Release ->
       [[("RELEASE", ["39"; "42"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
 
+(* Push .rpm artifacts to storagecloud rpm repository. *)
+let make_job_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
+    ?(prefix = false) ?dependencies ~variables ?id_tokens ~image ~before_script
+    script : tezos_job =
+  let variables =
+    variables
+    @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg")]
+    @ if prefix then [("PREFIX", "")] else []
+  in
+  job
+    ?rules
+    ?dependencies
+    ~__POS__
+    ~stage
+    ~name
+    ?id_tokens
+    ~image
+    ~before_script
+    ~retry:{max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
+    ~variables
+    script
+
 (* The entire RPM packages pipeline. When [pipeline_type] is [Before_merging]
    we test only on Rockylinux. Returns a triplet, the first element is
    the list of all jobs, the second is the job building fedora packages artifats
@@ -249,6 +271,24 @@ let jobs pipeline_type =
         ~dependencies:(Dependent [Job job_rpm_repo_fedora])
         ~image:Images.fedora_39
         ["./docs/introduction/install-bin-rpm.sh fedora 39"];
+      job_install_systemd_bin
+        ~__POS__
+        ~name:"oc.install_bin_fedora_39_systemd"
+        ~dependencies:
+          (Dependent
+             [
+               Job job_docker_systemd_test_rpm_dependencies;
+               Job job_rpm_repo_fedora;
+             ])
+        ~variables:
+          (variables
+             ~kind:"systemd-tests"
+             [("DISTRIBUTION", "fedora"); ("RELEASE", "39")])
+        [
+          "./scripts/ci/systemd-packages-test.sh \
+           docs/introduction/install-bin-rpm.sh \
+           images/packages/rpm-systemd-tests.Dockerfile";
+        ];
     ]
   in
   let test_rockylinux_packages_jobs =
@@ -277,11 +317,7 @@ let jobs pipeline_type =
         ~variables:
           (variables
              ~kind:"systemd-tests"
-             [
-               ("PREFIX", "next");
-               ("DISTRIBUTION", "rockylinux");
-               ("RELEASE", "9.3");
-             ])
+             [("DISTRIBUTION", "rockylinux"); ("RELEASE", "9.3")])
         [
           "./scripts/ci/systemd-packages-test.sh \
            docs/introduction/install-bin-rpm.sh \

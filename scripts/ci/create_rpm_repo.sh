@@ -34,7 +34,7 @@ fi
 
 ARCHITECTURES=${ARCHITECTURES:-"amd64"}
 
-# The prefix used for these packages in the repository. E.g. 'next'
+# The prefix used for these packages in the repository.
 PREFIX=${PREFIX:-""}
 
 # The linux distribution for which we are creating the rpm repository

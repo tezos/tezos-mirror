@@ -931,7 +931,7 @@ rpm_repo_rockylinux:
   variables:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
-    PREFIX: next
+    PREFIX: ""
   id_tokens:
     GCP_ID_TOKEN:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
@@ -1084,7 +1084,7 @@ rpm_repo_fedora:
   variables:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
-    PREFIX: next
+    PREFIX: ""
   id_tokens:
     GCP_ID_TOKEN:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}

@@ -295,28 +295,6 @@ let make_job_build_packages ~__POS__ ~name ~matrix ~script ~dependencies
     ]
   |> enable_sccache ~idle_timeout:"0"
 
-(* Push .rpm artifacts to storagecloud rpm repository. *)
-let make_job_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
-    ?(prefix = false) ?dependencies ~variables ?id_tokens ~image ~before_script
-    script : tezos_job =
-  let variables =
-    variables
-    @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg")]
-    @ if prefix then [("PREFIX", "next")] else []
-  in
-  job
-    ?rules
-    ?dependencies
-    ~__POS__
-    ~stage
-    ~name
-    ?id_tokens
-    ~image
-    ~before_script
-    ~retry:{max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
-    ~variables
-    script
-
 (** {2 Changesets} *)
 
 (** Modifying these files will unconditionally execute all conditional jobs.
