@@ -256,9 +256,13 @@ Data Availability Layer (DAL)
 DAL node
 ~~~~~~~~
 
+- **Feature** A new RPC ``/p2p/gossipsub/reconnection_delays`` which
+  provides for each unreachable point, the time remaining until the
+  next reconnection attempt. (MR :gl:`!16767`)
+
 - **Bugfix** From v21.2, the DAL node tries to recontact peers after
   the connection attempt failed. However, this MR fixes the timing
-  when those attempts were made (MR :gl:`!16466`)
+  when those attempts were made. (MR :gl:`!16466`)
 
 - **Feature** The DAL node stores now a peers.json file in its
   directory when it is shutdown with SIGINT. This file is read if it
