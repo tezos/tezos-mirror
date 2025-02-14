@@ -496,6 +496,10 @@ module P2P = struct
            ~subscribed:q#subscribed
            ctxt
 
+    let get_fanout ctxt () () =
+      let open Lwt_result_syntax in
+      return @@ Node_context.P2P.Gossipsub.get_fanout ctxt
+
     let get_slot_indexes_peers ctxt q () =
       let open Lwt_result_syntax in
       return
@@ -611,6 +615,10 @@ let register :
        Tezos_rpc.Directory.register0
        Services.P2P.Gossipsub.get_topics_peers
        (P2P.Gossipsub.get_topics_peers ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.P2P.Gossipsub.get_fanout
+       (P2P.Gossipsub.get_fanout ctxt)
   |> add_service
        Tezos_rpc.Directory.register0
        Services.P2P.Gossipsub.get_slot_indexes_peers
