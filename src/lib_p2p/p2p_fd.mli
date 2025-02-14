@@ -32,7 +32,9 @@ type listening_socket_open_failure = {
 
 (** Type of an error in case of the listening
     socket fails to open. *)
-type error += Failed_to_open_listening_socket of listening_socket_open_failure
+type error +=
+  | Failed_to_open_listening_socket of listening_socket_open_failure
+  | Full_waiting_queue
 
 (** This module defines a type [t] which wraps a file descriptor. Most
     functions simply call the underlying file descriptor function and generate
@@ -101,7 +103,12 @@ type connect_error =
     For most socket-errors you can just log them and call accept again to be
     ready for the next connection. *)
 type accept_error =
-  [`System_error of exn | `Socket_error of exn | unexpected_error]
+  [ `System_error of exn
+  | `Socket_error of exn
+  | `Full_waiting_queue
+  | unexpected_error ]
+
+val accept_error_to_tzerror : accept_error -> error
 
 (** Pretty printer for read_write_error. *)
 val pp_read_write_error : Format.formatter -> read_write_error -> unit

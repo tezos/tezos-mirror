@@ -80,10 +80,7 @@ let accept st =
                 (TzTrace.make (error_of_exn ex), "socket")
             in
             Lwt.return (Ok ())
-        | `Unexpected_error ex ->
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/5632
-               Losing some information here... *)
-            Lwt.return_error (TzTrace.make (error_of_exn ex)))
+        | ex -> Lwt_result_syntax.tzfail (P2p_fd.accept_error_to_tzerror ex))
       r
   in
   Lwt_mutex.unlock accept_lock ;

@@ -720,7 +720,7 @@ let connect ?trusted ?expected_peer_id ?timeout t point =
       let timestamp = Time.System.now () in
       P2p_point_state.set_requested ~timestamp point_info canceler ;
       let fd_pool = P2p_pool.get_fd_pool t.pool in
-      let*! fd = P2p_fd.socket ?fd_pool () in
+      let* fd = P2p_fd.socket ?fd_pool () in
       P2p_fd.set_point ~point fd ;
       let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
       let*! () = Events.(emit connect_status) ("start", point) in
