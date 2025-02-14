@@ -954,6 +954,19 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   let input_events_stream t = t.state.events_stream
 
+  let reconnection_delays {state = {unreachable_points; gossip_state; _}; _} =
+    let heartbeat_span = View.((view gossip_state).limits.heartbeat_interval) in
+    let View.{heartbeat_ticks; _} = View.(view gossip_state) in
+    unreachable_points |> Point.Map.to_seq
+    |> Seq.map (fun (point, next_heartbeat_reconnection_tick) ->
+           let how_many_ticks_left =
+             Int64.(sub next_heartbeat_reconnection_tick heartbeat_ticks)
+             |> Int64.to_int
+           in
+           let span = GS.Span.mul heartbeat_span how_many_ticks_left in
+           (point, span))
+    |> List.of_seq
+
   let is_subscribed t topic =
     GS.Introspection.(has_joined topic (view t.state.gossip_state))
 
