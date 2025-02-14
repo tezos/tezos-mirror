@@ -24,8 +24,6 @@ done
 debian_bookworm_packages="$(find packages/debian/bookworm/ -maxdepth 1 -name octez-\*.deb 2> /dev/null || printf '')"
 ubuntu_noble_packages="$(find packages/ubuntu/noble/ -maxdepth 1 -name octez-\*.deb 2> /dev/null || printf '')"
 ubuntu_jammy_packages="$(find packages/ubuntu/jammy/ -maxdepth 1 -name octez-\*.deb 2> /dev/null || printf '')"
-fedora_packages="$(find packages/fedora/39/ -maxdepth 1 -name octez-\*.rpm 2> /dev/null || printf '')"
-rockylinux_packages="$(find packages/rockylinux/9.3/ -maxdepth 1 -name octez-\*.rpm 2> /dev/null || printf '')"
 
 # https://docs.gitlab.com/ee/user/packages/generic_packages/index.html#download-package-file
 # :gitlab_api_url/projects/:id/packages/generic/:package_name/:package_version/:file_name
@@ -36,8 +34,6 @@ gitlab_octez_debian_bookworm_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT
 gitlab_octez_ubuntu_noble_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_ubuntu_noble_package_name}/${gitlab_package_version}"
 gitlab_octez_ubuntu_jammy_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_ubuntu_jammy_package_name}/${gitlab_package_version}"
 
-gitlab_octez_fedora_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_fedora_package_name}/${gitlab_package_version}"
-gitlab_octez_rockylinux_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_rockylinux_package_name}/${gitlab_package_version}"
 gitlab_octez_source_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_source_package_name}/${gitlab_package_version}"
 
 gitlab_upload() {
@@ -115,18 +111,6 @@ echo "Upload Ubuntu jammy packages"
 for package in ${ubuntu_jammy_packages}; do
   package_name="$(basename "${package}")"
   gitlab_upload "./${package}" "${package_name}" "${gitlab_octez_ubuntu_jammy_package_url}"
-done
-
-echo "Upload Fedora packages"
-for package in ${fedora_packages}; do
-  package_name="$(basename "${package}")"
-  gitlab_upload "./${package}" "${package_name}" "${gitlab_octez_fedora_package_url}"
-done
-
-echo "Upload Rocky Linux packages"
-for package in ${rockylinux_packages}; do
-  package_name="$(basename "${package}")"
-  gitlab_upload "./${package}" "${package_name}" "${gitlab_octez_rockylinux_package_url}"
 done
 
 # Source code archives automatically published in a GitLab release do not have a static checksum,
