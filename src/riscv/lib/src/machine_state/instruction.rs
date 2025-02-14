@@ -24,7 +24,7 @@ use super::{
     MachineCoreState, ProgramCounterUpdate,
     csregisters::CSRegister,
     memory::MemoryConfig,
-    registers::{FRegister, NonZeroXRegister, XRegister},
+    registers::{FRegister, NonZeroXRegister, XRegister, nz},
 };
 use crate::{
     default::ConstDefault,
@@ -334,8 +334,10 @@ pub enum OpCode {
     CLwsp,
     CSw,
     CSwsp,
-    CJr,
-    CJalr,
+    /// Jumps to val(rs1)
+    Jr,
+    /// Effects are to store the next instruction address in rd and jump to val(rs1).
+    Jalr,
     CAddw,
     CSubw,
 
@@ -542,8 +544,8 @@ impl OpCode {
             Self::CSwsp => Args::run_cswsp,
             Self::J => Args::run_j,
             Self::JAbsolute => Args::run_j_absolute,
-            Self::CJr => Args::run_cjr,
-            Self::CJalr => Args::run_cjalr,
+            Self::Jr => Args::run_jr,
+            Self::Jalr => Args::run_jalr,
             Self::Beqz => Args::run_beqz,
             Self::Bnez => Args::run_bnez,
             Self::Li => Args::run_li,
@@ -1371,20 +1373,24 @@ impl Args {
 
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
-    unsafe fn run_cjr<MC: MemoryConfig, M: ManagerReadWrite>(
+    unsafe fn run_jr<MC: MemoryConfig, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<MC, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
-        Ok(Set(core.hart.run_cjr(self.rs1.nzx)))
+        Ok(Set(core.hart.run_jr(self.rs1.nzx)))
     }
 
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
-    unsafe fn run_cjalr<MC: MemoryConfig, M: ManagerReadWrite>(
+    unsafe fn run_jalr<MC: MemoryConfig, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<MC, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
-        Ok(Set(core.hart.run_cjalr(self.rs1.nzx)))
+        Ok(Set(core.hart.run_jalr(
+            self.rd.nzx,
+            self.rs1.nzx,
+            self.width,
+        )))
     }
 
     fn run_nop<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
@@ -2008,14 +2014,10 @@ impl From<&InstrCacheable> for Instruction {
                 args: args.into(),
             },
             InstrCacheable::CJ(args) => Instruction::new_j(args.imm, InstrWidth::Compressed),
-            InstrCacheable::CJr(args) => Instruction {
-                opcode: OpCode::CJr,
-                args: args.into(),
-            },
-            InstrCacheable::CJalr(args) => Instruction {
-                opcode: OpCode::CJalr,
-                args: args.into(),
-            },
+            InstrCacheable::CJr(args) => Instruction::new_jr(args.rs1, InstrWidth::Compressed),
+            InstrCacheable::CJalr(args) => {
+                Instruction::new_jalr(nz::ra, args.rs1, InstrWidth::Compressed)
+            }
             InstrCacheable::CBeqz(args) => Instruction::from_ic_cbeqz(args),
             InstrCacheable::CBnez(args) => Instruction::from_ic_cbnez(args),
             InstrCacheable::CLi(args) => {

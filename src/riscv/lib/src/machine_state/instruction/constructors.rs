@@ -497,6 +497,31 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Jr`].
+    pub(crate) fn new_jr(rs1: NonZeroXRegister, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Jr,
+            args: Args {
+                rs1: rs1.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Jalr`].
+    pub(crate) fn new_jalr(rd: NonZeroXRegister, rs1: NonZeroXRegister, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Jalr,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {

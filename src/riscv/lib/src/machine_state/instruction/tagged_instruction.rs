@@ -354,7 +354,7 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         Fsw | Fsd | CFsd | CFsdsp => ArgsShape::XSrcFSrc,
 
         Addi | Andi | Ori | Xori | Slli | Srli | Srai | Add | Sub | Mv | Neg | And | Or | Xor
-        | Sll | Srl | Sra | Jal | J | JrImm | JAbsolute | JalrAbsolute | CJr | CJalr | CAddiw
+        | Sll | Srl | Sra | Jal | J | JrImm | JAbsolute | JalrAbsolute | Jr | Jalr | CAddiw
         | Li | CLdsp | CLwsp | Nop | Beq | Beqz | Bne | Bnez | JalrImm => ArgsShape::NZXSrcNZXDest,
 
         Addiw | Addw | Subw | Sllw | Srlw | Sraw | Slti | Sltiu | Slliw | Srliw | Sraiw | Slt
@@ -449,7 +449,7 @@ mod tests {
         assert_eq!(instr_xsrc_fsrc, instr_xsrc_fsrc_de);
 
         let instr_nzxsrc_nzxdest = Instruction {
-            opcode: OpCode::CJr,
+            opcode: OpCode::Jr,
             args: Args {
                 rs1: NonZeroXRegister::x2.into(),
                 ..Args::DEFAULT
