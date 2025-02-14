@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -ex
 
 script_dir="$(cd "$(dirname "$0")" && pwd -P)"
 
@@ -42,6 +42,11 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
     echo "Uploading binaries..."
     aws s3 sync "./octez-binaries/x86_64/" "s3://${S3_BUCKET}/${gitlab_release}/binaries/x86_64/" --region "${REGION}"
     aws s3 sync "./octez-binaries/arm64/" "s3://${S3_BUCKET}/${gitlab_release}/binaries/arm64/" --region "${REGION}"
+
+    tar -czf "octez.tar.gz" "octez-binaries/x86_64/"
+    aws s3 cp "./octez.tar.gz" "s3://${S3_BUCKET}/${gitlab_release}/binaries/arm64/" --region "${REGION}"
+    tar -czf "octez.tar.gz" "octez-binaries/arm64/"
+    aws s3 cp "./octez.tar.gz" "s3://${S3_BUCKET}/${gitlab_release}/binaries/arm64/" --region "${REGION}"
 
     # Upload rpm packages to S3 bucket
     echo "Uploading rpm packages..."
