@@ -268,6 +268,14 @@ module P2P = struct
     Gossipsub.Transport_layer.patch_peer transport_layer peer acl
 
   module Gossipsub = struct
+    let get_mesh {gs_worker; _} =
+      let open Gossipsub.Worker in
+      let state = state gs_worker in
+      GS.Topic.Map.fold
+        (fun topic peers acc -> (topic, GS.Peer.Set.elements peers) :: acc)
+        state.mesh
+        []
+
     let get_topics {gs_worker; _} =
       let state = Gossipsub.Worker.state gs_worker in
       Gossipsub.Worker.GS.Topic.Map.fold
