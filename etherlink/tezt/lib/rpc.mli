@@ -97,6 +97,10 @@ val net_version :
 val get_chain_id :
   ?websocket:Websocket.t -> Evm_node.t -> (int, error) result Lwt.t
 
+(** [get_chain_family node] calls [tez_getChainFamily]. *)
+val get_chain_family :
+  ?websocket:Websocket.t -> Evm_node.t -> int -> (string, error) result Lwt.t
+
 (** [get_transaction_by_hash ~transaction_hash evm_node] calls [eth_getTransactionByHash]. *)
 val get_transaction_by_hash :
   ?websocket:Websocket.t ->
