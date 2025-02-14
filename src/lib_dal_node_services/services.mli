@@ -309,6 +309,15 @@ module P2P : sig
   end
 
   module Gossipsub : sig
+    val get_mesh :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (Types.Topic.t * Types.Peer.t list) list
+      ; prefix : unit
+      ; params : unit
+      ; query : unit >
+      service
+
     val get_topics :
       < meth : [`GET]
       ; input : unit
