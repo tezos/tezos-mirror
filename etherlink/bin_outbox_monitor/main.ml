@@ -101,24 +101,8 @@ let run_command =
     (fun {data_dir; verbosity} evm_node_endpoint _ ->
       let open Lwt_result_syntax in
       let*! () = log_config ~verbosity () in
-      let* _db = Db.init ~data_dir `Read_write in
-      let*! ws_client =
-        Websocket_client.connect Media_type.json evm_node_endpoint
-      in
-      let* heads_subscription = Websocket_client.subscribe_newHeads ws_client in
-      let cpt = ref 0 in
-      let*! () =
-        Lwt_stream.iter_s
-          (fun (head : _ Ethereum_types.block) ->
-            incr cpt ;
-            Format.eprintf "Block %a@." Ethereum_types.pp_quantity head.number ;
-            if !cpt = 10 then
-              let*! _ = heads_subscription.unsubscribe () in
-              Lwt.return_unit
-            else Lwt.return_unit)
-          heads_subscription.stream
-      in
-      return_unit)
+      let* db = Db.init ~data_dir `Read_write in
+      Etherlink_monitor.start db ~evm_node_endpoint)
 
 let commands = [run_command]
 
