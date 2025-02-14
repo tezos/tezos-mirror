@@ -5,7 +5,7 @@
 mod error;
 mod fds;
 
-use super::Pvm;
+use super::{Pvm, PvmHooks};
 use crate::{
     machine_state::{
         CacheLayouts, MachineCoreState, MachineError, MachineState,
@@ -28,6 +28,12 @@ pub const PAGE_SIZE: u64 = 4096;
 
 /// Thread identifier for the main thread
 const MAIN_THREAD_ID: u64 = 1;
+
+/// System call number for `write` on RISC-V
+const WRITE: u64 = 64;
+
+/// System call number for `writev` on RISC-V
+const WRITEV: u64 = 66;
 
 /// System call number for `ppoll` on RISC-V
 const PPOLL: u64 = 73;
@@ -264,6 +270,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     pub fn handle_system_call(
         &mut self,
         core: &mut MachineCoreState<impl MainMemoryLayout, M>,
+        hooks: &mut PvmHooks,
     ) -> bool
     where
         M: ManagerReadWrite,
@@ -277,6 +284,8 @@ impl<M: ManagerBase> SupervisorState<M> {
         let system_call_no = core.hart.xregisters.read(registers::a7);
 
         match system_call_no {
+            WRITE => return self.handle_write(core, hooks),
+            WRITEV => return self.handle_writev(core, hooks),
             PPOLL => return self.handle_ppoll(core),
             EXIT | EXITGROUP => return self.handle_exit(core),
             SET_TID_ADDRESS => return self.handle_set_tid_address(core),
@@ -522,7 +531,8 @@ mod tests {
             .xregisters
             .write(registers::a0, tid_address);
 
-        let result = supervisor_state.handle_system_call(&mut machine_state);
+        let result =
+            supervisor_state.handle_system_call(&mut machine_state, &mut PvmHooks::default());
         assert!(result);
 
         assert_eq!(supervisor_state.tid_address.read(), tid_address);
@@ -563,7 +573,8 @@ mod tests {
             machine_state.hart.xregisters.write(registers::a3, 0);
             machine_state.hart.xregisters.write(registers::a7, PPOLL);
 
-            let result = supervisor_state.handle_system_call(&mut machine_state);
+            let result =
+                supervisor_state.handle_system_call(&mut machine_state, &mut PvmHooks::default());
             assert!(result);
 
             let ret = machine_state.hart.xregisters.read(registers::a0);
@@ -616,7 +627,8 @@ mod tests {
         machine_state.hart.xregisters.write(registers::a3, 8);
 
         // Perform the system call
-        let result = supervisor_state.handle_system_call(&mut machine_state);
+        let result =
+            supervisor_state.handle_system_call(&mut machine_state, &mut PvmHooks::default());
         assert!(result);
 
         // Check if the location where the old handler was is now zeroed out

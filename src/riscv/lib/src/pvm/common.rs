@@ -241,7 +241,7 @@ impl<
         #[cfg(feature = "supervisor")]
         return self
             .system_state
-            .handle_system_call(&mut self.machine_state.core);
+            .handle_system_call(&mut self.machine_state.core, hooks);
 
         sbi::handle_call(
             &mut self.status,
@@ -287,7 +287,7 @@ impl<
                 #[cfg(feature = "supervisor")]
                 return Ok(self
                     .system_state
-                    .handle_system_call(&mut machine_state.core));
+                    .handle_system_call(&mut machine_state.core, hooks));
 
                 Ok(sbi::handle_call(
                     &mut self.status,
