@@ -767,7 +767,12 @@ let usage_internal ppf ~executable_name ~global_options ?(highlights = [])
     Format.pp_print_list
       ~pp_sep:(fun ppf () -> Format.fprintf ppf "@,@,")
       (print_group (fun ppf (Ex command) ->
-           print_command ?prefix:None ~highlights ppf command))
+           print_command
+             ?prefix:
+               (Some (fun ppf () -> Format.fprintf ppf "%s " executable_name))
+             ~highlights
+             ppf
+             command))
   in
   let pp_print_global_options ppf = function
     | Constant _ -> ()
