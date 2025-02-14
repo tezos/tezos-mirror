@@ -89,6 +89,9 @@ cd tezos
 dated_log "Compiling dependencies"
 # shellcheck disable=SC1091
 . "/home/mclaren/.cargo/env"
+# Reset switch
+rm -rf ../.opam
+opam init --bare --root /data/tezos-benchmarks/.opam --confirm-level=no
 # OPAMSOLVERTIMEOUT=0 means that the opam solver won't timeout
 make OPAMSOLVERTIMEOUT=0 build-dev-deps
 eval "$(opam env)"
