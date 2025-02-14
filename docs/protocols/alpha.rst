@@ -12,7 +12,7 @@ branch of Octez.
 Environment Version
 -------------------
 
-
+This protocol requires an updated protocol environment version (V15) from R version (V14).
 
 Smart Rollups
 -------------
@@ -54,5 +54,3 @@ Minor Changes
 
 Internal
 --------
-
-
