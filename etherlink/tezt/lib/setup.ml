@@ -216,8 +216,8 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
         (Array.to_list Eth_account.bootstrap_accounts)) ?sequencer_pool_address
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ?enable_fast_withdrawal ~enable_dal ?dal_slots
-    ~sequencer ~preimages_dir ~kernel () =
+    ?enable_fa_bridge ?enable_fast_withdrawal ~enable_dal ?dal_slots ~sequencer
+    ~preimages_dir ~kernel () =
   let output_config = Temp.file "config.yaml" in
   let*! () =
     Evm_node.make_kernel_installer_config
@@ -355,20 +355,18 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
       ~kernel
       ()
 
-let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
-    ?sequencer_rpc_port ?sequencer_private_rpc_port ~mainnet_compat
-    ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
+let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
+    ?next_wasm_runtime ?sequencer_rpc_port ?sequencer_private_rpc_port
+    ~mainnet_compat ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
-    ?commitment_period ?challenge_window ?bootstrap_accounts
-    ?(sequencer = Constant.bootstrap1) ?sequencer_pool_address
-    ?(kernel = Constant.WASM.evm_kernel) ?da_fee ?minimum_base_fee_per_gas
-    ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?commitment_period ?challenge_window ?(sequencer = Constant.bootstrap1)
+    ?(kernel = Constant.WASM.evm_kernel) ?preimages_dir ?maximum_allowed_ticks
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?enable_fast_withdrawal ?(threshold_encryption = false)
     ?(drop_duplicate_when_injection = true)
     ?(blueprints_publisher_order_enabled = true) ?rollup_history_mode
-    ~enable_dal ?dal_slots ~enable_multichain ?rpc_server ?websockets
+    ~enable_dal ?dal_slots ~enable_multichain ~l2_chains ?rpc_server ?websockets
     ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path protocol =
   let* node, client =
     setup_l1
@@ -403,16 +401,6 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ~default:(Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0")
       preimages_dir
   in
-  let l2_setup =
-    {
-      (default_l2_setup ~l2_chain_id:1) with
-      sequencer_pool_address;
-      bootstrap_accounts;
-      da_fee_per_byte = da_fee;
-      minimum_base_fee_per_gas;
-      maximum_gas_per_transaction;
-    }
-  in
   let* output =
     setup_kernel
       ~l1_contracts
@@ -426,7 +414,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ?enable_fast_withdrawal
       ?dal_slots
       ~enable_multichain
-      ~l2_chains:[l2_setup]
+      ~l2_chains
       ?max_blueprint_lookahead_in_seconds
       ?enable_fa_bridge
       ~preimages_dir
@@ -558,6 +546,75 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       enable_dal;
       enable_multichain;
     }
+
+let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
+    ?sequencer_rpc_port ?sequencer_private_rpc_port ~mainnet_compat
+    ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
+    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
+    ?commitment_period ?challenge_window ?bootstrap_accounts ?sequencer
+    ?sequencer_pool_address ?kernel ?da_fee ?minimum_base_fee_per_gas
+    ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
+    ?enable_fast_withdrawal ?threshold_encryption ?drop_duplicate_when_injection
+    ?blueprints_publisher_order_enabled ?rollup_history_mode ~enable_dal
+    ?dal_slots ~enable_multichain ?rpc_server ?websockets ?history_mode
+    ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path protocol =
+  (* Note that the chain_id is not important (it will become important later) *)
+  let l2_chains =
+    [
+      {
+        (default_l2_setup ~l2_chain_id:1) with
+        sequencer_pool_address;
+        bootstrap_accounts;
+        da_fee_per_byte = da_fee;
+        minimum_base_fee_per_gas;
+        maximum_gas_per_transaction;
+      };
+    ]
+  in
+  let* sequencer_setup =
+    setup_sequencer_internal
+      ?max_delayed_inbox_blueprint_length
+      ?next_wasm_runtime
+      ?sequencer_rpc_port
+      ?sequencer_private_rpc_port
+      ~mainnet_compat
+      ?commitment_period
+      ?challenge_window
+      ?genesis_timestamp
+      ?time_between_blocks
+      ?max_blueprints_lag
+      ?max_blueprints_ahead
+      ?max_blueprints_catchup
+      ?catchup_cooldown
+      ?delayed_inbox_timeout
+      ?delayed_inbox_min_levels
+      ?max_number_of_chunks
+      ?sequencer
+      ?kernel
+      ?preimages_dir
+      ?maximum_allowed_ticks
+      ?max_blueprint_lookahead_in_seconds
+      ?enable_fa_bridge
+      ?enable_fast_withdrawal
+      ?blueprints_publisher_order_enabled
+      ?drop_duplicate_when_injection
+      ?threshold_encryption
+      ?rollup_history_mode
+      ?websockets
+      ?history_mode
+      ~enable_dal
+      ?dal_slots
+      ~enable_multichain
+      ~l2_chains
+      ?rpc_server
+      ?enable_tx_queue
+      ?spawn_rpc
+      ?periodic_snapshot_path
+      protocol
+  in
+  return sequencer_setup
 
 (* Register a single variant of a test but for all protocols. *)
 let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
