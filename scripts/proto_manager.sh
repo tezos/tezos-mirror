@@ -837,6 +837,9 @@ function update_source() {
     # Previous parametrics constants are the same in Alpha and Beta, so it is correct to just replace the Alpha previous one by the Alpha current one
     cp src/proto_alpha/lib_protocol/constants_parametric_repr.ml src/proto_alpha/lib_protocol/constants_parametric_previous_repr.ml
     cp src/proto_alpha/lib_protocol/constants_parametric_repr.mli src/proto_alpha/lib_protocol/constants_parametric_previous_repr.mli
+    # Remove comment that is meant for constants_parametric_repr and should not be copied to constants_parametric_previous_repr.
+    perl -0777 -i -pe 's/\(\*\* Protocol-specific constants\..*?\*\)//s' src/proto_alpha/lib_protocol/constants_parametric_previous_repr.mli
+    ocamlformat -i src/proto_alpha/lib_protocol/constants_parametric_previous_repr.mli
   fi
 
   log_blue "update raw_context.ml"
