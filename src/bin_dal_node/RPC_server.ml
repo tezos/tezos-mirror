@@ -580,6 +580,10 @@ module P2P = struct
   let patch_peer ctxt peer () acl = Node_context.P2P.patch_peer ctxt peer acl
 
   module Gossipsub = struct
+    let get_mesh ctxt () () =
+      let open Lwt_result_syntax in
+      return @@ Node_context.P2P.Gossipsub.get_mesh ctxt
+
     let get_topics ctxt () () =
       let open Lwt_result_syntax in
       return @@ Node_context.P2P.Gossipsub.get_topics ctxt
@@ -699,6 +703,10 @@ let register :
        Services.get_slot_pages
        (Slots_handlers.get_slot_pages ctxt)
   |> add_service Tezos_rpc.Directory.register0 Services.version (version ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.P2P.Gossipsub.get_mesh
+       (P2P.Gossipsub.get_mesh ctxt)
   |> add_service
        Tezos_rpc.Directory.register0
        Services.P2P.Gossipsub.get_topics
