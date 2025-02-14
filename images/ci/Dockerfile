@@ -342,6 +342,9 @@ ENV NODE_OPTIONS="--dns-result-order=ipv4first"
 # See https://docs.docker.com/build/building/best-practices/#using-pipes
 SHELL ["/bin/ash", "-euo", "pipefail", "-c"]
 
+# [sqlite-libs] from [alpine:3.20] installed in [runtime] image
+# we need [sqlite-libs] from [alpine:3.21] installed in [e2etest]
+RUN apk del sqlite-dev sqlite-libs
 # hadolint ignore=DL3018,DL3019
 RUN apk update \
  && apk add --no-cache curl \
