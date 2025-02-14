@@ -6,9 +6,14 @@
 check:
 	@make -C rust/ check
 
+.PHONY: bindings
+bindings:
+	@make -C rust/ generate-bindings
+
 .PHONY: clean
 clean:
 	@make -C rust/ clean
+	@make -C python/ clean
 
 .PHONY: test
 test:
