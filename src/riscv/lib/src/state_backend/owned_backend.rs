@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -358,7 +359,9 @@ impl ManagerClone for Owned {
 pub mod test_helpers {
     use super::*;
     use crate::state_backend::{
-        Cell, Cells, DynCells, EnrichedCell, test_helpers::TestBackendFactory,
+        Cell, Cells, DynCells, EnrichedCell, Ref,
+        proof_backend::{ProofDynRegion, ProofGen, ProofRegion},
+        test_helpers::TestBackendFactory,
     };
 
     /// Test backend factory for the owned state manager
@@ -376,7 +379,8 @@ pub mod test_helpers {
     #[test]
     fn cell_serialise() {
         proptest::proptest!(|(value: u64)|{
-            let cell: Cell<u64, Owned> = Cell::bind([value; 1]);
+            let region = [value; 1];
+            let cell: Cell<u64, Owned> = Cell::bind(region);
             let bytes = bincode::serialize(&cell).unwrap();
 
             let cell_after: Cell<u64, Owned> = bincode::deserialize(&bytes).unwrap();
@@ -384,6 +388,12 @@ pub mod test_helpers {
 
             let bytes_after = bincode::serialize(&cell_after).unwrap();
             assert_eq!(bytes, bytes_after);
+
+            // Serialisation is consistent with that of the `ProofGen` backend.
+            let proof_cell: Cell<u64, ProofGen<Ref<'_, Owned>>> =
+                Cell::bind(ProofRegion::bind(&region));
+            let proof_bytes = bincode::serialize(&proof_cell).unwrap();
+            assert_eq!(bytes, proof_bytes);
         });
     }
 
@@ -404,6 +414,12 @@ pub mod test_helpers {
 
             let bytes_after = bincode::serialize(&cell_after).unwrap();
             assert_eq!(bytes, bytes_after);
+
+            // Serialisation is consistent with that of the `ProofGen` backend.
+            let proof_cells: Cells<u64, 3, ProofGen<Ref<'_, Owned>>> =
+                Cells::bind(ProofRegion::bind(cell.region_ref()));
+            let proof_bytes = bincode::serialize(&proof_cells).unwrap();
+            assert_eq!(bytes, proof_bytes);
         });
     }
 
@@ -422,6 +438,12 @@ pub mod test_helpers {
 
             let bytes_after = bincode::serialize(&cells_after).unwrap();
             assert_eq!(bytes, bytes_after);
+
+            // Serialisation is consistent with that of the `ProofGen` backend.
+            let proof_cells: DynCells<128, ProofGen<Ref<'_, Owned>>> =
+                DynCells::bind(ProofDynRegion::bind(cells.region_ref()));
+            let proof_bytes = bincode::serialize(&proof_cells).unwrap();
+            assert_eq!(bytes, proof_bytes);
         });
     }
 
@@ -462,6 +484,12 @@ pub mod test_helpers {
 
             assert_eq!(T::from(read_value).0, derived.0);
             assert_eq!(derived.0, derived_after.0);
+
+            // Serialisation is consistent with that of the `ProofGen` backend.
+            let proof_cell: EnrichedCell<Enriching, Ref<'_, Owned>> =
+                EnrichedCell::bind(cell.cell_ref());
+            let proof_bytes = bincode::serialize(&proof_cell).unwrap();
+            assert_eq!(bytes, proof_bytes);
         });
     }
 

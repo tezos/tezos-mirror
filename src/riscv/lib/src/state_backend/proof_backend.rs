@@ -15,11 +15,11 @@
 //! [`ProofLayout`]: super::ProofLayout
 
 use super::{
-    EnrichedCell, EnrichedValue, EnrichedValueLinked, ManagerBase, ManagerRead, ManagerReadWrite,
-    ManagerSerialise, ManagerWrite, Ref,
+    EnrichedValue, EnrichedValueLinked, ManagerBase, ManagerRead, ManagerReadWrite,
+    ManagerSerialise, ManagerWrite,
 };
-use crate::storage::binary;
 use merkle::AccessInfo;
+use serde::{Serialize, ser::SerializeTuple};
 use std::{
     cell::{Cell, RefCell},
     collections::{BTreeMap, BTreeSet},
@@ -197,21 +197,35 @@ impl<M: ManagerRead> ManagerReadWrite for ProofGen<M> {
     }
 }
 
+/// Implementation of [`ManagerSerialise`] which wraps another manager and
+/// serialises data as recorded by the `ProofGen` backend, reconstructed
+/// via variants of [`ManagerRead`] functions which do not record access
+/// information.
 impl<M: ManagerSerialise> ManagerSerialise for ProofGen<M> {
     fn serialise_region<E: serde::Serialize, const LEN: usize, S: serde::Serializer>(
         region: &Self::Region<E, LEN>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
-        // TODO RV-310: Serialise all the data in the region
-        M::serialise_region(&region.source, serializer)
+        if LEN == 1 {
+            let elem = region.unrecorded_ref(0);
+            return elem.serialize(serializer);
+        }
+
+        let mut serializer = serializer.serialize_tuple(LEN)?;
+        for i in 0..LEN {
+            let elem = region.unrecorded_ref(i);
+            serializer.serialize_element(elem)?;
+        }
+        serializer.end()
     }
 
     fn serialise_dyn_region<const LEN: usize, S: serde::Serializer>(
         region: &Self::DynRegion<LEN>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
-        // TODO RV-310: Serialise all the data in the dynamic region
-        M::serialise_dyn_region(&region.source, serializer)
+        let mut values = vec![0u8; LEN];
+        region.unrecorded_read_all(0, &mut values);
+        serializer.serialize_bytes(values.as_slice())
     }
 
     fn serialise_enriched_cell<V, S>(
@@ -223,8 +237,8 @@ impl<M: ManagerSerialise> ManagerSerialise for ProofGen<M> {
         V::E: serde::Serialize,
         S: serde::Serializer,
     {
-        // TODO RV-310: Serialise all the data in the enriched cell
-        M::serialise_enriched_cell(&cell.source, serializer)
+        let elem = cell.unrecorded_ref_stored();
+        elem.serialize(serializer)
     }
 }
 
@@ -249,9 +263,7 @@ impl<M: ManagerBase, E: 'static, const LEN: usize> ProofRegion<E, LEN, M> {
             access: Cell::new(AccessInfo::NoAccess),
         }
     }
-}
 
-impl<M: ManagerBase, E: 'static, const LEN: usize> ProofRegion<E, LEN, M> {
     /// Get a copy of the access log.
     pub fn get_access_info(&self) -> AccessInfo {
         self.access.get()
@@ -271,6 +283,11 @@ impl<M: ManagerBase, E: 'static, const LEN: usize> ProofRegion<E, LEN, M> {
     pub fn set_read_write(&self) {
         self.access.set(AccessInfo::ReadWrite)
     }
+
+    /// Get a reference to the wrapper region.
+    pub fn inner_region_ref(&self) -> &M::Region<E, LEN> {
+        &self.source
+    }
 }
 
 impl<M: ManagerRead, E: 'static, const LEN: usize> ProofRegion<E, LEN, M> {
@@ -282,7 +299,6 @@ impl<M: ManagerRead, E: 'static, const LEN: usize> ProofRegion<E, LEN, M> {
             .unwrap_or_else(|| M::region_ref(&self.source, index))
     }
 }
-
 /// Proof dynamic region which wraps a dynamic region managed by another manager.
 ///
 /// When Merkleising a [`ManagerBase::DynRegion`], its data can be split into multiple leaves.
@@ -304,9 +320,7 @@ impl<M: ManagerBase, const LEN: usize> ProofDynRegion<LEN, M> {
             writes: BTreeMap::new(),
         }
     }
-}
 
-impl<M: ManagerBase, const LEN: usize> ProofDynRegion<LEN, M> {
     /// Get the set of addresses of the region that were read from.
     /// This function is meant to be called once when Merkleising the region.
     pub fn get_read(&self) -> DynAccess {
@@ -419,18 +433,6 @@ impl<V: EnrichedValue, M: ManagerRead> ProofEnrichedCell<V, M> {
             None => M::enriched_cell_ref_stored(&self.source),
             Some(value) => value,
         }
-    }
-}
-
-impl<V: EnrichedValue, M: ManagerSerialise> ProofEnrichedCell<V, M> {
-    /// Serialise the wrapped cell only, discarding the additional data
-    /// of the proof-generating cell.
-    pub fn serialise_inner_enriched_cell(&self) -> bincode::Result<Vec<u8>>
-    where
-        V::E: serde::Serialize,
-    {
-        let value = EnrichedCell::<V, Ref<'_, M>>::bind(&self.source);
-        binary::serialise(&value)
     }
 }
 
