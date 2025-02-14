@@ -741,7 +741,7 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   let*! () =
     Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
-  () [@profiler.custom may_start_profiler config.data_dir] ;
+  () [@profiler.overwrite may_start_profiler config.data_dir] ;
   let*! () =
     Lwt_list.iter_s (fun evt -> Internal_event.Simple.emit evt ()) cli_warnings
   in
@@ -754,7 +754,7 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   let* () = Config_validation.check ?ignore_testchain_warning config in
   let* identity = init_identity_file config in
   ()
-  [@profiler.custom
+  [@profiler.overwrite
     {driver_ids = [Opentelemetry]}
       (Opentelemetry_profiler.initialize
          ~unique_identifier:(P2p_peer.Id.to_b58check identity.peer_id)

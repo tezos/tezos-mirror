@@ -55,7 +55,7 @@ let mapper =
                    let wrap_2 f = Format.printf "wrap_2\n%!"; f ()
 
                    let f x =
-                     g x [@profiler.custom_f wrap_1] [@profiler.custom_f wrap_2]
+                     g x [@profiler.wrap_f wrap_1] [@profiler.wrap_f wrap_2]
                  ]}
 
                  With the current implementation, it will be compiled as:

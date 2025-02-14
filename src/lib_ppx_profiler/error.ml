@@ -9,11 +9,11 @@ type error =
   | Invalid_action of string
   | Invalid_payload of bool * Ppxlib.payload
   | Invalid_aggregate of Key.t
-  | Invalid_custom of Key.t
   | Invalid_mark of Key.t
   | Invalid_record of Key.t
   | Invalid_span of Key.t
   | Invalid_stop of Key.t
+  | Invalid_wrap of Key.t
   | Invalid_list_of_driver_ids of Ppxlib.expression list
   | Improper_field of (Ppxlib.longident_loc * Ppxlib.expression)
   | Improper_list_field of (Ppxlib.longident_loc * Ppxlib.expression)
@@ -82,14 +82,6 @@ let error loc err =
              Found: @[<v 0>%a@]@."
             Key.pp
             key )
-    | Invalid_custom key ->
-        ( "Invalid custom.",
-          Format.asprintf
-            "@[<v 2>A [@profiler.custom] attribute must be a function \
-             application.@,\
-             Found: @[<v 0>%a@]@."
-            Key.pp
-            key )
     | Invalid_mark key ->
         ( "Invalid mark.",
           Format.asprintf
@@ -116,6 +108,14 @@ let error loc err =
         ( "Invalid stop.",
           Format.asprintf
             "@[<v 2>A [@profiler.stop] should not have an attribute.@,\
+             Found: @[<v 0>%a@]@."
+            Key.pp
+            key )
+    | Invalid_wrap key ->
+        ( "Invalid wrap.",
+          Format.asprintf
+            "@[<v 2>A [@profiler.wrap_*] attribute must be a function \
+             application.@,\
              Found: @[<v 0>%a@]@."
             Key.pp
             key )

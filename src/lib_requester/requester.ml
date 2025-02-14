@@ -819,7 +819,7 @@ module Make
       profiler_init := true)
 
   let create ?random_table:random ?global_input request_param disk =
-    () [@profiler.custom init_profiler ()] ;
+    () [@profiler.overwrite init_profiler ()] ;
     let scheduler = Scheduler.create request_param in
     let memory = Memory_table.create ~entry_type:"entries" ?random 17 in
     let input = Lwt_watcher.create_input () in

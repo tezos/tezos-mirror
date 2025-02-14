@@ -9,10 +9,8 @@ type action =
   | Aggregate
   | Aggregate_f
   | Aggregate_s
-  | Custom
-  | Custom_f
-  | Custom_s
   | Mark
+  | Overwrite
   | Record
   | Record_f
   | Record_s
@@ -22,6 +20,8 @@ type action =
   | Span_s
   | Stamp
   | Stop
+  | Wrap_f
+  | Wrap_s
 
 type t = {key : Key.t; action : action; location : Ppxlib.location}
 
@@ -40,22 +40,12 @@ let aggregate_s key location =
   | Key.Apply _ | Key.Ident _ | Key.String _ -> Aggregate_s
   | _ -> Error.error location (Error.Invalid_aggregate key)
 
-let custom _key _location = Custom
-
-let custom_f key location =
-  match Key.content key with
-  | Key.Apply _ | Key.Ident _ -> Custom_f
-  | _ -> Error.error location (Error.Invalid_custom key)
-
-let custom_s key location =
-  match Key.content key with
-  | Key.Apply _ | Key.Ident _ -> Custom_s
-  | _ -> Error.error location (Error.Invalid_custom key)
-
 let mark key location =
   match Key.content key with
   | Key.Apply _ | Key.Ident _ | Key.List _ -> Mark
   | _ -> Error.error location (Error.Invalid_mark key)
+
+let overwrite _key _location = Overwrite
 
 let record key location =
   match Key.content key with
@@ -102,6 +92,16 @@ let stop key location =
   | Key.Empty -> Stop
   | _ -> Error.error location (Error.Invalid_stop key)
 
+let wrap_f key location =
+  match Key.content key with
+  | Key.Apply _ | Key.Ident _ -> Wrap_f
+  | _ -> Error.error location (Error.Invalid_wrap key)
+
+let wrap_s key location =
+  match Key.content key with
+  | Key.Apply _ | Key.Ident _ -> Wrap_s
+  | _ -> Error.error location (Error.Invalid_wrap key)
+
 let get_location {location; _} = location
 
 let to_constant {action; _} =
@@ -109,10 +109,8 @@ let to_constant {action; _} =
   | Aggregate -> Constants.aggregate_constant
   | Aggregate_f -> Constants.aggregate_f_constant
   | Aggregate_s -> Constants.aggregate_s_constant
-  | Custom -> Constants.custom_constant
-  | Custom_f -> Constants.custom_f_constant
-  | Custom_s -> Constants.custom_s_constant
   | Mark -> Constants.mark_constant
+  | Overwrite -> Constants.overwrite_constant
   | Record -> Constants.record_constant
   | Record_f -> Constants.record_f_constant
   | Record_s -> Constants.record_s_constant
@@ -122,6 +120,8 @@ let to_constant {action; _} =
   | Span_s -> Constants.span_s_constant
   | Stamp -> Constants.stamp_constant
   | Stop -> Constants.stop_constant
+  | Wrap_f -> Constants.wrap_f_constant
+  | Wrap_s -> Constants.wrap_s_constant
 
 module StringMap = Map.Make (String)
 
@@ -133,10 +133,8 @@ let association_constant_action_maker =
     (Constants.aggregate_constant, aggregate);
     (Constants.aggregate_f_constant, aggregate_f);
     (Constants.aggregate_s_constant, aggregate_s);
-    (Constants.custom_constant, custom);
-    (Constants.custom_f_constant, custom_f);
-    (Constants.custom_s_constant, custom_s);
     (Constants.mark_constant, mark);
+    (Constants.overwrite_constant, overwrite);
     (Constants.record_constant, record);
     (Constants.record_f_constant, record_f);
     (Constants.record_s_constant, record_s);
@@ -146,6 +144,8 @@ let association_constant_action_maker =
     (Constants.span_s_constant, span_s);
     (Constants.stamp_constant, stamp);
     (Constants.stop_constant, stop);
+    (Constants.wrap_f_constant, wrap_f);
+    (Constants.wrap_s_constant, wrap_s);
   ]
   |> List.map (fun (const, fn) -> (Constants.get_attribute const, fn))
   |> List.to_seq |> StringMap.of_seq
@@ -183,9 +183,10 @@ let to_fully_qualified_lident_expr t loc =
         | Span_s -> "span_s"
         | Stamp -> "stamp"
         | Stop -> "stop"
-        | Custom | Custom_f | Custom_s ->
+        | Overwrite | Wrap_f | Wrap_s ->
             Stdlib.failwith
-              "A custom function shouldn't be called with a leading module" )
+              "An overwrite or wrap section shouldn't be called with a leading \
+               module" )
   in
   Ppxlib.Ast_helper.Exp.ident {txt = lident; loc}
 

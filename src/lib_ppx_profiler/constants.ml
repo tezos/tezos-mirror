@@ -23,17 +23,11 @@ let aggregate_f_constant = create_constant "aggregate_f"
 (** Constant representing [@profiler.aggregate_s] *)
 let aggregate_s_constant = create_constant "aggregate_s"
 
-(** Constant representing [@profiler.custom] *)
-let custom_constant = create_constant "custom"
-
-(** Constant representing [@profiler.custom_f] *)
-let custom_f_constant = create_constant "custom_f"
-
-(** Constant representing [@profiler.custom_s] *)
-let custom_s_constant = create_constant "custom_s"
-
 (** Constant representing [@profiler.mark] *)
 let mark_constant = create_constant "mark"
+
+(** Constant representing [@profiler.overwrite] *)
+let overwrite_constant = create_constant "overwrite"
 
 (** Constant representing [@profiler.record] *)
 let record_constant = create_constant "record"
@@ -62,6 +56,12 @@ let stamp_constant = create_constant "stamp"
 (** Constant representing [@profiler.stop] *)
 let stop_constant = create_constant "stop"
 
+(** Constant representing [@profiler.wrap_f] *)
+let wrap_f_constant = create_constant "wrap_f"
+
+(** Constant representing [@profiler.wrap_s] *)
+let wrap_s_constant = create_constant "wrap_s"
+
 let get_attribute t = t.attribute_name
 
 let get_action t = t.action
@@ -73,10 +73,8 @@ let constants =
     aggregate_constant;
     aggregate_f_constant;
     aggregate_s_constant;
-    custom_constant;
-    custom_f_constant;
-    custom_s_constant;
     mark_constant;
+    overwrite_constant;
     record_constant;
     record_f_constant;
     record_s_constant;
@@ -86,6 +84,8 @@ let constants =
     span_s_constant;
     stamp_constant;
     stop_constant;
+    wrap_f_constant;
+    wrap_s_constant;
   ]
 
 (** Attributes that are handled by this ppx *)

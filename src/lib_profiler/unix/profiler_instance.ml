@@ -135,7 +135,7 @@ let selected_backend () =
 
 let () =
   if
-    (true [@profiler.custom false])
+    (true [@profiler.overwrite false])
     && Sys.getenv_opt "PROFILING_BACKEND" <> None
   then
     Fmt.failwith
