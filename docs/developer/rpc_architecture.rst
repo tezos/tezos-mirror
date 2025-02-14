@@ -170,8 +170,7 @@ Ok
 just returns a value; the server serialises this value for the body of
 the HTTP response.
 
-.. mermaid
-.. code:: 
+.. mermaid::
 
    sequenceDiagram
        participant client as client
@@ -200,8 +199,7 @@ In this HTTP response format, the server sends a series of chunks with
 size headers and separators (see link). The server closes the connection
 only once all the chunks have been sent.
 
-.. mermaid
-.. code:: 
+.. mermaid:: 
 
    sequenceDiagram
        participant client as client
@@ -243,8 +241,7 @@ transmitted for :literal:`\`OkStream` is a fully form element of a
 stream. The client doesn’t concatenate the chunks together: it decodes
 them one after the other.
 
-.. mermaid
-.. code::
+.. mermaid::
 
    sequenceDiagram
        participant client as client
@@ -298,21 +295,22 @@ etc. See above.
 
 The services are declared in multiple files peppered around the source
 tree. E.g., the p2p-related services are declared in
-:src`src/lib_p2p_services/`. These declarations are split from the
+:src:`src/lib_p2p_services/`. These declarations are split from the
 registration so that both the serving and the querying stacks can depend
 on it without introducing unneeded dependencies.
 
 The files declare services by calling into
-`:src:src/lib_rpc/RPC_services.ml` which:
+:src:`src/lib_rpc/RPC_service.ml` which:
 
 - instantiates the functor ``MakeServices`` from ``resto/ser/resto.ml`` with a de/serialisation
   process, and
 - specialises the service type and constructors with tezos’ error-management type ``tzresult``
 
-.. mermaid
-.. code::
+.. mermaid::
 
-   graph TD
+   %%{init: {"flowchart": {"htmlLabels": false}} }%%
+   flowchart TD
+     classDef default font-size:95%
      Services[src/lib_*_services/] --> RPCservices[src/lib_rpc/RPC_services.ml]
      RPCservices --> Restoservices[resto/src/resto.ml]
 
@@ -355,10 +353,11 @@ and passes this information to the callback it was given.
 The ``cohttp`` library delegates the network management (bind, accept,
 close, etc.) to the ``conduit`` library.
 
-.. mermaid
-.. code::
+.. mermaid::
 
+   %%{init: {"flowchart": {"htmlLabels": false}} }%%
    graph TD
+     classDef default font-size:90%
      Node[src/bin_node/] --> RPCServer[src/lib_rpc_http/RPC_server.ml]
      RPCServer --> Restoserver[resto/src/server.ml]
      Restoserver --> Cohttp[cohttp-server]
@@ -381,8 +380,7 @@ The lifetime of a request
 The description of the stack above, can also be displayed as a sequence
 diagram which shows the lifetime of a request.
 
-.. mermaid
-.. code::
+.. mermaid::
 
    sequenceDiagram
        participant conduit as conduit
@@ -447,10 +445,11 @@ The code in :src:`src/lib_rpc_http/RPC_client.ml` is a wrapper around
 - error-management and error-related UI/UX (translating HTTP errors into more readable messages)
 - media-types management and de/serialisation.
 
-.. mermaid
-.. code::
+.. mermaid::
 
+   %%{init: {"flowchart": {"htmlLabels": false}} }%%
    graph TD
+     classDef default font-size:95%
      subgraph declaring
        Services[src/lib_*_services/]
      end
