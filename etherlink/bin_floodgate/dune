@@ -16,6 +16,7 @@
   octez-libs.clic
   octez-evm-node-libs.evm_node_lib_dev
   octez-evm-node-libs.evm_node_lib_dev_encoding
+  octez-evm-node-libs.evm_node_config
   octez-libs.tezos-workers)
  (link_flags
   (:standard)
@@ -24,4 +25,5 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Evm_node_lib_dev
-  -open Evm_node_lib_dev_encoding))
+  -open Evm_node_lib_dev_encoding
+  -open Evm_node_config))

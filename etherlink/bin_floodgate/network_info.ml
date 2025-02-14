@@ -6,7 +6,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {chain_id : Ethereum_types.quantity; base_fee_per_gas : Z.t}
+type t = {chain_id : Ethereum_types.chain_id; base_fee_per_gas : Z.t}
 
 let get_chain_id ~evm_node_endpoint =
   let open Lwt_result_syntax in
@@ -17,8 +17,9 @@ let get_chain_id ~evm_node_endpoint =
       ~evm_node_endpoint
       ()
   in
+  let mainnet_chain_id = Configuration.chain_id Mainnet in
   let* () =
-    when_ (chain_id = Constants.chain_id Mainnet) @@ fun () ->
+    when_ (chain_id = mainnet_chain_id) @@ fun () ->
     Lwt_result.ok (Floodgate_events.mainnet_experiment ())
   in
   return chain_id

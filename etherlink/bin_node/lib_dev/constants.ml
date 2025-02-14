@@ -11,9 +11,6 @@ let network_name = function
   | Configuration.Mainnet -> "Mainnet"
   | Testnet -> "Testnet"
 
-let chain_id network =
-  match Configuration.chain_id network with Chain_id x -> Ethereum_types.Qty x
-
 let rollup_address network =
   Tezos_crypto.Hashed.Smart_rollup_address.of_b58check_exn
   @@

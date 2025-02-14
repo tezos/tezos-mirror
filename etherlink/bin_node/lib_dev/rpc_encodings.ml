@@ -224,11 +224,11 @@ end
 module Chain_id = struct
   type input = unit
 
-  type output = Ethereum_types.quantity
+  type output = Ethereum_types.chain_id
 
   let input_encoding = Data_encoding.unit
 
-  let output_encoding = Ethereum_types.quantity_encoding
+  let output_encoding = Ethereum_types.Chain_id.encoding
 
   let method_ = "eth_chainId"
 

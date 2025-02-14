@@ -137,7 +137,7 @@ module Kernel_root_hash :
 module Network_id : METHOD with type input = unit and type output = string
 
 module Chain_id :
-  METHOD with type input = unit and type output = Ethereum_types.quantity
+  METHOD with type input = unit and type output = Ethereum_types.chain_id
 
 module Accounts :
   METHOD with type input = unit and type output = Ethereum_types.address list

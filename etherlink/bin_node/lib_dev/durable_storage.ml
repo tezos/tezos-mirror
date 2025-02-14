@@ -271,7 +271,10 @@ let block_receipts read n =
   Lwt.return_ok receipts
 
 let chain_id read =
-  inspect_durable_and_decode read Durable_storage_path.chain_id decode_number_le
+  inspect_durable_and_decode
+    read
+    Durable_storage_path.chain_id
+    Chain_id.decode_le
 
 let base_fee_per_gas read =
   let open Lwt_result_syntax in

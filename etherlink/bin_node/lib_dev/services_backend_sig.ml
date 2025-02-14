@@ -46,7 +46,7 @@ module type S = sig
     Ethereum_types.quantity tzresult Lwt.t
 
   (** [chain_id ()] returns chain id defined by the rollup. *)
-  val chain_id : unit -> Ethereum_types.quantity tzresult Lwt.t
+  val chain_id : unit -> Ethereum_types.chain_id tzresult Lwt.t
 
   (** [base_fee_per_gas ()] returns base fee defined by the rollup. *)
   val base_fee_per_gas : unit -> Ethereum_types.quantity tzresult Lwt.t

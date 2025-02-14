@@ -442,11 +442,11 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
         | Network_id.Method ->
             let f (_ : unit option) =
               let open Lwt_result_syntax in
-              let* (Qty chain_id) = Backend_rpc.chain_id () in
+              let* (Chain_id chain_id) = Backend_rpc.chain_id () in
               rpc_ok (Z.to_string chain_id)
             in
             build ~f module_ parameters
-        | Chain_id.Method ->
+        | Rpc_encodings.Chain_id.Method ->
             let f (_ : unit option) =
               let* chain_id = Backend_rpc.chain_id () in
               rpc_ok chain_id

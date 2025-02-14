@@ -32,7 +32,7 @@ let read state path =
 let network_sanity_check ~network ctxt =
   let open Lwt_result_syntax in
   let expected_smart_rollup_address = Constants.rollup_address network in
-  let (Qty expected_chain_id) = Constants.chain_id network in
+  let (Chain_id expected_chain_id) = Configuration.chain_id network in
 
   let* _, hash = Evm_store.(use ctxt.store Context_hashes.get_latest) in
   let* evm_state = get_evm_state ctxt hash in
@@ -40,7 +40,7 @@ let network_sanity_check ~network ctxt =
 
   let* () =
     match chain_id with
-    | Ok (Qty chain_id) ->
+    | Ok (Chain_id chain_id) ->
         unless Compare.Z.(chain_id = expected_chain_id) @@ fun () ->
         failwith
           "Local state is inconsistent with selected network %a: incorrect \
