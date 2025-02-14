@@ -1091,15 +1091,92 @@ module Local_helpers = struct
     let* () = Client.bake_for_and_wait ~keys:[baker] client in
     return accounts
 
+  let transfer ~baker ~amount ~giver ~receiver client =
+    Log.info
+      ~color:Log.Color.FG.green
+      "Transfer %s tez from %s to %s."
+      (Tez.to_string amount)
+      giver
+      receiver ;
+    let* () =
+      Client.transfer ~burn_cap:Tez.one ~amount ~giver ~receiver client
+    in
+    let* () = Client.bake_for_and_wait ~keys:[baker] client in
+    unit
+
+  let unstake ~baker ~amount ~staker client =
+    Log.info
+      ~color:Log.Color.FG.green
+      "Delegate %s unstakes %s tez."
+      staker
+      (Tez.to_string amount) ;
+    let* () = Client.unstake amount ~staker client in
+    let* () = Client.bake_for_and_wait ~keys:[baker] client in
+    unit
+
+  let unstake_requests ~(staker : Account.key) client =
+    let pkh = staker.public_key_hash in
+    let* unstake_requests =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_contract_unstake_requests pkh
+    in
+    Log.info
+      ~color:Log.Color.FG.gray
+      "Delegate %s: unstake_requests = %s"
+      staker.alias
+      (JSON.encode unstake_requests) ;
+    let finalizable = JSON.(unstake_requests |-> "finalizable" |> as_list) in
+    let unfinalizable =
+      JSON.(unstake_requests |-> "unfinalizable" |-> "requests" |> as_list)
+    in
+    return (finalizable, unfinalizable)
+
+  let unstaked_balance ~(staker : Account.key) client =
+    let pkh = staker.public_key_hash in
+    let* unstaked_finalizable_balance =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_contract_unstaked_finalizable_balance pkh
+    in
+    let* unstaked_frozen_balance =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_contract_unstaked_frozen_balance pkh
+    in
+    Log.info
+      ~color:Log.Color.FG.gray
+      "Delegate %s: unstaked_finalizable_balance = %s and \
+       unstaked_frozen_balance = %s"
+      staker.alias
+      (Int.to_string unstaked_finalizable_balance)
+      (Int.to_string unstaked_frozen_balance) ;
+    return (unstaked_finalizable_balance, unstaked_frozen_balance)
+
+  let check_is_finalizable_all_requests ~(staker : Account.key) client ~expected
+      =
+    let pkh = staker.public_key_hash in
+    let* unstaked_frozen_balance =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_contract_unstaked_frozen_balance pkh
+    in
+    if expected then
+      Check.((unstaked_frozen_balance = 0) ~__LOC__ int)
+        ~error_msg:"Expected unstaked_frozen_balance=%R, got %L"
+    else
+      Check.((unstaked_frozen_balance <> 0) ~__LOC__ int)
+        ~error_msg:"Expected unstaked_frozen_balance<>%R, got %L" ;
+    unit
+
   (* 1. Bake until [target_cycle] with the list of [bakers].
      2. For the last block of the [target_cycle - 1] cycle,
      the following is checked:
         - migration block consistency if it is a migration block
-        - [check] is valid
+        - [check_last_block] is valid
      3. The first block of [target_cycle] is baked with [delegate],
-        which is supposed to be its last activity in the cycle. *)
+        which is supposed to be its last activity in the cycle.
+        The following is also checked:
+        - [check_next_block] is valid *)
   let bake_until_cycle_with_and_check ~migration_level ~migrate_from ~migrate_to
-      ~blocks_per_cycle ~bakers ~target_cycle ~delegate ~check client =
+      ~blocks_per_cycle ~bakers ~target_cycle ~delegate ~check_last_block
+      ~check_next_block client =
     let* () = Client.bake_until_cycle ~keys:bakers ~target_cycle client in
     let level = target_cycle * blocks_per_cycle in
     let* () =
@@ -1117,7 +1194,7 @@ module Local_helpers = struct
           ~migrate_to)
       else unit
     in
-    let* () = check () in
+    let* () = check_last_block () in
     Log.info
       ~color:Log.Color.FG.red
       "Bake a block with %s [last activity is at cycle %s]."
@@ -1130,18 +1207,22 @@ module Local_helpers = struct
         ~cycle:target_cycle
         client
     in
-    if level = migration_level then (
-      Log.info
-        ~color:Log.Color.FG.green
-        "Checking post-migration block consistency (first block of new \
-         protocol %s)."
-        (Protocol.name migrate_to) ;
-      block_check
-        ~expected_block_type:`Non_migration
-        client
-        ~migrate_from
-        ~migrate_to)
-    else unit
+    let* () =
+      if level = migration_level then (
+        Log.info
+          ~color:Log.Color.FG.green
+          "Checking post-migration block consistency (first block of new \
+           protocol %s)."
+          (Protocol.name migrate_to) ;
+        block_check
+          ~expected_block_type:`Non_migration
+          client
+          ~migrate_from
+          ~migrate_to)
+      else unit
+    in
+    let* () = check_next_block () in
+    unit
 
   let print_parameters ~parameter_file ~migration_level =
     let parameters = JSON.parse_file parameter_file in
@@ -1190,6 +1271,34 @@ module Local_helpers = struct
     Check.((JSON.as_bool deactivated = expected) ~__LOC__ bool)
       ~error_msg:"Expected for deactivated=%R, got %L" ;
     unit
+
+  let log_staking_balance ~(delegate : Account.key) client =
+    let pkh = delegate.public_key_hash in
+    let* raw_json =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_raw_json ~path:["staking_balance"; pkh] ()
+    in
+    Log.info
+      ~color:Log.Color.FG.gray
+      "Delegate %s: staking balance = %s"
+      delegate.alias
+      (JSON.encode raw_json) ;
+    unit
+
+  let min_delegated_in_current_cycle_rpc ~(delegate : Account.key) client =
+    let pkh = delegate.public_key_hash in
+    let* raw_json =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_delegate_min_delegated_in_current_cycle pkh
+    in
+    let amount = JSON.(raw_json |-> "amount" |> as_int) in
+    let level = JSON.(raw_json |-> "level" |-> "level" |> as_int) in
+    Log.info
+      ~color:Log.Color.FG.gray
+      "Delegate %s: min_delegated_in_current_cycle_rpc = %s"
+      delegate.alias
+      (JSON.encode raw_json) ;
+    return (amount, level)
 end
 
 let test_tolerated_inactivity_period () =
@@ -1334,7 +1443,8 @@ let test_tolerated_inactivity_period () =
               ~bakers
               ~target_cycle
               ~delegate
-              ~check:(fun () -> check_deactivated_list expected_list)
+              ~check_last_block:(fun () -> check_deactivated_list expected_list)
+              ~check_next_block:(fun _ -> unit)
               client
           in
           unit)
@@ -1344,10 +1454,322 @@ let test_tolerated_inactivity_period () =
     unit
   done
 
+let test_unstaked_requests_many_delegates () =
+  let migrate_from = Protocol.Quebec in
+  let migrate_to = Protocol.Next in
+
+  Test.register
+    ~__FILE__
+    ~title:"protocol migration for unstaked_requests with many delegates"
+    ~tags:[team; "protocol"; "migration"; "unstaked_requests"]
+  @@ fun () ->
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Left (Protocol.parameter_file migrate_from))
+      (if Protocol.(number migrate_from <= number Quebec) then
+         [(["adaptive_issuance_force_activation"], `Bool true)]
+       else [])
+  in
+  let parameters = JSON.parse_file parameter_file in
+  let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+  (* Migration at the end of cycle 4 *)
+  (* delegate_0 unstakes during cycle 0 -> [unstake_requests] will be
+     finalizable at the beginning of cycle 4; delegate_0 is a
+     representative of the old protocol *)
+  let migration_level = 5 * blocks_per_cycle in
+  let () = Local_helpers.print_parameters ~parameter_file ~migration_level in
+
+  let* client, _node =
+    Local_helpers.activate_protocol
+      ~parameter_file
+      ~migrate_from
+      ~migrate_to
+      ~migration_level
+  in
+  let bake_until_cycle_with_and_check =
+    Local_helpers.bake_until_cycle_with_and_check
+      ~migration_level
+      ~migrate_from
+      ~migrate_to
+      ~blocks_per_cycle
+  in
+  (* [default_baker] never gets deactivated *)
+  let default_baker = Constant.bootstrap1.alias in
+  (* [funder] is used to fund all new accounts *)
+  let funder = Constant.bootstrap2.alias in
+
+  (* [delegate_i] unstakes in cycle i *)
+  let initial_amount = Tez.of_int 300_000 in
+  let amount_to_unstake = Tez.(initial_amount /! 4L) in
+  let* delegates =
+    Local_helpers.create_delegates_and_stake
+      ~baker:default_baker
+      ~giver:funder
+      ~delegates:
+        (List.init 6 (fun i -> ("delegate_" ^ Int.to_string i, initial_amount)))
+      client
+  in
+  let delegates_array = Array.of_list delegates in
+
+  let check_finalizable_list expected_finalizable_status =
+    Lwt_list.iteri_s
+      (fun i expected ->
+        let* () =
+          Local_helpers.check_is_finalizable_all_requests
+            ~staker:delegates_array.(i)
+            ~expected
+            client
+        in
+        unit)
+      expected_finalizable_status
+  in
+
+  let* () =
+    Local_helpers.check_current_level_and_cycle ~level:4 ~cycle:0 client
+  in
+  let* () =
+    Local_helpers.unstake
+      ~baker:default_baker
+      ~staker:delegates_array.(0).alias
+      ~amount:amount_to_unstake
+      client
+  in
+  let* () =
+    Lwt_list.iter_s
+      (fun target_cycle ->
+        let expected_list =
+          (* unstaked_frozen_balance =?= 0 *)
+          match target_cycle with
+          | 1 -> List.init 6 (fun i -> if i = 0 then false else true)
+          | 2 -> List.init 6 (fun i -> if i <= 1 then false else true)
+          | 3 -> List.init 6 (fun i -> if i <= 2 then false else true)
+          | 4 -> List.init 6 (fun i -> if 1 <= i && i <= 3 then false else true)
+          | 5 -> List.init 6 (fun i -> if 2 <= i && i <= 4 then false else true)
+          | 6 -> List.init 6 (fun i -> if 3 <= i then false else true)
+          | 7 -> List.init 6 (fun i -> if 4 <= i then false else true)
+          | 8 -> List.init 6 (fun i -> if i = 5 then false else true)
+          | 9 -> List.init 6 (fun _i -> true)
+          | _ -> failwith "unexpected input"
+        in
+        let* () =
+          bake_until_cycle_with_and_check
+            ~bakers:[default_baker]
+            ~target_cycle
+            ~delegate:default_baker
+            ~check_last_block:(fun _ -> unit)
+            ~check_next_block:(fun _ -> check_finalizable_list expected_list)
+            client
+        in
+        let* () =
+          if target_cycle <= 5 then
+            Local_helpers.unstake
+              ~baker:default_baker
+              ~staker:delegates_array.(target_cycle).alias
+              ~amount:amount_to_unstake
+              client
+          else unit
+        in
+        unit)
+      (* From cycle 1 to 9 *)
+      (List.init 9 (fun i -> i + 1))
+  in
+  unit
+
+let test_unstaked_requests_and_min_delegated () =
+  let migrate_from = Protocol.Quebec in
+  let migrate_to = Protocol.Next in
+
+  Test.register
+    ~__FILE__
+    ~title:"protocol migration for unstaked_requests and min_delegated"
+    ~tags:[team; "protocol"; "migration"; "unstaked_requests"]
+  @@ fun () ->
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Left (Protocol.parameter_file migrate_from))
+      (if Protocol.(number migrate_from <= number Quebec) then
+         [(["adaptive_issuance_force_activation"], `Bool true)]
+       else [])
+  in
+  let parameters = JSON.parse_file parameter_file in
+  let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+  (* Migration at the end of cycle 1 *)
+  let migration_level = 2 * blocks_per_cycle in
+  let () = Local_helpers.print_parameters ~parameter_file ~migration_level in
+
+  let* client, _node =
+    Local_helpers.activate_protocol
+      ~parameter_file
+      ~migrate_from
+      ~migrate_to
+      ~migration_level
+  in
+  let bake_until_cycle_with_and_check =
+    Local_helpers.bake_until_cycle_with_and_check
+      ~migration_level
+      ~migrate_from
+      ~migrate_to
+      ~blocks_per_cycle
+  in
+  (* [default_baker] never gets deactivated *)
+  let default_baker = Constant.bootstrap1.alias in
+  (* [funder] is used to fund all new accounts *)
+  let funder = Constant.bootstrap2.alias in
+
+  let* delegates =
+    Local_helpers.create_delegates_and_stake
+      ~baker:default_baker
+      ~giver:funder
+      ~delegates:
+        (List.init 1 (fun i ->
+             ("delegate_" ^ Int.to_string i, Tez.of_int 300_000)))
+      client
+  in
+  let delegate_0 = List.hd delegates in
+
+  let bake_until_level_and_unstake ~target_level ~amount
+      ~expected_length_unfinalizable ~expected_unstaked_frozen_balance =
+    let baker = default_baker in
+    let keys = [baker] in
+    let staker = delegate_0.alias in
+    let* current_level = Local_helpers.get_current_level client in
+    let* () =
+      if target_level = current_level.level then unit
+      else Client.bake_until_level ~keys ~target_level client
+    in
+    let* () =
+      if target_level = migration_level then (
+        Log.info
+          ~color:Log.Color.FG.green
+          "Checking migration block consistency." ;
+        let* () =
+          block_check
+            ~expected_block_type:`Migration
+            client
+            ~migrate_from
+            ~migrate_to
+        in
+        unit)
+      else unit
+    in
+    let* () = Local_helpers.unstake ~baker ~staker ~amount client in
+    let* finalizable, unfinalizable =
+      Local_helpers.unstake_requests ~staker:delegate_0 client
+    in
+    Check.((List.length finalizable = 0) ~__LOC__ int)
+      ~error_msg:"Expected length finalizable=%R, got %L" ;
+    Check.(
+      (List.length unfinalizable = expected_length_unfinalizable) ~__LOC__ int)
+      ~error_msg:"Expected length unfinalizable=%R, got %L" ;
+
+    let* unstaked_finalizable_balance, unstaked_frozen_balance =
+      Local_helpers.unstaked_balance ~staker:delegate_0 client
+    in
+    Check.((unstaked_finalizable_balance = 0) ~__LOC__ int)
+      ~error_msg:"Expected unstaked_finalizable_balance=%R, got %L" ;
+    Check.(
+      (unstaked_frozen_balance = expected_unstaked_frozen_balance) ~__LOC__ int)
+      ~error_msg:"Expected unstaked_frozen_balance=%R, got %L" ;
+    unit
+  in
+
+  (* unstake in the first block of the last cycle of migrate_from: L9 *)
+  let* () =
+    bake_until_level_and_unstake
+      ~target_level:(migration_level - blocks_per_cycle)
+      ~amount:(Tez.of_int 1_000)
+      ~expected_length_unfinalizable:1
+      ~expected_unstaked_frozen_balance:1_000_000_000
+  in
+  (* a new min_delegated for [delegate_0] *)
+  let* () =
+    Local_helpers.transfer
+      ~baker:default_baker
+      ~amount:(Tez.of_int 50_000)
+      ~giver:delegate_0.alias
+      ~receiver:default_baker
+      client
+  in
+  (* unstake in the block before migration: L15 *)
+  let* () =
+    bake_until_level_and_unstake
+      ~target_level:(migration_level - 2)
+      ~amount:(Tez.of_int 2_000)
+      ~expected_length_unfinalizable:1
+      ~expected_unstaked_frozen_balance:3_000_000_000
+  in
+  let* () = Local_helpers.log_staking_balance ~delegate:delegate_0 client in
+  let* amount_before, level_before =
+    Local_helpers.min_delegated_in_current_cycle_rpc ~delegate:delegate_0 client
+  in
+  (* unstake in the migration block: L16 *)
+  let* () =
+    bake_until_level_and_unstake
+      ~target_level:(migration_level - 1)
+      ~amount:(Tez.of_int 3_000)
+      ~expected_length_unfinalizable:1
+      ~expected_unstaked_frozen_balance:6_000_000_000
+  in
+  let* () = Local_helpers.log_staking_balance ~delegate:delegate_0 client in
+  let* amount_after, level_after =
+    Local_helpers.min_delegated_in_current_cycle_rpc ~delegate:delegate_0 client
+  in
+  Check.((amount_after = amount_before) ~__LOC__ int)
+    ~error_msg:"Expected amount_after=%R, got %L" ;
+  Check.((level_after = level_before) ~__LOC__ int)
+    ~error_msg:"Expected level_after=%R, got %L" ;
+  (* unstake in the next block after migration: L17 *)
+  let* () =
+    bake_until_level_and_unstake
+      ~target_level:migration_level
+      ~amount:(Tez.of_int 4_000)
+      ~expected_length_unfinalizable:2
+      ~expected_unstaked_frozen_balance:10_000_000_000
+  in
+  (* unstake in the last block of the first cycle of migrate_to: L24 *)
+  let* () =
+    bake_until_level_and_unstake
+      ~target_level:(migration_level + blocks_per_cycle - 1)
+      ~amount:(Tez.of_int 5_000)
+      ~expected_length_unfinalizable:2
+      ~expected_unstaked_frozen_balance:15_000_000_000
+  in
+  let* () =
+    bake_until_cycle_with_and_check
+      ~bakers:[default_baker]
+      ~target_cycle:5
+      ~delegate:default_baker
+      ~check_last_block:(fun _ -> unit)
+      ~check_next_block:(fun _ ->
+        let* _ = Local_helpers.unstake_requests ~staker:delegate_0 client in
+        Local_helpers.check_is_finalizable_all_requests
+          ~staker:delegate_0
+          ~expected:false
+          client)
+      client
+  in
+  let* () =
+    bake_until_cycle_with_and_check
+      ~bakers:[default_baker]
+      ~target_cycle:6
+      ~delegate:default_baker
+      ~check_last_block:(fun _ -> unit)
+      ~check_next_block:(fun _ ->
+        let* _ = Local_helpers.unstake_requests ~staker:delegate_0 client in
+        Local_helpers.check_is_finalizable_all_requests
+          ~staker:delegate_0
+          ~expected:true
+          client)
+      client
+  in
+  unit
+
 let register ~migrate_from ~migrate_to =
   test_migration_for_whole_cycle ~migrate_from ~migrate_to ;
   test_migration_with_bakers ~migrate_from ~migrate_to () ;
   test_forked_migration_bakers ~migrate_from ~migrate_to ;
   test_forked_migration_manual ~migrate_from ~migrate_to () ;
   test_migration_with_snapshots ~migrate_from ~migrate_to ;
-  test_tolerated_inactivity_period ()
+  test_tolerated_inactivity_period () ;
+  test_unstaked_requests_many_delegates () ;
+  test_unstaked_requests_and_min_delegated ()
