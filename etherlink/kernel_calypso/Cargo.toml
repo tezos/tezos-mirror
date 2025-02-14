@@ -59,12 +59,12 @@ libsecp256k1 = { version = "0.7", default-features = false, features = [
 ] }
 
 # kernel crates
-tezos_ethereum = { path = "./ethereum" }
-evm-execution = { path = "./evm_execution" }
-tezos-evm-logging = { path = "./logging" }
-tezos-evm-runtime = { path = "./runtime" }
-tezos-indexable-storage = { path = "./indexable_storage" }
-tezos-storage = { path = "./storage" }
+tezos_ethereum = { package = "tezos_ethereum_calypso", path = "./ethereum" }
+evm-execution = { package = "evm-execution-calypso", path = "./evm_execution" }
+tezos-evm-logging = { package = "tezos-evm-logging-calypso",  path = "./logging" }
+tezos-evm-runtime = { package = "tezos-evm-runtime-calypso", path = "./runtime" }
+tezos-indexable-storage = { package = "tezos-indexable-storage-calypso", path = "./indexable_storage" }
+tezos-storage = { package = "tezos-storage-calypso", path = "./storage" }
 
 # SDK
 # we disable BLS, because we don’t need it and it is a roadblock for the native execution
