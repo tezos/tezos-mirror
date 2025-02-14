@@ -943,21 +943,34 @@ impl Instruction {
         }
     }
 
-    /// Convert [`InstrCacheable::Jalr`] according to whether registers are non-zero.
+    /// Convert [`InstrCacheable::Jalr`] according to whether registers and imm are non-zero.
     ///
     /// [`InstrCacheable::Jalr`]: crate::parser::instruction::InstrCacheable::Jalr
     pub(super) fn from_ic_jalr(args: &ITypeArgs) -> Instruction {
         use XRegisterParsed as X;
-        match (split_x0(args.rd), split_x0(args.rs1)) {
-            (X::X0, X::X0) => Instruction::new_j_absolute(args.imm, InstrWidth::Uncompressed),
-            (X::X0, X::NonZero(rs1)) => {
-                Instruction::new_jr_imm(rs1, args.imm, InstrWidth::Uncompressed)
+        match (split_x0(args.rd), split_x0(args.rs1), args.imm) {
+            // if rd and rs1 are x0, the only effect is an unconditional jump to the absolute address `imm`.
+            (X::X0, X::X0, imm) => Instruction::new_j_absolute(imm, InstrWidth::Uncompressed),
+            // if rd is x0 and imm is 0, the only effect is an unconditional jump to the address stored in rs1.
+            (X::X0, X::NonZero(rs1), 0) => Instruction::new_jr(rs1, InstrWidth::Uncompressed),
+            // if rd is x0 and imm is non-zero, the only effect is an unconditional jump to the address stored in rs1 + imm.
+            (X::X0, X::NonZero(rs1), imm) => {
+                Instruction::new_jr_imm(rs1, imm, InstrWidth::Uncompressed)
             }
-            (X::NonZero(rd), X::X0) => {
-                Instruction::new_jalr_absolute(rd, args.imm, InstrWidth::Uncompressed)
+            // if rd is non-x0 and imm is 0, the effect is a jump to the absolute address `imm`
+            // and storing `pc + 4` in the register `rd`.
+            (X::NonZero(rd), X::X0, imm) => {
+                Instruction::new_jalr_absolute(rd, imm, InstrWidth::Uncompressed)
             }
-            (X::NonZero(rd), X::NonZero(rs1)) => {
-                Instruction::new_jalr_imm(rd, rs1, args.imm, InstrWidth::Uncompressed)
+            // if rd and rs1 are non-x0 and imm is 0, the effect is a jump to the address stored in rs1
+            // and storing `pc + 4` in the register `rd`.
+            (X::NonZero(rd), X::NonZero(rs1), 0) => {
+                Instruction::new_jalr(rd, rs1, InstrWidth::Uncompressed)
+            }
+            // if all non-zero, the effect is a jump to the address stored in rs1 + imm
+            // and storing `pc + 4` in the register `rd`.
+            (X::NonZero(rd), X::NonZero(rs1), imm) => {
+                Instruction::new_jalr_imm(rd, rs1, imm, InstrWidth::Uncompressed)
             }
         }
     }

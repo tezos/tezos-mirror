@@ -1450,7 +1450,7 @@ mod tests {
             })
             .unwrap(),
             Instruction::try_from(TaggedInstruction {
-                opcode: OpCode::JrImm,
+                opcode: OpCode::Jr,
                 args: TaggedArgs {
                     rd: nz::ra.into(),
                     rs1: nz::a0.into(),
