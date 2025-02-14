@@ -229,9 +229,6 @@ let get_attested_data_default_store_period t proto_parameters =
   assert (supports_refutations_bis = supports_refutations t) ;
   period
 
-let get_attested_data_default_store_period t proto_parameters =
-  get_attested_data_default_store_period t proto_parameters
-
 let profiles_filename = "profiles.json"
 
 (* TODO https://gitlab.com/tezos/tezos/-/issues/7033
