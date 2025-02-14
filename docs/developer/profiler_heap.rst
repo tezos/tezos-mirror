@@ -4,8 +4,34 @@ Memory profiling the OCaml heap
 The profiler offers specific support for displaying the memory footprint of the
 OCaml heap. This is how you can use it
 
-- Install an OCaml switch with the ``statmemprof`` patch:
+Using Memtrace
+==============
 
+- Install an OCaml switch that support ``statmemprof``:
+  until the ``4.14.2`` or after the ``5.3``
+
+- Install ``memtrace`` and ``memtrace_viewer``.
+
+- Add the following line at the beginning of the program you want to profile
+  ``Memtrace.trace_if_requested ();``
+
+- Recompile your program
+
+- Add the following environment variable to your executable command:
+  ``MEMTRACE=trace.ctf ./my_executable``
+
+- ``trace.ctf`` will be filled with data from the execution of the program and
+  can be analysed with ``memtrace-viewer trace.ctf``.
+
+- Open your favorite web browser and go to ``localhost:8080``
+
+
+Using Statmemprof-emacs
+=======================
+
+This section is legacy and might not work any more with recent OCaml versions.
+
+- Install an OCaml switch with the ``statmemprof`` patch:
   ``4.04.2+statistical-memprof`` or ``4.06.0+statistical-memprof``
 
 - Install ``statmemprof-emacs``.
