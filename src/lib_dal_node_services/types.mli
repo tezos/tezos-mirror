@@ -169,6 +169,8 @@ module Span : sig
 
   include COMPARABLE with type t := t
 
+  val rpc_encoding : t Data_encoding.t
+
   val zero : t
 
   val of_int_s : int -> t
