@@ -928,6 +928,11 @@ let register_dal_profiles cctxt dal_node_rpc_ctxt delegates =
             warn ()
           else Lwt.return_unit
     in
+    let delegates =
+      List.map
+        (fun delegate -> Consensus_key_id.to_pkh delegate.Consensus_key.id)
+        delegates
+    in
     Node_rpc.register_dal_profiles dal_ctxt delegates
   in
   Option.iter_es

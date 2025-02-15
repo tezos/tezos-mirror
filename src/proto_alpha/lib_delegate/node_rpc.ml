@@ -407,9 +407,7 @@ let register_dal_profiles dal_node_rpc_ctxt delegates =
     Tezos_dal_node_services.Operator_profile.make
       ~attesters:
         (List.map
-           (fun k ->
-             Tezos_crypto.Signature.Of_V1.public_key_hash
-             @@ Consensus_key_id.to_pkh k.Consensus_key.id)
+           (fun pkh -> Tezos_crypto.Signature.Of_V1.public_key_hash pkh)
            delegates)
       ()
   in
