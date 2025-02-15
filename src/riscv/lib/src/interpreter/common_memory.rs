@@ -7,7 +7,7 @@ use crate::{
     machine_state::{
         AccessType, MachineCoreState,
         memory::{self, Memory, OutOfBounds},
-        registers::XRegister,
+        registers::{NonZeroXRegister, XRegister},
     },
     state_backend as backend,
     traps::Exception,
@@ -37,6 +37,17 @@ where
         rs1: XRegister,
     ) -> Result<T, Exception> {
         let address = self.hart.xregisters.read(rs1).wrapping_add(imm as u64);
+        self.read_from_address(address)
+    }
+
+    /// Generic read function for loading `mem::size_of<T>` bytes from address val(rs1) + imm
+    /// where `rs1` is known not be x0.
+    pub(super) fn read_from_bus_nz<T: backend::Elem>(
+        &mut self,
+        imm: i64,
+        rs1: NonZeroXRegister,
+    ) -> Result<T, Exception> {
+        let address = self.hart.xregisters.read_nz(rs1).wrapping_add(imm as u64);
         self.read_from_address(address)
     }
 

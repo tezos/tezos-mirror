@@ -5,7 +5,7 @@
 use super::{Args, Instruction, OpCode};
 use crate::{
     default::ConstDefault,
-    machine_state::registers::{NonZeroXRegister, nz},
+    machine_state::registers::{NonZeroXRegister, XRegister, nz},
     parser::{
         XRegisterParsed,
         instruction::{
@@ -522,6 +522,39 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Ld`].
+    pub(crate) fn new_ld(rd: XRegister, rs1: XRegister, imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Ld,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Ldnz`].
+    pub(crate) fn new_ldnz(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Ldnz,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {
@@ -972,6 +1005,19 @@ impl Instruction {
             (X::NonZero(rd), X::NonZero(rs1), imm) => {
                 Instruction::new_jalr_imm(rd, rs1, imm, InstrWidth::Uncompressed)
             }
+        }
+    }
+
+    /// Convert [`InstrCacheable::Ld`] according to whether register is non-zero.
+    ///
+    /// [`InstrCacheable::Ld`]: crate::parser::instruction::InstrCacheable::Ld
+    pub(super) fn from_ic_ld(args: &ITypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rd), split_x0(args.rs1)) {
+            (X::NonZero(rd), X::NonZero(rs1)) => {
+                Instruction::new_ldnz(rd, rs1, args.imm, InstrWidth::Uncompressed)
+            }
+            _ => Instruction::new_ld(args.rd, args.rs1, args.imm, InstrWidth::Uncompressed),
         }
     }
 }

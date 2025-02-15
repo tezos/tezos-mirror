@@ -370,6 +370,8 @@ pub enum OpCode {
     JalrAbsolute,
     /// Same as `Jr` but jumps to `val(rs1) + imm`.
     JrImm,
+    /// Same as Ld but only using NonZeroXRegisters.
+    Ldnz,
 }
 
 impl OpCode {
@@ -420,6 +422,7 @@ impl OpCode {
             Self::Lhu => Args::run_lhu,
             Self::Lwu => Args::run_lwu,
             Self::Ld => Args::run_ld,
+            Self::Ldnz => Args::run_ldnz,
             Self::Sb => Args::run_sb,
             Self::Sh => Args::run_sh,
             Self::Sw => Args::run_sw,
@@ -776,6 +779,18 @@ macro_rules! impl_load_type {
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.imm, self.rs1.x, self.rd.x)
+                .map(|_| Next(self.width))
+        }
+    };
+
+    ($fn: ident, non_zero) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
+            &self,
+            core: &mut MachineCoreState<MC, M>,
+        ) -> Result<ProgramCounterUpdate, Exception> {
+            core.$fn(self.imm, self.rs1.nzx, self.rd.nzx)
                 .map(|_| Next(self.width))
         }
     };
@@ -1162,6 +1177,7 @@ impl Args {
     impl_load_type!(run_lhu);
     impl_load_type!(run_lwu);
     impl_load_type!(run_ld);
+    impl_load_type!(run_ldnz, non_zero);
 
     // RV64I S-type instructions
     impl_store_type!(run_sb);
@@ -1519,10 +1535,7 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Lwu,
                 args: args.to_args(InstrWidth::Uncompressed),
             },
-            InstrCacheable::Ld(args) => Instruction {
-                opcode: OpCode::Ld,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
+            InstrCacheable::Ld(args) => Instruction::from_ic_ld(args),
             // RV64I S-type instructions
             InstrCacheable::Sb(args) => Instruction {
                 opcode: OpCode::Sb,

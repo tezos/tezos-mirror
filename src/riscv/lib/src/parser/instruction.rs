@@ -341,6 +341,8 @@ pub enum InstrCacheable {
     Lbu(ITypeArgs),
     Lhu(ITypeArgs),
     Lwu(ITypeArgs),
+    /// `LD` - Loads a double-word (8 bytes) starting
+    /// from address given by: `val(rs1) + imm`.
     Ld(ITypeArgs),
 
     // RV64I S-type instructions
