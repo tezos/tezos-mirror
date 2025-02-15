@@ -5,6 +5,7 @@
 mod error;
 mod fds;
 mod fs;
+mod rng;
 
 use std::{ffi::CStr, num::NonZeroU64};
 
@@ -67,6 +68,9 @@ const RT_SIGACTION: u64 = 134;
 
 /// System call number for `rt_sigprocmask` on RISC-V
 const RT_SIGPROCMASK: u64 = 135;
+
+/// System call number for `getrandom` on RISC-V
+const GETRANDOM: u64 = 278;
 
 /// Size of the `sigset_t` type in bytes
 ///
@@ -304,6 +308,7 @@ impl<M: ManagerBase> SupervisorState<M> {
             SIGALTSTACK => return self.handle_sigaltstack(core),
             RT_SIGACTION => return self.handle_rt_sigaction(core),
             RT_SIGPROCMASK => return self.handle_rt_sigprocmask(core),
+            GETRANDOM => return self.handle_getrandom(core),
             _ => {}
         }
 
