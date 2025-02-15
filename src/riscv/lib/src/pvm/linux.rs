@@ -42,6 +42,9 @@ const WRITEV: u64 = 66;
 /// System call number for `ppoll` on RISC-V
 const PPOLL: u64 = 73;
 
+/// System call number for `readlinkat` on RISC-V
+const READLINKAT: u64 = 78;
+
 /// System call number for `exit` on RISC-V
 const EXIT: u64 = 93;
 
@@ -292,6 +295,7 @@ impl<M: ManagerBase> SupervisorState<M> {
             WRITE => return self.handle_write(core, hooks),
             WRITEV => return self.handle_writev(core, hooks),
             PPOLL => return self.handle_ppoll(core),
+            READLINKAT => return self.handle_readlinkat(core),
             EXIT | EXITGROUP => return self.handle_exit(core),
             SET_TID_ADDRESS => return self.handle_set_tid_address(core),
             TKILL => return self.handle_tkill(core),

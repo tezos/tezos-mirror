@@ -24,4 +24,18 @@ impl<M: ManagerBase> SupervisorState<M> {
         core.hart.xregisters.write_system_call_error(Error::Access);
         true
     }
+
+    /// Handle the `readlinkat` system call. All access to the file system is denied.
+    ///
+    /// See: <https://man7.org/linux/man-pages/man2/readlink.2.html>
+    pub(super) fn handle_readlinkat(
+        &mut self,
+        core: &mut MachineCoreState<impl MainMemoryLayout, M>,
+    ) -> bool
+    where
+        M: ManagerReadWrite,
+    {
+        core.hart.xregisters.write_system_call_error(Error::Access);
+        true
+    }
 }
