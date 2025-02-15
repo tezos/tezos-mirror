@@ -36,6 +36,11 @@ pub enum Error {
     /// See [`EINVAL`](https://github.com/torvalds/linux/blob/0ad2507d5d93f39619fc42372c347d6006b64319/include/uapi/asm-generic/errno-base.h#L26)
     InvalidArgument = 22,
 
+    /// Out of range
+    ///
+    /// See [`ERANGE`](https://github.com/torvalds/linux/blob/0ad2507d5d93f39619fc42372c347d6006b64319/include/uapi/asm-generic/errno-base.h#L38)
+    Range = 34,
+
     /// System call is not supported
     ///
     /// See [`ENOSYS`](https://github.com/torvalds/linux/blob/0ad2507d5d93f39619fc42372c347d6006b64319/tools/include/uapi/asm-generic/errno.h#L18)
