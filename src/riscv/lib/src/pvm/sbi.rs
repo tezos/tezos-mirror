@@ -433,18 +433,31 @@ where
             }
         }
         SBI_FIRMWARE_TEZOS => {
-            let sbi_function = machine.hart.xregisters.read(a6);
-            match sbi_function {
-                SBI_TEZOS_INBOX_NEXT => handle_tezos_inbox_next(status),
-                SBI_TEZOS_ED25519_SIGN => sbi_wrap(machine, handle_tezos_ed25519_sign),
-                SBI_TEZOS_ED25519_VERIFY => sbi_wrap(machine, handle_tezos_ed25519_verify),
-                SBI_TEZOS_BLAKE2B_HASH256 => sbi_wrap(machine, handle_tezos_blake2b_hash256),
-                SBI_TEZOS_REVEAL => handle_tezos_reveal(machine, reveal_request, status),
-                _ => handle_not_supported(&mut machine.hart.xregisters),
-            }
+            handle_tezos(machine, status, reveal_request);
         }
         _ => handle_not_supported(&mut machine.hart.xregisters),
     }
 
     status.read() == PvmStatus::Evaluating
+}
+
+/// Handle a Tezos SBI call.
+pub(super) fn handle_tezos<S, MC, M>(
+    machine: &mut MachineCoreState<MC, M>,
+    status: &mut S,
+    reveal_request: &mut RevealRequest<M>,
+) where
+    S: CellReadWrite<Value = PvmStatus>,
+    MC: MemoryConfig,
+    M: ManagerReadWrite,
+{
+    let sbi_function = machine.hart.xregisters.read(a6);
+    match sbi_function {
+        SBI_TEZOS_INBOX_NEXT => handle_tezos_inbox_next(status),
+        SBI_TEZOS_ED25519_SIGN => sbi_wrap(machine, handle_tezos_ed25519_sign),
+        SBI_TEZOS_ED25519_VERIFY => sbi_wrap(machine, handle_tezos_ed25519_verify),
+        SBI_TEZOS_BLAKE2B_HASH256 => sbi_wrap(machine, handle_tezos_blake2b_hash256),
+        SBI_TEZOS_REVEAL => handle_tezos_reveal(machine, reveal_request, status),
+        _ => handle_not_supported(&mut machine.hart.xregisters),
+    }
 }
