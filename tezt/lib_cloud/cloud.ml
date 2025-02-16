@@ -676,12 +676,10 @@ let open_telemetry_endpoint t =
           let port = 55681 in
           Some (Format.asprintf "http://%s:%d" address port))
 
-let get_agents = agents
-
 let register_binary cloud ?agents ?(group = "tezt-cloud") ~name () =
   if Env.process_monitoring then
     let agents =
-      match agents with None -> get_agents cloud | Some agents -> agents
+      match agents with None -> cloud.agents | Some agents -> agents
     in
     Lwt_list.iter_p
       (fun agent ->
