@@ -21,83 +21,64 @@ use tezos_smart_rollup_constants::{
 use super::{PvmHooks, PvmStatus, reveals::RevealRequest};
 use crate::{
     machine_state::{
-        AccessType, CacheLayouts, MachineState,
-        block_cache::bcall::Block,
+        AccessType, MachineCoreState,
         memory::{Memory, MemoryConfig},
-        registers::{XValue, a0, a1, a2, a3, a6, a7},
+        registers::{XRegisters, XValue, a0, a1, a2, a3, a6, a7},
     },
     parser::instruction::InstrUncacheable,
-    state_backend::{Cell, CellRead, CellReadWrite, CellWrite, ManagerReadWrite},
+    state_backend::{CellRead, CellReadWrite, CellWrite, ManagerReadWrite, ManagerWrite},
     traps::EnvironException,
 };
 
 /// Write the SBI error code as the return value.
-#[inline(always)]
-fn sbi_return_error<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerReadWrite>(
-    machine: &mut MachineState<MC, CL, B, M>,
-    code: SbiError,
-) {
-    machine.core.hart.xregisters.write(a0, code as i64 as u64);
+#[inline]
+fn sbi_return_error<M: ManagerWrite>(xregisters: &mut XRegisters<M>, code: SbiError) {
+    xregisters.write(a0, code as i64 as u64);
 }
 
 /// Write an arbitrary value as single return value.
-#[inline(always)]
-fn sbi_return1<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerReadWrite>(
-    machine: &mut MachineState<MC, CL, B, M>,
-    value: XValue,
-) {
+#[inline]
+fn sbi_return1<M: ManagerWrite>(xregisters: &mut XRegisters<M>, value: XValue) {
     // The SBI caller interprets the return value as a [i64]. We don't want the value to be
     // interpreted as negative because that indicates an error.
     if (value as i64) < 0 {
-        return sbi_return_error(machine, SbiError::Failed);
+        return sbi_return_error(xregisters, SbiError::Failed);
     }
 
-    machine.core.hart.xregisters.write(a0, value);
+    xregisters.write(a0, value);
 }
 
 /// Write an `sbiret` return struct.
-#[inline(always)]
-fn sbi_return_sbiret<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerReadWrite>(
-    machine: &mut MachineState<MC, CL, B, M>,
+#[inline]
+fn sbi_return_sbiret<M: ManagerWrite>(
+    xregisters: &mut XRegisters<M>,
     error: Option<SbiError>,
     value: XValue,
 ) {
-    machine
-        .core
-        .hart
-        .xregisters
-        .write(a0, error.map(|err| err as i64 as XValue).unwrap_or(0));
-    machine.core.hart.xregisters.write(a1, value);
+    xregisters.write(a0, error.map(|err| err as i64 as XValue).unwrap_or(0));
+    xregisters.write(a1, value);
 }
 
 /// Run the given closure `inner` and write the corresponding SBI results to `machine`.
-#[inline(always)]
-fn sbi_wrap<MC, CL, B, M, F>(machine: &mut MachineState<MC, CL, B, M>, inner: F)
+#[inline]
+fn sbi_wrap<MC, M, F>(machine: &mut MachineCoreState<MC, M>, inner: F)
 where
     MC: MemoryConfig,
-    CL: CacheLayouts,
-    B: Block<MC, M>,
-    M: ManagerReadWrite,
-    F: FnOnce(&mut MachineState<MC, CL, B, M>) -> Result<XValue, SbiError>,
+    M: ManagerWrite,
+    F: FnOnce(&mut MachineCoreState<MC, M>) -> Result<XValue, SbiError>,
 {
     match inner(machine) {
-        Ok(value) => sbi_return1(machine, value),
-        Err(error) => sbi_return_error(machine, error),
+        Ok(value) => sbi_return1(&mut machine.hart.xregisters, value),
+        Err(error) => sbi_return_error(&mut machine.hart.xregisters, error),
     }
 }
 
 /// Respond to a request for input with no input. Returns `false` in case the
 /// machine wasn't expecting any input, otherwise returns `true`.
-pub fn provide_no_input<S, MC, CL, B, M>(
-    status: &mut S,
-    machine: &mut MachineState<MC, CL, B, M>,
-) -> bool
+pub fn provide_no_input<S, M>(status: &mut S, xregisters: &mut XRegisters<M>) -> bool
 where
     S: CellReadWrite<Value = PvmStatus>,
-    CL: CacheLayouts,
-    MC: MemoryConfig,
-    B: Block<MC, M>,
-    M: ManagerReadWrite,
+    M: ManagerWrite,
 {
     // This method should only do something when we're waiting for input.
     match status.read() {
@@ -109,24 +90,22 @@ where
     status.write(PvmStatus::Evaluating);
 
     // Inform the caller that there is no more input by returning "bytes written" (a0) as 0.
-    sbi_return1(machine, 0);
+    sbi_return1(xregisters, 0);
     true
 }
 
 /// Provide input information to the machine. Returns `false` in case the
 /// machine wasn't expecting any input, otherwise returns `true`.
-pub fn provide_input<S, MC, CL, B, M>(
+pub fn provide_input<S, MC, M>(
     status: &mut S,
-    machine: &mut MachineState<MC, CL, B, M>,
+    machine: &mut MachineCoreState<MC, M>,
     level: u32,
     counter: u32,
     payload: &[u8],
 ) -> bool
 where
     S: CellReadWrite<Value = PvmStatus>,
-    CL: CacheLayouts,
     MC: MemoryConfig,
-    B: Block<MC, M>,
     M: ManagerReadWrite,
 {
     // This method should only do something when we're waiting for input.
@@ -140,18 +119,16 @@ where
 
     sbi_wrap(machine, |machine| {
         // These arguments should have been set by the previous SBI call.
-        let arg_buffer_addr = machine.core.hart.xregisters.read(a0);
-        let arg_buffer_size = machine.core.hart.xregisters.read(a1);
-        let arg_level_addr = machine.core.hart.xregisters.read(a2);
-        let arg_counter_addr = machine.core.hart.xregisters.read(a3);
+        let arg_buffer_addr = machine.hart.xregisters.read(a0);
+        let arg_buffer_size = machine.hart.xregisters.read(a1);
+        let arg_level_addr = machine.hart.xregisters.read(a2);
+        let arg_counter_addr = machine.hart.xregisters.read(a3);
 
         // The argument addresses are virtual addresses. We need to translate them to
         // physical addresses.
-        let phys_buffer_addr = machine.core.translate(arg_buffer_addr, AccessType::Store)?;
-        let phys_level_addr = machine.core.translate(arg_level_addr, AccessType::Store)?;
-        let phys_counter_addr = machine
-            .core
-            .translate(arg_counter_addr, AccessType::Store)?;
+        let phys_buffer_addr = machine.translate(arg_buffer_addr, AccessType::Store)?;
+        let phys_level_addr = machine.translate(arg_level_addr, AccessType::Store)?;
+        let phys_counter_addr = machine.translate(arg_counter_addr, AccessType::Store)?;
 
         // The SBI caller expects the payload to be returned at [phys_dest_addr]
         // with at maximum [max_buffer_size] bytes written.
@@ -162,11 +139,10 @@ where
         );
 
         machine
-            .core
             .main_memory
             .write_all(phys_buffer_addr, &payload[..max_buffer_size])?;
-        machine.core.main_memory.write(phys_level_addr, level)?;
-        machine.core.main_memory.write(phys_counter_addr, counter)?;
+        machine.main_memory.write(phys_level_addr, level)?;
+        machine.main_memory.write(phys_counter_addr, counter)?;
 
         // At the moment, this case is unlikely to occur because we cap [max_buffer_size] at
         // [MAX_INPUT_MESSAGE_SIZE].
@@ -178,16 +154,14 @@ where
 
 /// Provide reveal data in response to a reveal request. Returns `false`
 /// if the machine is not expecting reveal.
-pub fn provide_reveal_response<S, MC, CL, B, M>(
+pub fn provide_reveal_response<S, MC, M>(
     status: &mut S,
-    machine: &mut MachineState<MC, CL, B, M>,
+    machine: &mut MachineCoreState<MC, M>,
     reveal_data: &[u8],
 ) -> bool
 where
     S: CellReadWrite<Value = PvmStatus>,
-    CL: CacheLayouts,
     MC: MemoryConfig,
-    B: Block<MC, M>,
     M: ManagerReadWrite,
 {
     // This method should only do something when we're waiting for reveal.
@@ -200,8 +174,8 @@ where
 
     sbi_wrap(machine, |machine| {
         // These arguments should have been set by the previous SBI call.
-        let arg_buffer_addr = machine.core.hart.xregisters.read(a2);
-        let arg_buffer_size = machine.core.hart.xregisters.read(a3);
+        let arg_buffer_addr = machine.hart.xregisters.read(a2);
+        let arg_buffer_size = machine.hart.xregisters.read(a3);
 
         let memory_write_size = min(
             REVEAL_DATA_MAX_SIZE,
@@ -210,11 +184,10 @@ where
 
         // The argument address is a virtual address. We need to translate it to
         // a physical address.
-        let phys_dest_addr = machine.core.translate(arg_buffer_addr, AccessType::Store)?;
+        let phys_dest_addr = machine.translate(arg_buffer_addr, AccessType::Store)?;
 
         // TODO: RV-425 Cross-page memory accesses are not translated correctly
         machine
-            .core
             .main_memory
             .write_all(phys_dest_addr, &reveal_data[..memory_write_size])?;
 
@@ -236,76 +209,61 @@ where
 
 /// Produce a Ed25519 signature.
 #[inline]
-fn handle_tezos_ed25519_sign<MC, CL, B, M>(
-    machine: &mut MachineState<MC, CL, B, M>,
-) -> Result<u64, SbiError>
+fn handle_tezos_ed25519_sign<MC, M>(machine: &mut MachineCoreState<MC, M>) -> Result<u64, SbiError>
 where
     MC: MemoryConfig,
-    CL: CacheLayouts,
-    B: Block<MC, M>,
     M: ManagerReadWrite,
 {
-    let arg_sk_addr = machine.core.hart.xregisters.read(a0);
-    let arg_msg_addr = machine.core.hart.xregisters.read(a1);
-    let arg_msg_len = machine.core.hart.xregisters.read(a2);
-    let arg_sig_addr = machine.core.hart.xregisters.read(a3);
+    let arg_sk_addr = machine.hart.xregisters.read(a0);
+    let arg_msg_addr = machine.hart.xregisters.read(a1);
+    let arg_msg_len = machine.hart.xregisters.read(a2);
+    let arg_sig_addr = machine.hart.xregisters.read(a3);
 
-    let sk_addr = machine.core.translate(arg_sk_addr, AccessType::Load)?;
-    let msg_addr = machine.core.translate(arg_msg_addr, AccessType::Load)?;
-    let sig_addr = machine.core.translate(arg_sig_addr, AccessType::Store)?;
+    let sk_addr = machine.translate(arg_sk_addr, AccessType::Load)?;
+    let msg_addr = machine.translate(arg_msg_addr, AccessType::Load)?;
+    let sig_addr = machine.translate(arg_sig_addr, AccessType::Store)?;
 
     let mut sk_bytes = [0u8; 32];
-    machine.core.main_memory.read_all(sk_addr, &mut sk_bytes)?;
+    machine.main_memory.read_all(sk_addr, &mut sk_bytes)?;
     let sk = SigningKey::try_from(sk_bytes.as_slice()).map_err(|_| SbiError::Failed)?;
     sk_bytes.fill(0);
 
     let mut msg_bytes = vec![0; arg_msg_len as usize];
-    machine
-        .core
-        .main_memory
-        .read_all(msg_addr, &mut msg_bytes)?;
+    machine.main_memory.read_all(msg_addr, &mut msg_bytes)?;
 
     let sig = sk.sign(msg_bytes.as_slice());
     let sig_bytes: [u8; 64] = sig.to_bytes();
-    machine.core.main_memory.write_all(sig_addr, &sig_bytes)?;
+    machine.main_memory.write_all(sig_addr, &sig_bytes)?;
 
     Ok(sig_bytes.len() as u64)
 }
 
 /// Verify a Ed25519 signature.
 #[inline]
-fn handle_tezos_ed25519_verify<MC, CL, B, M>(
-    machine: &mut MachineState<MC, CL, B, M>,
+fn handle_tezos_ed25519_verify<MC, M>(
+    machine: &mut MachineCoreState<MC, M>,
 ) -> Result<u64, SbiError>
 where
     MC: MemoryConfig,
-    CL: CacheLayouts,
-    B: Block<MC, M>,
     M: ManagerReadWrite,
 {
-    let arg_pk_addr = machine.core.hart.xregisters.read(a0);
-    let arg_sig_addr = machine.core.hart.xregisters.read(a1);
-    let arg_msg_addr = machine.core.hart.xregisters.read(a2);
-    let arg_msg_len = machine.core.hart.xregisters.read(a3);
+    let arg_pk_addr = machine.hart.xregisters.read(a0);
+    let arg_sig_addr = machine.hart.xregisters.read(a1);
+    let arg_msg_addr = machine.hart.xregisters.read(a2);
+    let arg_msg_len = machine.hart.xregisters.read(a3);
 
-    let pk_addr = machine.core.translate(arg_pk_addr, AccessType::Load)?;
-    let sig_addr = machine.core.translate(arg_sig_addr, AccessType::Store)?;
-    let msg_addr = machine.core.translate(arg_msg_addr, AccessType::Load)?;
+    let pk_addr = machine.translate(arg_pk_addr, AccessType::Load)?;
+    let sig_addr = machine.translate(arg_sig_addr, AccessType::Store)?;
+    let msg_addr = machine.translate(arg_msg_addr, AccessType::Load)?;
 
     let mut pk_bytes = [0u8; 32];
-    machine.core.main_memory.read_all(pk_addr, &mut pk_bytes)?;
+    machine.main_memory.read_all(pk_addr, &mut pk_bytes)?;
 
     let mut sig_bytes = [0u8; 64];
-    machine
-        .core
-        .main_memory
-        .read_all(sig_addr, &mut sig_bytes)?;
+    machine.main_memory.read_all(sig_addr, &mut sig_bytes)?;
 
     let mut msg_bytes = vec![0u8; arg_msg_len as usize];
-    machine
-        .core
-        .main_memory
-        .read_all(msg_addr, &mut msg_bytes)?;
+    machine.main_memory.read_all(msg_addr, &mut msg_bytes)?;
 
     let pk = VerifyingKey::try_from(pk_bytes.as_slice()).map_err(|_| SbiError::Failed)?;
     let sig = Signature::from_slice(sig_bytes.as_slice()).map_err(|_| SbiError::Failed)?;
@@ -316,65 +274,54 @@ where
 
 /// Compute a BLAKE2B 256-bit digest.
 #[inline]
-fn handle_tezos_blake2b_hash256<MC, CL, B, M>(
-    machine: &mut MachineState<MC, CL, B, M>,
+fn handle_tezos_blake2b_hash256<MC, M>(
+    machine: &mut MachineCoreState<MC, M>,
 ) -> Result<u64, SbiError>
 where
     MC: MemoryConfig,
-    CL: CacheLayouts,
-    B: Block<MC, M>,
     M: ManagerReadWrite,
 {
-    let arg_out_addr = machine.core.hart.xregisters.read(a0);
-    let arg_msg_addr = machine.core.hart.xregisters.read(a1);
-    let arg_msg_len = machine.core.hart.xregisters.read(a2);
+    let arg_out_addr = machine.hart.xregisters.read(a0);
+    let arg_msg_addr = machine.hart.xregisters.read(a1);
+    let arg_msg_len = machine.hart.xregisters.read(a2);
 
-    let out_addr = machine.core.translate(arg_out_addr, AccessType::Store)?;
-    let msg_addr = machine.core.translate(arg_msg_addr, AccessType::Load)?;
+    let out_addr = machine.translate(arg_out_addr, AccessType::Store)?;
+    let msg_addr = machine.translate(arg_msg_addr, AccessType::Load)?;
 
     let mut msg_bytes = vec![0u8; arg_msg_len as usize];
-    machine
-        .core
-        .main_memory
-        .read_all(msg_addr, &mut msg_bytes)?;
+    machine.main_memory.read_all(msg_addr, &mut msg_bytes)?;
 
     let hash = tezos_crypto_rs::blake2b::digest_256(msg_bytes.as_slice());
-    machine
-        .core
-        .main_memory
-        .write_all(out_addr, hash.as_slice())?;
+    machine.main_memory.write_all(out_addr, hash.as_slice())?;
 
     Ok(hash.len() as u64)
 }
 
 /// Handle a [SBI_TEZOS_REVEAL] call.
 #[inline]
-fn handle_tezos_reveal<S, MC, CL, B, M>(
-    machine: &mut MachineState<MC, CL, B, M>,
+fn handle_tezos_reveal<S, MC, M>(
+    machine: &mut MachineCoreState<MC, M>,
     reveal_request: &mut RevealRequest<M>,
     status: &mut S,
 ) where
     S: CellReadWrite<Value = PvmStatus>,
     MC: MemoryConfig,
-    CL: CacheLayouts,
-    B: Block<MC, M>,
     M: ManagerReadWrite,
 {
-    let request_address = machine.core.hart.xregisters.read(a0);
-    let request_size = machine.core.hart.xregisters.read(a1);
+    let request_address = machine.hart.xregisters.read(a0);
+    let request_size = machine.hart.xregisters.read(a1);
 
     let mut buffer = vec![0u8; min(request_size as usize, REVEAL_REQUEST_MAX_SIZE)];
 
-    let Ok(phys_dest_addr) = machine.core.translate(request_address, AccessType::Store) else {
-        return sbi_return_error(machine, SbiError::InvalidAddress);
+    let Ok(phys_dest_addr) = machine.translate(request_address, AccessType::Store) else {
+        return sbi_return_error(&mut machine.hart.xregisters, SbiError::InvalidAddress);
     };
     if machine
-        .core
         .main_memory
         .read_all(phys_dest_addr, &mut buffer)
         .is_err()
     {
-        return sbi_return_error(machine, SbiError::InvalidAddress);
+        return sbi_return_error(&mut machine.hart.xregisters, SbiError::InvalidAddress);
     }
 
     // TODO: RV-425 Cross-page memory accesses are not translated correctly
@@ -385,136 +332,118 @@ fn handle_tezos_reveal<S, MC, CL, B, M>(
 
 /// Handle a [SBI_SHUTDOWN] call.
 #[inline(always)]
-fn handle_legacy_shutdown<MC, CL, B, M>(machine: &mut MachineState<MC, CL, B, M>)
+fn handle_legacy_shutdown<M>(xregisters: &mut XRegisters<M>)
 where
-    MC: MemoryConfig,
-    CL: CacheLayouts,
-    B: Block<MC, M>,
-    M: ManagerReadWrite,
+    M: ManagerWrite,
 {
     // This call always fails.
-    handle_not_supported(machine);
+    handle_not_supported(xregisters);
 }
 
 /// Handle a [SBI_CONSOLE_PUTCHAR] call.
 #[inline(always)]
-fn handle_legacy_console_putchar<MC, CL, B, M>(
-    machine: &mut MachineState<MC, CL, B, M>,
-    hooks: &mut PvmHooks,
-) where
-    MC: MemoryConfig,
-    CL: CacheLayouts,
-    B: Block<MC, M>,
+fn handle_legacy_console_putchar<M>(xregisters: &mut XRegisters<M>, hooks: &mut PvmHooks)
+where
     M: ManagerReadWrite,
 {
-    let char = machine.core.hart.xregisters.read(a0) as u8;
+    let char = xregisters.read(a0) as u8;
     (hooks.putchar_hook)(char);
 
     // This call always succeeds.
-    sbi_return1(machine, 0);
+    sbi_return1(xregisters, 0);
 }
 
 /// Handle a [SBI_DBCN_CONSOLE_WRITE_BYTE] call.
 #[inline(always)]
-fn handle_debug_console_write_byte<MC, CL, B, M>(
-    machine: &mut MachineState<MC, CL, B, M>,
-    hooks: &mut PvmHooks,
-) where
-    MC: MemoryConfig,
-    CL: CacheLayouts,
-    B: Block<MC, M>,
+fn handle_debug_console_write_byte<M>(xregisters: &mut XRegisters<M>, hooks: &mut PvmHooks)
+where
     M: ManagerReadWrite,
 {
-    let char = machine.core.hart.xregisters.read(a0) as u8;
+    let char = xregisters.read(a0) as u8;
     (hooks.putchar_hook)(char);
 
     // This call always succeeds.
-    sbi_return_sbiret(machine, None, 0);
+    sbi_return_sbiret(xregisters, None, 0);
 }
 
 /// Handle a [SBI_SRST_SYSTEM_RESET] call.
 #[inline(always)]
-fn handle_system_reset<MC, CL, B, M>(machine: &mut MachineState<MC, CL, B, M>)
+fn handle_system_reset<M>(xregisters: &mut XRegisters<M>)
 where
-    MC: MemoryConfig,
-    CL: CacheLayouts,
-    B: Block<MC, M>,
-    M: ManagerReadWrite,
+    M: ManagerWrite,
 {
-    sbi_return_sbiret(machine, Some(SbiError::NotSupported), 0);
+    sbi_return_sbiret(xregisters, Some(SbiError::NotSupported), 0);
 }
 
 /// Handle unsupported SBI calls.
 #[inline(always)]
-fn handle_not_supported<MC, CL, B, M>(machine: &mut MachineState<MC, CL, B, M>)
+fn handle_not_supported<M>(xregisters: &mut XRegisters<M>)
 where
-    MC: MemoryConfig,
-    CL: CacheLayouts,
-    B: Block<MC, M>,
-    M: ManagerReadWrite,
+    M: ManagerWrite,
 {
     // SBI requires us to indicate that we don't support this function by returning
     // `ERR_NOT_SUPPORTED`.
-    sbi_return_error(machine, SbiError::NotSupported);
+    sbi_return_error(xregisters, SbiError::NotSupported);
 }
 
 /// Handle a PVM SBI call. Returns `true` if it makes sense to continue evaluation.
 #[inline]
-pub fn handle_call<MC, CL, B, M>(
-    status: &mut Cell<PvmStatus, M>,
+pub fn handle_call<S, MC, M>(
+    status: &mut S,
     reveal_request: &mut RevealRequest<M>,
-    machine: &mut MachineState<MC, CL, B, M>,
+    machine: &mut MachineCoreState<MC, M>,
     hooks: &mut PvmHooks,
     env_exception: EnvironException,
 ) -> bool
 where
+    S: CellReadWrite<Value = PvmStatus>,
     MC: MemoryConfig,
-    CL: CacheLayouts,
-    B: Block<MC, M>,
     M: ManagerReadWrite,
 {
     if let EnvironException::EnvCallFromMMode = env_exception {
-        sbi_return_error(machine, SbiError::Failed);
+        sbi_return_error(&mut machine.hart.xregisters, SbiError::Failed);
         return true;
     }
 
     // No matter the outcome, we need to bump the
     // program counter because ECALL's don't update it
     // to the following instructions.
-    let pc = machine.core.hart.pc.read() + InstrUncacheable::Ecall.width() as u64;
-    machine.core.hart.pc.write(pc);
+    let pc = machine.hart.pc.read() + InstrUncacheable::Ecall.width() as u64;
+    machine.hart.pc.write(pc);
 
     // SBI extension is contained in a7.
-    let sbi_extension = machine.core.hart.xregisters.read(a7);
+    let sbi_extension = machine.hart.xregisters.read(a7);
     match sbi_extension {
-        SBI_CONSOLE_PUTCHAR => handle_legacy_console_putchar(machine, hooks),
-        SBI_SHUTDOWN => handle_legacy_shutdown(machine),
+        SBI_CONSOLE_PUTCHAR => handle_legacy_console_putchar(&mut machine.hart.xregisters, hooks),
+        SBI_SHUTDOWN => handle_legacy_shutdown(&mut machine.hart.xregisters),
         SBI_DBCN => {
-            let sbi_function = machine.core.hart.xregisters.read(a6);
+            let sbi_function = machine.hart.xregisters.read(a6);
             match sbi_function {
-                SBI_DBCN_CONSOLE_WRITE_BYTE => handle_debug_console_write_byte(machine, hooks),
-                _ => handle_not_supported(machine),
+                SBI_DBCN_CONSOLE_WRITE_BYTE => {
+                    handle_debug_console_write_byte(&mut machine.hart.xregisters, hooks)
+                }
+                _ => handle_not_supported(&mut machine.hart.xregisters),
             }
         }
         SBI_SRST => {
-            let sbi_function = machine.core.hart.xregisters.read(a6);
+            let sbi_function = machine.hart.xregisters.read(a6);
             match sbi_function {
-                SBI_SRST_SYSTEM_RESET => handle_system_reset(machine),
-                _ => handle_not_supported(machine),
+                SBI_SRST_SYSTEM_RESET => handle_system_reset(&mut machine.hart.xregisters),
+                _ => handle_not_supported(&mut machine.hart.xregisters),
             }
         }
         SBI_FIRMWARE_TEZOS => {
-            let sbi_function = machine.core.hart.xregisters.read(a6);
+            let sbi_function = machine.hart.xregisters.read(a6);
             match sbi_function {
                 SBI_TEZOS_INBOX_NEXT => handle_tezos_inbox_next(status),
                 SBI_TEZOS_ED25519_SIGN => sbi_wrap(machine, handle_tezos_ed25519_sign),
                 SBI_TEZOS_ED25519_VERIFY => sbi_wrap(machine, handle_tezos_ed25519_verify),
                 SBI_TEZOS_BLAKE2B_HASH256 => sbi_wrap(machine, handle_tezos_blake2b_hash256),
                 SBI_TEZOS_REVEAL => handle_tezos_reveal(machine, reveal_request, status),
-                _ => handle_not_supported(machine),
+                _ => handle_not_supported(&mut machine.hart.xregisters),
             }
         }
-        _ => handle_not_supported(machine),
+        _ => handle_not_supported(&mut machine.hart.xregisters),
     }
 
     status.read() == PvmStatus::Evaluating

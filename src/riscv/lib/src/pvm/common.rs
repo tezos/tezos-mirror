@@ -238,7 +238,7 @@ impl<
         sbi::handle_call(
             &mut self.status,
             &mut self.reveal_request,
-            &mut self.machine_state,
+            &mut self.machine_state.core,
             hooks,
             exception,
         )
@@ -284,7 +284,7 @@ impl<
                 Ok(sbi::handle_call(
                     &mut self.status,
                     &mut self.reveal_request,
-                    machine_state,
+                    &mut machine_state.core,
                     hooks,
                     exception,
                 ))
@@ -298,7 +298,10 @@ impl<
     where
         M: state_backend::ManagerReadWrite,
     {
-        sbi::provide_no_input(&mut self.status, &mut self.machine_state)
+        sbi::provide_no_input(
+            &mut self.status,
+            &mut self.machine_state.core.hart.xregisters,
+        )
     }
 
     /// Provide input. Returns `false` if the machine state is not expecting
@@ -309,7 +312,7 @@ impl<
     {
         sbi::provide_input(
             &mut self.status,
-            &mut self.machine_state,
+            &mut self.machine_state.core,
             level,
             counter,
             payload,
@@ -322,7 +325,7 @@ impl<
     where
         M: state_backend::ManagerReadWrite,
     {
-        sbi::provide_reveal_response(&mut self.status, &mut self.machine_state, reveal_data)
+        sbi::provide_reveal_response(&mut self.status, &mut self.machine_state.core, reveal_data)
     }
 
     /// Get the current machine status.
