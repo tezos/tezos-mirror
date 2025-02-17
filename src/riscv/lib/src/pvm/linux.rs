@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+mod error;
+
 use super::Pvm;
 use crate::{
     machine_state::{
@@ -17,6 +19,7 @@ use crate::{
         ManagerReadWrite, ManagerWrite, Ref,
     },
 };
+use error::Error;
 use std::{ffi::CStr, num::NonZeroU64};
 
 /// Size of a memory page in bytes
@@ -24,18 +27,6 @@ pub const PAGE_SIZE: u64 = 4096;
 
 /// Thread identifier for the main thread
 const MAIN_THREAD_ID: u64 = 1;
-
-/// Indicates a process or thread was not found
-const ESRCH: i64 = 3;
-
-/// Indicates a memory address was faulty
-const EFAULT: i64 = 14;
-
-/// Indicates an invalid argument
-const EINVAL: i64 = 22;
-
-/// Indicates a system call is not supported
-const ENOSYS: i64 = 38;
 
 /// System call number for `ppoll` on RISC-V
 const PPOLL: u64 = 73;
@@ -315,7 +306,9 @@ impl<M: ManagerBase> SupervisorState<M> {
         eprintln!("\ta5 = {}", xregisters.read(registers::a5));
         eprintln!("\ta6 = {}", xregisters.read(registers::a6));
 
-        core.hart.xregisters.write(registers::a0, -ENOSYS as u64);
+        core.hart
+            .xregisters
+            .write_system_call_error(Error::NoSystemCall);
 
         false
     }
@@ -360,7 +353,9 @@ impl<M: ManagerBase> SupervisorState<M> {
         // Enforce a limit on the number of file descriptors to prevent proof-size explosion.
         // This is akin to enforcing RLIMIT_NOFILE in a real system.
         if num_fds > RLIMIT_NOFILE {
-            core.hart.xregisters.write(registers::a0, -EINVAL as u64);
+            core.hart
+                .xregisters
+                .write_system_call_error(Error::InvalidArgument);
             return true;
         }
 
@@ -393,13 +388,15 @@ impl<M: ManagerBase> SupervisorState<M> {
             })
             .collect::<Result<Vec<_>, _>>()
         else {
-            core.hart.xregisters.write(registers::a0, -EFAULT as u64);
+            core.hart.xregisters.write_system_call_error(Error::Fault);
             return true;
         };
 
         // Only support the initial ppoll that Musl and Rust's init code issue
         if !fds.iter().all(|fd| [0, 1, 2].contains(fd)) {
-            core.hart.xregisters.write(registers::a0, -ENOSYS as u64);
+            core.hart
+                .xregisters
+                .write_system_call_error(Error::NoSystemCall);
             return true;
         }
 
@@ -409,7 +406,7 @@ impl<M: ManagerBase> SupervisorState<M> {
                 .wrapping_add(OFFSET_REVENTS)
                 .wrapping_add(fd_ptrs);
             let Ok(()) = core.main_memory.write_all(revents_ptr, &0u16.to_le_bytes()) else {
-                core.hart.xregisters.write(registers::a0, -EFAULT as u64);
+                core.hart.xregisters.write_system_call_error(Error::Fault);
                 return true;
             };
         }
@@ -445,7 +442,7 @@ impl<M: ManagerBase> SupervisorState<M> {
 
         if let Some(old) = NonZeroU64::new(old) {
             let Ok(()) = core.main_memory.write(old.get(), [0u8; SIZE_SIGALTSTACK]) else {
-                core.hart.xregisters.write(registers::a0, -EFAULT as u64);
+                core.hart.xregisters.write_system_call_error(Error::Fault);
                 return true;
             };
         }
@@ -470,7 +467,9 @@ impl<M: ManagerBase> SupervisorState<M> {
         // As we're implementing a 64-bit system, the size of `sigset_t` must be 8 bytes.
         // This is an assumption which is used in the remainder of the function body.
         if sigset_t_size != SIGSET_SIZE {
-            core.hart.xregisters.write(registers::a0, -EINVAL as u64);
+            core.hart
+                .xregisters
+                .write_system_call_error(Error::InvalidArgument);
             return true;
         }
 
@@ -483,7 +482,7 @@ impl<M: ManagerBase> SupervisorState<M> {
                 .main_memory
                 .write(old_action.get(), [0u8; SIZE_SIGACTION])
             else {
-                core.hart.xregisters.write(registers::a0, -EFAULT as u64);
+                core.hart.xregisters.write_system_call_error(Error::Fault);
                 return true;
             };
         }
@@ -509,7 +508,9 @@ impl<M: ManagerBase> SupervisorState<M> {
         // As we're implementing a 64-bit system, the size of `sigset_t` must be 8 bytes.
         // This is an assumption which is used in the remainder of the function body.
         if sigset_t_size != SIGSET_SIZE {
-            core.hart.xregisters.write(registers::a0, -EINVAL as u64);
+            core.hart
+                .xregisters
+                .write_system_call_error(Error::InvalidArgument);
             return true;
         }
 
@@ -519,7 +520,7 @@ impl<M: ManagerBase> SupervisorState<M> {
                 .main_memory
                 .write(old_action.get(), [0u8; SIGSET_SIZE as usize])
             else {
-                core.hart.xregisters.write(registers::a0, -EFAULT as u64);
+                core.hart.xregisters.write_system_call_error(Error::Fault);
                 return true;
             };
         }
@@ -541,7 +542,7 @@ impl<M: ManagerBase> SupervisorState<M> {
 
         if thread_id != MAIN_THREAD_ID {
             // We only support exiting the main thread
-            core.hart.xregisters.write(registers::a0, -ESRCH as u64);
+            core.hart.xregisters.write_system_call_error(Error::Search);
             return true;
         }
 
