@@ -431,9 +431,6 @@ Smart Rollups
 -------------
 
 
-Zero Knowledge Rollups (ongoing)
---------------------------------
-
 Data Availability Layer
 -----------------------
 
