@@ -31,6 +31,11 @@ type withdrawal_log = {
   withdrawal : withdrawal;
 }
 
+type l2_levels_range = {
+  start_l2 : Ethereum_types.quantity;
+  end_l2 : Ethereum_types.quantity;
+}
+
 (** Human readable encoding for quantities (levels, amounts, etc.) *)
 val quantity_hum_encoding : Ethereum_types.quantity Data_encoding.t
 
@@ -48,6 +53,31 @@ val init : data_dir:string -> [`Read_only | `Read_write] -> t tzresult Lwt.t
 
 module Withdrawals : sig
   val store : ?conn:Sqlite.conn -> t -> withdrawal_log -> unit tzresult Lwt.t
+end
+
+module Levels : sig
+  val store :
+    ?conn:Sqlite.conn ->
+    t ->
+    l1_level:int32 ->
+    start_l2_level:Ethereum_types.quantity ->
+    end_l2_level:Ethereum_types.quantity ->
+    unit tzresult Lwt.t
+
+  val get_l2_range :
+    ?conn:Sqlite.conn ->
+    t ->
+    l1_level:int32 ->
+    l2_levels_range option tzresult Lwt.t
+
+  val get_l1 :
+    ?conn:Sqlite.conn ->
+    t ->
+    l2_level:Ethereum_types.quantity ->
+    int32 option tzresult Lwt.t
+
+  val last :
+    ?conn:Sqlite.conn -> t -> (int32 * l2_levels_range) option tzresult Lwt.t
 end
 
 module Pointers : sig

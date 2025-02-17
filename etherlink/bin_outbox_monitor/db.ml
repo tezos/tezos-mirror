@@ -40,6 +40,11 @@ type withdrawal_log = {
   withdrawal : withdrawal;
 }
 
+type l2_levels_range = {
+  start_l2 : Ethereum_types.quantity;
+  end_l2 : Ethereum_types.quantity;
+}
+
 let withdrawal_kind_encoding =
   let open Data_encoding in
   union
@@ -265,6 +270,12 @@ module Types = struct
     @@ proj bool (fun l -> l.removed)
     @@ proj withdrawal (fun l -> l.withdrawal)
     @@ proj_end
+
+  let l2_levels_range =
+    product (fun start_l2 end_l2 -> {start_l2; end_l2})
+    @@ proj level (fun l -> l.start_l2)
+    @@ proj level (fun l -> l.end_l2)
+    @@ proj_end
 end
 
 module Migrations = struct
@@ -402,6 +413,46 @@ module Withdrawals = struct
 
   let store ?conn db log =
     with_connection db conn @@ fun conn -> Sqlite.Db.exec conn Q.insert log
+end
+
+module Levels = struct
+  module Q = struct
+    open Types
+
+    let set =
+      (t2 int32 l2_levels_range ->. unit)
+      @@ {sql|REPLACE INTO levels (l1, start_l2, end_l2) VALUES (?, ?, ?)|sql}
+
+    let get_l2_range =
+      (int32 ->? l2_levels_range)
+      @@ {sql|SELECT start_l2, end_l2 FROM levels WHERE l1 = ?|sql}
+
+    let get_l1 =
+      (level ->? int32)
+      @@ {sql|SELECT l1 FROM levels WHERE $1 > start_l2 AND $1 <= end_l2|sql}
+
+    let last =
+      (unit ->? t2 int32 l2_levels_range)
+      @@ {sql|SELECT l1, start_l2, end_l2 FROM levels ORDER BY l1 DESC LIMIT 1|sql}
+  end
+
+  let store ?conn db ~l1_level ~start_l2_level ~end_l2_level =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.exec
+      conn
+      Q.set
+      (l1_level, {start_l2 = start_l2_level; end_l2 = end_l2_level})
+
+  let get_l2_range ?conn db ~l1_level =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.get_l2_range l1_level
+
+  let get_l1 ?conn db ~l2_level =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.get_l1 l2_level
+
+  let last ?conn db =
+    with_connection db conn @@ fun conn -> Sqlite.Db.find_opt conn Q.last ()
 end
 
 module Pointers = struct
