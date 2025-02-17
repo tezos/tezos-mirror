@@ -12,7 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "base-unix"
   "octez-distributed-internal" { = version }
-  "lwt" { >= "5.7.0" }
+  "lwt" { >= "5.7.0" & < "5.9.0" }
   "logs"
 ]
 build: [

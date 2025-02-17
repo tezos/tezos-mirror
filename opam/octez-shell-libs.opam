@@ -37,7 +37,7 @@ depends: [
   "tezos-benchmark" { = version }
   "qcheck-alcotest" { with-test & >= "0.20" }
   "qcheck-core" {with-test}
-  "lwt" { with-test & >= "5.7.0" }
+  "lwt" { with-test & >= "5.7.0" & < "5.9.0" }
 ]
 depopts: [
   "ledgerwallet-tezos"
