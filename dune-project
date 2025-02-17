@@ -165,5 +165,6 @@
 (package (name tezt-tests-cloud)(allow_empty))
 (package (name tezt-tezos))
 (package (name tezt-tx-kernel)(allow_empty))
+(package (name tobi))
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.

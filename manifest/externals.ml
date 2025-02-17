@@ -79,6 +79,8 @@ let checkseum = external_lib "checkseum" (V.different_from "0.5.0")
 
 let checkseum_ocaml = external_sublib checkseum "checkseum.ocaml"
 
+let clap = external_lib "clap" V.(at_least "0.3.0")
+
 let cmdliner = external_lib "cmdliner" V.(at_least "1.1.0")
 
 let cohttp = external_lib "cohttp" V.(at_least "5.3.1")
