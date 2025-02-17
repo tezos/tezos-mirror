@@ -98,9 +98,9 @@ let encoding =
       })
     (obj3
        (* Use the new name in the encoding. *)
-       (req "operators" (list int31))
-       (req "observers" (list int31))
-       (req "attesters" (list Signature.Public_key_hash.encoding)))
+       (dft "operators" (list int31) [])
+       (dft "observers" (list int31) [])
+       (dft "attesters" (list Signature.Public_key_hash.encoding) []))
 
 (* The version used by the v20 release. *)
 module Legacy = struct
