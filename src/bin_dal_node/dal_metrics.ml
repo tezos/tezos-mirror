@@ -93,6 +93,17 @@ module Node_metrics = struct
       ~subsystem
       name
 
+  let attested_slots_for_baker_per_level_ratio =
+    let name = "attested_slot_for_baker_per_level_ratio" in
+    Prometheus.Gauge.v_label
+      ~label_name:"attester"
+      ~help:
+        "Ratio between the number of slots attested by the baker over the \
+         total number of attestable slots per level."
+      ~namespace
+      ~subsystem
+      name
+
   let new_layer1_head =
     let name = "new_layer1_head" in
     Prometheus.Gauge.v
@@ -517,6 +528,12 @@ let slot_waiting_for_attestation ~set i =
 let slot_attested ~set i =
   let v = float_of_int @@ if set then 1 else 0 in
   Prometheus.Gauge.set (Node_metrics.slots_attested (string_of_int i)) v
+
+let attested_slots_for_baker_per_level_ratio ~delegate ratio =
+  let attester = Format.asprintf "%a@." Signature.Public_key_hash.pp delegate in
+  Prometheus.Gauge.set
+    (Node_metrics.attested_slots_for_baker_per_level_ratio attester)
+    ratio
 
 let new_layer1_head ~head_level =
   Int32.to_float head_level |> Prometheus.Gauge.set Node_metrics.new_layer1_head
