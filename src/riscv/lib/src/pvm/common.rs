@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2025 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -7,6 +7,7 @@ use crate::{
     default::ConstDefault,
     machine_state::{
         self,
+        block_cache::bcall,
         main_memory::{self},
     },
     pvm::sbi,
@@ -120,13 +121,24 @@ impl fmt::Display for PvmStatus {
 /// Value for the initial version
 const INITIAL_VERSION: u64 = 0;
 
+/// Proof generator for the PVM.
+///
+/// Uses the interpreted block backend by default.
+type PvmProofGen<'a, ML, CL, M> = Pvm<
+    ML,
+    CL,
+    bcall::Interpreted<ML, ProofGen<state_backend::Ref<'a, M>>>,
+    ProofGen<state_backend::Ref<'a, M>>,
+>;
+
 /// Proof-generating virtual machine
 pub struct Pvm<
     ML: main_memory::MainMemoryLayout,
     CL: machine_state::CacheLayouts,
+    B: bcall::Block<ML, M>,
     M: state_backend::ManagerBase,
 > {
-    pub(crate) machine_state: machine_state::MachineState<ML, CL, M>,
+    pub(crate) machine_state: machine_state::MachineState<ML, CL, B, M>,
     reveal_request: RevealRequest<M>,
     #[cfg(feature = "supervisor")]
     pub(super) system_state: linux::SupervisorState<M>,
@@ -137,8 +149,9 @@ pub struct Pvm<
 impl<
     ML: main_memory::MainMemoryLayout,
     CL: machine_state::CacheLayouts,
+    B: bcall::Block<ML, M>,
     M: state_backend::ManagerBase,
-> Pvm<ML, CL, M>
+> Pvm<ML, CL, B, M>
 {
     /// Bind the PVM to the given allocated region.
     pub fn bind(space: state_backend::AllocatedOf<PvmLayout<ML, CL>, M>) -> Self {
@@ -168,7 +181,7 @@ impl<
     }
 
     /// Generate a proof-generating version of this PVM.
-    pub fn start_proof(&self) -> Pvm<ML, CL, ProofGen<state_backend::Ref<'_, M>>> {
+    pub fn start_proof(&self) -> PvmProofGen<'_, ML, CL, M> {
         enum ProofWrapper {}
 
         impl<M: state_backend::ManagerBase> state_backend::FnManager<M> for ProofWrapper {
@@ -346,8 +359,9 @@ impl<
 impl<
     ML: main_memory::MainMemoryLayout,
     CL: machine_state::CacheLayouts,
+    B: bcall::Block<ML, M> + Clone,
     M: state_backend::ManagerClone,
-> Clone for Pvm<ML, CL, M>
+> Clone for Pvm<ML, CL, B, M>
 {
     fn clone(&self) -> Self {
         Self {
@@ -364,6 +378,7 @@ impl<
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::state_backend::test_helpers::TestBackendFactory;
     use crate::{
         backend_test, create_state,
         machine_state::{
@@ -384,10 +399,11 @@ mod tests {
     fn test_read_input() {
         type ML = M1M;
         type L = PvmLayout<ML, TestCacheLayouts>;
+        type B = bcall::Interpreted<ML, Owned>;
 
         // Setup PVM
         let space = Owned::allocate::<L>();
-        let mut pvm = Pvm::<ML, TestCacheLayouts, _>::bind(space);
+        let mut pvm = Pvm::<ML, TestCacheLayouts, B, _>::bind(space);
         pvm.reset();
 
         let level_addr = main_memory::FIRST_ADDRESS;
@@ -484,13 +500,14 @@ mod tests {
     fn test_write_debug() {
         type ML = M1M;
         type L = PvmLayout<ML, TestCacheLayouts>;
+        type B = bcall::Interpreted<ML, Owned>;
 
         let mut buffer = Vec::new();
         let mut hooks = PvmHooks::new(|c| buffer.push(c));
 
         // Setup PVM
         let space = Owned::allocate::<L>();
-        let mut pvm = Pvm::<ML, TestCacheLayouts, _>::bind(space);
+        let mut pvm = Pvm::<ML, TestCacheLayouts, B, _>::bind(space);
         pvm.reset();
 
         // Prepare subsequent ECALLs to use the SBI_CONSOLE_PUTCHAR extension
@@ -526,9 +543,10 @@ mod tests {
     backend_test!(test_reveal, F, {
         type ML = M1M;
         type L = PvmLayout<ML, TestCacheLayouts>;
+        type B<F> = bcall::Interpreted<ML, <F as TestBackendFactory>::Manager>;
 
         // Setup PVM
-        let mut pvm = create_state!(Pvm, L, F, ML, TestCacheLayouts);
+        let mut pvm = create_state!(Pvm, L, F, ML, TestCacheLayouts, B<F>);
         pvm.reset();
 
         let input_address = main_memory::FIRST_ADDRESS;
@@ -596,9 +614,10 @@ mod tests {
     backend_test!(test_reveal_insufficient_buffer_size, F, {
         type ML = M1M;
         type L = PvmLayout<ML, TestCacheLayouts>;
+        type B<F> = bcall::Interpreted<ML, <F as TestBackendFactory>::Manager>;
 
         // Setup PVM
-        let mut pvm = create_state!(Pvm, L, F, ML, TestCacheLayouts);
+        let mut pvm = create_state!(Pvm, L, F, ML, TestCacheLayouts, B<F>);
         pvm.reset();
 
         const OUTPUT_BUFFER_SIZE: usize = 10;

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024-2025 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -9,7 +9,12 @@ use crate::{
 };
 use octez_riscv::{
     machine_state::{DefaultCacheLayouts, main_memory::M1G},
+    machine_state::{
+        TestCacheLayouts,
+        block_cache::bcall::{Block, Interpreted},
+    },
     pvm::PvmHooks,
+    state_backend::owned_backend::Owned,
     stepper::{StepResult, Stepper, StepperStatus, pvm::PvmStepper, test::TestStepper},
 };
 use std::{error::Error, fs, io::Write, ops::Bound};
@@ -50,7 +55,7 @@ pub fn general_run<F: UseStepper<R>, R>(
     f: F,
 ) -> Result<R, Box<dyn Error>> {
     if common.pvm {
-        run_pvm(program.as_slice(), initrd.as_deref(), common, |stepper| {
+        run_pvm::<_, Interpreted<_, _>>(program.as_slice(), initrd.as_deref(), common, |stepper| {
             f.advance(stepper)
         })
     } else {
@@ -60,22 +65,22 @@ pub fn general_run<F: UseStepper<R>, R>(
     }
 }
 
-fn run_test<R>(
+fn run_test<R, B: Block<M1G, Owned>>(
     program: &[u8],
     initrd: Option<&[u8]>,
     common: &CommonOptions,
-    f_stepper: impl FnOnce(TestStepper) -> R,
+    f_stepper: impl FnOnce(TestStepper<M1G, TestCacheLayouts, B>) -> R,
 ) -> Result<R, Box<dyn Error>> {
     let stepper =
-        TestStepper::<M1G>::new(program, initrd, posix_exit_mode(&common.posix_exit_mode))?;
+        TestStepper::<M1G, _, B>::new(program, initrd, posix_exit_mode(&common.posix_exit_mode))?;
     Ok(f_stepper(stepper))
 }
 
-fn run_pvm<R>(
+fn run_pvm<R, B: Block<M1G, Owned>>(
     program: &[u8],
     initrd: Option<&[u8]>,
     common: &CommonOptions,
-    f_stepper: impl FnOnce(PvmStepper<M1G>) -> R,
+    f_stepper: impl FnOnce(PvmStepper<M1G, DefaultCacheLayouts, Owned, B>) -> R,
 ) -> Result<R, Box<dyn Error>> {
     let mut inbox = InboxBuilder::new();
     if let Some(inbox_file) = &common.inbox.file {
@@ -94,7 +99,7 @@ fn run_pvm<R>(
         let _written = console.write(&[c]).unwrap();
     });
 
-    let stepper = PvmStepper::<'_, M1G, DefaultCacheLayouts>::new(
+    let stepper = PvmStepper::<'_, M1G, DefaultCacheLayouts, Owned, B>::new(
         program,
         initrd,
         inbox.build(),

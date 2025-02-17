@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use super::{Stepper, StepperStatus};
+use crate::machine_state::block_cache::bcall::{Block, Interpreted};
 use crate::state_backend::{ManagerBase, ManagerReadWrite};
 use crate::{
     kernel_loader,
@@ -47,8 +48,9 @@ pub struct PvmStepper<
     ML: MainMemoryLayout = M1G,
     CL: CacheLayouts = DefaultCacheLayouts,
     M: ManagerBase = Owned,
+    B: Block<ML, M> = Interpreted<ML, M>,
 > {
-    pvm: Pvm<ML, CL, M>,
+    pvm: Pvm<ML, CL, B, M>,
     hooks: PvmHooks<'hooks>,
     inbox: Inbox,
     rollup_address: [u8; 20],
@@ -56,7 +58,9 @@ pub struct PvmStepper<
     reveal_request_response_map: HashMap<Box<[u8]>, ResponseFn>,
 }
 
-impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL, Owned> {
+impl<'hooks, ML: MainMemoryLayout, B: Block<ML, Owned>, CL: CacheLayouts>
+    PvmStepper<'hooks, ML, CL, Owned, B>
+{
     /// Create a new PVM stepper.
     pub fn new(
         program: &[u8],
@@ -102,7 +106,9 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL, 
             reveal_request_response_map,
         })
     }
+}
 
+impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL, Owned> {
     /// Obtain the root hash for the PVM state.
     pub fn hash(&self) -> Hash {
         let refs = self.pvm.struct_ref::<FnManagerIdent>();
@@ -132,8 +138,8 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL, 
     }
 }
 
-impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
-    PvmStepper<'hooks, ML, CL, M>
+impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: ManagerReadWrite>
+    PvmStepper<'hooks, ML, CL, M, B>
 {
     /// Non-continuing variant of [`Stepper::step_max`]
     fn step_max_once(&mut self, steps: Bound<usize>) -> StepperStatus {
@@ -253,7 +259,11 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
             _ => false,
         }
     }
+}
 
+impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
+    PvmStepper<'hooks, ML, CL, M>
+{
     /// Create a new stepper in which the existing PVM is managed by
     /// the proof-generating backend.
     pub fn start_proof_mode<'a>(&'a self) -> PvmStepper<'hooks, ML, CL, ProofGen<Ref<'a, M>>> {
@@ -285,7 +295,7 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
             return false;
         };
 
-        let pvm = Pvm::<ML, CL, Verifier>::bind(space);
+        let pvm = Pvm::<ML, CL, Interpreted<_, _>, Verifier>::bind(space);
         let mut stepper = PvmStepper {
             pvm,
             rollup_address: self.rollup_address,
@@ -342,7 +352,9 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
     }
 }
 
-impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> Stepper for PvmStepper<'hooks, ML, CL> {
+impl<'hooks, ML: MainMemoryLayout, B: Block<ML, Owned>, CL: CacheLayouts> Stepper
+    for PvmStepper<'hooks, ML, CL, Owned, B>
+{
     type MainMemoryLayout = ML;
 
     type CacheLayouts = CL;

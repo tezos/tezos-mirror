@@ -5,6 +5,7 @@
 use octez_riscv::{
     machine_state::{DefaultCacheLayouts, main_memory::M64M},
     pvm::PvmHooks,
+    state_backend::owned_backend::Owned,
     stepper::{Stepper, StepperStatus, pvm::PvmStepper},
 };
 use std::{fs, io::Write, ops::Bound};
@@ -39,7 +40,7 @@ fn test_jstz_regression() {
         const ROLLUP_ADDRESS: [u8; 20] = [0; 20];
         const ORIGINATION_LEVEL: u32 = 1;
 
-        let mut stepper = PvmStepper::<'_, M64M, DefaultCacheLayouts>::new(
+        let mut stepper = PvmStepper::<'_, M64M, DefaultCacheLayouts, Owned>::new(
             &boot_program,
             Some(&main_program),
             inbox,
