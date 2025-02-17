@@ -294,7 +294,6 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
         log!(host, Debug, "Entering stage two.");
         if let block::ComputationResult::RebootNeeded = block::produce(
             host,
-            chain_id,
             &mut configuration,
             sequencer_pool_address,
             trace_input,
@@ -429,6 +428,13 @@ mod tests {
     const DUMMY_CHAIN_ID: U256 = U256::one();
     const DUMMY_BASE_FEE_PER_GAS: u64 = 12345u64;
     const DUMMY_DA_FEE: u64 = 2_000_000_000_000u64;
+
+    fn dummy_configuration() -> Configuration {
+        Configuration {
+            chain_id: DUMMY_CHAIN_ID,
+            ..Configuration::default()
+        }
+    }
 
     fn dummy_block_fees() -> BlockFees {
         BlockFees::new(
@@ -601,7 +607,7 @@ mod tests {
 
         let mut configuration = Configuration {
             limits,
-            ..Configuration::default()
+            ..dummy_configuration()
         };
 
         crate::storage::store_minimum_base_fee_per_gas(
@@ -612,14 +618,9 @@ mod tests {
         crate::storage::store_da_fee(&mut host, block_fees.da_fee_per_byte()).unwrap();
 
         // If the upgrade is started, it should raise an error
-        let computation_result = crate::block::produce(
-            &mut host,
-            DUMMY_CHAIN_ID,
-            &mut configuration,
-            None,
-            None,
-        )
-        .expect("Should have produced");
+        let computation_result =
+            crate::block::produce(&mut host, &mut configuration, None, None)
+                .expect("Should have produced");
 
         // test there is a new block
         assert_eq!(
