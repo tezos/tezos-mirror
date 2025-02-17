@@ -848,7 +848,25 @@ module Make (C : AUTOMATON_CONFIG) :
           (fun message_id ->
             match Message_id.valid message_id with
             | `Valid -> Ok (should_handle_message_id message_id)
-            | `Unknown | `Outdated -> Ok false
+            | `Unknown ->
+                (* Currently, we (possibly) respond by IWant to IHave messages ids
+                   whose validity is not known (e.g. messages ids are in the
+                   future for this node).
+
+                   The rational behind this is that we don't want to implement a
+                   complicated mempool for messages ids as well (in addition to
+                   full messages), in particular, because:
+
+                   - we should take care of not beaking the limits of max numbers
+                   of Ihave/Iwant;
+
+                   - if the message is legit, we'd request it in a few blocks
+                   anyway.
+
+                   Note however that we still discard IHave messages ids when
+                   Outdated or Invalid. *)
+                Ok (should_handle_message_id message_id)
+            | `Outdated -> Ok false
             | `Invalid -> Error ())
           message_ids
       in
