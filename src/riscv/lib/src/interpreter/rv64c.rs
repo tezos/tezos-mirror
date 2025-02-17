@@ -70,18 +70,6 @@ where
     MC: memory::MemoryConfig,
     M: backend::ManagerReadWrite,
 {
-    /// `C.LD` CL-type compressed instruction
-    ///
-    /// Loads a 64-bit value from memory into register `rd`. It computes
-    /// an effective address by adding the immediate to the base address
-    /// in register `rs1`.
-    /// The immediate is obtained by zero-extending and scaling by 8 the
-    /// offset encoded in the instruction (see U:C-16.3).
-    pub fn run_cld(&mut self, imm: i64, rs1: XRegister, rd: XRegister) -> Result<(), Exception> {
-        debug_assert!(imm >= 0 && imm % 8 == 0);
-        self.run_ld(imm, rs1, rd)
-    }
-
     /// `C.LDSP` CI-type compressed instruction
     ///
     /// Loads a 64-bit value from memory into register `rd`. It computes

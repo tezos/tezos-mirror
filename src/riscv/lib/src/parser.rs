@@ -1005,8 +1005,22 @@ const fn c_rs1p(instr: u16) -> XRegister {
 }
 
 #[inline(always)]
+const fn c_rs1p_nz(instr: u16) -> NonZeroXRegister {
+    // This cannot panic as parsing can only return a register from x8 to x15,
+    // which are all non-zero.
+    NonZeroXRegister::assert_from(parse_xregister(c_reg_prime(instr, 7)))
+}
+
+#[inline(always)]
 const fn c_rdp_rs2p(instr: u16) -> XRegister {
     parse_xregister(c_reg_prime(instr, 2))
+}
+
+#[inline(always)]
+const fn c_rdp_rs2p_nz(instr: u16) -> NonZeroXRegister {
+    // This cannot panic as parsing can only return a register from x8 to x15,
+    // which are all non-zero.
+    NonZeroXRegister::assert_from(parse_xregister(c_reg_prime(instr, 2)))
 }
 
 #[inline(always)]
@@ -1214,9 +1228,9 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
                 rs1: c_rs1p(instr),
                 imm: clw_imm(instr),
             }),
-            C_F3_3 => CLd(ITypeArgs {
-                rd: c_rdp_rs2p(instr),
-                rs1: c_rs1p(instr),
+            C_F3_3 => CLd(NonZeroITypeArgs {
+                rd: c_rdp_rs2p_nz(instr),
+                rs1: c_rs1p_nz(instr),
                 imm: cld_imm(instr),
             }),
             C_F3_5 => CFsd(FStoreArgs {

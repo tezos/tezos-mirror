@@ -247,6 +247,7 @@ where
     ///
     /// Relevant opcodes:
     /// - `LD`
+    /// - `C.LD`
     pub fn run_ldnz(
         &mut self,
         imm: i64,
