@@ -70,9 +70,6 @@ type block_info = {
 
 type cache = {
   known_timestamps : Timestamp.time Baking_cache.Timestamp_of_round_cache.t;
-  round_timestamps :
-    (Timestamp.time * Round.t * consensus_key_and_delegate)
-    Baking_cache.Round_timestamp_interval_cache.t;
 }
 
 type block_kind =
