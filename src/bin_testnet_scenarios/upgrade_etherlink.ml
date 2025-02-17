@@ -10,8 +10,10 @@
         - dune exec src/bin_testnet_scenarios/main.exe -- -f upgrade_etherlink.ml -a network=mainnet --verbose --keep-temp -a upgrade-kernel=<NEW_KERNEL>
         - dune exec src/bin_testnet_scenarios/main.exe -- -f upgrade_etherlink.ml -a network=mainnet --verbose --keep-temp -a upgrade-kernel=<NEW_KERNEL> -a node-snapshot=<OCTEZ_NODE_ROLLING_SNAPSHOT> -a rollup-node-snapshot=<ROLLUP_NODE_FULL_SNAPSHOT>
 
-     Note : <..._SNAPSHOT> can either be a URL (the snapshot will be downloaded)
-     or the path to a file (a symlink will be created).
+     Note :
+         - <..._SNAPSHOT> can either be a URL (the snapshot will be downloaded)
+           or the path to a file (a symlink will be created).
+         - network is either mainnet or testnet
 *)
 
 open Rpc.Syntax
@@ -25,7 +27,7 @@ let protocol_of_string s =
 let bake ~env rollup_node node yes_wallet () =
   let* () =
     Client.bake_for_and_wait
-      ~context_path:(Node.data_dir node // "context")
+      ~context_path:(Node.data_dir node)
       ~env
       ~keys:[]
       ~minimal_timestamp:true
@@ -127,7 +129,7 @@ let env =
   @@ String_map.add
        "LD_PRELOAD"
        "/usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1"
-  @@ String_map.add "FAKETIME" "@2025-01-01 11:15:13"
+  @@ String_map.add "FAKETIME" "@2026-01-01 11:15:13"
   @@ String_map.add "FAKETIME_DONT_RESET" "1"
   @@ String_map.empty
 
