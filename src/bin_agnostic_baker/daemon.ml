@@ -27,7 +27,16 @@ let run_thread
     ~baker_args ~cancel_promise ~logs_path =
   let open Agnostic_baker_plugin in
   register_commands () ;
-  init_sapling_params () ;
+
+  (* This call is not strictly necessary as the parameters are initialized
+     lazily the first time a Sapling operation (validation or forging) is
+     done. This is what the client does.
+     For a long running binary however it is important to make sure that the
+     parameters files are there at the start and avoid failing much later while
+     validating an operation. Plus paying this cost upfront means that the first
+     validation will not be more expensive. *)
+  let () = Tezos_sapling.Core.Validator.init_params () in
+
   let module Config = struct
     include Daemon_config
 

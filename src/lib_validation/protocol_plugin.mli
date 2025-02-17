@@ -226,8 +226,6 @@ module type AGNOSTIC_BAKER_PLUGIN = sig
     'b ->
     (Tezos_client_base.Client_context.full Tezos_clic.command trace, 'c) result
     Lwt.t
-
-  val init_sapling_params : unit -> unit
 end
 
 (** Register a validation plugin for a specific protocol
