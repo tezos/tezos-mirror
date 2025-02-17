@@ -241,7 +241,7 @@ let create_connection t p2p_conn id_point point_info peer_info
   return conn
 
 let is_acceptable t connection_point_info peer_info incoming version =
-  let open Result_syntax in
+  let open Lwt_result_syntax in
   (* Private mode only accept trusted *)
   let unexpected =
     t.config.private_mode
@@ -263,7 +263,7 @@ let is_acceptable t connection_point_info peer_info incoming version =
       | Some connection_point_info -> (
           match P2p_point_state.get connection_point_info with
           | Accepted _ | Running _ ->
-              P2p_rejection.(rejecting Already_connected)
+              Lwt.return P2p_rejection.(rejecting Already_connected)
           | Requested {cancel} when incoming ->
               (* Prioritise incoming connections. *)
               Lwt.dont_wait
@@ -291,7 +291,7 @@ let is_acceptable t connection_point_info peer_info incoming version =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4679
        in some circumstances cancel and accept... *)
     | Running _ ->
-        P2p_rejection.(rejecting Already_connected)
+        Lwt.return P2p_rejection.(rejecting Already_connected)
     (* All right, welcome ! *)
     | Disconnected -> return version
 
@@ -450,9 +450,8 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
   let peer_info = P2p_pool.register_peer t.pool info.peer_id in
   (* [acceptable] is either Ok with a network version, or a Rejecting
      error with a motive *)
-  let acceptable =
-    let open Result_syntax in
-    let* version =
+  let*! acceptable =
+    let*? version =
       select
         ~chain_name:t.message_config.chain_name
         ~distributed_db_versions:t.message_config.distributed_db_versions
@@ -466,7 +465,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
         t.config.max_connections + Random.int 2
         > P2p_pool.active_connections t.pool
       then return_unit
-      else P2p_rejection.(rejecting Too_many_connections)
+      else Lwt.return P2p_rejection.(rejecting Too_many_connections)
     in
     (* we have a slot, checking if point and peer are acceptable *)
     is_acceptable t connection_point_info peer_info incoming version
