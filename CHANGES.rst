@@ -312,6 +312,9 @@ DAL node
   parameters that the DAL node uses for a given level, which by default is the
   last finalized level the node is aware of. (MR :gl:`!16704`)
 
+- Added a new RPC ``GET /p2p/gossipsub/mesh/`` that returns the GossipSub mesh
+  (i.e. full data connections per topic) of a peer. (MR :gl:`!16754`)
+
 Protocol
 ~~~~~~~~
 
