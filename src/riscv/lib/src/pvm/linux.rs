@@ -4,9 +4,10 @@
 
 use crate::{
     machine_state::{
+        CacheLayouts, MachineCoreState, MachineError, MachineState,
         main_memory::{Address, MainMemoryLayout},
         mode::Mode,
-        registers, CacheLayouts, MachineCoreState, MachineError, MachineState,
+        registers,
     },
     program::Program,
     state_backend::{

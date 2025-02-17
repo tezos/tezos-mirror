@@ -9,10 +9,10 @@
 
 use crate::{
     machine_state::{
+        MachineCoreState, ProgramCounterUpdate,
         hart_state::HartState,
         main_memory::{Address, MainMemoryLayout},
-        registers::{sp, x0, NonZeroXRegister, XRegister, XRegisters},
-        MachineCoreState, ProgramCounterUpdate,
+        registers::{NonZeroXRegister, XRegister, XRegisters, sp, x0},
     },
     parser::instruction::InstrWidth,
     state_backend as backend,
@@ -193,10 +193,10 @@ mod tests {
     use crate::{
         backend_test, create_state,
         machine_state::{
+            MachineCoreState, MachineCoreStateLayout,
             hart_state::{HartState, HartStateLayout},
             main_memory::tests::T1K,
-            registers::{nz, nz::a0, XRegisters, XRegistersLayout},
-            MachineCoreState, MachineCoreStateLayout,
+            registers::{XRegisters, XRegistersLayout, nz, nz::a0},
         },
     };
     use proptest::{prelude::*, prop_assert_eq, proptest};

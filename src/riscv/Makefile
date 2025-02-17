@@ -70,6 +70,9 @@ ifneq ($(NATIVE_TARGET),)
 	@rustup target add $(NATIVE_TARGET)
 endif
 
+	# Install Nightly for formatting with its Rustfmt
+	@rustup toolchain install nightly-2025-01-30 -c rustfmt
+
 	# Iterate through all the toolchains. 'rustup show' will install the
 	# toolchain in addition to showing toolchain information.
 	@find . -iname 'rust-toolchain*' -execdir rustup show active-toolchain \; 2>/dev/null
@@ -86,14 +89,14 @@ test-long:
 
 .PHONY: check
 check:
-	# Check format of all crates
-	@exec ../../scripts/check-format-rust.sh
+	@exec scripts/format.sh --check
+	@taplo format --check $(shell ls **/Cargo.toml)
 
 	@cargo update --workspace --locked
 	@cargo check --workspace --all-targets $(CHECK_FEATURES)
 	@cargo clippy --workspace --all-targets $(CHECK_FEATURES) -- --deny warnings
 	@cargo doc --document-private-items --no-deps $(CHECK_FEATURES)
-	@taplo format --check $(shell git ls-files '**/Cargo.toml')
+
 	@make -C dummy_kernel check
 	@make -C supervised_dummy_kernel check
 	@make -C dummy_sdk_kernel check

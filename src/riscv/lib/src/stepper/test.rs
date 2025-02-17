@@ -8,9 +8,10 @@ use super::{StepResult, Stepper, StepperStatus};
 use crate::{
     kernel_loader,
     machine_state::{
-        main_memory::{MainMemoryLayout, M1G},
-        mode, CacheLayouts, MachineCoreState, MachineError, MachineState, MachineStateLayout,
+        CacheLayouts, MachineCoreState, MachineError, MachineState, MachineStateLayout,
         StepManyResult, TestCacheLayouts,
+        main_memory::{M1G, MainMemoryLayout},
+        mode,
     },
     program::Program,
     state_backend::owned_backend::Owned,

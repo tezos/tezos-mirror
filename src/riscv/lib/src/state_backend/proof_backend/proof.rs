@@ -14,10 +14,10 @@
 //!
 //! - Convert [`super::merkle::MerkleTree`] to [`MerkleProof`]
 
-use super::tree::{impl_modify_map_collect, ModifyResult, Tree};
+use super::tree::{ModifyResult, Tree, impl_modify_map_collect};
 use crate::{
     state_backend::hash::Hash,
-    storage::{HashError, DIGEST_SIZE},
+    storage::{DIGEST_SIZE, HashError},
 };
 use itertools::Itertools;
 
@@ -358,15 +358,15 @@ pub fn deserialise_proof(
 #[cfg(test)]
 mod tests {
     use super::{
-        serialise_proof, DeserialiseError, MerkleProof, MerkleProofLeaf, Shape, TAG_BLIND,
-        TAG_NODE, TAG_READ,
+        DeserialiseError, MerkleProof, MerkleProofLeaf, Shape, TAG_BLIND, TAG_NODE, TAG_READ,
+        serialise_proof,
     };
     use crate::{
-        state_backend::proof_backend::proof::{deserialise_proof, Proof},
-        storage::{Hash, DIGEST_SIZE},
+        state_backend::proof_backend::proof::{Proof, deserialise_proof},
+        storage::{DIGEST_SIZE, Hash},
     };
     use proptest::proptest;
-    use rand::{thread_rng, Fill};
+    use rand::{Fill, thread_rng};
 
     /// Utility struct that computes the bounds of a [`MerkleProof`] serialisation
     /// based on total number of nodes in the tree and total size of raw data in the leafs.

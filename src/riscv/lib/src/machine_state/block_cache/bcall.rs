@@ -7,13 +7,13 @@
 //!
 //! Currently just for interperation only, but will expand to cover JIT.
 
-use super::{run_instr, ICallLayout, ICallPlaced, CACHE_INSTR};
+use super::{CACHE_INSTR, ICallLayout, ICallPlaced, run_instr};
 use crate::{
     default::ConstDefault,
     machine_state::{
+        MachineCoreState, ProgramCounterUpdate,
         instruction::Instruction,
         main_memory::{Address, MainMemoryLayout},
-        MachineCoreState, ProgramCounterUpdate,
     },
     state_backend::{
         AllocatedOf, Atom, Cell, EnrichedCell, FnManager, ManagerBase, ManagerClone, ManagerRead,

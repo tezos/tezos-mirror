@@ -19,7 +19,7 @@ use self::{
 };
 use super::{hart_state::HartState, main_memory::Address, mode::TrapMode};
 use crate::{
-    bits::{ones, u64, Bits64},
+    bits::{Bits64, ones, u64},
     machine_state::mode::Mode,
     state_backend::{self as backend, ManagerRead},
     traps::{Exception, Interrupt, TrapContext, TrapKind},
@@ -1678,8 +1678,8 @@ mod tests {
         create_state,
         machine_state::{
             csregisters::{
-                values::CSRValue, xstatus::MStatus, CSRRepr, CSRegister, CSRegisters,
-                CSRegistersLayout, Exception,
+                CSRRepr, CSRegister, CSRegisters, CSRegistersLayout, Exception, values::CSRValue,
+                xstatus::MStatus,
             },
             mode::Mode,
         },
@@ -1689,7 +1689,7 @@ mod tests {
 
     #[test]
     fn test_privilege_access() {
-        use crate::machine_state::csregisters::{check_privilege as check, CSRegister as csreg};
+        use crate::machine_state::csregisters::{CSRegister as csreg, check_privilege as check};
 
         let is_illegal_instr = |e| -> bool { e == Exception::IllegalInstruction };
 
@@ -1712,7 +1712,7 @@ mod tests {
     #[test]
     fn test_read_write_access() {
         use crate::machine_state::csregisters::{
-            check_write as check, CSRegister as csreg, Exception,
+            CSRegister as csreg, Exception, check_write as check,
         };
 
         let is_illegal_instr = |e| -> bool { e == Exception::IllegalInstruction };

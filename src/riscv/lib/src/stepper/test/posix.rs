@@ -4,10 +4,10 @@
 
 use crate::{
     machine_state::{
+        CacheLayouts, MachineState,
         main_memory::MainMemoryLayout,
         mode::Mode,
         registers::{a0, a7},
-        CacheLayouts, MachineState,
     },
     state_backend::{
         AllocatedOf, Atom, Cell, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite,

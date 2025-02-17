@@ -103,7 +103,7 @@ where
 mod test {
     use crate::{
         backend_test, create_state,
-        machine_state::registers::{a0, a1, a2, a3, XRegisters, XRegistersLayout},
+        machine_state::registers::{XRegisters, XRegistersLayout, a0, a1, a2, a3},
     };
     use proptest::{prelude::any, prop_assert_eq, proptest};
 

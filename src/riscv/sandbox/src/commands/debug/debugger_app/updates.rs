@@ -7,9 +7,9 @@ use super::{DebuggerApp, Instruction, PC_CONTEXT};
 use octez_riscv::{
     bits::Bits64,
     machine_state::{
-        csregisters::{satp::Satp, CSRegister},
-        main_memory::Address,
         AccessType,
+        csregisters::{CSRegister, satp::Satp},
+        main_memory::Address,
     },
     parser::{instruction::Instr, parse},
     state_backend::{ManagerRead, ManagerReadWrite},

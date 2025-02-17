@@ -5,13 +5,14 @@
 use super::{Args, Instruction, OpCode};
 use crate::{
     default::ConstDefault,
-    machine_state::registers::{nz, NonZeroXRegister},
+    machine_state::registers::{NonZeroXRegister, nz},
     parser::{
+        XRegisterParsed,
         instruction::{
             CIBTypeArgs, CRTypeArgs, InstrWidth, NonZeroRdITypeArgs, NonZeroRdRTypeArgs,
             SplitITypeArgs,
         },
-        split_x0, XRegisterParsed,
+        split_x0,
     },
 };
 

@@ -31,16 +31,16 @@ use crate::{
 };
 pub use address_translation::AccessType;
 use address_translation::{
-    translation_cache::{TranslationCache, TranslationCacheLayout},
     PAGE_SIZE,
+    translation_cache::{TranslationCache, TranslationCacheLayout},
 };
 use block_cache::{
-    bcall::{BCall, Block},
     BlockCache,
+    bcall::{BCall, Block},
 };
 pub use cache_layouts::{CacheLayouts, DefaultCacheLayouts, TestCacheLayouts};
 use csregisters::CSRegister;
-use csregisters::{values::CSRValue, CSRRepr};
+use csregisters::{CSRRepr, values::CSRValue};
 use hart_state::{HartState, HartStateLayout};
 use instruction::Instruction;
 use main_memory::{Address, MainMemory, OutOfBounds};
@@ -94,11 +94,11 @@ pub struct MachineState<
 }
 
 impl<
-        ML: main_memory::MainMemoryLayout,
-        CL: CacheLayouts,
-        B: Block<ML, M> + Clone,
-        M: backend::ManagerClone,
-    > Clone for MachineState<ML, CL, M, B>
+    ML: main_memory::MainMemoryLayout,
+    CL: CacheLayouts,
+    B: Block<ML, M> + Clone,
+    M: backend::ManagerClone,
+> Clone for MachineState<ML, CL, M, B>
 {
     fn clone(&self) -> Self {
         Self {
@@ -126,16 +126,12 @@ pub struct StepManyResult<E> {
 
 /// Runs a syscall instruction (ecall, ebreak)
 macro_rules! run_syscall_instr {
-    ($state: ident, $run_fn: ident) => {{
-        Err($state.hart.$run_fn())
-    }};
+    ($state: ident, $run_fn: ident) => {{ Err($state.hart.$run_fn()) }};
 }
 
 /// Runs a xret instruction (mret, sret, mnret)
 macro_rules! run_xret_instr {
-    ($state: ident, $run_fn: ident) => {{
-        $state.hart.$run_fn().map(Set)
-    }};
+    ($state: ident, $run_fn: ident) => {{ $state.hart.$run_fn().map(Set) }};
 }
 
 /// Runs a no-arguments instruction (wfi, fenceI)
@@ -529,7 +525,7 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, M: backend::ManagerBas
                     return StepManyResult {
                         steps,
                         error: Some(e),
-                    }
+                    };
                 }
             };
 
@@ -664,44 +660,44 @@ pub enum MachineError {
 #[cfg(test)]
 mod tests {
     use super::{
+        MachineState, MachineStateLayout,
         instruction::{
-            tagged_instruction::{TaggedArgs, TaggedInstruction},
             Instruction, OpCode,
+            tagged_instruction::{TaggedArgs, TaggedInstruction},
         },
         main_memory::tests::T1K,
-        MachineState, MachineStateLayout,
     };
     use crate::{
         backend_test,
-        bits::{u16, Bits64, FixedWidthBits},
+        bits::{Bits64, FixedWidthBits, u16},
         create_state,
         default::ConstDefault,
         machine_state::{
+            DefaultCacheLayouts, TestCacheLayouts,
             address_translation::{
-                pte::{PPNField, PageTableEntry},
                 PAGE_SIZE,
+                pte::{PPNField, PageTableEntry},
             },
             cache_layouts,
             csregisters::{
+                CSRRepr, CSRegister,
                 satp::{Satp, TranslationAlgorithm},
                 xstatus::{self, MStatus},
-                CSRRepr, CSRegister,
             },
             main_memory::{self, M1M, M8K},
             mode::Mode,
             registers::{a0, a1, a2, nz, t0, t1, t2, zero},
-            DefaultCacheLayouts, TestCacheLayouts,
         },
         parser::{
+            XRegisterParsed::*,
             instruction::{
                 CIBNZTypeArgs, Instr, InstrCacheable, InstrWidth, SBTypeArgs, SplitITypeArgs,
             },
             parse_block,
-            XRegisterParsed::*,
         },
         state_backend::{
-            test_helpers::{assert_eq_struct, copy_via_serde, TestBackendFactory},
             FnManagerIdent,
+            test_helpers::{TestBackendFactory, assert_eq_struct, copy_via_serde},
         },
         traps::{EnvironException, Exception, TrapContext},
     };
@@ -879,36 +875,33 @@ mod tests {
     backend_test!(test_instruction_cache, F, {
         // Instruction that writes the value in t1 to the address t0.
         const I_WRITE_T1_TO_ADDRESS_T0: u32 = 0b0011000101010000000100011;
-        assert_eq!(
-            parse_block(&I_WRITE_T1_TO_ADDRESS_T0.to_le_bytes()),
-            [Instr::Cacheable(InstrCacheable::Sw(SBTypeArgs {
+        assert_eq!(parse_block(&I_WRITE_T1_TO_ADDRESS_T0.to_le_bytes()), [
+            Instr::Cacheable(InstrCacheable::Sw(SBTypeArgs {
                 rs1: t0,
                 rs2: t1,
                 imm: 0,
-            }))]
-        );
+            }))
+        ]);
 
         // Instruction that loads 6 into t2.
         const I_LOAD_6_INTO_T2: u32 = 0b11000000000001110010011;
-        assert_eq!(
-            parse_block(&I_LOAD_6_INTO_T2.to_le_bytes()),
-            [Instr::Cacheable(InstrCacheable::Addi(SplitITypeArgs {
+        assert_eq!(parse_block(&I_LOAD_6_INTO_T2.to_le_bytes()), [
+            Instr::Cacheable(InstrCacheable::Addi(SplitITypeArgs {
                 rd: NonZero(nz::t2),
                 rs1: X0,
                 imm: 6,
-            }))]
-        );
+            }))
+        ]);
 
         // Instruction that loads 5 into t2.
         const I_LOAD_5_INTO_T2: u32 = 0b10100000000001110010011;
-        assert_eq!(
-            parse_block(&I_LOAD_5_INTO_T2.to_le_bytes()),
-            [Instr::Cacheable(InstrCacheable::Addi(SplitITypeArgs {
+        assert_eq!(parse_block(&I_LOAD_5_INTO_T2.to_le_bytes()), [
+            Instr::Cacheable(InstrCacheable::Addi(SplitITypeArgs {
                 rd: NonZero(nz::t2),
                 rs1: X0,
                 imm: 5,
-            }))]
-        );
+            }))
+        ]);
 
         type LocalLayout = MachineStateLayout<M1K, TestCacheLayouts>;
 
@@ -1113,21 +1106,18 @@ mod tests {
         .into_iter()
         .flat_map(u32::to_le_bytes)
         .collect::<Vec<_>>();
-        assert_eq!(
-            parse_block(instrs0.as_slice()),
-            [
-                Instr::Cacheable(InstrCacheable::Sd(SBTypeArgs {
-                    rs1: t1,
-                    rs2: t0,
-                    imm: 8,
-                })),
-                Instr::Cacheable(InstrCacheable::CLi(CIBNZTypeArgs {
-                    rd_rs1: nz::a0,
-                    imm: 1
-                })),
-                Instr::Cacheable(InstrCacheable::UnknownCompressed { instr: 0 })
-            ]
-        );
+        assert_eq!(parse_block(instrs0.as_slice()), [
+            Instr::Cacheable(InstrCacheable::Sd(SBTypeArgs {
+                rs1: t1,
+                rs2: t0,
+                imm: 8,
+            })),
+            Instr::Cacheable(InstrCacheable::CLi(CIBNZTypeArgs {
+                rd_rs1: nz::a0,
+                imm: 1
+            })),
+            Instr::Cacheable(InstrCacheable::UnknownCompressed { instr: 0 })
+        ]);
 
         // Instructions at [code1_addr].
         let instrs1 = [
@@ -1137,21 +1127,18 @@ mod tests {
         .into_iter()
         .flat_map(u32::to_le_bytes)
         .collect::<Vec<_>>();
-        assert_eq!(
-            parse_block(instrs1.as_slice()),
-            [
-                Instr::Cacheable(InstrCacheable::Sd(SBTypeArgs {
-                    rs1: t1,
-                    rs2: t0,
-                    imm: 8,
-                })),
-                Instr::Cacheable(InstrCacheable::CLi(CIBNZTypeArgs {
-                    rd_rs1: nz::a0,
-                    imm: 2
-                })),
-                Instr::Cacheable(InstrCacheable::UnknownCompressed { instr: 0 })
-            ]
-        );
+        assert_eq!(parse_block(instrs1.as_slice()), [
+            Instr::Cacheable(InstrCacheable::Sd(SBTypeArgs {
+                rs1: t1,
+                rs2: t0,
+                imm: 8,
+            })),
+            Instr::Cacheable(InstrCacheable::CLi(CIBNZTypeArgs {
+                rd_rs1: nz::a0,
+                imm: 2
+            })),
+            Instr::Cacheable(InstrCacheable::UnknownCompressed { instr: 0 })
+        ]);
 
         type LocalLayout = MachineStateLayout<M1M, TestCacheLayouts>;
 

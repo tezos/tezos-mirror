@@ -10,12 +10,12 @@ use crate::cli::GdbServerOptions;
 use gdbstub::arch::Arch;
 use gdbstub::common::Signal;
 use gdbstub::conn::{Connection, ConnectionExt};
-use gdbstub::stub::{run_blocking, GdbStub, SingleThreadStopReason};
+use gdbstub::stub::{GdbStub, SingleThreadStopReason, run_blocking};
+use gdbstub::target::ext::base::BaseOps;
 use gdbstub::target::ext::base::singlethread::{
     SingleThreadBase, SingleThreadResume, SingleThreadResumeOps, SingleThreadSingleStep,
     SingleThreadSingleStepOps,
 };
-use gdbstub::target::ext::base::BaseOps;
 use gdbstub::target::ext::breakpoints::{
     Breakpoints, BreakpointsOps, SwBreakpoint, SwBreakpointOps,
 };
@@ -26,7 +26,7 @@ use octez_riscv::pvm::PvmHooks;
 use octez_riscv::stepper::pvm::PvmStepper;
 use octez_riscv::stepper::{StepResult, Stepper, StepperStatus};
 use octez_riscv::{
-    machine_state::main_memory::{OutOfBounds, M1G},
+    machine_state::main_memory::{M1G, OutOfBounds},
     state_backend::FnManagerIdent,
 };
 use std::collections::HashSet;

@@ -22,16 +22,16 @@
 
 use crate::{
     machine_state::{
+        MachineCoreState,
         main_memory::MainMemoryLayout,
         registers::{NonZeroXRegister, XValue},
-        MachineCoreState,
     },
-    state_backend::{owned_backend::Owned, ManagerReadWrite},
+    state_backend::{ManagerReadWrite, owned_backend::Owned},
 };
 use cranelift::{
     codegen::ir::{
-        types::{I64, I8},
         AbiParam, FuncRef, InstBuilder, Signature, Value,
+        types::{I8, I64},
     },
     frontend::FunctionBuilder,
 };

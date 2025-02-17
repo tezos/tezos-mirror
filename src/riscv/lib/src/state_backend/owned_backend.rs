@@ -358,7 +358,7 @@ impl ManagerClone for Owned {
 pub mod test_helpers {
     use super::*;
     use crate::state_backend::{
-        test_helpers::TestBackendFactory, Cell, Cells, DynCells, EnrichedCell,
+        Cell, Cells, DynCells, EnrichedCell, test_helpers::TestBackendFactory,
     };
 
     /// Test backend factory for the owned state manager

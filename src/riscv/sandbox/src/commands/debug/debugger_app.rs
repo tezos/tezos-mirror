@@ -7,20 +7,20 @@ use super::{errors, tui};
 use crate::commands::debug::DebugOptions;
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use goblin::{elf, elf::header::ET_DYN, elf::Elf};
+use goblin::{elf, elf::Elf, elf::header::ET_DYN};
 use octez_riscv::{
     bits::Bits64,
     kernel_loader::Error,
     machine_state::{
+        AccessType, CacheLayouts, MachineCoreState,
         csregisters::satp::{Satp, SvLength, TranslationAlgorithm},
         main_memory::{self, Address, MainMemoryLayout},
         mode::Mode,
-        AccessType, CacheLayouts, MachineCoreState,
     },
     program::Program,
     pvm::PvmHooks,
     state_backend::ManagerReadWrite,
-    stepper::{pvm::PvmStepper, test::TestStepper, StepResult, Stepper, StepperStatus},
+    stepper::{StepResult, Stepper, StepperStatus, pvm::PvmStepper, test::TestStepper},
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
 use rustc_demangle::demangle;
@@ -487,7 +487,7 @@ impl<'a> ProgramView<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{posix_exit_mode, ExitMode};
+    use crate::{ExitMode, posix_exit_mode};
     use octez_riscv::machine_state::main_memory::M1G;
     use std::fs;
 
@@ -517,10 +517,10 @@ mod test {
             .insert(debugger.program.instructions[1].address);
 
         debugger.step_until_breakpoint();
-        assert!(matches!(
-            debugger.state.result,
-            StepperStatus::Running { steps: 1, .. }
-        ));
+        assert!(matches!(debugger.state.result, StepperStatus::Running {
+            steps: 1,
+            ..
+        }));
 
         debugger.step_until_breakpoint();
         assert_eq!(maxstep, debugger.state.result.steps())

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{binary, Hash, StorageError, Store, CHUNK_SIZE};
+use super::{CHUNK_SIZE, Hash, StorageError, Store, binary};
 use std::{
     cmp,
     collections::VecDeque,

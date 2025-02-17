@@ -1065,26 +1065,18 @@ impl fmt::Display for InstrCacheable {
             Srli(args) => i_instr_hex!(f, "srli", args),
             // For consistency with objdump, only the shift amount is printed
             Srai(args) => {
-                i_instr_hex!(
-                    f,
-                    "srai",
-                    NonZeroRdITypeArgs {
-                        imm: args.imm & !(1 << 10),
-                        ..*args
-                    }
-                )
+                i_instr_hex!(f, "srai", NonZeroRdITypeArgs {
+                    imm: args.imm & !(1 << 10),
+                    ..*args
+                })
             }
             Slliw(args) => i_instr_hex!(f, "slliw", args),
             Srliw(args) => i_instr_hex!(f, "srliw", args),
             Sraiw(args) => {
-                i_instr_hex!(
-                    f,
-                    "sraiw",
-                    NonZeroRdITypeArgs {
-                        imm: args.imm & !(1 << 10),
-                        ..*args
-                    }
-                )
+                i_instr_hex!(f, "sraiw", NonZeroRdITypeArgs {
+                    imm: args.imm & !(1 << 10),
+                    ..*args
+                })
             }
             Slti(args) => i_instr!(f, "slti", args),
             Sltiu(args) => i_instr!(f, "sltiu", args),
@@ -1112,22 +1104,14 @@ impl fmt::Display for InstrCacheable {
 
             // RV64I U-type instructions
             // For consistency with objdump, upper immediates are shifted down
-            Lui(args) => j_instr!(
-                f,
-                "lui",
-                NonZeroRdUJTypeArgs {
-                    rd: args.rd,
-                    imm: (args.imm >> 12) & ((0b1 << 20) - 1),
-                }
-            ),
-            Auipc(args) => j_instr!(
-                f,
-                "auipc",
-                NonZeroRdUJTypeArgs {
-                    rd: args.rd,
-                    imm: (args.imm >> 12) & ((0b1 << 20) - 1),
-                }
-            ),
+            Lui(args) => j_instr!(f, "lui", NonZeroRdUJTypeArgs {
+                rd: args.rd,
+                imm: (args.imm >> 12) & ((0b1 << 20) - 1),
+            }),
+            Auipc(args) => j_instr!(f, "auipc", NonZeroRdUJTypeArgs {
+                rd: args.rd,
+                imm: (args.imm >> 12) & ((0b1 << 20) - 1),
+            }),
 
             // RV64I jump instructions
             Jal(args) => u_instr!(f, "jal", args),

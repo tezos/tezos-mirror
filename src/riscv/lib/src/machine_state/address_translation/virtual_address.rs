@@ -15,7 +15,7 @@ use super::PAGE_OFFSET_WIDTH;
 use crate::{
     bits::{ones, u64},
     machine_state::{
-        csregisters::{satp::SvLength, CSRRepr},
+        csregisters::{CSRRepr, satp::SvLength},
         main_memory::Address,
     },
 };

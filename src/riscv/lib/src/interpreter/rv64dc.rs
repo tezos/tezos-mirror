@@ -9,9 +9,9 @@
 
 use crate::{
     machine_state::{
-        main_memory::MainMemoryLayout,
-        registers::{sp, FRegister, XRegister},
         MachineCoreState,
+        main_memory::MainMemoryLayout,
+        registers::{FRegister, XRegister, sp},
     },
     state_backend as backend,
     traps::Exception,
@@ -78,13 +78,13 @@ mod test {
         bits::Bits64,
         create_state,
         machine_state::{
+            MachineCoreState, MachineCoreStateLayout,
             csregisters::{
-                xstatus::{ExtensionValue, MStatus},
                 CSRegister,
+                xstatus::{ExtensionValue, MStatus},
             },
             main_memory::tests::T1K,
             registers::{fa2, fa3, parse_xregister, sp},
-            MachineCoreState, MachineCoreStateLayout,
         },
         traps::Exception,
     };

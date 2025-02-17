@@ -4,14 +4,14 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    hash,
+    Array, Atom, DynArray, Layout, Many, RefProofGenOwnedAlloc, hash,
     hash::HashError,
     proof_backend::{
-        merkle::{chunks_to_writer, MerkleTree, MerkleWriter, MERKLE_ARITY, MERKLE_LEAF_SIZE},
+        merkle::{MERKLE_ARITY, MERKLE_LEAF_SIZE, MerkleTree, MerkleWriter, chunks_to_writer},
         proof::{MerkleProof, MerkleProofLeaf},
         tree::Tree,
     },
-    verify_backend, Array, Atom, DynArray, Layout, Many, RefProofGenOwnedAlloc,
+    verify_backend,
 };
 use crate::{array_utils::boxed_array, default::ConstDefault, storage::binary};
 

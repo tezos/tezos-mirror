@@ -3,11 +3,11 @@
 // SPDX-License-Identifier: MIT
 
 use octez_riscv::{
-    machine_state::{main_memory::M64M, DefaultCacheLayouts},
+    machine_state::{DefaultCacheLayouts, main_memory::M64M},
     pvm::PvmHooks,
     stepper::pvm::PvmStepper,
 };
-use rand::{seq::SliceRandom, Rng};
+use rand::{Rng, seq::SliceRandom};
 use std::fs;
 use tezos_smart_rollup_utils::inbox::InboxBuilder;
 

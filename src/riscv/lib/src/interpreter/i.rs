@@ -32,7 +32,7 @@ mod tests {
     use crate::machine_state::MachineCoreState;
     use crate::{
         backend_test, create_state,
-        machine_state::{main_memory::tests::T1K, registers::nz, MachineCoreStateLayout},
+        machine_state::{MachineCoreStateLayout, main_memory::tests::T1K, registers::nz},
     };
     backend_test!(test_add, F, {
         let imm_rs1_res = [

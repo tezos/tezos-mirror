@@ -6,16 +6,17 @@ use crate::{
     cli::{BenchMode, BenchRunOptions},
     commands::{
         bench::{
+            BenchStats,
             data::{BenchData, FineBenchData, InstrGetError, InstrType, SimpleBenchData},
-            save_to_file, show_results, BenchStats,
+            save_to_file, show_results,
         },
-        run::{general_run, UseStepper},
+        run::{UseStepper, general_run},
     },
     format_status,
 };
 use enum_tag::EnumTag;
 use octez_riscv::{
-    machine_state::{main_memory::Address, AccessType},
+    machine_state::{AccessType, main_memory::Address},
     parser::{instruction::Instr, parse},
     state_backend::ManagerRead,
     stepper::{StepResult, Stepper, StepperStatus},

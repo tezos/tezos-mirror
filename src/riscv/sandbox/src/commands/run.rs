@@ -8,9 +8,9 @@ use crate::{
     posix_exit_mode,
 };
 use octez_riscv::{
-    machine_state::{main_memory::M1G, DefaultCacheLayouts},
+    machine_state::{DefaultCacheLayouts, main_memory::M1G},
     pvm::PvmHooks,
-    stepper::{pvm::PvmStepper, test::TestStepper, StepResult, Stepper, StepperStatus},
+    stepper::{StepResult, Stepper, StepperStatus, pvm::PvmStepper, test::TestStepper},
 };
 use std::{error::Error, fs, io::Write, ops::Bound};
 use tezos_smart_rollup::utils::{console::Console, inbox::InboxBuilder};

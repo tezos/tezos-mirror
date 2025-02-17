@@ -13,9 +13,9 @@
 
 use super::physical_address;
 use crate::{
-    bits::{ones, u64, Bits64, ConstantBits},
+    bits::{Bits64, ConstantBits, ones, u64},
     csr,
-    machine_state::csregisters::{satp::SvLength, CSRRepr},
+    machine_state::csregisters::{CSRRepr, satp::SvLength},
 };
 
 /// Structure representing the raw bits of a PPN field.

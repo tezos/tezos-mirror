@@ -5,12 +5,12 @@
 //! Merkle trees used for proof generation by the PVM
 
 use super::{
-    proof::{MerkleProof, MerkleProofLeaf},
     DynAccess,
+    proof::{MerkleProof, MerkleProofLeaf},
 };
 use crate::state_backend::{
     hash::{Hash, HashError},
-    proof_backend::tree::{impl_modify_map_collect, ModifyResult},
+    proof_backend::tree::{ModifyResult, impl_modify_map_collect},
 };
 use std::{convert::Infallible, num::NonZeroUsize};
 
@@ -88,13 +88,10 @@ impl MerkleTree {
                     .map(|child| {
                         use CompressedAccessInfo::*;
                         match child {
-                            CompresedLeaf(hash, access_info) => (
-                                hash,
-                                match access_info {
-                                    NoAccess | Write => Some(access_info.clone()),
-                                    Read(_) | ReadWrite(_) => None,
-                                },
-                            ),
+                            CompresedLeaf(hash, access_info) => (hash, match access_info {
+                                NoAccess | Write => Some(access_info.clone()),
+                                Read(_) | ReadWrite(_) => None,
+                            }),
                             CompresedNode(hash, _) => (hash, None),
                         }
                     })
@@ -491,8 +488,8 @@ impl MerkleTree {
 #[cfg(test)]
 mod tests {
     use super::{
-        chunks_to_writer, AccessInfo, CompressedAccessInfo, CompressedMerkleTree, MerkleTree,
-        MERKLE_LEAF_SIZE,
+        AccessInfo, CompressedAccessInfo, CompressedMerkleTree, MERKLE_LEAF_SIZE, MerkleTree,
+        chunks_to_writer,
     };
     use crate::state_backend::{
         hash::{Hash, HashError},

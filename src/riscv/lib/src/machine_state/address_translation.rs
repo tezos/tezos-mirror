@@ -3,13 +3,13 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
+    MachineCoreState,
     csregisters::{
-        satp::{Satp, SvLength, TranslationAlgorithm},
         CSRRepr, CSRegister,
+        satp::{Satp, SvLength, TranslationAlgorithm},
     },
     main_memory::{self, Address},
     mode::Mode,
-    MachineCoreState,
 };
 use crate::{
     bits::Bits64,

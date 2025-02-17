@@ -85,11 +85,7 @@ impl Bits64 for bool {
 
     #[inline(always)]
     fn to_bits(&self) -> u64 {
-        if *self {
-            1
-        } else {
-            0
-        }
+        if *self { 1 } else { 0 }
     }
 }
 
@@ -216,13 +212,10 @@ mod tests {
             *bit = u16::bit(bytes, 15 - i);
         }
 
-        assert_eq!(
-            bits,
-            [
-                false, false, false, false, false, false, true, false, true, false, false, true,
-                false, false, false, true
-            ]
-        );
+        assert_eq!(bits, [
+            false, false, false, false, false, false, true, false, true, false, false, true, false,
+            false, false, true
+        ]);
     }
 
     #[test]

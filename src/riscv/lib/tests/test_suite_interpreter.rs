@@ -8,12 +8,12 @@ use octez_riscv::{
     machine_state::{
         main_memory::M1M,
         mode::Mode,
-        registers::{gp, XRegister, XValue},
+        registers::{XRegister, XValue, gp},
     },
     state_backend::ManagerRead,
     stepper::{
-        test::{TestStepper, TestStepperResult::*},
         Stepper,
+        test::{TestStepper, TestStepperResult::*},
     },
 };
 use std::{fs, io::Write, ops::Bound};

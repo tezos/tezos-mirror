@@ -700,10 +700,9 @@ mod tests {
             dyn_cells
         })
         .unwrap();
-        assert_eq_found!(
-            dyn_cells.read::<[u8; 6]>(LEAF_SIZE * 2 - 4),
-            [11, 14, 14, 15, 255, 0]
-        );
+        assert_eq_found!(dyn_cells.read::<[u8; 6]>(LEAF_SIZE * 2 - 4), [
+            11, 14, 14, 15, 255, 0
+        ]);
         assert_eq_found!(dyn_cells.read::<[u8; 2]>(LEAF_SIZE * 2), [255, 0]);
         assert_not_found!(dyn_cells.read::<[u8; 4]>(LEAF_SIZE * 2));
         assert_not_found!(dyn_cells.read::<[u8; 2]>(LEAF_SIZE * 2 + 2));

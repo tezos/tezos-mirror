@@ -9,18 +9,18 @@
 use super::float::FloatExt;
 use crate::{
     machine_state::{
+        MachineCoreState,
         hart_state::HartState,
         main_memory::MainMemoryLayout,
         registers::{FRegister, FValue, XRegister},
-        MachineCoreState,
     },
     parser::instruction::InstrRoundingMode,
     state_backend as backend,
     traps::Exception,
 };
 use rustc_apfloat::{
-    ieee::{Double, Single},
     Float, Status, StatusAnd,
+    ieee::{Double, Single},
 };
 
 impl From<Double> for FValue {
@@ -551,14 +551,14 @@ mod tests {
         bits::Bits64,
         create_state,
         machine_state::{
+            MachineCoreState, MachineCoreStateLayout,
             csregisters::{
-                xstatus::{ExtensionValue, MStatus},
                 CSRegister,
+                xstatus::{ExtensionValue, MStatus},
             },
             hart_state::{HartState, HartStateLayout},
             main_memory::tests::T1K,
             registers::{fa2, fa3, parse_fregister, parse_xregister, t0},
-            MachineCoreState, MachineCoreStateLayout,
         },
         traps::Exception,
     };
