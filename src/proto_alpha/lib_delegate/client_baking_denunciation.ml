@@ -234,12 +234,12 @@ let events_of_kind (type kind) (op_kind : kind denunciable_consensus_operation)
       Events.
         ( double_attestation_detected,
           double_attestation_denounced,
-          double_attestation_ignored )
+          attestation_conflict_ignored )
   | Preattestation ->
       Events.
         ( double_preattestation_detected,
           double_preattestation_denounced,
-          double_preattestation_ignored )
+          preattestation_conflict_ignored )
 
 let should_different_slots_be_denunced (type kind) state
     (op_kind : kind denunciable_consensus_operation) =
@@ -294,7 +294,7 @@ let process_consensus_op (type kind) state cctxt
                        {operation = new_op; previously_denounced_oph = None})
                     round_map)
         | Operation_seen {operation = existing_op; previously_denounced_oph} ->
-            let double_op_detected, double_op_denounced, double_op_ignored =
+            let double_op_detected, double_op_denounced, conflict_ignored =
               events_of_kind op_kind
             in
             let new_op_hash, existing_op_hash =
@@ -360,7 +360,7 @@ let process_consensus_op (type kind) state cctxt
               return_unit)
             else
               let*! () =
-                Events.(emit double_op_ignored) (existing_op_hash, new_op_hash)
+                Events.(emit conflict_ignored) (existing_op_hash, new_op_hash)
               in
               return_unit)
 
