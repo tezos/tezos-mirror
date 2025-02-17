@@ -915,13 +915,55 @@ let rec retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
           retry cctxt ?max_delay ~delay ~factor ~msg ~tries:(tries - 1) f x)
   | Error _ as err -> Lwt.return err
 
+(* This function attempts to resolve the primary delegate associated with the given [key].
+
+   - If the given key is a primary baking key, the function returns it directly.
+   - If the given key is a consensus key, it searches for corresponding attestation rights
+     over the past 50 levels (HEAD, HEAD~1, ..., HEAD~50). If attestation rights are found,
+     it retrieves and returns the associated primary delegate.
+   - The function follows a best-effort approach: if the key has no attestation rights yet,
+     no rights within the last 50 levels, or is neither a registered delegate nor a consensus key,
+     it simply returns the PKH of the given key. *)
+let try_resolve_consensus_keys cctxt key =
+  let open Lwt_syntax in
+  let levels_to_inspect = 50 in
+  let pkh = key.public_key_hash in
+  let* res =
+    Plugin.Alpha_services.Delegate.deactivated cctxt (`Main, `Head 0) pkh
+  in
+  match res with
+  | Ok _deactivated ->
+      (* [pkh] is actually the primary registered key as delegate. *)
+      return pkh
+  | Error _ ->
+      (* [pkh] is probably a consensus key. Try resolving it. *)
+      let rec try_find_delegate_key head_offset =
+        if head_offset <= 0 then
+          (* Went trough the loop and didn't find any assigned slot for the pkh.
+             return the given pkh. *)
+          return pkh
+        else
+          let* attesting_rights =
+            Plugin.RPC.Validators.get
+              cctxt
+              (`Main, `Head head_offset)
+              ~consensus_keys:[pkh]
+          in
+          match attesting_rights with
+          | Error _ | Ok [] -> try_find_delegate_key (head_offset - 1)
+          | Ok
+              (Plugin.RPC.Validators.
+                 {delegate; level = _; consensus_key = _; slots = _}
+              :: _) ->
+              (* The primary registered key as delegate found. Return it. *)
+              return delegate
+      in
+      try_find_delegate_key levels_to_inspect
+
 let register_dal_profiles cctxt dal_node_rpc_ctxt delegates =
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7648
-     In case the daemon was started with a consensus key, then we'd register
-     this consensus key, which is wrong, we should register the corresponding
-     delegate key. *)
+  let open Lwt_result_syntax in
+  let*! delegates = List.map_s (try_resolve_consensus_keys cctxt) delegates in
   let register dal_ctxt =
-    let open Lwt_result_syntax in
     let* profiles = Node_rpc.get_dal_profiles dal_ctxt in
     let warn =
       Events.emit Baking_events.Scheduling.dal_node_no_attester_profile
