@@ -2458,7 +2458,7 @@ mod test {
 
     // The default register should be valid for all variants
     #[test]
-    fn test_register_default() {
+    fn miri_test_register_default() {
         let default = Register::DEFAULT;
 
         assert!(default == Register { x: XRegister::x1 });

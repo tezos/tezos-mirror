@@ -16,6 +16,9 @@ endif
 # We don't want to check all features in CI, so we provide this varible to configure it.
 CHECK_FEATURES ?= --all-features
 
+# The version of nightly that we use for anything that requires it
+NIGHTLY_VERSION = nightly-2025-01-30
+
 .PHONY: build
 build: riscv-dummy.elf riscv-dummy-sdk.elf riscv-sandbox
 	@cargo build --release --workspace $(NATIVE_OPT)
@@ -70,8 +73,8 @@ ifneq ($(NATIVE_TARGET),)
 	@rustup target add $(NATIVE_TARGET)
 endif
 
-	# Install Nightly for formatting with its Rustfmt
-	@rustup toolchain install nightly-2025-01-30 -c rustfmt
+	# Install Nightly for formatting with its Rustfmt, and running Miri
+	@rustup toolchain install $(NIGHTLY_VERSION) -c rustfmt miri rust-src
 
 	# Iterate through all the toolchains. 'rustup show' will install the
 	# toolchain in addition to showing toolchain information.
@@ -86,6 +89,10 @@ test: build
 .PHONY: test-long
 test-long: 
 	@cargo test --release -- test_jstz_determinism --nocapture --ignored
+
+.PHONY: test-miri
+test-miri:
+	@cargo +$(NIGHTLY_VERSION) miri test -- miri
 
 .PHONY: check
 check:
