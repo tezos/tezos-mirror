@@ -630,6 +630,28 @@ module P2P = struct
         ~output:Data_encoding.(list topic_with_peers)
         (open_root / "topics" / "peers")
 
+    let get_fanout :
+        < meth : [`GET]
+        ; input : unit
+        ; output : (Topic.t * Peer.t list * Time.t) list
+        ; prefix : unit
+        ; params : unit
+        ; query : unit >
+        service =
+      Tezos_rpc.Service.get_service
+        ~description:
+          "Returns the fanout peers per topic alongside the last publication \
+           time on the topic."
+        ~query:Tezos_rpc.Query.empty
+        ~output:
+          Data_encoding.(
+            list
+              (obj3
+                 (req "topic" Topic.encoding)
+                 (req "peers" (list Peer.encoding))
+                 (req "last_publication_time" Time.encoding)))
+        (open_root / "fanout")
+
     let get_slot_indexes_peers :
         < meth : [`GET]
         ; input : unit

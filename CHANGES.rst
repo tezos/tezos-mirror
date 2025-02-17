@@ -315,6 +315,9 @@ DAL node
 - Added a new RPC ``GET /p2p/gossipsub/mesh/`` that returns the GossipSub mesh
   (i.e. full data connections per topic) of a peer. (MR :gl:`!16754`)
 
+- Added a new RPC ``GET /p2p/gossipsub/fanout/`` that returns the GossipSub
+  fanout of a peer. (MR :gl:`!16764`)
+
 Protocol
 ~~~~~~~~
 
