@@ -66,7 +66,7 @@ let perform_protocol_migration ?(resilience_test = false) ?node_name
       Lwt_list.iter_s
         (fun account ->
           let Account.{alias; public_key_hash; _} = account in
-          Client.import_signer_key client ~alias ~public_key_hash uri)
+          Client.import_signer_key client ~alias ~public_key_hash ~signer:uri)
         keys
     else unit
   in

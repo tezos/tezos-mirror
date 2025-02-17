@@ -238,6 +238,9 @@ Smart Rollup node
 - New CLI switch ``--unsafe-disable-wasm-kernel-checks`` which allows to bypass
   invalid kernel checks in the WASM VM, for use by jstz. (MR :gl:`!15910`)
 
+- Support ``remote`` signer scheme and check remote signer available on
+  startup. (MR :gl:`!16651`)
+
 Smart Rollup WASM Debugger
 --------------------------
 

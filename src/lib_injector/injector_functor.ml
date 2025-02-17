@@ -249,6 +249,21 @@ module Make (Parameters : PARAMETERS) = struct
         cctxt
         (List.map (fun k -> k.alias) signers)
     in
+    let* () =
+      List.iter_es
+        (fun s ->
+          let* pk_uri = Client_keys.neuterize s.sk in
+          (* Fetch public key for remote signer to make sure it is reachable. *)
+          trace_eval
+            (fun () ->
+              error_of_fmt
+                "Cannot get public key for signer %s. Most likely, the remote \
+                 signer cannot be reached."
+                s.alias)
+            (let* (_ : Signature.public_key) = Client_keys.public_key pk_uri in
+             return_unit))
+        signers
+    in
     let data_dir = Filename.concat data_dir "injector" in
     let*! () = Lwt_utils_unix.create_dir data_dir in
     let filter op_proj op =
