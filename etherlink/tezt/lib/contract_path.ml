@@ -35,8 +35,8 @@ let delayed_path ~kernel =
      chunking must use "chunked_delayed_transaction_bridge.tz" *)
   let contract_basename =
     match kernel with
-    | Kernel.Latest -> "chunked_delayed_transaction_bridge"
-    | Mainnet | Ghostnet -> "delayed_transaction_bridge"
+    | Kernel.Latest | Ghostnet -> "chunked_delayed_transaction_bridge"
+    | Mainnet -> "delayed_transaction_bridge"
   in
   Base.(project_root // sf "etherlink/tezos_contracts/%s.tz" contract_basename)
 
