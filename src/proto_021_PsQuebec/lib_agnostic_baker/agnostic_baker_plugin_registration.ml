@@ -10,17 +10,14 @@ module Agnostic_baker_plugin = struct
 
   let name = Protocol.name
 
-  let register_commands () =
-    Client_commands.register Protocol.hash @@ fun _network ->
+  let map_commands () =
     List.map (Tezos_clic.map_command (new Protocol_client_context.wrap_full))
     @@ Baking_commands.baker_commands ()
 
-  let select_commands _ _ =
-    let open Lwt_result_syntax in
-    return
-      (List.map
-         (Tezos_clic.map_command (new Protocol_client_context.wrap_full))
-         (Baking_commands.baker_commands ()))
+  let register_commands () =
+    Client_commands.register Protocol.hash @@ fun _network -> map_commands ()
+
+  let select_commands _ _ = Lwt_result_syntax.return @@ map_commands ()
 end
 
 let () =
