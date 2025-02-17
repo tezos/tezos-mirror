@@ -100,6 +100,10 @@ module Raw_consensus = struct
             consensus attestation power and DAL attestation power. This is
             [None] only in mempool mode, or in application mode when there is no
             locked round (so the block cannot contain any preattestations). *)
+    allowed_consensus :
+      (consensus_pk * int * int) Slot_repr.Map.t Level_repr.Map.t option;
+        (** In mempool mode, hold delegates minimal slots for all allowed
+            levels. [None] in all other modes. *)
     forbidden_delegates : Signature.Public_key_hash.Set.t;
         (** Delegates that are not allowed to bake or attest blocks; i.e.,
             delegates which have zero frozen deposit due to a previous
@@ -132,6 +136,7 @@ module Raw_consensus = struct
       current_attestation_power = 0;
       allowed_attestations = Some Slot_repr.Map.empty;
       allowed_preattestations = Some Slot_repr.Map.empty;
+      allowed_consensus = None;
       forbidden_delegates = Signature.Public_key_hash.Set.empty;
       attestations_seen = Slot_repr.Set.empty;
       preattestations_seen = Slot_repr.Set.empty;
@@ -214,6 +219,9 @@ module Raw_consensus = struct
   let initialize_with_attestations_and_preattestations ~allowed_attestations
       ~allowed_preattestations t =
     {t with allowed_attestations; allowed_preattestations}
+
+  let initialize_with_allowed_consensus ~allowed_consensus t =
+    {t with allowed_consensus}
 
   let locked_round_evidence t = t.locked_round_evidence
 
@@ -1928,6 +1936,8 @@ module type CONSENSUS = sig
 
   type 'value slot_map
 
+  type 'value level_map
+
   type slot_set
 
   type slot
@@ -1940,6 +1950,9 @@ module type CONSENSUS = sig
 
   val allowed_preattestations : t -> (consensus_pk * int * int) slot_map option
 
+  val allowed_consensus :
+    t -> (consensus_pk * int * int) slot_map level_map option
+
   val forbidden_delegates : t -> Signature.Public_key_hash.Set.t
 
   type error += Slot_map_not_found of {loc : string}
@@ -1951,6 +1964,9 @@ module type CONSENSUS = sig
     allowed_attestations:(consensus_pk * int * int) slot_map option ->
     allowed_preattestations:(consensus_pk * int * int) slot_map option ->
     t
+
+  val initialize_allowed_consensus :
+    t -> (consensus_pk * int * int) slot_map level_map option -> t
 
   val record_attestation : t -> initial_slot:slot -> power:int -> t tzresult
 
@@ -1979,6 +1995,7 @@ module Consensus :
     with type t := t
      and type slot := Slot_repr.t
      and type 'a slot_map := 'a Slot_repr.Map.t
+     and type 'a level_map := 'a Level_repr.Map.t
      and type slot_set := Slot_repr.Set.t
      and type round := Round_repr.t
      and type consensus_pk := consensus_pk = struct
@@ -1995,6 +2012,8 @@ module Consensus :
 
   let[@inline] allowed_preattestations ctxt =
     ctxt.back.consensus.allowed_preattestations
+
+  let[@inline] allowed_consensus ctxt = ctxt.back.consensus.allowed_consensus
 
   let[@inline] forbidden_delegates ctxt =
     ctxt.back.consensus.forbidden_delegates
@@ -2018,6 +2037,11 @@ module Consensus :
       (Raw_consensus.initialize_with_attestations_and_preattestations
          ~allowed_attestations
          ~allowed_preattestations)
+
+  let[@inline] initialize_allowed_consensus ctxt allowed_consensus =
+    update_consensus_with
+      ctxt
+      (Raw_consensus.initialize_with_allowed_consensus ~allowed_consensus)
 
   let[@inline] record_preattestation ctxt ~initial_slot ~power round =
     update_consensus_with_tzresult

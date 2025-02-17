@@ -5417,6 +5417,7 @@ module Consensus : sig
       with type t := t
        and type slot := Slot.t
        and type 'a slot_map := 'a Slot.Map.t
+       and type 'a level_map := 'a Level.Map.t
        and type slot_set := Slot.Set.t
        and type round := Round.t
        and type consensus_pk := Consensus_key.pk
