@@ -137,6 +137,15 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
 {
     /// Non-continuing variant of [`Stepper::step_max`]
     fn step_max_once(&mut self, steps: Bound<usize>) -> StepperStatus {
+        #[cfg(feature = "supervisor")]
+        if let Some(exit_code) = self.pvm.has_exited() {
+            return StepperStatus::Exited {
+                steps: 0,
+                success: exit_code == 0,
+                status: format!("Exited with code {}", exit_code),
+            };
+        }
+
         match self.pvm.status() {
             PvmStatus::Evaluating => {
                 let steps = self.pvm.eval_max(&mut self.hooks, steps);
