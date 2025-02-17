@@ -352,6 +352,7 @@ where
     ///
     /// Relevant opcodes:
     /// - `SD`
+    /// - `C.SD`
     pub fn run_sdnz(
         &mut self,
         imm: i64,

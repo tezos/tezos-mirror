@@ -70,6 +70,13 @@ pub struct SBTypeArgs {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
+pub struct NonZeroSBTypeArgs {
+    pub rs1: NonZeroXRegister,
+    pub rs2: NonZeroXRegister,
+    pub imm: i64,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct UJTypeArgs {
     pub rd: XRegister,
     pub imm: i64,
@@ -599,7 +606,12 @@ pub enum InstrCacheable {
     /// The immediate is obtained by zero-extending and scaling by 8 the
     /// offset encoded in the instruction (see U:C-16.3).
     CLdsp(CIBNZTypeArgs),
-    CSd(SBTypeArgs),
+    /// `C.SD` - Stores a 64-bit value in register `rs2` to memory. It computes
+    /// an effective address by adding the immediate to the base address in register `rs1`.
+    ///
+    /// The immediate is obtained by zero-extending and scaling by 8 the
+    /// offset encoded in the instruction (see U:C-16.3).
+    CSd(NonZeroSBTypeArgs),
     CSdsp(CSSTypeArgs),
     CAddiw(CIBNZTypeArgs),
 
