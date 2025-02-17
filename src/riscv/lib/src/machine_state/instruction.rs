@@ -342,7 +342,6 @@ pub enum OpCode {
     CSubw,
 
     // RV64C compressed instructions
-    CLdsp,
     CSd,
     CSdsp,
     CAddiw,
@@ -555,7 +554,6 @@ impl OpCode {
             Self::CAddw => Args::run_caddw,
             Self::CSubw => Args::run_csubw,
             Self::Nop => Args::run_nop,
-            Self::CLdsp => Args::run_cldsp,
             Self::CSd => Args::run_csd,
             Self::CSdsp => Args::run_csdsp,
             Self::CAddiw => Args::run_caddiw,
@@ -1415,7 +1413,6 @@ impl Args {
     // RV64C compressed instructions
     impl_store_type!(run_csd);
     impl_css_type!(run_csdsp);
-    impl_cload_sp_type!(run_cldsp);
     impl_ci_type!(run_caddiw, non_zero);
     impl_cr_type!(run_caddw);
     impl_cr_type!(run_csubw);
@@ -2069,10 +2066,10 @@ impl From<&InstrCacheable> for Instruction {
                 debug_assert!(args.imm >= 0 && args.imm % 8 == 0);
                 Instruction::new_ldnz(args.rd, args.rs1, args.imm, InstrWidth::Compressed)
             }
-            InstrCacheable::CLdsp(args) => Instruction {
-                opcode: OpCode::CLdsp,
-                args: args.into(),
-            },
+            InstrCacheable::CLdsp(args) => {
+                debug_assert!(args.imm >= 0 && args.imm % 8 == 0);
+                Instruction::new_ldnz(args.rd_rs1, nz::sp, args.imm, InstrWidth::Compressed)
+            }
             InstrCacheable::CSd(args) => Instruction {
                 opcode: OpCode::CSd,
                 args: args.to_args(InstrWidth::Compressed),

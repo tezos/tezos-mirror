@@ -591,6 +591,11 @@ pub enum InstrCacheable {
     /// The immediate is obtained by zero-extending and scaling by 8 the
     /// offset encoded in the instruction (see U:C-16.3).
     CLd(NonZeroITypeArgs),
+    /// `C.LDSP` - Loads a 64-bit value from memory into register `rd`. It computes
+    /// an effective address by adding the immediate to the stack pointer.
+    ///
+    /// The immediate is obtained by zero-extending and scaling by 8 the
+    /// offset encoded in the instruction (see U:C-16.3).
     CLdsp(CIBNZTypeArgs),
     CSd(SBTypeArgs),
     CSdsp(CSSTypeArgs),
