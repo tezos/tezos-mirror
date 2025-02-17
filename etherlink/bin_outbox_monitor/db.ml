@@ -382,11 +382,21 @@ module Withdrawals = struct
     let insert =
       (withdrawal_log ->. unit)
       @@ {sql|
-      REPLACE INTO withdrawals
+      INSERT INTO withdrawals
       (transactionHash,
        transactionIndex, logIndex, blockHash, blockNumber,
        removed, kind, ticket_owner, amount, sender, receiver, withdrawal_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      ON CONFLICT (transactionHash, transactionIndex, logIndex) DO UPDATE SET
+        blockHash = $4,
+        blockNumber = $5,
+        removed = $6,
+        kind = $7,
+        ticket_owner = $8,
+        amount = $9,
+        sender = $10,
+        receiver = $11,
+        withdrawal_id = $12
       |sql}
   end
 
