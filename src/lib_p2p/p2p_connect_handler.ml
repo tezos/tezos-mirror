@@ -252,9 +252,9 @@ let is_acceptable t connection_point_info peer_info incoming version =
              connection_point_info))
     && not (t.dependencies.peer_state_info_trusted peer_info)
   in
-  if unexpected then (
-    Events.(emit__dont_wait__use_with_care peer_rejected) () ;
-    tzfail P2p_errors.Private_mode)
+  if unexpected then
+    let*! () = Events.(emit peer_rejected) () in
+    tzfail P2p_errors.Private_mode
   else
     (* checking if point is acceptable *)
     let* version =
@@ -266,22 +266,27 @@ let is_acceptable t connection_point_info peer_info incoming version =
               Lwt.return P2p_rejection.(rejecting Already_connected)
           | Requested {cancel} when incoming ->
               (* Prioritise incoming connections. *)
-              Lwt.dont_wait
-                (fun () ->
-                  Lwt.bind (Lwt_canceler.cancel cancel) (fun result ->
-                      match result with
-                      | Error err ->
-                          let tztrace = List.map Error_monad.error_of_exn err in
-                          Format.eprintf
-                            "Unexpected error while cancelling: %a@."
-                            Error_monad.pp_print_trace
-                            tztrace ;
-                          Lwt.return_unit
-                      | Ok () -> Lwt.return_unit))
-                (fun exn ->
-                  Format.eprintf
-                    "Unexpected exn while cancelling: %s@."
-                    (Printexc.to_string exn)) ;
+              let*! () =
+                Lwt.catch
+                  (fun () ->
+                    Lwt.bind (Lwt_canceler.cancel cancel) (fun result ->
+                        match result with
+                        | Error err ->
+                            let tztrace =
+                              List.map Error_monad.error_of_exn err
+                            in
+                            Format.eprintf
+                              "Unexpected error while cancelling: %a@."
+                              Error_monad.pp_print_trace
+                              tztrace ;
+                            Lwt.return_unit
+                        | Ok () -> Lwt.return_unit))
+                  (fun exn ->
+                    Format.eprintf
+                      "Unexpected exn while cancelling: %s@."
+                      (Printexc.to_string exn) ;
+                    Lwt.return_unit)
+              in
               return version
           | Requested _ | Disconnected -> return version)
     in
