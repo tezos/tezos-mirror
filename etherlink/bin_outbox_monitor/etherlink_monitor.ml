@@ -105,6 +105,15 @@ module Event = struct
       ~level:Error
       ("error", Data_encoding.string)
       ~pp1:Format.pp_print_string
+
+  let new_etherlink_head =
+    declare_1
+      ~section
+      ~name:"new_etherlink_head"
+      ~msg:"New etherlink head {level}"
+      ~level:Notice
+      ("level", Db.quantity_hum_encoding)
+      ~pp1:Ethereum_types.pp_quantity
 end
 
 module Withdrawal = struct
@@ -286,11 +295,8 @@ let lwt_stream_iter_es f stream =
   in
   loop ()
 
-let start db ~evm_node_endpoint =
+let monitor_withdrawals db ws_client =
   let open Lwt_result_syntax in
-  let*! ws_client =
-    Websocket_client.connect Media_type.json evm_node_endpoint
-  in
   let* logs_subscription =
     Websocket_client.subscribe_logs
       ws_client
@@ -324,5 +330,27 @@ let start db ~evm_node_endpoint =
             let*! () = Event.emit_withdrawal_log withdrawal in
             Db.Withdrawals.store db withdrawal)
       logs_subscription.stream
+  in
+  return_unit
+
+let monitor_heads db ws_client =
+  let open Lwt_result_syntax in
+  let* heads_subscription = Websocket_client.subscribe_newHeads ws_client in
+  let* () =
+    lwt_stream_iter_es
+      (fun (b : _ Ethereum_types.block) ->
+        let*! () = Event.(emit new_etherlink_head) b.number in
+        Db.Pointers.L2_head.set db b.number)
+      heads_subscription.stream
+  in
+  return_unit
+
+let start db ~evm_node_endpoint =
+  let open Lwt_result_syntax in
+  let*! ws_client =
+    Websocket_client.connect Media_type.json evm_node_endpoint
+  in
+  let* () =
+    Lwt.pick [monitor_withdrawals db ws_client; monitor_heads db ws_client]
   in
   return_unit

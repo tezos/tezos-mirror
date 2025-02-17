@@ -49,3 +49,17 @@ val init : data_dir:string -> [`Read_only | `Read_write] -> t tzresult Lwt.t
 module Withdrawals : sig
   val store : ?conn:Sqlite.conn -> t -> withdrawal_log -> unit tzresult Lwt.t
 end
+
+module Pointers : sig
+  module type S = sig
+    val set :
+      ?conn:Sqlite.conn -> t -> Ethereum_types.quantity -> unit tzresult Lwt.t
+
+    val get :
+      ?conn:Sqlite.conn -> t -> Ethereum_types.quantity option tzresult Lwt.t
+  end
+
+  module Finalized_L1_head : S
+
+  module L2_head : S
+end
