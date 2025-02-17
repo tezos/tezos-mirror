@@ -78,6 +78,14 @@ packages() {
   cp "$packaging_dir/scripts/packaging/octez/debian/"*.service "$SPECS_DIR/"
   cp "$packaging_dir/scripts/packaging/octez/debian/"*.default "$SPECS_DIR/"
   cp "$packaging_dir/scripts/packaging/octez/debian/"*.manpages "$SPECS_DIR/"
+  {
+    echo "DATADIR=/var/tezos/.tezos-node"
+    echo "NETWORK=mainnet"
+    echo "HISTORY_MODE=rolling"
+    echo "SNAPSHOT_IMPORT=true"
+    echo "SNAPSHOT_NO_CHECK=false"
+  } >> "$SPECS_DIR/octez-node.default"
+
   grep "Package:" "$packaging_dir/scripts/packaging/octez/debian/control" | cut -d' ' -f2 |
     while read -r pkg; do
       cp "$packaging_dir/scripts/packaging/octez/rpm/SPECS/$pkg.spec" "$SPECS_DIR/"
@@ -102,7 +110,7 @@ zcash() {
     while read -r pkg; do
       cp "$packaging_dir/scripts/packaging/octez/rpm/SPECS/$pkg.spec" "$SPECS_DIR/"
       cd "$SPECS_DIR" || exit
-      rpmbuild -ba \
+      rpmbuild -ba --quiet \
         --define "version $_VERSION" \
         --define "epoch $_EPOCH" \
         --define '_source_filedir %{nil}' \

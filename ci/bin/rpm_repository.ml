@@ -320,7 +320,7 @@ let jobs pipeline_type =
              [("DISTRIBUTION", "rockylinux"); ("RELEASE", "9.3")])
         [
           "./scripts/ci/systemd-packages-test.sh \
-           docs/introduction/install-bin-rpm.sh \
+           scripts/packaging/tests/rpm/rpm-install.sh \
            images/packages/rpm-systemd-tests.Dockerfile";
         ];
     ]

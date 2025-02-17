@@ -7,6 +7,17 @@ REPO="https://storage.googleapis.com/$GCP_LINUX_PACKAGES_BUCKET/$CI_COMMIT_REF_N
 DISTRO=$1
 RELEASE=$2
 
+# wait for systemd to be ready
+count=0
+while [ "$(systemctl is-system-running)" = "offline" ]; do
+  count=$((count + 1))
+  if [ $count -ge 10 ]; then
+    echo "System is not running after 10 iterations."
+    exit 1
+  fi
+  sleep 1
+done
+
 # Update and install the config-mananger plugin
 dnf -y update
 dnf -y install dnf-plugins-core
@@ -21,6 +32,26 @@ dnf -y update
 # Install public key
 rpm --import "$REPO/$DISTRO/octez.asc"
 
+dnf -y install sudo procps
+
+sudo dnf -y install octez-client
 dnf -y install octez-node
-rpm -v --info -q octez-node
-rpm -v --verify octez-node
+
+# if systemd is available we test the service scripts
+if [ "$(ps --no-headers -o comm 1)" = "systemd" ]; then
+  systemctl enable octez-node
+  systemctl start octez-node
+
+  sleep 5
+  systemctl status octez-node
+
+  journalctl -xeu octez-node.service
+
+fi
+
+sudo dnf -y install octez-baker
+
+# If systemd is available we stop the service scripts started above.
+if [ "$(ps --no-headers -o comm 1)" = "systemd" ]; then
+  systemctl stop octez-node
+fi

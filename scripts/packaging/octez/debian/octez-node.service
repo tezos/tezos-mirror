@@ -4,6 +4,7 @@ Documentation=https://tezos.gitlab.io/
 After=network.target
 
 [Service]
+TimeoutSec=600s
 EnvironmentFile=-/etc/default/octez-node
 WorkingDirectory=/var/tezos
 Restart=on-failure
