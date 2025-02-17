@@ -418,11 +418,13 @@ module Dal () : Dal = struct
 end
 
 module type Layer1 = sig
-  val network : [`Mainnet | `Ghostnet]
+  val network : [`Mainnet | `Ghostnet] option
 
   val stake : int list option
 
   val stresstest : (string * string * int * int) option
+
+  val default_maintenance_delay : int
 
   val maintenance_delay : int option
 
@@ -430,16 +432,17 @@ module type Layer1 = sig
 
   val snapshot : string option
 
-  val sync : bool
-
   val octez_release : string option
 
   val vms_config : string option
+
+  val config : string option
 end
 
 module Layer1 () = struct
-  (** Keep the options optionnal without default value. CLI args consistency is checked
-      in the layer 1 scenario *)
+  (** Keep the CLI arguments optional because they can be defined in a
+      config file. Parameters consistency will be checked in the Layer1
+      scenario. *)
 
   let section =
     Clap.section
@@ -449,7 +452,7 @@ module Layer1 () = struct
          [cloud] and [layer1] tags on the command line"
       "LAYER1"
 
-  let network : [`Mainnet | `Ghostnet] =
+  let network : [`Mainnet | `Ghostnet] option =
     let typ =
       Clap.typ
         ~name:"network"
@@ -460,7 +463,7 @@ module Layer1 () = struct
           | _ -> None)
         ~show:(fun n -> Network.to_string (n :> Network.t))
     in
-    Clap.mandatory
+    Clap.optional
       ~section
       ~long:"network"
       ~placeholder:"<ghostnet|mainnet>"
@@ -512,14 +515,18 @@ module Layer1 () = struct
       typ
       ()
 
+  let default_maintenance_delay = 1
+
   let maintenance_delay =
     Clap.optional_int
       ~section
       ~long:"maintenance-delay"
       ~placeholder:"N"
       ~description:
-        "Each baker has maintenance delayed by (position in the list * N). \
-         Default is 1. Use 0 for disabling mainteance delay"
+        (sf
+           "Each baker has maintenance delayed by (position in the list * N). \
+            Default is %d. Use 0 for disabling mainteance delay"
+           default_maintenance_delay)
       ()
 
   let migration_offset =
@@ -540,13 +547,6 @@ module Layer1 () = struct
          bootstrapping the experiment"
       ()
 
-  let sync =
-    Clap.flag
-      ~section
-      ~unset_long:"no-sync"
-      ~description:"Wait for the node to be synced before continuing"
-      true
-
   let octez_release =
     Clap.optional_string
       ~section
@@ -563,5 +563,13 @@ module Layer1 () = struct
       ~description:
         "JSON file optionally describing options for each VM involved in the \
          test"
+      ()
+
+  let config =
+    Clap.optional_string
+      ~section
+      ~long:"config"
+      ~description:
+        "JSON file optionally describing options for the test scenario"
       ()
 end
