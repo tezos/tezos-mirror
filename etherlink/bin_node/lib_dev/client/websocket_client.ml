@@ -396,3 +396,8 @@ let subscribe_logs ?address ?topics client =
   subscribe_filter client (Logs {address; topics}) @@ function
   | Ethereum_types.Subscription.Logs log -> Some log
   | _ -> None
+
+let subscribe_l1_l2_levels ?start_l1_level client =
+  subscribe_filter client (Etherlink (L1_L2_levels start_l1_level)) @@ function
+  | Ethereum_types.Subscription.(Etherlink (L1_l2_levels l)) -> Some l
+  | _ -> None
