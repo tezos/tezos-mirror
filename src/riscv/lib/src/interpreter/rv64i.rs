@@ -338,12 +338,28 @@ where
         Ok(())
     }
 
-    /// `SD` S-type instruction
+    /// Stores a double-word (8 bytes from rs2) to the address starting at: `val(rs1) + imm`
     ///
-    /// Stores a double-word (8 bytes from rs2) to the address starting at: val(rs1) + imm
+    /// Relevant opcodes:
+    /// - `SD`
     pub fn run_sd(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Result<(), Exception> {
         let value: u64 = self.hart.xregisters.read(rs2);
         self.write_to_bus(imm, rs1, value)
+    }
+
+    /// Stores a double-word (8 bytes from rs2) to the address starting at: `val(rs1) + imm`
+    /// where `rs1` and `rs2` are NonZeroXRegisters.
+    ///
+    /// Relevant opcodes:
+    /// - `SD`
+    pub fn run_sdnz(
+        &mut self,
+        imm: i64,
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+    ) -> Result<(), Exception> {
+        let value: u64 = self.hart.xregisters.read_nz(rs2);
+        self.write_to_bus_nz(imm, rs1, value)
     }
 
     /// `SW` S-type instruction
