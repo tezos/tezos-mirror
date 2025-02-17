@@ -78,6 +78,7 @@ make -C src/riscv all
 /assign @emturner
 /assign @santnr
 /assign @hantang.sun
+/assign @kurtis.charnock
 
 /assign_reviewer @ole.kruger
 /assign_reviewer @victor-dumitrescu
@@ -86,6 +87,7 @@ make -C src/riscv all
 /assign_reviewer @santnr
 /assign_reviewer @hantang.sun
 /assign_reviewer @jobjo
+/assign_reviewer @kurtis.charnock
 
 /unassign me
 /unassign_reviewer me
