@@ -475,7 +475,28 @@ module P2P = struct
   end
 
   module Gossipsub = struct
+    let topic_with_peers =
+      Data_encoding.(
+        obj2 (req "topic" Topic.encoding) (req "peers" (list Peer.encoding)))
+
     let open_root = open_root / "gossipsub"
+
+    let get_mesh :
+        < meth : [`GET]
+        ; input : unit
+        ; output : (Topic.t * Peer.t list) list
+        ; prefix : unit
+        ; params : unit
+        ; query : unit >
+        service =
+      Tezos_rpc.Service.get_service
+        ~description:
+          "Get the mesh of the peer. Concretely, the RPC returns a list of \
+           topics, where each topic is associated to the remote peers with \
+           which the current node shares a full connection (on that topic)."
+        ~query:Tezos_rpc.Query.empty
+        ~output:(Data_encoding.list topic_with_peers)
+        (open_root / "mesh")
 
     let get_topics :
         < meth : [`GET]
@@ -506,12 +527,7 @@ module P2P = struct
            the 'subscribed' flag is given, then restrict the output to the \
            topics this peer is subscribed to."
         ~query:subscribed_query
-        ~output:
-          Data_encoding.(
-            list
-              (obj2
-                 (req "topic" Types.Topic.encoding)
-                 (req "peers" (list Types.Peer.encoding))))
+        ~output:Data_encoding.(list topic_with_peers)
         (open_root / "topics" / "peers")
 
     let get_slot_indexes_peers :

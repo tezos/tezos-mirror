@@ -29,6 +29,10 @@ Available services:
           Get the backoffs of the peers with a backoff, per topic. 
       - GET /p2p/gossipsub/connections
           Get this node's currently active connections. 
+      - GET /p2p/gossipsub/mesh
+          Get the mesh of the peer. Concretely, the RPC returns a list of
+          topics, where each topic is associated to the remote peers with
+          which the current node shares a full connection (on that topic). 
       - GET /p2p/gossipsub/message_cache
           Get the number of message ids in the message cache, grouped by
           heartbeat tick and topic. 
