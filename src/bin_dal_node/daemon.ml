@@ -1148,8 +1148,8 @@ let get_proto_plugins cctxt profile_ctxt ~last_processed_level ~first_seen_level
    and we don't detect it if this code starts running just before the migration
    level, and the head changes meanwhile to be above the migration level.
 *)
-let clean_up_store ctxt cctxt ~last_processed_level ~first_seen_level head_level
-    proto_parameters =
+let clean_up_store_and_catch_up ctxt cctxt ~last_processed_level
+    ~first_seen_level head_level proto_parameters =
   let open Lwt_result_syntax in
   let store_skip_list_cells ~level =
     let*? (module Plugin) =
@@ -1521,7 +1521,7 @@ let run ~data_dir ~configuration_override =
     match last_processed_level with
     | None -> (* there's nothing to clean up *) return_unit
     | Some last_processed_level ->
-        clean_up_store
+        clean_up_store_and_catch_up
           ctxt
           cctxt
           ~last_processed_level
