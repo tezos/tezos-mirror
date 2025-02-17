@@ -48,6 +48,8 @@ type level = t
 
 include Compare.S with type t := level
 
+module Map : Map.S with type key = t
+
 val encoding : level Data_encoding.t
 
 val pp : Format.formatter -> level -> unit

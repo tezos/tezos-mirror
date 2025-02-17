@@ -1278,6 +1278,8 @@ module Level : sig
   val dawn_of_a_new_cycle : context -> Cycle.t option
 
   val may_compute_randao : context -> bool
+
+  module Map : Map.S with type key = t
 end
 
 (** This module re-exports definitions from {!Fitness_repr}. *)
