@@ -191,7 +191,8 @@ let export ?snapshot_file ~compression ~data_dir () =
     in
     let files = evm_context_files in
     (* Export SQLite database *)
-    Lwt_utils_unix.with_tempdir "evm_node_sqlite_export_" @@ fun tmp_dir ->
+    Lwt_utils_unix.with_tempdir ~temp_dir:data_dir ".evm_node_sqlite_export_"
+    @@ fun tmp_dir ->
     let output_db_file = Filename.concat tmp_dir Evm_store.sqlite_file_name in
     let* {
            rollup_address;
