@@ -197,6 +197,9 @@ Baker
   behind the L1 node. (MR :gl:`!15756`)
 - Set the message validation function at node startup, fixing
   https://gitlab.com/tezos/tezos/-/issues/7629. (MR :gl:`!15830`)
+- Added a new RPC ``GET /p2p/gossipsub/mesh/`` that returns the GossipSub mesh
+  (i.e. full data connections per topic) of a peer. (MRs :gl:`!16754`,
+  :gl:`!16775`)
 
 Miscellaneous
 -------------
