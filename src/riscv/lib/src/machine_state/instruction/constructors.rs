@@ -295,6 +295,63 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sll`].
+    pub(crate) fn new_sll(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Sll,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Srl`].
+    pub(crate) fn new_srl(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Srl,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sra`].
+    pub(crate) fn new_sra(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Sra,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {
@@ -551,6 +608,54 @@ impl Instruction {
             (X::X0, _) | (_, X::X0) => Instruction::new_nop(InstrWidth::Compressed),
             (X::NonZero(rd_rs1), X::NonZero(rs2)) => {
                 Instruction::new_xor(rd_rs1, rd_rs1, rs2, InstrWidth::Compressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::Sll`] according to whether register is non-zero.
+    ///
+    /// [`InstrCacheable::Sll`]: crate::parser::instruction::InstrCacheable::Sll
+    pub(super) fn from_ic_sll(args: &NonZeroRdRTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rs1), split_x0(args.rs2)) {
+            // Shifting 0 by any amount is 0.
+            (X::X0, _) => Instruction::new_li(args.rd, 0, InstrWidth::Uncompressed),
+            // Shifting by 0 and storing in rd is equivalent to moving the value to rd.
+            (X::NonZero(rs1), X::X0) => Instruction::new_mv(args.rd, rs1, InstrWidth::Uncompressed),
+            (X::NonZero(rs1), X::NonZero(rs2)) => {
+                Instruction::new_sll(args.rd, rs1, rs2, InstrWidth::Uncompressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::Srl`] according to whether register is non-zero.
+    ///
+    /// [`InstrCacheable::Srl`]: crate::parser::instruction::InstrCacheable::Srl
+    pub(super) fn from_ic_srl(args: &NonZeroRdRTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rs1), split_x0(args.rs2)) {
+            // Shifting 0 by any amount is 0.
+            (X::X0, _) => Instruction::new_li(args.rd, 0, InstrWidth::Uncompressed),
+            // Shifting by 0 and storing in rd is equivalent to moving the value to rd.
+            (X::NonZero(rs1), X::X0) => Instruction::new_mv(args.rd, rs1, InstrWidth::Uncompressed),
+            (X::NonZero(rs1), X::NonZero(rs2)) => {
+                Instruction::new_srl(args.rd, rs1, rs2, InstrWidth::Uncompressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::Sra`] according to whether register is non-zero.
+    ///
+    /// [`InstrCacheable::Sra`]: crate::parser::instruction::InstrCacheable::Sra
+    pub(super) fn from_ic_sra(args: &NonZeroRdRTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rs1), split_x0(args.rs2)) {
+            // Shifting 0 by any amount is 0.
+            (X::X0, _) => Instruction::new_li(args.rd, 0, InstrWidth::Uncompressed),
+            // Shifting by 0 and storing in rd is equivalent to moving the value to rd.
+            (X::NonZero(rs1), X::X0) => Instruction::new_mv(args.rd, rs1, InstrWidth::Uncompressed),
+            (X::NonZero(rs1), X::NonZero(rs2)) => {
+                Instruction::new_sra(args.rd, rs1, rs2, InstrWidth::Uncompressed)
             }
         }
     }

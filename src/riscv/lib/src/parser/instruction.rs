@@ -288,8 +288,14 @@ pub enum InstrCacheable {
     Or(NonZeroRdRTypeArgs),
     /// `AND` - Saves in `rd` the bitwise AND between the value in `rs1` and `rs2`
     And(NonZeroRdRTypeArgs),
+    /// `SLL` - Shift left logically bits in rs1 by `shift_amount = val(rs2)[5:0]`
+    /// saving the result in rd. (zeros are shifted in the lower bits)
     Sll(NonZeroRdRTypeArgs),
+    /// `SRL` - Shift right logically bits in rs1 by `shift_amount = val(rs2)[5:0]`
+    /// saving the result in rd (zeros are shifted in the upper bits)
     Srl(NonZeroRdRTypeArgs),
+    /// `SRA` - Shift right arithmeticallly bits in rs1 by `shift_amount = val(rs2)[5:0]`
+    /// saving the result in rd (sign-bits are shifted in the upper bits)
     Sra(NonZeroRdRTypeArgs),
     Slt(NonZeroRdRTypeArgs),
     Sltu(NonZeroRdRTypeArgs),
