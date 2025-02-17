@@ -237,7 +237,7 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
             // in the storage.
             set_kernel_version(host)?;
             host.mark_for_reboot()?;
-            let configuration = fetch_configuration(host);
+            let configuration = fetch_configuration(host, chain_id);
             log!(
                 host,
                 Info,
@@ -271,7 +271,7 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     let smart_rollup_address = host.reveal_metadata().raw_rollup_address;
     // 2. Fetch the per mode configuration of the kernel. Returns the default
     //    configuration if it fails.
-    let mut configuration = fetch_configuration(host);
+    let mut configuration = fetch_configuration(host, chain_id);
     let sequencer_pool_address = read_sequencer_pool_address(host);
 
     // Run the stage one, this is a no-op if the inbox was already consumed

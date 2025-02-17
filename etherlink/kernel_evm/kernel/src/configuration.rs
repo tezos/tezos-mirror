@@ -201,14 +201,16 @@ fn fetch_dal_configuration<Host: Runtime>(host: &mut Host) -> Option<DalConfigur
     }
 }
 
-pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
+pub fn fetch_configuration<Host: Runtime>(
+    host: &mut Host,
+    chain_id: U256,
+) -> Configuration {
     let tezos_contracts = fetch_tezos_contracts(host);
     let limits = fetch_limits(host);
     let sequencer = sequencer(host).unwrap_or_default();
     let enable_fa_bridge = is_enable_fa_bridge(host).unwrap_or_default();
     let dal: Option<DalConfiguration> = fetch_dal_configuration(host);
     let evm_node_flag = evm_node_flag(host).unwrap_or(false);
-    let chain_id = U256::from(CHAIN_ID);
     match sequencer {
         Some(sequencer) => {
             let delayed_bridge = read_delayed_transaction_bridge(host)
