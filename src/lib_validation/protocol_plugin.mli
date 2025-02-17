@@ -217,6 +217,16 @@ end
 module type AGNOSTIC_BAKER_PLUGIN = sig
   val hash : Protocol_hash.t
 
+  val register_commands : unit -> unit
+
+  val select_commands :
+    'a ->
+    'b ->
+    (Tezos_client_base.Client_context.full Tezos_clic.command trace, 'c) result
+    Lwt.t
+
+  val init_sapling_params : unit -> unit
+
   val run_baker_binary :
     baker_args:string list ->
     cancel_promise:int Lwt.t ->

@@ -3714,6 +3714,45 @@ let octez_protocol_updater =
         dynlink;
       ]
 
+let octez_client_base =
+  octez_shell_lib
+    "client-base"
+    ~internal_name:"tezos_client_base"
+    ~path:"src/lib_client_base"
+    ~synopsis:"Tezos: common helpers for `octez-client`"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_clic;
+        octez_rpc;
+        octez_shell_services |> open_;
+        octez_sapling;
+        uri;
+      ]
+    ~modules:[":standard"; "bip39_english"]
+    ~linkall:true
+    ~dune:
+      Dune.
+        [
+          targets_rule
+            ["bip39_english.ml"]
+            ~deps:
+              [
+                [S ":exe"; S "gen/bip39_generator.exe"];
+                S "gen/bip39_english.txt";
+              ]
+            ~action:[S "run"; S "%{exe}"; S "%{targets}"];
+        ]
+
+let _octez_client_base_tests =
+  tezt
+    ["bip39_tests"; "pbkdf_tests"]
+    ~path:"src/lib_client_base/test"
+    ~opam:"octez-shell-libs"
+    ~with_macos_security_framework:true
+    ~deps:
+      [octez_rustzcash_deps; octez_base; octez_client_base |> open_; alcotezt]
+
 let octez_validation =
   let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   octez_shell_lib
@@ -3727,8 +3766,10 @@ let octez_validation =
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
+        octez_client_base |> open_;
         octez_crypto |> open_;
         octez_rpc;
+        octez_clic;
         octez_context_ops |> open_;
         octez_shell_services |> open_;
         octez_protocol_updater |> open_;
@@ -4052,45 +4093,6 @@ let _octez_rpc_http_server_tests =
         qcheck_alcotest;
         alcotezt;
       ]
-
-let octez_client_base =
-  octez_shell_lib
-    "client-base"
-    ~internal_name:"tezos_client_base"
-    ~path:"src/lib_client_base"
-    ~synopsis:"Tezos: common helpers for `octez-client`"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_clic;
-        octez_rpc;
-        octez_shell_services |> open_;
-        octez_sapling;
-        uri;
-      ]
-    ~modules:[":standard"; "bip39_english"]
-    ~linkall:true
-    ~dune:
-      Dune.
-        [
-          targets_rule
-            ["bip39_english.ml"]
-            ~deps:
-              [
-                [S ":exe"; S "gen/bip39_generator.exe"];
-                S "gen/bip39_english.txt";
-              ]
-            ~action:[S "run"; S "%{exe}"; S "%{targets}"];
-        ]
-
-let _octez_client_base_tests =
-  tezt
-    ["bip39_tests"; "pbkdf_tests"]
-    ~path:"src/lib_client_base/test"
-    ~opam:"octez-shell-libs"
-    ~with_macos_security_framework:true
-    ~deps:
-      [octez_rustzcash_deps; octez_base; octez_client_base |> open_; alcotezt]
 
 let _bip39_generator =
   private_exe
