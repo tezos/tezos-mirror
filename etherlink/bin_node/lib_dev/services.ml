@@ -250,9 +250,7 @@ let eth_subscribe ~(kind : Ethereum_types.Subscription.kind) =
         in
         let stream = produce_logs_stream ~bloom_filter stream in
         return (stream, stopper)
-    | NewPendingTransactions ->
-        let stream, stopper = Lwt_watcher.create_stream Tx_pool.txs_watcher in
-        return (stream, stopper)
+    | NewPendingTransactions -> return @@ Tx_watcher.create_stream ()
     | Syncing ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/7642 *)
         Stdlib.failwith "The websocket event [syncing] is not implemented yet."
