@@ -12,6 +12,7 @@ val run :
   rpc_endpoint:Uri.t ->
   controller:Account.Secret_key.t ->
   max_active_eoa:int ->
+  max_transaction_batch_length:int option ->
   spawn_interval:float ->
   tick_interval:float ->
   base_fee_factor:float ->

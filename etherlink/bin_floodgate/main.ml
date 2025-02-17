@@ -107,6 +107,16 @@ module Arg = struct
          transaction during an experiment"
       Parameter.int
 
+  let max_transaction_batch_length =
+    Tezos_clic.arg
+      ~long:"max-transaction-batch-length"
+      ~short:'b'
+      ~placeholder:"N"
+      ~doc:
+        "Maximum number of transactions injected at each tick; if this option \
+         is not given there is no limit"
+      Parameter.int
+
   let spawn_interval =
     let default = "0.5" in
     Tezos_clic.default_arg
@@ -191,12 +201,13 @@ let run_command =
   command
     ~desc:"Start Floodgate to spam an EVM-compatible network"
     Arg.(
-      args10
+      args11
         verbose
         relay_endpoint
         rpc_endpoint
         controller
         max_active_eoa
+        max_transaction_batch_length
         spawn_interval
         tick_interval
         base_fee_factor
@@ -208,6 +219,7 @@ let run_command =
            rpc_endpoint,
            controller,
            max_active_eoa,
+           max_transaction_batch_length,
            spawn_interval,
            tick_interval,
            base_fee_factor,
@@ -224,6 +236,7 @@ let run_command =
         ~rpc_endpoint
         ~controller
         ~max_active_eoa
+        ~max_transaction_batch_length
         ~spawn_interval
         ~tick_interval
         ~base_fee_factor

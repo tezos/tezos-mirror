@@ -148,8 +148,8 @@ module Floodgate = struct
 
   module Agent = struct
     let run ?(path = "floodgate") ?scenario ~rpc_endpoint ~controller
-        ?relay_endpoint ?max_active_eoa ?spawn_interval ?tick_interval
-        ?base_fee_factor ?initial_balance agent =
+        ?relay_endpoint ?max_active_eoa ?max_transaction_batch_length
+        ?spawn_interval ?tick_interval ?base_fee_factor ?initial_balance agent =
       let* path = Agent.copy agent ~source:path in
       let runner = Agent.runner agent in
       run
@@ -160,6 +160,7 @@ module Floodgate = struct
         ~controller
         ?relay_endpoint
         ?max_active_eoa
+        ?max_transaction_batch_length
         ?spawn_interval
         ?tick_interval
         ?base_fee_factor
