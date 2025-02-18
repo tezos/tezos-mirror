@@ -846,6 +846,19 @@ open struct
          delegate."
       ~level:Warning
       ("pkh", Signature.Public_key_hash.encoding)
+
+  let cannot_attest_slot_because_of_trap =
+    declare_4
+      ~section
+      ~name:"slot_contains_trap"
+      ~msg:
+        "{delegate} cannot attest slot {slot_index} at published level \
+         {published_level}: shard {shard_index} is a trap."
+      ~level:Notice
+      ("delegate", Signature.Public_key_hash.encoding)
+      ("published_level", Data_encoding.int32)
+      ("slot_index", Data_encoding.int31)
+      ("shard_index", Data_encoding.int31)
 end
 
 (* DAL node event emission functions *)
@@ -1081,3 +1094,9 @@ let emit_trap_delegate_attestation_not_found ~delegate ~slot_index ~shard_index
 
 let emit_registered_pkh_not_a_delegate ~pkh =
   emit registered_pkh_not_a_delegate pkh
+
+let emit_cannot_attest_slot_because_of_trap ~pkh ~published_level ~slot_index
+    ~shard_index =
+  emit
+    cannot_attest_slot_because_of_trap
+    (pkh, published_level, slot_index, shard_index)
