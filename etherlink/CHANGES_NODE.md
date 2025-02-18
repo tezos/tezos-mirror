@@ -6,6 +6,9 @@
 
 ### Bug fixes
 
+- `eth_getLogs` now accepts `null` as a valid value for all its filter
+  parameters. (!16808)
+
 ### Internals
 
 ## Version 0.17 (2025-02-14)
