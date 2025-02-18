@@ -163,7 +163,16 @@ let string_of_sockaddr addr =
 
 let id t = t.id
 
-let raw_socket () = Lwt_unix.socket ~cloexec:true PF_INET6 SOCK_STREAM 0
+let raw_socket () =
+  let sock = Lwt_unix.socket ~cloexec:true PF_INET6 SOCK_STREAM 0 in
+  (* By setting [SO_KEEPALIVE] to [true], the socket is configured to send
+     periodic keep-alive probes to verify that the connection is still
+     active.
+
+     It reset (send TCP RST message and close) if the peer is
+     unresponsive. *)
+  Lwt_unix.(setsockopt sock SO_KEEPALIVE true) ;
+  sock
 
 let socket () = create (raw_socket ())
 
@@ -175,14 +184,6 @@ let create_listening_socket ?(reuse_port = false) ~backlog
       let sock = raw_socket () in
       (if reuse_port then Lwt_unix.(setsockopt sock SO_REUSEPORT true)) ;
       Lwt_unix.(setsockopt sock SO_REUSEADDR true) ;
-
-      (* By setting [SO_KEEPALIVE] to [true], the socket is configured to send
-         periodic keep-alive probes to verify that the connection is still
-         active.
-
-         It reset (send TCP RST message and close) if the peer is
-         unresponsive. *)
-      Lwt_unix.(setsockopt sock SO_KEEPALIVE true) ;
       let*! () =
         Lwt_unix.bind
           sock
