@@ -9613,13 +9613,12 @@ let get_dal_participation l1_node public_key_hash =
     }
 
 let get_tb_expected_attesting_rewards l1_node public_key_hash =
-  let open JSON in
-  let* json =
+  let* participation =
     Node.RPC.(
       call l1_node
       @@ get_chain_block_context_delegate_participation public_key_hash)
   in
-  return (json |-> "expected_attesting_rewards" |> as_int)
+  return participation.expected_attesting_rewards
 
 (** [test_dal_rewards_distribution _protocol dal_parameters cryptobox node
     client _dal_node] verifies the correct distribution of DAL rewards among
@@ -10027,7 +10026,12 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
      - the participation RPC's result is aligned with the first check. *)
   List.iter
     (fun (account, bal1, bal2) ->
-      check_bal_incr ~__LOC__ account bal1 bal2 ~delta:expected_full_tb_rewards ;
+      check_bal_incr
+        ~__LOC__
+        account
+        bal1
+        bal2
+        ~delta:(Tez.to_mutez expected_full_tb_rewards) ;
       let dal_participation =
         List.assoc account bootstrap_accounts_participation
       in
@@ -10036,7 +10040,7 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
         ~__LOC__
         ~error_msg:
           ("account " ^ account.Account.public_key_hash
-         ^ ", expected to have insufficnent DAL participation."))
+         ^ ", expected to have sufficient DAL participation?"))
     [
       (not_attesting_dal, not_attesting_dal_bal1, not_attesting_dal_bal2);
       ( not_sufficiently_attesting_dal_slot_10,
@@ -10051,7 +10055,7 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
     attesting_dal_slot_10
     attesting_dal_slot_10_bal1
     attesting_dal_slot_10_bal2
-    ~delta:(expected_full_tb_rewards + expected_full_dal_rewards) ;
+    ~delta:(Tez.to_mutez expected_full_tb_rewards + expected_full_dal_rewards) ;
   let dal_participation =
     List.assoc attesting_dal_slot_10 bootstrap_accounts_participation
   in

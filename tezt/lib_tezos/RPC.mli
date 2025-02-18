@@ -1160,8 +1160,24 @@ val get_chain_block_context_delegate_min_delegated_in_current_cycle :
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
-val get_chain_block_context_delegate_participation :
+val get_chain_block_context_delegate_participation_raw :
   ?chain:string -> ?block:string -> string -> JSON.t t
+
+type participation = {
+  expected_cycle_activity : int;
+  minimal_cycle_activity : int;
+  missed_slots : int;
+  missed_levels : int;
+  remaining_allowed_missed_slots : int;
+  expected_attesting_rewards : Tez.t;
+}
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/participation]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_delegate_participation :
+  ?chain:string -> ?block:string -> string -> participation t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/dal_participation]
 
