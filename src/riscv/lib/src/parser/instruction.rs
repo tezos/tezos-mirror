@@ -349,6 +349,8 @@ pub enum InstrCacheable {
     Sraiw(NonZeroRdITypeArgs),
     Slti(NonZeroRdITypeArgs),
     Sltiu(NonZeroRdITypeArgs),
+    /// `LB` - Loads a single byte from the address given by: `val(rs1) + imm`
+    /// and sign-extending the result.
     Lb(ITypeArgs),
     /// `LH` - Loads a half-word (2 bytes) starting from address
     /// given by: `val(rs1) + imm` and sign-extending the result.
@@ -364,6 +366,7 @@ pub enum InstrCacheable {
     Ld(ITypeArgs),
 
     // RV64I S-type instructions
+    /// `SB` - Stores a byte (lowest 1 byte from rs2) to the address starting at: `val(rs1) + imm`
     Sb(SBTypeArgs),
     /// `SH` - Stores a half-word (lowest 2 bytes from rs2) to the address
     /// starting at: `val(rs1) + imm`.

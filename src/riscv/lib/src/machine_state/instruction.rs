@@ -374,6 +374,10 @@ pub enum OpCode {
     Lhnz,
     /// Same as `Sh` but only using NonZeroXRegisters.
     Shnz,
+    /// Same as `Lb` but only using NonZeroXRegisters.
+    Lbnz,
+    /// Same as `Sb` but only using NonZeroXRegisters.
+    Sbnz,
 }
 
 impl OpCode {
@@ -418,6 +422,7 @@ impl OpCode {
             Self::Slti => Args::run_slti,
             Self::Sltiu => Args::run_sltiu,
             Self::Lb => Args::run_lb,
+            Self::Lbnz => Args::run_lbnz,
             Self::Lh => Args::run_lh,
             Self::Lhnz => Args::run_lhnz,
             Self::Lw => Args::run_lw,
@@ -428,6 +433,7 @@ impl OpCode {
             Self::Ld => Args::run_ld,
             Self::Ldnz => Args::run_ldnz,
             Self::Sb => Args::run_sb,
+            Self::Sbnz => Args::run_sbnz,
             Self::Sh => Args::run_sh,
             Self::Shnz => Args::run_shnz,
             Self::Sw => Args::run_sw,
@@ -1167,6 +1173,7 @@ impl Args {
     impl_load_type!(run_ldnz, non_zero);
     impl_load_type!(run_lwnz, non_zero);
     impl_load_type!(run_lhnz, non_zero);
+    impl_load_type!(run_lbnz, non_zero);
 
     // RV64I S-type instructions
     impl_store_type!(run_sb);
@@ -1176,6 +1183,7 @@ impl Args {
     impl_store_type!(run_sdnz, non_zero);
     impl_store_type!(run_swnz, non_zero);
     impl_store_type!(run_shnz, non_zero);
+    impl_store_type!(run_sbnz, non_zero);
 
     // RV64I B-type instructions
     impl_b_type!(run_beq, non_zero);
@@ -1495,10 +1503,7 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Sltiu,
                 args: args.to_args(InstrWidth::Uncompressed),
             },
-            InstrCacheable::Lb(args) => Instruction {
-                opcode: OpCode::Lb,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
+            InstrCacheable::Lb(args) => Instruction::from_ic_lb(args),
             InstrCacheable::Lh(args) => Instruction::from_ic_lh(args),
             InstrCacheable::Lw(args) => Instruction::from_ic_lw(args),
             InstrCacheable::Lbu(args) => Instruction {
@@ -1515,10 +1520,7 @@ impl From<&InstrCacheable> for Instruction {
             },
             InstrCacheable::Ld(args) => Instruction::from_ic_ld(args),
             // RV64I S-type instructions
-            InstrCacheable::Sb(args) => Instruction {
-                opcode: OpCode::Sb,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
+            InstrCacheable::Sb(args) => Instruction::from_ic_sb(args),
             InstrCacheable::Sh(args) => Instruction::from_ic_sh(args),
             InstrCacheable::Sw(args) => Instruction::from_ic_sw(args),
             InstrCacheable::Sd(args) => Instruction::from_ic_sd(args),

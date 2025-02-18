@@ -720,6 +720,72 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Lb`].
+    pub(crate) fn new_lb(rd: XRegister, rs1: XRegister, imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Lb,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Lbnz`].
+    pub(crate) fn new_lbnz(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Lbnz,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sb`].
+    pub(crate) fn new_sb(rs1: XRegister, rs2: XRegister, imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Sb,
+            args: Args {
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sbnz`].
+    pub(crate) fn new_sbnz(
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Sbnz,
+            args: Args {
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {
@@ -1272,6 +1338,32 @@ impl Instruction {
                 Instruction::new_shnz(rs1, rs2, args.imm, InstrWidth::Uncompressed)
             }
             _ => Instruction::new_sh(args.rs1, args.rs2, args.imm, InstrWidth::Uncompressed),
+        }
+    }
+
+    /// Convert [`InstrCacheable::Lb`] according to whether register is non-zero.
+    ///
+    /// [`InstrCacheable::Lb`]: crate::parser::instruction::InstrCacheable::Lb
+    pub(super) fn from_ic_lb(args: &ITypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rd), split_x0(args.rs1)) {
+            (X::NonZero(rd), X::NonZero(rs1)) => {
+                Instruction::new_lbnz(rd, rs1, args.imm, InstrWidth::Uncompressed)
+            }
+            _ => Instruction::new_lb(args.rd, args.rs1, args.imm, InstrWidth::Uncompressed),
+        }
+    }
+
+    /// Convert [`InstrCacheable::Sb`] according to whether registers are non-zero.
+    ///
+    /// [`InstrCacheable::Sb`]: crate::parser::instruction::InstrCacheable::Sb
+    pub(super) fn from_ic_sb(args: &SBTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rs1), split_x0(args.rs2)) {
+            (X::NonZero(rs1), X::NonZero(rs2)) => {
+                Instruction::new_sbnz(rs1, rs2, args.imm, InstrWidth::Uncompressed)
+            }
+            _ => Instruction::new_sb(args.rs1, args.rs2, args.imm, InstrWidth::Uncompressed),
         }
     }
 }
