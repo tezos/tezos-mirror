@@ -205,87 +205,62 @@ where
         target_address
     }
 
-    /// `JAL` J-type instruction (note: uncompressed variant)
-    ///
-    /// Instruction mis-aligned will never be thrown because we allow C extension
-    ///
+    /// Store the next instruction address in `rd` and jump to the target address.
     /// Always returns the target address (current program counter + imm)
-    pub fn run_jal(&mut self, imm: i64, rd: XRegister) -> Address {
+    pub fn run_jal(&mut self, imm: i64, rd: NonZeroXRegister, width: InstrWidth) -> Address {
         let current_pc = self.pc.read();
 
         // Save the address after jump instruction into rd
-        let return_address = current_pc.wrapping_add(InstrWidth::Uncompressed as u64);
-        self.xregisters.write(rd, return_address);
+        let return_address = current_pc.wrapping_add(width as u64);
+        self.xregisters.write_nz(rd, return_address);
 
         current_pc.wrapping_add(imm as u64)
     }
 
-    /// `BEQ` w.r.t. instruction width argument
-    #[inline(always)]
-    pub(super) fn run_beq_impl(
-        &mut self,
-        imm: i64,
-        rs1: XRegister,
-        rs2: XRegister,
-        width: InstrWidth,
-    ) -> ProgramCounterUpdate {
-        let current_pc = self.pc.read();
-
-        // Branch if `val(rs1) == val(rs2)`, jumping `imm` bytes ahead.
-        // Otherwise, jump the width of current instruction
-        if self.xregisters.read(rs1) == self.xregisters.read(rs2) {
-            ProgramCounterUpdate::Set(current_pc.wrapping_add(imm as u64))
-        } else {
-            ProgramCounterUpdate::Next(width)
-        }
-    }
-
-    /// `BEQ` B-type instruction
+    /// Performs a conditional ( `val(rs1) == val(rs2)` ) control transfer.
+    /// If condition met, the offset is sign-extended and added to the pc to form the branch
+    /// target address that is then set, otherwise indicates to proceed to the next instruction.
     ///
-    /// Sets the target address if registers contain the same value,
-    /// otherwise proceeds to the next instruction address
+    /// Relevant RISC-V opcodes:
+    /// - `BEQ`
+    /// - `C.BEQZ`
     pub fn run_beq(
         &mut self,
         imm: i64,
-        rs1: XRegister,
-        rs2: XRegister,
-        width: InstrWidth,
-    ) -> ProgramCounterUpdate {
-        self.run_beq_impl(imm, rs1, rs2, width)
-    }
-
-    /// `BNE` w.r.t. instruction width argument
-    #[inline(always)]
-    pub(super) fn run_bne_impl(
-        &mut self,
-        imm: i64,
-        rs1: XRegister,
-        rs2: XRegister,
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
         width: InstrWidth,
     ) -> ProgramCounterUpdate {
         let current_pc = self.pc.read();
 
-        // Branch if `val(rs1) != val(rs2)`, jumping `imm` bytes ahead.
-        // Otherwise, jump the width of current instruction
-        if self.xregisters.read(rs1) != self.xregisters.read(rs2) {
+        if self.xregisters.read_nz(rs1) == self.xregisters.read_nz(rs2) {
             ProgramCounterUpdate::Set(current_pc.wrapping_add(imm as u64))
         } else {
             ProgramCounterUpdate::Next(width)
         }
     }
 
-    /// `BNE` B-type instruction
+    /// Performs a conditional ( `val(rs1) != val(rs2)` ) control transfer.
+    /// If condition met, the offset is sign-extended and added to the pc to form the branch
+    /// target address that is then set, otherwise indicates to proceed to the next instruction.
     ///
-    /// Sets the target address if registers contain different values,
-    /// otherwise proceeds to the next instruction address
+    /// Relevant RISC-V opcodes:
+    /// - `BNE`
+    /// - `C.BNEZ`
     pub fn run_bne(
         &mut self,
         imm: i64,
-        rs1: XRegister,
-        rs2: XRegister,
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
         width: InstrWidth,
     ) -> ProgramCounterUpdate {
-        self.run_bne_impl(imm, rs1, rs2, width)
+        let current_pc = self.pc.read();
+
+        if self.xregisters.read_nz(rs1) != self.xregisters.read_nz(rs2) {
+            ProgramCounterUpdate::Set(current_pc.wrapping_add(imm as u64))
+        } else {
+            ProgramCounterUpdate::Next(width)
+        }
     }
 
     /// `BGE` B-type instruction
@@ -501,6 +476,21 @@ mod tests {
         };
     }
 
+    macro_rules! test_nz_branch_instr {
+        ($state:ident, $branch_fn:tt, $imm:expr,
+            $rs1:ident, $r1_val:expr,
+            $rs2:ident, $r2_val:expr, $width:expr,
+            $init_pc:ident, $expected_pc:expr
+           ) => {
+            $state.pc.write($init_pc);
+            $state.xregisters.write($rs1, $r1_val);
+            $state.xregisters.write($rs2, $r2_val);
+
+            let new_pc = $state.$branch_fn($imm, nz::$rs1, nz::$rs2, $width);
+            prop_assert_eq!(&new_pc, $expected_pc);
+        };
+    }
+
     backend_test!(test_beq_bne, F, {
         proptest!(|(
             init_pc in any::<u64>(),
@@ -520,34 +510,34 @@ mod tests {
             let mut state = create_state!(HartState, F);
 
             // BEQ - different
-            test_branch_instr!(state, run_beq, imm, t1, r1_val, t2, r2_val, width, init_pc, &next_pcu);
+            test_nz_branch_instr!(state, run_beq, imm, t1, r1_val, t2, r2_val, width, init_pc, &next_pcu);
             // BEQ - equal
-            test_branch_instr!(state, run_beq, imm, t1, r1_val, t2, r1_val, width, init_pc, &branch_pcu);
+            test_nz_branch_instr!(state, run_beq, imm, t1, r1_val, t2, r1_val, width, init_pc, &branch_pcu);
 
             // BNE - different
-            test_branch_instr!(state, run_bne, imm, t1, r1_val, t2, r2_val, width, init_pc, &branch_pcu);
+            test_nz_branch_instr!(state, run_bne, imm, t1, r1_val, t2, r2_val, width, init_pc, &branch_pcu);
             // BNE - equal
-            test_branch_instr!(state, run_bne, imm, t1, r1_val, t2, r1_val, width, init_pc, &next_pcu);
+            test_nz_branch_instr!(state, run_bne, imm, t1, r1_val, t2, r1_val, width, init_pc, &next_pcu);
 
             // BEQ - different - imm = 0
-            test_branch_instr!(state, run_beq, 0, t1, r1_val, t2, r2_val, width, init_pc, &next_pcu);
+            test_nz_branch_instr!(state, run_beq, 0, t1, r1_val, t2, r2_val, width, init_pc, &next_pcu);
             // BEQ - equal - imm = 0
-            test_branch_instr!(state, run_beq, 0, t1, r1_val, t2, r1_val, width, init_pc, &init_pcu);
+            test_nz_branch_instr!(state, run_beq, 0, t1, r1_val, t2, r1_val, width, init_pc, &init_pcu);
 
             // BNE - different - imm = 0
-            test_branch_instr!(state, run_bne, 0, t1, r1_val, t2, r2_val, width, init_pc, &init_pcu);
+            test_nz_branch_instr!(state, run_bne, 0, t1, r1_val, t2, r2_val, width, init_pc, &init_pcu);
             // BNE - equal - imm = 0
-            test_branch_instr!(state, run_bne, 0, t1, r1_val, t2, r1_val, width, init_pc, &next_pcu);
+            test_nz_branch_instr!(state, run_bne, 0, t1, r1_val, t2, r1_val, width, init_pc, &next_pcu);
 
             // BEQ - same register - imm = 0
-            test_branch_instr!(state, run_beq, 0, t1, r1_val, t1, r2_val, width, init_pc, &init_pcu);
+            test_nz_branch_instr!(state, run_beq, 0, t1, r1_val, t1, r2_val, width, init_pc, &init_pcu);
             // BEQ - same register
-            test_branch_instr!(state, run_beq, imm, t1, r1_val, t1, r2_val, width, init_pc, &branch_pcu);
+            test_nz_branch_instr!(state, run_beq, imm, t1, r1_val, t1, r2_val, width, init_pc, &branch_pcu);
 
             // BNE - same register - imm = 0
-            test_branch_instr!(state, run_bne, 0, t1, r1_val, t1, r2_val, width, init_pc, &next_pcu);
+            test_nz_branch_instr!(state, run_bne, 0, t1, r1_val, t1, r2_val, width, init_pc, &next_pcu);
             // BNE - same register
-            test_branch_instr!(state, run_bne, imm, t1, r1_val, t1, r2_val, width, init_pc, &next_pcu);
+            test_nz_branch_instr!(state, run_bne, imm, t1, r1_val, t1, r2_val, width, init_pc, &next_pcu);
         });
     });
 
@@ -793,14 +783,14 @@ mod tests {
 
     backend_test!(test_jal, F, {
         let ipc_imm_rd_fpc_frd = [
-            (42, 42, t1, 84, 46),
-            (0, 1000, t1, 1000, 4),
-            (50, -100, t1, -50_i64 as u64, 54),
-            (u64::MAX - 1, 100, t1, 98_i64 as u64, 2),
+            (42, 42, nz::t1, 84, 46),
+            (0, 1000, nz::t1, 1000, 4),
+            (50, -100, nz::t1, -50_i64 as u64, 54),
+            (u64::MAX - 1, 100, nz::t1, 98_i64 as u64, 2),
             (
                 1_000_000_000_000,
                 (u64::MAX - 1_000_000_000_000 + 1) as i64,
-                t2,
+                nz::t2,
                 0,
                 1_000_000_000_004,
             ),
@@ -809,11 +799,11 @@ mod tests {
             let mut state = create_state!(HartState, F);
 
             state.pc.write(init_pc);
-            let new_pc = state.run_jal(imm, rd);
+            let new_pc = state.run_jal(imm, rd, InstrWidth::Uncompressed);
 
             assert_eq!(state.pc.read(), init_pc);
             assert_eq!(new_pc, res_pc);
-            assert_eq!(state.xregisters.read(rd), res_rd);
+            assert_eq!(state.xregisters.read_nz(rd), res_rd);
         }
     });
 

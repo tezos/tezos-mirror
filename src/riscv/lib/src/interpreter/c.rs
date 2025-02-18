@@ -12,6 +12,12 @@ use crate::{instruction_context::ICB, machine_state::registers::NonZeroXRegister
 ///
 /// Relevant RISC-V opcodes:
 /// - C.MV
+/// - ADD
+/// - OR
+/// - XOR
+/// - SLL
+/// - SRL
+/// - SRA
 pub fn run_mv(icb: &mut impl ICB, rd_rs1: NonZeroXRegister, rs2: NonZeroXRegister) {
     let rs2_val = icb.xregister_read(rs2);
     icb.xregister_write(rd_rs1, rs2_val)
@@ -21,6 +27,16 @@ pub fn run_mv(icb: &mut impl ICB, rd_rs1: NonZeroXRegister, rs2: NonZeroXRegiste
 ///
 /// Relevant RISC-V opcodes:
 /// - C.NOP
+/// - ADDI
+/// - C.ADDI4SPN
+/// - C.ANDI
+/// - C.SRLI
+/// - C.SRAI
+/// - C.AND
+/// - C.OR
+/// - C.XOR
+/// - BNE
+/// - C.BNEZ
 pub fn run_nop(_icb: &mut impl ICB) {}
 
 #[cfg(test)]

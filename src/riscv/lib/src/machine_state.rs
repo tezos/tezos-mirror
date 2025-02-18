@@ -1384,6 +1384,9 @@ mod tests {
                 args: TaggedArgs {
                     imm: 128 - 4,
                     width: InstrWidth::Compressed,
+                    rd: nz::ra.into(),
+                    rs1: nz::ra.into(),
+                    rs2: nz::ra.into(),
                     ..TaggedArgs::DEFAULT
                 },
             })

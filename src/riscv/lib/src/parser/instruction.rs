@@ -347,7 +347,11 @@ pub enum InstrCacheable {
     Sd(SBTypeArgs),
 
     // RV64I B-type instructions
+    /// `BEQ` - Sets the target address if registers contain the same value,
+    /// otherwise proceeds to the next instruction address.
     Beq(SBTypeArgs),
+    /// `BNE` - Sets the target address if registers contain different values,
+    /// otherwise proceeds to the next instruction address.
     Bne(SBTypeArgs),
     Blt(SBTypeArgs),
     Bge(SBTypeArgs),
@@ -359,6 +363,10 @@ pub enum InstrCacheable {
     Auipc(NonZeroRdUJTypeArgs),
 
     // RV64I jump instructions
+    /// `JAL` (note: uncompressed variant) - Instruction mis-aligned will
+    /// never be thrown because we allow C extension
+    ///
+    /// Always returns the target address (current program counter + imm)
     Jal(UJTypeArgs),
     Jalr(ITypeArgs),
 
@@ -480,10 +488,18 @@ pub enum InstrCacheable {
     CLwsp(CIBNZTypeArgs),
     CSw(SBTypeArgs),
     CSwsp(CSSTypeArgs),
+    /// `C.J` - Performs an unconditional control transfer. The immediate is added to
+    /// the pc to form the jump target address.
     CJ(CJTypeArgs),
     CJr(CRJTypeArgs),
     CJalr(CRJTypeArgs),
+    /// `C.BEQZ` - Performs a conditional ( `val(rs1) == 0` ) control transfer.
+    /// The offset is sign-extended and added to the pc to form the branch
+    /// target address.
     CBeqz(CIBTypeArgs),
+    /// `C.BNEZ` -  Performs a conditional ( `val(rs1) != 0`) control transfer.
+    /// The offset is sign-extended and added to the pc to form the branch
+    /// target address.
     CBnez(CIBTypeArgs),
     /// `C.LI` - Loads the sign-extended 6-bit immediate into register `rd_rs1`.
     CLi(CIBNZTypeArgs),

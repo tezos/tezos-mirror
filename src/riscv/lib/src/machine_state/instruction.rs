@@ -824,6 +824,19 @@ macro_rules! impl_b_type {
             Ok(core.hart.$fn(self.imm, self.rs1.x, self.rs2.x, self.width))
         }
     };
+
+    ($fn: ident, non_zero) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+            &self,
+            core: &mut MachineCoreState<ML, M>,
+        ) -> Result<ProgramCounterUpdate, Exception> {
+            Ok(core
+                .hart
+                .$fn(self.imm, self.rs1.nzx, self.rs2.nzx, self.width))
+        }
+    };
 }
 
 macro_rules! impl_amo_type {
@@ -899,7 +912,7 @@ macro_rules! impl_cb_type {
             &self,
             core: &mut MachineCoreState<ML, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            Ok(core.hart.$fn(self.imm, self.rd.x, self.width))
+            Ok(core.hart.$fn(self.imm, self.rs1.nzx, self.width))
         }
     };
 }
@@ -1117,8 +1130,8 @@ impl Args {
     impl_store_type!(run_sd);
 
     // RV64I B-type instructions
-    impl_b_type!(run_beq);
-    impl_b_type!(run_bne);
+    impl_b_type!(run_beq, non_zero);
+    impl_b_type!(run_bne, non_zero);
     impl_b_type!(run_blt);
     impl_b_type!(run_bge);
     impl_b_type!(run_bltu);
@@ -1154,7 +1167,7 @@ impl Args {
         &self,
         core: &mut MachineCoreState<ML, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
-        Ok(Set(core.hart.run_jal(self.imm, self.rd.x)))
+        Ok(Set(core.hart.run_jal(self.imm, self.rd.nzx, self.width)))
     }
 
     /// SAFETY: This function must only be called on an `Args` belonging
@@ -1468,14 +1481,8 @@ impl From<&InstrCacheable> for Instruction {
             },
 
             // RV64I B-type instructions
-            InstrCacheable::Beq(args) => Instruction {
-                opcode: OpCode::Beq,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
-            InstrCacheable::Bne(args) => Instruction {
-                opcode: OpCode::Bne,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
+            InstrCacheable::Beq(args) => Instruction::from_ic_beq(args),
+            InstrCacheable::Bne(args) => Instruction::from_ic_bne(args),
             InstrCacheable::Blt(args) => Instruction {
                 opcode: OpCode::Blt,
                 args: args.to_args(InstrWidth::Uncompressed),
@@ -1504,10 +1511,7 @@ impl From<&InstrCacheable> for Instruction {
             },
 
             // RV64I jump instructions
-            InstrCacheable::Jal(args) => Instruction {
-                opcode: OpCode::Jal,
-                args: args.into(),
-            },
+            InstrCacheable::Jal(args) => Instruction::from_ic_jal(args),
             InstrCacheable::Jalr(args) => Instruction {
                 opcode: OpCode::Jalr,
                 args: args.to_args(InstrWidth::Uncompressed),
@@ -1952,10 +1956,7 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::CSwsp,
                 args: args.into(),
             },
-            InstrCacheable::CJ(args) => Instruction {
-                opcode: OpCode::J,
-                args: args.into(),
-            },
+            InstrCacheable::CJ(args) => Instruction::new_j(args.imm, InstrWidth::Compressed),
             InstrCacheable::CJr(args) => Instruction {
                 opcode: OpCode::CJr,
                 args: args.into(),
@@ -1964,14 +1965,8 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::CJalr,
                 args: args.into(),
             },
-            InstrCacheable::CBeqz(args) => Instruction {
-                opcode: OpCode::Beqz,
-                args: args.into(),
-            },
-            InstrCacheable::CBnez(args) => Instruction {
-                opcode: OpCode::Bnez,
-                args: args.into(),
-            },
+            InstrCacheable::CBeqz(args) => Instruction::from_ic_cbeqz(args),
+            InstrCacheable::CBnez(args) => Instruction::from_ic_cbnez(args),
             InstrCacheable::CLi(args) => {
                 Instruction::new_li(args.rd_rs1, args.imm, InstrWidth::Compressed)
             }
