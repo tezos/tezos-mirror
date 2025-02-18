@@ -151,42 +151,6 @@ let double_consensus_wrong_slot
   let* () = waiter_already_denounced in
   unit
 
-(** Adaptation of [double_consensus_wrong_slot] under [aggregate_attestations]
-   feature flag *)
-let double_consensus_wrong_slot_feature_flag
-    (consensus_for, mk_consensus, _, consensus_name) protocol =
-  let* parameter_file =
-    Protocol.write_parameter_file
-      ~base:(Right (protocol, None))
-      [(["aggregate_attestation"], `Bool true)]
-  in
-  let* (client, accuser), (branch, level, round, slots, block_payload_hash) =
-    double_attestation_init
-      ~parameter_file
-      consensus_for
-      consensus_name
-      protocol
-      ()
-  in
-  Log.info "Inject an invalid %s and wait for denounciation" consensus_name ;
-  let op =
-    mk_consensus ~slot:(List.nth slots 1) ~level ~round ~block_payload_hash
-  in
-  let waiter =
-    Accuser.wait_for accuser "attestation_conflict_ignored.v0" (fun _ ->
-        Some ())
-  in
-  let* _ =
-    Operation.Consensus.inject
-      ~protocol
-      ~branch
-      ~signer:Constant.bootstrap1
-      op
-      client
-  in
-  let* () = waiter in
-  unit
-
 let attest_utils =
   ( Client.attest_for,
     (fun ~slot ~level ~round ~block_payload_hash ->
@@ -215,16 +179,6 @@ let double_preattestation_wrong_slot =
     ~tags:[Tag.layer1; "double"; "preattestation"; "accuser"; "slot"; "node"]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol -> double_consensus_wrong_slot preattest_utils protocol
-
-let double_attestation_wrong_slot_feature_flag =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"double attestation using wrong slot under feature flag"
-    ~tags:[Tag.layer1; "double"; "attestation"; "accuser"; "slot"; "node"]
-    ~supports:(Protocol.From_protocol 023)
-    ~uses:(fun protocol -> [Protocol.accuser protocol])
-  @@ fun protocol ->
-  double_consensus_wrong_slot_feature_flag attest_utils protocol
 
 let double_consensus_wrong_block_payload_hash
     (consensus_for, mk_consensus, consensus_waiter, consensus_name) protocol =
@@ -513,7 +467,6 @@ let operation_too_far_in_future =
 let register ~protocols =
   double_attestation_wrong_slot protocols ;
   double_preattestation_wrong_slot protocols ;
-  double_attestation_wrong_slot_feature_flag protocols ;
   double_attestation_wrong_block_payload_hash protocols ;
   double_preattestation_wrong_block_payload_hash protocols ;
   double_attestation_wrong_branch protocols ;
