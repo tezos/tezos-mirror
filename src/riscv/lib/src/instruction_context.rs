@@ -41,6 +41,9 @@ pub trait ICB {
     /// registers that are guaranteed not to be x0.
     fn xregister_write(&mut self, reg: NonZeroXRegister, value: Self::XValue);
 
+    /// Construct an [`ICB::XValue`] from an `imm: i64`.
+    fn xvalue_of_imm(&mut self, imm: i64) -> Self::XValue;
+
     /// Perform a wrapping add of two **XValues**, returning the new value.
     ///
     /// This behaves identically for both signed & unsigned values.
@@ -74,6 +77,11 @@ impl<ML: MainMemoryLayout, M: ManagerReadWrite> ICB for MachineCoreState<ML, M> 
     #[inline(always)]
     fn xregister_write(&mut self, reg: NonZeroXRegister, value: Self::XValue) {
         self.hart.xregisters.write_nz(reg, value)
+    }
+
+    #[inline(always)]
+    fn xvalue_of_imm(&mut self, imm: i64) -> Self::XValue {
+        imm as u64
     }
 
     #[inline(always)]

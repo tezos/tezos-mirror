@@ -119,30 +119,6 @@ impl<M> XRegisters<M>
 where
     M: backend::ManagerReadWrite,
 {
-    /// Loads the immediate `imm` into register `rd_rs1`.
-    ///
-    /// Relevant RISC-V opcodes:
-    /// - C.LI
-    /// - ADD
-    /// - ADDI
-    /// - ANDI
-    /// - ORI
-    /// - XORI
-    /// - SLLI
-    /// - SRLI
-    /// - SRAI
-    /// - AND
-    /// - C.AND
-    /// - OR
-    /// - XOR
-    /// - SLL
-    /// - SRL
-    /// - SRA
-    /// - SUB
-    pub fn run_li(&mut self, imm: i64, rd_rs1: NonZeroXRegister) {
-        self.write_nz(rd_rs1, imm as u64)
-    }
-
     /// `C.LUI` CI-type compressed instruction
     ///
     /// Loads the non-zero 6-bit immediate into bits 17–12 of the
@@ -284,20 +260,6 @@ mod tests {
             // value for the program counter is correct.
             assert_eq!(state.pc.read(), init_pc);
             assert_eq!(new_pc, res_pc);
-        }
-    });
-
-    backend_test!(test_run_cli, F, {
-        let imm_rdrs1_res = [
-            (0_i64, nz::t3, 0_u64),
-            (0xFFF0_0420, nz::t2, 0xFFF0_0420),
-            (-1, nz::t4, 0xFFFF_FFFF_FFFF_FFFF),
-        ];
-
-        for (imm, rd_rs1, res) in imm_rdrs1_res {
-            let mut state = create_state!(HartState, F);
-            state.xregisters.run_li(imm, rd_rs1);
-            assert_eq!(state.xregisters.read_nz(rd_rs1), res);
         }
     });
 

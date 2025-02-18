@@ -51,15 +51,6 @@ where
         self.write_nz(rd, result)
     }
 
-    /// `LUI` U-type instruction
-    ///
-    /// Set the upper 20 bits of the `rd` register with the `U-type` formatted immediate `imm`
-    pub fn run_lui(&mut self, imm: i64, rd: NonZeroXRegister) {
-        // Being a `U-type` operation, the immediate is correctly formatted
-        // (lower 12 bits cleared and the value is sign-extended)
-        self.write_nz(rd, imm as u64);
-    }
-
     /// Saves in `rd` the bitwise AND between the value in `rs1` and `imm`
     ///
     /// Relevant RISC-V opcodes:

@@ -29,7 +29,7 @@ use super::{
 use crate::{
     default::ConstDefault,
     instruction_context::{ICB, IcbLoweringFn},
-    interpreter::{c, i},
+    interpreter::{c, i, load_store},
     machine_state::ProgramCounterUpdate::{Next, Set},
     parser::instruction::{
         AmoArgs, CIBDTypeArgs, CIBNZTypeArgs, CIBTypeArgs, CJTypeArgs, CNZRTypeArgs, CRJTypeArgs,
@@ -574,6 +574,7 @@ impl OpCode {
             Self::Mv => Some(Args::run_mv),
             Self::Nop => Some(Args::run_nop),
             Self::Add => Some(Args::run_add),
+            Self::Li => Some(Args::run_li),
             _ => None,
         }
     }
@@ -883,6 +884,15 @@ macro_rules! impl_ci_type {
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart.xregisters.$fn(self.imm, self.rd.nzx);
             Ok(ProgramCounterUpdate::Next(self.width))
+        }
+    };
+
+    ($impl: path, $fn: ident, non_zero) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
+            $impl(icb, self.imm, self.rd.nzx);
+            icb.ok(ProgramCounterUpdate::Next(self.width))
         }
     };
 }
@@ -1319,7 +1329,7 @@ impl Args {
     impl_store_type!(run_csw);
     impl_cb_type!(run_beqz);
     impl_cb_type!(run_bnez);
-    impl_ci_type!(run_li, non_zero);
+    impl_ci_type!(load_store::run_li, run_li, non_zero);
     impl_ci_type!(run_clui, non_zero);
     impl_cr_type!(run_neg, non_zero);
     impl_css_type!(run_cswsp);

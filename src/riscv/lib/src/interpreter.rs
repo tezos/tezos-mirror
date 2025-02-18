@@ -9,6 +9,7 @@ mod common_memory;
 pub mod float;
 pub mod i;
 pub mod integer;
+pub mod load_store;
 pub mod rv32a;
 pub mod rv32c;
 pub mod rv32i;
