@@ -542,6 +542,19 @@ let () =
   List.map_ep (get_outbox_content node_ctxt) outbox_messages
 
 let () =
+  Local_directory.register0 Rollup_node_services.Local.outbox_pending
+  @@ fun node_ctxt outbox_level () ->
+  let open Lwt_result_syntax in
+  let* outbox_messages =
+    Node_context.get_pending_outbox_messages ?outbox_level node_ctxt
+  in
+  List.map_ep
+    (fun (outbox_msg, status) ->
+      let+ outbos_msg = get_outbox_content node_ctxt outbox_msg in
+      (outbos_msg, status))
+    outbox_messages
+
+let () =
   Local_directory.register0 Rollup_node_services.Local.gc_info
   @@ fun node_ctxt () () ->
   let open Lwt_result_syntax in

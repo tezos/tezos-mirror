@@ -712,6 +712,45 @@ let get_unexecutable_pending_outbox_messages ?outbox_level
         ~min_level:outbox_level
         ~max_level:outbox_level
 
+let get_pending_outbox_messages ?outbox_level
+    ({store; lcc; current_protocol; _} as node_ctxt) =
+  let open Lwt_result_syntax in
+  let* head = last_processed_head_opt node_ctxt in
+  let*? max_level =
+    match head with
+    | None -> error_with "No L2 head"
+    | Some h -> Ok h.header.level
+  in
+  let lcc = (Reference.get lcc).level in
+  let constants = (Reference.get current_protocol).constants.sc_rollup in
+  let lost_level =
+    Int32.sub
+      lcc
+      (Int32.of_int
+         (constants.max_number_of_stored_cemented_commitments
+        * constants.commitment_period_in_blocks))
+  in
+  let+ messages =
+    match outbox_level with
+    | None -> Store.Outbox_messages.pending store ~min_level:0l ~max_level
+    | Some outbox_level when outbox_level > max_level -> return_nil
+    | Some outbox_level ->
+        Store.Outbox_messages.pending
+          store
+          ~min_level:outbox_level
+          ~max_level:outbox_level
+  in
+  List.rev_map
+    (fun ((outbox_level, _) as msg) ->
+      let status =
+        if outbox_level < lost_level then `Lost
+        else if outbox_level <= lcc then `Executable
+        else `Pending
+      in
+      (msg, status))
+    messages
+  |> List.rev
+
 let get_full_l2_block ?get_outbox_messages node_ctxt block_hash =
   let open Lwt_result_syntax in
   let* block = Store.L2_blocks.find_full node_ctxt.store block_hash in

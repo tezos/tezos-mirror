@@ -481,6 +481,12 @@ val get_executable_pending_outbox_messages :
 val get_unexecutable_pending_outbox_messages :
   ?outbox_level:int32 -> _ t -> (int32 * int list) list tzresult Lwt.t
 
+(** Returns all pending messages with their status. *)
+val get_pending_outbox_messages :
+  ?outbox_level:int32 ->
+  _ t ->
+  ((int32 * int list) * [`Executable | `Lost | `Pending]) list tzresult Lwt.t
+
 (** {3 Protocol} *)
 
 (** [protocol_of_level_with_store store level] returns the protocol of block level [level]. *)
