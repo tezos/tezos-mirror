@@ -266,8 +266,8 @@ let default_limits =
     peer_validator_limits = default_peer_validator_limits;
     chain_validator_limits = default_chain_validator_limits;
     history_mode = None;
-    disable_context_pruning = Some false;
-    storage_maintenance_delay = Some Auto;
+    disable_context_pruning = None;
+    storage_maintenance_delay = None;
   }
 
 let limits_encoding =
