@@ -6,7 +6,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [start db ~evm_node_endpoint] starts the Etherlink withdrawl monitors by
-    subscribing to the relevant logs on [evm_node_endpoint] and storing
-    information in the database [db]. *)
-val start : Db.t -> evm_node_endpoint:Uri.t -> unit tzresult Lwt.t
+(** [start db ~evm_node_endpoint ~rollup_node_endpoint] starts the Etherlink
+    withdrawl monitors by subscribing to the relevant logs on
+    [evm_node_endpoint] and storing information in the database [db]. *)
+val start :
+  Db.t ->
+  evm_node_endpoint:Uri.t ->
+  rollup_node_endpoint:Uri.t ->
+  unit tzresult Lwt.t

@@ -534,7 +534,7 @@ let monitor_heads db ws_client =
   in
   return_unit
 
-let monitor_l2_l1_levels db ws_client ~last_levels =
+let monitor_l2_l1_levels db ws_client rollup_node_rpc ~last_levels =
   let open Lwt_result_syntax in
   let last_l1_level = Option.map fst last_levels in
   (* TODO: https://gitlab.com/tezos/tezos/-/merge_requests/16879
@@ -555,20 +555,44 @@ let monitor_l2_l1_levels db ws_client ~last_levels =
             Event.(emit finalized_l2_levels)
               (l1_level, Ethereum_types.Qty.next start_l2_level, end_l2_level)
         in
-        Db.Levels.store db ~l1_level ~start_l2_level ~end_l2_level)
+        let* outbox_messages =
+          Rollup_node_rpc.get_outbox_messages
+            rollup_node_rpc
+            ~outbox_level:l1_level
+        and* lcc = Rollup_node_rpc.get_lcc rollup_node_rpc in
+        let* () = Db.Pointers.LCC.set db lcc in
+        let* () =
+          List.iter_es
+            (fun {Rollup_node_rpc.outbox_level; message_index; transactions} ->
+              List.iteri_es
+                (fun transaction_index transaction ->
+                  Db.Outbox_messages.store
+                    db
+                    ~transaction_index
+                    ~outbox_level
+                    ~message_index
+                    transaction)
+                transactions)
+            outbox_messages
+        in
+        let* () = Db.Levels.store db ~l1_level ~start_l2_level ~end_l2_level in
+        return_unit)
       levels_subscription.stream
   in
   return_unit
 
-let start db ~evm_node_endpoint =
+let start db ~evm_node_endpoint ~rollup_node_endpoint =
   let open Lwt_result_syntax in
   let*! ws_client =
     Websocket_client.connect Media_type.json evm_node_endpoint
   in
+  let rollup_node_rpc = Rollup_node_rpc.make_ctxt ~rollup_node_endpoint in
   let* last_l2_head = Db.Pointers.L2_head.get db in
   let* last_levels = Db.Levels.last db in
   let monitor_withdrawals = monitor_withdrawals db ws_client in
-  let monitor_l2_l1_levels = monitor_l2_l1_levels db ws_client ~last_levels in
+  let monitor_l2_l1_levels =
+    monitor_l2_l1_levels db ws_client rollup_node_rpc ~last_levels
+  in
   let* () = catch_up_withdrawals db ws_client ~last_l2_head in
   let* () =
     Lwt.pick
