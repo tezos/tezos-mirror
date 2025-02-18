@@ -1,4 +1,4 @@
-ARG IMAGE
+ARG IMAGE=invalid
 # the image with proper version is set as ARG
 #hadolint ignore=DL3006
 FROM ${IMAGE}

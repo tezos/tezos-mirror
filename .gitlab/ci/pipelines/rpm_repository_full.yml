@@ -438,7 +438,8 @@ oc.install_bin_fedora_39_systemd:
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
-  - ./scripts/ci/systemd-packages-test.sh docs/introduction/install-bin-rpm.sh images/packages/rpm-systemd-tests.Dockerfile
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/rpm/rpm-install.sh
+    images/packages/rpm-systemd-tests.Dockerfile
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:

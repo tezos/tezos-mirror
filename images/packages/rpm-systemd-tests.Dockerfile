@@ -1,9 +1,11 @@
-FROM rockylinux:9.3
-
+ARG IMAGE=invalid
+# The image with proper version is set as ARG
+#hadolint ignore=DL3006
+FROM ${IMAGE}
 
 #hadolint ignore=DL3008,DL3041
 RUN dnf -y update && \
-    dnf -y install systemd bash && \
+    dnf -y install systemd bash procps && \
     dnf clean all
 
 #hadolint ignore=DL3045

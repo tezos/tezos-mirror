@@ -29,7 +29,7 @@ else
   docker rmi $IMAGE || true
   echo "Image $IMAGE does not exist locally."
   echo "Building or updating the local image for you"
-  docker build -f "$DOCKERFILE" . -t systemd
+  docker build --build-arg IMAGE="$DISTRIBUTION:$RELEASE" -f "$DOCKERFILE" . -t systemd
 fi
 
 # Trap signals (EXIT, INT, TERM) and perform cleanup
