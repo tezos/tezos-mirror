@@ -3615,18 +3615,55 @@ let generate_dune_project_files () =
     Format.fprintf fmt "(package (name %s)%s)@." package allow_empty ) ;
   pp_do_not_edit ~comment_start:";" fmt ()
 
-let generate_executable_list filename release_status_to_list =
-  write filename @@ fun fmt ->
-  Fun.flip List.iter !Target.registered @@ fun (internal : Target.internal) ->
-  if internal.release_status = release_status_to_list then
-    match internal.kind with
-    | Public_library _ | Private_library _ | Private_executable _
-    | Test_executable _ ->
-        ()
-    | Public_executable ne_list ->
-        Fun.flip List.iter (Ne_list.to_list ne_list)
-        @@ fun (full_name : Target.full_name) ->
-        Format.fprintf fmt "%s@." full_name.public_name
+let generate_executable_list path release_status_to_list =
+  let all_filename =
+    path
+    // (Target.show_release_status release_status_to_list
+       |> String.lowercase_ascii)
+    ^ "-executables"
+  in
+  (* Generate one file for all products. *)
+  write all_filename @@ fun fmt ->
+  !Target.executables_by_product
+  |> String_map.iter @@ fun product internal_list ->
+     let filename =
+       (path // product) ^ "-"
+       ^ (Target.show_release_status release_status_to_list
+         |> String.lowercase_ascii)
+       ^ "-executables"
+     in
+     let executables_list =
+       List.filter_map
+         (fun (internal : Target.internal) ->
+           if internal.release_status = release_status_to_list then
+             Some internal
+           else None)
+         internal_list
+     in
+     (* Generate one file for each product. *)
+     (if executables_list != [] then
+        write filename @@ fun fmt ->
+        Fun.flip List.iter executables_list
+        @@ fun (internal : Target.internal) ->
+        if internal.release_status = release_status_to_list then
+          match internal.kind with
+          | Public_library _ | Private_library _ | Private_executable _
+          | Test_executable _ ->
+              ()
+          | Public_executable ne_list ->
+              Fun.flip List.iter (Ne_list.to_list ne_list)
+              @@ fun (full_name : Target.full_name) ->
+              Format.fprintf fmt "%s@." full_name.public_name) ;
+     Fun.flip List.iter internal_list @@ fun (internal : Target.internal) ->
+     if internal.release_status = release_status_to_list then
+       match internal.kind with
+       | Public_library _ | Private_library _ | Private_executable _
+       | Test_executable _ ->
+           ()
+       | Public_executable ne_list ->
+           Fun.flip List.iter (Ne_list.to_list ne_list)
+           @@ fun (full_name : Target.full_name) ->
+           Format.fprintf fmt "%s@." full_name.public_name
 
 let generate_workspace env dune =
   let pp_dune fmt dune =
@@ -4667,10 +4704,8 @@ let generate ~make_tezt_exe ~tezt_exe_deps ~default_profile ~add_to_meta_package
          opam_release_graph)
       opam_dep_graph ;
     generate_opam_ci_input opam_release_graph ;
-    generate_executable_list "script-inputs/released-executables" Released ;
-    generate_executable_list
-      "script-inputs/experimental-executables"
-      Experimental ;
+    generate_executable_list "script-inputs/" Released ;
+    generate_executable_list "script-inputs/" Experimental ;
     generate_profiles ~default_profile ;
     Option.iter
       (generate_opam_files_for_release
