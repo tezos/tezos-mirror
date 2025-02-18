@@ -104,7 +104,7 @@ for release in $RELEASES; do             # unstable, jammy, noble ...
 
     # we also add the data packages that we built for
     # bookworm, that are distribution independent. Only for next packages
-    if [ -n "$PREFIX" ]; then
+    if [ -z "$PREFIX" ]; then
       for file in packages/debian/bookworm/*_all.deb; do
         cp "$file" "$TARGETDIR/${target}/"
         echo "Adding data package $file to $TARGETDIR/${target}/"

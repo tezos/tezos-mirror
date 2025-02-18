@@ -21,18 +21,9 @@ for arg in "$@"; do
   esac
 done
 
-debian_bookworm_packages="$(find packages/debian/bookworm/ -maxdepth 1 -name octez-\*.deb 2> /dev/null || printf '')"
-ubuntu_noble_packages="$(find packages/ubuntu/noble/ -maxdepth 1 -name octez-\*.deb 2> /dev/null || printf '')"
-ubuntu_jammy_packages="$(find packages/ubuntu/jammy/ -maxdepth 1 -name octez-\*.deb 2> /dev/null || printf '')"
-
 # https://docs.gitlab.com/ee/user/packages/generic_packages/index.html#download-package-file
 # :gitlab_api_url/projects/:id/packages/generic/:package_name/:package_version/:file_name
 gitlab_octez_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_binaries_package_name}/${gitlab_package_version}"
-
-gitlab_octez_debian_bookworm_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_debian_bookworm_package_name}/${gitlab_package_version}"
-
-gitlab_octez_ubuntu_noble_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_ubuntu_noble_package_name}/${gitlab_package_version}"
-gitlab_octez_ubuntu_jammy_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_ubuntu_jammy_package_name}/${gitlab_package_version}"
 
 gitlab_octez_source_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_source_package_name}/${gitlab_package_version}"
 
@@ -93,24 +84,6 @@ for architecture in ${architectures}; do
   tar -czf "octez-${architecture}.tar.gz" "octez-${architecture}/"
   gitlab_upload "octez-${architecture}.tar.gz" "${gitlab_octez_binaries_package_name}-linux-${architecture}.tar.gz"
   cd ..
-done
-
-echo "Upload debian bookworm packages"
-for package in ${debian_bookworm_packages}; do
-  package_name="$(basename "${package}")"
-  gitlab_upload "./${package}" "${package_name}" "${gitlab_octez_debian_bookworm_package_url}"
-done
-
-echo "Upload Ubuntu noble packages"
-for package in ${ubuntu_noble_packages}; do
-  package_name="$(basename "${package}")"
-  gitlab_upload "./${package}" "${package_name}" "${gitlab_octez_ubuntu_noble_package_url}"
-done
-
-echo "Upload Ubuntu jammy packages"
-for package in ${ubuntu_jammy_packages}; do
-  package_name="$(basename "${package}")"
-  gitlab_upload "./${package}" "${package_name}" "${gitlab_octez_ubuntu_jammy_package_url}"
 done
 
 # Source code archives automatically published in a GitLab release do not have a static checksum,

@@ -138,7 +138,7 @@ else
 fi
 
 # [ preeseed octez ]
-if [ -n "$PREFIX" ]; then
+if [ -z "$PREFIX" ]; then
   # preseed octez-node for debconf. Notice we set purge_warning to yes,
   # to make the `autopurge` pass and remove all the node data at the end of this
   # script.
@@ -178,7 +178,7 @@ apt-get install -y octez-baker
 apt-get install -y octez-dal-node
 
 # [install octez additional packages]
-if [ -n "$PREFIX" ]; then
+if [ -z "$PREFIX" ]; then
   # [install octez NEXT packages]
   apt-get install -y octez-smart-rollup-node
 else
@@ -203,7 +203,7 @@ apt-get autopurge -y octez-node octez-client octez-baker octez-dal-node
 # [check autopurge]
 set +x
 
-if [ -n "$PREFIX" ]; then
+if [ -z "$PREFIX" ]; then
   # check the package configuration
   sudo debconf-get-selections | if grep -q octez; then
     echo "Leftovers in debconf db"
