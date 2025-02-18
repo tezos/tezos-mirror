@@ -860,47 +860,61 @@ let craft_dal_attestation ?level ?round ?payload_level ~signer ~nb_slots
   let* level =
     match level with Some level -> return level | None -> Client.level client
   in
-  let* slots =
+  let* json =
     Client.RPC.call client
     @@ RPC.get_chain_block_helper_validators
          ~level
          ~delegate:signer.Account.public_key_hash
          ()
   in
-  let slot =
-    JSON.(List.hd JSON.(slots |> as_list) |-> "slots" |> as_list)
-    |> List.hd |> JSON.as_int
-  in
-  let* block_payload_hash, round =
-    let block =
-      (match payload_level with None -> level | Some l -> l) |> string_of_int
-    in
-    let* block_payload_hash =
-      Operation.Consensus.get_block_payload_hash ~block client
-    in
-    let* round =
-      match round with
-      | None ->
-          Client.RPC.call client @@ RPC.get_chain_block_helper_round ~block ()
-      | Some round -> return round
-    in
-    return (block_payload_hash, round)
-  in
-  Operation.Consensus.operation
-    ~with_dal:true
-    ~signer
-    (Operation.Consensus.attestation
-       ~level
-       ~round
-       ?dal_attestation
-       ~slot
-       ~block_payload_hash
-       ())
-    client
+  match JSON.(json |> as_list) with
+  | [] ->
+      Log.info
+        "[craft_dal_attestation] %s not in TB committee at level %d"
+        signer.public_key_hash
+        level ;
+      none
+  | [validator] ->
+      let slots = JSON.(validator |-> "slots" |> as_list) in
+      let slot = List.hd slots |> JSON.as_int in
+      let* block_payload_hash, round =
+        let block =
+          Option.value payload_level ~default:level |> string_of_int
+        in
+        let* block_payload_hash =
+          Operation.Consensus.get_block_payload_hash ~block client
+        in
+        let* round =
+          match round with
+          | None ->
+              Client.RPC.call client
+              @@ RPC.get_chain_block_helper_round ~block ()
+          | Some round -> return round
+        in
+        return (block_payload_hash, round)
+      in
+      let* op =
+        Operation.Consensus.operation
+          ~with_dal:true
+          ~signer
+          (Operation.Consensus.attestation
+             ~level
+             ~round
+             ?dal_attestation
+             ~slot
+             ~block_payload_hash
+             ())
+          client
+      in
+      some op
+  | _ ->
+      Test.fail
+        ~__LOC__
+        "Unexpected format for get_chain_block_helper_validators RPC"
 
-let inject_dal_attestation ?level ?round ?payload_level ?force ?error ?request
-    ~signer ~nb_slots availability client =
-  let* op =
+let craft_dal_attestation_exn ?level ?round ?payload_level ~signer ~nb_slots
+    availability client =
+  let* res =
     craft_dal_attestation
       ?level
       ?round
@@ -910,13 +924,59 @@ let inject_dal_attestation ?level ?round ?payload_level ?force ?error ?request
       availability
       client
   in
-  let* oph = Operation.inject ?force ?error ?request op client in
-  return (op, oph)
+  match res with
+  | None ->
+      Test.fail
+        ~__LOC__
+        "Unexpected case: pkh %s has no TB slot"
+        signer.Account.public_key_hash
+  | Some v -> return v
+
+let inject_dal_attestation ?level ?round ?payload_level ?force ?error ?request
+    ~signer ~nb_slots availability client =
+  let* op_opt =
+    craft_dal_attestation
+      ?level
+      ?round
+      ?payload_level
+      ~signer
+      ~nb_slots
+      availability
+      client
+  in
+  match op_opt with
+  | None -> none
+  | Some op ->
+      let* oph = Operation.inject ?force ?error ?request op client in
+      some (op, oph)
+
+let inject_dal_attestation_exn ?level ?round ?payload_level ?force ?error
+    ?request ~signer ~nb_slots availability client =
+  let* res =
+    inject_dal_attestation
+      ?level
+      ?round
+      ?payload_level
+      ?force
+      ?error
+      ?request
+      ~signer
+      ~nb_slots
+      availability
+      client
+  in
+  match res with
+  | None ->
+      Test.fail
+        ~__LOC__
+        "Unexpected case: pkh %s has no TB slot"
+        signer.Account.public_key_hash
+  | Some v -> return v
 
 let inject_dal_attestations ?payload_level ?level ?round ?force ?request
     ?(signers = Array.to_list Account.Bootstrap.keys) ~nb_slots availability
     client =
-  Lwt_list.map_s
+  Lwt_list.filter_map_s
     (fun signer ->
       inject_dal_attestation
         ?payload_level
@@ -1328,7 +1388,7 @@ let test_slots_attestation_operation_behavior _protocol parameters _cryptobox
   assert (lag > 1) ;
   let attest ?payload_level ?(signer = Constant.bootstrap2) ~level () =
     let* _op, op_hash =
-      inject_dal_attestation
+      inject_dal_attestation_exn
         ?payload_level
         ~force:true
         ~nb_slots
@@ -1517,7 +1577,7 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
   let* () = bake_for client in
   let* level = Client.level client in
   let* _op, `OpHash _oph =
-    inject_dal_attestation
+    inject_dal_attestation_exn
       ~nb_slots
       ~level
       ~signer:Constant.bootstrap1
@@ -1583,7 +1643,7 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
         check_in_TB_committee ~__LOC__ node new_account.public_key_hash ~level
       in
       let* _op, `OpHash _oph =
-        inject_dal_attestation
+        inject_dal_attestation_exn
           ~error:Operation.dal_data_availibility_attester_not_in_committee
           ~nb_slots
           ~level
@@ -8703,7 +8763,11 @@ let test_inject_accusation _protocol dal_parameters cryptobox node client
   let availability = Slots [slot_index] in
   let signer = Constant.bootstrap2 in
   let* attestation, _op_hash =
-    inject_dal_attestation ~signer ~nb_slots:number_of_slots availability client
+    inject_dal_attestation_exn
+      ~signer
+      ~nb_slots:number_of_slots
+      availability
+      client
   in
   let* signature = Operation.sign attestation client in
   let attestation = (attestation, signature) in
@@ -8881,7 +8945,7 @@ let test_attester_did_not_attest (_protocol : Protocol.t)
   log_step
     "Crafting attestation for [bootstrap3] (with expected DAL attestation)." ;
   let* op1 =
-    craft_dal_attestation
+    craft_dal_attestation_exn
       ~nb_slots:dal_params.number_of_slots
       ~signer:Constant.bootstrap3
       (Slots [index])
@@ -8891,7 +8955,7 @@ let test_attester_did_not_attest (_protocol : Protocol.t)
   let op1_promise = wait_for_classified oph1 node in
   log_step "Crafting attestation for [bootstrap2] (with empty DAL attestation)." ;
   let* op2 =
-    craft_dal_attestation
+    craft_dal_attestation_exn
       ~nb_slots:dal_params.number_of_slots
       ~signer:Constant.bootstrap2
       (Slots [])
@@ -9037,7 +9101,7 @@ let test_duplicate_denunciations _protocol dal_parameters cryptobox node client
   let availability = Slots [slot_index] in
   let signer = Constant.bootstrap2 in
   let* attestation, _op_hash =
-    inject_dal_attestation
+    inject_dal_attestation_exn
       ~signer
       ~nb_slots:dal_parameters.number_of_slots
       availability
@@ -9186,7 +9250,7 @@ let test_denunciation_next_cycle _protocol dal_parameters cryptobox node client
     Log.info "Injecting a first attestation at level %d" current_level ;
     let availability = Slots [slot_index] in
     let* attestation, _op_hash =
-      inject_dal_attestation
+      inject_dal_attestation_exn
         ~signer:Constant.bootstrap2
         ~nb_slots:dal_parameters.number_of_slots
         availability
@@ -9235,7 +9299,7 @@ let test_denunciation_next_cycle _protocol dal_parameters cryptobox node client
     let availability = Slots [slot_index] in
     let signer = Constant.bootstrap2 in
     let* attestation, _op_hash =
-      inject_dal_attestation
+      inject_dal_attestation_exn
         ~signer
         ~nb_slots:dal_parameters.number_of_slots
         availability
@@ -9684,7 +9748,7 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
     let* level = Node.get_level node in
     let count_dal_attesting_bakers = ref 0 in
     (* 1. Baker always attests TB and all DAL slots *)
-    let* (_ : (Operation_core.t * [`OpHash of peer_id]) list) =
+    let* (_ : Operation_core.t * [`OpHash of peer_id]) =
       (* The baker delegate will miss 1/10 of its DAL attestations and will send
          [No_dal_attestation] in this case. *)
       let baker_attestation =
@@ -9693,14 +9757,14 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
           incr count_dal_attesting_bakers ;
           Slots all_slots)
       in
-      inject_dal_attestations
-        ~signers:[baker]
+      inject_dal_attestation_exn
+        ~signer:baker
         ~nb_slots
         baker_attestation
         client
     in
     (* 2. attesting_dal_slot_10 always attests TB and DAL slot 10 *)
-    let* (_ : (Operation_core.t * [`OpHash of peer_id]) list) =
+    let* (_ : Operation_core.t * [`OpHash of peer_id]) =
       (* The attesting_dal_slot_10 delegate misses 1/11th of its DAL
          attestations and will send Slots [], but it should be fine for its
          rewards. *)
@@ -9710,36 +9774,35 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
           incr count_dal_attesting_bakers ;
           Slots [10])
       in
-      inject_dal_attestations
-        ~signers:[attesting_dal_slot_10]
+      inject_dal_attestation_exn
+        ~signer:attesting_dal_slot_10
         ~nb_slots
         attestation
         client
     in
     (* 3. not_attesting_at_all is not attesting neither TB nor DAL slots *)
     (* 4. not_attesting_dal either sends no DAL content or sends bitset 0 *)
-    let* (_ : (Operation_core.t * [`OpHash of peer_id]) list) =
+    let* (_ : Operation_core.t * [`OpHash of peer_id]) =
       let dal_attestation =
         if level mod 2 = 0 then No_dal_attestation else Slots []
       in
-      inject_dal_attestations
-        ~signers:[not_attesting_dal]
+      inject_dal_attestation_exn
+        ~signer:not_attesting_dal
         ~nb_slots
         dal_attestation
         client
     in
     (* 5. not_sufficiently_attesting_dal_slot_10: is attesting DAL slot 10, but only 25%
        of the time. *)
-    let* (_ : (Operation_core.t * [`OpHash of peer_id]) list) =
-      let* level = Node.get_level node in
+    let* (_ : Operation_core.t * [`OpHash of peer_id]) =
       let slots_to_attest =
         if level mod 4 = 0 then (
           incr count_dal_attesting_bakers ;
           Slots [10])
         else No_dal_attestation
       in
-      inject_dal_attestations
-        ~signers:[not_sufficiently_attesting_dal_slot_10]
+      inject_dal_attestation_exn
+        ~signer:not_sufficiently_attesting_dal_slot_10
         ~nb_slots
         slots_to_attest
         client
