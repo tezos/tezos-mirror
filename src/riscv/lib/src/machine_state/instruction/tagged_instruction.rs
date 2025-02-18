@@ -293,9 +293,9 @@ pub struct TaggedArgs {
 
 impl ConstDefault for TaggedArgs {
     const DEFAULT: Self = Self {
-        rd: TaggedRegister::X(XRegister::x0),
-        rs1: TaggedRegister::X(XRegister::x0),
-        rs2: TaggedRegister::X(XRegister::x0),
+        rd: TaggedRegister::NZX(NonZeroXRegister::x1),
+        rs1: TaggedRegister::NZX(NonZeroXRegister::x1),
+        rs2: TaggedRegister::NZX(NonZeroXRegister::x1),
         imm: 0,
         csr: CSRegister::fflags,
         rs3f: FRegister::f0,
@@ -373,7 +373,7 @@ mod tests {
     };
 
     #[test]
-    fn test_instruction_serde() {
+    fn test_miri_instruction_serde() {
         let instr_xsrc_xdst = Instruction {
             opcode: OpCode::Add,
             args: Args {
@@ -409,7 +409,6 @@ mod tests {
             args: Args {
                 rd: FRegister::f0.into(),
                 rs1: XRegister::x0.into(),
-                rs2: XRegister::x0.into(),
                 ..Args::DEFAULT
             },
         };
@@ -437,7 +436,6 @@ mod tests {
         let instr_xsrc_fsrc = Instruction {
             opcode: OpCode::Fsw,
             args: Args {
-                rd: FRegister::f0.into(),
                 rs1: XRegister::x0.into(),
                 rs2: FRegister::f0.into(),
                 ..Args::DEFAULT
@@ -452,9 +450,7 @@ mod tests {
         let instr_nzxsrc_nzxdest = Instruction {
             opcode: OpCode::CJr,
             args: Args {
-                rd: NonZeroXRegister::x1.into(),
                 rs1: NonZeroXRegister::x2.into(),
-                rs2: NonZeroXRegister::x3.into(),
                 ..Args::DEFAULT
             },
         };

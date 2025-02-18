@@ -664,9 +664,10 @@ mod tests {
         block_cache::bcall::Interpreted,
         instruction::{
             Instruction, OpCode,
-            tagged_instruction::{TaggedArgs, TaggedInstruction},
+            tagged_instruction::{TaggedArgs, TaggedInstruction, TaggedRegister},
         },
         main_memory::tests::T1K,
+        registers::XRegister,
     };
     use crate::{
         backend_test,
@@ -1374,6 +1375,8 @@ mod tests {
                 args: TaggedArgs {
                     rd: nz::a0.into(),
                     imm: 0,
+                    rs1: TaggedRegister::X(XRegister::x1),
+                    rs2: TaggedRegister::X(XRegister::x1),
                     ..TaggedArgs::DEFAULT
                 },
             })
@@ -1419,6 +1422,7 @@ mod tests {
                     rd: nz::a1.into(),
                     rs1: a1.into(),
                     imm: u16::bits_subset(overwrite_bytes, 11, 0) as i64,
+                    rs2: TaggedRegister::X(XRegister::x1),
                     ..TaggedArgs::DEFAULT
                 },
             })
@@ -1430,6 +1434,7 @@ mod tests {
                     rs2: a1.into(),
                     imm: 0,
                     width: InstrWidth::Compressed,
+                    rd: TaggedRegister::X(XRegister::x1),
                     ..TaggedArgs::DEFAULT
                 },
             })
@@ -1440,6 +1445,7 @@ mod tests {
                     rd: zero.into(),
                     rs1: a0.into(),
                     imm: 0,
+                    rs2: TaggedRegister::X(XRegister::x1),
                     ..TaggedArgs::DEFAULT
                 },
             })

@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs. <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2024-2025 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -1635,6 +1635,14 @@ let jobs pipeline_type =
           ~dependencies:(Dependent [Job job_check_riscv_kernels])
           ["make -C src/riscv test-long"]
       in
+      let job_test_miri_riscv_kernels : tezos_job =
+        make_job_kernel
+          ~__POS__
+          ~name:"test_miri_riscv_kernels"
+          ~changes:changeset_riscv_kernels
+          ~dependencies:(Dependent [Job job_check_riscv_kernels])
+          ["make -C src/riscv test-miri"]
+      in
       let job_test_evm_compatibility : tezos_job =
         make_job_kernel
           ~__POS__
@@ -1658,6 +1666,7 @@ let jobs pipeline_type =
         job_check_riscv_kernels;
         job_test_riscv_kernels;
         job_test_long_riscv_kernels;
+        job_test_miri_riscv_kernels;
         job_test_evm_compatibility;
       ]
     in

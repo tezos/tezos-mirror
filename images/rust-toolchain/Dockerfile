@@ -42,7 +42,7 @@ RUN rustup update 1.66.0 1.73.0 1.76.0 1.77.2 1.78.0 nightly-2025-01-30 && \
     riscv64gc-unknown-linux-gnu \
     x86_64-unknown-linux-musl; \
     done && \
-    rustup component add --toolchain=nightly-2025-01-30 rustfmt
+    rustup component add --toolchain=nightly-2025-01-30 rustfmt miri rust-src
 
 # Install Rust 1.73.0 standard library for riscv64gc-unknown-hermit
 RUN curl -L "https://github.com/hermit-os/rust-std-hermit/releases/download/1.73.0/rust-std-1.73.0-riscv64gc-unknown-hermit.tar.gz" -o rust-std-1.73.0-riscv64gc-unknown-hermit.tar.gz \

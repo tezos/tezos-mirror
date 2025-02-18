@@ -597,6 +597,12 @@ pub union Register {
     pub nzx: NonZeroXRegister,
 }
 
+impl ConstDefault for Register {
+    const DEFAULT: Self = Self {
+        nzx: NonZeroXRegister::x1,
+    };
+}
+
 impl From<XRegister> for Register {
     fn from(x: XRegister) -> Self {
         Self { x }
@@ -643,9 +649,9 @@ pub struct Args {
 
 impl ConstDefault for Args {
     const DEFAULT: Self = Self {
-        rd: Register { x: XRegister::x0 },
-        rs1: Register { x: XRegister::x0 },
-        rs2: Register { x: XRegister::x0 },
+        rd: Register::DEFAULT,
+        rs1: Register::DEFAULT,
+        rs2: Register::DEFAULT,
         imm: 0,
         csr: CSRegister::fflags,
         rs3f: FRegister::f0,
@@ -2108,9 +2114,6 @@ impl ITypeArgs {
         Args {
             rd: self.rd.into(),
             rs1: self.rs1.into(),
-            // We are adding a default value for rs2 as x0 to be explicit
-            // that it is of XRegister type.
-            rs2: XRegister::x0.into(),
             imm: self.imm,
             width,
             ..Args::DEFAULT
@@ -2123,9 +2126,6 @@ impl NonZeroRdITypeArgs {
         Args {
             rd: self.rd.into(),
             rs1: self.rs1.into(),
-            // We are adding a default value for rs2 as x0 to be explicit
-            // that it is of XRegister type.
-            rs2: XRegister::x0.into(),
             imm: self.imm,
             width,
             ..Args::DEFAULT
@@ -2136,9 +2136,6 @@ impl NonZeroRdITypeArgs {
 impl SBTypeArgs {
     fn to_args(self, width: InstrWidth) -> Args {
         Args {
-            // We are adding a default value for rd as X0 to be explicit
-            // that it is of XRegister type.
-            rd: XRegister::x0.into(),
             rs1: self.rs1.into(),
             rs2: self.rs2.into(),
             imm: self.imm,
@@ -2152,10 +2149,6 @@ impl From<&UJTypeArgs> for Args {
     fn from(value: &UJTypeArgs) -> Self {
         Self {
             rd: value.rd.into(),
-            // We are adding a default value for rs1 and rs2 as X0
-            // to be explicit that they are of XRegister type.
-            rs1: XRegister::x0.into(),
-            rs2: XRegister::x0.into(),
             imm: value.imm,
             width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
@@ -2167,10 +2160,6 @@ impl From<&NonZeroRdUJTypeArgs> for Args {
     fn from(value: &NonZeroRdUJTypeArgs) -> Self {
         Self {
             rd: value.rd.into(),
-            // We are adding a default value for rs1 and rs2 as X0
-            // to be explicit that they are of XRegister type.
-            rs1: XRegister::x0.into(),
-            rs2: XRegister::x0.into(),
             imm: value.imm,
             width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
@@ -2198,11 +2187,6 @@ impl From<&CIBTypeArgs> for Args {
             rd: value.rd_rs1.into(),
             imm: value.imm,
             rs1: value.rd_rs1.into(),
-            // We are adding a default value for rs2 as X0
-            // to be explicit that it is of XRegister type.
-            // In the cases of CBEQZ and CBNEZ, rs2 must be
-            // 0 as rs1 is being compared to it.
-            rs2: XRegister::x0.into(),
             width: InstrWidth::Compressed,
             ..Self::DEFAULT
         }
@@ -2214,10 +2198,6 @@ impl From<&CIBNZTypeArgs> for Args {
         Self {
             rd: value.rd_rs1.into(),
             imm: value.imm,
-            // Setting a default value of NonZeroXRegister::x1 for rs1
-            // and rs2 to be explicit they are NonZeroXRegister type.
-            rs1: NonZeroXRegister::x1.into(),
-            rs2: NonZeroXRegister::x1.into(),
             width: InstrWidth::Compressed,
             ..Self::DEFAULT
         }
@@ -2228,9 +2208,6 @@ impl From<&CRTypeArgs> for Args {
     fn from(value: &CRTypeArgs) -> Self {
         Self {
             rd: value.rd_rs1.into(),
-            // We are adding a default value for rs1 as X0
-            // to be explicit that it is of XRegister type.
-            rs1: XRegister::x0.into(),
             rs2: value.rs2.into(),
             width: InstrWidth::Compressed,
             ..Self::DEFAULT
@@ -2242,9 +2219,6 @@ impl From<&CNZRTypeArgs> for Args {
     fn from(value: &CNZRTypeArgs) -> Self {
         Self {
             rd: value.rd_rs1.into(),
-            // We are adding a default value for rs1 as NonZeroXRegister::x1
-            // to be explicit that it is of NonZeroXRegister type.
-            rs1: NonZeroXRegister::x1.into(),
             rs2: value.rs2.into(),
             width: InstrWidth::Compressed,
             ..Self::DEFAULT
@@ -2255,11 +2229,6 @@ impl From<&CNZRTypeArgs> for Args {
 impl From<&CJTypeArgs> for Args {
     fn from(value: &CJTypeArgs) -> Self {
         Self {
-            // We are adding a default value for rd, rs1 and rs2 as X0
-            // to be explicit that they are of XRegister type.
-            rd: XRegister::x0.into(),
-            rs1: XRegister::x0.into(),
-            rs2: XRegister::x0.into(),
             imm: value.imm,
             width: InstrWidth::Compressed,
             ..Self::DEFAULT
@@ -2270,11 +2239,7 @@ impl From<&CJTypeArgs> for Args {
 impl From<&CRJTypeArgs> for Args {
     fn from(value: &CRJTypeArgs) -> Self {
         Self {
-            // Setting a default value of NonZeroXRegister::x1 for rd
-            // and rs2 to be explicit they are NonZeroXRegister type.
-            rd: NonZeroXRegister::x1.into(),
             rs1: value.rs1.into(),
-            rs2: NonZeroXRegister::x1.into(),
             width: InstrWidth::Compressed,
             ..Self::DEFAULT
         }
@@ -2284,10 +2249,6 @@ impl From<&CRJTypeArgs> for Args {
 impl From<&CSSTypeArgs> for Args {
     fn from(value: &CSSTypeArgs) -> Self {
         Self {
-            // We are adding a default value for rd and rs2 as X0
-            // to be explicit that they are of XRegister type.
-            rd: XRegister::x0.into(),
-            rs1: XRegister::x0.into(),
             rs2: value.rs2.into(),
             imm: value.imm,
             width: InstrWidth::Compressed,
@@ -2301,9 +2262,6 @@ impl From<&CsrArgs> for Args {
         Self {
             rd: value.rd.into(),
             rs1: value.rs1.into(),
-            // We are adding a default value for rs2 as X0 to be explicit
-            // that it is of XRegister type.
-            rs2: XRegister::x0.into(),
             csr: value.csr,
             width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
@@ -2315,10 +2273,6 @@ impl From<&CsriArgs> for Args {
     fn from(value: &CsriArgs) -> Self {
         Self {
             rd: value.rd.into(),
-            // We are adding a default value for rs1 and rs2 as X0
-            // to be explicit that they are of XRegister type.
-            rs1: XRegister::x0.into(),
-            rs2: XRegister::x0.into(),
             imm: value.imm,
             csr: value.csr,
             width: InstrWidth::Uncompressed,
@@ -2332,9 +2286,6 @@ impl FLoadArgs {
         Args {
             rd: self.rd.into(),
             rs1: self.rs1.into(),
-            // We are adding a default value for rs2 as X0 to be explicit
-            // that it is of XRegister type.
-            rs2: XRegister::x0.into(),
             imm: self.imm,
             width,
             ..Args::DEFAULT
@@ -2345,9 +2296,6 @@ impl FLoadArgs {
 impl FStoreArgs {
     fn to_args(self, width: InstrWidth) -> Args {
         Args {
-            // We are adding a default value for rd as X0 to be explicit
-            // that it is of XRegister type.
-            rd: XRegister::x0.into(),
             rs1: self.rs1.into(),
             rs2: self.rs2.into(),
             imm: self.imm,
@@ -2361,11 +2309,6 @@ impl From<&CSSDTypeArgs> for Args {
     fn from(value: &CSSDTypeArgs) -> Self {
         Self {
             imm: value.imm,
-            // as these arguments associate with the XSrcFSrc ArgsShape,
-            // we are adding a default value for rd and rs1 as X0
-            // to be explicit.
-            rd: XRegister::x0.into(),
-            rs1: XRegister::x0.into(),
             rs2: value.rs2.into(),
             width: InstrWidth::Compressed,
             ..Self::DEFAULT
@@ -2378,11 +2321,6 @@ impl From<&CIBDTypeArgs> for Args {
         Self {
             imm: value.imm,
             rd: value.rd_rs1.into(),
-            // as these arguments associate with the XSrcFDst ArgsShape,
-            // we are adding a default value for rs1 and rs2 as X0
-            // to be explicit.
-            rs1: XRegister::x0.into(),
-            rs2: XRegister::x0.into(),
             width: InstrWidth::Compressed,
             ..Self::DEFAULT
         }
@@ -2394,9 +2332,6 @@ impl From<&XRegToFRegArgs> for Args {
         Self {
             rd: value.rd.into(),
             rs1: value.rs1.into(),
-            // as these arguments associate with the XSrcFDst ArgsShape,
-            // we are adding a default value for rs2 as X0 to be explicit.
-            rs2: XRegister::x0.into(),
             width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
         }
@@ -2408,9 +2343,6 @@ impl From<&XRegToFRegArgsWithRounding> for Args {
         Self {
             rd: value.rd.into(),
             rs1: value.rs1.into(),
-            // as these arguments associate with the XSrcFDst ArgsShape,
-            // we are adding a default value for rs2 as X0 to be explicit.
-            rs2: XRegister::x0.into(),
             rm: value.rm,
             width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
@@ -2423,9 +2355,6 @@ impl From<&FRegToXRegArgs> for Args {
         Self {
             rd: value.rd.into(),
             rs1: value.rs1.into(),
-            // as these arguments associate with the FSrcXDst ArgsShape,
-            // we are adding a default value for rs2 as F0.
-            rs2: FRegister::f0.into(),
             width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
         }
@@ -2437,9 +2366,6 @@ impl From<&FRegToXRegArgsWithRounding> for Args {
         Self {
             rd: value.rd.into(),
             rs1: value.rs1.into(),
-            // as these arguments associate with the FSrcXDst ArgsShape,
-            // we are adding a default value for rs2 as F0.
-            rs2: FRegister::f0.into(),
             rm: value.rm,
             width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
@@ -2478,9 +2404,6 @@ impl From<&FR1ArgWithRounding> for Args {
         Self {
             rd: value.rd.into(),
             rs1: value.rs1.into(),
-            // as these arguments associate with the FSrcFDst ArgsShape,
-            // we are adding a default value for rs2 as F0 to be explicit.
-            rs2: FRegister::f0.into(),
             rm: value.rm,
             width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
@@ -2510,5 +2433,42 @@ impl From<&FCmpArgs> for Args {
             width: InstrWidth::Uncompressed,
             ..Self::DEFAULT
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::Register;
+    use crate::{
+        default::ConstDefault,
+        machine_state::registers::{FRegister, NonZeroXRegister, XRegister},
+    };
+
+    // Ensure no undefined behaviour when reading any field from `Register::DEFAULT`
+    #[test]
+    #[cfg(miri)]
+    fn miri_test_register_default_safety() {
+        let default = Register::DEFAULT;
+
+        assert_eq!(XRegister::x1, unsafe { default.x });
+        assert_eq!(NonZeroXRegister::x1, unsafe { default.nzx });
+        // FRegisters are not offset by one as f0 is stored in state, unlike x0
+        assert_eq!(FRegister::f0, unsafe { default.f });
+    }
+
+    // The default register should be valid for all variants
+    #[test]
+    fn miri_test_register_default() {
+        let default = Register::DEFAULT;
+
+        assert!(default == Register { x: XRegister::x1 });
+        assert!(
+            default
+                == Register {
+                    nzx: NonZeroXRegister::x1
+                }
+        );
+        // FRegisters are not offset by one as f0 is stored in state, unlike x0
+        assert!(default == Register { f: FRegister::f0 });
     }
 }
