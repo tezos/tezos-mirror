@@ -115,6 +115,10 @@ module type CURVE = sig
 
   val add_bulk : t list -> t
 
+  (** [affine_add_bulk xs] returns the sum of the elements of [xs] by
+      performing only one allocation for the output. *)
+  val affine_add_bulk : affine_array -> t
+
   (** [double g] returns [2g] *)
   val double : t -> t
 

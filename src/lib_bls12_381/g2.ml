@@ -90,6 +90,9 @@ module Stubs = struct
   external set_affine_coordinates : affine -> Fq2.t -> Fq2.t -> int
     = "caml_blst_p2_set_coordinates_stubs"
 
+  external affine_add_bulk : jacobian -> affine_array -> int -> int
+    = "caml_blst_p2s_add_stubs"
+
   external pippenger :
     jacobian ->
     jacobian array ->
@@ -235,6 +238,11 @@ module G2 = struct
   let add_bulk xs =
     let buffer = Stubs.allocate_g2 () in
     List.iter (fun x -> ignore @@ Stubs.dadd buffer buffer x) xs ;
+    buffer
+
+  let affine_add_bulk (affine_points, npoints) =
+    let buffer = Stubs.allocate_g2 () in
+    ignore @@ Stubs.affine_add_bulk buffer affine_points npoints ;
     buffer
 
   let double x =

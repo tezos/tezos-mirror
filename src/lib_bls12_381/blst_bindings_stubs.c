@@ -588,6 +588,29 @@ CAMLprim value caml_blst_p1_set_coordinates_stubs(value buffer, value x,
   CAMLreturn(CAML_BLS12_381_OUTPUT_SUCCESS);
 }
 
+CAMLprim value caml_blst_p1s_add_stubs(value jacobian_res, value affine_points,
+                                       value npoints) {
+  CAMLparam3(jacobian_res, affine_points, npoints);
+  int npoints_c = Int_val(npoints);
+  blst_p1_affine *affine_points_c = Blst_p1_affine_val(affine_points);
+
+  blst_p1_affine **addr_ps =
+      (blst_p1_affine **)calloc(npoints_c, sizeof(blst_p1_affine *));
+  if (addr_ps == NULL) {
+    CAMLreturn(CAML_BLS12_381_OUTPUT_OUT_OF_MEMORY);
+  }
+  for (int i = 0; i < npoints_c; i++) {
+    addr_ps[i] = affine_points_c + i;
+  }
+
+  blst_p1s_add(Blst_p1_val(jacobian_res), (const blst_p1_affine **)addr_ps,
+               npoints_c);
+
+  free(addr_ps);
+
+  CAMLreturn(CAML_BLS12_381_OUTPUT_SUCCESS);
+}
+
 static struct custom_operations blst_p2_ops = {"blst_p2",
                                                custom_finalize_default,
                                                custom_compare_default,
@@ -737,6 +760,29 @@ CAMLprim value caml_blst_p2_set_coordinates_stubs(value buffer, value x,
   blst_fp2 *x_c = Blst_fp2_val(x);
   blst_fp2 *y_c = Blst_fp2_val(y);
   blst_p2_set_coordinates(buffer_c, x_c, y_c);
+  CAMLreturn(CAML_BLS12_381_OUTPUT_SUCCESS);
+}
+
+CAMLprim value caml_blst_p2s_add_stubs(value jacobian_res, value affine_points,
+                                       value npoints) {
+  CAMLparam3(jacobian_res, affine_points, npoints);
+  int npoints_c = Int_val(npoints);
+  blst_p2_affine *affine_points_c = Blst_p2_affine_val(affine_points);
+
+  blst_p2_affine **addr_ps =
+      (blst_p2_affine **)calloc(npoints_c, sizeof(blst_p2_affine *));
+  if (addr_ps == NULL) {
+    CAMLreturn(CAML_BLS12_381_OUTPUT_OUT_OF_MEMORY);
+  }
+  for (int i = 0; i < npoints_c; i++) {
+    addr_ps[i] = affine_points_c + i;
+  }
+
+  blst_p2s_add(Blst_p2_val(jacobian_res), (const blst_p2_affine **)addr_ps,
+               npoints_c);
+
+  free(addr_ps);
+
   CAMLreturn(CAML_BLS12_381_OUTPUT_SUCCESS);
 }
 
