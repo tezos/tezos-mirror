@@ -18,20 +18,11 @@
 
     {ul
       {li Depending on the result of the RPC, its [callback] is called with
-          either [`Accepted hash] (where [hash] is the hash of the raw
-          transaction) or [`Refused]).}
+          either [`Accepted] or [`Refused]).}
       {li As soon as the transaction appears in a blueprint, its callback is
           called with [`Confirmed]. If this does not happen before 2s, the
           [callback] is called with [`Dropped].}} *)
-type callback =
-  [`Accepted of Ethereum_types.hash | `Confirmed | `Dropped | `Refused] ->
-  unit Lwt.t
-
-(** A [request] submitted to the [Tx_queue] consists in a payload
-    (that is, a raw transaction) and a {!type:callback} that will be
-    used to advertise the transaction's life cycle. *)
-
-type request = {payload : Ethereum_types.hex; callback : callback}
+type callback = [`Accepted | `Confirmed | `Dropped | `Refused] -> unit Lwt.t
 
 (** [start ~evm_node_endpoint ~max_transaction_batch_length ()] starts
     the worker, meaning it is possible to call {!inject}, {!confirm}
@@ -63,3 +54,9 @@ val confirm : Ethereum_types.hash -> unit tzresult Lwt.t
 (** [beacon ~tick_interval] is a never fulfilled promise which triggers a tick
     in the [Tx_queue] every [tick_interval] seconds. *)
 val beacon : tick_interval:float -> unit tzresult Lwt.t
+
+(** [find hash] returns the transaction associated with that hash if
+    it's found in the tx_queue. *)
+val find :
+  Ethereum_types.hash ->
+  Ethereum_types.legacy_transaction_object option tzresult Lwt.t

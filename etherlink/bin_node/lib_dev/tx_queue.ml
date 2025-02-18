@@ -12,7 +12,7 @@ let two_seconds = Ptime.Span.of_int_s 2
 
 type parameters = {evm_node_endpoint : Uri.t; config : Configuration.tx_queue}
 
-type queue_variant = [`Accepted of Ethereum_types.hash | `Refused]
+type queue_variant = [`Accepted | `Refused]
 
 type pending_variant = [`Confirmed | `Dropped]
 
@@ -39,7 +39,29 @@ type pending_request = {
 
 type callback = all_variant variant_callback
 
-type request = {payload : Ethereum_types.hex; callback : callback}
+type request = {
+  payload : Ethereum_types.hex;
+  tx_object : Ethereum_types.legacy_transaction_object;
+  callback : callback;
+}
+
+module Tx_object = struct
+  open Ethereum_types
+  module S = String.Hashtbl
+
+  type t = Ethereum_types.legacy_transaction_object S.t
+
+  let empty ~start_size = S.create start_size
+
+  let add htbl
+      (({hash = Hash (Hex hash); _} : Ethereum_types.legacy_transaction_object)
+       as tx_object) =
+    S.add htbl hash tx_object
+
+  let find htbl (Hash (Hex hash)) = S.find htbl hash
+
+  let remove htbl (Hash (Hex hash)) = S.remove htbl hash
+end
 
 module Pending_transactions = struct
   open Ethereum_types
@@ -80,6 +102,7 @@ type state = {
   evm_node_endpoint : Uri.t;
   mutable queue : queue_request Queue.t;
   pending : Pending_transactions.t;
+  tx_object : Tx_object.t;
   config : Configuration.tx_queue;
 }
 
@@ -105,6 +128,10 @@ module Request = struct
   type ('a, 'b) t =
     | Inject : request -> (unit, tztrace) t
     | Confirm : {txn_hash : Ethereum_types.hash} -> (unit, tztrace) t
+    | Find : {
+        txn_hash : Ethereum_types.hash;
+      }
+        -> (Ethereum_types.legacy_transaction_object option, tztrace) t
     | Tick : (unit, tztrace) t
 
   type view = View : _ t -> view
@@ -140,6 +167,14 @@ module Request = struct
           (obj1 (req "request" (constant "tick")))
           (function View Tick -> Some () | _ -> None)
           (fun _ -> assert false);
+        case
+          Json_only
+          ~title:"Find"
+          (obj2
+             (req "request" (constant "find"))
+             (req "transaction_hash" Ethereum_types.hash_encoding))
+          (function View (Find {txn_hash}) -> Some ((), txn_hash) | _ -> None)
+          (fun _ -> assert false);
       ]
 
   let pp fmt (View r) =
@@ -148,6 +183,7 @@ module Request = struct
     | Inject {payload = Hex txn; _} -> fprintf fmt "Inject %s" txn
     | Confirm {txn_hash = Hash (Hex txn_hash)} ->
         fprintf fmt "Confirm %s" txn_hash
+    | Find {txn_hash = Hash (Hex txn_hash)} -> fprintf fmt "Find %s" txn_hash
     | Tick -> fprintf fmt "Tick"
 end
 
@@ -208,11 +244,7 @@ let send_transactions_batch ~evm_node_endpoint transactions =
               | value, Some callback ->
                   let* () =
                     match value with
-                    | Ok res ->
-                        let hash =
-                          Data_encoding.Json.destruct Srt.output_encoding res
-                        in
-                        Lwt_result.ok (callback (`Accepted hash))
+                    | Ok _hash_encoded -> Lwt_result.ok (callback `Accepted)
                     | Error error ->
                         let*! () = Tx_queue_events.rpc_error error in
                         Lwt_result.ok (callback `Refused)
@@ -240,15 +272,22 @@ module Handlers = struct
     let open Lwt_result_syntax in
     let state = Worker.state self in
     match request with
-    | Inject {payload; callback} ->
-        let queue_callback reason =
-          (match reason with
-          | `Accepted hash ->
-              Pending_transactions.add state.pending hash (fun reason ->
-                  callback (reason :> all_variant))
-          | `Refused -> ()) ;
+    | Inject {payload; tx_object; callback} ->
+        let pending_callback (reason : pending_variant) =
+          Tx_object.remove state.tx_object tx_object.hash ;
           callback (reason :> all_variant)
         in
+        let queue_callback reason =
+          (match reason with
+          | `Accepted ->
+              Pending_transactions.add
+                state.pending
+                tx_object.hash
+                pending_callback
+          | `Refused -> Tx_object.remove state.tx_object tx_object.hash) ;
+          callback (reason :> all_variant)
+        in
+        Tx_object.add state.tx_object tx_object ;
         Queue.add {payload; queue_callback} state.queue ;
         return_unit
     | Confirm {txn_hash} -> (
@@ -257,6 +296,7 @@ module Handlers = struct
             Lwt.async (fun () -> pending_callback `Confirmed) ;
             return_unit
         | None -> return_unit)
+    | Find {txn_hash} -> return @@ Tx_object.find state.tx_object txn_hash
     | Tick ->
         let all_transactions = Queue.to_seq state.queue in
         let* transactions_to_inject, remaining_transactions =
@@ -306,6 +346,7 @@ module Handlers = struct
         pending = Pending_transactions.empty ~start_size:(config.max_size / 4);
         (* start with /4 and let it grow if necessary to not allocate
            too much at start. *)
+        tx_object = Tx_object.empty ~start_size:(config.max_size / 4);
         config;
       }
 
@@ -345,6 +386,16 @@ let worker =
     | Lwt.Fail e -> Result_syntax.tzfail (error_of_exn e)
     | Lwt.Sleep -> Result_syntax.tzfail No_worker)
 
+let handle_request_error rq =
+  let open Lwt_syntax in
+  let* rq in
+  match rq with
+  | Ok res -> return_ok res
+  | Error (Worker.Request_error errs) -> Lwt.return_error errs
+  | Error (Closed None) -> Lwt.return_error [Tx_queue_is_closed]
+  | Error (Closed (Some errs)) -> Lwt.return_error errs
+  | Error (Any exn) -> Lwt.return_error [Exn exn]
+
 let bind_worker f =
   let open Lwt_result_syntax in
   let res = Lazy.force worker in
@@ -370,12 +421,10 @@ let rec beacon ~tick_interval =
 
 let inject ?(callback = fun _ -> Lwt_syntax.return_unit)
     (tx_object : Ethereum_types.legacy_transaction_object) txn =
-  (* tx_object uses only for it's hash for now. This will be revisited
-     in a follow-up *)
   let open Lwt_syntax in
   let* () = Tx_queue_events.add_transaction tx_object.hash in
   let* worker = worker_promise in
-  push_request worker (Inject {payload = txn; callback})
+  push_request worker (Inject {payload = txn; tx_object; callback})
 
 let confirm txn_hash =
   bind_worker @@ fun w -> push_request w (Confirm {txn_hash})
@@ -388,6 +437,11 @@ let start ~config ~evm_node_endpoint () =
   Lwt.wakeup worker_waker worker ;
   let*! () = Tx_queue_events.is_ready () in
   return_unit
+
+let find txn_hash =
+  let open Lwt_result_syntax in
+  let*? w = Lazy.force worker in
+  Worker.Queue.push_request_and_wait w (Find {txn_hash}) |> handle_request_error
 
 let shutdown () =
   let open Lwt_result_syntax in

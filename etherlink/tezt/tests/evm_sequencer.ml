@@ -10248,38 +10248,103 @@ let test_tx_queue =
     let*@ _ = produce_block sequencer in
     unit
   and* () = Evm_node.wait_for_blueprint_applied observer 1 in
-
-  let observer_wait_tx_added =
-    Evm_node.wait_for_tx_queue_add_transaction observer
+  let check_tx_is_found ~__LOC__ ~hash ~node =
+    let*@ tx = Rpc.get_transaction_by_hash ~transaction_hash:hash node in
+    Check.(
+      is_true
+        (Option.is_some tx)
+        ~__LOC__
+        ~error_msg:"Expected to find the transaction but it was not found.") ;
+    unit
   in
-  let sequencer_wait_tx_added =
-    Evm_node.wait_for_tx_pool_add_transaction sequencer
-  in
-  let observer_wait_tx_injected =
-    Evm_node.wait_for_tx_queue_injecting_transaction observer
-  in
-  let* raw_tx =
+  (* helper to craft a tx with given nonce. *)
+  let raw_tx ~nonce =
     Cast.craft_tx
       ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
       ~chain_id:1337
-      ~nonce:0
+      ~nonce
       ~gas_price:1_000_000_000
       ~gas:23_300
       ~value:Wei.one
       ~address:Eth_account.bootstrap_accounts.(1).address
       ()
   in
-  let* () =
-    let*@ _hash = Rpc.send_raw_transaction ~raw_tx observer in
-    unit
+
+  (* number of transactions that we are going to process (submit,
+      inject, ...) *)
+  let nb_txs = 10 in
+
+  let wait_for_all_tx_process ~name ~waiter =
+    let rec aux total =
+      if total = nb_txs then (
+        Log.info "All (%d) txs processed: \"%s\"." total name ;
+        unit)
+      else if total > nb_txs then
+        Test.fail
+          "more transaction where processed (%s) than expected, impossible"
+          name
+      else
+        let* nb = waiter () in
+        let total = total + nb in
+        Log.debug "Processed %d of txs. (%s)" total name ;
+        aux total
+    in
+    aux 0
+  in
+
+  (* Promises that checks that [nb_txs] txs have been seen with different
+     events. *)
+
+  (* Checks that all txs were added to the observer tx_queue *)
+  let observer_wait_tx_added =
+    let waiter () =
+      let* _ = Evm_node.wait_for_tx_queue_add_transaction observer in
+      return 1
+    in
+    wait_for_all_tx_process ~name:"tx added in observer queue" ~waiter
+  in
+
+  (* Checks that all txs were added to the sequencer tx_pool *)
+  let sequencer_wait_tx_added =
+    let waiter () =
+      let* _ = Evm_node.wait_for_tx_pool_add_transaction sequencer in
+      return 1
+    in
+    wait_for_all_tx_process ~name:"tx added in sequencer tx pool" ~waiter
+  in
+
+  (* Checks that all txs were injected to the sequencer by the
+      observer *)
+  let observer_wait_tx_injected =
+    let waiter () = Evm_node.wait_for_tx_queue_injecting_transaction observer in
+    wait_for_all_tx_process ~name:"tx injected by observer queue" ~waiter
+  in
+
+  (* Test start here *)
+  Log.info
+    "Sending %d transactions to the observer and check after each submition \
+     that the tx can be retrieved"
+    nb_txs ;
+  let* hashes =
+    fold nb_txs [] @@ fun i hashes ->
+    let* raw_tx = raw_tx ~nonce:i in
+    let*@ hash = Rpc.send_raw_transaction ~raw_tx observer in
+    let* () = check_tx_is_found ~__LOC__ ~hash ~node:observer in
+    return (hash :: hashes)
   and* _ = observer_wait_tx_added
-  and* observer_wait_tx_injected
+  and* _ = observer_wait_tx_injected
   and* _ = sequencer_wait_tx_added in
-  Check.(
-    (observer_wait_tx_injected = 1)
-      ~__LOC__
-      int
-      ~error_msg:"Expected %r transaction injected found %l.") ;
+  Log.info
+    "Verifying that all transactions can be retrieved both in the observer and \
+     in the sequencer" ;
+  let* () =
+    Lwt_list.iter_p
+      (fun hash ->
+        let* () = check_tx_is_found ~__LOC__ ~hash ~node:observer
+        and* () = check_tx_is_found ~__LOC__ ~hash ~node:sequencer in
+        unit)
+      hashes
+  in
   unit
 
 let test_spawn_rpc =
