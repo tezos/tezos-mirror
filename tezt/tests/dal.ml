@@ -9575,9 +9575,12 @@ let create_account_and_reveal ?source ~amount ~alias client =
     client _dal_node] verifies the correct distribution of DAL rewards among
     delegates based on their participation in DAL attestations activity.
 
+    The test uses the 5 bootstrap accounts and a new account with a small stake
+    that has on average one assigned shard per level.
+
     The main steps of the test are:
 
-    1. Initialize delegates: we assign five bootstrap accounts to specific roles:
+    1. Initialize delegates: we assign six accounts to specific roles:
     - **Baker:** Always attests both TenderBake (TB) and all DAL slots.
     - **Attesting DAL Slot 10:** Always attests TB and specifically DAL slot 10.
     - **Not Attesting at All:** Does not attest either TB or DAL slots.
@@ -9585,6 +9588,7 @@ let create_account_and_reveal ?source ~amount ~alias client =
     any DAL attestation or by sending an empty bitset.
     - **Not Sufficiently Attesting DAL Slot 10:** Attests DAL slot 10 only 25%
     of the time.
+    - **Small Baker:** It has very few assigned shards, but does the same as the Baker.
 
     2. Initial balances snapshot: we capture the initial balances of all
     delegates to compare against post-test balances.
@@ -9595,7 +9599,7 @@ let create_account_and_reveal ?source ~amount ~alias client =
     - we inject attestations from each delegate according to their assigned
     behavior.
 
-    4. Blocks production until ~end of cycle: we bake blocks up to the last
+    4. Blocks production until end of cycle: we bake blocks up to the last
     block of the current cycle, ensuring DAL slot publications and attestations
     are appropriately injected. Each time a new block is produced, we check the
     value of the "dal_attestation" bitset in the block's metadata and count the
@@ -9631,21 +9635,117 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
   in
   let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
   assert (blocks_per_cycle >= dal_parameters.Dal.Parameters.attestation_lag) ;
-  let* () = bake_for client in
+  let consensus_rights_delay =
+    JSON.(proto_params |-> "consensus_rights_delay" |> as_int)
+  in
+  let minimal_stake = JSON.(proto_params |-> "minimal_stake" |> as_int) in
+  let nb_slots = dal_parameters.Dal.Parameters.number_of_slots in
+  let all_slots = List.init nb_slots Fun.id in
+  let number_of_shards =
+    dal_parameters.Dal.Parameters.cryptobox.number_of_shards
+  in
+
+  (* Compute the stake of the small baker. *)
+  let* small_baker_stake =
+    let* bootstrap_info =
+      Node.RPC.call node
+      @@ RPC.get_chain_block_context_delegate
+           Constant.bootstrap1.public_key_hash
+    in
+    let bootstrap_baking_power =
+      JSON.(bootstrap_info |-> "baking_power" |> as_string) |> int_of_string
+    in
+    let total_baking_power =
+      bootstrap_baking_power * Array.length Account.Bootstrap.keys
+    in
+    (* The amount is such that this baker has only one assigned shard per cycles
+       (on average). Note that if the baker has no assigned shard, the test
+       should still pass, because we just check that it gets its DAL rewards.
+
+       Let [t] be total_baking_power, [s] be [small_baker_stake], and [1/n]
+       desired shards fraction for the small baker. We want [s / (t + s) = 1 /
+       n], ie [t + s = n * s], ie [t = (n-1) * s] ie, [s = t / (n-1)] *)
+    let desired_stake =
+      total_baking_power / ((blocks_per_cycle * number_of_shards) - 1)
+    in
+    let small_baker_stake = max desired_stake minimal_stake in
+    Log.info
+      "total_baking_power = %d, small_baker_stake = %d"
+      total_baking_power
+      small_baker_stake ;
+    return small_baker_stake
+  in
+
+  (* Each of the 5 bootstrap accounts contributes equally to the new baker's
+     account. We give it a bit more tez, for it to be able to pay the fees for
+     the pk reveal and stake operations. *)
+  let to_transfer = (small_baker_stake + 3_000) / 5 in
+
   let* level = Node.get_level node in
   assert (level < blocks_per_cycle) ;
   let level = ref level in
-  let nb_slots = dal_parameters.Dal.Parameters.number_of_slots in
-  let all_slots = List.init nb_slots Fun.id in
+  let* small_baker =
+    create_account_and_reveal ~amount:to_transfer ~alias:"small_baker" client
+  in
+  incr level ;
 
-  (* We get our available delegates (up to 5) and assign them different roles
-     they'll play during the test. *)
+  let* () =
+    Lwt_list.iter_s
+      (fun bootstrap ->
+        if bootstrap <> Constant.bootstrap2 then
+          let* _oph =
+            Operation.Manager.inject_single_transfer
+              client
+              ~source:bootstrap
+              ~dest:small_baker
+              ~amount:to_transfer
+          in
+          unit
+        else unit)
+      (Array.to_list Account.Bootstrap.keys)
+  in
+  let* () = bake_for client in
+  incr level ;
+
+  Log.info "Register small_baker as a delegate" ;
+  let* _small_baker =
+    Client.register_delegate ~delegate:small_baker.alias client
+  in
+  let* () = bake_for client in
+  incr level ;
+
+  Log.info "Stake for small_baker" ;
+  let* () =
+    Client.stake
+      (Tez.of_mutez_int small_baker_stake)
+      ~staker:small_baker.public_key_hash
+      client
+  in
+
+  Log.info
+    "Bake (almost) %d cycles to activate the delegate"
+    consensus_rights_delay ;
+  let* () =
+    bake_for
+      ~count:((blocks_per_cycle * (1 + consensus_rights_delay)) - !level - 1)
+      client
+  in
+  let* current_level =
+    Node.RPC.call node @@ RPC.get_chain_block_helper_current_level ()
+  in
+  assert (current_level.cycle_position = blocks_per_cycle - 1) ;
+  level := blocks_per_cycle * (1 + consensus_rights_delay) ;
+  assert (!level = current_level.level) ;
+
+  (* We get our available delegates and assign them different roles they'll play
+     during the test. *)
   let ( accounts_list,
         ( baker,
           attesting_dal_slot_10,
           not_attesting_at_all,
           not_attesting_dal,
-          not_sufficiently_attesting_dal_slot_10 ) ) =
+          not_sufficiently_attesting_dal_slot_10,
+          small_baker ) ) =
     match Account.Bootstrap.keys with
     | [|d1; d2; d3; d4; d5|] ->
         ( [
@@ -9654,8 +9754,9 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
             (d3, "not_attesting_at_all");
             (d4, "not_attesting_dal");
             (d5, "not_sufficiently_attesting_dal_slot_10");
+            (small_baker, "small_baker");
           ],
-          (d1, d2, d3, d4, d5) )
+          (d1, d2, d3, d4, d5, small_baker) )
     | _ -> Test.fail "Expected exactly 5 bootstrap accounts."
   in
 
@@ -9675,10 +9776,11 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
           bal not_attesting_at_all;
           bal not_attesting_dal;
           bal not_sufficiently_attesting_dal_slot_10;
+          bal small_baker;
         ]
     in
     match l with
-    | [b1; b2; b3; b4; b5] -> return (b1, b2, b3, b4, b5)
+    | [b1; b2; b3; b4; b5; b6] -> return (b1, b2, b3, b4, b5, b6)
     | _ -> Test.fail "Not reachable."
   in
 
@@ -9687,21 +9789,21 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
          attesting_dal_slot_10_bal0,
          not_attesting_at_all_bal0,
          not_attesting_dal_bal0,
-         not_sufficiently_attesting_dal_slot_10_bal0 ) =
+         not_sufficiently_attesting_dal_slot_10_bal0,
+         small_baker_bal0 ) =
     snapshot_full_balances_helper ()
   in
 
   (* This is the main helper function which injects (DAL) attestations for
      delegates depending on their profiles. *)
   let inject_attestations () =
-    let* level = Node.get_level node in
     let count_dal_attesting_bakers = ref 0 in
     (* 1. Baker always attests TB and all DAL slots *)
     let* (_ : Operation_core.t * [`OpHash of peer_id]) =
       (* The baker delegate will miss 1/10 of its DAL attestations and will send
          [No_dal_attestation] in this case. *)
       let baker_attestation =
-        if level mod 10 = 0 then No_dal_attestation
+        if !level mod 10 = 0 then No_dal_attestation
         else (
           incr count_dal_attesting_bakers ;
           Slots all_slots)
@@ -9718,7 +9820,7 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
          attestations and will send Slots [], but it should be fine for its
          rewards. *)
       let attestation =
-        if level mod 11 = 0 then Slots []
+        if !level mod 11 = 0 then Slots []
         else (
           incr count_dal_attesting_bakers ;
           Slots [10])
@@ -9733,7 +9835,7 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
     (* 4. not_attesting_dal either sends no DAL content or sends bitset 0 *)
     let* (_ : Operation_core.t * [`OpHash of peer_id]) =
       let dal_attestation =
-        if level mod 2 = 0 then No_dal_attestation else Slots []
+        if !level mod 2 = 0 then No_dal_attestation else Slots []
       in
       inject_dal_attestation_exn
         ~signer:not_attesting_dal
@@ -9745,7 +9847,7 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
        of the time. *)
     let* (_ : Operation_core.t * [`OpHash of peer_id]) =
       let slots_to_attest =
-        if level mod 4 = 0 then (
+        if !level mod 4 = 0 then (
           incr count_dal_attesting_bakers ;
           Slots [10])
         else No_dal_attestation
@@ -9756,9 +9858,28 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
         slots_to_attest
         client
     in
+    (* 6. small_baker: is always attesting DAL slot 10. *)
+    let* () =
+      let slots_to_attest = Slots [10] in
+      let* res =
+        inject_dal_attestation
+          ~signer:small_baker
+          ~nb_slots
+          slots_to_attest
+          client
+      in
+      (match res with
+      | None ->
+          Log.info
+            "At level %d, %s could not TB attest"
+            !level
+            small_baker.alias
+      | Some _ -> incr count_dal_attesting_bakers) ;
+      unit
+    in
     Log.info
       "At level %d, there are %d bakers that DAL attested"
-      level
+      !level
       !count_dal_attesting_bakers ;
     unit
   in
@@ -9789,9 +9910,7 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
      attestations. We stop before baking the last block of the current cycle,
      where DAL rewards are distributed. *)
   let* () =
-    repeat
-      (blocks_per_cycle - !level - 1)
-      (fun () ->
+    repeat (blocks_per_cycle - 1) (fun () ->
         let* () = count_slot_10_if_attested () in
         let* (`OpHash _oph1) =
           publish_dummy_slot
@@ -9827,11 +9946,13 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
                ~validation_pass:0
                ()
         in
-        Check.(
-          (List.length @@ JSON.as_list attestations = 4)
-            int
-            ~__LOC__
-            ~error_msg:"expected 4 attestations in block, got %L") ;
+        let num_attestations = List.length @@ JSON.as_list attestations in
+        (* The small baker may not have rights to inject its attestation *)
+        let check_num = num_attestations = 4 || num_attestations = 5 in
+        Check.is_true
+          check_num
+          ~__LOC__
+          ~error_msg:"expected 4 or 5 attestations in block" ;
         unit)
   in
 
@@ -9841,7 +9962,8 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
          attesting_dal_slot_10_bal1,
          not_attesting_at_all_bal1,
          not_attesting_dal_bal1,
-         not_sufficiently_attesting_dal_slot_10_bal1 ) =
+         not_sufficiently_attesting_dal_slot_10_bal1,
+         small_baker_bal1 ) =
     snapshot_full_balances_helper ()
   in
 
@@ -9859,17 +9981,55 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
       accounts_list
   in
 
+  (* We use the 'participation' RPC to get the expected Tenderbake rewards of delegate
+     who TB-attested sufficiently. *)
+  let snapshot_tb_participation () =
+    let participation account =
+      Node.RPC.call node
+      @@ RPC.get_chain_block_context_delegate_participation
+           account.Account.public_key_hash
+    in
+    let* l =
+      Lwt.all
+        [
+          participation baker;
+          participation attesting_dal_slot_10;
+          participation not_attesting_at_all;
+          participation not_attesting_dal;
+          participation not_sufficiently_attesting_dal_slot_10;
+          participation small_baker;
+        ]
+    in
+    match l with
+    | [p1; p2; p3; p4; p5; p6] -> return (p1, p2, p3, p4, p5, p6)
+    | _ -> Test.fail "Not reachable."
+  in
+  let* ( _baker_tb_participation,
+         attesting_dal_slot_10_tb_participation,
+         _not_attesting_at_all_tb_participation,
+         not_attesting_dal_tb_participation,
+         not_sufficiently_attesting_dal_slot_10_tb_participation,
+         small_baker_tb_participation ) =
+    snapshot_tb_participation ()
+  in
+
   (* We now bake the last block of the cycle, which should trigger TB and DAL
      rewards distribution. TB rewards are actually set to 0. *)
   let* () = bake_for ~delegates:(`For [baker.Account.public_key_hash]) client in
+  let* _json = Node.RPC.(call node @@ get_chain_block_metadata_raw ()) in
   incr level ;
+  let* current_level =
+    Node.RPC.call node @@ RPC.get_chain_block_helper_current_level ()
+  in
+  assert (current_level.cycle_position = blocks_per_cycle - 1) ;
 
   (* We snapshot the balances of the delegates at the end of the cycle. *)
   let* ( _baker_bal2,
          attesting_dal_slot_10_bal2,
          not_attesting_at_all_bal2,
          not_attesting_dal_bal2,
-         not_sufficiently_attesting_dal_slot_10_bal2 ) =
+         not_sufficiently_attesting_dal_slot_10_bal2,
+         small_baker_bal2 ) =
     snapshot_full_balances_helper ()
   in
 
@@ -9908,17 +10068,20 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
       ( not_sufficiently_attesting_dal_slot_10,
         not_sufficiently_attesting_dal_slot_10_bal0,
         not_sufficiently_attesting_dal_slot_10_bal1 );
+      (small_baker, small_baker_bal0, small_baker_bal1);
     ] ;
 
-  (* As the delegates have the same stake distribution, they're expected to have
-     the same number of the assigned shards, to have shards at the same level,
-     to have the same rewards allocated, ... *)
-  let expected_full_dal_rewards =
-    match bootstrap_accounts_participation with
-    | [] -> Test.fail "Not reachable."
-    | (_account, dal_part) :: rest ->
+  (* As all delegates except [small_baker] have the same stake distribution,
+     they're expected to have the same number of the assigned shards, to have
+     shards at the same level, to have the same rewards allocated, ... *)
+  let () =
+    match List.rev bootstrap_accounts_participation with
+    | (_small_baker, _) :: (_account, dal_part) :: rest ->
         List.iter
           (fun (_account, dal_participation) ->
+            (* We transferred funds from [bootstrap2] to [small_baker], so
+               [bootstrap_2] has a smaller baking power than the other bootstrap
+               delegates. *)
             Check.(
               dal_part.expected_assigned_shards_per_slot
               = dal_participation.RPC.expected_assigned_shards_per_slot)
@@ -9926,31 +10089,23 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
               Check.int
               ~error_msg:"expected_assigned_shards_per_slot mismatch" ;
             Check.(
-              dal_part.delegate_attestable_dal_slots
-              = dal_participation.delegate_attestable_dal_slots)
-              ~__LOC__
-              Check.int
-              ~error_msg:"delegate_attestable_dal_slots mismatch" ;
-            Check.(
               Tez.to_mutez dal_part.expected_dal_rewards
               = Tez.to_mutez dal_participation.expected_dal_rewards)
               ~__LOC__
               Check.int
-              ~error_msg:"expected_dal_rewards mismatch")
-          rest ;
-        Tez.to_mutez dal_part.expected_dal_rewards
-  in
-
-  (* We use /participation RPC to get the expect Tenderbake rewards of delegate
-     who TB-attested sufficiently. *)
-  let* expected_full_tb_rewards =
-    get_tb_expected_attesting_rewards node baker.public_key_hash
+              ~error_msg:"expected_dal_rewards mismatch" ;
+            Check.(
+              dal_part.delegate_attestable_dal_slots
+              = dal_participation.delegate_attestable_dal_slots)
+              ~__LOC__
+              Check.int
+              ~error_msg:"delegate_attestable_dal_slots mismatch")
+          rest
+    | _ -> Test.fail "Not reachable."
   in
 
   (* After baking the last block of the cycle, we check that:
-
      - the balances of the delegates who didn't attest at all didn't change.
-
      - the participation RPC's result is aligned with the first check. *)
   List.iter
     (fun (account, bal1, bal2) ->
@@ -9971,53 +10126,63 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
     ] ;
 
   (* After baking the last block of the cycle, we check that:
-
      - the balances of the delegates who didn't attest DAL sufficiently or
-     didn't attest DAL at all only increased by a delta equal to the expected
-     Tenderbake attestation rewards.
-
+       didn't attest DAL at all only increased by a delta equal to the expected
+       Tenderbake attestation rewards.
      - the participation RPC's result is aligned with the first check. *)
   List.iter
-    (fun (account, bal1, bal2) ->
-      check_bal_incr
-        ~__LOC__
-        account
-        bal1
-        bal2
-        ~delta:(Tez.to_mutez expected_full_tb_rewards) ;
+    (fun (account, bal1, bal2, tb_participation, sufficient_dal_participation) ->
       let dal_participation =
         List.assoc account bootstrap_accounts_participation
       in
-      Check.is_false
-        dal_participation.sufficient_dal_participation
-        ~__LOC__
-        ~error_msg:
-          ("account " ^ account.Account.public_key_hash
-         ^ ", expected to have sufficient DAL participation?"))
+      Check.(
+        (dal_participation.sufficient_dal_participation
+       = sufficient_dal_participation)
+          ~__LOC__
+          bool
+          ~error_msg:
+            ("account " ^ account.Account.public_key_hash
+           ^ ", expected to have sufficient DAL participation? %R, but got %L")) ;
+      let expected_dal_rewards =
+        if sufficient_dal_participation then
+          Tez.to_mutez dal_participation.expected_dal_rewards
+        else 0
+      in
+      let delta =
+        Tez.to_mutez tb_participation.RPC.expected_attesting_rewards
+        + expected_dal_rewards
+      in
+      Log.info
+        "[check] %s %s: %Ld = %Ld + %d + %d"
+        account.Account.alias
+        account.public_key_hash
+        bal1
+        bal2
+        (Tez.to_mutez tb_participation.expected_attesting_rewards)
+        expected_dal_rewards ;
+      check_bal_incr ~__LOC__ account bal1 bal2 ~delta)
     [
-      (not_attesting_dal, not_attesting_dal_bal1, not_attesting_dal_bal2);
+      ( not_attesting_dal,
+        not_attesting_dal_bal1,
+        not_attesting_dal_bal2,
+        not_attesting_dal_tb_participation,
+        false );
       ( not_sufficiently_attesting_dal_slot_10,
         not_sufficiently_attesting_dal_slot_10_bal1,
-        not_sufficiently_attesting_dal_slot_10_bal2 );
+        not_sufficiently_attesting_dal_slot_10_bal2,
+        not_sufficiently_attesting_dal_slot_10_tb_participation,
+        false );
+      ( attesting_dal_slot_10,
+        attesting_dal_slot_10_bal1,
+        attesting_dal_slot_10_bal2,
+        attesting_dal_slot_10_tb_participation,
+        true );
+      ( small_baker,
+        small_baker_bal1,
+        small_baker_bal2,
+        small_baker_tb_participation,
+        true );
     ] ;
-
-  (* Below, we check that the only delegate who attested slot 10 correctly got
-     its (Tenderbake and) DAL rewards. *)
-  check_bal_incr
-    ~__LOC__
-    attesting_dal_slot_10
-    attesting_dal_slot_10_bal1
-    attesting_dal_slot_10_bal2
-    ~delta:(Tez.to_mutez expected_full_tb_rewards + expected_full_dal_rewards) ;
-  let dal_participation =
-    List.assoc attesting_dal_slot_10 bootstrap_accounts_participation
-  in
-  Check.is_true
-    dal_participation.sufficient_dal_participation
-    ~__LOC__
-    ~error_msg:
-      ("account " ^ attesting_dal_slot_10.Account.public_key_hash
-     ^ ", expected balance to have sufficient DAL participation.") ;
 
   (* As a final check, we verify that no delegate is denounced and that we
      report the correct number of attested slots. *)
@@ -10030,14 +10195,18 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
           ("account " ^ account.Account.public_key_hash
          ^ ", not expected to be denounced.") ;
 
-      Check.(
-        dal_participation.delegate_attestable_dal_slots
-        = !count_set_dal_attestation_bitset)
-        ~__LOC__
-        Check.int
-        ~error_msg:
-          "Expecting %L attestable DAL slots, but %R were reported in blocks \
-           metadata")
+      (* The number of attestable slots for the small stake baker is smaller
+         than for the other bakers and since we did not count them, we don't
+         check them. *)
+      if not @@ String.equal account.alias small_baker.alias then
+        Check.(
+          dal_participation.delegate_attestable_dal_slots
+          = !count_set_dal_attestation_bitset)
+          ~__LOC__
+          Check.int
+          ~error_msg:
+            "Expecting %L attestable DAL slots, but %R were reported in blocks \
+             metadata")
     bootstrap_accounts_participation ;
   unit
 
