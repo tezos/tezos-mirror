@@ -299,6 +299,20 @@ let evm_node_lib_dev =
         performance_metrics;
       ]
 
+let _evm_node_lib_dev_client =
+  octez_evm_node_lib
+    "evm_node_lib_dev_client"
+    ~path:"etherlink/bin_node/lib_dev/client"
+    ~synopsis:"Client library for communicating with an EVM node"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        websocket_lwt_unix;
+        evm_node_lib_dev_encoding |> open_;
+        evm_node_lib_dev |> open_;
+        octez_rpc_http |> open_;
+      ]
+
 let _octez_evm_node_tests =
   tests
     [
