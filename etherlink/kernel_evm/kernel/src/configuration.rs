@@ -58,6 +58,24 @@ impl std::fmt::Display for ConfigurationMode {
     }
 }
 
+pub struct ChainConfig {
+    pub chain_id: U256,
+}
+
+impl Default for ChainConfig {
+    fn default() -> Self {
+        Self {
+            chain_id: U256::from(CHAIN_ID),
+        }
+    }
+}
+
+impl std::fmt::Display for ChainConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{Chain id: {}}}", self.chain_id)
+    }
+}
+
 pub struct Limits {
     pub maximum_allowed_ticks: u64,
     pub maximum_gas_limit: u64,
@@ -77,7 +95,7 @@ pub struct Configuration {
     pub mode: ConfigurationMode,
     pub limits: Limits,
     pub enable_fa_bridge: bool,
-    pub chain_id: U256,
+    pub chain_config: ChainConfig,
     pub garbage_collect_blocks: bool,
 }
 
@@ -88,7 +106,7 @@ impl Default for Configuration {
             mode: ConfigurationMode::Proxy,
             limits: Limits::default(),
             enable_fa_bridge: false,
-            chain_id: U256::from(CHAIN_ID),
+            chain_config: ChainConfig::default(),
             garbage_collect_blocks: false,
         }
     }
@@ -98,8 +116,8 @@ impl std::fmt::Display for Configuration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Tezos Contracts: {}, Mode: {}, Enable FA Bridge: {}, Chain id: {}, Garbage collect blocks: {}",
-            &self.tezos_contracts, &self.mode, &self.enable_fa_bridge, &self.chain_id, &self.garbage_collect_blocks
+            "Tezos Contracts: {}, Mode: {}, Enable FA Bridge: {}, Chain Config: {}, Garbage collect blocks: {}",
+            &self.tezos_contracts, &self.mode, &self.enable_fa_bridge, &self.chain_config, &self.garbage_collect_blocks
         )
     }
 }
@@ -211,6 +229,7 @@ pub fn fetch_configuration<Host: Runtime>(
     let enable_fa_bridge = is_enable_fa_bridge(host).unwrap_or_default();
     let dal: Option<DalConfiguration> = fetch_dal_configuration(host);
     let evm_node_flag = evm_node_flag(host).unwrap_or(false);
+    let chain_config = ChainConfig { chain_id };
     match sequencer {
         Some(sequencer) => {
             let delayed_bridge = read_delayed_transaction_bridge(host)
@@ -239,7 +258,7 @@ pub fn fetch_configuration<Host: Runtime>(
                     },
                     limits,
                     enable_fa_bridge,
-                    chain_id,
+                    chain_config,
                     garbage_collect_blocks: !evm_node_flag,
                 },
                 Err(err) => {
@@ -256,7 +275,7 @@ pub fn fetch_configuration<Host: Runtime>(
             mode: ConfigurationMode::Proxy,
             limits,
             enable_fa_bridge,
-            chain_id,
+            chain_config,
             garbage_collect_blocks: false,
         },
     }

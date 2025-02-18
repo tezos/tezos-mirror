@@ -190,7 +190,7 @@ pub fn fetch_blueprints<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use crate::{
-        configuration::{Limits, CHAIN_ID},
+        configuration::{ChainConfig, Limits},
         dal_slot_import_signal::{
             DalSlotImportSignals, DalSlotIndicesList, DalSlotIndicesOfLevel,
             UnsignedDalSlotSignals,
@@ -268,7 +268,7 @@ mod tests {
             },
             limits: Limits::default(),
             enable_fa_bridge: false,
-            chain_id: U256::from(CHAIN_ID),
+            chain_config: ChainConfig::default(),
             garbage_collect_blocks: false,
         }
     }
@@ -283,7 +283,7 @@ mod tests {
             mode: ConfigurationMode::Proxy,
             limits: Limits::default(),
             enable_fa_bridge: false,
-            chain_id: U256::from(CHAIN_ID),
+            chain_config: ChainConfig::default(),
             garbage_collect_blocks: false,
         }
     }

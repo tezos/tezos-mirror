@@ -375,7 +375,7 @@ mod tests {
 
     use crate::block_storage;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
-    use crate::configuration::{Configuration, Limits};
+    use crate::configuration::{ChainConfig, Configuration, Limits};
     use crate::fees;
     use crate::main;
     use crate::parsing::RollupType;
@@ -431,7 +431,9 @@ mod tests {
 
     fn dummy_configuration() -> Configuration {
         Configuration {
-            chain_id: DUMMY_CHAIN_ID,
+            chain_config: ChainConfig {
+                chain_id: DUMMY_CHAIN_ID,
+            },
             ..Configuration::default()
         }
     }

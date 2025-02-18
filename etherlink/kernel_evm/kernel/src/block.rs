@@ -475,7 +475,7 @@ pub fn produce<Host: Runtime>(
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
 ) -> Result<ComputationResult, anyhow::Error> {
-    let chain_id = config.chain_id;
+    let chain_id = config.chain_config.chain_id;
     let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host)?;
     let da_fee_per_byte = crate::retrieve_da_fee(host)?;
 
@@ -606,6 +606,7 @@ mod tests {
     use crate::blueprint_storage::read_next_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
+    use crate::configuration::ChainConfig;
     use crate::fees::DA_FEE_PER_BYTE;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
     use crate::inbox::Transaction;
@@ -681,7 +682,9 @@ mod tests {
 
     fn dummy_configuration() -> Configuration {
         Configuration {
-            chain_id: DUMMY_CHAIN_ID,
+            chain_config: ChainConfig {
+                chain_id: DUMMY_CHAIN_ID,
+            },
             ..Configuration::default()
         }
     }
