@@ -107,20 +107,22 @@ impl Runtime for WasmRuntime {
 #[derive(Clone, Copy)]
 enum NativeKernel {
     Bifrost,
+    Calypso,
 }
 
 impl NativeKernel {
     fn runtime_version(&self) -> RuntimeVersion {
-        // TODO: When adding support for the kernel adding Bifrost, the expected version should be
-        // `V1`.
         match self {
             Self::Bifrost => RuntimeVersion::V0,
+            Self::Calypso => RuntimeVersion::V1,
         }
     }
 }
 
 const BIFROST_ROOT_HASH_HEX: &'static str =
     "7ff257e4f6ddb11766ec2266857c8fc75bd00e73230a7b598fec2bd9a68b6908";
+const CALYPSO_ROOT_HASH_HEX: &'static str =
+    "96114bf7a28e617a3788d8554aa24711b4b11f9c54cd0b12c00bc358beb814a7";
 
 impl NativeKernel {
     fn of_root_hash(root_hash: &ContextHash) -> Option<NativeKernel> {
@@ -129,6 +131,7 @@ impl NativeKernel {
 
         match root_hash_hex.as_str() {
             BIFROST_ROOT_HASH_HEX => Some(NativeKernel::Bifrost),
+            CALYPSO_ROOT_HASH_HEX => Some(NativeKernel::Calypso),
             _ => None,
         }
     }
@@ -159,6 +162,16 @@ impl Runtime for NativeRuntime {
             ("populate_delayed_inbox", NativeKernel::Bifrost) => {
                 trace!("bifrost::populate_delayed_inbox");
                 kernel_bifrost::evm_node_entrypoint::populate_delayed_inbox(self.mut_host());
+                Ok(())
+            }
+            ("kernel_run", NativeKernel::Calypso) => {
+                trace!("calypso::kernel_loop");
+                kernel_calypso::kernel_loop(self.mut_host());
+                Ok(())
+            }
+            ("populate_delayed_inbox", NativeKernel::Calypso) => {
+                trace!("calypso::populate_delayed_inbox");
+                kernel_calypso::evm_node_entrypoint::populate_delayed_inbox(self.mut_host());
                 Ok(())
             }
             (missing_entrypoint, _) => todo!("entrypoint {missing_entrypoint} not covered yet"),

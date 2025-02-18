@@ -7,6 +7,7 @@
 - RPC node uses a private injector to bypass the excessive validations of
   going through the public endpoint. Reads `--evm-node-private-endpoint` if
   specified or the RW config private rpc if not. (!16664)
+- Supports native execution for the Calypso kernel. (!16728 !16729 !16734)
 
 ### Bug fixes
 
