@@ -276,6 +276,34 @@ module Types = struct
     @@ proj level (fun l -> l.start_l2)
     @@ proj level (fun l -> l.end_l2)
     @@ proj_end
+
+  let micheline : string Tezos_micheline.Micheline.canonical Caqti_type.t =
+    custom
+      ~encode:(fun expr ->
+        let open Tezos_micheline.Micheline_printer in
+        Format.asprintf "%a" print_expr_unwrapped (printable Fun.id expr)
+        |> Result.ok)
+      ~decode:(fun str ->
+        let open Tezos_micheline.Micheline_parser in
+        let open Result_syntax in
+        let node =
+          let* tokens = tokenize str |> no_parsing_error in
+          parse_expression ~check:false tokens |> no_parsing_error
+        in
+        let+ node =
+          node |> Result.map_error (Format.asprintf "%a" pp_print_trace)
+        in
+        Tezos_micheline.Micheline.strip_locations node)
+      string
+
+  let outbox_transaction =
+    let open Octez_smart_rollup.Outbox_message in
+    product (fun destination entrypoint parameters ->
+        {destination; entrypoint; parameters; parameters_ty = None})
+    @@ proj string (fun o -> o.destination)
+    @@ proj string (fun o -> o.entrypoint)
+    @@ proj micheline (fun o -> o.parameters)
+    @@ proj_end
 end
 
 module Migrations = struct
@@ -456,21 +484,30 @@ module Levels = struct
 end
 
 module Pointers = struct
+  module type S = sig
+    type value
+
+    val set : ?conn:Sqlite.conn -> t -> value -> unit tzresult Lwt.t
+
+    val get : ?conn:Sqlite.conn -> t -> value option tzresult Lwt.t
+  end
+
   module Make (N : sig
     val name : string
-  end) =
-  struct
-    module Q = struct
-      open Types
 
+    type value
+
+    val value : value Caqti_type.t
+  end) : S with type value := N.value = struct
+    module Q = struct
       let set =
-        (level ->. unit)
+        (N.value ->. unit)
         @@ Format.sprintf
              {sql|REPLACE INTO pointers (name, value) VALUES (%S, ?)|sql}
              N.name
 
       let get =
-        (unit ->? level)
+        (unit ->? N.value)
         @@ Format.sprintf
              {sql|SELECT value from pointers WHERE name = %S|sql}
              N.name
@@ -483,19 +520,53 @@ module Pointers = struct
       with_connection db conn @@ fun conn -> Sqlite.Db.find_opt conn Q.get ()
   end
 
-  module type S = sig
-    val set :
-      ?conn:Sqlite.conn -> t -> Ethereum_types.quantity -> unit tzresult Lwt.t
-
-    val get :
-      ?conn:Sqlite.conn -> t -> Ethereum_types.quantity option tzresult Lwt.t
-  end
-
   module Finalized_L1_head = Make (struct
     let name = "finalized_l1_head"
+
+    type value = Ethereum_types.quantity
+
+    let value = Types.level
   end)
 
   module L2_head = Make (struct
     let name = "l2_head"
+
+    type value = Ethereum_types.quantity
+
+    let value = Types.level
   end)
+
+  module LCC = Make (struct
+    let name = "lcc"
+
+    type value = int32
+
+    let value = Caqti_type.int32
+  end)
+end
+
+module Outbox_messages = struct
+  module Q = struct
+    open Types
+
+    let insert =
+      (t4 int32 int int outbox_transaction ->. unit)
+      @@ {sql|
+      INSERT INTO outbox_messages
+      (outbox_level, message_index, transaction_index,
+       destination, entrypoint, parameters)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (outbox_level, message_index, transaction_index) DO UPDATE SET
+        destination = $4,
+        entrypoint = $5,
+        parameters = $6
+      |sql}
+  end
+
+  let store ?conn db ~outbox_level ~message_index ~transaction_index tx =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.exec
+      conn
+      Q.insert
+      (outbox_level, message_index, transaction_index, tx)
 end

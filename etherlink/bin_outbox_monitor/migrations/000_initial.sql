@@ -36,3 +36,13 @@ CREATE TABLE levels (
 
 CREATE INDEX idx_start_l2_levels ON levels(start_l2);
 CREATE INDEX idx_end_l2_levels ON levels(end_l2);
+
+CREATE TABLE outbox_messages (
+  outbox_level INTEGER NOT NULL,
+  message_index INTEGER NOT NULL,
+  transaction_index INTEGER NOT NULL,
+  destination VARCHAR NOT NULL,
+  entrypoint VARCHAR NOT NULL,
+  parameters VARCHAR NOT NULL,
+  PRIMARY KEY(outbox_level, message_index, transaction_index)
+);
