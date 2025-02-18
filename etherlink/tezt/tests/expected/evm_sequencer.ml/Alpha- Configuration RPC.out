@@ -22,7 +22,8 @@
       "ping_interval": 5,
       "ping_timeout": 30
     },
-    "l2_chains": null
+    "l2_chains": null,
+    "enable_tx_queue": false
   },
   "proxy": {
     "ignore_block_param": false
@@ -80,7 +81,8 @@
       "ping_interval": 5,
       "ping_timeout": 30
     },
-    "l2_chains": null
+    "l2_chains": null,
+    "enable_tx_queue": false
   },
   "proxy": {
     "ignore_block_param": false
@@ -131,7 +133,8 @@
       "ping_interval": 5,
       "ping_timeout": 30
     },
-    "l2_chains": null
+    "l2_chains": null,
+    "enable_tx_queue": false
   },
   "proxy": {
     "evm_node_endpoint": "hidden",

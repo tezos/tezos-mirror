@@ -120,7 +120,7 @@ module Request = struct
         case
           Json_only
           ~title:"Tick"
-          (obj1 (req "request" (constant "flush")))
+          (obj1 (req "request" (constant "tick")))
           (function View Tick -> Some () | _ -> None)
           (fun _ -> assert false);
       ]
@@ -306,6 +306,18 @@ let worker_promise, worker_waker = Lwt.task ()
 
 type error += No_worker
 
+type error += Tx_queue_is_closed
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"tx_queue_is_closed"
+    ~title:"Tx_queue_is_closed"
+    ~description:"Failed to add a request to the Tx queue, it's closed."
+    Data_encoding.unit
+    (function Tx_queue_is_closed -> Some () | _ -> None)
+    (fun () -> Tx_queue_is_closed)
+
 let worker =
   lazy
     (match Lwt.state worker_promise with
@@ -313,11 +325,22 @@ let worker =
     | Lwt.Fail e -> Result_syntax.tzfail (error_of_exn e)
     | Lwt.Sleep -> Result_syntax.tzfail No_worker)
 
-let tick () =
+let bind_worker f =
   let open Lwt_result_syntax in
-  let*? worker = Lazy.force worker in
-  let*! (_was_pushed : bool) = Worker.Queue.push_request worker Tick in
-  return_unit
+  let res = Lazy.force worker in
+  match res with
+  | Error [No_worker] ->
+      (* There is no worker, nothing to do *)
+      return_unit
+  | Error errs -> fail errs
+  | Ok w -> f w
+
+let push_request worker request =
+  let open Lwt_result_syntax in
+  let*! (pushed : bool) = Worker.Queue.push_request worker request in
+  if not pushed then tzfail Tx_queue_is_closed else return_unit
+
+let tick () = bind_worker @@ fun w -> push_request w Tick
 
 let rec beacon ~tick_interval =
   let open Lwt_result_syntax in
@@ -325,22 +348,17 @@ let rec beacon ~tick_interval =
   let*! () = Lwt_unix.sleep tick_interval in
   beacon ~tick_interval
 
-let inject ?(callback = fun _ -> Lwt_syntax.return_unit) txn =
+let inject ?(callback = fun _ -> Lwt_syntax.return_unit)
+    (tx_object : Ethereum_types.legacy_transaction_object) txn =
+  (* tx_object uses only for it's hash for now. This will be revisited
+     in a follow-up *)
   let open Lwt_syntax in
+  let* () = Tx_queue_events.add_transaction tx_object.hash in
   let* worker = worker_promise in
-  let* (_was_pushed : bool) =
-    Worker.Queue.push_request worker (Inject {payload = txn; callback})
-  in
-  return_unit
+  push_request worker (Inject {payload = txn; callback})
 
 let confirm txn_hash =
-  let open Lwt_result_syntax in
-  let*? worker = Lazy.force worker in
-  let*! (was_pushed : bool) =
-    Worker.Queue.push_request worker (Confirm {txn_hash})
-  in
-  assert was_pushed ;
-  return_unit
+  bind_worker @@ fun w -> push_request w (Confirm {txn_hash})
 
 let start ~relay_endpoint ~max_transaction_batch_length () =
   let open Lwt_result_syntax in
@@ -352,5 +370,12 @@ let start ~relay_endpoint ~max_transaction_batch_length () =
       (module Handlers)
   in
   Lwt.wakeup worker_waker worker ;
-  let*! () = Floodgate_events.tx_queue_is_ready () in
+  let*! () = Tx_queue_events.is_ready () in
+  return_unit
+
+let shutdown () =
+  let open Lwt_result_syntax in
+  bind_worker @@ fun w ->
+  let*! () = Tx_queue_events.shutdown () in
+  let*! () = Worker.shutdown w in
   return_unit

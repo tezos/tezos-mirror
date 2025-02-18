@@ -30,6 +30,12 @@
 
 ### Internals
 
+### Experimental
+
+- Adds a new experimental feature `enable_tx_queue` to replace the tx
+  pool by a tx queue to improve performance and simplify the
+  code. (!16812)
+
 ## Version 0.17 (2025-02-14)
 
 This release addresses several bugs reported by partners, notably around the

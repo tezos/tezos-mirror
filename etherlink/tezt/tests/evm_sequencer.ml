@@ -252,8 +252,8 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
     ?websockets ?enable_fast_withdrawal ?history_mode
     ?(use_threshold_encryption = default_threshold_encryption_registration)
     ?(use_dal = default_dal_registration)
-    ?(use_multichain = default_multichain_registration) ~title ~tags body
-    protocols =
+    ?(use_multichain = default_multichain_registration) ?enable_tx_queue ~title
+    ~tags body protocols =
   let dal_cases =
     match use_dal with
     | Register_both {extra_tags_with; extra_tags_without} ->
@@ -319,6 +319,7 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
                 ?rollup_history_mode
                 ~enable_dal
                 ~enable_multichain
+                ?enable_tx_queue
                 ~title
                 ~tags:(te_tags @ dal_tags @ multichain_tags @ tags)
                 body
@@ -10014,6 +10015,55 @@ let test_apply_from_full_history_mode =
   let*@ _ = Rpc.get_block_by_number ~block:"1" observer in
   unit
 
+let test_tx_queue =
+  register_all
+    ~tags:["observer"; "tx_queue"]
+    ~time_between_blocks:Nothing
+    ~kernels:[Latest] (* node only test *)
+    ~use_threshold_encryption:Register_without_feature
+    ~use_dal:Register_without_feature
+    ~enable_tx_queue:true
+    ~websockets:false
+    ~title:"Submits a transaction to an observer with a tx queue."
+  @@ fun {sequencer; observer; _} _protocol ->
+  let* () =
+    let*@ _ = produce_block sequencer in
+    unit
+  and* () = Evm_node.wait_for_blueprint_applied observer 1 in
+
+  let observer_wait_tx_added =
+    Evm_node.wait_for_tx_queue_add_transaction observer
+  in
+  let sequencer_wait_tx_added =
+    Evm_node.wait_for_tx_pool_add_transaction sequencer
+  in
+  let observer_wait_tx_injected =
+    Evm_node.wait_for_tx_queue_injecting_transaction observer
+  in
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~value:Wei.one
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  let* () =
+    let*@ _hash = Rpc.send_raw_transaction ~raw_tx observer in
+    unit
+  and* _ = observer_wait_tx_added
+  and* observer_wait_tx_injected
+  and* _ = sequencer_wait_tx_added in
+  Check.(
+    (observer_wait_tx_injected = 1)
+      ~__LOC__
+      int
+      ~error_msg:"Expected %r transaction injected found %l.") ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -10154,4 +10204,5 @@ let () =
   test_rpc_getLogs_with_earliest_fail protocols ;
   test_eip2930_transaction_object [Alpha] ;
   test_eip1559_transaction_object [Alpha] ;
-  test_apply_from_full_history_mode protocols
+  test_apply_from_full_history_mode protocols ;
+  test_tx_queue [Alpha]

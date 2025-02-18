@@ -99,6 +99,7 @@ type experimental_features = {
   max_websocket_message_length : int;
   monitor_websocket_heartbeat : monitor_websocket_heartbeat option;
   l2_chains : l2_chain list option;
+  enable_tx_queue : bool;
 }
 
 type sequencer = {

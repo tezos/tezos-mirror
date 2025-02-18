@@ -10,8 +10,8 @@
     [eth_sendRawTransaction] at a regular interval. It provides a non-blocking
     interface based on the use of callbacks. *)
 
-(** A [callback] is called by the [Tx_queue] at various stage of a submitted
-    transaction life.
+(** A [callback] is called by the [Tx_queue] at various stages of a
+    submitted transaction's life.
 
     The next tick after its insertion in the queue, a transaction is submitted
     to the relay node within a batch of [eth_sendRawTransaction] requests.
@@ -29,7 +29,8 @@ type callback =
 
 (** A [request] submitted to the [Tx_queue] consists in a payload
     (that is, a raw transaction) and a {!type:callback} that will be
-    used to advertise the transaction life cycle. *)
+    used to advertise the transaction's life cycle. *)
+
 type request = {payload : Ethereum_types.hex; callback : callback}
 
 (** [start ~relay_endpoint ~max_transaction_batch_length ()] starts
@@ -41,11 +42,19 @@ val start :
   unit ->
   unit tzresult Lwt.t
 
-(** [inject ?callback raw_txn] pushes the raw transaction [raw_txn] to the
-    worker queue.
+(** [shutdown ()] stops the tx queue, waiting for the ongoing request
+    to be processed. *)
+val shutdown : unit -> unit tzresult Lwt.t
+
+(** [inject ?callback tx_object raw_txn] pushes the raw transaction
+    [raw_txn] to the worker queue.
 
     {b Note:} The promise will be sleeping until at least {!start} is called. *)
-val inject : ?callback:callback -> Ethereum_types.hex -> unit Lwt.t
+val inject :
+  ?callback:callback ->
+  Ethereum_types.legacy_transaction_object ->
+  Ethereum_types.hex ->
+  unit tzresult Lwt.t
 
 (** [confirm hash] is to be called by an external component to advertise a
     transaction has been included in a blueprint. *)

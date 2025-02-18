@@ -556,6 +556,14 @@ let wait_for_tx_pool_add_transaction ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"tx_pool_add_transaction.v0"
   @@ JSON.as_string_opt
 
+let wait_for_tx_queue_add_transaction ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"tx_queue_add_transaction.v0"
+  @@ fun json -> JSON.(json |> as_string |> Option.some)
+
+let wait_for_tx_queue_injecting_transaction ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"tx_queue_injecting_transaction.v0"
+  @@ fun json -> JSON.(json |> as_int |> Option.some)
+
 let wait_for_split ?level evm_node =
   wait_for_event evm_node ~event:"evm_context_gc_split.v0" @@ fun json ->
   let event_level = JSON.(json |-> "level" |> as_int) in
@@ -1250,7 +1258,8 @@ let optional_json_put ~name v f json =
 let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false)
     ?(blueprints_publisher_order_enabled = false) ?(next_wasm_runtime = true)
-    ?rpc_server ?(enable_websocket = false) ?max_websocket_message_length () =
+    ?rpc_server ?(enable_websocket = false) ?max_websocket_message_length
+    ?(enable_tx_queue = false) () =
   JSON.update "experimental_features" @@ fun json ->
   conditional_json_put
     drop_duplicate_when_injection
@@ -1269,6 +1278,7 @@ let patch_config_with_experimental_feature
          | Resto -> `String "resto"
          | Dream -> `String "dream")
   |> conditional_json_put enable_websocket ~name:"enable_websocket" (`Bool true)
+  |> conditional_json_put enable_tx_queue ~name:"enable_tx_queue" (`Bool true)
   |> optional_json_put
        max_websocket_message_length
        ~name:"max_websocket_message_length"

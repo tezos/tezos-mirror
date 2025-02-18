@@ -643,7 +643,12 @@ let dispatch_request (rpc : Configuration.rpc)
                     in
                     rpc_error (Rpc_errors.transaction_rejected err None)
                 | Ok transaction_object -> (
-                    let* tx_hash = Tx_pool.add transaction_object txn in
+                    let* tx_hash =
+                      if config.experimental_features.enable_tx_queue then
+                        let* () = Tx_queue.inject transaction_object tx_raw in
+                        return (Ok transaction_object.hash)
+                      else Tx_pool.add transaction_object txn
+                    in
                     match tx_hash with
                     | Ok tx_hash -> rpc_ok tx_hash
                     | Error reason ->
@@ -794,7 +799,7 @@ let dispatch_request (rpc : Configuration.rpc)
   Lwt.return JSONRPC.{value; id}
 
 let dispatch_private_request (rpc : Configuration.rpc)
-    (_config : Configuration.t)
+    (config : Configuration.t)
     ((module Backend_rpc : Services_backend_sig.S), _) ~block_production
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_syntax in
@@ -859,13 +864,17 @@ let dispatch_private_request (rpc : Configuration.rpc)
           in
           match is_valid with
           | Error err ->
-              let*! () =
-                let transaction = Ethereum_types.hex_encode_string raw_txn in
-                Tx_pool_events.invalid_transaction ~transaction
-              in
+              let transaction = Ethereum_types.hex_encode_string raw_txn in
+              let*! () = Tx_pool_events.invalid_transaction ~transaction in
               rpc_error (Rpc_errors.transaction_rejected err None)
           | Ok transaction_object -> (
-              let* tx_hash = Tx_pool.add transaction_object raw_txn in
+              let* tx_hash =
+                if config.experimental_features.enable_tx_queue then
+                  let transaction = Ethereum_types.hex_encode_string raw_txn in
+                  let* () = Tx_queue.inject transaction_object transaction in
+                  return @@ Ok transaction_object.hash
+                else Tx_pool.add transaction_object raw_txn
+              in
               match tx_hash with
               | Ok tx_hash -> rpc_ok tx_hash
               | Error reason ->
