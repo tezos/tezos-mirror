@@ -5,12 +5,12 @@
 use super::{Args, Instruction, OpCode};
 use crate::{
     default::ConstDefault,
-    machine_state::registers::{NonZeroXRegister, XRegister, nz},
+    machine_state::registers::{NonZeroXRegister, XRegister, nz, sp, x0},
     parser::{
         XRegisterParsed,
         instruction::{
-            CIBTypeArgs, CRTypeArgs, ITypeArgs, InstrWidth, NonZeroRdITypeArgs, NonZeroRdRTypeArgs,
-            SBTypeArgs, SplitITypeArgs, UJTypeArgs,
+            CIBTypeArgs, CRTypeArgs, CSSTypeArgs, ITypeArgs, InstrWidth, NonZeroRdITypeArgs,
+            NonZeroRdRTypeArgs, SBTypeArgs, SplitITypeArgs, UJTypeArgs,
         },
         split_x0,
     },
@@ -1064,6 +1064,18 @@ impl Instruction {
                 Instruction::new_sdnz(rs1, rs2, args.imm, InstrWidth::Uncompressed)
             }
             _ => Instruction::new_sd(args.rs1, args.rs2, args.imm, InstrWidth::Uncompressed),
+        }
+    }
+
+    /// Convert [`InstrCacheable::CSdsp`] according to whether register is non-zero.
+    ///
+    /// [`InstrCacheable::CSdsp`]: crate::parser::instruction::InstrCacheable::CSdsp
+    pub(super) fn from_ic_csdsp(args: &CSSTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        debug_assert!(args.imm >= 0 && args.imm % 8 == 0);
+        match split_x0(args.rs2) {
+            X::NonZero(rs2) => Instruction::new_sdnz(nz::sp, rs2, args.imm, InstrWidth::Compressed),
+            X::X0 => Instruction::new_sd(sp, x0, args.imm, InstrWidth::Compressed),
         }
     }
 }

@@ -8,12 +8,8 @@
 //! U:C-16
 
 use crate::{
-    machine_state::{
-        MachineCoreState, memory,
-        registers::{NonZeroXRegister, XRegister, XRegisters, sp},
-    },
+    machine_state::registers::{NonZeroXRegister, XRegister, XRegisters},
     state_backend as backend,
-    traps::Exception,
 };
 
 impl<M> XRegisters<M>
@@ -65,22 +61,6 @@ where
     }
 }
 
-impl<MC, M> MachineCoreState<MC, M>
-where
-    MC: memory::MemoryConfig,
-    M: backend::ManagerReadWrite,
-{
-    /// `C.SDSP` CSS-type compressed instruction
-    ///
-    /// Stores a 64-bit value in register `rs2` to memory. It computes
-    /// an effective address by adding the immediate to the stack pointer.
-    /// The immediate is obtained by zero-extending and scaling by 8 the
-    /// offset encoded in the instruction (see U:C-16.3).
-    pub fn run_csdsp(&mut self, imm: i64, rs2: XRegister) -> Result<(), Exception> {
-        debug_assert!(imm >= 0 && imm % 8 == 0);
-        self.run_sd(imm, sp, rs2)
-    }
-}
 #[cfg(test)]
 mod tests {
     use std::panic::{AssertUnwindSafe, catch_unwind};

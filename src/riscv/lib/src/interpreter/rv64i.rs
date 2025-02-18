@@ -342,6 +342,7 @@ where
     ///
     /// Relevant opcodes:
     /// - `SD`
+    /// - `C.SDSP`
     pub fn run_sd(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Result<(), Exception> {
         let value: u64 = self.hart.xregisters.read(rs2);
         self.write_to_bus(imm, rs1, value)
@@ -353,6 +354,7 @@ where
     /// Relevant opcodes:
     /// - `SD`
     /// - `C.SD`
+    /// - `C.SDSP`
     pub fn run_sdnz(
         &mut self,
         imm: i64,
