@@ -272,14 +272,32 @@ where
         Ok(())
     }
 
-    /// `LW` I-type instruction
-    ///
     /// Loads a word (4 bytes) starting from address given by: val(rs1) + imm
     /// NOTE: For RV64I the value is sign-extended to 64 bits
+    ///
+    /// Relevant opcodes:
+    /// - `LW`
     pub fn run_lw(&mut self, imm: i64, rs1: XRegister, rd: XRegister) -> Result<(), Exception> {
         let value: i32 = self.read_from_bus(imm, rs1)?;
         // i32 as u64 sign-extends to 64 bits
         self.hart.xregisters.write(rd, value as u64);
+        Ok(())
+    }
+
+    /// Loads a word (4 bytes) starting from address given by: val(rs1) + imm
+    /// NOTE: For RV64I the value is sign-extended to 64 bits
+    ///
+    /// Relevant opcodes:
+    /// - `LW`
+    pub fn run_lwnz(
+        &mut self,
+        imm: i64,
+        rs1: NonZeroXRegister,
+        rd: NonZeroXRegister,
+    ) -> Result<(), Exception> {
+        let value: i32 = self.read_from_bus_nz(imm, rs1)?;
+        // i32 as u64 sign-extends to 64 bits
+        self.hart.xregisters.write_nz(rd, value as u64);
         Ok(())
     }
 

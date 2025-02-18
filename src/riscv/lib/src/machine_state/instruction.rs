@@ -370,6 +370,8 @@ pub enum OpCode {
     Ldnz,
     /// Same as Sd but only using NonZeroXRegisters.
     Sdnz,
+    /// Same as Lw but only using NonZeroXRegisters.
+    Lwnz,
 }
 
 impl OpCode {
@@ -416,6 +418,7 @@ impl OpCode {
             Self::Lb => Args::run_lb,
             Self::Lh => Args::run_lh,
             Self::Lw => Args::run_lw,
+            Self::Lwnz => Args::run_lwnz,
             Self::Lbu => Args::run_lbu,
             Self::Lhu => Args::run_lhu,
             Self::Lwu => Args::run_lwu,
@@ -1185,6 +1188,7 @@ impl Args {
     impl_load_type!(run_lwu);
     impl_load_type!(run_ld);
     impl_load_type!(run_ldnz, non_zero);
+    impl_load_type!(run_lwnz, non_zero);
 
     // RV64I S-type instructions
     impl_store_type!(run_sb);
@@ -1523,10 +1527,7 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Lh,
                 args: args.to_args(InstrWidth::Uncompressed),
             },
-            InstrCacheable::Lw(args) => Instruction {
-                opcode: OpCode::Lw,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
+            InstrCacheable::Lw(args) => Instruction::from_ic_lw(args),
             InstrCacheable::Lbu(args) => Instruction {
                 opcode: OpCode::Lbu,
                 args: args.to_args(InstrWidth::Uncompressed),

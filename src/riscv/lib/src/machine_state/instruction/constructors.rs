@@ -588,6 +588,39 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Lw`].
+    pub(crate) fn new_lw(rd: XRegister, rs1: XRegister, imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Lw,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Lwnz`].
+    pub(crate) fn new_lwnz(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Lwnz,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {
@@ -1076,6 +1109,19 @@ impl Instruction {
         match split_x0(args.rs2) {
             X::NonZero(rs2) => Instruction::new_sdnz(nz::sp, rs2, args.imm, InstrWidth::Compressed),
             X::X0 => Instruction::new_sd(sp, x0, args.imm, InstrWidth::Compressed),
+        }
+    }
+
+    /// Convert [`InstrCacheable::Lw`] according to whether register is non-zero.
+    ///
+    /// [`InstrCacheable::Lw`]: crate::parser::instruction::InstrCacheable::Lw
+    pub(super) fn from_ic_lw(args: &ITypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rd), split_x0(args.rs1)) {
+            (X::NonZero(rd), X::NonZero(rs1)) => {
+                Instruction::new_lwnz(rd, rs1, args.imm, InstrWidth::Uncompressed)
+            }
+            _ => Instruction::new_lw(args.rd, args.rs1, args.imm, InstrWidth::Uncompressed),
         }
     }
 }
