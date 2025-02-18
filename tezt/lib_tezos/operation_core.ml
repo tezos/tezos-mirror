@@ -386,25 +386,22 @@ module Consensus = struct
     inject ?request ?force ?error ~protocol op client
 
   let get_slots ~level client =
-    Client.RPC.call_via_endpoint client
-    @@ RPC.get_chain_block_helper_validators ~level ()
-
-  let first_slot ~slots_json (delegate : Account.key) =
+    let* rpc_json =
+      Client.RPC.call client @@ RPC.get_chain_block_helper_validators ~level ()
+    in
     let open JSON in
-    match
-      List.find_opt
-        (fun slots ->
-          String.equal
-            (slots |-> "delegate" |> as_string)
-            delegate.public_key_hash)
-        (as_list slots_json)
-    with
-    | Some slots -> List.hd (slots |-> "slots" |> as_list) |> as_int
-    | None ->
-        Test.fail
-          "No slots found for %s in: %s"
-          delegate.public_key_hash
-          (JSON.encode slots_json)
+    return
+    @@ List.map
+         (fun json ->
+           let delegate = json |-> "delegate" |> as_string in
+           let slots = json |-> "slots" |> as_list |> List.map as_int in
+           (delegate, slots))
+         (as_list rpc_json)
+
+  let first_slot ~slots (delegate : Account.key) =
+    match List.assoc_opt delegate.public_key_hash slots with
+    | Some slots -> List.hd slots
+    | None -> Test.fail "No slots found for %s" delegate.public_key_hash
 
   let get_block_payload_hash ?block client =
     let* block_header =

@@ -1908,11 +1908,11 @@ module Revamped = struct
     let* block_payload_hash =
       Operation.Consensus.get_block_payload_hash client
     in
-    let* slots_json = Operation.Consensus.get_slots ~level client in
+    let* slots = Operation.Consensus.get_slots ~level client in
     let inject_attestation (delegate : Account.key) =
       Operation.Consensus.inject
         (Operation.Consensus.attestation
-           ~slot:(Operation.Consensus.first_slot ~slots_json delegate)
+           ~slot:(Operation.Consensus.first_slot ~slots delegate)
            ~level
            ~round:0
            ~block_payload_hash
@@ -2159,12 +2159,12 @@ module Revamped = struct
     let* block_payload_hash =
       Operation.Consensus.get_block_payload_hash client
     in
-    let* slots_json = Operation.Consensus.get_slots ~level client in
+    let* slots = Operation.Consensus.get_slots ~level client in
     let inject_attestation (delegate : Account.key) =
       let* op =
         Operation.Consensus.operation
           (Operation.Consensus.attestation
-             ~slot:(Operation.Consensus.first_slot ~slots_json delegate)
+             ~slot:(Operation.Consensus.first_slot ~slots delegate)
              ~level
              ~round:0
              ~block_payload_hash
@@ -2421,11 +2421,11 @@ module Revamped = struct
     let* block_payload_hash =
       Operation.Consensus.get_block_payload_hash client
     in
-    let* slots_json = Operation.Consensus.get_slots ~level client in
+    let* slots = Operation.Consensus.get_slots ~level client in
     let inject_attestation (account : Account.key) =
       Operation.Consensus.inject
         (Operation.Consensus.attestation
-           ~slot:(Operation.Consensus.first_slot ~slots_json account)
+           ~slot:(Operation.Consensus.first_slot ~slots account)
            ~level
            ~round:0
            ~block_payload_hash
@@ -2534,11 +2534,11 @@ module Revamped = struct
     let* block_payload_hash =
       Operation.Consensus.get_block_payload_hash client
     in
-    let* slots_json = Operation.Consensus.get_slots ~level client in
+    let* slots = Operation.Consensus.get_slots ~level client in
     let inject_attestation (account : Account.key) =
       Operation.Consensus.inject
         (Operation.Consensus.attestation
-           ~slot:(Operation.Consensus.first_slot ~slots_json account)
+           ~slot:(Operation.Consensus.first_slot ~slots account)
            ~level
            ~round:0
            ~block_payload_hash
@@ -2666,11 +2666,11 @@ module Revamped = struct
     let* block_payload_hash =
       Operation.Consensus.get_block_payload_hash client
     in
-    let* slots_json = Operation.Consensus.get_slots ~level client in
+    let* slots = Operation.Consensus.get_slots ~level client in
     let inject_attestation ~(account : Account.key) ~(signer : Account.key) =
       Operation.Consensus.inject
         (Operation.Consensus.attestation
-           ~slot:(Operation.Consensus.first_slot ~slots_json account)
+           ~slot:(Operation.Consensus.first_slot ~slots account)
            ~level
            ~round:0
            ~block_payload_hash

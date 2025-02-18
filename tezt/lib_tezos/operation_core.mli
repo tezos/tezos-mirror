@@ -306,16 +306,17 @@ module Consensus : sig
     Client.t ->
     [`OpHash of string] Lwt.t
 
-  (** Retrieves the attestation slots at [level] by calling the [GET
-      /chains/<chain>/blocks/<block>/helpers/validators] RPC. *)
-  val get_slots : level:int -> Client.t -> JSON.t Lwt.t
+  (** Retrieves the attestation slots at [level] by calling the
+      [GET /chains/<chain>/blocks/<block>/helpers/validators] RPC.
+      Returns an association list that maps a public key hash to
+      the owned slot list *)
+  val get_slots : level:int -> Client.t -> (string * int list) list Lwt.t
 
-  (** Returns the first slot of the provided delegate in the
-      [slots_json] that describes all attestation rights at some
-      level.
+  (** Returns the first slot of the provided delegate in the [slots]
+      association list that describes all attestation rights at some level.
 
       Causes the test to fail if the delegate is not found. *)
-  val first_slot : slots_json:JSON.t -> Account.key -> int
+  val first_slot : slots:(string * int list) list -> Account.key -> int
 
   (** Calls the [GET /chains/<chain>/blocks/<block>/header] RPC and
       extracts the head block's payload hash from the result. *)
