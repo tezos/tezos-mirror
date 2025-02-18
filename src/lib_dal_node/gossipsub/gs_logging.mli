@@ -24,5 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [event e] logs the event [e] of the Gossipsub worker *)
-val event : Gs_interface.Worker_instance.event -> unit Lwt.t
+(** [event ~verbose e] logs the event [e] of the Gossipsub worker.  When
+    [verbose] is unset, only a few messages of GS control messages are
+    logged. *)
+val event : verbose:bool -> Gs_interface.Worker_instance.event -> unit Lwt.t

@@ -193,7 +193,7 @@ module Events = struct
       ("message_ids", list Types.Message_id.encoding)
 end
 
-let event =
+let event ~verbose:_ =
   let open Events in
   function
   | Check_unknown_messages -> emit check_unknown_messages ()

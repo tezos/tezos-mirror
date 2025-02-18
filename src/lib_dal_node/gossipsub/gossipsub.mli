@@ -56,7 +56,7 @@ module Worker : sig
        and type Point.t = Types.Point.t
 
   module Logging : sig
-    val event : event -> unit Monad.t
+    val event : verbose:bool -> event -> unit Monad.t
   end
 
   (** A hook to set or update messages and messages IDs validation
