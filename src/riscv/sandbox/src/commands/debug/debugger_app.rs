@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024-2025 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -13,6 +13,7 @@ use octez_riscv::{
     kernel_loader::Error,
     machine_state::{
         AccessType, CacheLayouts, MachineCoreState,
+        block_cache::bcall::InterpretedBlockBuilder,
         csregisters::satp::{Satp, SvLength, TranslationAlgorithm},
         main_memory::{self, Address, MainMemoryLayout},
         mode::Mode,
@@ -201,8 +202,10 @@ impl<'a, ML: MainMemoryLayout> DebuggerApp<'a, TestStepper<ML>> {
         demangle_sybols: bool,
         max_steps: Option<usize>,
     ) -> Result<()> {
+        let block_builder = InterpretedBlockBuilder;
+
         let (mut interpreter, prog) =
-            TestStepper::<ML>::new_with_parsed_program(program, initrd, exit_mode)?;
+            TestStepper::<ML>::new_with_parsed_program(program, initrd, exit_mode, block_builder)?;
         let symbols = get_elf_symbols(program, demangle_sybols)?;
         errors::install_hooks()?;
         let terminal = tui::init()?;
@@ -224,6 +227,7 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> DebuggerApp<'_, PvmStepper<
         opts: &DebugOptions,
     ) -> Result<()> {
         let hooks = PvmHooks::new(|_| {});
+        let block_builder = InterpretedBlockBuilder;
 
         let mut stepper = PvmStepper::<'_, ML, CL>::new(
             program,
@@ -232,6 +236,7 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> DebuggerApp<'_, PvmStepper<
             hooks,
             rollup_address,
             opts.common.inbox.origination_level,
+            block_builder,
         )?;
 
         let symbols = get_elf_symbols(program, opts.demangle)?;
@@ -499,10 +504,13 @@ mod test {
             Err(e) => panic!("Failed to read program file: {}", e),
         };
 
+        let block_builder = InterpretedBlockBuilder;
+
         let (mut interpreter, prog) = TestStepper::<M1G>::new_with_parsed_program(
             program.as_slice(),
             None,
             posix_exit_mode(&ExitMode::User),
+            block_builder,
         )
         .unwrap();
 

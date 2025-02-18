@@ -93,8 +93,9 @@ impl<ML: MainMemoryLayout, B: Block<ML, Owned>> TestStepper<ML, TestCacheLayouts
         program: &[u8],
         initrd: Option<&[u8]>,
         mode: mode::Mode,
+        block_builder: B::BlockBuilder,
     ) -> Result<Self, TestStepperError> {
-        Ok(Self::new_with_parsed_program(program, initrd, mode)?.0)
+        Ok(Self::new_with_parsed_program(program, initrd, mode, block_builder)?.0)
     }
 
     /// Initialise an interpreter with a given `program`, starting execution in [mode::Mode].
@@ -105,10 +106,11 @@ impl<ML: MainMemoryLayout, B: Block<ML, Owned>> TestStepper<ML, TestCacheLayouts
         program: &[u8],
         initrd: Option<&[u8]>,
         mode: mode::Mode,
+        block_builder: B::BlockBuilder,
     ) -> Result<(Self, BTreeMap<u64, String>), TestStepperError> {
         let (posix_space, machine_state_space) = Owned::allocate::<TestStepperLayout<ML>>();
         let posix_state = PosixState::bind(posix_space);
-        let machine_state = MachineState::bind(machine_state_space);
+        let machine_state = MachineState::bind(machine_state_space, block_builder);
         let mut stepper = Self {
             posix_state,
             machine_state,

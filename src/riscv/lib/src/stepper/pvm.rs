@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use super::{Stepper, StepperStatus};
-use crate::machine_state::block_cache::bcall::{Block, Interpreted};
+use crate::machine_state::block_cache::bcall::{Block, Interpreted, InterpretedBlockBuilder};
 use crate::state_backend::{ManagerBase, ManagerReadWrite};
 use crate::{
     kernel_loader,
@@ -69,9 +69,10 @@ impl<'hooks, ML: MainMemoryLayout, B: Block<ML, Owned>, CL: CacheLayouts>
         hooks: PvmHooks<'hooks>,
         rollup_address: [u8; 20],
         origination_level: u32,
+        block_builder: B::BlockBuilder,
     ) -> Result<Self, PvmStepperError> {
         let space = Owned::allocate::<PvmLayout<ML, CL>>();
-        let mut pvm = Pvm::bind(space);
+        let mut pvm = Pvm::bind(space, block_builder);
 
         let program = Program::<ML>::from_elf(program)?;
 
@@ -259,6 +260,33 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: Manager
             _ => false,
         }
     }
+
+    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
+    /// the constituents of `N` that were produced from the constituents of `&M`.
+    pub fn struct_ref(&self) -> AllocatedOf<PvmLayout<ML, CL>, Ref<'_, M>> {
+        self.pvm.struct_ref::<FnManagerIdent>()
+    }
+
+    /// Re-bind the PVM type by serialising and deserialising its state in order to eliminate
+    /// ephemeral state that doesn't make it into the serialised output.
+    ///
+    /// We additionally pass a new instance of the [`BlockBuilder`], to be used in the deserialised
+    /// pvm.
+    ///
+    /// [`BlockBuilder`]: Block::BlockBuilder
+    pub fn rebind_via_serde(&mut self, block_builder: B::BlockBuilder)
+    where
+        for<'a> AllocatedOf<PvmLayout<ML, CL>, Ref<'a, M>>: Serialize,
+        AllocatedOf<PvmLayout<ML, CL>, M>: DeserializeOwned,
+    {
+        let space = {
+            let refs = self.pvm.struct_ref::<FnManagerIdent>();
+            let data = binary::serialise(&refs).unwrap();
+            binary::deserialise(&data).unwrap()
+        };
+
+        self.pvm = Pvm::bind(space, block_builder);
+    }
 }
 
 impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
@@ -295,7 +323,7 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
             return false;
         };
 
-        let pvm = Pvm::<ML, CL, Interpreted<_, _>, Verifier>::bind(space);
+        let pvm = Pvm::<ML, CL, Interpreted<_, _>, Verifier>::bind(space, InterpretedBlockBuilder);
         let mut stepper = PvmStepper {
             pvm,
             rollup_address: self.rollup_address,
@@ -318,28 +346,6 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
         // let _refs = stepper.pvm.struct_ref::<FnManagerIdent>();
         // let hash: Hash = todo!("Can't obtain the hash of a verification state yet");
         // &hash == proof.final_state_hash()
-    }
-
-    /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
-    /// the constituents of `N` that were produced from the constituents of `&M`.
-    pub fn struct_ref(&self) -> AllocatedOf<PvmLayout<ML, CL>, Ref<'_, M>> {
-        self.pvm.struct_ref::<FnManagerIdent>()
-    }
-
-    /// Re-bind the PVM type by serialising and deserialising its state in order to eliminate
-    /// ephemeral state that doesn't make it into the serialised output.
-    pub fn rebind_via_serde(&mut self)
-    where
-        for<'a> AllocatedOf<PvmLayout<ML, CL>, Ref<'a, M>>: Serialize,
-        AllocatedOf<PvmLayout<ML, CL>, M>: DeserializeOwned,
-    {
-        let space = {
-            let refs = self.pvm.struct_ref::<FnManagerIdent>();
-            let data = binary::serialise(&refs).unwrap();
-            binary::deserialise(&data).unwrap()
-        };
-
-        self.pvm = Pvm::bind(space);
     }
 }
 

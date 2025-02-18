@@ -509,7 +509,7 @@ pub mod tests {
     #[macro_export]
     macro_rules! create_state {
         // For an extra generic in the state (MachineState for example)
-        ($State:tt, $StateLayout:ty, $Factory:ty $(, $ExtraGenerics:ty)*) => {
+        ($State:tt, $StateLayout:ty, $Factory:ty $(, $ExtraGenerics:ty)* $(, || $arg: expr)*) => {
             {
                 let new_state =
                     $State::<
@@ -517,6 +517,7 @@ pub mod tests {
                         <$Factory as $crate::state_backend::test_helpers::TestBackendFactory>::Manager,
                     >::bind(
                         <$Factory as $crate::state_backend::test_helpers::TestBackendFactory>::allocate::<$StateLayout>(),
+                        $($arg,)*
                     );
 
                 new_state

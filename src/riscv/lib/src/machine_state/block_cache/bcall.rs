@@ -63,8 +63,8 @@ pub type BlockLayout<ML> = (Atom<u8>, [ICallLayout<ML>; CACHE_INSTR]);
 /// Blocks will never contain more than [`CACHE_INSTR`] instructions.
 pub trait Block<ML: MainMemoryLayout, M: ManagerBase> {
     /// Block construction may require additional state not kept in storage,
-    /// this can be passed through as an additional parameter in `bind`.
-    type BindState: Clone;
+    /// this is then passed as a parameter to [`Block::complete_block`].
+    type BlockBuilder: Default;
 
     /// Bind the block to the given allocated state.
     fn bind(allocated: AllocatedOf<BlockLayout<ML>, M>) -> Self;
@@ -94,7 +94,7 @@ pub trait Block<ML: MainMemoryLayout, M: ManagerBase> {
     /// Mark a block as complete.
     ///
     /// This may trigger effects such as JIT-compilation.
-    fn complete_block(&mut self)
+    fn complete_block(&mut self, builder: &mut Self::BlockBuilder)
     where
         M: ManagerReadWrite;
 
@@ -120,7 +120,17 @@ pub trait Block<ML: MainMemoryLayout, M: ManagerBase> {
         M: ManagerRead;
 }
 
+/// Interpreted blocks are built automatically, and require no additional context.
+#[derive(Debug, Default)]
+pub struct InterpretedBlockBuilder;
+
 /// Blocks that are executed via intepreting the individual instructions.
+///
+/// Interpreted blocks use the [`EnrichedCell`] mechanism, in order to dispatch
+/// opcode to function statically during block construction. This saves time over
+/// dispatching on every 'instruction run'. See [`ICall`] for more information.
+///
+/// [`ICall`]: super::ICall
 pub struct Interpreted<ML: MainMemoryLayout, M: ManagerBase> {
     instr: [EnrichedCell<ICallPlaced<ML>, M>; CACHE_INSTR],
     len_instr: Cell<u8, M>,
@@ -155,7 +165,7 @@ impl<ML: MainMemoryLayout, M: ManagerBase> BCall<ML, M> for [EnrichedCell<ICallP
 }
 
 impl<ML: MainMemoryLayout, M: ManagerBase> Block<ML, M> for Interpreted<ML, M> {
-    type BindState = ();
+    type BlockBuilder = InterpretedBlockBuilder;
 
     fn num_instr(&self) -> usize
     where
@@ -164,7 +174,7 @@ impl<ML: MainMemoryLayout, M: ManagerBase> Block<ML, M> for Interpreted<ML, M> {
         self.len_instr.read() as usize
     }
 
-    fn complete_block(&mut self)
+    fn complete_block(&mut self, _builder: &mut Self::BlockBuilder)
     where
         M: ManagerReadWrite,
     {
