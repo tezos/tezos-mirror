@@ -311,6 +311,9 @@ module P2P : sig
       t ->
       (Types.Peer.t * Types.Gossipsub.connection) list
 
+    (** [get_reconnection_delays t] returns the reconnections delays for unreachable points. *)
+    val get_reconnection_delays : t -> (Types.Point.t * Types.Span.t) list
+
     (** [get_scores t] returns the score of peers with a known score. *)
     val get_scores : t -> (Types.Peer.t * Types.Score.t) list
 

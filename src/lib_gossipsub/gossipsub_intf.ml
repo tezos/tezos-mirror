@@ -1222,6 +1222,11 @@ module type WORKER = sig
       to be processed by the worker. *)
   val input_events_stream : t -> event Stream.t
 
+  (** [reconnection_delays t] returns the points that are currently
+      unreachable with the span before the next attempt to reconnect
+      to them. *)
+  val reconnection_delays : t -> (Point.t * GS.Span.t) list
+
   (** [is_subscribed t topic] checks whether [topic] is in the mesh of [t]. *)
   val is_subscribed : t -> GS.Topic.t -> bool
 

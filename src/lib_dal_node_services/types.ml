@@ -260,6 +260,13 @@ module Span = struct
 
   let pp = Ptime.Span.pp
 
+  let rpc_encoding : t Data_encoding.t =
+    let open Data_encoding in
+    conv
+      (fun span -> Format.asprintf "%a" Ptime.Span.pp span)
+      (fun _ -> Stdlib.failwith "This is only used for encoding")
+      Data_encoding.string
+
   let encoding : t Data_encoding.t =
     let open Data_encoding in
     (* We limit the size of a {!Span.t} value to 2 bytes. It is sufficient for the
