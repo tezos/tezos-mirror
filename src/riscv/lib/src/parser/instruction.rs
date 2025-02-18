@@ -364,6 +364,9 @@ pub enum InstrCacheable {
     // RV64I S-type instructions
     Sb(SBTypeArgs),
     Sh(SBTypeArgs),
+
+    /// `SW` -  Stores a word (lowest 4 bytes from rs2) to the address
+    /// starting at: `val(rs1) + imm`.
     Sw(SBTypeArgs),
     /// `SD` - Stores a double-word (8 bytes from rs2) to the address
     /// starting at: `val(rs1) + imm`.
