@@ -12,6 +12,9 @@
 
 - `eth_getLogs` now accepts `null` as a valid value for all its filter
   parameters. (!16808)
+- Fixes switching to a history mode with a smaller retention period.
+  Previously, the command would succeed, but the node would keep using the
+  previous retention period. (!16798)
 
 ### Internals
 

@@ -537,15 +537,13 @@ DO UPDATE SET value = excluded.value
       (t2 level timestamp ->. unit)
       @@ {|INSERT INTO irmin_chunks (level, timestamp) VALUES (?, ?)|}
 
-    let oldest =
-      (unit ->! t2 level timestamp)
-      @@ {|SELECT level, timestamp from irmin_chunks ORDER BY level ASC LIMIT 1|}
+    let nth =
+      (int ->? t2 level timestamp)
+      @@ {|SELECT level, timestamp from irmin_chunks ORDER BY level DESC LIMIT 1 OFFSET ?|}
 
     let latest =
       (unit ->? t2 level timestamp)
       @@ {|SELECT level, timestamp from irmin_chunks ORDER BY level DESC LIMIT 1|}
-
-    let count = (unit ->! int) @@ {|SELECT COUNT(*) FROM irmin_chunks|}
 
     let clear = (unit ->. unit) @@ {|DELETE FROM irmin_chunks|}
 
@@ -1077,18 +1075,12 @@ module Irmin_chunks = struct
     with_connection conn @@ fun conn ->
     Db.exec conn Q.Irmin_chunks.insert (level, timestamp)
 
-  let oldest conn =
-    with_connection conn @@ fun conn -> Db.find conn Q.Irmin_chunks.oldest ()
+  let nth conn n =
+    with_connection conn @@ fun conn -> Db.find_opt conn Q.Irmin_chunks.nth n
 
   let latest conn =
     with_connection conn @@ fun conn ->
     Db.find_opt conn Q.Irmin_chunks.latest ()
-
-  let count conn =
-    let open Lwt_result_syntax in
-    with_connection conn @@ fun conn ->
-    let* count = Db.find_opt conn Q.Irmin_chunks.count () in
-    return (Option.value ~default:0 count)
 
   let clear store =
     with_connection store @@ fun conn -> Db.exec conn Q.Irmin_chunks.clear ()
@@ -1261,8 +1253,8 @@ let reset_before store ~l2_level ~history_mode =
   in
 
   (* {!reset_before} is called when garbage collector is trigerred.
-     Garbage collector is trigerred when the maximum number of splits
-     is reached, [l2_level] was the pointer to the oldest split.
+     Garbage collector is trigerred when the maximum number of splits is
+     reached, [l2_level] was the pointer to the first split to remove.
 
      If it wasn't included, the garbage collector would keep the maximum
      number of splits plus an additional one. *)

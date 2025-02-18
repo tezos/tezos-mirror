@@ -331,17 +331,14 @@ module State = struct
           Irmin_context.split ctxt.index ;
           let* () = Evm_store.Irmin_chunks.insert conn level timestamp in
           let*! () = Evm_context_events.gc_split level timestamp in
-          let* number_of_chunks = Evm_store.Irmin_chunks.count conn in
-          let max_number_of_chunks = gc_param.number_of_chunks in
-          let* () =
-            if number_of_chunks > max_number_of_chunks then
-              let* gc_level, _gc_timestamp =
-                Evm_store.Irmin_chunks.oldest conn
-              in
-              gc ctxt conn gc_level level history_mode
-            else return_unit
+          let* chunk_needing_gc =
+            Evm_store.Irmin_chunks.nth conn gc_param.number_of_chunks
           in
-          return_some (level, timestamp))
+          match chunk_needing_gc with
+          | Some (gc_level, _gc_timestamp) ->
+              let* () = gc ctxt conn gc_level level history_mode in
+              return_some (level, timestamp)
+          | None -> return_none)
         else return_none
 
   let commit_next_head (ctxt : t) conn timestamp evm_state =
