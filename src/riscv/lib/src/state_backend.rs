@@ -247,7 +247,7 @@ pub trait ManagerReadWrite: ManagerRead + ManagerWrite {
 }
 
 /// Manager with the ability to serialise regions
-pub trait ManagerSerialise: ManagerBase {
+pub trait ManagerSerialise: ManagerRead {
     /// Serialise the contents of the region.
     fn serialise_region<E: serde::Serialize, const LEN: usize, S: serde::Serializer>(
         region: &Self::Region<E, LEN>,

@@ -134,9 +134,11 @@ impl<ML: MainMemoryLayout> state_backend::ProofLayout for ICallLayout<ML> {
     fn to_merkle_tree(
         state: state_backend::RefProofGenOwnedAlloc<Self>,
     ) -> Result<proof_backend::merkle::MerkleTree, HashError> {
-        let cell = state.cell_ref();
-        let serialised = proof_backend::ProofEnrichedCell::serialise_inner_enriched_cell(cell)?;
-        proof_backend::merkle::MerkleTree::make_merkle_leaf(serialised, cell.get_access_info())
+        let serialised = binary::serialise(&state)?;
+        proof_backend::merkle::MerkleTree::make_merkle_leaf(
+            serialised,
+            state.cell_ref().get_access_info(),
+        )
     }
 
     fn from_proof(proof: state_backend::ProofTree) -> state_backend::FromProofResult<Self> {
@@ -219,7 +221,7 @@ impl state_backend::Layout for AddressCellLayout {
 
 impl state_backend::CommitmentLayout for AddressCellLayout {
     fn state_hash(state: state_backend::RefOwnedAlloc<Self>) -> Result<Hash, HashError> {
-        Hash::blake2b_hash(state)
+        <Atom<Address> as state_backend::CommitmentLayout>::state_hash(state)
     }
 }
 

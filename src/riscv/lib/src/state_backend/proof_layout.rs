@@ -4,8 +4,9 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    Array, Atom, DynArray, Layout, Many, RefProofGenOwnedAlloc, hash,
+    Array, Atom, DynArray, Layout, Many, Ref, RefProofGenOwnedAlloc,
     hash::HashError,
+    owned_backend::Owned,
     proof_backend::{
         merkle::{MERKLE_ARITY, MERKLE_LEAF_SIZE, MerkleTree, MerkleWriter, chunks_to_writer},
         proof::{MerkleProof, MerkleProofLeaf},
@@ -19,7 +20,7 @@ use crate::{array_utils::boxed_array, default::ConstDefault, storage::binary};
 #[derive(Debug, thiserror::Error)]
 pub enum FromProofError {
     #[error("Error during hashing: {0}")]
-    Hash(#[from] hash::HashError),
+    Hash(#[from] HashError),
 
     #[error("Error during deserialisation: {0}")]
     Deserialise(#[from] bincode::Error),
@@ -131,12 +132,19 @@ pub trait ProofLayout: Layout {
     fn from_proof(proof: ProofTree) -> FromProofResult<Self>;
 }
 
-impl<T: ConstDefault + serde::Serialize + serde::de::DeserializeOwned + 'static> ProofLayout
-    for Atom<T>
+impl<T> ProofLayout for Atom<T>
+where
+    T: serde::Serialize + serde::de::DeserializeOwned + Copy + ConstDefault + 'static,
 {
     fn to_merkle_tree(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
-        let serialised = binary::serialise(&state)?;
-        MerkleTree::make_merkle_leaf(serialised, state.into_region().get_access_info())
+        // The Merkle leaf must hold the serialisation of the initial state.
+        // Directly serialising the `ProofGen` state would produce the serialisation
+        // of the final state. Therefore, we rebind and serialise the wrapped `Owned` state.
+        let region = state.into_region();
+        let access_info = region.get_access_info();
+        let cell = super::Cell::<T, Ref<'_, Owned>>::bind(region.inner_region_ref());
+        let serialised = binary::serialise(&cell)?;
+        MerkleTree::make_merkle_leaf(serialised, access_info)
     }
 
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
@@ -144,15 +152,22 @@ impl<T: ConstDefault + serde::Serialize + serde::de::DeserializeOwned + 'static>
     }
 }
 
-impl<T: serde::Serialize + 'static, const LEN: usize> ProofLayout for Array<T, LEN>
+impl<T, const LEN: usize> ProofLayout for Array<T, LEN>
 where
-    [T; LEN]: ConstDefault + serde::de::DeserializeOwned,
+    T: serde::Serialize + serde::de::DeserializeOwned + Copy + ConstDefault + 'static,
 {
     fn to_merkle_tree(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
         // RV-282: Break down into multiple leaves if the size of the `Cells`
         // is too large for a proof.
-        let serialised = binary::serialise(&state)?;
-        MerkleTree::make_merkle_leaf(serialised, state.into_region().get_access_info())
+        //
+        // The Merkle leaf must hold the serialisation of the initial state.
+        // Directly serialising the `ProofGen` state would produce the serialisation
+        // of the final state. Therefore, we rebind and serialise the wrapped `Owned` state.
+        let region = state.into_region();
+        let access_info = region.get_access_info();
+        let cells = super::Cells::<T, LEN, Ref<'_, Owned>>::bind(region.inner_region_ref());
+        let serialised = binary::serialise(&cells)?;
+        MerkleTree::make_merkle_leaf(serialised, access_info)
     }
 
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
@@ -165,9 +180,9 @@ where
             match leaf {
                 MerkleProofLeaf::Blind(_) => verify_backend::Region::Absent,
                 MerkleProofLeaf::Read(data) => {
-                    let data: [T; LEN] = binary::deserialise(data.as_slice())?;
-                    let data = Box::new(data.map(Some));
-                    verify_backend::Region::Partial(data)
+                    let cells: super::Cells<T, LEN, Owned> = binary::deserialise(data)?;
+                    let arr: Box<[Option<T>; LEN]> = Box::new(cells.into_region().map(Some));
+                    verify_backend::Region::Partial(arr)
                 }
             }
         } else {
