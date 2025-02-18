@@ -1321,7 +1321,7 @@ let run ~data_dir ~configuration_override =
       Gossipsub.Worker.(
         make
           ~bootstrap_points:get_bootstrap_points
-          ~events_logging:Logging.event
+          ~events_logging:(Logging.event ~verbose:config.verbose)
           ~self
           rng
           limits
