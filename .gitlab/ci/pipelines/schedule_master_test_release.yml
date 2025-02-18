@@ -795,7 +795,7 @@ oc.docker-build-rockylinux-dependencies:
       - gcp
       - gcp_arm64
 
-oc.docker-systemd_tests-rpm:
+oc.docker-systemd-tests-rpm-rockylinux:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: images
   tags:
@@ -964,6 +964,34 @@ oc.docker-build-fedora-dependencies:
     when:
     - stuck_or_timeout_failure
     - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - "39"
+      - "42"
+      TAGS:
+      - gcp
+      - gcp_arm64
+
+oc.docker-systemd-tests-rpm-fedora:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - $TAGS
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-systemd-tests.Dockerfile
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    FLAVOUR: systemd-tests
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DISTRIBUTION: fedora
   parallel:
     matrix:
     - RELEASE:

@@ -96,12 +96,19 @@ let jobs pipeline_type =
          images/packages/rpm-systemd-tests.Dockerfile";
       ]
   in
-  let job_docker_systemd_test_rpm_dependencies : tezos_job =
+  let job_docker_systemd_test_rpm_rockylinux_dependencies : tezos_job =
     make_job_docker_systemd_tests
       ~__POS__
-      ~name:"oc.docker-systemd_tests-rpm"
+      ~name:"oc.docker-systemd-tests-rpm-rockylinux"
       ~distribution:"rockylinux"
       ~matrix:(rockylinux_package_release_matrix pipeline_type)
+  in
+  let job_docker_systemd_test_rpm_fedora_dependencies : tezos_job =
+    make_job_docker_systemd_tests
+      ~__POS__
+      ~name:"oc.docker-systemd-tests-rpm-fedora"
+      ~distribution:"fedora"
+      ~matrix:(fedora_package_release_matrix pipeline_type)
   in
 
   let make_job_docker_build_dependencies ~__POS__ ~name ~matrix ~distribution =
@@ -277,7 +284,7 @@ let jobs pipeline_type =
         ~dependencies:
           (Dependent
              [
-               Job job_docker_systemd_test_rpm_dependencies;
+               Job job_docker_systemd_test_rpm_fedora_dependencies;
                Job job_rpm_repo_fedora;
              ])
         ~variables:
@@ -286,7 +293,7 @@ let jobs pipeline_type =
              [("DISTRIBUTION", "fedora"); ("RELEASE", "39")])
         [
           "./scripts/ci/systemd-packages-test.sh \
-           docs/introduction/install-bin-rpm.sh \
+           scripts/packaging/tests/rpm/rpm-install.sh \
            images/packages/rpm-systemd-tests.Dockerfile";
         ];
     ]
@@ -311,7 +318,7 @@ let jobs pipeline_type =
         ~dependencies:
           (Dependent
              [
-               Job job_docker_systemd_test_rpm_dependencies;
+               Job job_docker_systemd_test_rpm_rockylinux_dependencies;
                Job job_rpm_repo_rockylinux;
              ])
         ~variables:
@@ -328,7 +335,7 @@ let jobs pipeline_type =
   let rockylinux_jobs =
     [
       job_docker_build_rockylinux_dependencies;
-      job_docker_systemd_test_rpm_dependencies;
+      job_docker_systemd_test_rpm_rockylinux_dependencies;
       job_build_rockylinux_package;
       job_build_rockylinux_package_data;
       job_rpm_repo_rockylinux;
@@ -337,6 +344,7 @@ let jobs pipeline_type =
   let fedora_jobs =
     [
       job_docker_build_fedora_dependencies;
+      job_docker_systemd_test_rpm_fedora_dependencies;
       job_build_fedora_package;
       job_build_fedora_package_data;
       job_rpm_repo_fedora;
