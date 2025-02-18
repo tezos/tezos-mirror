@@ -9545,6 +9545,32 @@ let get_tb_expected_attesting_rewards l1_node public_key_hash =
   in
   return participation.expected_attesting_rewards
 
+let create_account ?(source = Constant.bootstrap2) ~amount ~alias client =
+  Log.info
+    "Create a [%s] account: generate a key, inject a transaction that funds \
+     it, and bake a block to apply the transaction."
+    alias ;
+  let* fresh_account = Client.gen_and_show_keys ~alias client in
+  let* _oph =
+    Operation.Manager.inject_single_transfer
+      client
+      ~source
+      ~dest:fresh_account
+      ~amount
+  in
+  let* () = bake_for client in
+  return fresh_account
+
+let create_account_and_reveal ?source ~amount ~alias client =
+  let* fresh_account = create_account ?source ~amount ~alias client in
+  Log.info "Reveal pkh of [%s] account." alias ;
+  let op_reveal =
+    Operation.Manager.(make ~source:fresh_account (reveal fresh_account))
+  in
+  let* _oph = Operation.Manager.inject [op_reveal] client in
+  let* () = bake_for client in
+  return fresh_account
+
 (** [test_dal_rewards_distribution _protocol dal_parameters cryptobox node
     client _dal_node] verifies the correct distribution of DAL rewards among
     delegates based on their participation in DAL attestations activity.
