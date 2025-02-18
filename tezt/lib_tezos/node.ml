@@ -1004,10 +1004,10 @@ let replay ?on_terminate ?event_level ?event_sections_levels ?(strict = false)
     node
     arguments
 
-let init ?runner ?path ?name ?env ?color ?data_dir ?event_pipe ?net_port
-    ?advertised_net_port ?metrics_addr ?metrics_port ?rpc_external ?rpc_host
-    ?rpc_port ?rpc_tls ?event_level ?event_sections_levels ?patch_config
-    ?snapshot arguments =
+let init ?runner ?path ?name ?env ?color ?data_dir ?event_pipe ?net_addr
+    ?net_port ?advertised_net_port ?metrics_addr ?metrics_port ?rpc_external
+    ?rpc_host ?rpc_port ?rpc_tls ?event_level ?event_sections_levels
+    ?patch_config ?snapshot arguments =
   let run_arguments, config_arguments =
     List.partition should_be_runlike_argument arguments
   in
@@ -1019,6 +1019,7 @@ let init ?runner ?path ?name ?env ?color ?data_dir ?event_pipe ?net_port
       ?color
       ?data_dir
       ?event_pipe
+      ?net_addr
       ?net_port
       ?advertised_net_port
       ?metrics_addr

@@ -15,7 +15,8 @@ module Node = struct
 
   module Agent = struct
     let create ?rpc_external ?(metadata_size_limit = true) ?(arguments = [])
-        ?data_dir ?(path = Uses.path Constant.octez_node) ?name agent =
+        ?data_dir ?(path = Uses.path Constant.octez_node) ?name ?net_addr agent
+        =
       let* path = Agent.copy agent ~source:path in
       let runner = Agent.runner agent in
       let rpc_port = Agent.next_available_port agent in
@@ -32,6 +33,7 @@ module Node = struct
         ~path
         ?runner
         ?rpc_external
+        ?net_addr
         ~rpc_port
         ~net_port
         ~metrics_port
@@ -39,7 +41,8 @@ module Node = struct
       |> Lwt.return
 
     let init ?rpc_external ?(metadata_size_limit = true) ?(arguments = [])
-        ?data_dir ?(path = Uses.path Constant.octez_node) ?name agent =
+        ?data_dir ?(path = Uses.path Constant.octez_node) ?net_addr ?name agent
+        =
       let runner = Agent.runner agent in
       let* path = Agent.copy agent ~source:path in
       let rpc_port = Agent.next_available_port agent in
@@ -57,6 +60,7 @@ module Node = struct
         ?runner
         ?rpc_external
         ~rpc_port
+        ?net_addr
         ~net_port
         ~metrics_port
         ~event_level:`Notice
