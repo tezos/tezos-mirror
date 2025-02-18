@@ -5,7 +5,8 @@
 
 use crate::blueprint::Blueprint;
 use crate::blueprint_storage::{
-    clear_all_blueprints, store_forced_blueprint, store_inbox_blueprint,
+    clear_all_blueprints, read_current_block_header, store_forced_blueprint,
+    store_inbox_blueprint, BlockHeader,
 };
 use crate::configuration::{
     Configuration, ConfigurationMode, DalConfiguration, TezosContracts,
@@ -18,7 +19,6 @@ use crate::storage::read_last_info_per_level_timestamp;
 use anyhow::Ok;
 use std::ops::Add;
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_ethereum::block::L2Block;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
@@ -58,8 +58,13 @@ fn fetch_delayed_transactions<Host: Runtime>(
     delayed_inbox: &mut DelayedInbox,
 ) -> anyhow::Result<()> {
     let timestamp = read_last_info_per_level_timestamp(host)?;
-    // Number for the first forced blueprint
-    let base = crate::blueprint_storage::read_next_blueprint_number(host)?;
+    // Number and minimal timestamp for the first forced blueprint
+    let (base, minimal_timestamp) = match read_current_block_header(host) {
+        Result::Ok(BlockHeader {
+            blueprint_header, ..
+        }) => (blueprint_header.number + 1, blueprint_header.timestamp),
+        Err(_) => (0.into(), 0.into()),
+    };
     // Accumulator of how many blueprints we fetched
     let mut offset: u32 = 0;
 
@@ -71,22 +76,9 @@ fn fetch_delayed_transactions<Host: Runtime>(
             timed_out.len()
         );
 
-        let timestamp = match crate::block_storage::read_current(host) {
-            Result::Ok(L2Block {
-                timestamp: head_timestamp,
-                ..
-            }) => {
-                // Timestamp has to be at least equal or greater than previous timestamp.
-                // If it's not the case, we fallback and take the previous block timestamp.
-                std::cmp::max(timestamp, head_timestamp)
-            }
-            Err(_) => {
-                // If there's no current block, there's no previous
-                // timestamp. So we take whatever is the current
-                // timestamp.
-                timestamp
-            }
-        };
+        // Timestamp has to be at least equal or greater than previous timestamp.
+        // If it's not the case, we fallback and take the previous block timestamp.
+        let timestamp = std::cmp::max(timestamp, minimal_timestamp);
 
         let level = base.add(offset);
         Event::FlushDelayedInbox {
