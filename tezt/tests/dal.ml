@@ -501,7 +501,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     ?dal_rewards_weight ?traps_fraction ?event_sections_levels ?node_arguments
     ?activation_timestamp ?dal_bootstrap_peers ?(parameters = [])
     ?(prover = true) ?smart_rollup_timeout_period_in_blocks ?l1_history_mode
-    ?blocks_per_cycle f ~protocol =
+    ?blocks_per_cycle ?blocks_per_commitment f ~protocol =
   let parameter_overrides =
     make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
@@ -547,6 +547,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
          make_bool_parameter ["adaptive_issuance_force_activation"] (Some true)
        else [])
     @ make_int_parameter ["blocks_per_cycle"] blocks_per_cycle
+    @ make_int_parameter ["blocks_per_commitment"] blocks_per_commitment
     @ parameters
   in
 
@@ -628,7 +629,7 @@ let scenario_with_layer1_node ?attestation_threshold ?regression ?(tags = [])
     ?(dal_enable = true) ?incentives_enable ?traps_fraction ?dal_rewards_weight
     ?event_sections_levels ?node_arguments ?activation_timestamp
     ?consensus_committee_size ?minimal_block_delay ?delay_increment_per_round
-    ?blocks_per_cycle variant scenario =
+    ?blocks_per_cycle ?blocks_per_commitment variant scenario =
   let description = "Testing DAL L1 integration" in
   let tags = if List.mem team tags then tags else team :: tags in
   let tags =
@@ -643,6 +644,7 @@ let scenario_with_layer1_node ?attestation_threshold ?regression ?(tags = [])
     (fun protocol ->
       with_layer1
         ?blocks_per_cycle
+        ?blocks_per_commitment
         ?attestation_threshold
         ~custom_constants
         ?additional_bootstrap_accounts
