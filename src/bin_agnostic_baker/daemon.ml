@@ -147,10 +147,21 @@ let monitor_voting_periods ~state head_stream =
           else return_unit
         in
         loop ()
-    | None -> return_unit
+    | None -> tzfail Lost_node_connection
   in
   let* () = loop () in
   return_unit
+
+(** [baker_thread ~state] monitors the current baker thread for any potential error, and
+    it propagates any error that can appear. *)
+let baker_thread ~state =
+  let open Lwt_result_syntax in
+  let*! retcode =
+    match state.current_baker with
+    | Some baker -> baker.process.thread
+    | None -> Lwt.return 0
+  in
+  if retcode = 0 then return_unit else tzfail Baker_process_error
 
 (** [may_start_initial_baker state] aims to start the baker associated
     to the current protocol. If the protocol is considered as [frozen] (not
@@ -223,5 +234,7 @@ let run state =
   let* head_stream = monitor_heads ~node_addr in
   (* Monitoring voting periods through heads monitoring to avoid
      missing UAUs. *)
-  let* () = monitor_voting_periods ~state head_stream in
+  let* () =
+    Lwt.pick [monitor_voting_periods ~state head_stream; baker_thread ~state]
+  in
   return_unit
