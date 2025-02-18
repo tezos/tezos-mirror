@@ -18,7 +18,9 @@ use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use tezos_ethereum::block::L2Block;
 use tezos_ethereum::eth_gen::OwnedHash;
-use tezos_ethereum::rlp_helpers;
+use tezos_ethereum::rlp_helpers::{
+    self, append_timestamp, append_u256_le, decode_field_u256_le, decode_timestamp,
+};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
@@ -228,6 +230,70 @@ pub fn store_forced_blueprint<Host: Runtime>(
     let chunk_path = blueprint_chunk_path(&blueprint_path, 0)?;
     let store_blueprint = StoreBlueprint::InboxBlueprint(blueprint);
     store_rlp(&store_blueprint, host, &chunk_path).map_err(Error::from)
+}
+
+impl Encodable for EVMBlockHeader {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        let Self {
+            hash,
+            receipts_root,
+            transactions_root,
+        } = self;
+        stream.begin_list(3);
+        stream.append(hash);
+        stream.append(receipts_root);
+        stream.append(transactions_root);
+    }
+}
+
+impl Decodable for EVMBlockHeader {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
+        rlp_helpers::check_list(decoder, 3)?;
+        let mut it = decoder.iter();
+        let hash = rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "hash")?;
+        let receipts_root =
+            rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "receipts_root")?;
+        let transactions_root =
+            rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "transactions_root")?;
+        Ok(Self {
+            hash,
+            receipts_root,
+            transactions_root,
+        })
+    }
+}
+
+impl Encodable for BlockHeader {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        let Self {
+            blueprint_header: BlueprintHeader { number, timestamp },
+            evm_block_header,
+        } = self;
+        stream.begin_list(3);
+        append_u256_le(stream, number);
+        append_timestamp(stream, *timestamp);
+        stream.begin_list(1); // Nesting added for forward-compatibility with multichain
+        stream.append(evm_block_header);
+    }
+}
+
+impl Decodable for BlockHeader {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
+        rlp_helpers::check_list(decoder, 3)?;
+
+        let mut it = decoder.iter();
+        let number = decode_field_u256_le(&rlp_helpers::next(&mut it)?, "number")?;
+        let timestamp = decode_timestamp(&rlp_helpers::next(&mut it)?)?;
+        let decoder = &rlp_helpers::next(&mut it)?;
+        rlp_helpers::check_list(decoder, 1)?; // Nesting added for forward-compatibility with multichain
+        let mut it = decoder.iter();
+        let evm_block_header =
+            rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "evm_block_header")?;
+        Ok(Self {
+            blueprint_header: BlueprintHeader { number, timestamp },
+            evm_block_header,
+        })
+    }
 }
 
 /// For the tick model we only accept blueprints where cumulative size of chunks
