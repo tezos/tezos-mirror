@@ -193,7 +193,7 @@ module Events = struct
       ("message_ids", list Types.Message_id.encoding)
 end
 
-let event ~verbose:_ =
+let event ~verbose =
   let open Events in
   function
   | Check_unknown_messages -> emit check_unknown_messages ()
@@ -215,15 +215,19 @@ let event ~verbose:_ =
               emit message_with_header (from_peer.peer_id, topic, message_id)
           | Subscribe {topic} -> emit subscribe (from_peer.peer_id, topic)
           | Unsubscribe {topic} -> emit unsubscribe (from_peer.peer_id, topic)
-          | Graft {topic} -> emit graft (from_peer.peer_id, topic)
+          | Graft {topic} ->
+              if not verbose then Lwt.return_unit
+              else emit graft (from_peer.peer_id, topic)
           | Prune {topic; px; backoff} ->
-              emit
-                prune
-                ( from_peer.peer_id,
-                  topic,
-                  backoff,
-                  List.of_seq px
-                  |> List.map (fun Types.Peer.{peer_id; _} -> peer_id) )
+              if not verbose then Lwt.return_unit
+              else
+                emit
+                  prune
+                  ( from_peer.peer_id,
+                    topic,
+                    backoff,
+                    List.of_seq px
+                    |> List.map (fun Types.Peer.{peer_id; _} -> peer_id) )
           | IHave {topic; message_ids} ->
               emit ihave (from_peer.peer_id, topic, message_ids)
           | IWant {message_ids} -> emit iwant (from_peer.peer_id, message_ids)))
