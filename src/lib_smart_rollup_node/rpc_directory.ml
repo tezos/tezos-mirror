@@ -77,6 +77,20 @@ module Global_directory = Make_directory (struct
     Lwt_result.return (Node_context.readonly node_ctxt)
 end)
 
+(* The block directory needs to be registered in the protocol plugin. *)
+module Block_directory = Make_sub_directory (struct
+  include Rollup_node_services.Block
+
+  type context = Node_context.rw
+
+  type subcontext = Node_context.ro * Block_hash.t
+
+  let context_of_prefix node_ctxt (((), block) : prefix) =
+    let open Lwt_result_syntax in
+    let+ block = Block_directory_helpers.block_of_prefix node_ctxt block in
+    (Node_context.readonly node_ctxt, block)
+end)
+
 module Local_directory = Make_directory (struct
   include Rollup_node_services.Local
 
@@ -263,6 +277,110 @@ let () =
   Global_directory.gen_register0
     Rollup_node_services.Global.global_block_watcher
   @@ fun node_ctxt () () -> create_block_watcher_service node_ctxt
+
+let () =
+  Block_directory.register0 Rollup_node_services.Block.block
+  @@ fun (node_ctxt, block) outbox () ->
+  let open Lwt_result_syntax in
+  let* get_outbox_messages =
+    if not outbox then return_none
+    else
+      let+ (module Plugin) =
+        Protocol_plugins.proto_plugin_for_block node_ctxt block
+      in
+      Some Plugin.Pvm.get_outbox_messages
+  in
+  Node_context.get_full_l2_block ?get_outbox_messages node_ctxt block
+
+let () =
+  Block_directory.register0 Rollup_node_services.Block.num_messages
+  @@ fun (node_ctxt, block) () () ->
+  let open Lwt_result_syntax in
+  let* l2_block = Node_context.get_l2_block node_ctxt block in
+  let+ num_messages =
+    Node_context.get_num_messages node_ctxt l2_block.header.inbox_witness
+  in
+  Z.of_int num_messages
+
+let () =
+  let open Lwt_result_syntax in
+  Block_directory.register0 Rollup_node_services.Block.hash
+  @@ fun (_node_ctxt, block) () () -> return block
+
+let () =
+  Block_directory.register0 Rollup_node_services.Block.level
+  @@ fun (node_ctxt, block) () () -> Node_context.level_of_hash node_ctxt block
+
+let () =
+  Block_directory.register0 Rollup_node_services.Block.inbox
+  @@ fun (node_ctxt, block) () () ->
+  Node_context.get_inbox_by_block_hash node_ctxt block
+
+let () =
+  Block_directory.register0 Rollup_node_services.Block.ticks
+  @@ fun (node_ctxt, block) () () ->
+  let open Lwt_result_syntax in
+  let+ l2_block = Node_context.get_l2_block node_ctxt block in
+  Z.of_int64 l2_block.num_ticks
+
+let get_state (node_ctxt : _ Node_context.t) block_hash =
+  let open Lwt_result_syntax in
+  let* ctxt = Node_context.checkout_context node_ctxt block_hash in
+  let*! state = Context.PVMState.find ctxt in
+  match state with None -> failwith "No state" | Some state -> return state
+
+let () =
+  Block_directory.register0 Rollup_node_services.Block.total_ticks
+  @@ fun (node_ctxt, block) () () ->
+  let open Lwt_result_syntax in
+  let* state = get_state node_ctxt block in
+  let* (module Plugin) =
+    Protocol_plugins.proto_plugin_for_block node_ctxt block
+  in
+  let*! tick = Plugin.Pvm.get_tick node_ctxt.kind state in
+  return tick
+
+let () =
+  Block_directory.register0 Rollup_node_services.Block.state_hash
+  @@ fun (node_ctxt, block) () () ->
+  let open Lwt_result_syntax in
+  let* state = get_state node_ctxt block in
+  let* (module Plugin) =
+    Protocol_plugins.proto_plugin_for_block node_ctxt block
+  in
+  let*! hash = Plugin.Pvm.state_hash node_ctxt.kind state in
+  return hash
+
+let () =
+  Block_directory.register0 Rollup_node_services.Block.state_current_level
+  @@ fun (node_ctxt, block) () () ->
+  let open Lwt_result_syntax in
+  let* state = get_state node_ctxt block in
+  let* (module Plugin) =
+    Protocol_plugins.proto_plugin_for_block node_ctxt block
+  in
+  let*! current_level = Plugin.Pvm.get_current_level node_ctxt.kind state in
+  return current_level
+
+let () =
+  Block_directory.register0 Rollup_node_services.Block.state_value
+  @@ fun (node_ctxt, block) {key} () ->
+  let open Lwt_result_syntax in
+  let* ctx = get_state node_ctxt block in
+  let path = String.split_on_char '/' key in
+  let*! value = Context.PVMState.lookup ctx path in
+  match value with
+  | None -> failwith "No such key in PVM state"
+  | Some value ->
+      Format.eprintf "Encoded %S\n@.%!" (Bytes.to_string value) ;
+      return value
+
+let () =
+  Block_directory.register0 Rollup_node_services.Block.committed_status
+  @@ fun (node_ctxt, block) () () ->
+  let open Lwt_result_syntax in
+  let* block = Node_context.get_l2_block node_ctxt block in
+  Publisher.Helpers.committed_status node_ctxt block
 
 let () =
   Local_directory.gen_register0
@@ -720,6 +838,8 @@ let top_directory (node_ctxt : _ Node_context.t) =
       Local_directory.build_directory;
       Admin_directory.build_directory;
     ]
+
+let build_block_subdirectory = Block_directory.build_sub_directory
 
 let block_prefix =
   Tezos_rpc.Path.(

@@ -36,3 +36,7 @@ val generate_openapi :
   ?protocol:Protocol_hash.t ->
   #Client_context.full ->
   Ezjsonm.value tzresult Lwt.t
+
+val build_block_subdirectory :
+  Node_context.rw ->
+  (unit * Rollup_node_services.Arg.block_id) Tezos_rpc.Directory.t
