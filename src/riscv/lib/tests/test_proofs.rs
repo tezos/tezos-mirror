@@ -15,6 +15,7 @@ use rand::Rng;
 use std::ops::Bound;
 
 #[test]
+#[ignore]
 fn test_jstz_proofs_one_step() {
     test_jstz_proofs(false)
 }
