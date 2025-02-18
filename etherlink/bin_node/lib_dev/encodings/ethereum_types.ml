@@ -1245,11 +1245,11 @@ module Filter = struct
       (fun (from_block, to_block, address, topics, block_hash) ->
         {from_block; to_block; address; topics; block_hash})
       (obj5
-         (opt "fromBlock" Block_parameter.encoding)
-         (opt "toBlock" Block_parameter.encoding)
-         (opt "address" filter_address_encoding)
+         (dft "fromBlock" (option Block_parameter.encoding) None)
+         (dft "toBlock" (option Block_parameter.encoding) None)
+         (dft "address" (option filter_address_encoding) None)
          (dft "topics" (option (list @@ option topic_encoding)) None)
-         (opt "blockHash" block_hash_encoding))
+         (dft "blockHash" (option block_hash_encoding) None))
 end
 
 module Subscription = struct
