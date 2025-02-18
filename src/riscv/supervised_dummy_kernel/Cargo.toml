@@ -2,3 +2,6 @@
 name = "riscv-supervised-dummy"
 version = "0.0.0"
 edition = "2021"
+
+[dependencies]
+libc = "0.2.169"
