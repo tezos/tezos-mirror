@@ -10037,7 +10037,8 @@ let register ~protocols =
        who attest sufficiently. *)
     ~attestation_threshold:30
     ~attestation_lag:2
-    ~blocks_per_cycle:16 ;
+    ~blocks_per_cycle:16
+    ~blocks_per_commitment:16 ;
   scenario_with_layer1_node
     ~attestation_lag:5
     "slots attestation operation behavior"
