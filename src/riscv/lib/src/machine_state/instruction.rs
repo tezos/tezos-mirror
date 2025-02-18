@@ -330,7 +330,6 @@ pub enum OpCode {
     Csrrci,
 
     // RV32C compressed instructions
-    CLw,
     CLwsp,
     CSw,
     CSwsp,
@@ -543,7 +542,6 @@ impl OpCode {
             Self::Csrrwi => Args::run_csrrwi,
             Self::Csrrsi => Args::run_csrrsi,
             Self::Csrrci => Args::run_csrrci,
-            Self::CLw => Args::run_clw,
             Self::CLwsp => Args::run_clwsp,
             Self::CSw => Args::run_csw,
             Self::CSwsp => Args::run_cswsp,
@@ -1365,7 +1363,6 @@ impl Args {
 
     // RV32C compressed instructions
     impl_cr_nz_type!(c::run_mv, run_mv);
-    impl_load_type!(run_clw);
     impl_cload_sp_type!(run_clwsp);
     impl_store_type!(run_csw);
     impl_cb_type!(run_beqz);
@@ -2012,10 +2009,10 @@ impl From<&InstrCacheable> for Instruction {
             },
 
             // RV32C compressed instructions
-            InstrCacheable::CLw(args) => Instruction {
-                opcode: OpCode::CLw,
-                args: args.to_args(InstrWidth::Compressed),
-            },
+            InstrCacheable::CLw(args) => {
+                debug_assert!(args.imm >= 0 && args.imm % 4 == 0);
+                Instruction::new_lwnz(args.rd, args.rs1, args.imm, InstrWidth::Compressed)
+            }
             InstrCacheable::CLwsp(args) => Instruction {
                 opcode: OpCode::CLwsp,
                 args: args.into(),

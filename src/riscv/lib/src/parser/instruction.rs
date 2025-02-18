@@ -517,7 +517,13 @@ pub enum InstrCacheable {
     Csrrci(CsriArgs),
 
     // RV32C compressed instructions
-    CLw(ITypeArgs),
+    /// `C.LW` - Loads a 32-bit value from memory into register `rd`. It computes
+    /// an effective address by adding the immediate to the base address
+    /// in register `rs1`.
+    ///
+    /// The immediate is obtained by zero-extending and scaling by 4 the
+    /// offset encoded in the instruction (see U:C-16.3).
+    CLw(NonZeroITypeArgs),
     CLwsp(CIBNZTypeArgs),
     CSw(SBTypeArgs),
     CSwsp(CSSTypeArgs),

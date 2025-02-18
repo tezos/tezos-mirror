@@ -289,6 +289,7 @@ where
     ///
     /// Relevant opcodes:
     /// - `LW`
+    /// - `C.LW`
     pub fn run_lwnz(
         &mut self,
         imm: i64,
