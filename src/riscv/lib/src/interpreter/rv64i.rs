@@ -302,14 +302,32 @@ where
         Ok(())
     }
 
-    /// `LH` I-type instruction
-    ///
     /// Loads a half-word (2 bytes) starting from address given by: val(rs1) + imm
     /// sign-extending the result
+    ///
+    /// Relevant opcodes:
+    /// - `LH`
     pub fn run_lh(&mut self, imm: i64, rs1: XRegister, rd: XRegister) -> Result<(), Exception> {
         let value: i16 = self.read_from_bus(imm, rs1)?;
         // i16 as u64 sign-extends to 64 bits
         self.hart.xregisters.write(rd, value as u64);
+        Ok(())
+    }
+
+    /// Loads a half-word (2 bytes) starting from address given by: val(rs1) + imm
+    /// sign-extending the result but where `rs1` and `rd` are NonZeroXRegisters.
+    ///
+    /// Relevant opcodes:
+    /// - `LH`
+    pub fn run_lhnz(
+        &mut self,
+        imm: i64,
+        rs1: NonZeroXRegister,
+        rd: NonZeroXRegister,
+    ) -> Result<(), Exception> {
+        let value: i16 = self.read_from_bus_nz(imm, rs1)?;
+        // i16 as u64 sign-extends to 64 bits
+        self.hart.xregisters.write_nz(rd, value as u64);
         Ok(())
     }
 
@@ -413,13 +431,30 @@ where
         self.write_to_bus_nz(imm, rs1, value as u32)
     }
 
-    /// `SH` S-type instruction
+    /// Stores a half-word (lowest 2 bytes from rs2) to the address starting at: `val(rs1) + imm`
     ///
-    /// Stores a half-word (lowest 2 bytes from rs2) to the address starting at: val(rs1) + imm
+    /// Relevant opcodes:
+    /// - `SH`
     pub fn run_sh(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Result<(), Exception> {
         let value: u64 = self.hart.xregisters.read(rs2);
         // u64 as u16 is truncated, getting the lowest 16 bits
         self.write_to_bus(imm, rs1, value as u16)
+    }
+
+    /// Stores a half-word (lowest 2 bytes from rs2) to the address starting at: `val(rs1) + imm`
+    /// where `rs1` and `rs2` are NonZeroXRegisters.
+    ///
+    /// Relevant opcodes:
+    /// - `SH`
+    pub fn run_shnz(
+        &mut self,
+        imm: i64,
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+    ) -> Result<(), Exception> {
+        let value: u64 = self.hart.xregisters.read_nz(rs2);
+        // u64 as u16 is truncated, getting the lowest 16 bits
+        self.write_to_bus_nz(imm, rs1, value as u16)
     }
 
     /// `SB` S-type instruction
