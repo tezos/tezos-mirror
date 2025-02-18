@@ -259,6 +259,9 @@ DAL node
 - **Feature** A new RPC ``/p2p/gossipsub/reconnection_delays`` which
   provides for each unreachable point, the time remaining until the
   next reconnection attempt. (MR :gl:`!16767`)
+- **Bugfix** From v21.2, the ``SO_KEEP_ALIVE`` socket option was used
+  for incoming connections only. It is not used with both incoming
+  connections and outgoing connections.
 
 - **Bugfix** From v21.2, the DAL node tries to recontact peers after
   the connection attempt failed. However, this MR fixes the timing
