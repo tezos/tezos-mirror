@@ -21,6 +21,12 @@ open Lwt_syntax
 let replace_variables string =
   let replacements =
     [
+      (* Special case for [stamp] operation that may run in less
+          than 0.001ms and be printed without a time associated. *)
+      ( "stamp \\.{70} 1 {24}$",
+        "stamp \
+         ...................................................................... \
+         1            0.000ms   0%" );
       ("  +\\d{1,3}\\.\\d{3}ms +\\d{1,3}% +\\+\\d{1,3}\\.\\d{3}ms", "[PROF]");
       ("  +\\+?\\d{1,3}\\.\\d{3}ms *\\d*%?", "[PROF]");
       ("20\\d{2}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}", "[TIMESTAMP]");
