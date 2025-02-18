@@ -859,6 +859,19 @@ open struct
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
       ("shard_index", Data_encoding.int31)
+
+  let register_trap =
+    declare_4
+      ~section
+      ~name:"register_trap"
+      ~msg:
+        "The shard {shard_index} for slot {slot_index} and published level \
+         {published_level} is a trap for {delegate}."
+      ~level:Info
+      ("delegate", Signature.Public_key_hash.encoding)
+      ("published_level", Data_encoding.int32)
+      ("slot_index", Data_encoding.int31)
+      ("shard_index", Data_encoding.int31)
 end
 
 (* DAL node event emission functions *)
@@ -1100,3 +1113,9 @@ let emit_cannot_attest_slot_because_of_trap ~pkh ~published_level ~slot_index
   emit
     cannot_attest_slot_because_of_trap
     (pkh, published_level, slot_index, shard_index)
+
+let emit_dont_wait__register_trap ~delegate ~published_level ~slot_index
+    ~shard_index =
+  emit__dont_wait__use_with_care
+    register_trap
+    (delegate, published_level, slot_index, shard_index)

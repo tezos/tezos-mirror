@@ -207,6 +207,13 @@ let maybe_register_trap traps_store ~traps_fraction message_id message =
   match trap_res with
   | Ok true ->
       let slot_id = Types.Slot_id.{slot_index; slot_level = level} in
+      let () =
+        Event.emit_dont_wait__register_trap
+          ~delegate
+          ~published_level:slot_id.slot_level
+          ~slot_index:slot_id.slot_index
+          ~shard_index
+      in
       Store.Traps.add
         traps_store
         ~slot_id
@@ -267,7 +274,7 @@ let shards_to_attesters committee =
   fun index -> get_opt committee index
 
 (** This function publishes the shards of a commitment that is waiting
-    for attestion on L1 if this node has those shards and their proofs
+    for attestation on L1 if this node has those shards and their proofs
     in memory. *)
 let publish_proved_shards ctxt (slot_id : Types.slot_id) ~level_committee
     proto_parameters commitment shards shard_proofs gs_worker =
