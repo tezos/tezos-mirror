@@ -1332,6 +1332,9 @@ module Target = struct
   (* List of all targets, in reverse order of registration. *)
   let registered = ref []
 
+  (* List of executables targets sorted by product. *)
+  let executables_by_product = ref String_map.empty
+
   (* List of targets sorted by path,
      so that we can create dune files with multiple targets. *)
   let by_path = ref String_map.empty
@@ -1343,7 +1346,7 @@ module Target = struct
   (* Set to [false] by [generate] to prevent further modifying the above references. *)
   let can_register = ref true
 
-  let register_internal ({path; opam; _} as internal) =
+  let register_internal ({path; opam; product; kind; _} as internal) =
     let path = sanitize_path path in
     if not !can_register then
       invalid_arg
@@ -1358,6 +1361,15 @@ module Target = struct
         in
         by_opam := String_map.add opam (internal :: old) !by_opam)
       opam ;
+    (match kind with
+    | Public_executable _ ->
+        let old =
+          String_map.find_opt product !executables_by_product
+          |> Option.value ~default:[]
+        in
+        executables_by_product :=
+          String_map.add product (internal :: old) !executables_by_product
+    | _ -> ()) ;
     registered := internal :: !registered ;
     Some (Internal internal)
 
