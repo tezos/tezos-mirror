@@ -77,7 +77,7 @@ module Helpers : sig
      are smaller than the expected size of a slot. *)
   type slot
 
-  (** [make_slot ?paddming ~slot_size content] produces a slot. If [padding=true]
+  (** [make_slot ?padding ~slot_size content] produces a slot. If [padding=true]
       (which is the default), then the content is padded to reach the expected
       size given by [slot_size] (which is usually obtained from
       {!type:Cryptobox.parameters}). *)
@@ -96,6 +96,10 @@ module Helpers : sig
     ?on_error:(string -> Cryptobox.t Lwt.t) ->
     Cryptobox.parameters ->
     Cryptobox.t Lwt.t
+
+  (* Calls {!Cryptobox.init_prover_dal} to initialize the DAL crypto in "prover"
+     mode. *)
+  val init_prover : ?__LOC__:string -> unit -> unit Lwt.t
 
   (** Generates a random string (with chars from 'a' to 'z') of size
       [slot_size]. *)

@@ -674,6 +674,22 @@ module Helpers = struct
              Data_encoding.Json.pp
              parameters_json
 
+  let init_prover ?__LOC__ () =
+    let* init =
+      Cryptobox.init_prover_dal
+        ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
+        ~fetch_trusted_setup:false
+        ()
+    in
+    match init with
+    | Error e ->
+        Test.fail
+          ?__LOC__
+          "init_prover failed: %a@."
+          Tezos_error_monad.Error_monad.pp_print_trace
+          e
+    | Ok () -> unit
+
   let generate_slot ~slot_size =
     Bytes.init slot_size (fun _ ->
         let x = Random.int 26 in

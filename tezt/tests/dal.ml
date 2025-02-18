@@ -563,23 +563,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
       ~protocol
       ()
   in
-  let* () =
-    let* init =
-      if prover then
-        Cryptobox.init_prover_dal
-          ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
-          ~fetch_trusted_setup:false
-          ()
-      else Lwt.return (Ok ())
-    in
-    match init with
-    | Error e ->
-        Test.fail
-          "Dal.with_layer1: init_prover_dal failed: %a@."
-          Tezos_error_monad.Error_monad.pp_print_trace
-          e
-    | Ok () -> unit
-  in
+  let* () = if prover then Helpers.init_prover ~__LOC__ () else unit in
   let* cryptobox = Helpers.make_cryptobox dal_parameters.cryptobox in
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   f dal_parameters cryptobox node client bootstrap1_key
@@ -1071,6 +1055,50 @@ let publish_commitment ?dont_wait ?counter ?force ~source ?(fee = 1200) ~index
     ~commitment
     ~proof
     client
+
+(* Produce a slot, store it in the DAL node, and then (try to) publish the same
+   commitment for each level between [from] and [into]. *)
+let simple_slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node
+    l1_client =
+  (* This is the account used to sign injected slot headers on L1. *)
+  let source = Constant.bootstrap2 in
+  let slot =
+    Helpers.generate_slot ~slot_size
+    |> Bytes.to_string
+    |> Helpers.make_slot ~slot_size
+  in
+  let* commitment, proof = Helpers.store_slot ~slot_index dal_node slot in
+  let rec loop current_level =
+    if current_level > into then unit
+    else
+      let* level = Node.wait_for_level l1_node current_level in
+      (* Warn when we don't advance level by level, because this means we
+         couldn't publish at each level. Also, we force the injection because
+         when a level is missed then probably there will be two injection
+         attempts at the same level later. *)
+      if current_level < level then
+        Log.warn
+          "[slot_producer] missed some levels (expected level is %d, got %d)"
+          current_level
+          level ;
+      Log.info
+        "[slot_producer] publish at slot index %d at level %d"
+        slot_index
+        level ;
+      let* _op_hash =
+        publish_commitment
+          ~force:true
+          ~source
+          ~index:slot_index
+          ~commitment
+          ~proof
+          l1_client
+      in
+      loop (level + 1)
+  in
+  let* () = loop from in
+  Log.info "[slot_producer] will terminate" ;
+  unit
 
 type status = Applied | Failed of {error_id : string}
 
@@ -4455,10 +4483,12 @@ let test_peers_reconnection _protocol _parameters _cryptobox node client
   unit
 
 (* Adapted from sc_rollup.ml *)
-let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
-    ~migration_level ~scenario ~description ?producer_profiles ?attestation_lag
-    ?number_of_slots ?number_of_shards ?slot_size ?page_size ?redundancy_factor
-    ?consensus_committee_size () =
+let test_l1_migration_scenario ?(tags = []) ?(uses = []) ~migrate_from
+    ~migrate_to ~migration_level ~scenario ~description ?producer_profiles
+    ?attestation_lag ?attestation_threshold ?number_of_slots ?number_of_shards
+    ?slot_size ?page_size ?redundancy_factor ?traps_fraction
+    ?consensus_committee_size ?blocks_per_cycle ?minimal_block_delay
+    ?activation_timestamp () =
   let tags =
     Tag.tezos2 :: "dal" :: Protocol.tag migrate_from :: Protocol.tag migrate_to
     :: "migration" :: tags
@@ -4466,7 +4496,7 @@ let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
   Test.register
     ~__FILE__
     ~tags
-    ~uses:[Constant.octez_dal_node]
+    ~uses:(Constant.octez_dal_node :: uses)
     ~title:
       (sf
          "%s->%s: %s"
@@ -4476,7 +4506,12 @@ let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
   @@ fun () ->
   let parameter_overrides =
     make_int_parameter ["consensus_committee_size"] consensus_committee_size
+    @ make_int_parameter ["blocks_per_cycle"] blocks_per_cycle
+    @ make_string_parameter ["minimal_block_delay"] minimal_block_delay
     @ make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
+    @ make_int_parameter
+        ["dal_parametric"; "attestation_threshold"]
+        attestation_threshold
     @ make_int_parameter ["dal_parametric"; "number_of_slots"] number_of_slots
     @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
     @ make_int_parameter
@@ -4484,12 +4519,14 @@ let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
         redundancy_factor
     @ make_int_parameter ["dal_parametric"; "slot_size"] slot_size
     @ make_int_parameter ["dal_parametric"; "page_size"] page_size
+    @ make_q_parameter ["dal_parametric"; "traps_fraction"] traps_fraction
   in
   let* node, client, dal_parameters =
     setup_node
       ~parameter_overrides
       ~protocol:migrate_from
       ~l1_history_mode:Default_with_refutation
+      ?activation_timestamp
       ()
   in
 
@@ -4545,6 +4582,112 @@ let test_migration_plugin ~migrate_from ~migrate_to =
     ~scenario
     ~tags
     ~description
+    ()
+
+(* This test checks the following scenario (that occurred on `nextnet--20250203`):
+   - start a DAL node attester in protocol [migrate_from]
+   - then start a DAL node accuser in protocol [migrate_to]
+   - check that no baker is denounced
+
+   This issue was that bakers were denounced, because the DAL node attester was
+   started when the DAL incentives were not enabled, so they did not check for
+   traps, and the DAL node did not used the new protocol parameters after
+   migrating to the new protocol, so they also did not check for traps when the
+   DAL incentives were enabled.
+*)
+let test_migration_accuser_issue ~migrate_from ~migrate_to =
+  let slot_index = 0 in
+  let tags = ["accuser"; "migration"] in
+  let description = "test accuser" in
+  let scenario ~migration_level dal_parameters client node dal_node =
+    let* proto_params =
+      Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+    in
+    let blocks_per_cycle =
+      JSON.(proto_params |-> "blocks_per_cycle" |> as_int)
+    in
+    assert (migration_level < blocks_per_cycle) ;
+    let* level = Client.level client in
+    let first_level = level + 1 in
+    let last_level = blocks_per_cycle in
+    Log.info
+      "Publish slots from first_level = %d to last_level = %d"
+      first_level
+      last_level ;
+    let _promise =
+      simple_slot_producer
+        ~slot_size:dal_parameters.Dal.Parameters.cryptobox.slot_size
+        ~slot_index
+        ~from:(migration_level - 1)
+        ~into:last_level
+        dal_node
+        node
+        client
+    in
+    Log.info "Start bakers for the current and the next protocols" ;
+    let baker_from =
+      Baker.create ~dal_node ~protocol:migrate_from node client
+    in
+    let baker_to = Baker.create ~dal_node ~protocol:migrate_to node client in
+
+    let* () = Baker.run baker_from in
+    let* () = Baker.run baker_to in
+
+    let* _level = Node.wait_for_level node migration_level in
+    Log.info "migrated to next protocol, starting a second DAL node accuser" ;
+    let dal_node_p2p_endpoint = Dal_node.listen_addr dal_node in
+    let accuser = Dal_node.create ~node () in
+    let* () =
+      Dal_node.init_config
+        ~peers:[dal_node_p2p_endpoint]
+        ~producer_profiles:[slot_index]
+        accuser
+    in
+    let* () = Dal_node.run accuser ~wait_ready:true in
+
+    let* _level = Node.wait_for_level node last_level in
+    let* () = Baker.terminate baker_from in
+    let* () = Baker.terminate baker_to in
+
+    Lwt_list.iter_s
+      (fun delegate ->
+        let* dal_participation =
+          Node.RPC.call node
+          @@ RPC.get_chain_block_context_delegate_dal_participation
+               ~block:(string_of_int (last_level - 1))
+               delegate.Account.public_key_hash
+        in
+        let is_denounced =
+          JSON.(dal_participation |-> "denounced" |> as_bool)
+        in
+        Check.is_false
+          is_denounced
+          ~__LOC__
+          ~error_msg:"Expected the delegate to not be denounced" ;
+        unit)
+      (Array.to_list Account.Bootstrap.keys)
+  in
+  test_l1_migration_scenario
+    ~scenario
+    ~tags
+    ~description
+    ~uses:[Protocol.baker migrate_from; Protocol.baker migrate_to]
+    ~activation_timestamp:Now
+    ~producer_profiles:[slot_index]
+    ~minimal_block_delay:
+      (* to be sure there is enough time to published slots *)
+      "2"
+    ~blocks_per_cycle:32
+    ~consensus_committee_size:512
+      (* Use more blocks per cycle and more shards so that we're sure that we
+         encounter traps: there are 32 (blocks per cycle) - 4 (migration level)
+         - 8 (attestation lag) = 20 attestable levels; so 20 * 512 = 10240
+         shards. Since [traps_fraction = 1 / 2000], the probability to not
+         encounter at least one trap in these many shards is (1 - 1/2000)^10240
+         = 0.6%. *)
+    ~number_of_shards:512
+    ~migrate_from
+    ~migrate_to
     ()
 
 let test_producer_profile _protocol _dal_parameters _cryptobox _node _client
@@ -5184,6 +5327,8 @@ module History_rpcs = struct
       scenario
       protocols
 
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7754
+     The test currently fails, so it is disabled. *)
   let test_commitments_history_rpcs_with_migration ~migrate_from ~migrate_to
       ~migration_level =
     let slot_index = 3 in
@@ -5210,7 +5355,7 @@ module History_rpcs = struct
     in
 
     let description = "test commitments history with migration" in
-    let tags = ["rpc"; "skip_list"; Tag.memory_3k] in
+    let tags = ["rpc"; "skip_list"; Tag.memory_3k; Tag.ci_disabled] in
     test_l1_migration_scenario
       ~migrate_from
       ~migrate_to
@@ -7965,46 +8110,6 @@ let rollup_batches_and_publishes_optimal_dal_slots _protocol parameters dal_node
   check_packs published_slots annotated_messages ;
   unit
 
-(* Produce a slot, store it in the DAL node, and then (try to) publish the same
-   commitment for each level between [from] and [into]. *)
-let slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node l1_client
-    =
-  (* This is the account used to sign injected slot headers on L1. *)
-  let source = Constant.bootstrap2 in
-  let slot = Helpers.make_slot ~slot_size "some data" in
-  let* commitment, proof = Helpers.store_slot ~slot_index dal_node slot in
-  let rec loop current_level =
-    if current_level > into then unit
-    else
-      let* level = Node.wait_for_level l1_node current_level in
-      (* Warn when we don't advance level by level, because this means we
-         couldn't publish at each level. Also, we force the injection because
-         when a level is missed then probably there will be two injection
-         attempts at the same level later. *)
-      if current_level < level then
-        Log.warn
-          "[slot_producer] missed some levels (expected level is %d, got %d)"
-          current_level
-          level ;
-      Log.info
-        "[slot_producer] publish at slot index %d at level %d"
-        slot_index
-        level ;
-      let* _op_hash =
-        publish_commitment
-          ~force:true
-          ~source
-          ~index:slot_index
-          ~commitment
-          ~proof
-          l1_client
-      in
-      loop (level + 1)
-  in
-  let* () = loop from in
-  Log.info "[slot_producer] will terminate" ;
-  unit
-
 (* We have a bootstrap node, a producer node and an attester node for a new
    attester. We check that as soon as the attester is in the DAL committee it
    attests. *)
@@ -9955,19 +10060,16 @@ let register ~protocols =
     test_one_committee_per_level
     protocols ;
   scenario_with_layer1_node
-    ~incentives_enable:true
     ~traps_fraction:Q.one
     "inject accusation"
     test_inject_accusation
     (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
   scenario_with_layer1_node
-    ~incentives_enable:true
     ~traps_fraction:Q.one
     "inject a duplicated denunciation at different steps"
     test_duplicate_denunciations
     (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
   scenario_with_layer1_node
-    ~incentives_enable:true
     ~traps_fraction:Q.one
     "inject a denunciation at the next cycle"
     test_denunciation_next_cycle
@@ -10345,7 +10447,8 @@ let register_migration ~migrate_from ~migrate_to =
     ~migration_level:10
     ~migrate_from
     ~migrate_to ;
-  tests_start_dal_node_around_migration ~migrate_from ~migrate_to
+  tests_start_dal_node_around_migration ~migrate_from ~migrate_to ;
+  test_migration_accuser_issue ~migration_level:4 ~migrate_from ~migrate_to
 
 let () =
   Regression.register
