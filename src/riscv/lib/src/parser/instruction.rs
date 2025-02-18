@@ -278,8 +278,9 @@ pub struct CSSDTypeArgs {
 )]
 pub enum InstrCacheable {
     // RV64I R-type instructions
-    /// `ADD` - Perform val(rs1) + val(rs2) and store the result in `rd`
+    /// `ADD` - Perform `val(rs1) + val(rs2)` and store the result in `rd`
     Add(NonZeroRdRTypeArgs),
+    /// `SUB` - Perform `val(rs1) - val(rs2)` and store the result in `rd`
     Sub(NonZeroRdRTypeArgs),
     /// `XOR` - Saves in `rd` the bitwise XOR between the value in `rs1` and `rs2`.
     Xor(NonZeroRdRTypeArgs),
@@ -544,6 +545,8 @@ pub enum InstrCacheable {
     /// `C.XOR` - Computes the bitwise XOR of the values in registers `rd_rs1` and `rs2`,
     /// then writes the result back to register rd `rd_rs1`.
     CXor(CRTypeArgs),
+    /// `C.SUB` - Subtracts the value in register `rs2` from the value in register `rd_rs1`,
+    /// then writes the result to register `rd_rs1`.
     CSub(CRTypeArgs),
     CAddw(CRTypeArgs),
     CSubw(CRTypeArgs),

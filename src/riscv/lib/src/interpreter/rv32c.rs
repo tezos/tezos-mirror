@@ -119,18 +119,6 @@ impl<M> XRegisters<M>
 where
     M: backend::ManagerReadWrite,
 {
-    /// `C.SUB` CA-type compressed instruction
-    ///
-    /// Subtracts the value in register `rs2` from the value in register `rd_rs1`,
-    /// then writes the result to register `rd_rs1`.
-    pub fn run_csub(&mut self, rd_rs1: XRegister, rs2: XRegister) {
-        let lhs = self.read(rd_rs1);
-        let rhs = self.read(rs2);
-        // Wrapped subtraction in two's complement behaves the same for signed and unsigned
-        let result = lhs.wrapping_sub(rhs);
-        self.write(rd_rs1, result)
-    }
-
     /// Loads the immediate `imm` into register `rd_rs1`.
     ///
     /// Relevant RISC-V opcodes:
@@ -150,6 +138,7 @@ where
     /// - SLL
     /// - SRL
     /// - SRA
+    /// - SUB
     pub fn run_li(&mut self, imm: i64, rd_rs1: NonZeroXRegister) {
         self.write_nz(rd_rs1, imm as u64)
     }

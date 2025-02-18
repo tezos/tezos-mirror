@@ -335,7 +335,6 @@ pub enum OpCode {
     CJr,
     CJalr,
     CLui,
-    CSub,
     CAddw,
     CSubw,
 
@@ -359,6 +358,7 @@ pub enum OpCode {
     Mv,
     Li,
     Nop,
+    Neg,
 }
 
 impl OpCode {
@@ -375,6 +375,7 @@ impl OpCode {
         match self {
             Self::Add => Args::run_add,
             Self::Sub => Args::run_sub,
+            Self::Neg => Args::run_neg,
             Self::Xor => Args::run_xor,
             Self::Or => Args::run_or,
             Self::And => Args::run_and,
@@ -537,7 +538,6 @@ impl OpCode {
             Self::Li => Args::run_li,
             Self::CLui => Args::run_clui,
             Self::Mv => Args::run_mv,
-            Self::CSub => Args::run_csub,
             Self::CAddw => Args::run_caddw,
             Self::CSubw => Args::run_csubw,
             Self::Nop => Args::run_nop,
@@ -891,6 +891,18 @@ macro_rules! impl_cr_type {
             Ok(ProgramCounterUpdate::Next(self.width))
         }
     };
+
+    ($fn: ident, non_zero) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+            &self,
+            core: &mut MachineCoreState<ML, M>,
+        ) -> Result<ProgramCounterUpdate, Exception> {
+            core.hart.xregisters.$fn(self.rd.nzx, self.rs2.nzx);
+            Ok(ProgramCounterUpdate::Next(self.width))
+        }
+    };
 }
 
 macro_rules! impl_cr_nz_type {
@@ -1086,7 +1098,7 @@ macro_rules! impl_f_r_type {
 impl Args {
     // RV64I R-type instructions
     impl_r_type!(i::run_add, run_add, non_zero);
-    impl_r_type!(run_sub, non_zero_rd);
+    impl_r_type!(run_sub, non_zero);
     impl_r_type!(run_xor, non_zero);
     impl_r_type!(run_or, non_zero);
     impl_r_type!(run_and, non_zero);
@@ -1301,7 +1313,7 @@ impl Args {
     impl_cb_type!(run_bnez);
     impl_ci_type!(run_li, non_zero);
     impl_ci_type!(run_clui, non_zero);
-    impl_cr_type!(run_csub);
+    impl_cr_type!(run_neg, non_zero);
     impl_css_type!(run_cswsp);
 
     fn run_j<ML: MainMemoryLayout, M: ManagerReadWrite>(
@@ -1363,10 +1375,7 @@ impl From<&InstrCacheable> for Instruction {
         match value {
             // RV64I R-type instructions
             InstrCacheable::Add(args) => Instruction::from_ic_add(args),
-            InstrCacheable::Sub(args) => Instruction {
-                opcode: OpCode::Sub,
-                args: args.into(),
-            },
+            InstrCacheable::Sub(args) => Instruction::from_ic_sub(args),
             InstrCacheable::Xor(args) => Instruction::from_ic_xor(args),
             InstrCacheable::Or(args) => Instruction::from_ic_or(args),
             InstrCacheable::And(args) => Instruction::from_ic_and(args),
@@ -1999,10 +2008,7 @@ impl From<&InstrCacheable> for Instruction {
             InstrCacheable::CAnd(args) => Instruction::from_ic_cand(args),
             InstrCacheable::CXor(args) => Instruction::from_ic_cxor(args),
             InstrCacheable::COr(args) => Instruction::from_ic_cor(args),
-            InstrCacheable::CSub(args) => Instruction {
-                opcode: OpCode::CSub,
-                args: args.into(),
-            },
+            InstrCacheable::CSub(args) => Instruction::from_ic_csub(args),
             InstrCacheable::CNop => Instruction::new_nop(InstrWidth::Compressed),
 
             // RV64C compressed instructions

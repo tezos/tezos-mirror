@@ -8,7 +8,7 @@
 
 use crate::{instruction_context::ICB, machine_state::registers::NonZeroXRegister};
 
-/// Perform val(rs1) + val(rs2) and store the result in `rd`
+/// Perform `val(rs1) + val(rs2)` and store the result in `rd`
 ///
 /// Relevant RISC-V opcodes:
 /// - ADD

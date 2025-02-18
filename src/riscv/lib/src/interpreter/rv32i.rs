@@ -38,12 +38,14 @@ where
         self.write_nz(rd, result)
     }
 
-    /// `SUB` R-type instruction
+    /// Perform [`val(rs1) - val(rs2)`] and store the result in `rd`
     ///
-    /// Perform val(rs1) - val(rs2) and store the result in `rd`
-    pub fn run_sub(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
-        let lhs = self.read(rs1);
-        let rhs = self.read(rs2);
+    /// Relevant RISC-V opcodes:
+    /// - SUB
+    /// - C.SUB
+    pub fn run_sub(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
+        let lhs = self.read_nz(rs1);
+        let rhs = self.read_nz(rs2);
         // Wrapped subtraction in two's complement behaves the same for signed and unsigned
         let result = lhs.wrapping_sub(rhs);
         self.write_nz(rd, result)
@@ -429,10 +431,10 @@ mod tests {
             // test sub with: res - imm = rs1 and res - rs1 = imm
             state.hart.xregisters.write(a0, res);
             state.hart.xregisters.write(t0, imm as u64);
-            state.hart.xregisters.run_sub(a0, t0, nz::a1);
+            state.hart.xregisters.run_sub(nz::a0, nz::t0, nz::a1);
             assert_eq!(state.hart.xregisters.read(a1), rs1);
             // now rs1 is in register a1
-            state.hart.xregisters.run_sub(a0, a1, nz::a1);
+            state.hart.xregisters.run_sub(nz::a0, nz::a1, nz::a1);
             assert_eq!(state.hart.xregisters.read(a1), imm as u64);
         }
     });
