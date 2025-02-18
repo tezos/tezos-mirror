@@ -196,6 +196,7 @@ module Transport_layer_hooks : sig
     Transport_layer.t ->
     app_messages_callback:
       (Types.Message.t -> Types.Message_id.t -> unit tzresult Lwt.t) ->
+    verbose:bool ->
     unit Lwt.t
 end
 
