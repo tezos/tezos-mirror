@@ -35,17 +35,18 @@ impl RevealRequestResponseMap {
 
     /// Construct an entry of RevealRequestResponseMap with response that requires loading
     #[allow(dead_code)]
-    pub fn add_handler(&mut self, request: impl Into<Box<[u8]>>, response: ResponseFn) {
-        self.map.insert(request.into(), response);
+    pub fn add_handler(
+        &mut self,
+        request: impl Into<Box<[u8]>>,
+        response: impl Fn() -> Result<Box<[u8]>, std::io::Error> + 'static,
+    ) {
+        self.map.insert(request.into(), Arc::new(response));
     }
 
     /// Construct an entry of RevealRequestResponseMap with static response
     pub fn add_static(&mut self, request: impl Into<Box<[u8]>>, response: impl Into<Box<[u8]>>) {
-        let response_value = Arc::new(response.into());
-        self.map.insert(
-            request.into(),
-            Arc::new(move || Ok(response_value.as_ref().clone())),
-        );
+        let response_value: Box<[u8]> = response.into();
+        self.add_handler(request, move || Ok(response_value.clone()));
     }
 
     /// Get response function for the given request

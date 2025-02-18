@@ -1,5 +1,5 @@
 
-./src/riscv/riscv-sandbox run --input src/riscv/assets/hermit-loader --initrd src/riscv/assets/riscv-dummy.elf --max-steps 9223372036854775807 --inbox-file tezt/tests/riscv-tests/dummy-kernel-inbox.json --pvm --print-steps
+./src/riscv/riscv-sandbox run --input src/riscv/assets/hermit-loader --initrd src/riscv/assets/riscv-dummy.elf --max-steps 9223372036854775807 --inbox-file tezt/tests/riscv-tests/dummy-kernel-inbox.json --pvm --origination-level 1 --print-steps
 [src/arch/riscv64/kernel/core_local.rs:38] CPU_ONLINE.load(Ordering::Relaxed) = 0
 [0][WARN] Unable to read entropy! Fallback to a naive implementation!
 Hello World
@@ -27,7 +27,7 @@ RollupMetadata {
         221,
         181,
     ],
-    origination_level: 0,
+    origination_level: 1,
 }
 [09, 90, A8, 2F, DD, B2, 8D, E6, 07, 33, 28, 86, 5C, EF, 23, A4, D5, 2A, CC, 6C, D4, 17, D8, AB, 39, 66, 69, D6, 3C, 3B, A8, BD]
 Internal(
