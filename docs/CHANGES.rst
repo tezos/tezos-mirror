@@ -3,6 +3,28 @@
 Changelog
 '''''''''
 
+Version 21.4
+============
+
+DAL node
+--------
+
+- **Bugfix** Fixed the timing of the reconnection to peers attempts. (MR :gl:`!16466`)
+
+- Added a new RPC ``GET /p2p/gossipsub/mesh/`` that returns the GossipSub mesh
+  (i.e. full data connections per topic) of a peer. (MR :gl:`!16754`)
+
+- Added a new RPC ``GET /p2p/gossipsub/fanout/`` that returns the GossipSub
+  fanout of a peer. (MR :gl:`!16764`)
+
+- **Bugfix** From v21.2, the ``SO_KEEP_ALIVE`` socket option was used
+  for incoming connections only. It is now used with both incoming
+  connections and outgoing connections. (MR :gl:`!16820`)
+
+- **Feature** A new RPC ``/p2p/gossipsub/reconnection_delays`` which
+  provides for each unreachable point, the time remaining until the
+  next reconnection attempt. (MR :gl:`!16767`)
+
 Version 21.3
 ============
 

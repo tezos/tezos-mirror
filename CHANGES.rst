@@ -272,19 +272,6 @@ DAL node
   Linux). Users can opt out by setting the value to ``0``. (MR
   :gl:`!16907`)
 
-
-- **Feature** A new RPC ``/p2p/gossipsub/reconnection_delays`` which
-  provides for each unreachable point, the time remaining until the
-  next reconnection attempt. (MR :gl:`!16767`)
-
-- **Bugfix** From v21.2, the ``SO_KEEP_ALIVE`` socket option was used
-  for incoming connections only. It is not used with both incoming
-  connections and outgoing connections.
-
-- **Bugfix** From v21.2, the DAL node tries to recontact peers after
-  the connection attempt failed. However, this MR fixes the timing
-  when those attempts were made. (MR :gl:`!16466`)
-
 - **Feature** The DAL node stores now a peers.json file in its
   directory when it is shutdown with SIGINT. This file is read if it
   exists when starting the DAL node to restore previous known
@@ -336,12 +323,6 @@ DAL node
 - Added a new RPC ``GET /protocol_parameters/`` that retrieve the protocol
   parameters that the DAL node uses for a given level, which by default is the
   last finalized level the node is aware of. (MR :gl:`!16704`)
-
-- Added a new RPC ``GET /p2p/gossipsub/mesh/`` that returns the GossipSub mesh
-  (i.e. full data connections per topic) of a peer. (MR :gl:`!16754`)
-
-- Added a new RPC ``GET /p2p/gossipsub/fanout/`` that returns the GossipSub
-  fanout of a peer. (MR :gl:`!16764`)
 
 - Added a new RPC ``GET /published_levels/<level>/known_traps`` that returns the
   trap shards that the DAL node knows. (MR :gl:`!16870`)
