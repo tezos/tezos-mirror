@@ -761,7 +761,10 @@ pub fn read_sequencer_inbox<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::blueprint_storage::blueprint_path;
+    use crate::blueprint_storage::{
+        blueprint_path, store_current_block_header, BlockHeader, BlueprintHeader,
+        EVMBlockHeader,
+    };
     use crate::configuration::TezosContracts;
     use crate::dal_slot_import_signal::{
         DalSlotIndicesList, DalSlotIndicesOfLevel, UnsignedDalSlotSignals,
@@ -1374,8 +1377,19 @@ mod tests {
         // Prepare the host.
         let mut host = MockKernelHost::default();
         let address = smart_rollup_address();
-        crate::block_storage::internal_for_tests::store_current_number(
-            &mut host, head_level,
+        store_current_block_header(
+            &mut host,
+            &BlockHeader {
+                blueprint_header: BlueprintHeader {
+                    number: head_level,
+                    timestamp: 0.into(),
+                },
+                evm_block_header: EVMBlockHeader {
+                    hash: crate::block::GENESIS_PARENT_HASH,
+                    receipts_root: vec![],
+                    transactions_root: vec![],
+                },
+            },
         )
         .unwrap();
 
