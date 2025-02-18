@@ -473,13 +473,13 @@ val register_outbox_messages :
     The returned list contains outbox levels and indexes for each level (in
     order). *)
 val get_executable_pending_outbox_messages :
-  _ t -> (int32 * int list) list tzresult Lwt.t
+  ?outbox_level:int32 -> _ t -> (int32 * int list) list tzresult Lwt.t
 
 (** Returns the pending messages (i.e. unexecuted) that cannot be executed yet.
     The returned list contains outbox levels and indexes for each level (in
     order). *)
 val get_unexecutable_pending_outbox_messages :
-  _ t -> (int32 * int list) list tzresult Lwt.t
+  ?outbox_level:int32 -> _ t -> (int32 * int list) list tzresult Lwt.t
 
 (** {3 Protocol} *)
 

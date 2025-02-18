@@ -522,20 +522,22 @@ let get_outbox_content (node_ctxt : _ Node_context.t)
 
 let () =
   Local_directory.register0 Rollup_node_services.Local.outbox_pending_executable
-  @@ fun node_ctxt () () ->
+  @@ fun node_ctxt outbox_level () ->
   let open Lwt_result_syntax in
   let* outbox_messages =
-    Node_context.get_executable_pending_outbox_messages node_ctxt
+    Node_context.get_executable_pending_outbox_messages ?outbox_level node_ctxt
   in
   List.map_ep (get_outbox_content node_ctxt) outbox_messages
 
 let () =
   Local_directory.register0
     Rollup_node_services.Local.outbox_pending_unexecutable
-  @@ fun node_ctxt () () ->
+  @@ fun node_ctxt outbox_level () ->
   let open Lwt_result_syntax in
   let* outbox_messages =
-    Node_context.get_unexecutable_pending_outbox_messages node_ctxt
+    Node_context.get_unexecutable_pending_outbox_messages
+      ?outbox_level
+      node_ctxt
   in
   List.map_ep (get_outbox_content node_ctxt) outbox_messages
 

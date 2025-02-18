@@ -668,7 +668,9 @@ let register_outbox_messages {store; _} ~outbox_level ~indexes =
   let*? indexes = Bitset.from_list indexes in
   Store.Outbox_messages.register_outbox_messages store ~outbox_level ~indexes
 
-let get_executable_pending_outbox_messages {store; lcc; current_protocol; _} =
+let get_executable_pending_outbox_messages ?outbox_level
+    {store; lcc; current_protocol; _} =
+  let open Lwt_result_syntax in
   let max_level = (Reference.get lcc).level in
   let constants = (Reference.get current_protocol).constants.sc_rollup in
   let min_level =
@@ -678,9 +680,19 @@ let get_executable_pending_outbox_messages {store; lcc; current_protocol; _} =
          (constants.max_number_of_stored_cemented_commitments
         * constants.commitment_period_in_blocks))
   in
-  Store.Outbox_messages.pending store ~min_level ~max_level
+  match outbox_level with
+  | None -> Store.Outbox_messages.pending store ~min_level ~max_level
+  | Some outbox_level when outbox_level > max_level || outbox_level < min_level
+    ->
+      return_nil
+  | Some outbox_level ->
+      Store.Outbox_messages.pending
+        store
+        ~min_level:outbox_level
+        ~max_level:outbox_level
 
-let get_unexecutable_pending_outbox_messages ({store; lcc; _} as node_ctxt) =
+let get_unexecutable_pending_outbox_messages ?outbox_level
+    ({store; lcc; _} as node_ctxt) =
   let open Lwt_result_syntax in
   let* head = last_processed_head_opt node_ctxt in
   let*? max_level =
@@ -689,7 +701,16 @@ let get_unexecutable_pending_outbox_messages ({store; lcc; _} as node_ctxt) =
     | Some h -> Ok h.header.level
   in
   let min_level = Int32.succ (Reference.get lcc).level in
-  Store.Outbox_messages.pending store ~min_level ~max_level
+  match outbox_level with
+  | None -> Store.Outbox_messages.pending store ~min_level ~max_level
+  | Some outbox_level when outbox_level > max_level || outbox_level < min_level
+    ->
+      return_nil
+  | Some outbox_level ->
+      Store.Outbox_messages.pending
+        store
+        ~min_level:outbox_level
+        ~max_level:outbox_level
 
 let get_full_l2_block ?get_outbox_messages node_ctxt block_hash =
   let open Lwt_result_syntax in
