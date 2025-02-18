@@ -10,7 +10,8 @@ use crate::apply::{
 };
 use crate::block_storage;
 use crate::blueprint_storage::{
-    drop_blueprint, read_blueprint, BlockHeader, BlueprintHeader, EVMBlockHeader,
+    drop_blueprint, read_blueprint, store_current_block_header, BlockHeader,
+    BlueprintHeader, EVMBlockHeader,
 };
 use crate::configuration::ConfigurationMode;
 use crate::configuration::Limits;
@@ -440,13 +441,15 @@ fn promote_block<Host: Runtime>(
     if let BlockInProgressProvenance::Storage = block_in_progress_provenance {
         storage::delete_block_in_progress(safe_host)?;
     }
+    let block_header = BlockHeader::from(block);
     safe_host.promote()?;
     safe_host.promote_trace()?;
-    drop_blueprint(safe_host.host, block.number)?;
+    drop_blueprint(safe_host.host, block_header.blueprint_header.number)?;
+    store_current_block_header(safe_host.host, &block_header)?;
 
     Event::BlueprintApplied {
-        number: block.number,
-        hash: block.hash,
+        number: block_header.blueprint_header.number,
+        hash: block_header.evm_block_header.hash,
     }
     .store(safe_host.host)?;
 
