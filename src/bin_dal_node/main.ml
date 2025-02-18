@@ -44,6 +44,7 @@ let merge
         service_namespace;
         experimental_features;
         fetch_trusted_setup;
+        verbose;
       } configuration =
   let profile =
     match profile with
@@ -81,6 +82,7 @@ let merge
       merge_experimental_features
         experimental_features
         configuration.experimental_features;
+    verbose = configuration.verbose || verbose;
   }
 
 let wrap_with_error main_promise =

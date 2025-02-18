@@ -343,6 +343,13 @@ module Term = struct
       & opt (some bool) None
       & info ~docs ~doc ~docv:"true | false" ["fetch-trusted-setup"])
 
+  let verbose =
+    let open Cmdliner in
+    let doc =
+      "Controls the verbosity of some emitted events. Default value is false."
+    in
+    Arg.(value & flag & info ~docs ~doc ["verbose"])
+
   (* Experimental features. *)
 
   let sqlite3_backend =
@@ -364,7 +371,7 @@ module Term = struct
        $ public_addr $ endpoint $ metrics_addr $ attester_profile
        $ producer_profile $ observer_profile $ bootstrap_profile $ peers
        $ history_mode $ service_name $ service_namespace $ sqlite3_backend
-       $ fetch_trusted_setup))
+       $ fetch_trusted_setup $ verbose))
 end
 
 type t = Run | Config_init | Config_update | Debug_print_store_schemas
@@ -522,13 +529,14 @@ type options = {
   service_namespace : string option;
   experimental_features : experimental_features;
   fetch_trusted_setup : bool option;
+  verbose : bool;
 }
 
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
       endpoint metrics_addr attesters producers observers bootstrap_flag peers
       history_mode service_name service_namespace sqlite3_backend
-      fetch_trusted_setup =
+      fetch_trusted_setup verbose =
     let run profile =
       run
         subcommand
@@ -547,6 +555,7 @@ let make ~run =
           service_namespace;
           experimental_features = {sqlite3_backend};
           fetch_trusted_setup;
+          verbose;
         }
     in
     let profile = Operator_profile.make ~attesters ~producers ?observers () in
