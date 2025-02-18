@@ -231,78 +231,6 @@ module Block = struct
 
   let prefix = root / "global" / "block" /: Rollup_node_services.Arg.block_id
 
-  let block =
-    Tezos_rpc.Service.get_service
-      ~description:
-        "Layer-2 block of the layer-2 chain with respect to a Layer 1 block \
-         identifier"
-      ~query:Query.outbox_query
-      ~output:Sc_rollup_block.full_encoding
-      path
-
-  let hash =
-    Tezos_rpc.Service.get_service
-      ~description:"Tezos block hash of block known to the smart rollup node"
-      ~query:Tezos_rpc.Query.empty
-      ~output:Block_hash.encoding
-      (path / "hash")
-
-  let level =
-    Tezos_rpc.Service.get_service
-      ~description:"Level of Tezos block known to the smart rollup node"
-      ~query:Tezos_rpc.Query.empty
-      ~output:Data_encoding.int32
-      (path / "level")
-
-  let inbox =
-    Tezos_rpc.Service.get_service
-      ~description:"Rollup inbox for block"
-      ~query:Tezos_rpc.Query.empty
-      ~output:Octez_smart_rollup.Inbox.encoding
-      (path / "inbox")
-
-  let ticks =
-    Tezos_rpc.Service.get_service
-      ~description:"Number of ticks for specified level"
-      ~query:Tezos_rpc.Query.empty
-      ~output:Data_encoding.z
-      (path / "ticks")
-
-  let total_ticks =
-    Tezos_rpc.Service.get_service
-      ~description:"Total number of ticks at specified block"
-      ~query:Tezos_rpc.Query.empty
-      ~output:Sc_rollup.Tick.encoding
-      (path / "total_ticks")
-
-  let num_messages =
-    Tezos_rpc.Service.get_service
-      ~description:"Number of messages for specified block"
-      ~query:Tezos_rpc.Query.empty
-      ~output:Data_encoding.z
-      (path / "num_messages")
-
-  let state_hash =
-    Tezos_rpc.Service.get_service
-      ~description:"State hash for this block"
-      ~query:Tezos_rpc.Query.empty
-      ~output:Sc_rollup.State_hash.encoding
-      (path / "state_hash")
-
-  let state_current_level =
-    Tezos_rpc.Service.get_service
-      ~description:"Retrieve the current level of a PVM"
-      ~query:Tezos_rpc.Query.empty
-      ~output:(Data_encoding.option Raw_level.encoding)
-      (path / "state_current_level")
-
-  let state_value =
-    Tezos_rpc.Service.get_service
-      ~description:"Retrieve value from key is PVM state of specified block"
-      ~query:Query.key_query
-      ~output:Data_encoding.bytes
-      (path / "state")
-
   let durable_state_value (pvm_kind : Sc_rollup.Kind.t) =
     Tezos_rpc.Service.get_service
       ~description:
@@ -403,15 +331,6 @@ module Block = struct
       ~query:Tezos_rpc.Query.empty
       ~output:Data_encoding.(list Sc_rollup.output_encoding)
       (path / "outbox" /: level_param / "messages")
-
-  let committed_status =
-    Tezos_rpc.Service.get_service
-      ~description:
-        "Commitment status of the rollup state which will include content of \
-         this block"
-      ~query:Tezos_rpc.Query.empty
-      ~output:Rollup_node_services.Encodings.committed_status
-      (path / "committed_status")
 
   module Helpers = struct
     type nonrec prefix = prefix
