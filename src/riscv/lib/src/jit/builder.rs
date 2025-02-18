@@ -75,9 +75,18 @@ impl<'a, ML: MainMemoryLayout, JSA: JitStateAccess> Builder<'a, ML, JSA> {
     }
 
     /// Clear the builder context on failure.
-    pub(super) fn fail(self) {
-        // On failure, the context must be cleared to ensure a clean context for the next
-        // block to be compiled. This is done via `finalize`, which internally clears the
+    pub(super) fn fail(mut self) {
+        // On failure, the context must be cleared to ensure a clean context for the next block to
+        // be compiled.
+
+        // Before clearing the context, we need to ensure that
+        // the block compiled so far matches the ABI of the function
+        //
+        // In this case, we must ensure that we explicitly declare
+        // a lack of return values.
+        self.builder.ins().return_(&[]);
+
+        // Clearing the context is done via `finalize`, which internally clears the
         // buffers to allow re-use.
         self.builder.finalize();
     }
