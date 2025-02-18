@@ -55,6 +55,9 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+# Set up a trap to remove the file on error (non-zero exit status)
+trap 'rm -f /tmp/$HISTORY_MODE' EXIT
+
 # We need access to the config.json as the tezos user.
 # We simply check if the config file exist. But we don't
 # try to update the octez node configuration. Trying to
@@ -70,6 +73,7 @@ fi
 
 # Commands execution
 echo "Downloading snapshot for network: $NETWORK, history mode: $HISTORY_MODE..."
+rm -f "/tmp/$HISTORY_MODE"
 curl -s -o "/tmp/$HISTORY_MODE" "https://snapshots.tzinit.org/$NETWORK/$HISTORY_MODE"
 
 echo "Importing snapshot with option: $SNAPSHOT_NO_CHECK..."
