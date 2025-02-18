@@ -130,20 +130,6 @@ where
     MC: memory::MemoryConfig,
     M: backend::ManagerReadWrite,
 {
-    /// `C.LWSP` CI-type compressed instruction
-    ///
-    /// Loads a 32-bit value from memory into register `rd`. It computes
-    /// an effective address by adding the immediate to the stack pointer.
-    /// The immediate is obtained by zero-extending and scaling by 4 the
-    /// offset encoded in the instruction (see U:C-16.3).
-    pub fn run_clwsp(&mut self, imm: i64, rd_rs1: NonZeroXRegister) -> Result<(), Exception> {
-        debug_assert!(imm >= 0 && imm % 4 == 0);
-        let value: i32 = self.read_from_bus(imm, sp)?;
-        // i32 as u64 sign-extends to 64 bits
-        self.hart.xregisters.write_nz(rd_rs1, value as u64);
-        Ok(())
-    }
-
     /// `C.SW` CS-type compressed instruction
     ///
     /// Stores a 32-bit value in register `rs2` to memory. It computes

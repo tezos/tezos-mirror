@@ -330,7 +330,6 @@ pub enum OpCode {
     Csrrci,
 
     // RV32C compressed instructions
-    CLwsp,
     CSw,
     CSwsp,
     /// Jumps to val(rs1)
@@ -542,7 +541,6 @@ impl OpCode {
             Self::Csrrwi => Args::run_csrrwi,
             Self::Csrrsi => Args::run_csrrsi,
             Self::Csrrci => Args::run_csrrci,
-            Self::CLwsp => Args::run_clwsp,
             Self::CSw => Args::run_csw,
             Self::CSwsp => Args::run_cswsp,
             Self::J => Args::run_j,
@@ -791,18 +789,7 @@ macro_rules! impl_load_type {
         }
     };
 }
-macro_rules! impl_cload_sp_type {
-    ($fn: ident) => {
-        /// SAFETY: This function must only be called on an `Args` belonging
-        /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
-            &self,
-            core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rd.nzx).map(|_| Next(self.width))
-        }
-    };
-}
+
 macro_rules! impl_cfload_sp_type {
     ($fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
@@ -1363,7 +1350,6 @@ impl Args {
 
     // RV32C compressed instructions
     impl_cr_nz_type!(c::run_mv, run_mv);
-    impl_cload_sp_type!(run_clwsp);
     impl_store_type!(run_csw);
     impl_cb_type!(run_beqz);
     impl_cb_type!(run_bnez);
@@ -2013,10 +1999,10 @@ impl From<&InstrCacheable> for Instruction {
                 debug_assert!(args.imm >= 0 && args.imm % 4 == 0);
                 Instruction::new_lwnz(args.rd, args.rs1, args.imm, InstrWidth::Compressed)
             }
-            InstrCacheable::CLwsp(args) => Instruction {
-                opcode: OpCode::CLwsp,
-                args: args.into(),
-            },
+            InstrCacheable::CLwsp(args) => {
+                debug_assert!(args.imm >= 0 && args.imm % 4 == 0);
+                Instruction::new_lwnz(args.rd_rs1, nz::sp, args.imm, InstrWidth::Compressed)
+            }
             InstrCacheable::CSw(args) => Instruction {
                 opcode: OpCode::CSw,
                 args: args.to_args(InstrWidth::Compressed),
