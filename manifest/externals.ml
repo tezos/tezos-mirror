@@ -163,7 +163,8 @@ let logs_lwt = external_sublib logs "logs.lwt"
 
 let lru = external_lib "lru" V.(at_least "0.3.0")
 
-let lwt = external_lib "lwt" V.(at_least "5.7.0")
+(* 5.9.0 deprecates Lwt_stream.junk_old, which we use *)
+let lwt = external_lib "lwt" V.(at_least "5.7.0" && less_than "5.9.0")
 
 let lwt_canceler =
   external_lib "lwt-canceler" V.(at_least "0.3" && less_than "0.4")

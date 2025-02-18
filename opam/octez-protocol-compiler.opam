@@ -14,7 +14,7 @@ depends: [
   "octez-proto-libs" { = version }
   "bls12-381" { = version }
   "octez-protocol-compiler-compat" { = version }
-  "lwt" { >= "5.7.0" }
+  "lwt" { >= "5.7.0" & < "5.9.0" }
   "ocp-ocamlres" { >= "0.4" }
   "base-unix"
   "octez-version" { = version }

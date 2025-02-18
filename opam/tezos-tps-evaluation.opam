@@ -16,7 +16,7 @@ depends: [
   "caqti"
   "caqti-dynload"
   "caqti-lwt" { >= "2.0.1" }
-  "lwt" { >= "5.7.0" }
+  "lwt" { >= "5.7.0" & < "5.9.0" }
   "octez-protocol-alpha-libs" { = version }
   "octez-shell-libs" { = version }
   "tezos-protocol-alpha" { = version }
