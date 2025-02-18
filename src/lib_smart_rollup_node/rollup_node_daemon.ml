@@ -264,7 +264,16 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
            the predecessor. In this case, we don't update the head or notify the
            block. *)
         return_unit
-      else Node_context.set_l2_head node_ctxt l2_block
+      else
+        (* Reorg (reproposal) of a block already handled *)
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7731
+           This just overwrites the outbox messages with the correct ones for
+           the level but we need to properly handle reorgs in the storage. *)
+        let* ctxt = Node_context.checkout_context node_ctxt head.hash in
+        let* () =
+          register_outbox_messages state.plugin node_ctxt ctxt head.level
+        in
+        Node_context.set_l2_head node_ctxt l2_block
   | `New l2_block ->
       let* () = Node_context.set_l2_head node_ctxt l2_block in
       let stop_timestamp = Time.System.now () in
@@ -342,6 +351,7 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
     Node_context.get_tezos_reorg_for_new_head node_ctxt old_head stripped_head
   in
   let*? reorg = report_missing_data reorg in
+  let*! () = Daemon_event.reorg reorg.old_chain in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3348
      Rollback state information on reorganization, i.e. for
      reorg.old_chain. *)
@@ -370,7 +380,7 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
   notify_synchronization node_ctxt head.level ;
   let* () = Publisher.publish_commitments () in
   let* () = Publisher.cement_commitments () in
-  let* () = Publisher.execute_outbox () in
+  let* () = Outbox_execution.publish_executable_messages node_ctxt in
   let*! () = Daemon_event.new_heads_processed reorg.new_chain in
   let* () = Batcher.produce_batches () in
   let* () = Dal_injection_queue.produce_dal_slots ~level:head.level in
