@@ -58,10 +58,7 @@ impl<M: ManagerRead> ManagerRead for ProofGen<M> {
 
     fn region_ref<E: 'static, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> &E {
         region.set_read();
-        region
-            .writes
-            .get(&index)
-            .unwrap_or_else(|| M::region_ref(&region.source, index))
+        region.unrecorded_ref(index)
     }
 
     fn region_read_all<E: Copy, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E> {
@@ -77,29 +74,8 @@ impl<M: ManagerRead> ManagerRead for ProofGen<M> {
         region: &Self::DynRegion<LEN>,
         address: usize,
     ) -> E {
-        let elem_size = mem::size_of::<E>();
         region.reads.borrow_mut().insert::<E>(address);
-
-        // Read a value from the wrapped region and convert it to the stored representation.
-        let mut value: E = M::dyn_region_read(&region.source, address);
-        value.to_stored_in_place();
-
-        // Get a mutable slice of bytes over the value and overwrite any byte that has been written
-        // during the proof step.
-        let value_bytes: &mut [u8] = unsafe {
-            // SAFETY: Obtaining a mutable slice of `mem::size_of::<E>()` bytes from a mutable reference
-            // to one value of type `E` should be safe, assuming `value` is not the result of
-            // multiple allocations.
-            // Cannot use `mem::transmute` because `E` does not have a constant size.
-            slice::from_raw_parts_mut((&mut value as *mut E) as *mut u8, elem_size)
-        };
-        for (i, byte) in region.writes.range(address..address + elem_size) {
-            value_bytes[*i - address] = *byte;
-        }
-
-        // Convert back from the stored representation and return.
-        value.from_stored_in_place();
-        value
+        region.unrecorded_read(address)
     }
 
     fn dyn_region_read_all<E: super::Elem, const LEN: usize>(
@@ -139,10 +115,7 @@ impl<M: ManagerRead> ManagerRead for ProofGen<M> {
         V: EnrichedValue,
     {
         cell.set_read();
-        match &cell.written {
-            None => M::enriched_cell_ref_stored(&cell.source),
-            Some(value) => value,
-        }
+        cell.unrecorded_ref_stored()
     }
 }
 
@@ -300,6 +273,16 @@ impl<M: ManagerBase, E: 'static, const LEN: usize> ProofRegion<E, LEN, M> {
     }
 }
 
+impl<M: ManagerRead, E: 'static, const LEN: usize> ProofRegion<E, LEN, M> {
+    /// Version of [`ManagerRead::region_ref`] which does not record
+    /// the access as a read.
+    fn unrecorded_ref(&self, index: usize) -> &E {
+        self.writes
+            .get(&index)
+            .unwrap_or_else(|| M::region_ref(&self.source, index))
+    }
+}
+
 /// Proof dynamic region which wraps a dynamic region managed by another manager.
 ///
 /// When Merkleising a [`ManagerBase::DynRegion`], its data can be split into multiple leaves.
@@ -343,6 +326,43 @@ impl<M: ManagerRead, const LEN: usize> ProofDynRegion<LEN, M> {
     pub fn inner_dyn_region_read<E: super::Elem>(&self, address: usize) -> E {
         M::dyn_region_read(&self.source, address)
     }
+
+    /// Version of [`ManagerRead::dyn_region_read`] which does not record
+    /// the access as a read.
+    fn unrecorded_read<E: super::Elem>(&self, address: usize) -> E {
+        let elem_size = mem::size_of::<E>();
+
+        // Read a value from the wrapped region and convert it to the stored representation.
+        let mut value: E = M::dyn_region_read(&self.source, address);
+        value.to_stored_in_place();
+
+        // Get a mutable slice of bytes over the value and overwrite any byte that has been written
+        // during the proof step.
+        let value_bytes: &mut [u8] = unsafe {
+            // SAFETY: Obtaining a mutable slice of `mem::size_of::<E>()` bytes from a mutable reference
+            // to one value of type `E` should be safe, assuming `value` is not the result of
+            // multiple allocations.
+            // Cannot use `mem::transmute` because `E` does not have a constant size.
+            slice::from_raw_parts_mut((&mut value as *mut E) as *mut u8, elem_size)
+        };
+        for (i, byte) in self.writes.range(address..address + elem_size) {
+            value_bytes[*i - address] = *byte;
+        }
+
+        // Convert back from the stored representation and return.
+        value.from_stored_in_place();
+        value
+    }
+
+    /// Version of [`ManagerRead::dyn_region_read_all`] which does not record
+    /// the access as a read.
+    fn unrecorded_read_all<E: super::Elem>(&self, address: usize, values: &mut [E]) {
+        assert!(address + mem::size_of_val(values) <= LEN);
+
+        for (offset, value) in values.iter_mut().enumerate() {
+            *value = self.unrecorded_read(address + offset * mem::size_of::<E>());
+        }
+    }
 }
 
 /// Proof enriched cell which wraps an enriched cell managed by another manager.
@@ -385,6 +405,20 @@ impl<V: EnrichedValue, M: ManagerBase> ProofEnrichedCell<V, M> {
     /// Set the access log to `ReadWrite`.
     pub fn set_read_write(&self) {
         self.access.set(AccessInfo::ReadWrite)
+    }
+}
+
+impl<V: EnrichedValue, M: ManagerRead> ProofEnrichedCell<V, M> {
+    /// Version of [`ManagerRead::enriched_cell_ref_stored`] which does not
+    /// record the access as a read.
+    fn unrecorded_ref_stored(&self) -> &V::E
+    where
+        V: EnrichedValue,
+    {
+        match &self.written {
+            None => M::enriched_cell_ref_stored(&self.source),
+            Some(value) => value,
+        }
     }
 }
 
