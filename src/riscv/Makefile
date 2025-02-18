@@ -87,8 +87,8 @@ test: build
 	@make -C jstz test
 
 .PHONY: test-long
-test-long: 
-	@cargo test --release -- test_jstz_determinism --nocapture --ignored
+test-long:
+	@cargo test --release -- test_jstz_determinism test_jstz_proofs_one_step --nocapture --ignored
 
 .PHONY: test-miri
 test-miri:
