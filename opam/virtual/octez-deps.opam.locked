@@ -134,6 +134,7 @@ depends: [
   "lwt-dllist" {= "1.0.1"}
   "lwt-exit" {= "1.0"}
   "lwt-watcher" {= "0.2"}
+  "lwt_log" {= "1.1.2"}
   "lwt_ppx" {= "5.8.0"}
   "lwt_react" {= "1.2.0"}
   "lwt_ssl" {= "1.2.0"}
