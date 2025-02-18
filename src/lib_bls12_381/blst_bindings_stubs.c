@@ -7,6 +7,7 @@
 #include <caml/fail.h>
 #include <caml/memory.h>
 #include <caml/mlvalues.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -588,6 +589,35 @@ CAMLprim value caml_blst_p1_set_coordinates_stubs(value buffer, value x,
   CAMLreturn(CAML_BLS12_381_OUTPUT_SUCCESS);
 }
 
+CAMLprim value caml_blst_p1_affine_array_of_compressed_bytes_stubs(
+    value affine_points, value points_in_bytes, value npoints,
+    value subgroup_check) {
+  CAMLparam4(affine_points, points_in_bytes, npoints, subgroup_check);
+  int npoints_c = Int_val(npoints);
+  blst_p1_affine *affine_points_c = Blst_p1_affine_val(affine_points);
+  bool subgroup_check_c = Bool_val(subgroup_check);
+  int r = 0;
+  bool in_g1 = true;
+
+  for (int i = 0; i < npoints_c; i++) {
+    r = blst_p1_uncompress(affine_points_c + i,
+                           Bytes_val(Field(points_in_bytes, i)));
+    // fails if the point is not on the curve
+    if (r != 0) {
+      CAMLreturn(Val_int(r));
+    }
+    if (subgroup_check_c) {
+      in_g1 = blst_p1_affine_in_g1(affine_points_c + i);
+      // fails if the point is not in the group
+      if (!in_g1) {
+        CAMLreturn(Val_int(BLST_POINT_NOT_IN_GROUP));
+      }
+    }
+  }
+
+  CAMLreturn(Val_int(r));
+}
+
 CAMLprim value caml_blst_p1s_add_stubs(value jacobian_res, value affine_points,
                                        value npoints) {
   CAMLparam3(jacobian_res, affine_points, npoints);
@@ -761,6 +791,35 @@ CAMLprim value caml_blst_p2_set_coordinates_stubs(value buffer, value x,
   blst_fp2 *y_c = Blst_fp2_val(y);
   blst_p2_set_coordinates(buffer_c, x_c, y_c);
   CAMLreturn(CAML_BLS12_381_OUTPUT_SUCCESS);
+}
+
+CAMLprim value caml_blst_p2_affine_array_of_compressed_bytes_stubs(
+    value affine_points, value points_in_bytes, value npoints,
+    value subgroup_check) {
+  CAMLparam4(affine_points, points_in_bytes, npoints, subgroup_check);
+  int npoints_c = Int_val(npoints);
+  blst_p2_affine *affine_points_c = Blst_p2_affine_val(affine_points);
+  bool subgroup_check_c = Bool_val(subgroup_check);
+  int r = 0;
+  bool in_g2 = true;
+
+  for (int i = 0; i < npoints_c; i++) {
+    r = blst_p2_uncompress(affine_points_c + i,
+                           Bytes_val(Field(points_in_bytes, i)));
+    // fails if the point is not on the curve
+    if (r != 0) {
+      CAMLreturn(Val_int(r));
+    }
+    if (subgroup_check_c) {
+      in_g2 = blst_p2_affine_in_g2(affine_points_c + i);
+      // fails if the point is not in the group
+      if (!in_g2) {
+        CAMLreturn(Val_int(BLST_POINT_NOT_IN_GROUP));
+      }
+    }
+  }
+
+  CAMLreturn(Val_int(r));
 }
 
 CAMLprim value caml_blst_p2s_add_stubs(value jacobian_res, value affine_points,

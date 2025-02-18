@@ -91,6 +91,10 @@ module Stubs = struct
   external set_affine_coordinates : affine -> Fq.t -> Fq.t -> int
     = "caml_blst_p1_set_coordinates_stubs"
 
+  external affine_array_of_compressed_bytes :
+    affine_array -> Bytes.t array -> int -> bool -> int
+    = "caml_blst_p1_affine_array_of_compressed_bytes_stubs"
+
   external affine_add_bulk : jacobian -> affine_array -> int -> int
     = "caml_blst_p1s_add_stubs"
 
@@ -152,6 +156,18 @@ module G1 = struct
         let p = Stubs.allocate_g1 () in
         ignore @@ Stubs.continuous_array_get p l i ;
         p)
+
+  let affine_array_of_compressed_bytes_opt ~subgroup_check points_in_bytes =
+    let npoints = Array.length points_in_bytes in
+    let buffer = Stubs.allocate_g1_affine_contiguous_array npoints in
+    let res =
+      Stubs.affine_array_of_compressed_bytes
+        buffer
+        points_in_bytes
+        npoints
+        subgroup_check
+    in
+    if res = 0 then Some (buffer, npoints) else None
 
   let size_of_affine_array (_, n) = n
 
