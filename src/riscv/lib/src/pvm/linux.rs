@@ -229,7 +229,7 @@ impl<ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: ManagerBase>
     }
 }
 
-impl<ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerBase> Pvm<ML, CL, M> {
+impl<ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: ManagerBase> Pvm<ML, CL, B, M> {
     /// Check if the supervised process has requested an exit.
     pub fn has_exited(&self) -> Option<u64>
     where
