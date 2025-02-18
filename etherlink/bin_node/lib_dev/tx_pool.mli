@@ -12,7 +12,10 @@ type mode =
   | Relay
       (** Relays the transactions when they are valid w.r.t. the local state. *)
   | Forward of {
-      injector : string -> (Ethereum_types.hash, string) result tzresult Lwt.t;
+      injector :
+        Ethereum_types.legacy_transaction_object ->
+        string ->
+        (Ethereum_types.hash, string) result tzresult Lwt.t;
     }
       (** Forwards the transactions without checking the
           transaction validity. *)

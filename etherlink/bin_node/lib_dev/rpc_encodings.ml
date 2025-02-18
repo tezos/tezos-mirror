@@ -756,15 +756,17 @@ module Produce_proposal = struct
 end
 
 module Inject_transaction = struct
+  open Ethereum_types
+
   type input = Ethereum_types.legacy_transaction_object * string
 
-  type output = unit
+  type output = hash
 
   let input_encoding =
     Data_encoding.(
       tup2 Ethereum_types.legacy_transaction_object_encoding string)
 
-  let output_encoding = Data_encoding.unit
+  let output_encoding = hash_encoding
 
   let method_ = "injectTransaction"
 

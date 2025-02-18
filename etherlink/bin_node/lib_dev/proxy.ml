@@ -65,9 +65,11 @@ let main
         Tx_pool.Forward
           {
             injector =
-              Injector.send_raw_transaction
-                ~keep_alive:config.keep_alive
-                ~base:evm_node_endpoint;
+              (fun _ raw_tx ->
+                Injector.send_raw_transaction
+                  ~keep_alive:config.keep_alive
+                  ~base:evm_node_endpoint
+                  ~raw_tx);
           }
   in
   let* () =

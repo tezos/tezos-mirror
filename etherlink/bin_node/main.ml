@@ -100,6 +100,8 @@ module Params = struct
 
   let evm_node_endpoint = endpoint
 
+  let evm_node_private_endpoint = endpoint
+
   let sequencer_key =
     Tezos_clic.param
       ~name:"sequencer-key"
@@ -525,6 +527,13 @@ let evm_node_endpoint_arg =
     ~placeholder:"url"
     ~doc:"The address of an EVM node to connect to."
     Params.evm_node_endpoint
+
+let evm_node_private_endpoint_arg =
+  Tezos_clic.arg
+    ~long:"evm-node-private-endpoint"
+    ~placeholder:"url"
+    ~doc:"The address of an EVM node and its private endpoint."
+    Params.evm_node_private_endpoint
 
 let bundler_node_endpoint_arg =
   Tezos_clic.arg
@@ -1013,8 +1022,9 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
     ()
 
 let rpc_run_args =
-  Tezos_clic.args4
+  Tezos_clic.args5
     evm_node_endpoint_arg
+    evm_node_private_endpoint_arg
     preimages_arg
     preimages_endpoint_arg
     native_execution_policy_arg
@@ -1023,7 +1033,7 @@ let rpc_command =
   let open Lwt_result_syntax in
   let open Tezos_clic in
   command
-    ~desc:"Start the EVM node in sequencer mode"
+    ~desc:"Start the EVM node in rpc mode"
     (merge_options common_config_args rpc_run_args)
     (prefixes ["experimental"; "run"; "rpc"] stop)
     (fun ( ( data_dir,
@@ -1046,6 +1056,7 @@ let rpc_command =
              whitelisted_rpcs,
              finalized_view ),
            ( evm_node_endpoint,
+             evm_node_private_endpoint,
              preimages,
              preimages_endpoint,
              native_execution_policy ) )
@@ -1077,25 +1088,27 @@ let rpc_command =
           ~finalized_view
           ()
       in
-      let evm_node_endpoint =
-        match evm_node_endpoint with
-        | Some uri ->
-            (* We reuse `--evm-node-endpoint` to allow to overwrite the
+      let default_addr rpc =
+        let evm_node_addr =
+          match rpc.addr with
+          | "0.0.0.0" (* IPv4 catch-all bind address *)
+          | "[::]" (* IPv6 catch-all bind address *) ->
+              "localhost"
+          | addr -> addr
+        in
+        Uri.make ~scheme:"http" ~host:evm_node_addr ~port:rpc.port ()
+      in
+      (* We reuse `--evm-node-endpoint` to allow to overwrite the
                endpoint used to connect to the read-write node. *)
-            uri
-        | None ->
-            let evm_node_addr =
-              match read_write_config.public_rpc.addr with
-              | "0.0.0.0" (* IPv4 catch-all bind address *)
-              | "[::]" (* IPv6 catch-all bind address *) ->
-                  "localhost"
-              | addr -> addr
-            in
-            Uri.make
-              ~scheme:"http"
-              ~host:evm_node_addr
-              ~port:read_write_config.public_rpc.port
-              ()
+      let evm_node_endpoint =
+        Option.value
+          ~default:(default_addr read_write_config.public_rpc)
+          evm_node_endpoint
+      in
+      let evm_node_private_endpoint =
+        match evm_node_private_endpoint with
+        | Some _ as v -> v
+        | None -> Option.map default_addr read_write_config.private_rpc
       in
       let config =
         Cli.patch_configuration_from_args
@@ -1142,7 +1155,12 @@ let rpc_command =
       in
       let* () = websocket_checks config in
       let*! () = Internal_event.Simple.emit Event.event_starting "rpc" in
-      Evm_node_lib_dev.Rpc.main ~data_dir ~evm_node_endpoint ~config)
+      Evm_node_lib_dev.Rpc.main
+        ~data_dir
+        ~evm_node_endpoint
+        ?evm_node_private_endpoint
+        ~config
+        ())
 
 let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
     ?private_rpc_port ?cors_origins ?cors_headers ~verbose ?preimages

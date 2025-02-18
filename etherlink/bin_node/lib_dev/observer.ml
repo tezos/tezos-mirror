@@ -181,9 +181,11 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       Tx_pool.Forward
         {
           injector =
-            Injector.send_raw_transaction
-              ~keep_alive:config.keep_alive
-              ~base:evm_node_endpoint;
+            (fun _ raw_tx ->
+              Injector.send_raw_transaction
+                ~keep_alive:config.keep_alive
+                ~base:evm_node_endpoint
+                ~raw_tx);
         }
     else Tx_pool.Relay
   in

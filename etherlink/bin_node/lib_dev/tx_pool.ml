@@ -227,7 +227,10 @@ type mode =
   | Sequencer
   | Relay
   | Forward of {
-      injector : string -> (Ethereum_types.hash, string) result tzresult Lwt.t;
+      injector :
+        Ethereum_types.legacy_transaction_object ->
+        string ->
+        (Ethereum_types.hash, string) result tzresult Lwt.t;
     }
 
 type parameters = {
@@ -738,7 +741,7 @@ module Handlers = struct
         Tx_watcher.notify transaction_object.hash ;
         let* res =
           match state.mode with
-          | Forward {injector} -> injector txn
+          | Forward {injector} -> injector transaction_object txn
           | Proxy | Sequencer | Relay ->
               insert_valid_transaction state txn transaction_object
         in
