@@ -5,8 +5,11 @@
 use std::{fs, io::Write, ops::Bound};
 
 use octez_riscv::{
+    jit::JIT,
     machine_state::{
-        DefaultCacheLayouts, block_cache::bcall::InterpretedBlockBuilder, main_memory::M64M,
+        DefaultCacheLayouts,
+        block_cache::bcall::{Block, InlineJit, Interpreted, InterpretedBlockBuilder},
+        main_memory::M64M,
     },
     pvm::PvmHooks,
     state_backend::owned_backend::Owned,
@@ -23,7 +26,18 @@ fn capture_debug_log(mint: &mut goldenfile::Mint) -> PvmHooks<'_> {
 }
 
 #[test]
-fn test_jstz_regression() {
+fn test_jstz_regression_interpreted() {
+    let block_builder = InterpretedBlockBuilder;
+    test_jstz_regression::<Interpreted<M64M, Owned>>(block_builder);
+}
+
+#[test]
+fn test_jstz_regression_inline_jit() {
+    let block_buider = (JIT::<M64M, Owned>::new().unwrap(), InterpretedBlockBuilder);
+    test_jstz_regression::<InlineJit<_, _>>(block_buider)
+}
+
+fn test_jstz_regression<B: Block<M64M, Owned>>(block_builder: B::BlockBuilder) {
     let mut mint = goldenfile::Mint::new(GOLDEN_DIR);
 
     let (result, initial_hash, final_hash) = {
@@ -43,9 +57,7 @@ fn test_jstz_regression() {
         const ROLLUP_ADDRESS: [u8; 20] = [0; 20];
         const ORIGINATION_LEVEL: u32 = 1;
 
-        let block_builder = InterpretedBlockBuilder;
-
-        let mut stepper = PvmStepper::<'_, M64M, DefaultCacheLayouts, Owned>::new(
+        let mut stepper = PvmStepper::<'_, M64M, DefaultCacheLayouts, Owned, B>::new(
             &boot_program,
             Some(&main_program),
             inbox,

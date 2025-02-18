@@ -9,7 +9,7 @@ use octez_riscv::{
     machine_state::{DefaultCacheLayouts, main_memory::M1G},
     machine_state::{
         TestCacheLayouts,
-        block_cache::bcall::{Block, Interpreted, InterpretedBlockBuilder},
+        block_cache::bcall::{self, Block},
     },
     pvm::PvmHooks,
     state_backend::owned_backend::Owned,
@@ -22,6 +22,13 @@ use crate::{
     cli::{CommonOptions, RunOptions},
     posix_exit_mode,
 };
+/// Execution style of blocks
+#[cfg(not(feature = "inline-jit"))]
+pub type BlockImpl = bcall::Interpreted<M1G, Owned>;
+
+/// Execution style of blocks
+#[cfg(feature = "inline-jit")]
+pub type BlockImpl = bcall::InlineJit<M1G, Owned>;
 
 pub fn run(opts: RunOptions) -> Result<(), Box<dyn Error>> {
     let program = fs::read(&opts.input)?;
@@ -35,7 +42,7 @@ pub fn run(opts: RunOptions) -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let steps = general_run(&opts.common, program, initrd, Runner(&opts))??;
+    let steps = general_run::<_, _, BlockImpl>(&opts.common, program, initrd, Runner(&opts))??;
 
     if opts.print_steps {
         println!("Run consumed {steps} steps.");
@@ -50,16 +57,16 @@ pub trait UseStepper<R> {
     fn advance<S: Stepper>(self, stepper: S) -> R;
 }
 
-pub fn general_run<F: UseStepper<R>, R>(
+pub fn general_run<F: UseStepper<R>, R, B: Block<M1G, Owned>>(
     common: &CommonOptions,
     program: Vec<u8>,
     initrd: Option<Vec<u8>>,
     f: F,
 ) -> Result<R, Box<dyn Error>> {
-    let block_builder = InterpretedBlockBuilder;
+    let block_builder = B::BlockBuilder::default();
 
     if common.pvm {
-        run_pvm::<_, Interpreted<_, _>>(
+        run_pvm::<_, B>(
             program.as_slice(),
             initrd.as_deref(),
             common,
@@ -67,7 +74,7 @@ pub fn general_run<F: UseStepper<R>, R>(
             block_builder,
         )
     } else {
-        run_test(
+        run_test::<_, B>(
             program.as_slice(),
             initrd.as_deref(),
             common,

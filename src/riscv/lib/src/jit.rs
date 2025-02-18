@@ -256,7 +256,9 @@ impl<ML: MainMemoryLayout, M: JitStateAccess> Default for JIT<ML, M> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::machine_state::block_cache::bcall::{BCall, Block, BlockLayout, Interpreted};
+    use crate::machine_state::block_cache::bcall::{
+        BCall, Block, BlockLayout, Interpreted, InterpretedBlockBuilder,
+    };
     use crate::machine_state::main_memory::tests::T1K;
     use crate::machine_state::{MachineCoreState, MachineCoreStateLayout};
     use crate::parser::instruction::InstrWidth::*;
@@ -288,6 +290,7 @@ mod tests {
         ];
 
         let mut jit = JIT::<T1K, F::Manager>::new().unwrap();
+        let interpreted_bb = InterpretedBlockBuilder;
 
         for scenario in scenarios {
             let mut interpreted =
@@ -312,11 +315,12 @@ mod tests {
                 .compile(instructions(&block).as_slice())
                 .expect("Compilation of CNop should succeed");
 
-            let interpreted_res = block.callable().unwrap().run_block(
-                &mut interpreted,
-                initial_pc,
-                &mut interpreted_steps,
-            );
+            let interpreted_res = unsafe {
+                // SAFETY: interpreted blocks are always callable
+                block.callable(&interpreted_bb)
+            }
+            .unwrap()
+            .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
             let jitted_res = unsafe {
                 // # Safety - the jit is not dropped until after we
                 //            exit the for loop
@@ -359,6 +363,7 @@ mod tests {
         ];
 
         let mut jit = JIT::<T1K, F::Manager>::new().unwrap();
+        let interpreted_bb = InterpretedBlockBuilder;
 
         for scenario in scenarios {
             let mut interpreted =
@@ -383,11 +388,12 @@ mod tests {
                 .compile(instructions(&block).as_slice())
                 .expect("Compilation should succeed");
 
-            let interpreted_res = block.callable().unwrap().run_block(
-                &mut interpreted,
-                initial_pc,
-                &mut interpreted_steps,
-            );
+            let interpreted_res = unsafe {
+                // SAFETY: interpreted blocks are always callable
+                block.callable(&interpreted_bb)
+            }
+            .unwrap()
+            .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
             let jitted_res = unsafe {
                 // # Safety - the jit is not dropped until after we
                 //            exit the for loop
@@ -431,6 +437,7 @@ mod tests {
         ];
 
         let mut jit = JIT::<T1K, F::Manager>::new().unwrap();
+        let interpreted_bb = InterpretedBlockBuilder;
 
         let mut interpreted = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
         let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
@@ -453,11 +460,12 @@ mod tests {
             .compile(instructions(&block).as_slice())
             .expect("Compilation should succeed");
 
-        let interpreted_res = block.callable().unwrap().run_block(
-            &mut interpreted,
-            initial_pc,
-            &mut interpreted_steps,
-        );
+        let interpreted_res = unsafe {
+            // SAFETY: interpreted blocks are always callable
+            block.callable(&interpreted_bb)
+        }
+        .unwrap()
+        .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
         let jitted_res = unsafe {
             // # Safety - the jit is not dropped until after we
             //            exit the block
