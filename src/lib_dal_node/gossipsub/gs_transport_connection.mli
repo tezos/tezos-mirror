@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [activate gs_worker transport_layer ~app_messages_handler] connects the
+(** [activate gs_worker transport_layer ~app_messages_handler ~verbose] connects the
     given [gs_worker] and [transport_layer]. (Dis)connections and messages of
     the transport layer are forwarded to the GS worker. P2P output messages and
     (dis)connection requests are forwarded from the GS worker to the transport
@@ -32,7 +32,9 @@
 
     The [app_messages_handler] is invoked when some application messages are put
     by the Gossipsub worker in the application output stream.
-*)
+
+    The [verbose] flag controls the amount of events produced for some frequent
+    GS messages like the notification of messages to the application layer. *)
 val activate :
   Gs_interface.Worker_instance.t ->
   ( Gs_interface.Worker_instance.p2p_message,
@@ -41,4 +43,5 @@ val activate :
   P2p.t ->
   app_messages_callback:
     (Types.Message.t -> Types.Message_id.t -> unit tzresult Lwt.t) ->
+  verbose:bool ->
   unit Lwt.t
