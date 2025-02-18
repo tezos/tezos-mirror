@@ -540,6 +540,11 @@ pub enum InstrCacheable {
     /// The immediate is obtained by zero-extending and scaling by 4 the
     /// offset encoded in the instruction (see U:C-16.3).
     CSw(NonZeroSBTypeArgs),
+    /// `C.SWSP` - Stores a 32-bit value in register `rs2` to memory. It computes
+    /// an effective address by adding the immediate to the stack pointer.
+    ///
+    /// The immediate is obtained by zero-extending and scaling by 4 the
+    /// offset encoded in the instruction (see U:C-16.3).
     CSwsp(CSSTypeArgs),
     /// `C.J` - Performs an unconditional control transfer. The immediate is added to
     /// the pc to form the jump target address.

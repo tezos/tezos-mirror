@@ -1170,4 +1170,16 @@ impl Instruction {
             _ => Instruction::new_sw(args.rs1, args.rs2, args.imm, InstrWidth::Uncompressed),
         }
     }
+
+    /// Convert [`InstrCacheable::CSwsp`] according to whether register is non-zero.
+    ///
+    /// [`InstrCacheable::CSwsp`]: crate::parser::instruction::InstrCacheable::CSwsp
+    pub(super) fn from_ic_cswsp(args: &CSSTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        debug_assert!(args.imm >= 0 && args.imm % 4 == 0);
+        match split_x0(args.rs2) {
+            X::NonZero(rs2) => Instruction::new_swnz(nz::sp, rs2, args.imm, InstrWidth::Compressed),
+            X::X0 => Instruction::new_sw(sp, x0, args.imm, InstrWidth::Compressed),
+        }
+    }
 }

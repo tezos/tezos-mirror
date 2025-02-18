@@ -388,6 +388,7 @@ where
     ///
     /// Relevant opcodes:
     /// - `SW`
+    /// - `C.SWSP`
     pub fn run_sw(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Result<(), Exception> {
         let value: u64 = self.hart.xregisters.read(rs2);
         // u64 as u32 is truncated, getting the lowest 32 bits
@@ -400,6 +401,7 @@ where
     /// Relevant opcodes:
     /// - `SW`
     /// - `C.SW`
+    /// - `C.SWSP`
     pub fn run_swnz(
         &mut self,
         imm: i64,
