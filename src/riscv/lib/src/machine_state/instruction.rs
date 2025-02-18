@@ -330,7 +330,6 @@ pub enum OpCode {
     Csrrci,
 
     // RV32C compressed instructions
-    CSw,
     CSwsp,
     /// Jumps to val(rs1)
     Jr,
@@ -544,7 +543,6 @@ impl OpCode {
             Self::Csrrwi => Args::run_csrrwi,
             Self::Csrrsi => Args::run_csrrsi,
             Self::Csrrci => Args::run_csrrci,
-            Self::CSw => Args::run_csw,
             Self::CSwsp => Args::run_cswsp,
             Self::J => Args::run_j,
             Self::JAbsolute => Args::run_j_absolute,
@@ -1354,7 +1352,6 @@ impl Args {
 
     // RV32C compressed instructions
     impl_cr_nz_type!(c::run_mv, run_mv);
-    impl_store_type!(run_csw);
     impl_cb_type!(run_beqz);
     impl_cb_type!(run_bnez);
     impl_ci_type!(load_store::run_li, run_li, non_zero);
@@ -2004,10 +2001,10 @@ impl From<&InstrCacheable> for Instruction {
                 debug_assert!(args.imm >= 0 && args.imm % 4 == 0);
                 Instruction::new_lwnz(args.rd_rs1, nz::sp, args.imm, InstrWidth::Compressed)
             }
-            InstrCacheable::CSw(args) => Instruction {
-                opcode: OpCode::CSw,
-                args: args.to_args(InstrWidth::Compressed),
-            },
+            InstrCacheable::CSw(args) => {
+                debug_assert!(args.imm >= 0 && args.imm % 4 == 0);
+                Instruction::new_swnz(args.rs1, args.rs2, args.imm, InstrWidth::Compressed)
+            }
             InstrCacheable::CSwsp(args) => Instruction {
                 opcode: OpCode::CSwsp,
                 args: args.into(),

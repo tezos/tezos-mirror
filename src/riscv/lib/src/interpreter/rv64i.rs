@@ -399,6 +399,7 @@ where
     ///
     /// Relevant opcodes:
     /// - `SW`
+    /// - `C.SW`
     pub fn run_swnz(
         &mut self,
         imm: i64,

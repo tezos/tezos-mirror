@@ -1238,9 +1238,9 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
                 rs2: c_f_rdp_rs2p(instr),
                 imm: cld_imm(instr),
             }),
-            C_F3_6 => CSw(SBTypeArgs {
-                rs1: c_rs1p(instr),
-                rs2: c_rdp_rs2p(instr),
+            C_F3_6 => CSw(NonZeroSBTypeArgs {
+                rs1: c_rs1p_nz(instr),
+                rs2: c_rdp_rs2p_nz(instr),
                 imm: clw_imm(instr),
             }),
             C_F3_7 => CSd(NonZeroSBTypeArgs {
