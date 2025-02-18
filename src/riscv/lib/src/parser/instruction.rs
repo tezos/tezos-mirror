@@ -362,6 +362,12 @@ pub enum InstrCacheable {
     Bgeu(SBTypeArgs),
 
     // RV64I U-type instructions
+    /// `LUI` U-type instruction
+    ///
+    /// Set the upper 20 bits of the `rd` register with the `U-type` formatted immediate `imm`.
+    ///
+    /// Being a `U-type` operation, the immediate is correctly formatted
+    /// (lower 12 bits cleared and the value is sign-extended).
     Lui(NonZeroRdUJTypeArgs),
     Auipc(NonZeroRdUJTypeArgs),
 
@@ -506,6 +512,11 @@ pub enum InstrCacheable {
     CBnez(CIBTypeArgs),
     /// `C.LI` - Loads the sign-extended 6-bit immediate into register `rd_rs1`.
     CLi(CIBNZTypeArgs),
+    /// `C.LUI` CI-type compressed instruction
+    ///
+    /// Loads the non-zero 6-bit immediate into bits 17–12 of the
+    /// register `rd_rs1`, clears the bottom 12 bits, and sign-extends bit 17
+    /// into all higher bits of `rd_rs1`.
     CLui(CIBNZTypeArgs),
     /// `C.ADDI` - Adds the non-zero sign-extended 6-bit `imm`
     /// to the value in `rd_rs1` then writes the result to `rd_rs1`.

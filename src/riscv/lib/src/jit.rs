@@ -337,10 +337,7 @@ mod tests {
 
         // Arrange
         let scenarios: &[&[I]] = &[
-            &[
-                I::new_li(x1, 1, Compressed),
-                I::new_mv(x2, x1, Compressed),
-            ],
+            &[I::new_li(x1, 1, Compressed), I::new_mv(x2, x1, Compressed)],
             &[
                 I::new_li(x1, 1, Uncompressed),
                 I::new_mv(x2, x1, Uncompressed),

@@ -12,7 +12,7 @@ use crate::{
         MachineCoreState, ProgramCounterUpdate,
         hart_state::HartState,
         main_memory::{Address, MainMemoryLayout},
-        registers::{NonZeroXRegister, XRegister, XRegisters, sp},
+        registers::{NonZeroXRegister, XRegister, sp},
     },
     parser::instruction::InstrWidth,
     state_backend as backend,
@@ -115,20 +115,6 @@ where
     }
 }
 
-impl<M> XRegisters<M>
-where
-    M: backend::ManagerReadWrite,
-{
-    /// `C.LUI` CI-type compressed instruction
-    ///
-    /// Loads the non-zero 6-bit immediate into bits 17–12 of the
-    /// register `rd_rs1`, clears the bottom 12 bits, and sign-extends bit 17
-    /// into all higher bits of `rd_rs1`.
-    pub fn run_clui(&mut self, imm: i64, rd_rs1: NonZeroXRegister) {
-        self.write_nz(rd_rs1, imm as u64)
-    }
-}
-
 impl<ML, M> MachineCoreState<ML, M>
 where
     ML: MainMemoryLayout,
@@ -195,7 +181,6 @@ mod tests {
             hart_state::{HartState, HartStateLayout},
             main_memory::tests::T1K,
             registers::{
-                XRegisters, XRegistersLayout,
                 nz::{self, a0},
                 t1,
             },
@@ -261,23 +246,6 @@ mod tests {
             assert_eq!(state.pc.read(), init_pc);
             assert_eq!(new_pc, res_pc);
         }
-    });
-
-    backend_test!(test_run_clui, F, {
-        proptest!(|(imm in any::<i64>())| {
-            let mut xregs = create_state!(XRegisters, F);
-            xregs.write_nz(nz::a2, 0);
-            xregs.write_nz(nz::a4, 0);
-
-            // U-type immediate sets imm[31:20]
-            let imm = imm & 0xFFFF_F000;
-            xregs.run_clui(imm, nz::a3);
-            // read value is the expected one
-            prop_assert_eq!(xregs.read_nz(nz::a3), imm as u64);
-            // it doesn't modify other registers
-            prop_assert_eq!(xregs.read_nz(nz::a2), 0);
-            prop_assert_eq!(xregs.read_nz(nz::a4), 0);
-        });
     });
 
     macro_rules! test_shift_instr {
