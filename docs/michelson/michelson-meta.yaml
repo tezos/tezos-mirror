@@ -709,7 +709,7 @@ instructions:
 
       The ``CONTRACT ty`` instruction has a variant ``CONTRACT %entrypoint ty``.
       It allows the specification of a specific
-      `entrypoint <http://tezos.gitlab.io/whitedoc/michelson.html#entrypoints>`_.
+      `entrypoint <http://octez.tezos.com/docs/active/michelson.html#entrypoints>`_.
       In addition to the requirements above, this variant is only
       well-typed if the address is a contract with an entrypoint named
       ``%entrypoint``. This works as follows:
@@ -1141,7 +1141,7 @@ instructions:
     documentation_short: Create an implicit account
     documentation: |
       Push on the stack the contract value corresponding to the
-      `implicit account <http://tezos.gitlab.io/user/glossary.html#implicit-account>`_
+      `implicit account <http://octez.tezos.com/docs/active/glossary.html#user-account>`_
       of a public key hash. These contracts always have type ``unit``.
 
   ITER:
@@ -1403,7 +1403,7 @@ instructions:
       the ``SELF`` instruction has a variant ``SELF %entrypoint``,
       that is only well-typed if the current contract has an entrypoint named ``%entrypoint``.
       It returns the ``contract ty1`` corresponding to a specific
-      `entrypoint <http://tezos.gitlab.io/whitedoc/michelson.html#entrypoints>`_
+      `entrypoint <http://octez.tezos.com/docs/active/michelson.html#entrypoints>`_
       of the current contract, where ``ty1`` is the type of the ``%entrypoint``.
       Unlike for ``CONTRACT``, ``SELF %default`` is allowed and is
       strictly equal to ``SELF``.
@@ -1785,7 +1785,7 @@ instructions:
       Lastly the instruction pushes the updated state and balance as an ``option``
       on the stack.
 
-      Please see the `Sapling integration <https://tezos.gitlab.io/008/sapling.html>`_
+      Please see the `Sapling integration <https://octez.tezos.com/docs/active/sapling.html>`_
       page for a more comprehensive description of the Sapling protocol.
 
   SAPLING_EMPTY_STATE:
@@ -1796,7 +1796,7 @@ instructions:
       ``SAPLING_EMPTY_STATE ms`` pushes the empty Sapling state (i.e. no one can spend tokens from it)
       with memo size ``ms``.
 
-      Please see the `Sapling integration <https://tezos.gitlab.io/008/sapling.html>`_
+      Please see the `Sapling integration <https://octez.tezos.com/docs/active/sapling.html>`_
       page for a more comprehensive description of the Sapling protocol.
 
   TICKET:
@@ -2382,7 +2382,7 @@ types:
       ``sapling_transaction_deprecated ms`` is the type of Sapling
       transactions of memo-size ``ms``.
 
-      Please see the `Sapling integration <https://tezos.gitlab.io/008/sapling.html>`_
+      Please see the `Sapling integration <https://octez.tezos.com/docs/active/sapling.html>`_
       page for a more comprehensive description of the Sapling protocol.
     insertions:
       - 'sapling_transaction_deprecated 8'
@@ -2401,7 +2401,7 @@ types:
       ``sapling_state ms`` is the type of Sapling
       states of memo-size ``ms``.
 
-      Please see the `Sapling integration <https://tezos.gitlab.io/008/sapling.html>`_
+      Please see the `Sapling integration <https://octez.tezos.com/docs/active/sapling.html>`_
       page for a more comprehensive description of the Sapling protocol.
     examples:
       - ['{}', 'sapling_state 8']
