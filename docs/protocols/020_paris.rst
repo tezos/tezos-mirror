@@ -38,8 +38,8 @@ Data Availability Layer
   network. Do note that this operation itself does not contain the data
   themselves. Instead, it contains the slot index, the commitment over the data,
   and a proof regarding the size for those data. The data must be sent using the
-  DAL node. For more information on how it works, please read the `DAL
-  documentation <https://tezos.gitlab.io/shell/dal.html>`_.
+  DAL node. For more information on how it works, please read the :doc:`DAL
+  documentation <../shell/dal>`.
 
 - Optimize the DAL commitment publication operation by memoizing the
   cryptobox. (MR :gl:`!11594`)
@@ -50,8 +50,7 @@ Data Availability Layer
   enables kernel to read the DAL parameters. This should ease the
   writing of smart rollups kernels to make them generic over the
   values of those parameters. For more information on how it works,
-  please read the `DAL smart rollup integration
-  <https://tezos.gitlab.io/alpha/dal_support.html#smart-rollups-integration>`_.
+  please read :ref:`dal_rollups_integration`.
 
 
 Adaptive Issuance
@@ -117,8 +116,8 @@ Breaking Changes
 - A new ``dal_attestation`` field has been added to the
   ``block_metadata`` indicating the attested slots. The slots being
   attested are the slots that were published ``attestation_lag`` levels
-  ago (MRs :gl:`!11903`, :gl:`!12063`) (see `DAL documentation
-  <https://tezos.gitlab.io/shell/dal.html>`_ for more context).
+  ago (MRs :gl:`!11903`, :gl:`!12063`) (see :doc:`DAL documentation
+  <../shell/dal>` for more context).
 
 -  The protocol no longer relies on stake snapshots to compute rights. Instead:
 

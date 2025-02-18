@@ -437,7 +437,7 @@ Where:
 
 
 The `RPC endpoint
-<https://tezos.gitlab.io/active/rpc.html#get-block-id-context-issuance-expected-issuance>`__,
+<https://octez.tezos.com/docs/active/rpc.html#get-block-id-context-issuance-expected-issuance>`__,
 ``/issuance/expected_issuance`` reports the precomputed values of all
 participation rewards for the provided block and the next
 ``consensus_rights_delay`` cycles.

@@ -2094,11 +2094,11 @@
       "locked": false,
       "fontSize": 28,
       "fontFamily": 3,
-      "text": "Images used in https://tezos.gitlab.io/developer/rpc.html",
+      "text": "Images used in https://octez.tezos.com/docsab.io/developer/rpc.html",
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "Images used in https://tezos.gitlab.io/developer/rpc.html",
+      "originalText": "Images used in https://octez.tezos.com/docsab.io/developer/rpc.html",
       "autoResize": true,
       "lineHeight": 1.2
     },
