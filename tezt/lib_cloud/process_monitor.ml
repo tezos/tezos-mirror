@@ -13,16 +13,15 @@ type t = {
 
 let executable = "prometheus-process-exporter"
 
+let init ~listening_port =
+  {listening_port; monitored_processes = []; checked_in_path = false}
+
 let encoding =
   let open Data_encoding in
   conv
-    (fun {listening_port; monitored_processes = _; _} -> listening_port)
-    (fun listening_port ->
-      {listening_port; monitored_processes = []; checked_in_path = false})
+    (fun {listening_port; _} -> listening_port)
+    (fun listening_port -> init ~listening_port)
     (obj1 (req "listening_port" int31))
-
-let init ~listening_port =
-  {listening_port; monitored_processes = []; checked_in_path = false}
 
 let add_binary t ~group ~name =
   if List.mem (group, name) t.monitored_processes then false
