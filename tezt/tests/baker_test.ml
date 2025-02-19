@@ -61,16 +61,17 @@ let check_node_version_check_bypass_test =
     ~title:"baker node version check bypass test"
     ~tags:[team; "node"; "baker"]
     ~supports:Protocol.(From_protocol 021)
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol `Client ~protocol () in
   let baker =
-    Baker.create ~protocol ~node_version_check_bypass:true node client
+    Agnostic_baker.create ~node_version_check_bypass:true node client
   in
   let check_bypassed_event_promise =
-    Baker.wait_for baker "node_version_check_bypass.v0" (fun _ -> Some ())
+    Agnostic_baker.wait_for baker "node_version_check_bypass.v0" (fun _ ->
+        Some ())
   in
-  let* () = Baker.run baker in
+  let* () = Agnostic_baker.run baker in
   let* () = check_bypassed_event_promise in
   unit
 
@@ -80,12 +81,11 @@ let check_node_version_allowed_test =
     ~title:"baker node version allowed test"
     ~tags:[team; "node"; "baker"]
     ~supports:Protocol.(From_protocol 022)
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol `Client ~protocol () in
   let* _baker =
-    Baker.init
-      ~protocol
+    Agnostic_baker.init
       ~node_version_allowed:"octez-v7894.789:1a991a03"
       node
       client
@@ -98,11 +98,11 @@ let check_node_version_no_commit_allowed_test =
     ~title:"baker node version no commit allowed test"
     ~tags:[team; "node"; "baker"]
     ~supports:Protocol.(From_protocol 022)
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol `Client ~protocol () in
   let* _baker =
-    Baker.init ~protocol ~node_version_allowed:"octez-v7894.789" node client
+    Agnostic_baker.init ~node_version_allowed:"octez-v7894.789" node client
   in
   unit
 
@@ -111,7 +111,7 @@ let baker_reward_test =
     ~__FILE__
     ~title:"Baker rewards"
     ~tags:[team; "baker"; "rewards"]
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
     (fun protocol ->
       let* parameter_file =
         Protocol.write_parameter_file
@@ -127,9 +127,9 @@ let baker_reward_test =
           ()
       in
       let level_2_promise = Node.wait_for_level node 2 in
-      let* baker = Baker.init ~protocol node client in
+      let* baker = Agnostic_baker.init node client in
       Log.info "Wait for new head." ;
-      Baker.log_events baker ;
+      Agnostic_baker.log_events baker ;
       let* _ = level_2_promise in
       let* _ =
         Client.RPC.call ~hooks client @@ RPC.get_chain_block_metadata ()
@@ -154,9 +154,9 @@ let baker_test protocol ~keys =
   in
   let level_2_promise = Node.wait_for_level node 2 in
   let level_3_promise = Node.wait_for_level node 3 in
-  let* baker = Baker.init ~protocol node client in
+  let* baker = Agnostic_baker.init node client in
   Log.info "Wait for new head." ;
-  Baker.log_events baker ;
+  Agnostic_baker.log_events baker ;
   let* _ = level_2_promise in
   Log.info "New head arrive level 2" ;
   let* _ = level_3_promise in
@@ -168,7 +168,7 @@ let baker_simple_test =
     ~__FILE__
     ~title:"baker test"
     ~tags:[team; "node"; "baker"]
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   let* _ =
     baker_test protocol ~keys:(Account.Bootstrap.keys |> Array.to_list)
@@ -180,12 +180,12 @@ let baker_stresstest =
     ~__FILE__
     ~title:"baker stresstest"
     ~tags:[team; "node"; "baker"; "stresstest"]
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   let* node, client =
     Client.init_with_protocol `Client ~protocol () ~timestamp:Now
   in
-  let* _ = Baker.init ~protocol node client in
+  let* _ = Agnostic_baker.init node client in
   let* _ = Node.wait_for_level node 3 in
   (* Use a large tps, to have failing operations too *)
   let* () = Client.stresstest ~tps:25 ~transfers:100 client in
@@ -197,12 +197,12 @@ let baker_stresstest_apply =
     ~__FILE__
     ~title:"baker stresstest with forced application"
     ~tags:[team; "node"; "baker"; "stresstest"; "apply"]
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   let* node, client =
     Client.init_with_protocol `Client ~protocol () ~timestamp:Now
   in
-  let* _ = Baker.init ~force_apply_from_round:0 ~protocol node client in
+  let* _ = Agnostic_baker.init ~force_apply_from_round:0 node client in
   let* _ = Node.wait_for_level node 3 in
   (* Use a large tps, to have failing operations too *)
   let* () = Client.stresstest ~tps:25 ~transfers:100 client in
@@ -288,12 +288,12 @@ let baker_remote_test =
     ~__FILE__
     ~title:"Baker in RPC-only mode"
     ~tags:[team; "baker"; "remote"]
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   let* node, client =
     Client.init_with_protocol `Client ~protocol () ~timestamp:Now
   in
-  let* _ = Baker.init ~remote_mode:true ~protocol node client in
+  let* _ = Agnostic_baker.init ~remote_mode:true node client in
   let* _ = Node.wait_for_level node 3 in
   unit
 
@@ -302,7 +302,7 @@ let baker_check_consensus_branch =
     ~__FILE__
     ~title:"Baker check branch in consensus operations"
     ~tags:[team; "baker"; "grandparent"; "parent"]
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   Log.info "Init client and node with protocol %s" (Protocol.name protocol) ;
   let* node, client =
@@ -311,9 +311,9 @@ let baker_check_consensus_branch =
 
   let target_level = 5 in
   Log.info "Start a baker and bake until level %d" target_level ;
-  let* baker = Baker.init ~protocol node client in
+  let* baker = Agnostic_baker.init node client in
   let* _ = Node.wait_for_level node target_level in
-  let* () = Baker.kill baker in
+  let* () = Agnostic_baker.kill baker in
 
   Log.info "Retrieve mempool" ;
   let* mempool =
@@ -350,7 +350,7 @@ let force_apply_from_round =
     ~title:"Baker check force apply from round"
     ~tags:[team; "baker"; "force_apply_from_round"]
     ~supports:Protocol.(From_protocol 021)
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   log_step 1 "initialize a node and a client with protocol" ;
   let* node, client =
@@ -389,8 +389,7 @@ let force_apply_from_round =
     delegate
     force_apply_from_round ;
   let* baker =
-    Baker.init
-      ~protocol
+    Agnostic_baker.init
       ~force_apply_from_round
       ~delegates:[delegate]
       node
@@ -398,7 +397,7 @@ let force_apply_from_round =
   in
 
   (* fail if a block is applied at a round < [force_apply_from_round] *)
-  Baker.on_event baker (fun Baker.{name; value; _} ->
+  Agnostic_baker.on_event baker (fun Agnostic_baker.{name; value; _} ->
       if name = "forging_block.v0" then
         let round = JSON.(value |-> "round" |> as_int) in
         let level = JSON.(value |-> "level" |> as_int) in
@@ -412,7 +411,7 @@ let force_apply_from_round =
   (* a promise that resolves on event forging_block when
      (force_apply = true && round = [round] && level = [level]) *)
   let forced_application_promise =
-    Baker.wait_for baker "forging_block.v0" (fun json ->
+    Agnostic_baker.wait_for baker "forging_block.v0" (fun json ->
         let round' = JSON.(json |-> "round" |> as_int) in
         let level' = JSON.(json |-> "level" |> as_int) in
         let force_apply = JSON.(json |-> "force_apply" |> as_bool) in
