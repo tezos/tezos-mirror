@@ -104,7 +104,7 @@ module Mutable_state = struct
     Lwt.return (Api.octez_riscv_mut_set_input state input)
 
   let get_reveal_request state =
-    Lwt.return (Api.octez_riscv_mut_get_reveal_request state)
+    Lwt.return (String.of_bytes @@ Api.octez_riscv_mut_get_reveal_request state)
 end
 
 let compute_step_many ?reveal_builtins:_ ?write_debug ?stop_at_snapshot:_
@@ -178,4 +178,4 @@ let deserialise_output_proof bytes =
   Api.octez_riscv_deserialise_output_proof bytes
 
 let get_reveal_request state =
-  Lwt.return (Api.octez_riscv_get_reveal_request state)
+  Lwt.return (String.of_bytes @@ Api.octez_riscv_get_reveal_request state)

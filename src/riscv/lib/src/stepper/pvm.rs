@@ -185,22 +185,6 @@ impl<'hooks, MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerRead
                 }
             },
 
-            PvmStatus::WaitingForMetadata => {
-                let success = self
-                    .pvm
-                    .provide_metadata(&self.rollup_address, self.origination_level);
-
-                if success {
-                    StepperStatus::Running { steps: 1 }
-                } else {
-                    StepperStatus::Errored {
-                        steps: 0,
-                        cause: "PVM was waiting for metadata".to_owned(),
-                        message: "Providing metadata did not succeed".to_owned(),
-                    }
-                }
-            }
-
             PvmStatus::WaitingForReveal => {
                 let reveal_request = self.pvm.reveal_request();
 

@@ -14,8 +14,7 @@ use tezos_smart_rollup_constants::{
         REVEAL_DATA_MAX_SIZE, REVEAL_REQUEST_MAX_SIZE, SBI_CONSOLE_PUTCHAR, SBI_DBCN,
         SBI_DBCN_CONSOLE_WRITE_BYTE, SBI_FIRMWARE_TEZOS, SBI_SHUTDOWN, SBI_SRST,
         SBI_SRST_SYSTEM_RESET, SBI_TEZOS_BLAKE2B_HASH256, SBI_TEZOS_ED25519_SIGN,
-        SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_METADATA_REVEAL,
-        SBI_TEZOS_REVEAL, SbiError,
+        SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_REVEAL, SbiError,
     },
 };
 
@@ -177,50 +176,6 @@ where
     true
 }
 
-/// Provide metadata in response to a metadata request. Returns `false`
-/// if the machine is not expecting metadata.
-pub fn provide_metadata<S, MC, CL, B, M>(
-    status: &mut S,
-    machine: &mut MachineState<MC, CL, B, M>,
-    rollup_address: &[u8; 20],
-    origination_level: u32,
-) -> bool
-where
-    S: CellReadWrite<Value = PvmStatus>,
-    CL: CacheLayouts,
-    MC: MemoryConfig,
-    B: Block<MC, M>,
-    M: ManagerReadWrite,
-{
-    // This method should only do something when we're waiting for metadata.
-    match status.read() {
-        PvmStatus::WaitingForMetadata => {}
-        _ => return false,
-    }
-
-    // We're evaluating again after this.
-    status.write(PvmStatus::Evaluating);
-
-    sbi_wrap(machine, |machine| {
-        // These arguments should have been set by the previous SBI call.
-        let arg_buffer_addr = machine.core.hart.xregisters.read(a0);
-
-        // The argument address is a virtual address. We need to translate it to
-        // a physical address.
-        let phys_dest_addr = machine.core.translate(arg_buffer_addr, AccessType::Store)?;
-
-        machine
-            .core
-            .main_memory
-            .write_all(phys_dest_addr, rollup_address.as_slice())?;
-
-        // [origination_level] should not wrap around and become negative.
-        Ok(origination_level as u64)
-    });
-
-    true
-}
-
 /// Provide reveal data in response to a reveal request. Returns `false`
 /// if the machine is not expecting reveal.
 pub fn provide_reveal_response<S, MC, CL, B, M>(
@@ -277,16 +232,6 @@ where
 {
     // Prepare the EE state for an input tick.
     status.write(PvmStatus::WaitingForInput);
-}
-
-/// Handle a [SBI_TEZOS_METADATA_REVEAL] call.
-#[inline]
-fn handle_tezos_metadata_reveal<S>(status: &mut S)
-where
-    S: CellWrite<Value = PvmStatus>,
-{
-    // Prepare the EE state for a reveal metadata tick.
-    status.write(PvmStatus::WaitingForMetadata);
 }
 
 /// Produce a Ed25519 signature.
@@ -562,7 +507,6 @@ where
             let sbi_function = machine.core.hart.xregisters.read(a6);
             match sbi_function {
                 SBI_TEZOS_INBOX_NEXT => handle_tezos_inbox_next(status),
-                SBI_TEZOS_METADATA_REVEAL => handle_tezos_metadata_reveal(status),
                 SBI_TEZOS_ED25519_SIGN => sbi_wrap(machine, handle_tezos_ed25519_sign),
                 SBI_TEZOS_ED25519_VERIFY => sbi_wrap(machine, handle_tezos_ed25519_verify),
                 SBI_TEZOS_BLAKE2B_HASH256 => sbi_wrap(machine, handle_tezos_blake2b_hash256),

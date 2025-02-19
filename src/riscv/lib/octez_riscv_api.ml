@@ -8,7 +8,7 @@ type repo
 type state
 type mut_state
 type id
-type status = Evaluating | WaitingForInput | WaitingForMetadata | WaitingForReveal
+type status = Evaluating | WaitingForInput | WaitingForReveal
 type reveal_data = RawData of string | Metadata of bytes * int32
 type input = InboxMessage of int32 * int64 * string | Reveal of reveal_data
 type input_request

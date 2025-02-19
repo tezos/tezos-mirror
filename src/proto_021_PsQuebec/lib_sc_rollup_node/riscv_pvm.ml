@@ -73,7 +73,6 @@ module PVM :
             return
               (Sc_rollup.First_after
                  (Raw_level.of_int32_exn level, Z.of_int64 message_counter)))
-    | WaitingForMetadata -> return Sc_rollup.(Needs_reveal Reveal_metadata)
     | WaitingForReveal ->
         (* TODO: RV-407: Rollup node handles reveal request from riscv pvm *)
         assert false

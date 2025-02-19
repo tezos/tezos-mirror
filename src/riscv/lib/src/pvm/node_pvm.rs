@@ -298,22 +298,6 @@ impl<M: state_backend::ManagerBase> NodePvm<M> {
         })
     }
 
-    pub fn set_metadata(&mut self, rollup_address: &[u8; 20], origination_level: u32)
-    where
-        M: state_backend::ManagerReadWrite,
-    {
-        self.with_backend_mut(|state| {
-            assert!(
-                state
-                    .pvm
-                    .provide_metadata(rollup_address, origination_level),
-                "Cannot accept metadata in current state ({})",
-                state.pvm.status()
-            );
-            state.tick.write(state.tick.read() + 1);
-        })
-    }
-
     /// Set reveal data reponse to pvm state
     pub fn set_reveal_response(&mut self, reveal_data: &[u8])
     where

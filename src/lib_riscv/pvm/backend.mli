@@ -62,7 +62,7 @@ module Mutable_state : sig
 
   val set_input : t -> input -> unit Lwt.t
 
-  val get_reveal_request : t -> bytes Lwt.t
+  val get_reveal_request : t -> string Lwt.t
 end
 
 val compute_step_many :
@@ -115,4 +115,4 @@ val serialise_output_proof : output_proof -> bytes
 
 val deserialise_output_proof : bytes -> (output_proof, string) result
 
-val get_reveal_request : state -> bytes Lwt.t
+val get_reveal_request : state -> string Lwt.t

@@ -1,5 +1,5 @@
 
-./octez-client --wait none originate smart rollup rollup from bootstrap1 of kind riscv of type bytes with kernel kernel:src/riscv/assets/riscv-dummy.elf:75ba32c0c1f4a02b181f3429650919ec109cfa2e1622cbaf586640b3fed543f7 --burn-cap 9999999
+./octez-client --wait none originate smart rollup rollup from bootstrap1 of kind riscv of type bytes with kernel kernel:src/riscv/assets/riscv-dummy.elf:4ed99089593dbd419afb6e1cc9be283d7833f3feea9d4e110a1d75355102d5a6 --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 1933.839 units (will add 100 for safety)
 Estimated storage: 6552 bytes added (will add 20 for safety)
@@ -22,7 +22,7 @@ This sequence of operations was run:
     Smart rollup origination:
       Kind: riscv
       Parameter type: bytes
-      Kernel Blake2B hash: '38643eb033dfcc8598d7959d35dcabb811ceb05c07e426d3e914f4cc77a8f07b'
+      Kernel Blake2B hash: '341e8cb4da5792f4b15ecb728ce4ed33a870d6156d0cced1fec71569267be1d9'
       This smart rollup origination was successfully applied
       Consumed gas: 1933.806
       Storage size: 6552 bytes
@@ -73,26 +73,26 @@ Hello World
 I am [SMART_ROLLUP_HASH]
 RollupMetadata {
     raw_rollup_address: [
-        229,
-        76,
-        84,
-        7,
-        95,
-        137,
-        54,
-        133,
-        253,
-        114,
-        167,
-        75,
-        67,
-        174,
+        89,
+        82,
+        234,
         45,
-        71,
-        226,
-        100,
-        66,
-        116,
+        10,
+        37,
+        81,
+        234,
+        172,
+        152,
+        238,
+        39,
+        163,
+        198,
+        215,
+        41,
+        193,
+        91,
+        164,
+        10,
     ],
     origination_level: 2,
 }
@@ -130,7 +130,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"966091"
+"977942"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -138,7 +138,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"966091"
+"977942"
 
 
 ./octez-client --wait none send smart rollup message '["2 8 + value"]' from bootstrap2
@@ -197,7 +197,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"998515"
+"1009107"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -205,7 +205,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"998515"
+"1009107"
 
 
 ./octez-client --wait none send smart rollup message '["3 10 + value"]' from bootstrap2
@@ -265,7 +265,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1032072"
+"1041366"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -273,7 +273,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1032072"
+"1041366"
 
 
 ./octez-client --wait none send smart rollup message '["4 12 + value"]' from bootstrap2
@@ -333,7 +333,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1065629"
+"1073625"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -341,7 +341,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1065629"
+"1073625"
 
 
 ./octez-client --wait none send smart rollup message '["5 14 + value"]' from bootstrap2
@@ -401,7 +401,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1099186"
+"1105884"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -409,7 +409,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1099186"
+"1105884"
 
 
 ./octez-client --wait none send smart rollup message '["6 16 + value"]' from bootstrap2
@@ -469,7 +469,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1132743"
+"1138143"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -477,7 +477,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1132743"
+"1138143"
 
 
 ./octez-client --wait none send smart rollup message '["7 18 + value"]' from bootstrap2
@@ -537,7 +537,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1166300"
+"1170402"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -545,7 +545,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1166300"
+"1170402"
 
 
 ./octez-client --wait none send smart rollup message '["8 20 + value"]' from bootstrap2
@@ -605,7 +605,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1199857"
+"1202661"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -613,7 +613,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1199857"
+"1202661"
 
 
 ./octez-client --wait none send smart rollup message '["9 22 + value"]' from bootstrap2
@@ -673,7 +673,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1233414"
+"1234920"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -681,7 +681,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1233414"
+"1234920"
 
 
 ./octez-client --wait none send smart rollup message '["10 24 + value"]' from bootstrap2
@@ -742,5 +742,5 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1268104"
+"1268273"
 

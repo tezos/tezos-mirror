@@ -1,7 +1,7 @@
 [src/arch/riscv64/kernel/core_local.rs:38] CPU_ONLINE.load(Ordering::Relaxed) = 0
 [0][INFO] Welcome to Hermit 0.6.7
 [0][INFO] Kernel starts at 1200000
-[0][INFO] BSS starts at 0x1a98d18
+[0][INFO] BSS starts at 0x1a985d8
 [0][INFO] tls_info = Some(
     TlsInfo {
         start: 0x1a1fff8,
