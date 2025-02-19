@@ -409,6 +409,14 @@ module Q = struct
            FROM l1_l2_finalized_levels
            ORDER BY l1_level DESC LIMIT 1|}
 
+    let find_l1_level =
+      (level ->? l1_level)
+      @@ {|SELECT l1_level
+           FROM l1_l2_finalized_levels
+           WHERE $1 > start_l2_level
+             AND $1 <= end_l2_level
+           ORDER BY l1_level DESC LIMIT 1|}
+
     let list_by_l2_levels =
       (t2 level level ->* t2 l1_level finalized_levels)
       @@ {|SELECT l1_level, start_l2_level, end_l2_level
@@ -900,13 +908,6 @@ module L1_l2_levels_relationships = struct
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.L1_l2_levels_relationships.get ()
 
-  let list_from store ~finalized_l2_level =
-    with_connection store @@ fun conn ->
-    Db.collect_list
-      conn
-      Q.L1_l2_levels_relationships.list_until
-      finalized_l2_level
-
   let clear_after store l2_level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.L1_l2_levels_relationships.clear_after l2_level
@@ -936,6 +937,10 @@ module L1_l2_finalized_levels = struct
   let last store =
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.L1_l2_finalized_levels.last ()
+
+  let find_l1_level store ~l2_level =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.L1_l2_finalized_levels.find_l1_level l2_level
 
   let list_by_l2_levels store ~start_l2_level ~end_l2_level =
     with_connection store @@ fun conn ->

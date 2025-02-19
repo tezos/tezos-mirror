@@ -261,6 +261,11 @@ module L1_l2_finalized_levels : sig
       store. *)
   val last : conn -> (int32 * t) option tzresult Lwt.t
 
+  (** [find_l1_level conn ~l2_level] returns the L1 level in which the L2 level
+      [l2_level] was finalized. *)
+  val find_l1_level :
+    conn -> l2_level:Ethereum_types.quantity -> int32 option tzresult Lwt.t
+
   (** [list_by_l2_levels conn ~start_l2_level ~end_l2_level] returns all
       finalized L1-L2 level relationships where the end L2 level is between
       [start_l2_level] and [end_l2_level]. Requests are paginated by 10000

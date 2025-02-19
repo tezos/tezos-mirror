@@ -353,6 +353,10 @@ struct
           ~start_l1_level:from_l1_level
           ~end_l1_level
 
+  let l2_levels_of_l1_level l1_level =
+    Evm_store.use Ctxt.ctxt.store @@ fun conn ->
+    Evm_store.L1_l2_finalized_levels.find conn ~l1_level
+
   let block_param_to_block_number
       (block_param : Ethereum_types.Block_parameter.extended) =
     let open Lwt_result_syntax in

@@ -914,6 +914,40 @@ module Trace_block = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+type l1_block_l2_levels = {
+  start_l2_level : Ethereum_types.quantity;
+  end_l2_level : Ethereum_types.quantity;
+}
+
+module Get_finalized_blocks_of_l1_level = struct
+  type input = int32
+
+  type output = l1_block_l2_levels
+
+  let input_encoding = Data_encoding.int32
+
+  let output_encoding =
+    let open Data_encoding in
+    conv
+      (fun {start_l2_level; end_l2_level} -> (start_l2_level, end_l2_level))
+      (fun (start_l2_level, end_l2_level) -> {start_l2_level; end_l2_level})
+    @@ obj2
+         (req
+            "startBlockNumber"
+            ~description:
+              "Level of finalized L2 block before application of the L1 block"
+            Ethereum_types.quantity_encoding)
+         (req
+            "endBlockkNumber"
+            ~description:
+              "Level of finalized L2 block after application of the L1 block"
+            Ethereum_types.quantity_encoding)
+
+  let method_ = "tez_getFinalizedBlocksOfL1Level"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Eth_fee_history = struct
   open Ethereum_types
 
@@ -1037,6 +1071,7 @@ let evm_supported_methods : (module METHOD) list =
     (module Subscribe);
     (module Unsubscribe);
     (module Trace_block);
+    (module Get_finalized_blocks_of_l1_level);
   ]
 
 let evm_unsupported_methods : string list =

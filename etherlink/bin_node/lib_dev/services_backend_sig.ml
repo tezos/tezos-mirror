@@ -108,6 +108,9 @@ module type S = sig
     from_l1_level:int32 ->
     (int32 * Evm_store.L1_l2_finalized_levels.t) list tzresult Lwt.t
 
+  val l2_levels_of_l1_level :
+    int32 -> Evm_store.L1_l2_finalized_levels.t option tzresult Lwt.t
+
   include Tracer_sig.S
 end
 
@@ -133,6 +136,9 @@ module type Backend = sig
   val list_l1_l2_levels :
     from_l1_level:int32 ->
     (int32 * Evm_store.L1_l2_finalized_levels.t) list tzresult Lwt.t
+
+  val l2_levels_of_l1_level :
+    int32 -> Evm_store.L1_l2_finalized_levels.t option tzresult Lwt.t
 end
 
 module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
@@ -158,4 +164,6 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
   let smart_rollup_address = Backend.smart_rollup_address
 
   let list_l1_l2_levels = Backend.list_l1_l2_levels
+
+  let l2_levels_of_l1_level = Backend.l2_levels_of_l1_level
 end

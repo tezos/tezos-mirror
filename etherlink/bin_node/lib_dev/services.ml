@@ -886,6 +886,19 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
             in
 
             build_with_input ~f module_ parameters
+        | Get_finalized_blocks_of_l1_level.Method ->
+            let f l1_level =
+              let open Lwt_result_syntax in
+              let* l2_levels = Backend_rpc.l2_levels_of_l1_level l1_level in
+              match l2_levels with
+              | Some {start_l2_level; end_l2_level} ->
+                  rpc_ok Rpc_encodings.{start_l2_level; end_l2_level}
+              | None ->
+                  rpc_error
+                    (Rpc_errors.resource_not_found
+                       (Format.sprintf "Unknown L1 block %ld" l1_level))
+            in
+            build_with_input ~f module_ parameters
         | _ ->
             Stdlib.failwith "The pattern matching of methods is not exhaustive")
   in
