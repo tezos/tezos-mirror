@@ -90,6 +90,8 @@ let default_limits ?(time_in_mesh_weight = 1.0)
     retain_duration = Milliseconds.Span.of_int_s 10;
     fanout_ttl = Milliseconds.Span.of_int_s 60;
     heartbeat_interval = Milliseconds.Span.of_int_s 1;
+    heartbeat_ping_interval = 45 / 1;
+    (* 45 / heartbeat_interval *)
     backoff_cleanup_ticks = 15;
     score_cleanup_ticks = 1;
     degree_low = 5;
