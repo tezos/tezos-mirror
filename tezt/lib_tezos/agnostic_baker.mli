@@ -88,12 +88,11 @@ val protocol_status : Protocol.t -> protocol_status
     agnostic baker. This defaults to the empty list, which is a shortcut for "every known
     account".
 
-    [liquidity_baking_toggle_vote] is passed to the agnostic baker
-    daemon through the flags [--liquidity-baking-toggle-vote]. If
-    [--liquidity-baking-toggle-vote] is [None], then
-    [--liquidity-baking-toggle-vote] is not passed. If it is [Some x]
-    then [--liquidity-baking-toggle-vote x] is passed. The default
-    value is [Some Pass].
+    [operations_pool], [state_recorder] and [liquidity_baking_toggle_vote]
+    are passed to the baker daemon through the flags [--operations-pool], [--record-state]
+    and [--liquidity-baking-toggle-vote]. If [--liquidity-baking-toggle-vote]
+    is [None], then [--liquidity-baking-toggle-vote] is not passed. If it is [Some x] then
+    [--liquidity-baking-toggle-vote x] is passed. The default value is [Some Pass].
 
     [use_dal_node] is passed to the agnostic baker daemon through the
     [--without-dal] or [--dal-node <uri>] flags. If the flag is [None], the
@@ -110,6 +109,8 @@ val create :
   ?event_pipe:string ->
   ?delegates:string list ->
   ?remote_mode:bool ->
+  ?operations_pool:string ->
+  ?state_recorder:bool ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
   ?use_dal_node:string ->
   Node.t ->
@@ -138,6 +139,8 @@ val create_from_uris :
   ?event_pipe:string ->
   ?delegates:string list ->
   ?remote_mode:bool ->
+  ?operations_pool:string ->
+  ?state_recorder:bool ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
   ?use_dal_node:string ->
   base_dir:string ->
@@ -192,6 +195,8 @@ val init :
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?delegates:string list ->
   ?remote_mode:bool ->
+  ?operations_pool:string ->
+  ?state_recorder:bool ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
   ?use_dal_node:string ->
   Node.t ->
