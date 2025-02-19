@@ -7,22 +7,22 @@ The content of a Tezos block is made up of a block header and a payload consisti
 This page first describes the protocol-specific part of the block header, and then explains what operations are.
 For the protocol-independent part of the block header, see :ref:`shell_header`.
 
-.. _proto_block_header_next:
+.. _proto_block_header_r022:
 
 Protocol-specific block header
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:ref:`Recall<shell_proto_interact_next>` that, for the shell to interact with the economic protocol, two notions are defined abstractly at the level of the shell and made concrete at the level of the consensus protocol.
-Namely, these two notions are the protocol-specific header and the :ref:`fitness <fitness_section_next>`.
+:ref:`Recall<shell_proto_interact_r022>` that, for the shell to interact with the economic protocol, two notions are defined abstractly at the level of the shell and made concrete at the level of the consensus protocol.
+Namely, these two notions are the protocol-specific header and the :ref:`fitness <fitness_section_r022>`.
 
 As in Emmy*, the protocol-specific header contains the fields:
 
 - ``signature``: a digital signature of the shell and protocol headers (excluding the signature itself)
-- ``seed_nonce_hash``: a commitment to :ref:`a random number<random_seed_next>`, used to generate entropy on the chain
+- ``seed_nonce_hash``: a commitment to :ref:`a random number<random_seed_r022>`, used to generate entropy on the chain
 - ``proof_of_work_nonce``: a nonce used to pass a low-difficulty proof-of-work for the block, as a spam prevention measure
-- ``liquidity_baking_toggle_vote``: :ref:`a vote<toggle_next>` to continue the Liquidity Baking Subsidy, stop it, or abstain.
+- ``liquidity_baking_toggle_vote``: :ref:`a vote<toggle_r022>` to continue the Liquidity Baking Subsidy, stop it, or abstain.
 
-There are two additional fields: ``payload_hash`` and ``payload_round`` which are needed for establishing if a block is :ref:`final<finality_next>`.
+There are two additional fields: ``payload_hash`` and ``payload_round`` which are needed for establishing if a block is :ref:`final<finality_r022>`.
 
 Operations
 ~~~~~~~~~~
@@ -39,9 +39,9 @@ those available to end-users on Tezos Mainnet. The complete list of
 operations, including those corresponding to features in development
 or available only on test networks, is given in the
 :package-api:`OCaml Documentation
-<tezos-protocol-next/Tezos_raw_protocol_next/Operation_repr/index.html>`.
+<tezos-protocol-022-PsRiotum/Tezos_raw_protocol_022_PsRiotum/Operation_repr/index.html>`.
 
-.. _validation_passes_next:
+.. _validation_passes_r022:
 
 Validation Passes
 ~~~~~~~~~~~~~~~~~
@@ -49,20 +49,20 @@ Validation Passes
 The different kinds of operations are grouped into classes. Each class
 has an associated index, a natural number, also known as a
 :ref:`validation pass<shell_header>`. There are currently four classes
-of operations: :ref:`consensus <consensus_operations_next>`,
-:ref:`voting <voting_operations_next>`,
-:ref:`anonymous<anonymous_operations_next>`, and :ref:`manager
-operations<manager_operations_next>`. This order also specifies the
-:ref:`validation and application<operation_validity_next>` priority
+of operations: :ref:`consensus <consensus_operations_r022>`,
+:ref:`voting <voting_operations_r022>`,
+:ref:`anonymous<anonymous_operations_r022>`, and :ref:`manager
+operations<manager_operations_r022>`. This order also specifies the
+:ref:`validation and application<operation_validity_r022>` priority
 of each of these classes. Consensus operations are considered the
 highest priority ones, and manager operations the lowest.
 
-Each kind of operation belongs to exactly one validation pass, except for the :ref:`failing_noop_next` which belongs to no validation pass and therefore cannot be :ref:`applied<operation_validity_next>`.
+Each kind of operation belongs to exactly one validation pass, except for the :ref:`failing_noop_r022` which belongs to no validation pass and therefore cannot be :ref:`applied<operation_validity_r022>`.
 
 In the sequel, we describe the different classes of operations, and
 the different kinds of operations belonging to each class.
 
-.. _consensus_operations_next:
+.. _consensus_operations_r022:
 
 Consensus Operations
 ~~~~~~~~~~~~~~~~~~~~
@@ -75,14 +75,14 @@ kinds of consensus operations, each belonging to the different voting
 phases required to agree on the next block.
 
 - A ``Preattestation`` operation implements a first vote for a
-  :ref:`candidate block <candidate_block_next>` with the aim of
-  building a :ref:`preattestation quorum <quorum_next>`.
+  :ref:`candidate block <candidate_block_r022>` with the aim of
+  building a :ref:`preattestation quorum <quorum_r022>`.
 
 - An ``Attestation`` operation implements a vote for a candidate block
   for which a preattestation quorum certificate (PQC) has been
   observed.
 
-.. _voting_operations_next:
+.. _voting_operations_r022:
 
 Voting Operations
 ~~~~~~~~~~~~~~~~~
@@ -103,7 +103,7 @@ voting operations:
 Further details on each operation's implementation and semantics are
 provided in the dedicated entry for :doc:`on-chain governance<voting>`.
 
-.. _anonymous_operations_next:
+.. _anonymous_operations_r022:
 
 Anonymous Operations
 ~~~~~~~~~~~~~~~~~~~~
@@ -124,17 +124,17 @@ mechanism<randomness_generation>`:
 
 - The ``Vdf_revelation`` operation allows the submission of a solution
   to, and a proof of correctness of, the :ref:`VDF
-  challenge<vdf_next>` corresponding to the VDF revelation period of
+  challenge<vdf_r022>` corresponding to the VDF revelation period of
   the randomness generation protocol.
 
 Further details on the latter operation's implementation and semantics
 are provided in the :ref:`random seed generation
-protocol<randomness_generation_next>`.
+protocol<randomness_generation_r022>`.
 
 Three operations in this class are used to :ref:`punish participants
-which engage in Byzantine behaviour<slashing_next>` -- notably
-delegates which :ref:`"double sign" <def_double_signing_next>` blocks, or emit
-conflicting :ref:`consensus operations<consensus_operations_next>`:
+which engage in Byzantine behaviour<slashing_r022>` -- notably
+delegates which :ref:`"double sign" <def_double_signing_r022>` blocks, or emit
+conflicting :ref:`consensus operations<consensus_operations_r022>`:
 
 - The ``Double_preattestation_evidence`` operation allows for accusing
   a delegate of having *double-preattested* -- i.e., of having
@@ -151,13 +151,13 @@ conflicting :ref:`consensus operations<consensus_operations_next>`:
   having "double-baked" a block -- i.e., of having signed two
   different blocks at the same level and at same round. The bulk of
   the evidence consists of the :ref:`block
-  headers<block_contents_next>` of each of the two offending blocks.
+  headers<block_contents_r022>` of each of the two offending blocks.
 
-See :ref:`here<slashing_next>` for further detail on the semantics of
+See :ref:`here<slashing_r022>` for further detail on the semantics of
 evidence-providing operations.
 
 The ``Activation`` operation allows users which participated in the
-Tezos fundraiser to make their :ref:`accounts <def_account_next>` operational.
+Tezos fundraiser to make their :ref:`accounts <def_account_r022>` operational.
 
 Finally, the ``Drain_delegate`` operation allows an active
 consensus-key account, i.e., an account to which a baker delegated its
@@ -166,7 +166,7 @@ account. This operation is used as a deterrent to ensure that a
 delegate secures its consensus key as much as its manager (or main)
 key.
 
-.. _manager_operations_next:
+.. _manager_operations_r022:
 
 Manager Operations
 ~~~~~~~~~~~~~~~~~~
@@ -181,26 +181,26 @@ Manager operations enable end-users to interact with the Tezos
 blockchain -- e.g., transferring funds or calling :doc:`smart
 contracts<michelson>`. A manager operation is issued by a single
 *manager* account which signs the operation and pays the
-:ref:`fees<def_fee_next>` to the baker for its inclusion in a block. Indeed,
+:ref:`fees<def_fee_r022>` to the baker for its inclusion in a block. Indeed,
 manager operations are the only fee-paying and
-:ref:`gas-consuming<def_gas_next>` operations.
+:ref:`gas-consuming<def_gas_r022>` operations.
 
 - The ``Reveal`` operation reveals the public key of the sending
   manager. Knowing this public key is indeed necessary to check the signature
   of future operations signed by this manager.
 - The ``Transaction`` operation allows users to transfer tez
-  between accounts, to invoke a smart contract, or to invoke :ref:`pseudo-operations <pseudo_operations_next>` on user accounts.
-- The ``Delegation`` operation allows users to designate a :ref:`delegate<def_delegate_next>` (a
+  between accounts, to invoke a smart contract, or to invoke :ref:`pseudo-operations <pseudo_operations_r022>` on user accounts.
+- The ``Delegation`` operation allows users to designate a :ref:`delegate<def_delegate_r022>` (a
   *baker*) for :ref:`delegating <delegating_coins>` or :ref:`staking <delegating_coins>` their coins, or to register themselves as delegates.
 - The ``Update_consensus_key`` operation allows users to register a
-  :ref:`consensus key<consensus_key_next>`, which is a dedicated key
+  :ref:`consensus key<consensus_key_r022>`, which is a dedicated key
   for signing blocks and consensus-related operations.
 - The ``Origination`` operation is used to
-  :ref:`originate<def_origination_next>`, that is to deploy, smart contracts
+  :ref:`originate<def_origination_r022>`, that is to deploy, smart contracts
   in the Tezos blockchain.
 - The ``Set_deposits_limit`` operation enables delegates to adjust the
   amount of stake a delegate :ref:`has locked in
-  bonds<active_stake_next>`.
+  bonds<active_stake_r022>`.
 - Support for registering global constants is implemented with the
   ``Register_global_constant`` operation.
 - The ``Increase_paid_storage`` operation allows a sender to increase
@@ -255,7 +255,7 @@ handled with dedicated manager operations.
   determine if it is called by a smart rollup using the ``SENDER``
   Michelson instruction.
 
-.. _manager_operations_batches_next:
+.. _manager_operations_batches_r022:
 
 Manager Operation Batches
 """""""""""""""""""""""""
@@ -268,20 +268,20 @@ Batches satisfy the following properties:
 
 - All operations in a batch are issued by the same manager, which
   provides a single signature for the entire batch.
-- A batch is :ref:`applied<manager_operations_application_next>`
+- A batch is :ref:`applied<manager_operations_application_r022>`
   atomically: all its operations are executed sequentially, without
   interleaving other operations. Either all the operations in the
   batch succeed, or none is applied.
 
-.. _failing_noop_next:
+.. _failing_noop_r022:
 
 Failing_noop operation
 ~~~~~~~~~~~~~~~~~~~~~~
 
 The ``Failing_noop`` operation is not executable in the protocol:
 
-- it can only be validated in :ref:`mempool mode <partial_construction_next>`, by the :doc:`prevalidator component <../shell/prevalidation>`;
-- consequently, this operation cannot be :ref:`applied <operation_validity_next>`, and in fact will never be included into a block.
+- it can only be validated in :ref:`mempool mode <partial_construction_r022>`, by the :doc:`prevalidator component <../shell/prevalidation>`;
+- consequently, this operation cannot be :ref:`applied <operation_validity_r022>`, and in fact will never be included into a block.
 
 Rather, the ``Failing_noop`` operation allows
 to sign an arbitrary string, without introducing an operation that could be misinterpreted in the protocol.
