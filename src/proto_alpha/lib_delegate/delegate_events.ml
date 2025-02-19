@@ -65,12 +65,14 @@ module Denunciator = struct
       ~pp2:pp_ignore
       ("bytes", Data_encoding.bytes)
 
-  let double_attestation_ignored =
+  let attestation_conflict_ignored =
     declare_2
       ~section
-      ~level
-      ~name:"double_attestation_ignored"
-      ~msg:"ignoring non-denunciable double attestation"
+      ~level:Debug
+      ~name:"attestation_conflict_ignored"
+      ~msg:
+        "{existing_attestation} is conflicting with {new_attestation} but no \
+         misbehavior was found."
       ("existing_attestation", Operation_hash.encoding)
       ("new_attestation", Operation_hash.encoding)
 
@@ -95,12 +97,14 @@ module Denunciator = struct
       ~pp2:pp_ignore
       ("bytes", Data_encoding.bytes)
 
-  let double_preattestation_ignored =
+  let preattestation_conflict_ignored =
     declare_2
       ~section
-      ~level
-      ~name:"double_preattestation_ignored"
-      ~msg:"ignoring non-denunciable double pre-attestation"
+      ~level:Debug
+      ~name:"preattestation_conflict_ignored"
+      ~msg:
+        "{existing_preattestation} is conflicting with {new_preattestation} \
+         but no misbehavior was found."
       ("existing_preattestation", Operation_hash.encoding)
       ("new_preattestation", Operation_hash.encoding)
 

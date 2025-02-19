@@ -173,7 +173,8 @@ let double_consensus_wrong_slot_feature_flag
     mk_consensus ~slot:(List.nth slots 1) ~level ~round ~block_payload_hash
   in
   let waiter =
-    Accuser.wait_for accuser "double_attestation_ignored.v0" (fun _ -> Some ())
+    Accuser.wait_for accuser "attestation_conflict_ignored.v0" (fun _ ->
+        Some ())
   in
   let* _ =
     Operation.Consensus.inject
