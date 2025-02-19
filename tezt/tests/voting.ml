@@ -891,11 +891,7 @@ let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
         "to_" ^ Protocol.tag to_protocol;
       ]
     ~uses:
-      [
-        Protocol.accuser to_protocol;
-        Protocol.baker from_protocol;
-        Protocol.baker to_protocol;
-      ]
+      [Protocol.accuser to_protocol; Constant.octez_experimental_agnostic_baker]
   @@ fun () ->
   let node_arguments = [Node.Synchronisation_threshold 0] in
   let to_protocol_hash = Protocol.hash to_protocol in
@@ -1226,11 +1222,7 @@ let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
     Node.wait_for_level node (expected_level_of_next_proposal + good_measure)
   in
 
-  let* _ = Baker.init ~protocol:from_protocol node client in
-
-  (* The baker for [to_protocol] is not ready until that protocol
-     activates, therefore we do not resolve yet. *)
-  let _to_protocol_baker_p = Baker.init ~protocol:to_protocol node client in
+  let* _ = Agnostic_baker.init node client in
 
   (* We also start an accuser for the [to_protocol] protocol. After the
      protocol switch, we verify that it starts registering blocks. *)
@@ -1329,9 +1321,6 @@ let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
     "Bake until the first block of the next proposal period at level %d"
     expected_level_of_next_proposal ;
   let* (_ : int) = wait_for_next_proposal_p in
-
-  Log.info "Activate the replacement protocol baker" ;
-  let* _ = _to_protocol_baker_p in
 
   Log.info
     "Check that replacement protocol %s is active"
