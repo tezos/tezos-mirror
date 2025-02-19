@@ -1,12 +1,12 @@
-Protocol Next
+Protocol Rio
 ==============
 
-This page documents the changes brought by protocol Next with respect
+This page documents the changes brought by protocol Rio with respect
 to Quebec (see :ref:`naming_convention`).
 
 For changes brought by Quebec with respect to Paris, see :doc:`../protocols/021_quebec`.
 
-The code can be found in directory :src:`src/proto_next` of the ``master``
+The code can be found in directory :src:`src/proto_022_PsRiotum` of the ``master``
 branch of Octez.
 
 Environment Version
@@ -75,7 +75,7 @@ Operations
 
 - Added an optional ``proof`` parameter to the
   ``Update_consensus_key`` operation. This parameter is unused in the
-  Next protocol; it will be needed to update to a BLS consensus key
+  Rio protocol; it will be needed to update to a BLS consensus key
   when the ``allow_tz4_delegate_enable`` feature flag is enabled in a
   future protocol. (MR :gl:`!15670`)
 
@@ -113,7 +113,7 @@ Protocol parameters
   which is no longer used since the activation of Adaptive Slashing in
   the Paris protocol. (MR :gl:`!15223`)
 
-- Exposed :ref:`derived constants<protocol_constants_next>`
+- Exposed :ref:`derived constants<protocol_constants_r022>`
   ``issuance_modification_delay``, ``consensus_key_activation_delay``,
   and ``unstake_finalization_delay`` (which are automatically computed
   from the ``consensus_rights_delay`` parametric constant): they can
@@ -156,16 +156,16 @@ Feature flags
 - Added a feature flag ``aggregate_attestation`` to enable the
   aggregation of block attestation lists into a single aggregate
   operation. (MR :gl:`!15283`) (This feature is not active yet in the
-  Next protocol.)
+  Rio protocol.)
 
 - Added a feature flag ``allow_tz4_delegate_enable`` to allow tz4
   (BLS) addresses as delegates and/or as consensus keys. (MRs
   :gl:`!15311`, :gl:`!15302`) (This feature is not active yet in the
-  Next protocol.)
+  Rio protocol.)
 
 - Added a feature-controlling parameter
   ``all_bakers_attest_activation_level``. It is set to ``null`` in the
-  Next protocol, which means that the all-bakers-attest feature will
+  Rio protocol, which means that the all-bakers-attest feature will
   not be active at all in this protocol. (MRs :gl:`!15584`,
   :gl:`!15764`, :gl:`!16380`)
 
