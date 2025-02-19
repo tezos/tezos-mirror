@@ -13,6 +13,32 @@ open Prometheus
    solution is to create a new registry and implement the callback
    that serves this new registry specifically. *)
 
+module Counter = struct
+  include Counter
+
+  type t = Counter.t
+
+  let event_assertion_warning =
+    Internal_event.Simple.declare_2
+      ~section:["evm_node"; "dev"; "metrics"]
+      ~name:"counter_inc_assertion_warning"
+      ~msg:
+        "assertion failed while updating a Counter metric: the increment \
+         ({increment} occuring at {label}) is negative; the value will not be \
+         updated"
+      ~level:Warning
+      ("increment", Data_encoding.float)
+      ("label", Data_encoding.string)
+
+  let inc t v label =
+    if v >= 0.0 then inc t v
+    else
+      Lwt.dont_wait
+        (fun () ->
+          Internal_event.Simple.emit event_assertion_warning (v, label))
+        (Fun.const ())
+end
+
 let registry = CollectorRegistry.create ()
 
 type metrics_body = {body : string; content_type : string}
@@ -165,7 +191,7 @@ end
 
 module Rpc = struct
   let metrics =
-    Prometheus.Summary.v_labels
+    Summary.v_labels
       ~registry
       ~label_names:["endpoint"; "method"]
       ~help:"RPC endpoint call counts and sum of execution times."
@@ -174,7 +200,7 @@ module Rpc = struct
       "calls"
 
   let method_ =
-    Prometheus.Counter.v_label
+    Counter.v_label
       ~registry
       ~label_name:"method"
       ~help:"Method call counts"
@@ -183,7 +209,7 @@ module Rpc = struct
       "calls_method"
 
   let update_metrics uri meth =
-    Prometheus.Summary.(time (labels metrics [uri; meth]) Sys.time)
+    Summary.(time (labels metrics [uri; meth]) Sys.time)
 end
 
 module Tx_pool = struct
@@ -212,10 +238,9 @@ module Tx_pool = struct
         in
         LabelSetMap.of_list
           [
-            ( ["number_of_addresses"],
-              [Prometheus.Sample_set.sample number_of_addresses] );
+            (["number_of_addresses"], [Sample_set.sample number_of_addresses]);
             ( ["number_of_transactions"],
-              [Prometheus.Sample_set.sample number_of_transactions] );
+              [Sample_set.sample number_of_transactions] );
           ])
 end
 
@@ -344,7 +369,10 @@ let stop_bootstrapping () = Gauge.set metrics.health.bootstrapping 0.
 
 let inc_time_waiting span =
   let _, time = Ptime.Span.to_d_ps span in
-  Counter.inc metrics.simulation.time_waiting (Int64.to_float time)
+  Counter.inc
+    metrics.simulation.time_waiting
+    (Int64.to_float time)
+    "inc_time_waiting"
 
 let set_simulation_queue_size size =
   Gauge.set metrics.simulation.queue_size (Int.to_float size)
@@ -357,26 +385,34 @@ let is_bootstrapping () =
 let set_block ~time_processed ~transactions =
   let pt = Ptime.Span.to_float_s time_processed in
   Block.(Process_time_histogram.(observe process_time_histogram pt)) ;
-  Counter.inc metrics.block.time_processed pt ;
-  Counter.inc metrics.block.transactions (Int.to_float transactions)
+  Counter.inc metrics.block.time_processed pt "set_block:inc_time_processed" ;
+  Counter.inc
+    metrics.block.transactions
+    (Int.to_float transactions)
+    "set_block:inc_transactions"
 
 let record_signals_sent signals =
-  Prometheus.Counter.inc Dal.signals_sent (Int.to_float @@ List.length signals)
+  Counter.inc
+    Dal.signals_sent
+    (Int.to_float @@ List.length signals)
+    "record_signals_sent"
 
 let inc_confirm_gas_needed () =
-  Prometheus.Counter.inc_one metrics.simulation.confirm_gas_needed
+  Counter.inc_one metrics.simulation.confirm_gas_needed
 
 let record_blueprint_chunks_sent_on_dal chunks =
-  Prometheus.Counter.inc
+  Counter.inc
     Blueprint_chunk_sent.on_dal
     (Float.of_int (List.length chunks))
+    "record_blueprint_chunks_sent_on_dal"
 
 let record_blueprint_chunks_sent_on_inbox chunks =
-  Prometheus.Counter.inc
+  Counter.inc
     Blueprint_chunk_sent.on_inbox
     (Float.of_int (List.length chunks))
+    "record_blueprint_chunks_sent_on_inbox"
 
-let inc_rpc_method ~name = Prometheus.Counter.inc_one (Rpc.method_ name)
+let inc_rpc_method ~name = Counter.inc_one (Rpc.method_ name)
 
 module Performance_metrics_config = struct
   open Octez_performance_metrics

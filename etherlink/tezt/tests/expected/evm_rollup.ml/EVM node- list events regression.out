@@ -1383,6 +1383,21 @@ tx_pool_started:
     { /* tx_pool_started version 0 */
       "tx_pool_started.v0": any }
 
+counter_inc_assertion_warning:
+  description: assertion failed while updating a Counter metric: the increment ({increment} occuring at {label}) is negative; the value will not be updated
+  level: warning
+  section: evm_node.dev.metrics
+  json format:
+    { /* counter_inc_assertion_warning version 0 */
+      "counter_inc_assertion_warning.v0":
+        { "increment": number,
+          "label": $unistring } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+
 wasm_pvm_fallback:
   description: the node needs to fallback to the WASM PVM to execute a block
   level: warning
