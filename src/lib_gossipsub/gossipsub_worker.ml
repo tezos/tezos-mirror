@@ -181,6 +181,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Subscribe of {topic : Topic.t}
     | Unsubscribe of {topic : Topic.t}
     | Message_with_header of message_with_header
+    | Ping
 
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5323
 
@@ -307,7 +308,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           | IWant _ -> Introspection.update_count_sent_iwants stats `Incr
           | Message_with_header _ ->
               Introspection.update_count_sent_app_messages stats `Incr
-          | Subscribe _ | Unsubscribe _ -> ())
+          | Subscribe _ | Unsubscribe _ | Ping -> ())
       | Connect _ | Connect_point _ | Disconnect _ | Forget _ | Kick _ -> ()
     in
     fun {connected_bootstrap_peers; p2p_output_stream; stats; _} ~mk_output ->
@@ -323,7 +324,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
                   (* Don't emit app messages, send IHave messages or respond to
                      IWant if the remote peer has a bootstrap profile. *)
                   false
-              | Graft _ | Prune _ | Subscribe _ | Unsubscribe _ -> true)
+              | Graft _ | Prune _ | Subscribe _ | Unsubscribe _ | Ping -> true)
           | Connect _ | Connect_point _ | Disconnect _ | Forget _ | Kick _ ->
               true
         in
@@ -763,6 +764,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         GS.handle_prune prune gossip_state
         |> update_gossip_state state
         |> handle_prune ~self ~from_peer px
+    | Ping ->
+        (* We treat [Ping] message as a no-op and return the current [state]. *)
+        state
 
   (** Handling events received from P2P layer. *)
   let apply_p2p_event ~self ({gossip_state; _} as state) = function
@@ -1032,6 +1036,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         Format.fprintf fmt "Unsubscribe{topic=%a}" Topic.pp topic
     | Message_with_header message_with_header ->
         pp_message_with_header fmt message_with_header
+    | Ping -> Format.fprintf fmt "Ping"
 
   let pp_p2p_output fmt = function
     | Disconnect {peer} -> Format.fprintf fmt "Disconnect{peer=%a}" Peer.pp peer
