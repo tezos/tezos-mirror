@@ -240,6 +240,7 @@ let pp_limits fmtr
     retain_duration;
     fanout_ttl;
     heartbeat_interval;
+    heartbeat_ping_interval;
     backoff_cleanup_ticks;
     score_cleanup_ticks;
     degree_low;
@@ -276,6 +277,7 @@ let pp_limits fmtr
      retain_duration = %a;@;\
      fanout_ttl = %a;@;\
      heartbeat_interval = %a;@;\
+     heartbeat_ping_interval = %d;@;\
      backoff_cleanup_ticks = %d;@;\
      score_cleanup_ticks = %d;@;\
      degree_low = %d;@;\
@@ -312,6 +314,7 @@ let pp_limits fmtr
     fanout_ttl
     GS.Span.pp
     heartbeat_interval
+    heartbeat_ping_interval
     backoff_cleanup_ticks
     score_cleanup_ticks
     degree_low

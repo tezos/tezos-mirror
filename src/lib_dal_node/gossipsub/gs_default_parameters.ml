@@ -117,6 +117,25 @@ module Limits = struct
 
   let heartbeat_interval = Types.Span.of_int_s 1
 
+  (* The ping should be performed by the heartbeat handler at least
+     every 45s, hence every [heartbeat_ping_interval] ticks when
+     [heartbeat_interval] = 1s.
+
+     A 45-second ping interval is a reasonable choice as it sits in
+     the middle of the commonly recommended 30-60 second range for P2P
+     networks.
+
+     This timing provides a good balance between maintaining
+     reliable connections and managing network overhead.
+
+     It's frequent enough to detect stale peers before most
+     NAT/firewall timeouts (which typically occur after 60-120
+     seconds)
+  *)
+  let heartbeat_ping_interval =
+    let heartbeat_interval = Types.Span.to_int_s heartbeat_interval in
+    45 / heartbeat_interval
+
   let backoff_cleanup_ticks = 15
 
   let score_cleanup_ticks = 1

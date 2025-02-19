@@ -247,6 +247,8 @@ type ('topic, 'peer, 'message_id, 'span) limits = {
           subscribed to, then we don't track that topic anymore, that is, we
           delete it from the fanout map. *)
   heartbeat_interval : 'span;  (** The time between heartbeats. *)
+  heartbeat_ping_interval : int;
+      (** Number of heartbeat ticks between consecutive pings. *)
   backoff_cleanup_ticks : int;
       (** The number of heartbeat ticks setting the frequency at which the
           backoffs are checked and potentially cleared. *)
