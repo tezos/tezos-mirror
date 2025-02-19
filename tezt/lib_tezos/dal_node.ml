@@ -388,7 +388,7 @@ let run ?env ?event_level node =
     ?env
     ?event_level
     node
-    ["run"; "--data-dir"; node.persistent_state.data_dir]
+    ["run"; "--verbose"; "--data-dir"; node.persistent_state.data_dir]
 
 let run ?(wait_ready = true) ?env ?event_level node =
   let* () = run ?env ?event_level node in
