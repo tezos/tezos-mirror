@@ -11,6 +11,32 @@ module Cli = Scenarios_cli
 open Scenarios_helpers
 open Tezos
 
+type agent_kind =
+  | Bootstrap
+  | Baker of int
+  | Producer of int
+  | Observer of [`Index of int | `Pkh of string]
+  | Reverse_proxy
+  | Etherlink_operator
+  | Etherlink_dal_operator
+  | Etherlink_dal_observer of {slot_index : int}
+  | Etherlink_producer of int
+
+let name_of = function
+  | Bootstrap -> "bootstrap"
+  | Baker i -> Format.asprintf "attester-%d" i
+  | Producer i -> Format.asprintf "dal-producer-%d" i
+  | Observer (`Index i) -> Format.asprintf "dal-observer-%d" i
+  | Observer (`Pkh pkh) ->
+      (* Shorting the pkh enables to get better logs. *)
+      Format.asprintf "dal-observer-%s" (String.sub pkh 0 8)
+  | Reverse_proxy -> "dal-reverse-proxy"
+  | Etherlink_operator -> "etherlink-operator"
+  | Etherlink_dal_operator -> "etherlink-dal-operator"
+  | Etherlink_dal_observer {slot_index} ->
+      Format.asprintf "etherlink-dal-observer-%d" slot_index
+  | Etherlink_producer i -> Format.asprintf "etherlink-producer-%d" i
+
 module Disconnect = struct
   module IMap = Map.Make (Int)
 
@@ -339,7 +365,8 @@ module Dal_reverse_proxy = struct
       (proxified_dal_nodes : (int * string) Seq.t) =
     (* A NGINX reverse proxy which balances load between producer DAL
        nodes based on the requested slot index. *)
-    let* agent = next_agent ~name:"dal-reverse-proxy" in
+    let name = name_of Reverse_proxy in
+    let* agent = next_agent ~name in
     let runner = Agent.runner agent in
     let port = Agent.next_available_port agent in
     let () = toplog "Launching reverse proxy" in
@@ -1782,7 +1809,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
          this index on a dedicated VM and give it directly as endpoint
          to the rollup node. *)
       toplog "Etherlink sequencer will run its own DAL node" ;
-      let name = Format.asprintf "etherlink-dal-operator" in
+      let name = name_of Etherlink_dal_operator in
       let* agent = next_agent ~name in
       let* node =
         Node.init
@@ -1815,7 +1842,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
            Format.pp_print_int)
         dal_slots ;
       toplog "Etherlink sequencer will use a reverse proxy" ;
-      let name = Format.asprintf "etherlink-dal-operator" in
+      let name = name_of Etherlink_dal_operator in
       let* agent = next_agent ~name in
       let* node =
         Node.init
@@ -1838,9 +1865,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
       let* dal_slots_and_nodes =
         dal_slots
         |> Lwt_list.map_p (fun slot_index ->
-               let name =
-                 Format.asprintf "etherlink-dal-operator-%d" slot_index
-               in
+               let name = name_of (Etherlink_dal_observer {slot_index}) in
                let* agent = next_agent ~name in
                let* node =
                  Node.init
@@ -2149,7 +2174,8 @@ let init_etherlink_producer_setup operator name ~bootstrap agent =
 let init_etherlink cloud configuration etherlink_configuration ~bootstrap
     etherlink_rollup_operator_key batching_operators ~dal_slots next_agent =
   let () = toplog "Initializing an Etherlink operator" in
-  let* operator_agent = next_agent ~name:"etherlink-operator" in
+  let name = name_of Etherlink_operator in
+  let* operator_agent = next_agent ~name in
   let* operator =
     init_etherlink_operator_setup
       cloud
@@ -2166,7 +2192,7 @@ let init_etherlink cloud configuration etherlink_configuration ~bootstrap
   let accounts = Tezt_etherlink.Eth_account.bootstrap_accounts in
   let* producers_agents =
     List.init etherlink_configuration.etherlink_producers (fun i ->
-        let name = Format.asprintf "etherlink-producer-%d" i in
+        let name = name_of (Etherlink_producer i) in
         next_agent ~name)
     |> Lwt.all
   in
@@ -2233,14 +2259,15 @@ let init ~(configuration : configuration) etherlink_configuration cloud
   let () = toplog "Init" in
   let* bootstrap_agent =
     if configuration.bootstrap then
-      let* agent = next_agent ~name:"bootstrap" in
+      let name = name_of Bootstrap in
+      let* agent = next_agent ~name in
       Lwt.return_some agent
     else Lwt.return_none
   in
   let* attesters_agents =
     configuration.stake
     |> List.mapi (fun i _stake ->
-           let name = Format.asprintf "attester-%d" i in
+           let name = name_of (Baker i) in
            next_agent ~name)
     |> Lwt.all
   in
@@ -2254,15 +2281,15 @@ let init ~(configuration : configuration) etherlink_configuration cloud
   let* producers_agents =
     configuration.dal_node_producers
     |> List.map (fun slot_index ->
-           let name = Format.asprintf "dal-producer-%d" slot_index in
-           let* name = next_agent ~name in
-           return (name, slot_index))
+           let name = name_of (Producer slot_index) in
+           let* agent = next_agent ~name in
+           return (agent, slot_index))
     |> Lwt.all
   in
   let* observers_slot_index_agents =
     configuration.observer_slot_indices
     |> List.map (fun slot_index ->
-           let name = Format.asprintf "dal-observer-%d" slot_index in
+           let name = name_of (Observer (`Index slot_index)) in
            let* agent = next_agent ~name in
            return (`Slot_index slot_index, agent))
     |> Lwt.all
@@ -2270,7 +2297,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
   let* observers_bakers_agents =
     configuration.observer_pkhs
     |> List.map (fun pkh ->
-           let name = Format.asprintf "observer-%s" (String.sub pkh 0 8) in
+           let name = name_of (Observer (`Pkh pkh)) in
            let* agent = next_agent ~name in
            return (`Pkh pkh, agent))
     |> Lwt.all
@@ -2699,17 +2726,6 @@ let configuration, etherlink_configuration =
   in
   (t, etherlink)
 
-type agent_kind =
-  | Bootstrap
-  | Baker of int
-  | Producer of int
-  | Observer of [`Index of int | `Pkh of string]
-  | Reverse_proxy
-  | Etherlink_operator
-  | Etherlink_dal_operator
-  | Etherlink_dal_observer of {slot_index : int}
-  | Etherlink_producer of int
-
 let benchmark () =
   toplog "Parsing CLI done" ;
   let vms =
@@ -2744,21 +2760,6 @@ let benchmark () =
   in
   let default_vm_configuration ~name =
     Agent.Configuration.make ?docker_image ~name ()
-  in
-  let name_of = function
-    | Bootstrap -> "bootstrap"
-    | Baker i -> Format.asprintf "attester-%d" i
-    | Producer i -> Format.asprintf "dal-producer-%d" i
-    | Observer (`Index i) -> Format.asprintf "dal-observer-%d" i
-    | Observer (`Pkh pkh) ->
-        (* Shorting the pkh enables to get better logs. *)
-        Format.asprintf "dal-observer-%s" (String.sub pkh 0 8)
-    | Reverse_proxy -> "dal-reverse-proxy"
-    | Etherlink_operator -> "etherlink-operator"
-    | Etherlink_dal_operator -> Format.asprintf "etherlink-dal-operator"
-    | Etherlink_dal_observer {slot_index} ->
-        Format.asprintf "etherlink-dal-observer-%d" slot_index
-    | Etherlink_producer i -> Format.asprintf "etherlink-producer-%d" i
   in
   let vms =
     vms
