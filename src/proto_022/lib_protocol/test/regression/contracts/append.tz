@@ -1,0 +1,10 @@
+{ parameter (pair (list int) (list int)) ;
+  storage (list int) ;
+  code { CAR ;
+         UNPAIR ;
+         NIL int ;
+         SWAP ;
+         ITER { CONS } ;
+         ITER { CONS } ;
+         NIL operation ;
+         PAIR } }

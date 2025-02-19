@@ -1,0 +1,28 @@
+{ parameter nat ;
+  storage (list address) ;
+  code { DUP ;
+         CAR ;
+         DIP { CDR ; NIL operation } ;
+         PUSH bool True ;
+         LOOP { DUP ;
+                PUSH nat 0 ;
+                { COMPARE ; EQ } ;
+                IF { PUSH bool False }
+                   { PUSH nat 1 ;
+                     SWAP ;
+                     SUB ;
+                     ABS ;
+                     PUSH string "init" ;
+                     PUSH mutez 5000000 ;
+                     NONE key_hash ;
+                     CREATE_CONTRACT
+                       { parameter string ;
+                         storage string ;
+                         code { CAR ; NIL operation ; PAIR } } ;
+                     SWAP ;
+                     DIP { SWAP ; DIP { CONS } } ;
+                     SWAP ;
+                     DIP { SWAP ; DIP { CONS } } ;
+                     PUSH bool True } } ;
+         DROP ;
+         PAIR } }

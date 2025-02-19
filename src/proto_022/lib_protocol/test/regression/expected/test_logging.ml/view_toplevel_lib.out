@@ -1,0 +1,21 @@
+
+trace
+  - CAR (interp) @ location: 7
+    [ (Pair 5 3) ]
+  - CAR (entry) @ location: 7
+    [ (Pair 5 3) ]
+    - log/NIL (exit) @ location: 7
+      [ 5 ]
+  - NIL (entry) @ location: 8
+    [ 5 ]
+    - log/PAIR (exit) @ location: 8
+      [ {}
+        5 ]
+  - PAIR (entry) @ location: 10
+    [ {}
+      5 ]
+    - log/[halt] (exit) @ location: 10
+      [ (Pair {} 5) ]
+  - [halt] (entry) @ location: 6
+    [ (Pair {} 5) ]
+    - control: KNil
