@@ -274,6 +274,18 @@ type proto_parameters = {
   blocks_per_cycle : int32;
 }
 
+(** The type contains all elements required to construct a trap accusation.
+    - [delegate]: the baker who attested,
+    - [slot_index]: the index of the slot containing the trap,
+    - [shard]: the DAL shard containing the trap share,
+    - [shard_proof]: proof provided for the shard. *)
+type trap = {
+  delegate : Signature.Public_key_hash.t;
+  slot_index : slot_index;
+  shard : Cryptobox.shard;
+  shard_proof : Cryptobox.shard_proof;
+}
+
 val slot_encoding : Cryptobox.slot Data_encoding.t
 
 val slot_header_encoding : slot_header Data_encoding.t
@@ -289,6 +301,8 @@ val with_proof_encoding : with_proof Data_encoding.t
 val attestable_slots_encoding : attestable_slots Data_encoding.t
 
 val proto_parameters_encoding : proto_parameters Data_encoding.t
+
+val trap_encoding : trap Data_encoding.t
 
 val pp_header_status : Format.formatter -> header_status -> unit
 

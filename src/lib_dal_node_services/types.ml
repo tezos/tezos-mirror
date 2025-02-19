@@ -363,6 +363,13 @@ type proto_parameters = {
   blocks_per_cycle : int32;
 }
 
+type trap = {
+  delegate : Signature.Public_key_hash.t;
+  slot_index : slot_index;
+  shard : Cryptobox.shard;
+  shard_proof : Cryptobox.shard_proof;
+}
+
 (* Encodings associated to the types. *)
 
 let slot_id_encoding =
@@ -553,6 +560,19 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
           (req "commitment_period_in_blocks" int31)
           (req "dal_attested_slots_validity_lag" int31)
           (req "blocks_per_cycle" int32)))
+
+let trap_encoding =
+  Data_encoding.(
+    conv
+      (fun {delegate; slot_index; shard; shard_proof} ->
+        (delegate, slot_index, shard, shard_proof))
+      (fun (delegate, slot_index, shard, shard_proof) ->
+        {delegate; slot_index; shard; shard_proof})
+      (obj4
+         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "slot_index" uint8)
+         (req "shard" Cryptobox.shard_encoding)
+         (req "proof" Cryptobox.shard_proof_encoding)))
 
 module Store = struct
   (** Data kind stored in DAL. *)
