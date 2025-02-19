@@ -30,7 +30,7 @@ type protocol =
   | ParisC
   | Proto_alpha
   | Quebec
-  | Next
+  | R022
 
 (** [internal_message_kind] represent an internal message in a inbox. *)
 type internal_message_kind =

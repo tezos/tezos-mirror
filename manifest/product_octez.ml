@@ -7490,7 +7490,7 @@ let hash = Protocol.hash
 
   let _021_PsQuebec = active (Name.v "PsQuebec" 021)
 
-  let _next = active (Name.dev "next")
+  let _022_PsRiotum = active (Name.v "PsRiotum" 022)
 
   let alpha = active (Name.dev "alpha")
 

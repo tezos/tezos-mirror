@@ -726,6 +726,16 @@ function copy_source() {
   # modify the first_argument variable directly
   eval "$1=$long_hash"
 
+  ## update agnostic_baker
+  ## add protocol as active before alpha in parameters.ml
+  if ! grep -q "${long_hash}" src/bin_agnostic_baker/parameters.ml; then
+    ## look for | "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" -> ("alpha", Active)
+    ## and add   | "${longhash}" ) as full_hash -> (String.sub full_hash 0 8, Active)
+    sed -i.old -e "/| \"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK\" ->/a \  | \"${long_hash}\" as full_hash -> (String.sub full_hash 0 8, Active)" src/bin_agnostic_baker/parameters.ml
+    ocamlformat -i src/bin_agnostic_baker/parameters.ml
+    commit "src: add protocol to agnostic_baker"
+  fi
+
 }
 
 function update_protocol_tests() {
@@ -1088,11 +1098,23 @@ function update_tezt_tests() {
     regression_source_name="${regression_source_name}-"
   done
 
+  search_name=""
+  if [[ ${is_snapshot} == true ]]; then
+    search_name="*${regression_source_name}*.out"
+  else
+    search_name="*${alpha_regression}*.out"
+  fi
+
   # shellcheck disable=SC2312
   # shellcheck disable=SC2001
-  find . -type f -name "*${regression_source_name}*.out" | while read -r FILE; do
-    ORIG_FILENAME=$(echo "${FILE}" | sed "s/${alpha_regression}/${regression_source_name}/g")
-    NEW_FILENAME=$(echo "${FILE}" | sed "s/${alpha_regression}/${regression_protocol_name}/g")
+  find . -type f -name "${search_name}" | while read -r FILE; do
+    if [[ ${is_snapshot} == true ]]; then
+      ORIG_FILENAME=${FILE}
+      NEW_FILENAME=$(echo "${FILE}" | sed "s/${regression_source_name}/${regression_protocol_name}/g")
+    else
+      ORIG_FILENAME=$(echo "${FILE}" | sed "s/${alpha_regression}/${regression_source_name}/g")
+      NEW_FILENAME=$(echo "${FILE}" | sed "s/${alpha_regression}/${regression_protocol_name}/g")
+    fi
 
     # Create the directory structure for the new file if it doesn't exist
     mkdir -p "$(dirname "${NEW_FILENAME}")"
@@ -1115,8 +1137,15 @@ function update_tezt_tests() {
     fi
     #replace all occurences of protocol_source with label
     if [[ ${is_snapshot} == true ]]; then
-      sed -i.old -e "s/proto_${protocol_source}/proto_${version}-${short_hash}/g" "${NEW_FILENAME}"
-      sed -i.old -e "s/${protocol_source}/${version}-${short_hash}/g" "${NEW_FILENAME}"
+      # Replace `proto_${protocol_source}` with `proto_${version}-${short_hash}`
+      sed -i.old -E "s/proto_${protocol_source}/proto_${version}-${short_hash}/g" "${NEW_FILENAME}"
+
+      # Replace `${protocol_source}.` with `${version}-${short_hash}.`
+      sed -i.old -E "s/${protocol_source}\./${version}-${short_hash}\./g" "${NEW_FILENAME}"
+
+      # Replace `${protocol_source}` with `${label}` unless it's in a JSON key (avoid any pattern in a string with `"` before and after and followed by `:`)
+      perl -i.old -pe 's/\b$ENV{protocol_source}\b(?![^:]*":)/$ENV{label}/g' "$ENV{NEW_FILENAME}"
+
     else
       sed -i.old -e "s/${protocol_source}/${label}/g" "${NEW_FILENAME}"
     fi
@@ -1194,6 +1223,7 @@ function misc_updates() {
   fi
 
   find . -name '*.old' -exec rm {} \;
+  scripts/lint.sh --update-ocamlformat
   scripts/lint.sh --check-ocamlformat || echo "linting updated ocamlformat files"
   commit_if_changes "scripts: lint"
 
@@ -1279,9 +1309,12 @@ function generate_doc() {
       -i "docs/protocols/${new_versioned_name}.rst"
     protocol_source="${protocol_source_original}"
   fi
+  uncapitalized_source=$(echo "${protocol_source}" | tr '[:upper:]' '[:lower:]')
   sed -e "s/^Protocol ${capitalized_source}/Protocol ${capitalized_label}/" \
     -e "s/protocol ${capitalized_source}/protocol ${capitalized_label}/" \
     -e "s,src/proto_${protocol_source},src/proto_${new_protocol_name},g" \
+    -e "s/${capitalized_source}/${capitalized_label}/g" \
+    -e "s/${uncapitalized_source}/${label}/g" \
     -i "docs/protocols/${new_versioned_name}.rst"
 
   if [[ ${#label} -gt 5 ]]; then
@@ -1293,7 +1326,7 @@ function generate_doc() {
     sed -i.old -e "2s/$/${missing_equals}/" "docs/protocols/${new_versioned_name}.rst"
   fi
 
-  commit "docs: fix docs/protocols/${new_protocol_name}.rst"
+  commit_if_changes "docs: fix docs/protocols/${new_protocol_name}.rst"
 
   alpha_rst "${capitalized_label}" > "docs/protocols/alpha.rst"
   commit "docs: reset docs/protocols/alpha.rst"
@@ -1375,6 +1408,40 @@ function snapshot_protocol() {
   long_hash=
   # e.g. Pt8PY9P4 (set below)
   short_hash=
+
+  if [[ ${is_snapshot} == true ]]; then
+    # by default only propose to use one character values for variant and label
+    expected_variant="${capitalized_label:0:1}"
+    log_blue "Current expected variant is ${magenta}${expected_variant}${reset}"
+    read -r -p "Please enter the new variant or press enter to keep this one: " -e -i "${expected_variant}" new_variant
+    expected_label="${label:0:1}"
+    echo -e "Current expected tag is ${magenta}${expected_label}${reset}"
+    read -r -p "Please enter the new tag or press enter to keep this one: " -e -i "${expected_label}" new_tag
+    # new_tag must use only lowercase digits and underscores
+    while [[ ! "${new_tag}" =~ ^[a-z0-9_]+$ ]]; do
+      echo "Tag must use only lowercase digits and underscores"
+      read -r -p "Please enter the new tag or press enter to keep the current one: " -e -i "${previous_tag}" new_tag
+    done
+    capitalized_new_tag=$(tr '[:lower:]' '[:upper:]' <<< "${new_tag:0:1}")${new_tag:1}
+    label="${new_tag}"
+    capitalized_label="${capitalized_new_tag}"
+
+    tezos_protocol_source=$(echo "${protocol_source}" | tr '_' '-')
+
+    short_hash=$(echo "${protocol_source}" | cut -d'_' -f2)
+    if [[ "${is_snapshot}" == false ]]; then
+      if [[ ${source_short_hash} != "${short_hash}" ]]; then
+        is_snapshot=false
+      else
+        is_snapshot=true
+      fi
+    fi
+    label="${new_tag}"
+    capitalized_label="${capitalized_new_tag}"
+
+    protocol_target="${label}_${version}"
+
+  fi
 
   sanity_check_before_script
 

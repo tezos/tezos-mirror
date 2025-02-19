@@ -890,7 +890,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
 type previous_protocol =
   | Genesis of Parameters_repr.t
   | Alpha
-  | (* Alpha predecessor *) Next (* Alpha predecessor *)
+  | (* Alpha predecessor *) R022 (* Alpha predecessor *)
 
 let check_and_update_protocol_version ctxt =
   let open Lwt_result_syntax in
@@ -907,8 +907,8 @@ let check_and_update_protocol_version ctxt =
           let+ param, ctxt = get_proto_param ctxt in
           (Genesis param, ctxt)
         else if Compare.String.(s = "alpha_current") then return (Alpha, ctxt)
-        else if (* Alpha predecessor *) Compare.String.(s = "next") then
-          return (Next, ctxt) (* Alpha predecessor *)
+        else if (* Alpha predecessor *) Compare.String.(s = "r022_022") then
+          return (R022, ctxt) (* Alpha predecessor *)
         else Lwt.return @@ storage_error (Incompatible_protocol_version s)
   in
   let*! ctxt =
@@ -936,11 +936,11 @@ let get_previous_protocol_constants ctxt =
              context."
       | Some constants -> return constants)
 
-(* Start of code to remove at next automatic protocol snapshot *)
+(* Start of code to remove at r022 automatic protocol snapshot *)
 
-(* Please add here any code that should be removed at the next automatic protocol snapshot *)
+(* Please add here any code that should be removed at the r022 automatic protocol snapshot *)
 
-(* End of code to remove at next automatic protocol snapshot *)
+(* End of code to remove at r022 automatic protocol snapshot *)
 
 (* You should ensure that if the type `Constants_parametric_repr.t` is
    different from `Constants_parametric_previous_repr.t` or the value of these
@@ -1268,9 +1268,9 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
         return (ctxt, Some c)
         (* End of Alpha stitching. Comment used for automatic snapshot *)
         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
-    | Next ->
+    | R022 ->
         (*
-            FIXME chain_id is used for Q to Next migration and nomore after.
+            FIXME chain_id is used for Q to R022 migration and nomore after.
             We ignored for automatic stabilisation, should it be removed in
             Beta?
         *)
