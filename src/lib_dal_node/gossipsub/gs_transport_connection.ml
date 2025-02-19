@@ -287,7 +287,7 @@ let transport_layer_inputs_handler gs_worker p2p_layer =
 
 (** This loop pops messages from application output stream and calls the given
     [app_messages_callback] on them. *)
-let app_messages_handler gs_worker ~app_messages_callback =
+let app_messages_handler gs_worker ~app_messages_callback ~verbose:_ =
   let open Lwt_syntax in
   let rec loop app_output_stream =
     let* Worker.{message; message_id; topic = _} =
@@ -303,7 +303,7 @@ let app_messages_handler gs_worker ~app_messages_callback =
   in
   Worker.app_output_stream gs_worker |> loop
 
-let activate gs_worker p2p_layer ~app_messages_callback =
+let activate gs_worker p2p_layer ~app_messages_callback ~verbose =
   (* Register a handler to notify new P2P connections to GS. *)
   let () =
     new_connections_handler gs_worker p2p_layer
@@ -315,5 +315,5 @@ let activate gs_worker p2p_layer ~app_messages_callback =
     [
       gs_worker_p2p_output_handler gs_worker p2p_layer;
       transport_layer_inputs_handler gs_worker p2p_layer;
-      app_messages_handler gs_worker ~app_messages_callback;
+      app_messages_handler gs_worker ~app_messages_callback ~verbose;
     ]

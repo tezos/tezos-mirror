@@ -728,7 +728,7 @@ let daemonize handlers =
   |> lwt_map_error (List.fold_left (fun acc errs -> errs @ acc) [])
 
 let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt
-    amplificator =
+    amplificator ~verbose =
   let open Gossipsub in
   let shards_handler ({shards; _} : Store.t) =
     let save_and_notify = Store.Shards.write_all shards in
@@ -758,7 +758,8 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt
       Transport_layer_hooks.activate
         gs_worker
         transport_layer
-        ~app_messages_callback:(shards_handler node_store))
+        ~app_messages_callback:(shards_handler node_store)
+        ~verbose)
     (fun exn ->
       "[dal_node] error in Daemon.connect_gossipsub_with_p2p: "
       ^ Printexc.to_string exn
@@ -1337,7 +1338,14 @@ let run ~data_dir ~configuration_override =
     return crawler
   in
   (* Activate the p2p instance. *)
-  connect_gossipsub_with_p2p gs_worker transport_layer store ctxt amplificator ;
+  connect_gossipsub_with_p2p
+    gs_worker
+    transport_layer
+    store
+    ctxt
+    amplificator
+    ~verbose:config.verbose ;
+
   let*! () =
     Gossipsub.Transport_layer.activate ~additional_points:points transport_layer
   in
