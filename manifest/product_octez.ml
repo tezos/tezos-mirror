@@ -7123,7 +7123,17 @@ let hash = Protocol.hash
         ~internal_name:(sf "tezos_agnostic_baker_%s" name_dash)
         ~path:(path // "lib_agnostic_baker")
         ~synopsis:"Protocol specific library for the Agnostic Baker"
-        ~deps:[embedded |> open_; octez_validation |> open_]
+        ~deps:
+          [
+            octez_base |> open_ ~m:"TzPervasives";
+            client |> if_some |> open_;
+            embedded |> open_;
+            main |> open_;
+            octez_validation |> open_;
+            baking_commands |> if_some |> open_;
+            octez_client_commands |> open_;
+            octez_client_base_unix |> open_;
+          ]
         ~linkall:true
     in
     let octez_injector =

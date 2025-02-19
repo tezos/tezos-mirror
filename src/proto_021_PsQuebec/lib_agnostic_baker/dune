@@ -6,10 +6,22 @@
  (public_name octez-protocol-021-PsQuebec-libs.agnostic-baker)
  (instrumentation (backend bisect_ppx))
  (libraries
+  octez-libs.base
+  octez-protocol-021-PsQuebec-libs.client
   tezos-protocol-021-PsQuebec.embedded-protocol
-  octez-shell-libs.validation)
+  tezos-protocol-021-PsQuebec.protocol
+  octez-shell-libs.validation
+  octez-protocol-021-PsQuebec-libs.baking-commands
+  octez-shell-libs.client-commands
+  octez-shell-libs.client-base-unix)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_client_021_PsQuebec
   -open Tezos_embedded_protocol_021_PsQuebec
-  -open Tezos_validation))
+  -open Tezos_protocol_021_PsQuebec
+  -open Tezos_validation
+  -open Tezos_baking_021_PsQuebec_commands
+  -open Tezos_client_commands
+  -open Tezos_client_base_unix))
