@@ -278,6 +278,15 @@ let end_merging_stores =
     ~pp1:Time.System.Span.pp_hum
     ("time", Time.System.Span.encoding)
 
+let maintenance_status =
+  declare_1
+    ~section
+    ~level:Info
+    ~name:"delayed_maintenance_status"
+    ~msg:"delayed storage maintenance set to {mode}"
+    ~pp1:Storage_maintenance.pp_delay
+    ("mode", Storage_maintenance.delay_encoding)
+
 let delay_store_merging =
   declare_2
     ~section

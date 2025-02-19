@@ -323,6 +323,7 @@ let wrap_simple_store_init ?(patch_context = dummy_patch_context)
             ~store_dir
             ~context_dir
             ~allow_testchains
+            ~maintenance_delay:Disabled
             genesis
         in
         if with_gc then (
