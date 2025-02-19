@@ -29,13 +29,12 @@ module Agnostic_baker_plugin = struct
      validation will not be more expensive. *)
   let init_sapling_params () = Tezos_sapling.Core.Validator.init_params ()
 
-  module Config = struct
-    include Daemon_config
+  let run_baker_binary ~baker_args ~cancel_promise ~logs_path =
+    let module Config = struct
+      include Daemon_config
 
-    let default_daily_logs_path = Some ("octez-baker-" ^ Protocol.name)
-  end
-
-  let run_baker_binary ~baker_args ~cancel_promise =
+      let default_daily_logs_path = logs_path
+    end in
     register_commands () ;
     init_sapling_params () ;
     Lwt.pick

@@ -39,8 +39,14 @@ let spawn_baker protocol_hash ~baker_args =
   let* thread =
     match Protocol_plugin.find_agnostic_baker_plugin protocol_hash with
     | Some (module Agnostic_baker_plugin) ->
+        (* The internal event logging needs to be closed, because another one will be
+           initialised in the [run_baker_binary]. *)
+        let*! () = Tezos_base_unix.Internal_event_unix.close () in
         return
-        @@ Agnostic_baker_plugin.run_baker_binary ~baker_args ~cancel_promise
+        @@ Agnostic_baker_plugin.run_baker_binary
+             ~baker_args
+             ~cancel_promise
+             ~logs_path:Parameters.default_daily_logs_path
     | None ->
         tzfail
           (Missing_agnostic_baker_plugin

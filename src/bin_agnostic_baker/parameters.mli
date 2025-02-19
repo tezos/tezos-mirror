@@ -9,6 +9,9 @@
     [Octez_node_config.Config_file.default_rpc_port]. *)
 val default_node_endpoint : string
 
+(** Default logs path for the agnostic baker. *)
+val default_daily_logs_path : string option
+
 val log_config : base_dir:string option -> Tezos_base.Internal_event_config.t
 
 (** Status of a protocol, based on Manifest/Product_octez/Protocol. A
