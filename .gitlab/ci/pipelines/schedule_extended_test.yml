@@ -1629,12 +1629,14 @@ trigger:debian_repository_full:
   needs: []
   trigger:
     include: .gitlab/ci/pipelines/debian_repository_full.yml
+    strategy: depend
 
 trigger:rpm_repository_full:
   stage: test
   needs: []
   trigger:
     include: .gitlab/ci/pipelines/rpm_repository_full.yml
+    strategy: depend
 
 trigger:homebrew:
   stage: test
@@ -1642,6 +1644,7 @@ trigger:homebrew:
   - when: always
   trigger:
     include: .gitlab/ci/pipelines/homebrew.yml
+    strategy: depend
 
 kaitai_checks:
   image: ${ci_image_name}/build:${ci_image_tag}
