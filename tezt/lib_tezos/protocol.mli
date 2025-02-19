@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Protocols we may want to test with. *)
-type t = Next | Quebec | Alpha
+type t = R022 | Quebec | Alpha
 
 val encoding : t Data_encoding.t
 
