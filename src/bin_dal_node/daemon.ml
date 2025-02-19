@@ -495,6 +495,20 @@ module Handler = struct
         let num_attested_shards = attested_shards_per_slot.(index) in
         num_attested_shards >= threshold
       in
+      let contains_traps =
+        let store = Node_context.get_store node_ctxt in
+        let traps_store = Store.traps store in
+        let published_level =
+          Int32.(sub block_level (of_int parameters.attestation_lag))
+        in
+        fun pkh index ->
+          if published_level <= 1l then false
+          else
+            Store.Traps.find traps_store ~level:published_level
+            |> List.exists (fun Store.Traps.{delegate; slot_index; _} ->
+                   index = slot_index
+                   && Signature.Public_key_hash.equal delegate pkh)
+      in
       let*! () =
         List.iter_s
           (fun (_, delegate_opt, _attestation_op, dal_attestation_opt) ->
@@ -523,10 +537,17 @@ module Handler = struct
                           should_be_attested index
                           && not (is_attested bitset index)
                         then
-                          Event.emit_warn_attester_did_not_attest_slot
-                            ~attester:delegate
-                            ~slot_index:index
-                            ~attested_level:block_level
+                          if not (contains_traps delegate index) then
+                            Event.emit_warn_attester_did_not_attest_slot
+                              ~attester:delegate
+                              ~slot_index:index
+                              ~attested_level:block_level
+                          else
+                            Event
+                            .emit_attester_did_not_attest_slot_because_of_traps
+                              ~attester:delegate
+                              ~slot_index:index
+                              ~attested_level:block_level
                         else Lwt.return_unit)
                       (0 -- (parameters.number_of_slots - 1)))
             | None | Some _ ->
