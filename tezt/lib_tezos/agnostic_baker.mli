@@ -116,13 +116,13 @@ val create :
   ?color:Log.Color.t ->
   ?event_pipe:string ->
   ?delegates:string list ->
+  ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
   ?force_apply_from_round:int ->
   ?remote_mode:bool ->
   ?operations_pool:string ->
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
   ?node_version_allowed:string ->
-  ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
   ?use_dal_node:string ->
   Node.t ->
   Client.t ->
@@ -149,13 +149,13 @@ val create_from_uris :
   ?color:Log.Color.t ->
   ?event_pipe:string ->
   ?delegates:string list ->
+  ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
   ?force_apply_from_round:int ->
   ?remote_mode:bool ->
   ?operations_pool:string ->
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
   ?node_version_allowed:string ->
-  ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
   ?use_dal_node:string ->
   base_dir:string ->
   node_data_dir:string ->
@@ -208,13 +208,13 @@ val init :
   ?event_pipe:string ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?delegates:string list ->
+  ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
   ?force_apply_from_round:int ->
   ?remote_mode:bool ->
   ?operations_pool:string ->
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
   ?node_version_allowed:string ->
-  ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
   ?use_dal_node:string ->
   Node.t ->
   Client.t ->
