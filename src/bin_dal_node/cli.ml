@@ -307,13 +307,20 @@ module Term = struct
       & opt (some service_namespace_arg) None
       & info ~docs ~doc ~env:service_namespace_env ["service-namespace"])
 
+  let verbose =
+    let open Cmdliner in
+    let doc =
+      "Controls the verbosity of some emitted events. Default value is false."
+    in
+    Arg.(value & flag & info ~docs ~doc ["verbose"])
+
   let term process =
     Cmdliner.Term.(
       ret
         (const process $ data_dir $ rpc_addr $ expected_pow $ net_addr
        $ public_addr $ endpoint $ metrics_addr $ attester_profile
        $ producer_profile $ observer_profile $ bootstrap_profile $ peers
-       $ history_mode $ service_name $ service_namespace))
+       $ history_mode $ service_name $ service_namespace $ verbose))
 end
 
 module Run = struct
@@ -386,6 +393,7 @@ type options = {
   history_mode : Configuration_file.history_mode option;
   service_name : string option;
   service_namespace : string option;
+  verbose : bool;
 }
 
 type t = Run | Config_init
@@ -393,7 +401,7 @@ type t = Run | Config_init
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
       endpoint metrics_addr attesters producers observers bootstrap_flag peers
-      history_mode service_name service_namespace =
+      history_mode service_name service_namespace verbose =
     let run profile =
       run
         subcommand
@@ -410,6 +418,7 @@ let make ~run =
           history_mode;
           service_name;
           service_namespace;
+          verbose;
         }
     in
     let profile = Operator_profile.make ~attesters ~producers ?observers () in

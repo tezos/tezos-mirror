@@ -38,6 +38,7 @@ let merge
         history_mode;
         service_name;
         service_namespace;
+        verbose;
       } configuration =
   let profile =
     match profile with
@@ -67,6 +68,7 @@ let merge
     service_name = Option.either service_name configuration.service_name;
     service_namespace =
       Option.either service_namespace configuration.service_namespace;
+    verbose = configuration.verbose || verbose;
   }
 
 let wrap_with_error main_promise =
