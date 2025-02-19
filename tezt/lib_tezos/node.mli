@@ -653,6 +653,7 @@ val init :
   ?color:Log.Color.t ->
   ?data_dir:string ->
   ?event_pipe:string ->
+  ?net_addr:string ->
   ?net_port:int ->
   ?advertised_net_port:int ->
   ?metrics_addr:string ->

@@ -101,11 +101,20 @@ module Node = struct
     toplog "Inititializing an L1 node for %s" name ;
     match network with
     | (`Mainnet | `Ghostnet | `Nextnet _ | `Weeklynet _) as network -> (
+        (* For public networks deployments, we listen on all interfaces on both
+           ipv4 and ipv6 *)
+        let net_addr = "[::]" in
         match data_dir with
         | Some data_dir ->
             let rpc_external = Cli.node_external_rpc_server in
             let* node =
-              Node.Agent.create ~rpc_external ~arguments ~data_dir ~name agent
+              Node.Agent.create
+                ~rpc_external
+                ~net_addr
+                ~arguments
+                ~data_dir
+                ~name
+                agent
             in
             let* () = may_copy_node_identity_file agent node identity_file in
             let* () =
@@ -122,6 +131,7 @@ module Node = struct
             let* node =
               Node.Agent.create
                 ~rpc_external
+                ~net_addr
                 ~arguments:
                   [
                     Network (Network.to_octez_network_options network);
@@ -198,10 +208,13 @@ module Node = struct
             toplog "Node is bootstrapped" ;
             Lwt.return node)
     | `Sandbox -> (
+        (* For sandbox deployments, we only listen on local interface, hence
+           no connection could be made to us from outside networks *)
+        let net_addr = "127.0.0.1" in
         match data_dir with
         | None ->
             let rpc_external = Cli.node_external_rpc_server in
-            let* node = Node.Agent.create ~rpc_external ~name agent in
+            let* node = Node.Agent.create ~net_addr ~rpc_external ~name agent in
             let* () = Node.config_init node [Cors_origin "*"] in
             let* () =
               match dal_config with
@@ -232,7 +245,13 @@ module Node = struct
               @ arguments
             in
             let* node =
-              Node.Agent.create ~rpc_external ~arguments ~data_dir ~name agent
+              Node.Agent.create
+                ~rpc_external
+                ~net_addr
+                ~arguments
+                ~data_dir
+                ~name
+                agent
             in
             let* () = may_copy_node_identity_file agent node identity_file in
             let* () = Node.run node [] in
