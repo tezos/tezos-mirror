@@ -421,7 +421,16 @@ module Profile_handlers = struct
            (not the consensus key) *)
         let trap_res = Trap.share_is_trap pkh share ~traps_fraction in
         match trap_res with
-        | Ok trap -> return @@ not trap
+        | Ok true ->
+            let*! () =
+              Event.emit_cannot_attest_slot_because_of_trap
+                ~pkh
+                ~published_level:slot_id.slot_level
+                ~slot_index:slot_id.slot_index
+                ~shard_index
+            in
+            return_false
+        | Ok false -> return_true
         | Error _ ->
             (* assume the worst, that it is a trap *)
             let*! () =
