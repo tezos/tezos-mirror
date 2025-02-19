@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    Client
-   Invocation:   dune exec src/proto_next/lib_client/test/main.exe \
+   Invocation:   dune exec src/proto_022_PsRiotum/lib_client/test/main.exe \
                   -- --file test_client_proto_context.ml
    Subject:      Tests roundtrips of batch_transfer_operation_encoding
 *)

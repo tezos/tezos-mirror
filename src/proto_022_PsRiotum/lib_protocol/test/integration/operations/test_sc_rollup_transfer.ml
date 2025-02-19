@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Sc rollup L1/L2 communication
-    Invocation: dune exec src/proto_next/lib_protocol/test/integration/operations/main.exe \
+    Invocation: dune exec src/proto_022_PsRiotum/lib_protocol/test/integration/operations/main.exe \
                   -- --file test_sc_rollup_transfer.ml
     Subject:    Test transfers from Michelson to smart contract rollups
 *)

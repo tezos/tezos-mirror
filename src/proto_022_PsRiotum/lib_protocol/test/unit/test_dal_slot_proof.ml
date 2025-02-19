@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (dal slot proof)
-    Invocation: dune exec src/proto_next/lib_protocol/test/unit/main.exe \
+    Invocation: dune exec src/proto_022_PsRiotum/lib_protocol/test/unit/main.exe \
                   -- --file test_dal_slot_proof.ml
     Subject:    These unit tests check proof-related functions of Dal slots.
 *)

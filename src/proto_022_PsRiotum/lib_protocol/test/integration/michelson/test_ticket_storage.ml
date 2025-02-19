@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (Alpha_context.Ticket_balance)
-    Invocation: dune exec src/proto_next/lib_protocol/test/integration/michelson/main.exe \
+    Invocation: dune exec src/proto_022_PsRiotum/lib_protocol/test/integration/michelson/main.exe \
                   -- --file test_ticket_storage.ml
     Subject:    Ticket storage functions tested using the Ticket_balance module in Alpha_context.
 *)

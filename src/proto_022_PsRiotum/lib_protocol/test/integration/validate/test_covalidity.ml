@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:  Protocol (validate manager)
-    Invocation: dune exec src/proto_next/lib_protocol/test/integration/validate/main.exe \
+    Invocation: dune exec src/proto_022_PsRiotum/lib_protocol/test/integration/validate/main.exe \
                   -- --file test_covalidity.ml
     Subject:    Validation of operation.
 *)

@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:    protocol
-    Invocation:   dune exec src/proto_next/lib_protocol/test/unit/main.exe \
+    Invocation:   dune exec src/proto_022_PsRiotum/lib_protocol/test/unit/main.exe \
                   -- --file test_staking_operations.ml
     Subject:      test staking operations
 *)

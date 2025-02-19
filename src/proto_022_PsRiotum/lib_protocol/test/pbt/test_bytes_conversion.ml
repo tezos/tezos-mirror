@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    pbt for bytes <=> nat/int conversions
-    Invocation:   dune exec src/proto_next/lib_protocol/test/pbt/main.exe \
+    Invocation:   dune exec src/proto_022_PsRiotum/lib_protocol/test/pbt/main.exe \
                   -- --file test_bytes_conversion.ml
     Subject:      Test the conversions between bytes and int/nat
 *)
