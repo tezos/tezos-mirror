@@ -124,6 +124,17 @@ module type CURVE = sig
   (** Build a OCaml array of [t] values from the contiguous C array *)
   val of_affine_array : affine_array -> t array
 
+  (** [affine_array_of_compressed_bytes_opt pts] builds a contiguous C
+      array and populate it with the points [pts] in affine
+      coordinates from their compressed representation in bytes.
+
+      If [subgroup_check] is set, the function also checks if the
+      points are in the prime subgroup.
+
+      Use it with {!affine_add_bulk} to get better performance *)
+  val affine_array_of_compressed_bytes_opt :
+    subgroup_check:bool -> Bytes.t array -> affine_array option
+
   (** Return the number of elements in the array *)
   val size_of_affine_array : affine_array -> int
 
@@ -209,6 +220,10 @@ module type CURVE = sig
       one allocation for the output. This method is recommended to save the
       allocation overhead of using [n] times {!add}. *)
   val add_bulk : t list -> t
+
+  (** [affine_add_bulk xs] returns the sum of the elements of [xs] by
+      performing only one allocation for the output. *)
+  val affine_add_bulk : affine_array -> t
 
   (** [double g] returns [2g] *)
   val double : t -> t

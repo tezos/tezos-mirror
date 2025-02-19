@@ -30,6 +30,14 @@ module MakeBulkOperations (G : Bls12_381.CURVE) = struct
     let xs = List.init n (fun _ -> G.random ()) in
     assert (G.(eq (List.fold_left G.add G.zero xs) (G.add_bulk xs)))
 
+  let test_affine_bulk_add () =
+    let n = 10 + Random.int 1_000 in
+    let xs = Array.init n (fun _ -> G.random ()) in
+    let xs_affine = G.to_affine_array xs in
+    let xs = Array.to_list xs in
+    assert (
+      G.(eq (List.fold_left G.add G.zero xs) (G.affine_add_bulk xs_affine)))
+
   let test_pippenger () =
     let n = 1 + Random.int 5 in
     let start = Random.int n in
@@ -67,6 +75,20 @@ module MakeBulkOperations (G : Bls12_381.CURVE) = struct
     let p = Array.to_list p in
     let p' = Array.to_list p' in
     assert (List.for_all2 G.eq p p')
+
+  let test_affine_array_of_compressed_bytes () =
+    let n = 1 + Random.int 1000 in
+    let points = Array.init n (fun _ -> G.random ()) in
+    let points_in_bytes = Array.map G.to_compressed_bytes points in
+    let aux ~subgroup_check =
+      let affine_points =
+        G.affine_array_of_compressed_bytes_opt ~subgroup_check points_in_bytes
+      in
+      let points' = G.of_affine_array (Option.get affine_points) in
+      assert (Array.for_all2 G.eq points points')
+    in
+    aux ~subgroup_check:true ;
+    aux ~subgroup_check:false
 
   let test_size_of_affine_array () =
     let n = 1 + Random.int 1000 in
@@ -223,7 +245,12 @@ module MakeBulkOperations (G : Bls12_381.CURVE) = struct
     ( "Bulk operations",
       [
         test_case "bulk add" `Quick (repeat 10 test_bulk_add);
+        test_case "affine bulk add" `Quick (repeat 10 test_affine_bulk_add);
         test_case "to_affine_array" `Quick (repeat 10 test_to_affine_array);
+        test_case
+          "affine_array_of_compressed_bytes"
+          `Quick
+          (repeat 10 test_affine_array_of_compressed_bytes);
         test_case
           "size_of_affine_array"
           `Quick

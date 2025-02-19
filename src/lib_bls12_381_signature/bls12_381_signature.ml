@@ -242,19 +242,28 @@ module MinPk = struct
         else false)
 
   let aggregate_signature_opt signatures =
-    let rec aux signatures acc =
-      match signatures with
-      | [] -> Some acc
-      | signature :: signatures -> (
-          let signature = Bls12_381.G2.of_compressed_bytes_opt signature in
-          match signature with
-          | None -> None
-          | Some signature ->
-              let acc = Bls12_381.G2.(add signature acc) in
-              aux signatures acc)
+    let signatures =
+      Bls12_381.G2.affine_array_of_compressed_bytes_opt
+        ~subgroup_check:true
+        (Array.of_list signatures)
     in
-    let res = aux signatures Bls12_381.G2.zero in
-    Option.map Bls12_381.G2.to_compressed_bytes res
+    Option.map
+      (fun signatures ->
+        let res = Bls12_381.G2.affine_add_bulk signatures in
+        Bls12_381.G2.to_compressed_bytes res)
+      signatures
+
+  let aggregate_public_key_opt ?(subgroup_check = true) pks =
+    let pks =
+      Bls12_381.G1.affine_array_of_compressed_bytes_opt
+        ~subgroup_check
+        (Array.of_list pks)
+    in
+    Option.map
+      (fun pks ->
+        let res = Bls12_381.G1.affine_add_bulk pks in
+        Bls12_381.G1.to_compressed_bytes res)
+      pks
 
   let core_aggregate_verify pks_with_msgs aggregated_signature ciphersuite =
     let rec aux aggregated_signature pks_with_msgs ctxt =
@@ -402,15 +411,10 @@ module MinPk = struct
 
     let aggregate_verify pks_with_pops msg aggregated_signature =
       let pks_bytes = List.map fst pks_with_pops in
-      let pks_opts = List.map Bls12_381.G1.of_compressed_bytes_opt pks_bytes in
-      let pks_are_ok = List.for_all Option.is_some pks_opts in
-      if not pks_are_ok then false
+      let aggregated_pk = aggregate_public_key_opt pks_bytes in
+      if Option.is_none aggregated_pk then false
       else
-        let pks = List.map Option.get pks_opts in
-        let aggregated_pk =
-          List.fold_left Bls12_381.G1.add Bls12_381.G1.zero pks
-        in
-        let aggregated_pk = Bls12_381.G1.to_compressed_bytes aggregated_pk in
+        let aggregated_pk = Option.get aggregated_pk in
         let signature_check = verify aggregated_pk msg aggregated_signature in
         let pop_checks =
           List.for_all
@@ -549,19 +553,28 @@ module MinSig = struct
         else false)
 
   let aggregate_signature_opt signatures =
-    let rec aux signatures acc =
-      match signatures with
-      | [] -> Some acc
-      | signature :: signatures -> (
-          let signature = Bls12_381.G1.of_compressed_bytes_opt signature in
-          match signature with
-          | None -> None
-          | Some signature ->
-              let acc = Bls12_381.G1.(add signature acc) in
-              aux signatures acc)
+    let signatures =
+      Bls12_381.G1.affine_array_of_compressed_bytes_opt
+        ~subgroup_check:true
+        (Array.of_list signatures)
     in
-    let res = aux signatures Bls12_381.G1.zero in
-    Option.map Bls12_381.G1.to_compressed_bytes res
+    Option.map
+      (fun signatures ->
+        let res = Bls12_381.G1.affine_add_bulk signatures in
+        Bls12_381.G1.to_compressed_bytes res)
+      signatures
+
+  let aggregate_public_key_opt ?(subgroup_check = true) pks =
+    let pks =
+      Bls12_381.G2.affine_array_of_compressed_bytes_opt
+        ~subgroup_check
+        (Array.of_list pks)
+    in
+    Option.map
+      (fun pks ->
+        let res = Bls12_381.G2.affine_add_bulk pks in
+        Bls12_381.G2.to_compressed_bytes res)
+      pks
 
   let core_aggregate_verify pks_with_msgs aggregated_signature ciphersuite =
     let rec aux aggregated_signature pks_with_msgs ctxt =
@@ -709,15 +722,10 @@ module MinSig = struct
 
     let aggregate_verify pks_with_pops msg aggregated_signature =
       let pks_bytes = List.map fst pks_with_pops in
-      let pks_opts = List.map Bls12_381.G2.of_compressed_bytes_opt pks_bytes in
-      let pks_are_ok = List.for_all Option.is_some pks_opts in
-      if not pks_are_ok then false
+      let aggregated_pk = aggregate_public_key_opt pks_bytes in
+      if Option.is_none aggregated_pk then false
       else
-        let pks = List.map Option.get pks_opts in
-        let aggregated_pk =
-          List.fold_left Bls12_381.G2.add Bls12_381.G2.zero pks
-        in
-        let aggregated_pk = Bls12_381.G2.to_compressed_bytes aggregated_pk in
+        let aggregated_pk = Option.get aggregated_pk in
         let signature_check = verify aggregated_pk msg aggregated_signature in
         let pop_checks =
           List.for_all
