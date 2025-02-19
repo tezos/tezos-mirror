@@ -18,12 +18,12 @@ depends: [
   "octez-protocol-021-PsQuebec-libs" {with-test}
   "octez-smart-rollup-node-PsQuebec" {with-test}
   "octez-alcotezt" {with-test}
+  "tezos-protocol-022-PsRiotum" {with-test}
+  "octez-protocol-022-PsRiotum-libs" {with-test}
+  "octez-smart-rollup-node-PsRiotum" {with-test}
   "tezos-protocol-alpha" {with-test}
   "octez-protocol-alpha-libs" {with-test}
   "octez-smart-rollup-node-alpha" {with-test}
-  "tezos-protocol-next" {with-test}
-  "octez-protocol-next-libs" {with-test}
-  "octez-smart-rollup-node-next" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

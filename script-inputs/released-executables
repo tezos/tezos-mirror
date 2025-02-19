@@ -7,5 +7,7 @@ octez-client
 octez-admin-client
 octez-experimental-agnostic-baker
 octez-node
+octez-accuser-PsRiotum
+octez-baker-PsRiotum
 octez-accuser-PsQuebec
 octez-baker-PsQuebec

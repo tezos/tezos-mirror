@@ -18,12 +18,12 @@ depends: [
 ]
 depopts: [
   "tezos-injector-021-PsQuebec"
-  "tezos-injector-next"
+  "tezos-injector-022-PsRiotum"
   "tezos-injector-alpha"
 ]
 conflicts: [
   "tezos-injector-021-PsQuebec" { != version }
-  "tezos-injector-next" { != version }
+  "tezos-injector-022-PsRiotum" { != version }
   "tezos-injector-alpha" { != version }
 ]
 build: [

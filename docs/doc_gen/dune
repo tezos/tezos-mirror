@@ -18,7 +18,7 @@
   re
   tezos-protocol-genesis.embedded-protocol
   tezos-protocol-021-PsQuebec.embedded-protocol
-  tezos-protocol-next.embedded-protocol
+  tezos-protocol-022-PsRiotum.embedded-protocol
   tezos-protocol-alpha.embedded-protocol)
  (link_flags
   (:standard)
