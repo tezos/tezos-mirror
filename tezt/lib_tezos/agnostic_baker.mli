@@ -123,7 +123,6 @@ val create :
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
   ?node_version_allowed:string ->
-  ?use_dal_node:string ->
   Node.t ->
   Client.t ->
   t
@@ -161,7 +160,6 @@ val create_from_uris :
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
   ?node_version_allowed:string ->
-  ?use_dal_node:string ->
   base_dir:string ->
   node_data_dir:string ->
   node_rpc_endpoint:Endpoint.t ->
@@ -221,7 +219,6 @@ val init :
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
   ?node_version_allowed:string ->
-  ?use_dal_node:string ->
   Node.t ->
   Client.t ->
   t Lwt.t

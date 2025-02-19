@@ -32,7 +32,6 @@ module Parameters = struct
     state_recorder : bool;
     node_version_check_bypass : bool;
     node_version_allowed : string option;
-    use_dal_node : string option;
   }
 
   type session_state = {mutable ready : bool}
@@ -61,8 +60,8 @@ let create_from_uris ?runner
     ?event_pipe ?(delegates = []) ?(liquidity_baking_toggle_vote = Some Pass)
     ?force_apply_from_round ?(remote_mode = false) ?operations_pool
     ?dal_node_rpc_endpoint ?(state_recorder = false)
-    ?(node_version_check_bypass = false) ?node_version_allowed ?use_dal_node
-    ~base_dir ~node_data_dir ~node_rpc_endpoint () =
+    ?(node_version_check_bypass = false) ?node_version_allowed ~base_dir
+    ~node_data_dir ~node_rpc_endpoint () =
   let agnostic_baker =
     create
       ~path
@@ -85,7 +84,6 @@ let create_from_uris ?runner
         state_recorder;
         node_version_check_bypass;
         node_version_allowed;
-        use_dal_node;
       }
   in
   agnostic_baker
@@ -96,8 +94,7 @@ let handle_event node ({name; _} : event) =
 let create ?runner ?path ?name ?color ?event_pipe ?(delegates = [])
     ?(liquidity_baking_toggle_vote = Some Pass) ?force_apply_from_round
     ?(remote_mode = false) ?operations_pool ?dal_node ?(state_recorder = false)
-    ?(node_version_check_bypass = false) ?node_version_allowed ?use_dal_node
-    node client =
+    ?(node_version_check_bypass = false) ?node_version_allowed node client =
   let dal_node_rpc_endpoint = Option.map Dal_node.as_rpc_endpoint dal_node in
   let agnostic_baker =
     create_from_uris
@@ -106,7 +103,6 @@ let create ?runner ?path ?name ?color ?event_pipe ?(delegates = [])
       ?name
       ?color
       ?event_pipe
-      ?use_dal_node
       ~delegates
       ~liquidity_baking_toggle_vote
       ?force_apply_from_round
@@ -163,6 +159,11 @@ let run ?event_level ?event_sections_levels (agnostic_baker : t) =
       Endpoint.as_string
       agnostic_baker.persistent_state.dal_node_rpc_endpoint
   in
+  let without_dal =
+    Cli_arg.optional_switch
+      "without-dal"
+      (Option.is_none agnostic_baker.persistent_state.dal_node_rpc_endpoint)
+  in
   let state_recorder =
     Cli_arg.optional_switch
       "record-state"
@@ -179,11 +180,6 @@ let run ?event_level ?event_sections_levels (agnostic_baker : t) =
       Fun.id
       agnostic_baker.persistent_state.node_version_allowed
   in
-  let use_dal_node =
-    match agnostic_baker.persistent_state.use_dal_node with
-    | None -> ["--without-dal"]
-    | Some endpoint -> ["--dal-node"; endpoint]
-  in
   let run_args =
     if agnostic_baker.persistent_state.remote_mode then ["remotely"]
     else ["with"; "local"; "node"; node_data_dir]
@@ -191,9 +187,8 @@ let run ?event_level ?event_sections_levels (agnostic_baker : t) =
   let arguments =
     ["--"; "--endpoint"; node_addr; "--base-dir"; base_dir; "run"]
     @ run_args @ delegates @ liquidity_baking_toggle_vote
-    @ force_apply_from_round @ operations_pool @ dal_node_endpoint
+    @ force_apply_from_round @ operations_pool @ dal_node_endpoint @ without_dal
     @ state_recorder @ node_version_check_bypass @ node_version_allowed
-    @ use_dal_node
   in
 
   let on_terminate _ =
@@ -232,7 +227,7 @@ let init ?runner ?(path = Uses.path Constant.octez_experimental_agnostic_baker)
     ?name ?color ?event_level ?event_pipe ?event_sections_levels
     ?(delegates = []) ?liquidity_baking_toggle_vote ?force_apply_from_round
     ?remote_mode ?operations_pool ?dal_node ?state_recorder
-    ?node_version_check_bypass ?node_version_allowed ?use_dal_node node client =
+    ?node_version_check_bypass ?node_version_allowed node client =
   let* () = Node.wait_for_ready node in
   let agnostic_baker =
     create
@@ -249,7 +244,6 @@ let init ?runner ?(path = Uses.path Constant.octez_experimental_agnostic_baker)
       ?state_recorder
       ?node_version_check_bypass
       ?node_version_allowed
-      ?use_dal_node
       ~delegates
       node
       client
