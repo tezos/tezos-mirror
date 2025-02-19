@@ -314,6 +314,15 @@ module P2P : sig
       ; query : < subscribed : bool > >
       service
 
+    val get_fanout :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (Types.Topic.t * Types.Peer.t list * Types.Time.t) list
+      ; prefix : unit
+      ; params : unit
+      ; query : unit >
+      service
+
     val get_slot_indexes_peers :
       < meth : [`GET]
       ; input : unit

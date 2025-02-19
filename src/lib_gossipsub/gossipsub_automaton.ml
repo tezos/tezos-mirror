@@ -2546,6 +2546,8 @@ module Make (C : AUTOMATON_CONFIG) :
     let get_our_topics state =
       Topic.Map.fold (fun topic _peers acc -> topic :: acc) state.mesh []
 
+    let get_fanout state = state.fanout
+
     let get_fanout_peers topic state =
       match Topic.Map.find topic state.fanout with
       | None -> []

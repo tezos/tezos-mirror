@@ -991,6 +991,9 @@ module type AUTOMATON = sig
         that are subscribed by [peer] *)
     val get_subscribed_topics : Peer.t -> view -> Topic.t list
 
+    (** [get_fanout state] returns all the fanout peers. *)
+    val get_fanout : view -> fanout_peers Topic.Map.t
+
     (** [get_fanout_peers topic state] returns the fanout peers of [topic]. *)
     val get_fanout_peers : Topic.t -> view -> Peer.t list
 
