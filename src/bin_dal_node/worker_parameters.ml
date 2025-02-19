@@ -52,6 +52,7 @@ let limits =
     retain_duration;
     fanout_ttl;
     heartbeat_interval;
+    heartbeat_ping_interval;
     backoff_cleanup_ticks;
     score_cleanup_ticks;
     degree_low;
