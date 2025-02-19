@@ -44,14 +44,14 @@ let reload t run_cmd =
       let () =
         match r with
         | WEXITED 0 -> t.checked_in_path <- true
-        | _ -> Test.fail "Cannot find executable: %s" executable
+        | _ -> Log.warn "Cannot find executable: %s" executable
       in
       Lwt.return_unit
     else Lwt.return_unit
   in
   let processes_names = List.map snd (get_binaries t) in
   let processes = String.concat "," processes_names in
-  Log.warn
+  Log.report
     "Restarting prometheus-process-exporter; monitored processes = {%s}"
     processes ;
   let* _ = run_cmd ~detach:false "pkill" ["-f"; executable] |> Process.wait in
