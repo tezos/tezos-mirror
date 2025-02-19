@@ -69,15 +69,15 @@ echo "Remove all packages which are not needed by the packages we actually want.
 #   read tezos-indexer databases
 
 case "$(uname -m)" in
-  "x86_64")
-    arch="x86_64"
-    ;;
-  "aarch64")
-    arch="arm64"
-    ;;
-  *)
-    arch="unknown"
-    ;;
+"x86_64")
+  arch="x86_64"
+  ;;
+"aarch64")
+  arch="arm64"
+  ;;
+*)
+  arch="unknown"
+  ;;
 esac
 
 cd opam-repository
@@ -89,7 +89,7 @@ OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
 rm -rf packages/"$dummy_pkg" packages/octez-deps
 
 echo "Add safer hashes."
-opam admin list --short | while read -r line ; do
-  opam admin add-hashes sha256 sha512 -p $line
+opam admin list --short | while read -r line; do
+  opam admin add-hashes sha256 sha512 -p "$line"
 done
 cd ..
