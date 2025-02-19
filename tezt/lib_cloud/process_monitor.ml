@@ -55,12 +55,12 @@ let reload t run_cmd =
     "Restarting prometheus-process-exporter; monitored processes = {%s}"
     processes ;
   let* _ = run_cmd ~detach:false "pkill" ["-f"; executable] |> Process.wait in
-  let* () =
+  let* _ =
     run_cmd
       ~detach:true
       executable
       (["-web.listen-address"; Format.asprintf ":%d" t.listening_port]
       @ ["--procnames"; processes])
-    |> Process.check
+    |> Process.wait
   in
   Lwt.return_unit
