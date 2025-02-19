@@ -976,3 +976,9 @@ let clear_popped_transactions () =
     Worker.Queue.push_request w Request.Clear_popped_transactions
   in
   return_unit
+
+let mode () =
+  let open Lwt_result_syntax in
+  let*? worker = Lazy.force worker in
+  let state = Worker.state worker in
+  return state.mode

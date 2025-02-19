@@ -92,38 +92,64 @@ let validate_max_fee_per_gas (module Backend_rpc : Services_backend_sig.S)
   if transaction.max_fee_per_gas >= base_fee_per_gas then return (Ok ())
   else return (Error "Max gas fee too low")
 
-let validate_pay_for_fees (module Backend_rpc : Services_backend_sig.S)
-    (transaction : Transaction.transaction) caller =
+let validate_pay_for_fees (transaction : Transaction.transaction) ~balance =
   let open Lwt_result_syntax in
-  let* (Qty balance) =
-    Backend_rpc.balance caller Block_parameter.(Block_parameter Latest)
-  in
   let cost = Z.mul transaction.gas_limit transaction.max_fee_per_gas in
   if balance >= cost then return (Ok ())
   else return (Error "Cannot prepay transaction.")
 
-let validate backend_rpc transaction ~caller =
+let validate_total_cost (tx_object : legacy_transaction_object) ~balance =
+  let open Lwt_result_syntax in
+  let total_cost =
+    let (Qty gas) = tx_object.gas in
+    let (Qty gas_price) = tx_object.gasPrice in
+    let (Qty value) = tx_object.value in
+    Z.add (Z.mul gas gas_price) value
+  in
+  if total_cost > balance then return (Error "Not enough funds")
+  else return (Ok ())
+
+let validate_stateless backend_rpc transaction ~caller =
   let open Lwt_result_syntax in
   let** () = validate_chain_id backend_rpc transaction in
   let** () = validate_nonce backend_rpc transaction caller in
-  let** () = validate_max_fee_per_gas backend_rpc transaction in
-  let** () = validate_pay_for_fees backend_rpc transaction caller in
   let** () = validate_sender_not_a_contract backend_rpc caller in
-  let** () = validate_gas_limit backend_rpc transaction in
   return (Ok ())
 
-let valid_transaction_object ~backend_rpc ~decode ~hash tx_raw =
+let validate_with_state (module Backend_rpc : Services_backend_sig.S)
+    transaction (tx_object : legacy_transaction_object) =
+  let open Lwt_result_syntax in
+  let* (Qty balance) =
+    Backend_rpc.balance tx_object.from Block_parameter.(Block_parameter Latest)
+  in
+  let backend_rpc = (module Backend_rpc : Services_backend_sig.S) in
+  let** () = validate_max_fee_per_gas backend_rpc transaction in
+  let** () = validate_pay_for_fees transaction ~balance in
+  let** () = validate_gas_limit backend_rpc transaction in
+  let** () = validate_total_cost tx_object ~balance in
+  return (Ok ())
+
+type validation_mode = Stateless | With_state | Full
+
+let valid_transaction_object ~backend_rpc ~decode ~hash ~mode tx_raw =
   let open Lwt_result_syntax in
   let tx_raw = Bytes.unsafe_of_string tx_raw in
-  let**? transaction = decode tx_raw in
-  let**? transaction_object =
-    Transaction.to_transaction_object ~hash transaction
+  let**? tx = decode tx_raw in
+  let**? tx_object = Transaction.to_transaction_object ~hash tx in
+  let** () =
+    match mode with
+    | Stateless -> validate_stateless backend_rpc tx ~caller:tx_object.from
+    | With_state -> validate_with_state backend_rpc tx tx_object
+    | Full ->
+        let** () = validate_stateless backend_rpc tx ~caller:tx_object.from in
+        let** () = validate_with_state backend_rpc tx tx_object in
+        return (Ok ())
   in
-  let** () = validate backend_rpc transaction ~caller:transaction_object.from in
-  return (Ok transaction_object)
+
+  return (Ok tx_object)
 
 let is_tx_valid ((module Backend_rpc : Services_backend_sig.S) as backend_rpc)
-    tx_raw =
+    ~mode tx_raw =
   let hash = Ethereum_types.hash_raw_tx tx_raw in
   match String.get_uint8 tx_raw 0 with
   | 1 ->
@@ -132,6 +158,7 @@ let is_tx_valid ((module Backend_rpc : Services_backend_sig.S) as backend_rpc)
         ~backend_rpc
         ~decode:Transaction.decode_eip2930
         ~hash
+        ~mode
         tx_raw
   | 2 ->
       let tx_raw = String.sub tx_raw 1 (String.length tx_raw - 1) in
@@ -139,10 +166,12 @@ let is_tx_valid ((module Backend_rpc : Services_backend_sig.S) as backend_rpc)
         ~backend_rpc
         ~decode:Transaction.decode_eip1559
         ~hash
+        ~mode
         tx_raw
   | _ ->
       valid_transaction_object
         ~backend_rpc
         ~decode:Transaction.decode_legacy
         ~hash
+        ~mode
         tx_raw

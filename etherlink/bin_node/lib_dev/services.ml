@@ -414,7 +414,8 @@ let process_trace_result trace =
       let msg = Format.asprintf "%a" pp_print_trace e in
       rpc_error (Rpc_errors.internal_error msg)
 
-let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
+let dispatch_request (rpc : Configuration.rpc)
+    (validation : Validate.validation_mode) (config : Configuration.t)
     ((module Backend_rpc : Services_backend_sig.S), _)
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_result_syntax in
@@ -632,7 +633,9 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
             else
               let f tx_raw =
                 let txn = Ethereum_types.hex_to_bytes tx_raw in
-                let* is_valid = Validate.is_tx_valid (module Backend_rpc) txn in
+                let* is_valid =
+                  Validate.is_tx_valid (module Backend_rpc) ~mode:validation txn
+                in
                 match is_valid with
                 | Error err ->
                     let*! () =
@@ -640,29 +643,11 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
                     in
                     rpc_error (Rpc_errors.transaction_rejected err None)
                 | Ok transaction_object -> (
-                    let* (Qty balance) =
-                      Backend_rpc.balance
-                        transaction_object.from
-                        (Block_parameter.Block_parameter Latest)
-                    in
-                    let total_cost =
-                      let (Qty gas) = transaction_object.gas in
-                      let (Qty gas_price) = transaction_object.gasPrice in
-                      let (Qty value) = transaction_object.value in
-                      Z.add (Z.mul gas gas_price) value
-                    in
-                    if total_cost > balance then
-                      rpc_error
-                        (Rpc_errors.transaction_rejected
-                           "Not enough funds"
-                           None)
-                    else
-                      let* tx_hash = Tx_pool.add transaction_object txn in
-                      match tx_hash with
-                      | Ok tx_hash -> rpc_ok tx_hash
-                      | Error reason ->
-                          rpc_error
-                            (Rpc_errors.transaction_rejected reason None))
+                    let* tx_hash = Tx_pool.add transaction_object txn in
+                    match tx_hash with
+                    | Ok tx_hash -> rpc_ok tx_hash
+                    | Error reason ->
+                        rpc_error (Rpc_errors.transaction_rejected reason None))
               in
               build_with_input ~f module_ parameters
         | Eth_call.Method ->
@@ -862,11 +847,29 @@ let dispatch_private_request (rpc : Configuration.rpc)
     | Method (Inject_transaction.Method, module_) ->
         let open Lwt_result_syntax in
         let f (transaction_object, raw_txn) =
-          let* tx_hash = Tx_pool.add transaction_object raw_txn in
-          match tx_hash with
-          | Ok tx_hash -> rpc_ok tx_hash
-          | Error reason ->
-              rpc_error (Rpc_errors.transaction_rejected reason None)
+          let* is_valid =
+            let* mode = Tx_pool.mode () in
+            match mode with
+            | Sequencer ->
+                Validate.is_tx_valid
+                  (module Backend_rpc)
+                  ~mode:With_state
+                  raw_txn
+            | _ -> return @@ Ok transaction_object
+          in
+          match is_valid with
+          | Error err ->
+              let*! () =
+                let transaction = Ethereum_types.hex_encode_string raw_txn in
+                Tx_pool_events.invalid_transaction ~transaction
+              in
+              rpc_error (Rpc_errors.transaction_rejected err None)
+          | Ok transaction_object -> (
+              let* tx_hash = Tx_pool.add transaction_object raw_txn in
+              match tx_hash with
+              | Ok tx_hash -> rpc_ok tx_hash
+              | Error reason ->
+                  rpc_error (Rpc_errors.transaction_rejected reason None))
         in
         build_with_input ~f module_ parameters
     | Method (Durable_state_value.Method, module_) ->
@@ -942,7 +945,7 @@ let empty_stream =
 
 let empty_sid = Ethereum_types.(Subscription.Id (Hex ""))
 
-let dispatch_websocket (rpc : Configuration.rpc) config ctx
+let dispatch_websocket (rpc : Configuration.rpc) validation config ctx
     (input : JSONRPC.request) =
   let open Lwt_syntax in
   match map_method_name ~restrict:rpc.restricted_rpcs input.method_ with
@@ -984,7 +987,7 @@ let dispatch_websocket (rpc : Configuration.rpc) config ctx
       let+ value = build_with_input ~f module_ input.parameters in
       websocket_response_of_response JSONRPC.{value; id = input.id}
   | _ ->
-      let+ response = dispatch_request rpc config ctx input in
+      let+ response = dispatch_request rpc validation config ctx input in
       websocket_response_of_response response
 
 let dispatch_private_websocket ~block_production (rpc : Configuration.rpc)
@@ -1000,8 +1003,14 @@ let generic_dispatch (rpc : Configuration.rpc) config ctx dir path
   Evm_directory.register0 dir (dispatch_batch_service ~path) (fun () input ->
       dispatch_handler rpc config ctx dispatch_request input |> Lwt_result.ok)
 
-let dispatch_public (rpc : Configuration.rpc) config ctx dir =
-  generic_dispatch rpc config ctx dir Path.root (dispatch_request rpc)
+let dispatch_public (rpc : Configuration.rpc) validation config ctx dir =
+  generic_dispatch
+    rpc
+    config
+    ctx
+    dir
+    Path.root
+    (dispatch_request rpc validation)
 
 let dispatch_private (rpc : Configuration.rpc) ~block_production config ctx dir
     =
@@ -1013,8 +1022,8 @@ let dispatch_private (rpc : Configuration.rpc) ~block_production config ctx dir
     Path.(add_suffix root "private")
     (dispatch_private_request rpc ~block_production)
 
-let generic_websocket_dispatch (rpc : Configuration.rpc)
-    (config : Configuration.t) ctx dir path dispatch_websocket =
+let generic_websocket_dispatch (config : Configuration.t) ctx dir path
+    dispatch_websocket =
   if config.experimental_features.enable_websocket then
     Evm_directory.jsonrpc_websocket_register
       ?monitor:config.experimental_features.monitor_websocket_heartbeat
@@ -1022,33 +1031,40 @@ let generic_websocket_dispatch (rpc : Configuration.rpc)
         config.experimental_features.max_websocket_message_length
       dir
       path
-      (dispatch_websocket rpc config ctx)
+      (dispatch_websocket config ctx)
   else dir
 
-let dispatch_websocket_public (rpc : Configuration.rpc) config ctx dir =
-  generic_websocket_dispatch rpc config ctx dir "/ws" dispatch_websocket
+let dispatch_websocket_public (rpc : Configuration.rpc) validation config ctx
+    dir =
+  generic_websocket_dispatch
+    config
+    ctx
+    dir
+    "/ws"
+    (dispatch_websocket rpc validation)
 
 let dispatch_websocket_private (rpc : Configuration.rpc) ~block_production
     config ctx dir =
   generic_websocket_dispatch
-    rpc
     config
     ctx
     dir
     "/private/ws"
-    (dispatch_private_websocket ~block_production)
+    (dispatch_private_websocket ~block_production rpc)
 
-let directory ?delegate_health_check_to rpc config
+let directory ?delegate_health_check_to rpc validation config
     ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
   Evm_directory.empty config.experimental_features.rpc_server
   |> version |> configuration config
   |> health_check ?delegate_to:delegate_health_check_to
   |> dispatch_public
        rpc
+       validation
        config
        ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
   |> dispatch_websocket_public
        rpc
+       validation
        config
        ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
 

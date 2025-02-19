@@ -125,7 +125,7 @@ let monitor_performances ~data_dir =
   Lwt.dont_wait aux (Fun.const ())
 
 let start_public_server ?delegate_health_check_to ?evm_services ?data_dir
-    (config : Configuration.t) ctxt =
+    validation (config : Configuration.t) ctxt =
   let open Lwt_result_syntax in
   let*! can_start_performance_metrics =
     Octez_performance_metrics.supports_performance_metrics ()
@@ -144,7 +144,12 @@ let start_public_server ?delegate_health_check_to ?evm_services ?data_dir
           impl.time_between_blocks
   in
   let directory =
-    Services.directory ?delegate_health_check_to config.public_rpc config ctxt
+    Services.directory
+      ?delegate_health_check_to
+      config.public_rpc
+      validation
+      config
+      ctxt
     |> register_evm_services
     |> Evm_directory.register_metrics "/metrics"
   in
