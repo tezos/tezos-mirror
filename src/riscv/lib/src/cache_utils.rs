@@ -7,8 +7,8 @@ use crate::{
     default::ConstDefault,
     machine_state::main_memory::Address,
     state_backend::{
-        CommitmentLayout, FromProofResult, Layout, ManagerAlloc, ManagerBase, Many, ProofLayout,
-        ProofTree, RefOwnedAlloc,
+        AllocatedOf, CommitmentLayout, FromProofResult, Layout, ManagerAlloc, ManagerBase,
+        ManagerSerialise, Many, ProofLayout, ProofTree,
     },
     storage::{Hash, HashError},
 };
@@ -93,7 +93,7 @@ impl<const BITS: usize, const SIZE: usize, CachedLayout: Layout> Layout
 impl<const BITS: usize, const SIZE: usize, CachedLayout: CommitmentLayout> CommitmentLayout
     for Sizes<BITS, SIZE, CachedLayout>
 {
-    fn state_hash(state: RefOwnedAlloc<Self>) -> Result<Hash, HashError> {
+    fn state_hash<M: ManagerSerialise>(state: AllocatedOf<Self, M>) -> Result<Hash, HashError> {
         Many::<CachedLayout, SIZE>::state_hash(state)
     }
 }

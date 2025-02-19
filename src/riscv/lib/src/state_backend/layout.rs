@@ -150,20 +150,23 @@ macro_rules! struct_layout {
             }
 
             impl $crate::state_backend::CommitmentLayout for $layout_t {
-                fn state_hash(state: $crate::state_backend::RefOwnedAlloc<Self>) ->
-                    Result<$crate::storage::Hash, $crate::storage::HashError> {
-                        $crate::storage::Hash::blake2b_hash(state)
-                    }
+                fn state_hash<M: $crate::state_backend::ManagerRead + $crate::state_backend::ManagerSerialise>(state: AllocatedOf<Self, M>
+                ) -> Result<$crate::storage::Hash, $crate::storage::HashError> {
+                    $crate::storage::Hash::blake2b_hash(state)
+                }
             }
 
             impl $crate::state_backend::ProofLayout for $layout_t {
-                fn to_merkle_tree(state: $crate::state_backend::RefProofGenOwnedAlloc<Self>) ->
-                    Result<$crate::state_backend::proof_backend::merkle::MerkleTree, $crate::storage::HashError> {
-                        let serialised = $crate::storage::binary::serialise(&state)?;
-                        MerkleTree::make_merkle_leaf(serialised, state.aggregate_access_info())
-                    }
+                fn to_merkle_tree(
+                    state: $crate::state_backend::RefProofGenOwnedAlloc<Self>,
+                ) -> Result<$crate::state_backend::proof_backend::merkle::MerkleTree, $crate::storage::HashError> {
+                    let serialised = $crate::storage::binary::serialise(&state)?;
+                    MerkleTree::make_merkle_leaf(serialised, state.aggregate_access_info())
+                }
 
-                fn from_proof(proof: $crate::state_backend::ProofTree) -> Result<Self::Allocated<$crate::state_backend::verify_backend::Verifier>, $crate::state_backend::FromProofError> {
+                fn from_proof(
+                    proof: $crate::state_backend::ProofTree,
+                ) -> Result<Self::Allocated<$crate::state_backend::verify_backend::Verifier>, $crate::state_backend::FromProofError> {
                     if let $crate::state_backend::ProofTree::Present(proof) = proof {
                         match proof {
                             $crate::state_backend::proof_backend::tree::Tree::Leaf(_) => {

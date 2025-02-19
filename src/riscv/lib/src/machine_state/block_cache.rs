@@ -90,7 +90,7 @@ use crate::machine_state::address_translation::PAGE_SIZE;
 use crate::parser::instruction::InstrWidth;
 use crate::state_backend::{
     self, AllocatedOf, Atom, Cell, EnrichedCell, EnrichedValue, ManagerBase, ManagerClone,
-    ManagerRead, ManagerReadWrite, ManagerWrite, Ref, proof_backend,
+    ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite, Ref, proof_backend,
 };
 use crate::traps::{EnvironException, Exception};
 use crate::{cache_utils::FenceCounter, state_backend::FnManager};
@@ -125,7 +125,7 @@ impl<ML: MainMemoryLayout> state_backend::Layout for ICallLayout<ML> {
 }
 
 impl<ML: MainMemoryLayout> state_backend::CommitmentLayout for ICallLayout<ML> {
-    fn state_hash(state: state_backend::RefOwnedAlloc<Self>) -> Result<Hash, HashError> {
+    fn state_hash<M: ManagerSerialise>(state: AllocatedOf<Self, M>) -> Result<Hash, HashError> {
         Hash::blake2b_hash(state)
     }
 }
@@ -220,7 +220,7 @@ impl state_backend::Layout for AddressCellLayout {
 }
 
 impl state_backend::CommitmentLayout for AddressCellLayout {
-    fn state_hash(state: state_backend::RefOwnedAlloc<Self>) -> Result<Hash, HashError> {
+    fn state_hash<M: ManagerSerialise>(state: AllocatedOf<Self, M>) -> Result<Hash, HashError> {
         <Atom<Address> as state_backend::CommitmentLayout>::state_hash(state)
     }
 }

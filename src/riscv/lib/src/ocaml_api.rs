@@ -491,7 +491,7 @@ pub unsafe fn octez_riscv_verify_proof(
     // TODO: RV-362: Check the final state
     let hash: Hash = todo!("Can't obtain the final state hash just yet");
 
-    if &hash != proof.as_ref().final_state_hash() {
+    if hash != proof.as_ref().final_state_hash() {
         return None;
     }
 

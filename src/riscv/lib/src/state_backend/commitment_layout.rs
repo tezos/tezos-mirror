@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use super::{
-    Array, Atom, DynArray, Layout, Many, RefOwnedAlloc,
+    AllocatedOf, Array, Atom, DynArray, Layout, ManagerSerialise, Many,
     hash::{self, Hash, HashError, HashWriter},
     proof_backend::merkle::{MERKLE_ARITY, MERKLE_LEAF_SIZE, chunks_to_writer},
 };
@@ -14,26 +14,29 @@ use crate::default::ConstDefault;
 /// [`Layouts`]: crate::state_backend::Layout
 pub trait CommitmentLayout: Layout {
     /// Compute the root hash of the given state
-    fn state_hash(state: RefOwnedAlloc<Self>) -> Result<Hash, HashError>;
+    fn state_hash<M: ManagerSerialise>(state: AllocatedOf<Self, M>) -> Result<Hash, HashError>;
 }
 
-impl<T: ConstDefault + serde::Serialize + 'static> CommitmentLayout for Atom<T> {
-    fn state_hash(state: RefOwnedAlloc<Self>) -> Result<Hash, HashError> {
+impl<T> CommitmentLayout for Atom<T>
+where
+    T: serde::Serialize + ConstDefault + 'static,
+{
+    fn state_hash<M: ManagerSerialise>(state: AllocatedOf<Self, M>) -> Result<Hash, HashError> {
         Hash::blake2b_hash(state)
     }
 }
 
-impl<T: serde::Serialize + 'static, const LEN: usize> CommitmentLayout for Array<T, LEN>
+impl<T, const LEN: usize> CommitmentLayout for Array<T, LEN>
 where
-    [T; LEN]: ConstDefault,
+    T: serde::Serialize + Copy + ConstDefault + 'static,
 {
-    fn state_hash(state: RefOwnedAlloc<Self>) -> Result<Hash, HashError> {
+    fn state_hash<M: ManagerSerialise>(state: AllocatedOf<Self, M>) -> Result<Hash, HashError> {
         Hash::blake2b_hash(state)
     }
 }
 
 impl<const LEN: usize> CommitmentLayout for DynArray<LEN> {
-    fn state_hash(state: RefOwnedAlloc<Self>) -> Result<Hash, HashError> {
+    fn state_hash<M: ManagerSerialise>(state: AllocatedOf<Self, M>) -> Result<Hash, HashError> {
         let mut writer = HashWriter::new(MERKLE_LEAF_SIZE);
         chunks_to_writer::<LEN, _, _>(&mut writer, |address| {
             state.read::<[u8; MERKLE_LEAF_SIZE.get()]>(address)
@@ -48,7 +51,7 @@ where
     A: CommitmentLayout,
     B: CommitmentLayout,
 {
-    fn state_hash(state: RefOwnedAlloc<Self>) -> Result<Hash, HashError> {
+    fn state_hash<M: ManagerSerialise>(state: AllocatedOf<Self, M>) -> Result<Hash, HashError> {
         let hashes = [A::state_hash(state.0)?, B::state_hash(state.1)?];
         Hash::combine(&hashes)
     }
@@ -60,7 +63,7 @@ where
     B: CommitmentLayout,
     C: CommitmentLayout,
 {
-    fn state_hash(state: RefOwnedAlloc<Self>) -> Result<Hash, HashError> {
+    fn state_hash<M: ManagerSerialise>(state: AllocatedOf<Self, M>) -> Result<Hash, HashError> {
         let hashes = [
             A::state_hash(state.0)?,
             B::state_hash(state.1)?,
@@ -77,7 +80,7 @@ where
     C: CommitmentLayout,
     D: CommitmentLayout,
 {
-    fn state_hash(state: RefOwnedAlloc<Self>) -> Result<Hash, HashError> {
+    fn state_hash<M: ManagerSerialise>(state: AllocatedOf<Self, M>) -> Result<Hash, HashError> {
         let hashes = [
             A::state_hash(state.0)?,
             B::state_hash(state.1)?,
@@ -96,7 +99,7 @@ where
     D: CommitmentLayout,
     E: CommitmentLayout,
 {
-    fn state_hash(state: RefOwnedAlloc<Self>) -> Result<Hash, HashError> {
+    fn state_hash<M: ManagerSerialise>(state: AllocatedOf<Self, M>) -> Result<Hash, HashError> {
         let hashes = [
             A::state_hash(state.0)?,
             B::state_hash(state.1)?,
@@ -117,7 +120,7 @@ where
     E: CommitmentLayout,
     F: CommitmentLayout,
 {
-    fn state_hash(state: RefOwnedAlloc<Self>) -> Result<Hash, HashError> {
+    fn state_hash<M: ManagerSerialise>(state: AllocatedOf<Self, M>) -> Result<Hash, HashError> {
         let hashes = [
             A::state_hash(state.0)?,
             B::state_hash(state.1)?,
@@ -134,8 +137,8 @@ impl<T, const LEN: usize> CommitmentLayout for [T; LEN]
 where
     T: CommitmentLayout,
 {
-    fn state_hash(state: RefOwnedAlloc<Self>) -> Result<Hash, HashError> {
-        iter_state_hash::<_, T, LEN>(state)
+    fn state_hash<M: ManagerSerialise>(state: AllocatedOf<Self, M>) -> Result<Hash, HashError> {
+        iter_state_hash::<_, T, M, LEN>(state)
     }
 }
 
@@ -143,14 +146,15 @@ impl<T, const LEN: usize> CommitmentLayout for Many<T, LEN>
 where
     T: CommitmentLayout,
 {
-    fn state_hash(state: RefOwnedAlloc<Self>) -> Result<Hash, HashError> {
-        iter_state_hash::<_, T, LEN>(state)
+    fn state_hash<M: ManagerSerialise>(state: AllocatedOf<Self, M>) -> Result<Hash, HashError> {
+        iter_state_hash::<_, T, M, LEN>(state)
     }
 }
 
-fn iter_state_hash<'a, I, T, const LEN: usize>(iter: I) -> Result<Hash, HashError>
+fn iter_state_hash<I, T, M, const LEN: usize>(iter: I) -> Result<Hash, HashError>
 where
-    I: IntoIterator<Item = RefOwnedAlloc<'a, T>>,
+    M: ManagerSerialise,
+    I: IntoIterator<Item = AllocatedOf<T, M>>,
     T: CommitmentLayout,
 {
     let hashes: Vec<Hash> = iter
