@@ -8227,6 +8227,7 @@ let _octez_experimental_agnostic_baker =
          octez_validation |> open_;
          octez_client_base_unix |> open_;
          octez_node_config;
+         octez_client_commands |> open_;
        ]
       @ protocol_deps)
     ~linkall:true

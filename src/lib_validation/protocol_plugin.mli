@@ -219,13 +219,8 @@ module type AGNOSTIC_BAKER_PLUGIN = sig
 
   val name : string
 
-  val register_commands : unit -> unit
-
-  val select_commands :
-    'a ->
-    'b ->
-    (Tezos_client_base.Client_context.full Tezos_clic.command trace, 'c) result
-    Lwt.t
+  val map_commands :
+    unit -> Tezos_client_base.Client_context.full Tezos_clic.command list
 end
 
 (** Register a validation plugin for a specific protocol

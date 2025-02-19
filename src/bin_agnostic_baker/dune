@@ -15,6 +15,7 @@
   octez-shell-libs.validation
   octez-shell-libs.client-base-unix
   octez-node-config
+  octez-shell-libs.client-commands
   octez-protocol-021-PsQuebec-libs.agnostic-baker
   octez-protocol-022-PsRiotum-libs.agnostic-baker
   (select void_for_linking-octez-protocol-alpha-libs-agnostic-baker from
@@ -32,7 +33,8 @@
   -open Tezos_base
   -open Tezos_base_unix
   -open Tezos_validation
-  -open Tezos_client_base_unix))
+  -open Tezos_client_base_unix
+  -open Tezos_client_commands))
 
 (rule
  (action

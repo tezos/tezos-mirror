@@ -25,8 +25,14 @@ let shutdown baker =
 let run_thread
     (module Agnostic_baker_plugin : Protocol_plugin.AGNOSTIC_BAKER_PLUGIN)
     ~baker_args ~cancel_promise ~logs_path =
-  let open Agnostic_baker_plugin in
-  register_commands () ;
+  let () =
+    Client_commands.register Agnostic_baker_plugin.hash @@ fun _network ->
+    Agnostic_baker_plugin.map_commands ()
+  in
+
+  let select_commands _ _ =
+    Lwt_result_syntax.return @@ Agnostic_baker_plugin.map_commands ()
+  in
 
   (* This call is not strictly necessary as the parameters are initialized
      lazily the first time a Sapling operation (validation or forging) is
