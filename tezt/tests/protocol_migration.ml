@@ -1307,7 +1307,7 @@ let test_tolerated_inactivity_period () =
      current scenarion is equal to 5 cycles, we check a protocol
      migration near that cycle. *)
   let migrate_from = Protocol.Quebec in
-  let migrate_to = Protocol.Next in
+  let migrate_to = Protocol.R022 in
 
   for migration_cycle = 5 to 7 do
     Test.register
@@ -1456,7 +1456,7 @@ let test_tolerated_inactivity_period () =
 
 let test_unstaked_requests_many_delegates () =
   let migrate_from = Protocol.Quebec in
-  let migrate_to = Protocol.Next in
+  let migrate_to = Protocol.R022 in
 
   Test.register
     ~__FILE__
@@ -1577,7 +1577,7 @@ let test_unstaked_requests_many_delegates () =
 
 let test_unstaked_requests_and_min_delegated () =
   let migrate_from = Protocol.Quebec in
-  let migrate_to = Protocol.Next in
+  let migrate_to = Protocol.R022 in
 
   Test.register
     ~__FILE__
