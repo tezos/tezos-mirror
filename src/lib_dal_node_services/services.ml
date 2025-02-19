@@ -91,6 +91,20 @@ let level_query =
   let open Query in
   query (fun level -> level) |+ opt_field "level" Arg.int32 (fun t -> t) |> seal
 
+let trap_query =
+  let open Tezos_rpc in
+  let open Query in
+  query (fun delegate slot_index ->
+      object
+        method delegate = delegate
+
+        method slot_index = slot_index
+      end)
+  |+ opt_field "delegate" Signature.Public_key_hash.rpc_arg (fun obj ->
+         obj#delegate)
+  |+ opt_field "slot_index" Arg.int (fun obj -> obj#slot_index)
+  |> seal
+
 (* Service declarations *)
 
 type 'rpc service =
@@ -349,6 +363,26 @@ let get_attestable_slots :
     Tezos_rpc.Path.(
       open_root / "profiles" /: Signature.Public_key_hash.rpc_arg
       / "attested_levels" /: Tezos_rpc.Arg.int32 / "attestable_slots")
+
+let get_traps :
+    < meth : [`GET]
+    ; input : unit
+    ; output : Types.trap list
+    ; prefix : unit
+    ; params : unit * level
+    ; query :
+        < delegate : Signature.public_key_hash option
+        ; slot_index : slot_index option > >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:
+      "For a given published level, return all the traps known by the node. \
+       Optional arguments allow to restrict the output to a given delegate or \
+       slot index."
+    ~query:trap_query
+    ~output:(Data_encoding.list Types.trap_encoding)
+    Tezos_rpc.Path.(
+      open_root / "published_levels" /: Tezos_rpc.Arg.int32 / "known_traps")
 
 let get_slot_shard :
     < meth : [`GET]
