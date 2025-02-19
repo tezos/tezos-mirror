@@ -2,9 +2,9 @@ Protocol Alpha
 ==============
 
 This page documents the changes brought by protocol Alpha with respect
-to Next (see :ref:`naming_convention`).
+to Rio (see :ref:`naming_convention`).
 
-For changes brought by Next with respect to Quebec, see :doc:`../protocols/next`.
+For changes brought by Rio with respect to Quebec, see :doc:`../protocols/022_r022`.
 
 The code can be found in directory :src:`src/proto_alpha` of the ``master``
 branch of Octez.
