@@ -444,7 +444,8 @@ module Handler = struct
       cells_of_level
 
   (* This functions counts, for each slot, the number of shards attested by the bakers. *)
-  let get_attestable_slots attestations committee ~number_of_slots is_attested =
+  let attested_shards_per_slot attestations committee ~number_of_slots
+      is_attested =
     let count_per_slot = Array.make number_of_slots 0 in
     List.iter
       (fun (_tb_slot, delegate_opt, _attestation_op, dal_attestation_opt) ->
@@ -479,8 +480,8 @@ module Handler = struct
         Node_context.fetch_committee node_ctxt ~level:attestation_level
       in
       let attestations = get_attestations () in
-      let attestable_slots =
-        get_attestable_slots
+      let attested_shards_per_slot =
+        attested_shards_per_slot
           attestations
           committee
           ~number_of_slots:parameters.Types.number_of_slots
@@ -491,7 +492,7 @@ module Handler = struct
         / parameters.cryptobox_parameters.redundancy_factor
       in
       let should_be_attested index =
-        let num_attested_shards = attestable_slots.(index) in
+        let num_attested_shards = attested_shards_per_slot.(index) in
         num_attested_shards >= threshold
       in
       let*! () =
