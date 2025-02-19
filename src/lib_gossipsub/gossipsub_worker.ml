@@ -181,6 +181,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Subscribe of {topic : Topic.t}
     | Unsubscribe of {topic : Topic.t}
     | Message_with_header of message_with_header
+    | Ping
 
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5323
 
@@ -307,7 +308,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           | IWant _ -> Introspection.update_count_sent_iwants stats `Incr
           | Message_with_header _ ->
               Introspection.update_count_sent_app_messages stats `Incr
-          | Subscribe _ | Unsubscribe _ -> ())
+          | Subscribe _ | Unsubscribe _ | Ping -> ())
       | Connect _ | Connect_point _ | Disconnect _ | Forget _ | Kick _ -> ()
     in
     fun {connected_bootstrap_peers; p2p_output_stream; stats; _} ~mk_output ->
@@ -323,7 +324,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
                   (* Don't emit app messages, send IHave messages or respond to
                      IWant if the remote peer has a bootstrap profile. *)
                   false
-              | Graft _ | Prune _ | Subscribe _ | Unsubscribe _ -> true)
+              | Graft _ | Prune _ | Subscribe _ | Unsubscribe _ | Ping -> true)
           | Connect _ | Connect_point _ | Disconnect _ | Forget _ | Kick _ ->
               true
         in
@@ -632,13 +633,29 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
      Add more verification/attacks protections as done in Rust. *)
 
-  (** On a [Heartbeat] events, the worker sends graft and prune messages
-      following the automaton's output. It also sends [IHave] messages (computed
-      by the automaton as well). *)
-  let handle_heartheat = function
+  let emit_pings state =
+    let gstate = state.gossip_state in
+    let gstate_view = View.view gstate in
+    let heartbeat_ping_interval =
+      Int64.of_int gstate_view.limits.heartbeat_ping_interval
+    in
+    let heartbeat_ticks = gstate_view.heartbeat_ticks in
+    let rem = Int64.rem heartbeat_ticks heartbeat_ping_interval in
+    if Int64.equal rem 0L then
+      GS.Introspection.Connections.iter
+        (fun peer _connection -> emit_p2p_message state Ping (Seq.return peer))
+        gstate_view.connections
+
+  (** On a [Heartbeat] events, the worker sends graft and prune
+      messages following the automaton's output. It also sends [IHave]
+      messages (computed by the automaton as well). It also send ping
+      messages to its for each peer in its connections every
+      [heartbeat_ping_interval] ticks. *)
+  let handle_heartbeat = function
     | state, GS.Heartbeat {to_graft; to_prune; noPX_peers} ->
         let gstate = state.gossip_state in
         let gstate_view = View.view gstate in
+        emit_pings state ;
         let iter pmap mk_msg =
           Peer.Map.iter
             (fun peer topicset ->
@@ -763,6 +780,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         GS.handle_prune prune gossip_state
         |> update_gossip_state state
         |> handle_prune ~self ~from_peer px
+    | Ping ->
+        (* We treat [Ping] message as a no-op and return the current [state]. *)
+        state
 
   (** Handling events received from P2P layer. *)
   let apply_p2p_event ~self ({gossip_state; _} as state) = function
@@ -828,7 +848,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            Do we want to detect cases where two successive [Heartbeat] events
            would be handled (e.g. because the first one is late)? *)
         GS.heartbeat gossip_state |> update_gossip_state state
-        |> handle_heartheat
+        |> handle_heartbeat
     | P2P_input event -> apply_p2p_event ~self state event
     | App_input event -> apply_app_event state event
     | Check_unknown_messages -> check_unknown_messages_id state
@@ -1032,6 +1052,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         Format.fprintf fmt "Unsubscribe{topic=%a}" Topic.pp topic
     | Message_with_header message_with_header ->
         pp_message_with_header fmt message_with_header
+    | Ping -> Format.fprintf fmt "Ping"
 
   let pp_p2p_output fmt = function
     | Disconnect {peer} -> Format.fprintf fmt "Disconnect{peer=%a}" Peer.pp peer
