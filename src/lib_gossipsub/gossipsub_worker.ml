@@ -651,7 +651,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       messages (computed by the automaton as well). It also send ping
       messages to its for each peer in its connections every
       [heartbeat_ping_interval] ticks. *)
-  let handle_heartheat = function
+  let handle_heartbeat = function
     | state, GS.Heartbeat {to_graft; to_prune; noPX_peers} ->
         let gstate = state.gossip_state in
         let gstate_view = View.view gstate in
@@ -848,7 +848,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
            Do we want to detect cases where two successive [Heartbeat] events
            would be handled (e.g. because the first one is late)? *)
         GS.heartbeat gossip_state |> update_gossip_state state
-        |> handle_heartheat
+        |> handle_heartbeat
     | P2P_input event -> apply_p2p_event ~self state event
     | App_input event -> apply_app_event state event
     | Check_unknown_messages -> check_unknown_messages_id state
