@@ -53,7 +53,9 @@ let run ~kind ~input ?inbox ?(max_steps = Int64.max_int) ?initrd
       @
       match kind with
       | Test -> ["--posix-exit-mode"; "machine"]
-      | Pvm -> ["--pvm"] @ if print_steps then ["--print-steps"] else [])
+      | Pvm ->
+          ["--pvm"; "--origination-level"; "1"]
+          @ if print_steps then ["--print-steps"] else [])
   in
   Process.check process
 

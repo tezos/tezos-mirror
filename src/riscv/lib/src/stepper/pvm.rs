@@ -3,6 +3,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+mod reveals;
+
 use super::{Stepper, StepperStatus};
 use crate::machine_state::block_cache::bcall::{Block, Interpreted, InterpretedBlockBuilder};
 use crate::state_backend::{ManagerBase, ManagerReadWrite};
@@ -24,10 +26,9 @@ use crate::{
     },
     storage::binary,
 };
+use reveals::RevealRequestResponseMap;
 use serde::{Serialize, de::DeserializeOwned};
-use std::collections::HashMap;
 use std::ops::Bound;
-use std::sync::Arc;
 use tezos_smart_rollup_utils::inbox::Inbox;
 
 /// Error during PVM stepping
@@ -39,8 +40,6 @@ pub enum PvmStepperError {
     /// Errors arising from loading the kernel
     KernelError(kernel_loader::Error),
 }
-
-type ResponseFn = Arc<dyn Fn() -> Result<Box<[u8]>, std::io::Error>>;
 
 /// Wrapper over a PVM that lets you step through it
 pub struct PvmStepper<
@@ -55,7 +54,7 @@ pub struct PvmStepper<
     inbox: Inbox,
     rollup_address: [u8; 20],
     origination_level: u32,
-    reveal_request_response_map: HashMap<Box<[u8]>, ResponseFn>,
+    reveal_request_response_map: RevealRequestResponseMap,
 }
 
 impl<'hooks, ML: MainMemoryLayout, B: Block<ML, Owned>, CL: CacheLayouts>
@@ -91,12 +90,8 @@ impl<'hooks, ML: MainMemoryLayout, B: Block<ML, Owned>, CL: CacheLayouts>
             )?;
         }
 
-        // TODO RV-458: Sandbox can load pre-images and provide them when it receives reveal request
-        // Currently, one sample record with dummy data is added to the map for testing purpose
-        let mut reveal_request_response_map: HashMap<Box<[u8]>, ResponseFn> = HashMap::new();
-
-        reveal_request_response_map
-            .insert(Box::new([1u8; 100]), Arc::new(|| Ok(Box::new([2u8; 100]))));
+        let reveal_request_response_map =
+            RevealRequestResponseMap::new(rollup_address, origination_level);
 
         Ok(Self {
             pvm,
@@ -209,7 +204,7 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: Manager
 
                 let Some(reveal_response_getter) = self
                     .reveal_request_response_map
-                    .get(reveal_request.as_slice())
+                    .get_response(reveal_request.as_slice())
                 else {
                     return StepperStatus::Errored {
                         steps: 0,
