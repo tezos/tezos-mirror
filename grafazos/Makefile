@@ -1,4 +1,4 @@
-all: basic logs full compact dal-basic profiling
+all: basic logs full compact dal-basic profiling tezt_cloud-layer1
 
 NODE_INSTANCE_LABEL ?= instance
 STORAGE_MODE ?= default
@@ -29,3 +29,5 @@ compact: octez-compact.jsonnet
 dal-basic: dal/dal-basic.jsonnet
 
 profiling: octez-profiling.jsonnet
+
+tezt_cloud-layer1: tezt_cloud-layer1.jsonnet
