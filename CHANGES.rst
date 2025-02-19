@@ -259,6 +259,7 @@ DAL node
 - **Feature** A new RPC ``/p2p/gossipsub/reconnection_delays`` which
   provides for each unreachable point, the time remaining until the
   next reconnection attempt. (MR :gl:`!16767`)
+
 - **Bugfix** From v21.2, the ``SO_KEEP_ALIVE`` socket option was used
   for incoming connections only. It is not used with both incoming
   connections and outgoing connections.
@@ -324,6 +325,9 @@ DAL node
 
 - Added a new RPC ``GET /p2p/gossipsub/fanout/`` that returns the GossipSub
   fanout of a peer. (MR :gl:`!16764`)
+
+- Added a new RPC ``GET /published_levels/<level>/known_traps`` that returns the
+  trap shards that the DAL node knows. (MR :gl:`!16870`)
 
 Protocol
 ~~~~~~~~
