@@ -102,12 +102,11 @@ val protocol_status : Protocol.t -> protocol_status
     is [None], then [--liquidity-baking-toggle-vote] is not passed. If it is [Some x] then
     [--liquidity-baking-toggle-vote x] is passed. The default value is [Some Pass].
 
-    [use_dal_node] is passed to the agnostic baker daemon through the
-    [--without-dal] or [--dal-node <uri>] flags. If the flag is [None], the
-    former option is passed, otherwise if the flag is [Some <uri>], then the
-    latter option is passed. The default value is [None].
-
     If [remote_mode] is specified, the agnostic baker will run in RPC-only mode.
+
+    If [dal_node] is specified, then it is the DAL node that the baker queries
+    in order to determine the attestations it sends to the L1 node. A
+    [--dal_node] argument is passed to specify the DAL node's endpoint.
  *)
 val create :
   ?runner:Runner.t ->
@@ -120,6 +119,7 @@ val create :
   ?force_apply_from_round:int ->
   ?remote_mode:bool ->
   ?operations_pool:string ->
+  ?dal_node:Dal_node.t ->
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
   ?node_version_allowed:string ->
@@ -141,6 +141,10 @@ val create :
     The [base_dir] parameter contains needed information about the wallets used
     by the agnostic baker.
 
+    If [dal_node_rpc_endpoint] is specified, then it provides the DAL node RPC
+    server's endpoint that the baker queries in order to determine the
+    attestations it sends to the L1 node. A [--dal-node] argument is passed
+    to specify the DAL node's endpoint.
  *)
 val create_from_uris :
   ?runner:Runner.t ->
@@ -153,6 +157,7 @@ val create_from_uris :
   ?force_apply_from_round:int ->
   ?remote_mode:bool ->
   ?operations_pool:string ->
+  ?dal_node_rpc_endpoint:Endpoint.t ->
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
   ?node_version_allowed:string ->
@@ -212,6 +217,7 @@ val init :
   ?force_apply_from_round:int ->
   ?remote_mode:bool ->
   ?operations_pool:string ->
+  ?dal_node:Dal_node.t ->
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
   ?node_version_allowed:string ->
