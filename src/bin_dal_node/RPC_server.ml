@@ -555,6 +555,26 @@ let version ctxt () () =
   let open Lwt_result_syntax in
   Node_context.version ctxt |> return
 
+let get_traps ctxt published_level query () =
+  let traps_store = Node_context.get_store ctxt |> Store.traps in
+  let traps = Store.Traps.find traps_store ~level:published_level in
+  Lwt_result_syntax.return
+  @@
+  match (query#delegate, query#slot_index) with
+  | None, None -> traps
+  | Some pkh, None ->
+      List.filter
+        (fun Types.{delegate; _} ->
+          Signature.Public_key_hash.equal delegate pkh)
+        traps
+  | None, Some index ->
+      List.filter (fun Types.{slot_index; _} -> index = slot_index) traps
+  | Some pkh, Some index ->
+      List.filter
+        (fun Types.{delegate; slot_index; _} ->
+          index = slot_index && Signature.Public_key_hash.equal delegate pkh)
+        traps
+
 module P2P = struct
   let connect ctxt q point =
     Node_context.P2P.connect ctxt ?timeout:q#timeout point
@@ -716,6 +736,10 @@ let register :
        Tezos_rpc.Directory.opt_register2
        Services.get_attestable_slots
        (Profile_handlers.get_attestable_slots ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register1
+       Services.get_traps
+       (get_traps ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register2
        Services.get_slot_pages
