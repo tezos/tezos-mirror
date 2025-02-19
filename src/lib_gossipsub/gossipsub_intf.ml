@@ -1121,6 +1121,7 @@ module type WORKER = sig
     | Subscribe of {topic : GS.Topic.t}
     | Unsubscribe of {topic : GS.Topic.t}
     | Message_with_header of message_with_header
+    | Ping
 
   (** The different kinds of input events that could be received from the P2P
       layer. *)
