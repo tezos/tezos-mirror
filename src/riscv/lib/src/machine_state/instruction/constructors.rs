@@ -786,6 +786,108 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Blt`].
+    pub(crate) fn new_blt(
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Blt,
+            args: Args {
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Bltz`].
+    pub(crate) fn new_bltz(rs1: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Bltz,
+            args: Args {
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Bge`].
+    pub(crate) fn new_bge(
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Bge,
+            args: Args {
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Bgez`].
+    pub(crate) fn new_bgez(rs1: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Bgez,
+            args: Args {
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Bltu`].
+    pub(crate) fn new_bltu(
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Bltu,
+            args: Args {
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Bgeu`].
+    pub(crate) fn new_bgeu(
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Bgeu,
+            args: Args {
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {
@@ -1145,15 +1247,14 @@ impl Instruction {
     pub(super) fn from_ic_beq(args: &SBTypeArgs) -> Instruction {
         use XRegisterParsed as X;
         match (split_x0(args.rs1), split_x0(args.rs2)) {
-            // If both registers are x0, then the instruction is an unconditional jump.
+            // If the registers are the same, then the instruction is an unconditional jump.
             (X::X0, X::X0) => Instruction::new_j(args.imm, InstrWidth::Uncompressed),
+            (X::NonZero(rs1), X::NonZero(rs2)) if rs1 == rs2 => {
+                Instruction::new_j(args.imm, InstrWidth::Uncompressed)
+            }
             // If either register is x0, then the condition to branch is whether the other register stores 0.
             (X::NonZero(rs1), X::X0) | (X::X0, X::NonZero(rs1)) => {
                 Instruction::new_beqz(rs1, args.imm, InstrWidth::Uncompressed)
-            }
-            (X::NonZero(rs1), X::NonZero(rs2)) if rs1 == rs2 => {
-                // If the registers are the same, then the instruction is an unconditional jump.
-                Instruction::new_j(args.imm, InstrWidth::Uncompressed)
             }
             (X::NonZero(rs1), X::NonZero(rs2)) => {
                 Instruction::new_beq(rs1, rs2, args.imm, InstrWidth::Uncompressed)
@@ -1179,15 +1280,14 @@ impl Instruction {
     pub(super) fn from_ic_bne(args: &SBTypeArgs) -> Instruction {
         use XRegisterParsed as X;
         match (split_x0(args.rs1), split_x0(args.rs2)) {
-            // If both registers are x0, they are equal so we don't branch.
+            // If the registers are the same, they are equal so we don't branch.
             (X::X0, X::X0) => Instruction::new_nop(InstrWidth::Uncompressed),
+            (X::NonZero(rs1), X::NonZero(rs2)) if rs1 == rs2 => {
+                Instruction::new_nop(InstrWidth::Uncompressed)
+            }
             // If either register is x0, then the condition to branch is whether the other register doesn't store 0.
             (X::NonZero(rs1), X::X0) | (X::X0, X::NonZero(rs1)) => {
                 Instruction::new_bnez(rs1, args.imm, InstrWidth::Uncompressed)
-            }
-            (X::NonZero(rs1), X::NonZero(rs2)) if rs1 == rs2 => {
-                // If the registers are the same, they are equal so we don't branch.
-                Instruction::new_nop(InstrWidth::Uncompressed)
             }
             (X::NonZero(rs1), X::NonZero(rs2)) => {
                 Instruction::new_bne(rs1, rs2, args.imm, InstrWidth::Uncompressed)
@@ -1364,6 +1464,100 @@ impl Instruction {
                 Instruction::new_sbnz(rs1, rs2, args.imm, InstrWidth::Uncompressed)
             }
             _ => Instruction::new_sb(args.rs1, args.rs2, args.imm, InstrWidth::Uncompressed),
+        }
+    }
+
+    /// Convert [`InstrCacheable::Blt`] according to whether register is non-zero.
+    ///
+    /// [`InstrCacheable::Blt`]: crate::parser::instruction::InstrCacheable::Blt
+    pub(super) fn from_ic_blt(args: &SBTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rs1), split_x0(args.rs2)) {
+            // If the registers are the same, the values are the same so we don't branch.
+            (X::X0, X::X0) => Instruction::new_nop(InstrWidth::Uncompressed),
+            (X::NonZero(rs1), X::NonZero(rs2)) if rs1 == rs2 => {
+                Instruction::new_nop(InstrWidth::Uncompressed)
+            }
+            // If rs1 is x0, the condition to branch is whether `val(rs2) >= 0`.
+            (X::X0, X::NonZero(rs1)) => {
+                Instruction::new_bgez(rs1, args.imm, InstrWidth::Uncompressed)
+            }
+            // If rs2 is x0, the condition to branch is whether `val(rs1) < 0`.
+            (X::NonZero(rs1), X::X0) => {
+                Instruction::new_bltz(rs1, args.imm, InstrWidth::Uncompressed)
+            }
+            (X::NonZero(rs1), X::NonZero(rs2)) => {
+                Instruction::new_blt(rs1, rs2, args.imm, InstrWidth::Uncompressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::Bge`] according to whether register is non-zero.
+    ///
+    /// [`InstrCacheable::Bge`]: crate::parser::instruction::InstrCacheable::Bge
+    pub(super) fn from_ic_bge(args: &SBTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rs1), split_x0(args.rs2)) {
+            // If the registers are the same, the values are the same so we always branch.
+            (X::X0, X::X0) => Instruction::new_j(args.imm, InstrWidth::Uncompressed),
+            (X::NonZero(rs1), X::NonZero(rs2)) if rs1 == rs2 => {
+                Instruction::new_j(args.imm, InstrWidth::Uncompressed)
+            }
+            // If rs1 is x0, the condition to branch is whether `val(rs2) < 0`.
+            (X::X0, X::NonZero(rs1)) => {
+                Instruction::new_bltz(rs1, args.imm, InstrWidth::Uncompressed)
+            }
+            // If rs2 is x0, the condition to branch is whether `val(rs1) >= 0`.
+            (X::NonZero(rs1), X::X0) => {
+                Instruction::new_bgez(rs1, args.imm, InstrWidth::Uncompressed)
+            }
+            (X::NonZero(rs1), X::NonZero(rs2)) => {
+                Instruction::new_bge(rs1, rs2, args.imm, InstrWidth::Uncompressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::Bltu`] according to whether register is non-zero.
+    ///
+    /// [`InstrCacheable::Bltu`]: crate::parser::instruction::InstrCacheable::Bltu
+    pub(super) fn from_ic_bltu(args: &SBTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rs1), split_x0(args.rs2)) {
+            // If rs2 is x0, rs1 is either the same or greater than rs2, so we don't branch.
+            (_, X::X0) => Instruction::new_nop(InstrWidth::Uncompressed),
+            // If the registers are the same, the values are the same so we don't branch.
+            (X::NonZero(rs1), X::NonZero(rs2)) if rs1 == rs2 => {
+                Instruction::new_nop(InstrWidth::Uncompressed)
+            }
+            // If rs1 is x0, the condition to branch is whether `val(rs2) != 0`.
+            (X::X0, X::NonZero(rs1)) => {
+                Instruction::new_bnez(rs1, args.imm, InstrWidth::Uncompressed)
+            }
+            (X::NonZero(rs1), X::NonZero(rs2)) => {
+                Instruction::new_bltu(rs1, rs2, args.imm, InstrWidth::Uncompressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::Bgeu`] according to whether register is non-zero.
+    ///
+    /// [`InstrCacheable::Bgeu`]: crate::parser::instruction::InstrCacheable::Bgeu
+    pub(super) fn from_ic_bgeu(args: &SBTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rs1), split_x0(args.rs2)) {
+            // If rs2 is x0, rs1 is either the same or more than rs2, so we always branch.
+            (_, X::X0) => Instruction::new_j(args.imm, InstrWidth::Uncompressed),
+            // If the registers are the same, the values are the same so we always branch.
+            (X::NonZero(rs1), X::NonZero(rs2)) if rs1 == rs2 => {
+                Instruction::new_j(args.imm, InstrWidth::Uncompressed)
+            }
+            // If rs1 is x0, the condition to branch is whether `val(rs2) == 0`.
+            (X::X0, X::NonZero(rs1)) => {
+                Instruction::new_beqz(rs1, args.imm, InstrWidth::Uncompressed)
+            }
+            (X::NonZero(rs1), X::NonZero(rs2)) => {
+                Instruction::new_bgeu(rs1, rs2, args.imm, InstrWidth::Uncompressed)
+            }
         }
     }
 }

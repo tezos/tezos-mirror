@@ -37,7 +37,7 @@ use crate::{
         FR1ArgWithRounding, FR2ArgsWithRounding, FR3ArgsWithRounding, FRArgs, FRegToXRegArgs,
         FRegToXRegArgsWithRounding, FStoreArgs, ITypeArgs, InstrCacheable, InstrRoundingMode,
         InstrWidth, NonZeroRdITypeArgs, NonZeroRdRTypeArgs, NonZeroRdUJTypeArgs, RTypeArgs,
-        SBTypeArgs, UJTypeArgs, XRegToFRegArgs, XRegToFRegArgsWithRounding,
+        UJTypeArgs, XRegToFRegArgs, XRegToFRegArgsWithRounding,
     },
     state_backend::{ManagerBase, ManagerReadWrite},
     traps::Exception,
@@ -378,6 +378,10 @@ pub enum OpCode {
     Lbnz,
     /// Same as `Sb` but only using NonZeroXRegisters.
     Sbnz,
+    /// Jump to `pc + imm` if `val(rs2) < 0`.
+    Bltz,
+    /// Jump to `pc + imm` if `val(rs2) >= 0`.
+    Bgez,
 }
 
 impl OpCode {
@@ -444,6 +448,8 @@ impl OpCode {
             Self::Bne => Args::run_bne,
             Self::Blt => Args::run_blt,
             Self::Bge => Args::run_bge,
+            Self::Bltz => Args::run_bltz,
+            Self::Bgez => Args::run_bgez,
             Self::Bltu => Args::run_bltu,
             Self::Bgeu => Args::run_bgeu,
             Self::Auipc => Args::run_auipc,
@@ -861,17 +867,6 @@ macro_rules! impl_b_type {
             &self,
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
-            Ok(core.hart.$fn(self.imm, self.rs1.x, self.rs2.x, self.width))
-        }
-    };
-
-    ($fn: ident, non_zero) => {
-        /// SAFETY: This function must only be called on an `Args` belonging
-        /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
-            &self,
-            core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
             Ok(core
                 .hart
                 .$fn(self.imm, self.rs1.nzx, self.rs2.nzx, self.width))
@@ -1186,8 +1181,8 @@ impl Args {
     impl_store_type!(run_sbnz, non_zero);
 
     // RV64I B-type instructions
-    impl_b_type!(run_beq, non_zero);
-    impl_b_type!(run_bne, non_zero);
+    impl_b_type!(run_beq);
+    impl_b_type!(run_bne);
     impl_b_type!(run_blt);
     impl_b_type!(run_bge);
     impl_b_type!(run_bltu);
@@ -1355,6 +1350,8 @@ impl Args {
     impl_cr_nz_type!(c::run_mv, run_mv);
     impl_cb_type!(run_beqz);
     impl_cb_type!(run_bnez);
+    impl_cb_type!(run_bltz);
+    impl_cb_type!(run_bgez);
     impl_ci_type!(load_store::run_li, run_li, non_zero);
     impl_cr_type!(run_neg, non_zero);
 
@@ -1528,22 +1525,10 @@ impl From<&InstrCacheable> for Instruction {
             // RV64I B-type instructions
             InstrCacheable::Beq(args) => Instruction::from_ic_beq(args),
             InstrCacheable::Bne(args) => Instruction::from_ic_bne(args),
-            InstrCacheable::Blt(args) => Instruction {
-                opcode: OpCode::Blt,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
-            InstrCacheable::Bge(args) => Instruction {
-                opcode: OpCode::Bge,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
-            InstrCacheable::Bltu(args) => Instruction {
-                opcode: OpCode::Bltu,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
-            InstrCacheable::Bgeu(args) => Instruction {
-                opcode: OpCode::Bgeu,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
+            InstrCacheable::Blt(args) => Instruction::from_ic_blt(args),
+            InstrCacheable::Bge(args) => Instruction::from_ic_bge(args),
+            InstrCacheable::Bltu(args) => Instruction::from_ic_bltu(args),
+            InstrCacheable::Bgeu(args) => Instruction::from_ic_bgeu(args),
 
             // RV64I U-type instructions
             InstrCacheable::Lui(args) => {
@@ -2141,18 +2126,6 @@ impl NonZeroRdITypeArgs {
         Args {
             rd: self.rd.into(),
             rs1: self.rs1.into(),
-            imm: self.imm,
-            width,
-            ..Args::DEFAULT
-        }
-    }
-}
-
-impl SBTypeArgs {
-    fn to_args(self, width: InstrWidth) -> Args {
-        Args {
-            rs1: self.rs1.into(),
-            rs2: self.rs2.into(),
             imm: self.imm,
             width,
             ..Args::DEFAULT

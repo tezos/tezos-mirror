@@ -78,6 +78,7 @@ where
     /// Relevant RISC-V opcodes:
     /// - C.BEQZ
     /// - BEQ
+    /// - BGEU
     pub fn run_beqz(
         &mut self,
         imm: i64,
@@ -100,6 +101,7 @@ where
     /// Relevant RISC-V opcodes:
     /// - C.BNEZ
     /// - BNE
+    /// - BLTU
     pub fn run_bnez(
         &mut self,
         imm: i64,
