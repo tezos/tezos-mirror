@@ -227,22 +227,41 @@ module Pending_confirmations : sig
 end
 
 module L1_l2_levels_relationships : sig
-  type t = {
-    l1_level : int32;
-    current_number : Ethereum_types.quantity;
-    finalized : Ethereum_types.quantity;
-  }
+  type t = {l1_level : int32; current_number : Ethereum_types.quantity}
 
   val store :
     conn ->
     l1_level:int32 ->
     latest_l2_level:Ethereum_types.quantity ->
-    finalized_l2_level:Ethereum_types.quantity ->
     unit tzresult Lwt.t
 
   val find : conn -> t option tzresult Lwt.t
 
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
+end
+
+module L1_l2_finalized_levels : sig
+  type t = {
+    start_l2_level : Ethereum_types.quantity;
+    end_l2_level : Ethereum_types.quantity;
+  }
+
+  val store :
+    conn ->
+    l1_level:int32 ->
+    start_l2_level:Ethereum_types.quantity ->
+    end_l2_level:Ethereum_types.quantity ->
+    unit tzresult Lwt.t
+
+  (** [find conn ~l1_level] returns the finalized L2 levels for a given L1
+      level. *)
+  val find : conn -> l1_level:int32 -> t option tzresult Lwt.t
+
+  (** [last conn] returns the last finalized L1-L2 level relationship in the
+      store. *)
+  val last : conn -> (int32 * t) option tzresult Lwt.t
+
+  val clear_before : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 
 type metadata = {

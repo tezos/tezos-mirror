@@ -9,10 +9,11 @@
 open Filename.Infix
 include Sqlite
 
-type levels = {
-  l1_level : int32;
-  current_number : Ethereum_types.quantity;
-  finalized : Ethereum_types.quantity;
+type levels = {l1_level : int32; current_number : Ethereum_types.quantity}
+
+type finalized_levels = {
+  start_l2_level : Ethereum_types.quantity;
+  end_l2_level : Ethereum_types.quantity;
 }
 
 type pending_kernel_upgrade = {
@@ -170,11 +171,17 @@ module Q = struct
 
   let levels =
     custom
-      ~encode:(fun {current_number; l1_level; finalized} ->
-        Ok (current_number, l1_level, finalized))
-      ~decode:(fun (current_number, l1_level, finalized) ->
-        Ok {current_number; l1_level; finalized})
-      (t3 level l1_level level)
+      ~encode:(fun {current_number; l1_level} -> Ok (current_number, l1_level))
+      ~decode:(fun (current_number, l1_level) -> Ok {current_number; l1_level})
+      (t2 level l1_level)
+
+  let finalized_levels =
+    custom
+      ~encode:(fun {start_l2_level; end_l2_level} ->
+        Ok (start_l2_level, end_l2_level))
+      ~decode:(fun (start_l2_level, end_l2_level) ->
+        Ok {start_l2_level; end_l2_level})
+      (t2 level level)
 
   let pending_kernel_upgrade =
     product (fun injected_before hash timestamp ->
@@ -234,7 +241,7 @@ module Q = struct
       You can review the result at
       [etherlink/tezt/tests/expected/evm_sequencer.ml/EVM Node- debug print store schemas.out].
     *)
-    let version = 19
+    let version = 20
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version
@@ -363,12 +370,12 @@ module Q = struct
 
   module L1_l2_levels_relationships = struct
     let insert =
-      (t3 level l1_level level ->. unit)
-      @@ {|INSERT INTO l1_l2_levels_relationships (latest_l2_level, l1_level, finalized_l2_level) VALUES (?, ?, ?)|}
+      (t2 level l1_level ->. unit)
+      @@ {|INSERT INTO l1_l2_levels_relationships (latest_l2_level, l1_level) VALUES (?, ?)|}
 
     let get =
       (unit ->! levels)
-      @@ {|SELECT latest_l2_level, l1_level, finalized_l2_level FROM l1_l2_levels_relationships ORDER BY latest_l2_level DESC LIMIT 1|}
+      @@ {|SELECT latest_l2_level, l1_level FROM l1_l2_levels_relationships ORDER BY latest_l2_level DESC LIMIT 1|}
 
     let clear_after =
       (level ->. unit)
@@ -377,6 +384,40 @@ module Q = struct
     let clear_before =
       (level ->. unit)
       @@ {|DELETE FROM l1_l2_levels_relationships WHERE latest_l2_level < ?|}
+  end
+
+  module L1_l2_finalized_levels = struct
+    let insert =
+      (t2 l1_level finalized_levels ->. unit)
+      @@ {|REPLACE INTO l1_l2_finalized_levels
+           (l1_level, start_l2_level, end_l2_level)
+           VALUES (?, ?, ?)|}
+
+    let get =
+      (l1_level ->? finalized_levels)
+      @@ {|SELECT start_l2_level, end_l2_level
+           FROM l1_l2_finalized_levels
+           WHERE l1_level = ?|}
+
+    let last_l2_level =
+      (unit ->? level)
+      @@ {|SELECT MAX(end_l2_level) FROM l1_l2_finalized_levels|}
+
+    let last =
+      (unit ->? t2 l1_level finalized_levels)
+      @@ {|SELECT l1_level, start_l2_level, end_l2_level
+           FROM l1_l2_finalized_levels
+           ORDER BY l1_level DESC LIMIT 1|}
+
+    let clear_before =
+      (level ->. unit)
+      @@ {|DELETE FROM l1_l2_finalized_levels
+           WHERE start_l2_level < ?|}
+
+    let clear_after =
+      (level ->. unit)
+      @@ {|DELETE FROM l1_l2_finalized_levels
+           WHERE end_l2_level > ?|}
   end
 
   module Metadata = struct
@@ -693,11 +734,13 @@ module Context_hashes = struct
   let find_finalized store =
     let open Lwt_result_syntax in
     with_connection store @@ fun conn ->
-    let* l1_l2_levels = Db.find_opt conn Q.L1_l2_levels_relationships.get () in
-    match l1_l2_levels with
-    | None -> return_none
-    | Some {current_number = Qty current_number; finalized = Qty finalized; _}
-      ->
+    let* levels = Db.find_opt conn Q.L1_l2_levels_relationships.get () in
+    let* finalized =
+      Db.find_opt conn Q.L1_l2_finalized_levels.last_l2_level ()
+    in
+    match (levels, finalized) with
+    | None, _ | _, None -> return_none
+    | Some {current_number = Qty current_number; _}, Some (Qty finalized) ->
         let min = Ethereum_types.Qty (Z.min current_number finalized) in
         let+ hash = Db.find_opt conn Q.Context_hashes.select min in
         Option.map (fun hash -> (min, hash)) hash
@@ -829,18 +872,11 @@ module Blueprints = struct
 end
 
 module L1_l2_levels_relationships = struct
-  type t = levels = {
-    l1_level : int32;
-    current_number : Ethereum_types.quantity;
-    finalized : Ethereum_types.quantity;
-  }
+  type t = levels = {l1_level : int32; current_number : Ethereum_types.quantity}
 
-  let store store ~l1_level ~latest_l2_level ~finalized_l2_level =
+  let store store ~l1_level ~latest_l2_level =
     with_connection store @@ fun conn ->
-    Db.exec
-      conn
-      Q.L1_l2_levels_relationships.insert
-      (latest_l2_level, l1_level, finalized_l2_level)
+    Db.exec conn Q.L1_l2_levels_relationships.insert (latest_l2_level, l1_level)
 
   let find store =
     with_connection store @@ fun conn ->
@@ -853,6 +889,36 @@ module L1_l2_levels_relationships = struct
   let clear_before store l2_level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.L1_l2_levels_relationships.clear_before l2_level
+end
+
+module L1_l2_finalized_levels = struct
+  type t = finalized_levels = {
+    start_l2_level : Ethereum_types.quantity;
+    end_l2_level : Ethereum_types.quantity;
+  }
+
+  let store store ~l1_level ~start_l2_level ~end_l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec
+      conn
+      Q.L1_l2_finalized_levels.insert
+      (l1_level, {start_l2_level; end_l2_level})
+
+  let find store ~l1_level =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.L1_l2_finalized_levels.get l1_level
+
+  let last store =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.L1_l2_finalized_levels.last ()
+
+  let clear_before store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.L1_l2_finalized_levels.clear_before l2_level
+
+  let clear_after store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.L1_l2_finalized_levels.clear_after l2_level
 end
 
 module Metadata = struct
@@ -1225,6 +1291,7 @@ let reset_after store ~l2_level =
   let* () = Blueprints.clear_after store l2_level in
   let* () = Context_hashes.clear_after store l2_level in
   let* () = L1_l2_levels_relationships.clear_after store l2_level in
+  let* () = L1_l2_finalized_levels.clear_after store l2_level in
   let* () = Kernel_upgrades.clear_after store l2_level in
   let* () = Delayed_transactions.clear_after store l2_level in
   let* () = Blocks.clear_after store l2_level in
@@ -1240,6 +1307,7 @@ let reset_before store ~l2_level ~history_mode =
   let open Lwt_result_syntax in
   let* () = Context_hashes.clear_before store l2_level in
   let* () = L1_l2_levels_relationships.clear_before store l2_level in
+  let* () = L1_l2_finalized_levels.clear_before store l2_level in
   let* () =
     match history_mode with
     | Configuration.Rolling _ ->

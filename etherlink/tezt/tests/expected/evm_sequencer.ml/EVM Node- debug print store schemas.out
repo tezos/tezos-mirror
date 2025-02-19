@@ -27,7 +27,7 @@ CREATE TABLE delayed_transactions (
 CREATE TABLE "l1_l2_levels_relationships" (
   latest_l2_level PRIMARY KEY ON CONFLICT REPLACE,
   l1_level INT NOT NULL UNIQUE ON CONFLICT ABORT
-, finalized_l2_level INT DEFAULT 0);
+);
 
 CREATE UNIQUE INDEX unapplied_upgrade
 ON kernel_upgrades (
@@ -73,4 +73,16 @@ CREATE TABLE block_storage_mode (
   CONSTRAINT valid_legacy CHECK (legacy IN (0, 1))
 );
 
-CREATE INDEX index_transactions_block_number ON transactions(block_number)
+CREATE INDEX index_transactions_block_number ON transactions(block_number);
+
+CREATE TABLE l1_l2_finalized_levels (
+  l1_level INTEGER PRIMARY KEY,
+  start_l2_level INTEGER NOT NULL, -- L2 level at start of L1 block
+  end_l2_level INTEGER NOT NULL -- L2 level at end of L1 block
+);
+
+CREATE INDEX idx_start_l2_level
+ON l1_l2_finalized_levels(start_l2_level);
+
+CREATE INDEX idx_end_l2_level
+ON l1_l2_finalized_levels(end_l2_level)
