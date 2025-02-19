@@ -349,6 +349,9 @@ module P2P = struct
         state.connections
         []
 
+    let get_reconnection_delays {gs_worker; _} =
+      Gossipsub.Worker.reconnection_delays gs_worker
+
     let get_scores {gs_worker; _} =
       let state = Gossipsub.Worker.state gs_worker in
       Gossipsub.Worker.GS.Peer.Map.fold

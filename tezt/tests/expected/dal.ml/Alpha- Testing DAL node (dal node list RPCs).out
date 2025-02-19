@@ -44,6 +44,9 @@ Available services:
           connected peers and the remote peers subscribed to that topic. If
           the 'subscribed' flag is given, then restrict the output to the
           topics this peer is subscribed to. 
+      - GET /p2p/gossipsub/reconnection_delays
+          For each unreachable point, retrieve the time remaining until the
+          next reconnection attempt. 
       - GET /p2p/gossipsub/scores
           Get the scores of the peers with a known score. 
       - GET /p2p/gossipsub/slot_indexes/peers

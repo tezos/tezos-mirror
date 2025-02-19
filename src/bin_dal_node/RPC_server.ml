@@ -519,6 +519,10 @@ module P2P = struct
            ?ignore_bootstrap_topics
            ctxt
 
+    let get_reconnection_delays ctxt () () =
+      let open Lwt_result_syntax in
+      return @@ Node_context.P2P.Gossipsub.get_reconnection_delays ctxt
+
     let get_scores ctxt () () =
       let open Lwt_result_syntax in
       return @@ Node_context.P2P.Gossipsub.get_scores ctxt
@@ -631,6 +635,10 @@ let register :
        Tezos_rpc.Directory.register0
        Services.P2P.Gossipsub.get_connections
        (P2P.Gossipsub.get_connections ~ignore_bootstrap_topics:true ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.P2P.Gossipsub.get_reconnection_delays
+       (P2P.Gossipsub.get_reconnection_delays ctxt)
   |> add_service
        Tezos_rpc.Directory.register0
        Services.P2P.Gossipsub.get_scores

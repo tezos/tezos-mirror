@@ -617,6 +617,27 @@ module P2P = struct
                  (req "connection" Gossipsub.connection_encoding)))
         (open_root / "connections")
 
+    let get_reconnection_delays :
+        < meth : [`GET]
+        ; input : unit
+        ; output : (Point.t * Span.t) list
+        ; prefix : unit
+        ; params : unit
+        ; query : unit >
+        service =
+      Tezos_rpc.Service.get_service
+        ~description:
+          "For each unreachable point, retrieve the time remaining until the \
+           next reconnection attempt."
+        ~query:Tezos_rpc.Query.empty
+        ~output:
+          Data_encoding.(
+            list
+              (obj2
+                 (req "point" Point.encoding)
+                 (req "delay" Span.rpc_encoding)))
+        (open_root / "reconnection_delays")
+
     let get_scores :
         < meth : [`GET]
         ; input : unit

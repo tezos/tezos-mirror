@@ -350,6 +350,15 @@ module P2P : sig
       ; query : unit >
       service
 
+    val get_reconnection_delays :
+      < meth : [`GET]
+      ; input : unit
+      ; output : (Types.Point.t * Types.Span.t) list
+      ; prefix : unit
+      ; params : unit
+      ; query : unit >
+      service
+
     val get_scores :
       < meth : [`GET]
       ; input : unit
