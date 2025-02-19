@@ -24,6 +24,9 @@
 
 ### Storage changes
 
+- Augment L1/L2 relationships with a new table to keep more accurate
+  information. (!16848)
+
 ### Experimental features changes
 
 *No guarantees are provided regarding backward compatibility of experimental
