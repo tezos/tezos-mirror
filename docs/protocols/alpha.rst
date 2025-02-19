@@ -4,7 +4,7 @@ Protocol Alpha
 This page documents the changes brought by protocol Alpha with respect
 to Rio (see :ref:`naming_convention`).
 
-For changes brought by Rio with respect to Quebec, see :doc:`../protocols/022_r022`.
+For changes brought by Rio with respect to Quebec, see :doc:`../protocols/022_rio`.
 
 The code can be found in directory :src:`src/proto_alpha` of the ``master``
 branch of Octez.
