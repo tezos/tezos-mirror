@@ -633,13 +633,29 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
      Add more verification/attacks protections as done in Rust. *)
 
-  (** On a [Heartbeat] events, the worker sends graft and prune messages
-      following the automaton's output. It also sends [IHave] messages (computed
-      by the automaton as well). *)
+  let emit_pings state =
+    let gstate = state.gossip_state in
+    let gstate_view = View.view gstate in
+    let heartbeat_ping_interval =
+      Int64.of_int gstate_view.limits.heartbeat_ping_interval
+    in
+    let heartbeat_ticks = gstate_view.heartbeat_ticks in
+    let rem = Int64.rem heartbeat_ticks heartbeat_ping_interval in
+    if Int64.equal rem 0L then
+      GS.Introspection.Connections.iter
+        (fun peer _connection -> emit_p2p_message state Ping (Seq.return peer))
+        gstate_view.connections
+
+  (** On a [Heartbeat] events, the worker sends graft and prune
+      messages following the automaton's output. It also sends [IHave]
+      messages (computed by the automaton as well). It also send ping
+      messages to its for each peer in its connections every
+      [heartbeat_ping_interval] ticks. *)
   let handle_heartheat = function
     | state, GS.Heartbeat {to_graft; to_prune; noPX_peers} ->
         let gstate = state.gossip_state in
         let gstate_view = View.view gstate in
+        emit_pings state ;
         let iter pmap mk_msg =
           Peer.Map.iter
             (fun peer topicset ->
