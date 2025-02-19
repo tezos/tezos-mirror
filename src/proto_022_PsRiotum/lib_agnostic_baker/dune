@@ -1,0 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_agnostic_baker_022_PsRiotum)
+ (public_name octez-protocol-022-PsRiotum-libs.agnostic-baker)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-protocol-022-PsRiotum.embedded-protocol
+  octez-shell-libs.validation)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_embedded_protocol_022_PsRiotum
+  -open Tezos_validation))

@@ -5347,6 +5347,8 @@ module Protocol : sig
 
   val dal : t -> target option
 
+  val agnostic_baker : t -> target option
+
   val parameters_exn : t -> target
 
   val benchmarks_proto_exn : t -> target
@@ -5459,6 +5461,7 @@ end = struct
     plugin : target option;
     plugin_registerer : target option;
     dal : target option;
+    agnostic_baker : target option;
     test_helpers : target option;
     parameters : target option;
     benchmarks_proto : target option;
@@ -5470,9 +5473,9 @@ end = struct
 
   let make ?client ?client_commands ?client_commands_registration
       ?baking_commands_registration ?plugin ?plugin_registerer ?dal
-      ?test_helpers ?parameters ?benchmarks_proto ?octez_sc_rollup
-      ?octez_sc_rollup_node ?octez_injector ?baking ~status ~name ~main
-      ~embedded () =
+      ?agnostic_baker ?test_helpers ?parameters ?benchmarks_proto
+      ?octez_sc_rollup ?octez_sc_rollup_node ?octez_injector ?baking ~status
+      ~name ~main ~embedded () =
     {
       status;
       name;
@@ -5485,6 +5488,7 @@ end = struct
       plugin;
       plugin_registerer;
       dal;
+      agnostic_baker;
       test_helpers;
       parameters;
       benchmarks_proto;
@@ -5543,6 +5547,8 @@ end = struct
   let plugin_registerer p = p.plugin_registerer
 
   let dal p = p.dal
+
+  let agnostic_baker p = p.agnostic_baker
 
   let parameters_exn p = mandatory "parameters" p p.parameters
 
@@ -7110,6 +7116,16 @@ let hash = Protocol.hash
             alcotezt;
           ]
     in
+    let agnostic_baker =
+      only_if (active && N.(number >= 021)) @@ fun () ->
+      octez_protocol_lib
+        "agnostic-baker"
+        ~internal_name:(sf "tezos_agnostic_baker_%s" name_dash)
+        ~path:(path // "lib_agnostic_baker")
+        ~synopsis:"Protocol specific library for the Agnostic Baker"
+        ~deps:[embedded |> open_; octez_validation |> open_]
+        ~linkall:true
+    in
     let octez_injector =
       only_if N.(active && number >= 017) @@ fun () ->
       private_lib
@@ -7435,6 +7451,7 @@ let hash = Protocol.hash
          ?plugin
          ?plugin_registerer
          ?dal
+         ?agnostic_baker
          ?test_helpers
          ?parameters
          ?benchmarks_proto
@@ -8169,6 +8186,18 @@ let _octez_node =
         ]
 
 let _octez_experimental_agnostic_baker =
+  let protocol_deps =
+    let deps_for_protocol protocol =
+      let is_optional =
+        match (Protocol.status protocol, Protocol.number protocol) with
+        | Active, V _ -> false
+        | (Frozen | Overridden | Not_mainnet), _ | Active, (Dev | Other) -> true
+      in
+      let targets = List.filter_map Fun.id [Protocol.agnostic_baker protocol] in
+      if is_optional then List.map optional targets else targets
+    in
+    List.map deps_for_protocol Protocol.all |> List.flatten
+  in
   public_exe
     "octez-experimental-agnostic-baker"
     ~path:"src/bin_agnostic_baker"
@@ -8177,27 +8206,17 @@ let _octez_experimental_agnostic_baker =
     ~release_status:Released
     ~with_macos_security_framework:true
     ~deps:
-      [
-        octez_rustzcash_deps;
-        bls12_381_archive;
-        data_encoding |> open_;
-        octez_base |> open_ ~m:"TzPervasives" |> open_;
-        octez_base_unix |> open_;
-        octez_validation |> open_;
-        octez_client_base_unix |> open_;
-        octez_client_base |> open_;
-        octez_rpc |> open_;
-        octez_rpc_http_client |> open_;
-        octez_rpc_http_client_unix |> open_;
-        octez_rpc_http |> open_;
-        cohttp_lwt_unix;
-        octez_node_config;
-        octez_clic;
-        octez_stdlib_unix |> open_;
-        octez_event_logging |> open_;
-        octez_signer_services;
-        octez_version_value;
-      ]
+      ([
+         octez_rustzcash_deps;
+         bls12_381_archive;
+         data_encoding |> open_;
+         octez_base |> open_ ~m:"TzPervasives" |> open_;
+         octez_base_unix |> open_;
+         octez_validation |> open_;
+         octez_client_base_unix |> open_;
+         octez_node_config;
+       ]
+      @ protocol_deps)
     ~linkall:true
 
 let _octez_client =
