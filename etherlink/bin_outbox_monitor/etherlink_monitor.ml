@@ -576,6 +576,7 @@ let monitor_l2_l1_levels db ws_client rollup_node_rpc ~last_levels =
             outbox_messages
         in
         let* () = Db.Levels.store db ~l1_level ~start_l2_level ~end_l2_level in
+        let* () = Matcher.run db in
         return_unit)
       levels_subscription.stream
   in
@@ -587,7 +588,7 @@ let start db ~evm_node_endpoint ~rollup_node_endpoint =
     Websocket_client.connect Media_type.json evm_node_endpoint
   in
   let rollup_node_rpc = Rollup_node_rpc.make_ctxt ~rollup_node_endpoint in
-  let* last_l2_head = Db.Pointers.L2_head.get db in
+  let* last_l2_head = Db.Pointers.L2_head.find db in
   let* last_levels = Db.Levels.last db in
   let monitor_withdrawals = monitor_withdrawals db ws_client in
   let monitor_l2_l1_levels =
