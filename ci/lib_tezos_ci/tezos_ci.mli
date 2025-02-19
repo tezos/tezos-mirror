@@ -263,6 +263,10 @@ type tag =
       (** GCP prod AMD64 runner, suitable for jobs needing high CPU. *)
   | Gcp_high_cpu_dev
       (** GCP dev AMD64 runner, suitable for jobs needing high CPU. *)
+  | Gcp_very_high_cpu
+      (** GCP prod AMD64 runner, suitable for jobs needing very high CPU. *)
+  | Gcp_very_high_cpu_dev
+      (** GCP dev AMD64 runner, suitable for jobs needing very high CPU. *)
   | Aws_specific
       (** AWS runners, in cases where a CI is legacy or not suitable for GCP. *)
   | Dynamic
@@ -335,6 +339,11 @@ type git_strategy =
     CI/CD YAML variable [GIT_STRATEGY]. *)
 val enc_git_strategy : git_strategy -> string
 
+type cpu =
+  | Normal  (** Target default Gitlab runner pool. *)
+  | High  (** Target GCP high runner pool. *)
+  | Very_high  (** Target GCP very high runner pool. *)
+
 (** Define a job.
 
     This smart constructor for {!Gitlab_ci.Types.job} additionally:
@@ -366,8 +375,9 @@ val enc_git_strategy : git_strategy -> string
     architecture for the internal image cannot be statically
     deduced.
 
-    - The [high_cpu] parameter allocates the job to run on top of a GCP GitLab runner with a 1:1 ratio between CPU and RAM.
-      For more information, see [e2-highcpu-16](https://gcloud-compute.com/e2-highcpu-16.html). *)
+    - The [cpu] parameter specifies the CPU allocation for the job,
+      allowing it to run on a GCP GitLab runner with normal, high,
+      or very high CPU capacity. *)
 
 val job :
   ?arch:arch ->
@@ -385,7 +395,7 @@ val job :
   ?rules:Gitlab_ci.Types.job_rule list ->
   ?timeout:Gitlab_ci.Types.time_interval ->
   ?tag:tag ->
-  ?high_cpu:bool ->
+  ?cpu:cpu ->
   ?git_strategy:git_strategy ->
   ?coverage:string ->
   ?retry:Gitlab_ci.Types.retry ->

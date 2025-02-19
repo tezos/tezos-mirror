@@ -2522,7 +2522,7 @@ oc.unit:proto-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_high_cpu
+  - gcp_very_high_cpu
   rules:
   - when: on_success
   needs:
@@ -2654,7 +2654,7 @@ oc.unit:protocol_compiles:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_high_cpu
+  - gcp_very_high_cpu
   rules:
   - when: on_success
   needs:

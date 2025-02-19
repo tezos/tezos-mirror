@@ -587,7 +587,7 @@ let jobs pipeline_type =
     job_build_dynamic_binaries
       ~__POS__
       ~arch:Amd64
-      ~high_cpu:true
+      ~cpu:High
       ~retry:
         {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~dependencies:dependencies_needs_start
@@ -605,7 +605,7 @@ let jobs pipeline_type =
     job_build_dynamic_binaries
       ~__POS__
       ~arch:Amd64
-      ~high_cpu:true
+      ~cpu:High
       ~retry:
         {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~dependencies:dependencies_needs_start
@@ -693,7 +693,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"ocaml-check"
-        ~high_cpu:true
+        ~cpu:High
         ~image:Images.CI.build
         ~stage
         ~retry:
@@ -972,7 +972,7 @@ let jobs pipeline_type =
         make_rules ~changes:changeset_octez ~dependent:true ()
       in
       let job_unit_test ~__POS__ ?(image = Images.CI.build) ?timeout
-          ?parallel_vector ?(rules = rules) ~arch ?(high_cpu = false) ~name
+          ?parallel_vector ?(rules = rules) ~arch ?(cpu = Normal) ~name
           ~make_targets () : tezos_job =
         let arch_string = arch_to_string arch in
         let script = ["make $MAKE_TARGETS"] in
@@ -1006,7 +1006,7 @@ let jobs pipeline_type =
             ~stage:Stages.test
             ~image
             ~arch
-            ~high_cpu
+            ~cpu
             ~dependencies
             ~rules
             ~variables
@@ -1052,7 +1052,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name:"oc.unit:other-x86_64"
           ~arch:Amd64
-          ~high_cpu:true
+          ~cpu:High
           ~make_targets:["test-other-unit"]
           ()
         |> enable_coverage_instrumentation |> enable_coverage_output_artifact
@@ -1063,7 +1063,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name:"oc.unit:proto-x86_64"
           ~arch:Amd64
-          ~high_cpu:true
+          ~cpu:Very_high
           ~make_targets:["test-proto-unit"]
           ()
         |> enable_coverage_instrumentation |> enable_coverage_output_artifact
@@ -1103,7 +1103,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name:"oc.unit:protocol_compiles"
           ~arch:Amd64
-          ~high_cpu:true
+          ~cpu:Very_high
           ~retry:
             {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
           ~image:Images.CI.build
