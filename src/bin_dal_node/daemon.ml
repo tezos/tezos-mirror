@@ -505,7 +505,7 @@ module Handler = struct
           if published_level <= 1l then false
           else
             Store.Traps.find traps_store ~level:published_level
-            |> List.exists (fun Store.Traps.{delegate; slot_index; _} ->
+            |> List.exists (fun Types.{delegate; slot_index; _} ->
                    index = slot_index
                    && Signature.Public_key_hash.equal delegate pkh)
       in
