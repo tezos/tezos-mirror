@@ -113,7 +113,7 @@ Protocol parameters
   which is no longer used since the activation of Adaptive Slashing in
   the Paris protocol. (MR :gl:`!15223`)
 
-- Exposed :ref:`derived constants<protocol_constants_r022>`
+- Exposed :ref:`derived constants<protocol_constants_rio>`
   ``issuance_modification_delay``, ``consensus_key_activation_delay``,
   and ``unstake_finalization_delay`` (which are automatically computed
   from the ``consensus_rights_delay`` parametric constant): they can

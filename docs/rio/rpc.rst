@@ -78,7 +78,7 @@
 
 
 
-.. _rpc_index_r022 :
+.. _rpc_index_rio :
 
 Rio RPCs - Reference
 #####################

@@ -35,7 +35,7 @@ The five periods are as follows:
   At the end of a **proposal period**, if participation reaches a
   :ref:`proposal quorum <proposal_quorum>`, the proposal with most support is
   selected and we move to an **exploration period**. Note that support is
-  measured in the :ref:`voting power <voting_power_r022>` that delegates supporting the
+  measured in the :ref:`voting power <voting_power_rio>` that delegates supporting the
   proposal have. E.g., a proposal supported by a single delegate with 600,000 tz of voting power
   has more support than a proposal supported by two delegates with 100,000 tz
   each of voting power.
@@ -110,7 +110,7 @@ might be introduced, a different selection mechanism may be used, the quorum
 requirement might differ, etc.
 
 
-.. _voting_power_r022:
+.. _voting_power_rio:
 
 Voting Power
 ------------
@@ -121,8 +121,8 @@ all its delegators (including the delegate itself of course), no
 matter whether they are :doc:`staked<staking>` or not.
 
 More precisely, the voting power of a delegate during a voting period
-is the sum of its :ref:`total_staked<total_staked_r022>` and
-:ref:`total_delegated<total_delegated_r022>` amounts, measured in
+is the sum of its :ref:`total_staked<total_staked_rio>` and
+:ref:`total_delegated<total_delegated_rio>` amounts, measured in
 *mutez*, and snapshotted at the beginning of the voting period. (Note
 the differences from the validator selection for consensus, which is
 based on the more complex :doc:`baking power<baking_power>` instead,
@@ -352,7 +352,7 @@ Further details and explanations on the voting procedure can be found at:
 - `Tezos Governance <https://www.tezosagora.org/learn#an-introduction-to-tezos-governance>`_ on Tezos Agora.
 
 For more details on the client commands refer to the manual at
-:ref:`client_manual_r022`.
+:ref:`client_manual_rio`.
 
 For vote related RPCs check the :doc:`rpc` under the prefix
 ``votes/``.
