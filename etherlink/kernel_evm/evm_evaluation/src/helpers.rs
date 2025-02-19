@@ -64,6 +64,12 @@ pub fn construct_folder_path(
     path_buf
 }
 
+pub fn trim_trailing_zeros(vec: &mut Vec<u8>) {
+    while vec.last() == Some(&0) {
+        vec.pop();
+    }
+}
+
 #[macro_export]
 macro_rules! write_host {
     ($host: expr, $($args: expr),*) => {
