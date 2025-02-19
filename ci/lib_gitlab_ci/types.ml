@@ -275,13 +275,19 @@ type job = {
   parallel : parallel option;
 }
 
+(** Represents a trigger rule.
+
+    Implements [trigger:include] and [trigger:strategy].
+    [trigger:include] should be a path to the definition of the child-pipeline.
+*)
+type trigger = {include_ : string; strategy_depend : bool}
+
 (** Parent-child downstream pipeline trigger.
 
     {{:https://docs.gitlab.com/ee/ci/pipelines/downstream_pipelines.html#parent-child-pipelines}
     Parent-child downstream pipelines} execute in the same project as
     the parent pipeline. They inherit the global variables of the
-    parent pipeline. [trigger_include] should be a path to the
-    definition of the child-pipeline.
+    parent pipeline.
 
     Be aware that the child pipeline must define a workflow that
     enables the jobs therein. Notably, the default workflow does not
@@ -290,7 +296,7 @@ type job = {
     [workflow:] section with rules that also enables merge request
     pipelines.
 
-    Note that except [trigger_include], the fields of a trigger job is
+    The fields of a trigger job is
     a subset of those of a normal {!job} and share the same
     semantics. The fields supported by GitLab for trigger jobs are:
 
@@ -318,10 +324,7 @@ type trigger_job = {
   inherit_ : inherit_ option;
   rules : job_rule list option;
   needs : need list option;
-  trigger_include : string;
-      (** Path to the child pipeline that the trigger will execute.
-
-          Translates to [trigger:include:]. *)
+  trigger : trigger;
 }
 
 type generic_job = Job of job | Trigger_job of trigger_job
