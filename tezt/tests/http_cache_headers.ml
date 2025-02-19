@@ -117,7 +117,7 @@ let test_if_none_match ~rpc_external =
     ~title
     ~tags:["rpc"; "middleware"; "http_cache_headers"]
     ~supports:(From_protocol 19)
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   Log.info "Initialize client, node and baker" ;
   let* node, client =
@@ -143,7 +143,7 @@ let test_if_none_match ~rpc_external =
     Client.activate_protocol ~timestamp:Now ~parameter_file ~protocol client
   in
   Log.info "Bake and wait for block" ;
-  let* baker = Baker.init ~protocol ~delegates node client in
+  let* baker = Agnostic_baker.init ~delegates node client in
 
   Log.info "Check etag found in query" ;
   let* _ = Node.wait_for_level node 2 in
@@ -167,7 +167,7 @@ let test_if_none_match ~rpc_external =
       node
       (RPC.get_chain_block_hash ())
   in
-  let* () = Baker.terminate baker in
+  let* () = Agnostic_baker.terminate baker in
   Check.(
     (String.length body > 0)
       int
