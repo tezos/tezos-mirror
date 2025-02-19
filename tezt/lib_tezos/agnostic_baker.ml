@@ -251,3 +251,20 @@ let init ?runner ?(path = Uses.path Constant.octez_experimental_agnostic_baker)
   let* () = run ?event_level ?event_sections_levels agnostic_baker in
   let* () = wait_for_ready agnostic_baker in
   return agnostic_baker
+
+(** Logging helpers for baker events. *)
+
+let log_block_injection ?color baker =
+  on_event baker (fun event ->
+      if String.equal event.name "block_injected.v0" then
+        let open JSON in
+        let level = event.value |-> "level" |> as_int in
+        let round = event.value |-> "round" |> as_int in
+        let delegate = event.value |-> "delegate" |-> "alias" |> as_string in
+        Log.info
+          ?color
+          "[%s] Block injected at level %d round %d for %s."
+          (name baker)
+          level
+          round
+          delegate)

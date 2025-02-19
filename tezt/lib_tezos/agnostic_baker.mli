@@ -222,3 +222,13 @@ val init :
   Node.t ->
   Client.t ->
   t Lwt.t
+
+(** Log block injection events.
+
+    Show the baker daemon name, level and round of the block, and
+    delegate for which it was injected.
+
+    This log is relatively lightweight and a good indicator of chain
+    progress during a test. It can also be useful to observe baking
+    rights at the levels and rounds featured in a test. *)
+val log_block_injection : ?color:Log.Color.t -> t -> unit
