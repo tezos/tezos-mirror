@@ -16,17 +16,17 @@ P2PDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/p2p_doc.exe
 RPCDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCERRORDIR)/error_doc.exe
 
-NAMED_PROTOS  = quebec
-PROTOCOLS     = $(NAMED_PROTOS) alpha next
+NAMED_PROTOS  = quebec r022
+PROTOCOLS     = $(NAMED_PROTOS) alpha
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
 quebec_long  = PsQuebecnLByd3JwTiGadoG4nGWi3HYiLXUjkibeFV8dCFeVMUg
-next_long      = PtHyCPGM8ud7PZdFR5Cx1GYJ6KSnFwkD6FrCAykz5ogvjMurFxp
+r022_long      = PsRiotumaAMotcRoDWW1bysEhQy2n1M5fy8JgRp8jjRfHGmfeA7
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 quebec_short = PsQuebec
-next_short = next
+r022_short    = PsRiotum
 alpha_short   = alpha
 
 SCRIPTSDIR    = scripts
@@ -141,7 +141,7 @@ redirectcheck:
 # - on each other protocol including alpha, also checking label defs (option -l)
 .PHONY: xrefscheck
 xrefscheck:
-	$(CHECKXREFS) -l next
+	$(CHECKXREFS) r022
 	$(CHECKXREFS) quebec
 	$(CHECKXREFS) -l alpha
 
@@ -188,7 +188,7 @@ user/default-acl.json: $(RPCDOCEXE)
 
 .PHONY: rpc
 rpc: user/default-acl.json shell/rpc.rst \
-	alpha/rpc.rst next/rpc.rst
+	alpha/rpc.rst
 
 # To be triggered manually when needed
 .PHONY: rpc-protocols
@@ -314,6 +314,6 @@ fmt: black
 clean:
 	@-rm -Rf "$(BUILDDIR)" "$(BUILDDIRTXT)" linkcheck odoc.log
 	@-rm -f $(ERRDOCEXE) $(RPCDOCEXE) $(P2PDOCEXE)
-	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst next/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst developer/rollup_metrics.csv octezdoc.txt
-	@-rm -Rf api/octez-*.html api/octez-*.txt alpha/octez-*.html next/octez-*.html quebec/octez-*.html
+	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst developer/rollup_metrics.csv octezdoc.txt
+	@-rm -Rf api/octez-*.html api/octez-*.txt alpha/octez-*.html r022/octez-*.html quebec/octez-*.html
 	@-rm -Rf ../openapi-tmp
