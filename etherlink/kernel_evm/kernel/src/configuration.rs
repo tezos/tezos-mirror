@@ -1,5 +1,6 @@
 use crate::{
     blueprint_storage::DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS,
+    chains::ChainFamily,
     delayed_inbox::DelayedInbox,
     storage::{
         dal_slots, enable_dal, evm_node_flag, is_enable_fa_bridge,
@@ -60,19 +61,34 @@ impl std::fmt::Display for ConfigurationMode {
 
 pub struct ChainConfig {
     pub chain_id: U256,
+    pub chain_family: ChainFamily,
 }
 
 impl Default for ChainConfig {
     fn default() -> Self {
         Self {
             chain_id: U256::from(CHAIN_ID),
+            chain_family: ChainFamily::Evm,
         }
     }
 }
 
 impl std::fmt::Display for ChainConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{{Chain id: {}}}", self.chain_id)
+        write!(
+            f,
+            "{{Chain id: {}, Chain informations: {}}}",
+            self.chain_id, self.chain_family
+        )
+    }
+}
+
+impl ChainConfig {
+    pub fn new_evm_config(chain_id: U256) -> Self {
+        ChainConfig {
+            chain_id,
+            chain_family: ChainFamily::Evm,
+        }
     }
 }
 
@@ -229,7 +245,7 @@ pub fn fetch_configuration<Host: Runtime>(
     let enable_fa_bridge = is_enable_fa_bridge(host).unwrap_or_default();
     let dal: Option<DalConfiguration> = fetch_dal_configuration(host);
     let evm_node_flag = evm_node_flag(host).unwrap_or(false);
-    let chain_config = ChainConfig { chain_id };
+    let chain_config = ChainConfig::new_evm_config(chain_id);
     match sequencer {
         Some(sequencer) => {
             let delayed_bridge = read_delayed_transaction_bridge(host)

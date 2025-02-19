@@ -44,6 +44,7 @@ mod block_storage;
 mod blueprint;
 mod blueprint_storage;
 mod bridge;
+mod chains;
 mod configuration;
 mod dal;
 mod dal_slot_import_signal;
@@ -431,9 +432,7 @@ mod tests {
 
     fn dummy_configuration() -> Configuration {
         Configuration {
-            chain_config: ChainConfig {
-                chain_id: DUMMY_CHAIN_ID,
-            },
+            chain_config: ChainConfig::new_evm_config(DUMMY_CHAIN_ID),
             ..Configuration::default()
         }
     }

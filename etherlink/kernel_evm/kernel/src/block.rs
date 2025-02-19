@@ -682,9 +682,7 @@ mod tests {
 
     fn dummy_configuration() -> Configuration {
         Configuration {
-            chain_config: ChainConfig {
-                chain_id: DUMMY_CHAIN_ID,
-            },
+            chain_config: ChainConfig::new_evm_config(DUMMY_CHAIN_ID),
             ..Configuration::default()
         }
     }
