@@ -81,6 +81,7 @@ type t = {
   service_namespace : string option;
   experimental_features : experimental_features;
   fetch_trusted_setup : bool;
+  verbose : bool;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -143,6 +144,7 @@ let default =
     service_namespace = None;
     experimental_features = default_experimental_features;
     fetch_trusted_setup = default_fetch_trusted_setup;
+    verbose = false;
   }
 
 let neighbor_encoding : neighbor Data_encoding.t =
@@ -198,6 +200,7 @@ let encoding : t Data_encoding.t =
            service_namespace;
            experimental_features;
            fetch_trusted_setup;
+           verbose;
          } ->
       ( ( data_dir,
           rpc_addr,
@@ -215,7 +218,8 @@ let encoding : t Data_encoding.t =
           service_name,
           service_namespace,
           experimental_features,
-          fetch_trusted_setup ) ))
+          fetch_trusted_setup,
+          verbose ) ))
     (fun ( ( data_dir,
              rpc_addr,
              listen_addr,
@@ -232,7 +236,8 @@ let encoding : t Data_encoding.t =
              service_name,
              service_namespace,
              experimental_features,
-             fetch_trusted_setup ) ) ->
+             fetch_trusted_setup,
+             verbose ) ) ->
       {
         data_dir;
         rpc_addr;
@@ -251,6 +256,7 @@ let encoding : t Data_encoding.t =
         service_namespace;
         experimental_features;
         fetch_trusted_setup;
+        verbose;
       })
     (merge_objs
        (obj10
@@ -304,7 +310,7 @@ let encoding : t Data_encoding.t =
              ~description:"The point for the DAL node metrics server"
              (Encoding.option P2p_point.Id.encoding)
              None))
-       (obj7
+       (obj8
           (dft
              "history_mode"
              ~description:"The history mode for the DAL node"
@@ -335,7 +341,13 @@ let encoding : t Data_encoding.t =
              "fetch_trusted_setup"
              ~description:"Install trusted setup"
              bool
-             true)))
+             true)
+          (dft
+             "verbose"
+             ~description:
+               "Whether to emit details about frequent logging events"
+             bool
+             default.verbose)))
 
 module V0 = struct
   type t = {
@@ -490,6 +502,7 @@ let from_v0 v0 =
     service_namespace = None;
     experimental_features = default_experimental_features;
     fetch_trusted_setup = true;
+    verbose = false;
   }
 
 type error += DAL_node_unable_to_write_configuration_file of string

@@ -56,7 +56,7 @@ module Worker : sig
        and type Point.t = Types.Point.t
 
   module Logging : sig
-    val event : event -> unit Monad.t
+    val event : verbose:bool -> event -> unit Monad.t
   end
 
   (** A hook to set or update messages and messages IDs validation
@@ -196,6 +196,7 @@ module Transport_layer_hooks : sig
     Transport_layer.t ->
     app_messages_callback:
       (Types.Message.t -> Types.Message_id.t -> unit tzresult Lwt.t) ->
+    verbose:bool ->
     unit Lwt.t
 end
 

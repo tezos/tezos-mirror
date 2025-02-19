@@ -57,7 +57,9 @@ type options = {
   experimental_features : experimental_features;  (** Experimental features.  *)
   fetch_trusted_setup : bool option;
       (** Should the trusted setup be installed if required and invalid?
-        In case of [None] at init it is considered as yes.*)
+      In case of [None] at init it is considered as yes.*)
+  verbose : bool;
+      (** Emit events related to connections. Default value is false. *)
 }
 
 (** Subcommands that can be used by the DAL node. In the future this type

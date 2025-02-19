@@ -807,7 +807,7 @@ let update_timing_shard_received node_ctxt shards_timing_table slot_id
   timing
 
 let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
-    node_store node_ctxt amplificator =
+    node_store node_ctxt amplificator ~verbose =
   let open Gossipsub in
   let timing_table_size =
     2 * proto_parameters.Types.attestation_lag
@@ -865,7 +865,8 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
       Transport_layer_hooks.activate
         gs_worker
         transport_layer
-        ~app_messages_callback:(shards_handler node_store))
+        ~app_messages_callback:(shards_handler node_store)
+        ~verbose)
     (fun exn ->
       "[dal_node] error in Daemon.connect_gossipsub_with_p2p: "
       ^ Printexc.to_string exn
@@ -1321,7 +1322,7 @@ let run ~data_dir ~configuration_override =
       Gossipsub.Worker.(
         make
           ~bootstrap_points:get_bootstrap_points
-          ~events_logging:Logging.event
+          ~events_logging:(Logging.event ~verbose:config.verbose)
           ~self
           rng
           limits
@@ -1509,7 +1510,8 @@ let run ~data_dir ~configuration_override =
     transport_layer
     shards_store
     ctxt
-    amplificator ;
+    amplificator
+    ~verbose:config.verbose ;
   let*! () =
     Gossipsub.Transport_layer.activate ~additional_points:points transport_layer
   in
