@@ -4438,6 +4438,12 @@ module RPC = struct
     in
     return (rpc.decode json)
 
+  let call_via_endpoint client =
+    match mode_to_endpoint client.mode with
+    | Some (Node node) -> Node.RPC.call node
+    | Some (Foreign_endpoint endpoint) -> RPC_core.call endpoint
+    | _ -> call client
+
   let schema ?log_command ?log_status_on_exit ?log_output ?better_errors
       ?endpoint ?hooks ?env ?protocol_hash client RPC_core.{verb; path; _} =
     rpc_schema

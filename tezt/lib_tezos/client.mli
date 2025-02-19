@@ -3206,6 +3206,12 @@ module RPC : sig
     'result RPC_core.t ->
     'result Lwt.t
 
+  (** Call an RPC using the client's endpoint, if available. Otherwise, fallback
+      to {!call}, that is, fallback to [octez-client rpc]. Note that using
+      directly the endpoint is much (likely 2 orders of magnitude) faster than
+      using [octez-client]. *)
+  val call_via_endpoint : t -> 'result RPC_core.t -> 'result Lwt.t
+
   (** Call an RPC, but do not parse the client output. *)
   val call_raw :
     ?log_command:bool ->
