@@ -570,21 +570,22 @@ module P2P = struct
     return_unit
 
   let get_points ctxt q () =
-    Node_context.P2P.get_points ~connected:q#connected ctxt
+    Lwt.return @@ Node_context.P2P.get_points ~connected:q#connected ctxt
 
   let get_points_info ctxt q () =
-    Node_context.P2P.get_points_info ~connected:q#connected ctxt
+    Lwt.return @@ Node_context.P2P.get_points_info ~connected:q#connected ctxt
 
   let get_point_info ctxt point () () =
-    Node_context.P2P.get_point_info ctxt point
+    Lwt.return @@ Node_context.P2P.get_point_info ctxt point
 
   let get_peers ctxt q () =
-    Node_context.P2P.get_peers ~connected:q#connected ctxt
+    Lwt.return @@ Node_context.P2P.get_peers ~connected:q#connected ctxt
 
   let get_peers_info ctxt q () =
-    Node_context.P2P.get_peers_info ~connected:q#connected ctxt
+    Lwt.return @@ Node_context.P2P.get_peers_info ~connected:q#connected ctxt
 
-  let get_peer_info ctxt peer () () = Node_context.P2P.get_peer_info ctxt peer
+  let get_peer_info ctxt peer () () =
+    Lwt.return @@ Node_context.P2P.get_peer_info ctxt peer
 
   let patch_peer ctxt peer () acl = Node_context.P2P.patch_peer ctxt peer acl
 
@@ -651,7 +652,7 @@ module Health = struct
     let open Types.Health in
     let profiles = Node_context.get_profile_ctxt ctxt in
     let no_profile = Profile_manager.is_empty profiles in
-    let* points = Node_context.P2P.get_points ctxt in
+    let*? points = Node_context.P2P.get_points ctxt in
     let topics = Node_context.P2P.Gossipsub.get_topics ctxt in
     let connections = Node_context.P2P.Gossipsub.get_connections ctxt in
     match (points, no_profile, topics, connections) with

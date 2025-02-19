@@ -139,7 +139,7 @@ module Transport_layer : sig
       currently connected. Otherwise, it returns a list of known
       points (points for which we were already successfully connected
       in the past.) *)
-  val get_points : ?connected:bool -> t -> P2p_point.Id.t list tzresult Lwt.t
+  val get_points : ?connected:bool -> t -> P2p_point.Id.t list tzresult
 
   (** [get_points_info ?connected t] returns a list of info for
       points. If [connected] is [true] (default), it returns only info
@@ -147,20 +147,17 @@ module Transport_layer : sig
       list of infos for known points (points for which we were already
       successfully connected in the past.) *)
   val get_points_info :
-    ?connected:bool ->
-    t ->
-    (P2p_point.Id.t * P2p_point.Info.t) list tzresult Lwt.t
+    ?connected:bool -> t -> (P2p_point.Id.t * P2p_point.Info.t) list tzresult
 
   (** [get_point_info t point] returns the info of the corresponding
       point if found. *)
-  val get_point_info :
-    t -> P2p_point.Id.t -> P2p_point.Info.t option tzresult Lwt.t
+  val get_point_info : t -> P2p_point.Id.t -> P2p_point.Info.t option tzresult
 
   (** [get_peers ?connected t] returns a list of peers. If [connected]
       is [true] (default), it returns only the peers we are connected
       to. Otherwise, it returns a list of known peers (peers for which we
       were already successfully connected in the past.) *)
-  val get_peers : ?connected:bool -> t -> P2p_peer.Id.t list tzresult Lwt.t
+  val get_peers : ?connected:bool -> t -> P2p_peer.Id.t list tzresult
 
   (** [get_peers_info ?connected t] returns a list of info for
       peers. If [connected] is [true] (default), it returns only info
@@ -170,11 +167,11 @@ module Transport_layer : sig
   val get_peers_info :
     ?connected:bool ->
     t ->
-    (P2p_peer.Id.t * Types.P2P.Peer.Info.t) list tzresult Lwt.t
+    (P2p_peer.Id.t * Types.P2P.Peer.Info.t) list tzresult
 
   (** [get_peer_info t peer] returns the info of the corresponding peer if found. *)
   val get_peer_info :
-    t -> P2p_peer.Id.t -> Types.P2P.Peer.Info.t option tzresult Lwt.t
+    t -> P2p_peer.Id.t -> Types.P2P.Peer.Info.t option tzresult
 
   (** [patch_peer t peer acl] patches the acl of the corresponding
       peer if found and returns the info. When [acl] is [None] this is
