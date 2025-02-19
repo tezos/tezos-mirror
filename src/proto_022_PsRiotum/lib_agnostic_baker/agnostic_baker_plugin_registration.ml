@@ -8,6 +8,8 @@
 module Agnostic_baker_plugin = struct
   let hash = Registerer.Registered.hash
 
+  let name = Protocol.name
+
   let register_commands () =
     Client_commands.register Protocol.hash @@ fun _network ->
     List.map (Tezos_clic.map_command (new Protocol_client_context.wrap_full))
@@ -28,24 +30,6 @@ module Agnostic_baker_plugin = struct
      validating an operation. Plus paying this cost upfront means that the first
      validation will not be more expensive. *)
   let init_sapling_params () = Tezos_sapling.Core.Validator.init_params ()
-
-  let run_baker_binary ~baker_args ~cancel_promise ~logs_path =
-    let module Config = struct
-      include Daemon_config
-
-      let default_daily_logs_path = logs_path
-    end in
-    register_commands () ;
-    init_sapling_params () ;
-    Lwt.pick
-      [
-        Client_main_run.lwt_run
-          (module Config)
-          ~select_commands
-          ~cmd_args:baker_args
-          ();
-        cancel_promise;
-      ]
 end
 
 let () =

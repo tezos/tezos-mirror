@@ -18,6 +18,31 @@ let shutdown baker =
   Lwt.wakeup baker.process.canceller 0 ;
   return_unit
 
+(** [run_thread plugin ~baker_args ~cancel_promise ~logs_path] returns the main
+    running thread for the baker given its corresponding [plugin], with the command
+    line arguments given by [~baker_args] and cancellation Lwt promise
+    [~cancel_promise]. The event logs are stored according to [~logs_path]. *)
+let run_thread
+    (module Agnostic_baker_plugin : Protocol_plugin.AGNOSTIC_BAKER_PLUGIN)
+    ~baker_args ~cancel_promise ~logs_path =
+  let open Agnostic_baker_plugin in
+  register_commands () ;
+  init_sapling_params () ;
+  let module Config = struct
+    include Daemon_config
+
+    let default_daily_logs_path = logs_path
+  end in
+  Lwt.pick
+    [
+      Client_main_run.lwt_run
+        (module Config)
+        ~select_commands
+        ~cmd_args:baker_args
+        ();
+      cancel_promise;
+    ]
+
 (** [spawn_baker protocol_hash ~baker_args] spawns a baker for the given [protocol_hash]
     with [~baker_args] as command line arguments. *)
 let spawn_baker protocol_hash ~baker_args =
@@ -39,12 +64,13 @@ let spawn_baker protocol_hash ~baker_args =
   let cancel_promise, canceller = Lwt.wait () in
   let* thread =
     match Protocol_plugin.find_agnostic_baker_plugin protocol_hash with
-    | Some (module Agnostic_baker_plugin) ->
+    | Some plugin ->
         (* The internal event logging needs to be closed, because another one will be
            initialised in the [run_baker_binary]. *)
         let*! () = Tezos_base_unix.Internal_event_unix.close () in
         return
-        @@ Agnostic_baker_plugin.run_baker_binary
+        @@ run_thread
+             plugin
              ~baker_args
              ~cancel_promise
              ~logs_path:Parameters.default_daily_logs_path
