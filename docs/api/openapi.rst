@@ -61,14 +61,27 @@ Quebec RPCs
 -----------
 
 The OpenAPI specifications for RPCs which are specific to the Quebec (``PtQuebec``)
-protocol proposal can be found at:
+protocol can be found at:
 
 - :src:`docs/api/quebec-openapi.json` (version 21.4)
 
 The OpenAPI specifications for RPCs which are related to the mempool
-and specific to the Quebec protocol proposal can be found at:
+and specific to the Quebec protocol can be found at:
 
 - :src:`docs/api/quebec-mempool-openapi.json` (version 21.4)
+
+Rio RPCs
+--------
+
+The OpenAPI specifications for RPCs which are specific to the Rio (``PsRiotum``)
+protocol proposal can be found at:
+
+- :src:`docs/api/rio-openapi.json` (version 22.0~rc1)
+
+The OpenAPI specifications for RPCs which are related to the mempool
+and specific to the Rio protocol proposal can be found at:
+
+- :src:`docs/api/rio-mempool-openapi.json` (version 22.0~rc1)
 
 Alpha RPCs
 ----------
