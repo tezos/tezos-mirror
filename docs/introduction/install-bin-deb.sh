@@ -162,18 +162,6 @@ fi
 apt-get install -y octez-client
 apt-get install -y octez-node
 
-# If systemd is available we test the service scripts
-if [ "$(ps --no-headers -o comm 1)" = "systemd" ]; then
-  systemctl enable octez-node
-  systemctl start octez-node
-
-  sleep 5
-  systemctl status octez-node
-
-  journalctl -xeu octez-node.service
-
-fi
-
 apt-get install -y octez-baker
 apt-get install -y octez-dal-node
 
@@ -191,11 +179,6 @@ octez-client --version
 octez-node --version
 "octez-baker-$protocol" --version
 "octez-accuser-$protocol" --version
-
-# If systemd is available we test the service scripts
-if [ "$(ps --no-headers -o comm 1)" = "systemd" ]; then
-  systemctl stop octez-node
-fi
 
 # [test autopurge]
 apt-get autopurge -y octez-node octez-client octez-baker octez-dal-node

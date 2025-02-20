@@ -475,7 +475,7 @@ let jobs pipeline_type =
              ])
         [
           "./scripts/ci/systemd-packages-test.sh \
-           docs/introduction/install-bin-deb.sh \
+           scripts/packaging/tests/deb/install-bin-deb.sh \
            images/packages/debian-systemd-tests.Dockerfile";
         ];
     ]

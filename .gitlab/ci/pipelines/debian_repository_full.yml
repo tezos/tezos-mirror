@@ -617,7 +617,8 @@ oc.install_bin_debian_bookworm-systemd:
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
-  - ./scripts/ci/systemd-packages-test.sh docs/introduction/install-bin-deb.sh images/packages/debian-systemd-tests.Dockerfile
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/install-bin-deb.sh
+    images/packages/debian-systemd-tests.Dockerfile
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
