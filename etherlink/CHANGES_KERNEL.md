@@ -7,6 +7,7 @@
 ### Bug fixes
 
 - Improves call trace of `DELEGATECALL` and `CALLCODE`. (!16588)
+- The EVM now complies to EIP-3529. (!16887)
 
 ### Internal
 
