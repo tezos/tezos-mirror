@@ -75,6 +75,7 @@ let network_typ : Network.t Clap.typ =
     ~parse:(function
       | "mainnet" -> Some `Mainnet
       | "ghostnet" -> Some `Ghostnet
+      | "rionet" -> Some `Rionet
       | s when String.length s = 20 && String.sub s 0 10 = "weeklynet-" ->
           (* format:  weeklynet-2025-01-29 (with dashes) *)
           let date = String.sub s 10 10 in

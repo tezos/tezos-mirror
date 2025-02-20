@@ -100,7 +100,8 @@ module Node = struct
       agent =
     toplog "Inititializing an L1 node for %s" name ;
     match network with
-    | (`Mainnet | `Ghostnet | `Nextnet _ | `Weeklynet _) as network -> (
+    | (`Mainnet | `Ghostnet | `Nextnet _ | `Weeklynet _ | `Rionet) as network
+      -> (
         (* For public networks deployments, we listen on all interfaces on both
            ipv4 and ipv6 *)
         let net_addr = "[::]" in
@@ -2292,7 +2293,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
           configuration
           ?etherlink_configuration
           bootstrap_agent
-    | (`Ghostnet | `Nextnet _ | `Mainnet | `Weeklynet _) as network ->
+    | (`Ghostnet | `Nextnet _ | `Mainnet | `Weeklynet _ | `Rionet) as network ->
         init_public_network
           cloud
           configuration
