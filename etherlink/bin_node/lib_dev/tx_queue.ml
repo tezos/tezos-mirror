@@ -8,7 +8,11 @@
 
 open Tezos_workers
 
-type parameters = {evm_node_endpoint : Uri.t; config : Configuration.tx_queue}
+type parameters = {
+  evm_node_endpoint : Uri.t;
+  config : Configuration.tx_queue;
+  keep_alive : bool;
+}
 
 type queue_variant = [`Accepted | `Refused]
 
@@ -102,6 +106,7 @@ type state = {
   pending : Pending_transactions.t;
   tx_object : Tx_object.t;
   config : Configuration.tx_queue;
+  keep_alive : bool;
 }
 
 module Types = struct
@@ -191,7 +196,7 @@ type worker = Worker.infinite Worker.queue Worker.t
 
 let uuid_seed = Random.get_state ()
 
-let send_transactions_batch ~evm_node_endpoint transactions =
+let send_transactions_batch ~evm_node_endpoint ~keep_alive transactions =
   let open Lwt_result_syntax in
   let module M = Map.Make (String) in
   let module Srt = Rpc_encodings.Send_raw_transaction in
@@ -221,7 +226,7 @@ let send_transactions_batch ~evm_node_endpoint transactions =
 
     let* responses =
       Rollup_services.call_service
-        ~keep_alive:true
+        ~keep_alive
         ~base:evm_node_endpoint
         (Batch.dispatch_batch_service ~path:Resto.Path.root)
         ()
@@ -328,6 +333,7 @@ module Handlers = struct
 
         let+ () =
           send_transactions_batch
+            ~keep_alive:state.keep_alive
             ~evm_node_endpoint:state.evm_node_endpoint
             transactions_to_inject
         in
@@ -344,7 +350,8 @@ module Handlers = struct
 
   type launch_error = tztrace
 
-  let on_launch _self () ({evm_node_endpoint; config} : parameters) =
+  let on_launch _self () ({evm_node_endpoint; config; keep_alive} : parameters)
+      =
     let open Lwt_result_syntax in
     return
       {
@@ -355,6 +362,7 @@ module Handlers = struct
            too much at start. *)
         tx_object = Tx_object.empty ~start_size:(config.max_size / 4);
         config;
+        keep_alive;
       }
 
   let on_error (type a b) _self _status_request (_r : (a, b) Request.t)
@@ -436,10 +444,14 @@ let inject ?(callback = fun _ -> Lwt_syntax.return_unit)
 let confirm txn_hash =
   bind_worker @@ fun w -> push_request w (Confirm {txn_hash})
 
-let start ~config ~evm_node_endpoint () =
+let start ~config ~evm_node_endpoint ~keep_alive () =
   let open Lwt_result_syntax in
   let* worker =
-    Worker.launch table () {evm_node_endpoint; config} (module Handlers)
+    Worker.launch
+      table
+      ()
+      {evm_node_endpoint; config; keep_alive}
+      (module Handlers)
   in
   Lwt.wakeup worker_waker worker ;
   let*! () = Tx_queue_events.is_ready () in

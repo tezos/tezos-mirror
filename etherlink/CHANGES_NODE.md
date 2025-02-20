@@ -48,6 +48,9 @@
 
 ### Execution changes
 
+- **experimental feature** The `tx_queue` respect the configuration
+field `keep_alive` for it's RPC. (!16894)
+
 ### Storage changes
 
 - Adds support for the `%h` variable in the `snapshot export` and `run observer
