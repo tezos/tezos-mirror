@@ -33,7 +33,7 @@ use alloc::borrow::Cow;
 use alloc::rc::Rc;
 use core::convert::Infallible;
 use evm::executor::stack::Log;
-use evm::gasometer::{GasCost, MemoryCost};
+use evm::gasometer::{GasCost, Gasometer, MemoryCost};
 use evm::{
     CallScheme, Capture, Config, Context, CreateScheme, ExitError, ExitFatal, ExitReason,
     ExitRevert, ExitSucceed, Handler, Opcode, Resolve, Stack, Transfer,
@@ -453,13 +453,21 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     /// Get the total amount of gas used for the duration of the current
     /// transaction.
     pub fn gas_used(&self) -> u64 {
+        // EIP-3529
+        let compute_gas = |g: &Gasometer| {
+            let total_used_gas = g.total_used_gas();
+            let max_refund_quotient = self.config.max_refund_quotient;
+            let refunded_gas = g.refunded_gas() as u64;
+            total_used_gas - min(total_used_gas / max_refund_quotient, refunded_gas)
+        };
+
         self.transaction_data
             .last()
             .map(|layer| {
                 layer
                     .gasometer
                     .as_ref()
-                    .map(|g| g.total_used_gas())
+                    .map(|g| compute_gas(g))
                     .unwrap_or_default()
             })
             .unwrap_or_default()
