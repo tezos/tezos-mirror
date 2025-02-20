@@ -27,6 +27,7 @@ depends: [
   "tezos-dal-node-services" { = version }
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "lwt-exit"
+  "memtrace"
   "octez-protocol-compiler" { = version }
   "tezos-dal-node-lib" { = version }
   "octez-injector" { = version }
