@@ -518,8 +518,6 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
            Lwt.return
              (Time_to_prepare_next_level_block {at_round = next_baking_round}))
   in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7390
-     re-use what has been done in round_synchronizer.ml *)
   (* Compute the timestamp of the next possible round. *)
   let next_round = compute_next_round_time state in
   let*! next_baking = compute_next_potential_baking_time_at_next_level state in
