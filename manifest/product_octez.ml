@@ -6848,6 +6848,7 @@ let hash = Protocol.hash
             lwt_canceler;
             lwt_exit;
             uri;
+            memtrace;
           ]
         ~linkall:true
         ~all_modules_except:
