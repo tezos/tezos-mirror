@@ -11,6 +11,10 @@
   going through the public endpoint. Reads `--evm-node-private-endpoint` if
   specified or the RW config private rpc if not. (!16664)
 - Supports native execution for the Calypso kernel. (!16728 !16729 !16734)
+- Native execution is now enabled by default for RPCs (can be disabled with
+  `--native-execution-policy never` or with
+  `kernel_execution.native_execution_policy: never` in the configuration file).
+  (!16881)
 
 ### Bug fixes
 
