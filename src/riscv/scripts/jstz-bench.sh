@@ -8,7 +8,7 @@
 
 set -e
 
-USAGE="Usage: -t <num_transfers> [ -s: static inbox ] [ -p: profile with samply ] [ -n: run natively ] [ -i <num_iterations>: number of runs ] [ -j: enable inline jit ]"
+USAGE="Usage: -t <num_transfers> [ -s: static inbox ] [ -p: profile with samply ] [ -n: run natively ] [ -i <num_iterations>: number of runs ] [ -j: enable inline jit ] [ -m <all | jit-unsupported>: enable metrics ]"
 DEFAULT_ROLLUP_ADDRESS="sr163Lv22CdE8QagCwf48PWDTquk6isQwv57"
 
 ITERATIONS="1"
@@ -18,13 +18,15 @@ SANDBOX_BIN="riscv-sandbox"
 SANDBOX_ENABLE_FEATURES=""
 PROFILING_WRAPPER=""
 SAMPLY_OUT="riscv-sandbox-profile.json"
+METRICS=""
+METRICS_ARGS=()
 NATIVE=""
 
 CURR=$(pwd)
 RISCV_DIR=$(dirname "$0")/..
 cd "$RISCV_DIR"
 
-while getopts "i:t:spnj" OPTION; do
+while getopts "i:t:m:spnj" OPTION; do
   case "$OPTION" in
   i)
     ITERATIONS="$OPTARG"
@@ -44,6 +46,21 @@ while getopts "i:t:spnj" OPTION; do
     ;;
   j)
     SANDBOX_ENABLE_FEATURES="${SANDBOX_ENABLE_FEATURES} inline-jit"
+    ;;
+  m)
+    SANDBOX_ENABLE_FEATURES="${SANDBOX_ENABLE_FEATURES} metrics"
+    METRICS="y"
+
+    case "$OPTARG" in
+    all) ;;
+    jit-unsupported)
+      METRICS_ARGS+=("--exclude-supported-instructions")
+      ;;
+    *)
+      echo "$USAGE"
+      exit 1
+      ;;
+    esac
     ;;
   *)
     echo "$USAGE"
@@ -77,6 +94,11 @@ RUN_INBOX="$INBOX_FILE"
 
 log_file_args=()
 
+BLOCK_METRICS_FILE="${DATA_DIR}/block-metrics.out"
+if [ -n "$METRICS" ]; then
+  METRICS_ARGS+=("--block-metrics-file" "${BLOCK_METRICS_FILE}")
+fi
+
 ##########
 # RISC-V #
 ##########
@@ -98,6 +120,7 @@ run_jstz_riscv() {
     --initrd jstz/target/riscv64gc-unknown-hermit/release/jstz \
     --inbox-file "$RUN_INBOX" \
     --address "$DEFAULT_ROLLUP_ADDRESS" \
+    "${METRICS_ARGS[@]}" \
     --timings > "$LOG"
   log_file_args+=("--log-file=$LOG")
 }
@@ -161,6 +184,10 @@ collect
 if [ -n "$PROFILING_WRAPPER" ]; then
   echo "[INFO]: collecting results"
   samply load $SAMPLY_OUT
+fi
+
+if [ -n "${METRICS}" ]; then
+  echo "Block metrics at ${BLOCK_METRICS_FILE}"
 fi
 
 cd "$CURR"
