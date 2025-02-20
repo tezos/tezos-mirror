@@ -537,14 +537,17 @@ module Handler = struct
                           should_be_attested index
                           && not (is_attested bitset index)
                         then
-                          if not (contains_traps delegate index) then
-                            Event.emit_warn_attester_did_not_attest_slot
+                          if
+                            parameters.incentives_enable
+                            && contains_traps delegate index
+                          then
+                            Event
+                            .emit_attester_did_not_attest_slot_because_of_traps
                               ~attester:delegate
                               ~slot_index:index
                               ~attested_level:block_level
                           else
-                            Event
-                            .emit_attester_did_not_attest_slot_because_of_traps
+                            Event.emit_warn_attester_did_not_attest_slot
                               ~attester:delegate
                               ~slot_index:index
                               ~attested_level:block_level
