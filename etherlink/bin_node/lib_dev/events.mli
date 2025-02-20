@@ -101,6 +101,10 @@ val patched_state : string -> Ethereum_types.quantity -> unit Lwt.t
     downloaded all preimages under [root_hash]. *)
 val predownload_kernel : Hex.t -> unit Lwt.t
 
+(** [predownload_kernel_failed root_hash error] advertizes the EVM node has
+    failed to download preimages under [root_hash] with [error]. *)
+val predownload_kernel_failed : Hex.t -> tztrace -> unit Lwt.t
+
 (** [sandbox_started level] advertizes that sandbox mode started on top of
     level [level]. *)
 val sandbox_started : Z.t -> unit Lwt.t

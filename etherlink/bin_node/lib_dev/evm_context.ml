@@ -409,20 +409,32 @@ module State = struct
         []
 
   let background_preemptive_download
-      (kernel_execution : Configuration.kernel_execution_config)
-      Evm_events.Upgrade.{hash; timestamp = _} =
+      (kernel_execution : Configuration.kernel_execution_config) upgrade_event =
+    let open Lwt_syntax in
+    let open Evm_events.Upgrade in
+    let rec downloader root_hash preimages_endpoint preimages =
+      Lwt.catch
+        (fun () ->
+          (* Download the kernel. *)
+          Misc.unwrap_error_monad @@ fun () ->
+          Kernel_download.download ~preimages ~preimages_endpoint ~root_hash ())
+        (fun exn ->
+          (*  Error handling. *)
+          let* () =
+            Events.predownload_kernel_failed
+              root_hash
+              [Error_monad.error_of_exn exn]
+          in
+          let* () = Lwt_unix.sleep 60.0 in
+          downloader root_hash preimages_endpoint preimages)
+    in
     match kernel_execution.preimages_endpoint with
     | None -> ()
     | Some preimages_endpoint ->
-        Lwt.async @@ fun () ->
-        Misc.unwrap_error_monad @@ fun () ->
-        let (Hash (Hex root_hash)) = hash in
+        let (Hash (Hex root_hash)) = upgrade_event.hash in
         let root_hash = `Hex root_hash in
-        Kernel_download.download
-          ~preimages:kernel_execution.preimages
-          ~preimages_endpoint
-          ~root_hash
-          ()
+        Lwt.async (fun () ->
+            downloader root_hash preimages_endpoint kernel_execution.preimages)
 
   let reset_to_level ctxt conn l2_level checkpoint =
     let open Lwt_result_syntax in
