@@ -16,7 +16,7 @@ use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use std::fmt::Debug;
-use tezos_ethereum::block::L2Block;
+use tezos_ethereum::block::EthBlock;
 use tezos_ethereum::eth_gen::OwnedHash;
 use tezos_ethereum::rlp_helpers::{
     self, append_timestamp, append_u256_le, decode_field_u256_le, decode_timestamp,
@@ -116,8 +116,8 @@ pub struct BlockHeader<H> {
     pub evm_block_header: H,
 }
 
-impl From<L2Block> for BlockHeader<EVMBlockHeader> {
-    fn from(block: L2Block) -> Self {
+impl From<EthBlock> for BlockHeader<EVMBlockHeader> {
+    fn from(block: EthBlock) -> Self {
         Self {
             blueprint_header: BlueprintHeader {
                 number: block.number,

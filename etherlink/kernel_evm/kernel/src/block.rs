@@ -32,7 +32,7 @@ use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::trace::TracerInput;
 use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockConstants;
-use tezos_ethereum::block::L2Block;
+use tezos_ethereum::block::EthBlock;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::runtime::Runtime;
@@ -76,7 +76,7 @@ pub enum BlockComputationResult {
     RebootNeeded,
     Finished {
         included_delayed_transactions: Vec<TransactionHash>,
-        block: Box<L2Block>,
+        block: Box<EthBlock>,
     },
 }
 
@@ -438,7 +438,7 @@ fn promote_block<Host: Runtime>(
     safe_host: &mut SafeStorage<&mut Host>,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress_provenance: &BlockInProgressProvenance,
-    block: L2Block,
+    block: EthBlock,
     config: &mut Configuration,
     delayed_txs: Vec<TransactionHash>,
 ) -> anyhow::Result<()> {
