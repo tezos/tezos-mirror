@@ -534,26 +534,51 @@ module Handler = struct
                   ~attester:delegate
                   ~attested_level:block_level
             | Some bitset ->
-                List.iter_s
-                  (fun index ->
-                    if
-                      should_be_attested index && not (is_attested bitset index)
-                    then
-                      if
-                        parameters.incentives_enable
-                        && contains_traps delegate index
-                      then
-                        Event.emit_attester_did_not_attest_slot_because_of_traps
-                          ~attester:delegate
-                          ~slot_index:index
-                          ~attested_level:block_level
-                      else
-                        Event.emit_warn_attester_did_not_attest_slot
-                          ~attester:delegate
-                          ~slot_index:index
-                          ~attested_level:block_level
-                    else Lwt.return_unit)
-                  (0 -- (parameters.number_of_slots - 1)))
+                let attested, not_attested, not_attested_with_traps =
+                  List.fold_left
+                    (fun (attested, not_attested, not_attested_with_traps) index ->
+                      if should_be_attested index then
+                        if is_attested bitset index then
+                          ( index :: attested,
+                            not_attested,
+                            not_attested_with_traps )
+                        else if
+                          parameters.incentives_enable
+                          && contains_traps delegate index
+                        then
+                          ( attested,
+                            not_attested,
+                            index :: not_attested_with_traps )
+                        else
+                          ( attested,
+                            index :: not_attested,
+                            not_attested_with_traps )
+                      else (attested, not_attested, not_attested_with_traps))
+                    ([], [], [])
+                    (parameters.number_of_slots - 1 --- 0)
+                in
+                let*! () =
+                  if attested <> [] then
+                    Event.emit_attester_attested
+                      ~attester:delegate
+                      ~attested_level:block_level
+                      ~slot_indexes:attested
+                  else Lwt.return_unit
+                in
+                let*! () =
+                  if not_attested <> [] then
+                    Event.emit_warn_attester_did_not_attest
+                      ~attester:delegate
+                      ~attested_level:block_level
+                      ~slot_indexes:not_attested
+                  else Lwt.return_unit
+                in
+                if not_attested_with_traps <> [] then
+                  Event.emit_attester_did_not_attest_because_of_traps
+                    ~attester:delegate
+                    ~attested_level:block_level
+                    ~slot_indexes:not_attested_with_traps
+                else Lwt.return_unit)
       in
       let*! () =
         Signature.Public_key_hash.Set.iter_s
