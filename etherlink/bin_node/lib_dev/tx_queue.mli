@@ -64,3 +64,43 @@ val beacon : tick_interval:float -> unit tzresult Lwt.t
 val find :
   Ethereum_types.hash ->
   Ethereum_types.legacy_transaction_object option tzresult Lwt.t
+
+(**/*)
+
+module Internal_for_tests : sig
+  module Nonce_bitset : sig
+    type t = {next_nonce : Z.t; bitset : Tezos_base.Bitset.t}
+
+    val create : next_nonce:Z.t -> t
+
+    val offset : nonce1:Z.t -> nonce2:Z.t -> int tzresult
+
+    val add : t -> nonce:Z.t -> t tzresult
+
+    val remove : t -> nonce:Z.t -> t tzresult
+
+    val shift : t -> nonce:Z.t -> t tzresult
+
+    val is_empty : t -> bool
+
+    val next_gap : t -> Z.t
+
+    val shift_then_next_gap : t -> shift_nonce:Z.t -> Z.t tzresult
+  end
+
+  module Address_nonce : sig
+    type t
+
+    val empty : start_size:int -> t
+
+    val add : t -> addr:string -> next_nonce:Z.t -> nonce:Z.t -> unit tzresult
+
+    val find : t -> addr:string -> Nonce_bitset.t option
+
+    val confirm_nonce : t -> addr:string -> nonce:Z.t -> unit tzresult
+
+    val remove : t -> addr:string -> nonce:Z.t -> unit tzresult
+
+    val next_gap : t -> addr:string -> next_nonce:Z.t -> Z.t tzresult
+  end
+end

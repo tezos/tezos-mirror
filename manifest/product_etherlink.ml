@@ -313,6 +313,7 @@ let _octez_evm_node_tests =
       "test_call_tracer_algo";
       "test_wasm_runtime";
       "test_blueprint_roundtrip";
+      "test_bitset_nonce";
     ]
     ~path:"etherlink/bin_node/test"
     ~opam:"octez-evm-node-tests"

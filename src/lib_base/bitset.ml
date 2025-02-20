@@ -55,6 +55,11 @@ let remove field pos =
   let* () = error_when Compare.Int.(pos < 0) (Invalid_position pos) in
   return @@ Z.logand field Z.(lognot (shift_left one pos))
 
+let shift_right field ~offset =
+  let open Result_syntax in
+  let* () = error_when Compare.Int.(offset < 0) (Invalid_input "shift_right") in
+  return @@ Z.shift_right field offset
+
 let from_list positions = List.fold_left_e add empty positions
 
 let to_list field =
