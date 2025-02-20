@@ -244,6 +244,15 @@ module P2p_connect_handler = struct
       ~pp2:pp_print_top_error_of_trace
       ("errors", Error_monad.trace_encoding)
 
+  let unexpected_cancellation_error =
+    declare_1
+      ~section
+      ~name:"unexpected_cancellation_error"
+      ~msg:"unexpected cancellation error: {errors}"
+      ~level:Error
+      ~pp1:pp_print_top_error_of_trace
+      ("errors", Error_monad.trace_encoding)
+
   let connect_status =
     declare_2
       ~section
