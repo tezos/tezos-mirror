@@ -394,7 +394,7 @@ let restricted_rpcs_encoding =
         (fun l -> Blacklist l);
     ]
 
-let default_native_execution_policy = Never
+let default_native_execution_policy = Rpcs_only
 
 let kernel_execution_config_dft ~data_dir ?preimages ?preimages_endpoint
     ?native_execution_policy () =
