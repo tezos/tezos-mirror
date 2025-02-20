@@ -512,58 +512,54 @@ module Handler = struct
                    index = slot_index
                    && Signature.Public_key_hash.equal delegate pkh)
       in
+      let check_attester delegate =
+        let attestation_opt =
+          List.find
+            (fun (_tb_slot, delegate_opt, _attestation_op, _dal_attestation_opt) ->
+              match delegate_opt with
+              | Some pkh -> Signature.Public_key_hash.equal delegate pkh
+              | None -> false)
+            attestations
+        in
+        match attestation_opt with
+        | None ->
+            (* TODO: emit event: attestation not included! *)
+            Lwt.return_unit
+        | Some (_tb_slot, _delegate_opt, _attestation_op, dal_attestation_opt)
+          -> (
+            match dal_attestation_opt with
+            | None ->
+                Event.emit_warn_attester_not_dal_attesting
+                  ~attester:delegate
+                  ~attested_level:block_level
+            | Some bitset ->
+                List.iter_s
+                  (fun index ->
+                    if
+                      should_be_attested index && not (is_attested bitset index)
+                    then
+                      if
+                        parameters.incentives_enable
+                        && contains_traps delegate index
+                      then
+                        Event.emit_attester_did_not_attest_slot_because_of_traps
+                          ~attester:delegate
+                          ~slot_index:index
+                          ~attested_level:block_level
+                      else
+                        Event.emit_warn_attester_did_not_attest_slot
+                          ~attester:delegate
+                          ~slot_index:index
+                          ~attested_level:block_level
+                    else Lwt.return_unit)
+                  (0 -- (parameters.number_of_slots - 1)))
+      in
       let*! () =
         Signature.Public_key_hash.Set.iter_s
           (fun delegate ->
             if not @@ Signature.Public_key_hash.Map.mem delegate committee then
               Lwt.return_unit
-            else
-              let attestation_opt =
-                List.find
-                  (fun ( _tb_slot,
-                         delegate_opt,
-                         _attestation_op,
-                         _dal_attestation_opt ) ->
-                    match delegate_opt with
-                    | Some pkh -> Signature.Public_key_hash.equal delegate pkh
-                    | None -> false)
-                  attestations
-              in
-              match attestation_opt with
-              | None ->
-                  (* TODO: emit event: attestation not included! *)
-                  Lwt.return_unit
-              | Some
-                  (_tb_slot, _delegate_opt, _attestation_op, dal_attestation_opt)
-                -> (
-                  match dal_attestation_opt with
-                  | None ->
-                      Event.emit_warn_attester_not_dal_attesting
-                        ~attester:delegate
-                        ~attested_level:block_level
-                  | Some bitset ->
-                      List.iter_s
-                        (fun index ->
-                          if
-                            should_be_attested index
-                            && not (is_attested bitset index)
-                          then
-                            if
-                              parameters.incentives_enable
-                              && contains_traps delegate index
-                            then
-                              Event
-                              .emit_attester_did_not_attest_slot_because_of_traps
-                                ~attester:delegate
-                                ~slot_index:index
-                                ~attested_level:block_level
-                            else
-                              Event.emit_warn_attester_did_not_attest_slot
-                                ~attester:delegate
-                                ~slot_index:index
-                                ~attested_level:block_level
-                          else Lwt.return_unit)
-                        (0 -- (parameters.number_of_slots - 1))))
+            else check_attester delegate)
           attesters
       in
       return_unit
