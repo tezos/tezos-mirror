@@ -740,6 +740,18 @@ open struct
       ("current_level", Data_encoding.int32)
       ("current_baker_level", Data_encoding.int32)
 
+  let warn_no_attestation =
+    declare_2
+      ~section
+      ~name:"no_attestation"
+      ~msg:
+        "An attestation operation was not included for {attester} at attested \
+         level {attested_level}."
+      ~level:Warning
+      ("attester", Signature.Public_key_hash.encoding)
+      ("attested_level", Data_encoding.int32)
+      ~pp1:Signature.Public_key_hash.pp_short
+
   let warn_attester_not_dal_attesting =
     declare_2
       ~section
@@ -1096,6 +1108,9 @@ let emit_get_attestable_slots_future_level_warning ~current_level
   emit
     get_attestable_slots_future_level_warning
     (current_level, current_baker_level)
+
+let emit_warn_no_attestation ~attester ~attested_level =
+  emit warn_no_attestation (attester, attested_level)
 
 let emit_warn_attester_not_dal_attesting ~attester ~attested_level =
   emit warn_attester_not_dal_attesting (attester, attested_level)

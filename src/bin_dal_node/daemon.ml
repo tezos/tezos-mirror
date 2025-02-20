@@ -523,8 +523,9 @@ module Handler = struct
         in
         match attestation_opt with
         | None ->
-            (* TODO: emit event: attestation not included! *)
-            Lwt.return_unit
+            Event.emit_warn_no_attestation
+              ~attester:delegate
+              ~attested_level:block_level
         | Some (_tb_slot, _delegate_opt, _attestation_op, dal_attestation_opt)
           -> (
             match dal_attestation_opt with
