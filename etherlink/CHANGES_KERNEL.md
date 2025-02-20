@@ -9,7 +9,9 @@
 - Improves call trace of `DELEGATECALL` and `CALLCODE`. (!16588)
 - The EVM now complies to EIP-3529. (!16887)
 - The EVM now complies to EIP-3651. (!16888)
-
+- The EVM now properly record init code cost for `CREATE`/`CREATE2`
+  opcodes, now fully complying with EIP63860. (!16890)
+ 
 ### Internal
 
 - Rework block production to simplify data flow and remove unnecessary
