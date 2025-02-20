@@ -16,7 +16,8 @@ type public =
     string
     (* date of the genesis block of the current weeklynet;
        typically it is last wednesday.
-       format is YYYY-MM-DD *) ]
+       format is YYYY-MM-DD *)
+  | `Rionet ]
 
 type t = [public | `Sandbox]
 
