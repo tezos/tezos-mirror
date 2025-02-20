@@ -31,3 +31,4 @@ path = "../lib"
 [features]
 default = []
 inline-jit = []
+metrics = ["octez-riscv/metrics"]

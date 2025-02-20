@@ -53,6 +53,12 @@ pub fn run(opts: RunOptions) -> Result<(), Box<dyn Error>> {
         println!("Run consumed {steps} steps.");
     }
 
+    #[cfg(feature = "metrics")]
+    octez_riscv::dump_block_metrics!(
+        file = &opts.metrics.block_metrics_file,
+        exclude_supported_instructions = opts.metrics.exclude_supported_instructions
+    )?;
+
     Ok(())
 }
 

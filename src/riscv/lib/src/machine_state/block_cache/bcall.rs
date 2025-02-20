@@ -9,6 +9,7 @@
 
 use super::CACHE_INSTR;
 use super::ICallPlaced;
+use super::metrics::block_metrics;
 use super::run_instr;
 use crate::default::ConstDefault;
 use crate::jit::JCall;
@@ -200,7 +201,9 @@ impl<MC: MemoryConfig, M: ManagerBase> Interpreted<MC, M> {
             .map(|i| i.read_ref_stored())
             .collect::<Vec<_>>();
 
-        self.hash.make_runnable(&instr)
+        self.hash.make_runnable(&instr);
+
+        block_metrics!(constructed = self);
     }
 }
 
@@ -322,6 +325,8 @@ impl<MC: MemoryConfig, M: ManagerBase> Block<MC, M> for Interpreted<MC, M> {
                 self.update_block_hash();
             }
 
+            block_metrics!(hash = &self.hash, record_called);
+
             Some(&mut self.instr[0..len as usize])
         } else {
             None
@@ -432,6 +437,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
         M: ManagerRead + 'a,
     {
         if self.compiled {
+            block_metrics!(hash = &self.fallback.hash, record_called);
             return Some(self);
         }
 
@@ -455,6 +461,10 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
 
         self.jit_fn = jitfn;
         self.compiled = true;
+
+        if self.jit_fn.is_some() {
+            block_metrics!(hash = &self.fallback.hash, record_jitted);
+        }
 
         Some(self)
     }

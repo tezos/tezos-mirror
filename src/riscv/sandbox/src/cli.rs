@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2025 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
@@ -50,6 +50,11 @@ pub struct RunOptions {
     /// Print the number of steps taken by `run`.
     #[arg(long, default_value_t = false)]
     pub print_steps: bool,
+
+    /// Options for controlling the output of recorded metrics.
+    #[cfg(feature = "metrics")]
+    #[command(flatten)]
+    pub metrics: MetricsOptions,
 }
 
 #[derive(Debug, Clone, Parser)]
@@ -260,6 +265,18 @@ pub struct InboxOptions {
     /// Path to the file containing inbox messages
     #[arg(long = "inbox-file")]
     pub file: Option<Box<Path>>,
+}
+
+#[cfg(feature = "metrics")]
+#[derive(Debug, Clone, Parser)]
+pub struct MetricsOptions {
+    /// File to write the recorded block metrics.
+    #[arg(long)]
+    pub block_metrics_file: Box<Path>,
+
+    #[arg(long)]
+    /// Whether to include instructions that are supported by the JIT.
+    pub exclude_supported_instructions: bool,
 }
 
 /// Parse the command-line arguments.

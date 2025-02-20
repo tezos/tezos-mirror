@@ -34,7 +34,9 @@ pub const DIGEST_SIZE: usize = 32;
 /// produced by a preset hash function, currently BLAKE2b. It can be obtained
 /// by either hashing data directly or after hashing by converting from
 /// a suitably sized byte slice or vector.
-#[derive(Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Hash)]
+#[derive(
+    Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Hash, PartialOrd, Ord,
+)]
 pub struct Hash {
     digest: [u8; DIGEST_SIZE],
 }

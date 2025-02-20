@@ -80,6 +80,7 @@
 //! [`Interpreted`]: bcall::Interpreted
 
 pub mod bcall;
+pub mod metrics;
 
 use std::marker::PhantomData;
 use std::u64;

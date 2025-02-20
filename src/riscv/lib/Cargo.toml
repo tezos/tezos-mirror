@@ -53,3 +53,4 @@ goldenfile.workspace = true
 default = []
 ocaml-api = ["ocaml"]
 supervisor = []
+metrics = []
