@@ -234,6 +234,20 @@ module Types = struct
         |> Result.map_error (fun _e -> "invalid contract in db"))
       string
 
+  let operation_hash =
+    custom
+      ~encode:(fun c -> Ok (Operation_hash.to_b58check c))
+      ~decode:(fun s ->
+        Operation_hash.of_b58check s
+        |> Result.map_error (fun _e -> "invalid operation hash in db"))
+      string
+
+  let proto_timestamp =
+    custom
+      ~encode:(fun t -> Ok (Time.Protocol.to_seconds t))
+      ~decode:(fun s -> Ok (Time.Protocol.of_seconds s))
+      int64
+
   let withdrawal =
     product (fun kind amount sender receiver withdrawal_id ->
         {kind; amount; sender; receiver; withdrawal_id})
@@ -663,4 +677,27 @@ module Outbox_messages = struct
   let indexes_by_outbox_level ?conn db ~outbox_level =
     with_connection db conn @@ fun conn ->
     Sqlite.Db.rev_collect_list conn Q.indexes_by_outbox_level outbox_level
+end
+
+module Executions = struct
+  module Q = struct
+    open Types
+
+    let insert =
+      (t5 int32 int operation_hash int32 proto_timestamp ->. unit)
+      @@ {sql|
+      REPLACE INTO executions
+      (outbox_level, message_index, operation_hash,
+       l1_block, timestamp)
+      VALUES (?, ?, ?, ?, ?)
+      |sql}
+  end
+
+  let store ?conn db ~outbox_level ~message_index ~operation_hash ~l1_block
+      ~timestamp =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.exec
+      conn
+      Q.insert
+      (outbox_level, message_index, operation_hash, l1_block, timestamp)
 end

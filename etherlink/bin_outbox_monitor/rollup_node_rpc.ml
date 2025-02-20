@@ -51,3 +51,11 @@ let get_lcc ctxt =
     ((), `Cemented)
     ()
     ()
+
+let get_rollup_address ctxt =
+  Rollup_node_services.Global.make_call
+    Rollup_node_services.Global.sc_rollup_address
+    ctxt
+    ()
+    ()
+    ()

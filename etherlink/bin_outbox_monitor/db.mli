@@ -138,3 +138,15 @@ module Outbox_messages : sig
     outbox_level:int32 ->
     outbox_index list tzresult Lwt.t
 end
+
+module Executions : sig
+  val store :
+    ?conn:Sqlite.conn ->
+    t ->
+    outbox_level:int32 ->
+    message_index:int ->
+    operation_hash:Operation_hash.t ->
+    l1_block:int32 ->
+    timestamp:Time.Protocol.t ->
+    unit tzresult Lwt.t
+end

@@ -537,7 +537,8 @@ let monitor_heads db ws_client =
   in
   return_unit
 
-let monitor_l2_l1_levels db ws_client rollup_node_rpc ~last_levels =
+let monitor_l2_l1_levels db ws_client ~rollup_node_rpc ~l1_node_endpoint
+    rollup_address ~last_levels =
   let open Lwt_result_syntax in
   let* start_l1_level =
     match last_levels with
@@ -577,6 +578,13 @@ let monitor_l2_l1_levels db ws_client rollup_node_rpc ~last_levels =
                     transaction)
                 transactions)
             outbox_messages
+        in
+        let* () =
+          L1_execution.mark_executed_outbox_messages
+            db
+            ~l1_node_endpoint
+            ~rollup_address
+            ~block:l1_level
         in
         let* () = Db.Levels.store db ~l1_level ~start_l2_level ~end_l2_level in
         let* () = Matcher.run db in
@@ -628,7 +636,7 @@ let init_db_pointers db ws_client rollup_node_rpc =
   in
   return_unit
 
-let start db ~evm_node_endpoint ~rollup_node_endpoint =
+let start db ~evm_node_endpoint ~rollup_node_endpoint ~l1_node_endpoint =
   let open Lwt_result_syntax in
   let*! ws_client =
     Websocket_client.connect Media_type.json evm_node_endpoint
@@ -637,9 +645,16 @@ let start db ~evm_node_endpoint ~rollup_node_endpoint =
   let* () = init_db_pointers db ws_client rollup_node_rpc in
   let* last_l2_head = Db.Pointers.L2_head.get db in
   let* last_levels = Db.Levels.last db in
+  let* rollup_address = Rollup_node_rpc.get_rollup_address rollup_node_rpc in
   let monitor_withdrawals = monitor_withdrawals db ws_client in
   let monitor_l2_l1_levels =
-    monitor_l2_l1_levels db ws_client rollup_node_rpc ~last_levels
+    monitor_l2_l1_levels
+      db
+      ws_client
+      ~rollup_node_rpc
+      rollup_address
+      ~l1_node_endpoint
+      ~last_levels
   in
   let* () = catch_up_withdrawals db ws_client ~last_l2_head in
   let* () =

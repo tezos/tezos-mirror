@@ -46,3 +46,12 @@ CREATE TABLE outbox_messages (
   parameters VARCHAR NOT NULL,
   PRIMARY KEY(outbox_level, message_index, transaction_index)
 );
+
+CREATE TABLE executions (
+  outbox_level INTEGER NOT NULL,
+  message_index INTEGER NOT NULL,
+  operation_hash VARCHAR NOT NULL,
+  l1_block INTEGER NOT NULL,
+  timestamp INTEGER NOT NULL,
+  PRIMARY KEY(outbox_level, message_index)
+);
