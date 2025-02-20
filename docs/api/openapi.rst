@@ -53,6 +53,7 @@ The node provides some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
 - :src:`docs/api/rpc-openapi.json` (version 21.4)
+- :src:`docs/api/rpc-openapi-rc.json` (version 22.0~rc1)
 - :src:`docs/api/rpc-openapi-dev.json` (version master)
 
 .. TODO tezos/tezos#2170: add/remove section(s)
@@ -64,11 +65,13 @@ The OpenAPI specifications for RPCs which are specific to the Quebec (``PtQuebec
 protocol can be found at:
 
 - :src:`docs/api/quebec-openapi.json` (version 21.4)
+- :src:`docs/api/quebec-openapi-rc.json` (version 22.0~rc1)
 
 The OpenAPI specifications for RPCs which are related to the mempool
 and specific to the Quebec protocol can be found at:
 
 - :src:`docs/api/quebec-mempool-openapi.json` (version 21.4)
+- :src:`docs/api/quebec-mempool-openapi-rc.json` (version 22.0~rc1)
 
 Rio RPCs
 --------
@@ -113,6 +116,7 @@ The OpenAPI specifications for the RPCs of the smart rollup node for the Quebec
 (``PtQuebec``) protocol proposal can be found at:
 
 - :src:`docs/api/quebec-smart-rollup-node-openapi.json` (version 21.4)
+- :src:`docs/api/quebec-smart-rollup-node-openapi-rc.json` (version 22.0~rc1)
 
 Alpha RPCs
 ----------
@@ -129,6 +133,7 @@ The DAL node also provides RPCs.
 Their OpenAPI specification can be found at:
 
 - :src:`docs/api/dal-node-openapi.json` (version 21.4)
+- :src:`docs/api/dal-node-openapi-rc.json` (version 22.0~rc1)
 - :src:`docs/api/dal-node-openapi-dev.json` (version master)
 
 .. _openapi_generate:
