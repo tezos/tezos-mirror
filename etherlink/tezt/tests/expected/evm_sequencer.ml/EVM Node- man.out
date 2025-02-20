@@ -518,7 +518,7 @@ Miscellaneous commands:
                      [--bootstrap-account <0x...>]
                      [--set-code <0x...,0x....>]
                      [--world-state-path </evm/world_state/<chain_id>>]
-                     [--l2-chain-id <1>]
+                     [--l2-chain-id <1>] [--l2-chain-family <EVM>]
     Produce a file containing the part of the kernel configuration instructions related to a particular L2 chain.
     <kernel config file>: file path where the config will be written to
     --minimum-base-fee-per-gas <111...>: value for minimum_base_fee_per_gas in the installer config
@@ -530,6 +530,7 @@ Miscellaneous commands:
     --set-code <0x...,0x....>: add code to an account in the installer config.
     --world-state-path </evm/world_state/<chain_id>>: value for world_state_path in the installer config
     --l2-chain-id <1>: L2 chain id
+    --l2-chain-family <EVM>: Configure the family (either EVM or Michelson) of the L2 chain.
   
   octez-evm-node patch state at <path> with <value> [--data-dir <data-dir>]
                      [--block-number <N>] [-f --force]
