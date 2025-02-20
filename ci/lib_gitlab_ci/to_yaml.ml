@@ -329,10 +329,17 @@ let enc_inherit : inherit_ -> value = function
   | Variable_list v -> `O (key "variables" (list string) v)
 
 let enc_trigger_job : trigger_job -> value =
-  let enc_trigger_include trigger_include =
-    `O [("include", `String trigger_include)]
+  let enc_trigger trigger =
+    obj_flatten
+      [
+        key "include" string trigger.include_;
+        opt
+          "strategy"
+          string
+          (if trigger.strategy_depend then Some "depend" else None);
+      ]
   in
-  fun {name = _; stage; when_; inherit_; rules; needs; trigger_include} ->
+  fun {name = _; stage; when_; inherit_; rules; needs; trigger} ->
     obj_flatten
       [
         opt "stage" string stage;
@@ -340,7 +347,7 @@ let enc_trigger_job : trigger_job -> value =
         opt "rules" enc_job_rules rules;
         opt "needs" enc_needs needs;
         opt "when" enc_when_trigger_job when_;
-        key "trigger" enc_trigger_include trigger_include;
+        key "trigger" enc_trigger trigger;
       ]
 
 let enc_includes : include_ list -> value =

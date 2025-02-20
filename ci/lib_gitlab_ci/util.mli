@@ -91,6 +91,7 @@ val trigger_job :
   ?rules:job_rule list ->
   ?stage:string ->
   ?when_:when_trigger_job ->
+  ?strategy_depend:bool ->
   name:string ->
   string ->
   trigger_job

@@ -272,6 +272,7 @@ trigger:octez_monitoring:
   needs: []
   trigger:
     include: .gitlab/ci/pipelines/octez_monitoring.yml
+    strategy: depend
 
 oc.docker-build-debian-dependencies:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
