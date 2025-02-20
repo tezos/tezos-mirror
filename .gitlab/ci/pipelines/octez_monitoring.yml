@@ -54,6 +54,30 @@ oc.docker:jsonnet:amd64:
     reports:
       dotenv: jsonnet_image_tag.env
 
+oc.docker:ci:arm64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - gcp_arm64
+  dependencies: []
+  timeout: 90 minutes
+  before_script: []
+  script:
+  - ./images/ci_create_ci_images.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+    ARCH: arm64
+  artifacts:
+    reports:
+      dotenv: ci_image_tag.env
+  retry:
+    max: 1
+    when:
+    - runner_system_failure
+
 datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
   stage: start
@@ -128,7 +152,28 @@ build-layer1-profiling:
     paths:
     - ./octez-binaries/x86_64/octez-node
 
-build_teztale:
+teztale.build:static-arm64:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp_arm64
+  dependencies:
+  - oc.docker:ci:arm64
+  timeout: 60 minutes
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  script:
+  - make teztale
+  artifacts:
+    name: teztale-binaries
+    expire_in: never
+    paths:
+    - octez-teztale-*
+    when: on_success
+
+teztale.build:static-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
