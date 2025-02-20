@@ -145,6 +145,16 @@ module Event = struct
       ~msg:"Empty L1 level {l1_level}"
       ~level:Info
       ("l1_level", Data_encoding.int32)
+
+  let fallback_earliest =
+    declare_1
+      ~section
+      ~name:"fallback_earliest"
+      ~msg:
+        "LCC level {lcc} is not available in the EVM node, we fallback to \
+         starting from its earliest available level."
+      ~level:Warning
+      ("lcc", Data_encoding.int32)
 end
 
 type error +=
@@ -589,13 +599,32 @@ let init_db_pointers db ws_client rollup_node_rpc =
   let* () =
     match l2_head with
     | Some _ -> return_unit
-    | None ->
-        let* lcc_l2 =
+    | None -> (
+        let*! lcc_l2 =
           Websocket_client.send_jsonrpc
             ws_client
             (Call ((module Rpc_encodings.Get_finalized_blocks_of_l1_level), lcc))
         in
-        Db.Pointers.L2_head.set db lcc_l2.start_l2_level
+        match lcc_l2 with
+        | Ok lcc_l2 -> Db.Pointers.L2_head.set db lcc_l2.start_l2_level
+        | Error
+            (Websocket_client.Request_failed
+               ( _,
+                 Rpc_encodings.JSONRPC.
+                   {code = -32001 (* Resource unavailable *); _} )
+            :: _) ->
+            (* If the LCC L2 block is not available in the EVM node, fallback to
+               using the earliest available one. *)
+            let*! () = Event.(emit fallback_earliest) lcc in
+            let* earliest =
+              Websocket_client.send_jsonrpc
+                ws_client
+                (Call
+                   ( (module Rpc_encodings.Get_block_by_number),
+                     (Earliest, false) ))
+            in
+            Db.Pointers.L2_head.set db earliest.number
+        | Error _ as e -> Lwt.return e)
   in
   return_unit
 
