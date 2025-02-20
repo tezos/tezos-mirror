@@ -338,7 +338,6 @@ fn compute_bip<Host: Runtime>(
     outbox_queue: &OutboxQueue<'_, impl Path>,
     mut block_in_progress: BlockInProgress,
     precompiles: &PrecompileBTreeMap<Host>,
-    evm_account_storage: &mut EthereumAccountStorage,
     tick_counter: &mut TickCounter,
     sequencer_pool_address: Option<H160>,
     limits: &Limits,
@@ -349,6 +348,8 @@ fn compute_bip<Host: Runtime>(
     coinbase: H160,
     evm_configuration: &Config,
 ) -> anyhow::Result<BlockComputationResult> {
+    let mut evm_account_storage =
+        init_account_storage().context("Failed to initialize EVM account storage")?;
     let constants: BlockConstants = block_in_progress.constants(
         chain_id,
         minimum_base_fee_per_gas,
@@ -362,7 +363,7 @@ fn compute_bip<Host: Runtime>(
         &mut block_in_progress,
         &constants,
         precompiles,
-        evm_account_storage,
+        &mut evm_account_storage,
         sequencer_pool_address,
         limits,
         tracer_input,
@@ -490,8 +491,6 @@ pub fn produce<Host: Runtime>(
     // in blocks is set to the pool address.
     let coinbase = sequencer_pool_address.unwrap_or_default();
 
-    let mut evm_account_storage =
-        init_account_storage().context("Failed to initialize EVM account storage")?;
     let mut tick_counter = TickCounter::new(0u64);
 
     let mut safe_host = SafeStorage { host };
@@ -542,7 +541,6 @@ pub fn produce<Host: Runtime>(
         &outbox_queue,
         block_in_progress,
         &precompiles,
-        &mut evm_account_storage,
         &mut tick_counter,
         sequencer_pool_address,
         &config.limits,
