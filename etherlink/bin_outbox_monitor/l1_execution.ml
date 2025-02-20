@@ -6,6 +6,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Event = struct
+  include Internal_event.Simple
+
+  let section = ["outbox_monitor"; "l1_execution"]
+
+  let executed_withdrawal =
+    declare_6
+      ~section
+      ~name:"executed_withdrawal"
+      ~msg:
+        "Withdrawal {withdrawal_id} of {amount} {token} was executed in \
+         operation {operation_hash} of block {l1_block} at {timestamp}"
+      ~level:Notice
+      ("withdrawal_id", Db.quantity_hum_encoding)
+      ("amount", Db.quantity_hum_encoding)
+      ("token", Db.withdrawal_kind_encoding)
+      ("operation_hash", Operation_hash.encoding)
+      ("l1_block", Data_encoding.int32)
+      ("timestamp", Time.Protocol.encoding)
+      ~pp1:Ethereum_types.pp_quantity
+      ~pp2:Ethereum_types.pp_quantity
+      ~pp3:Db.pp_withdrawal_kind
+      ~pp4:Operation_hash.pp
+      ~pp6:Time.Protocol.pp_hum
+end
+
 let fetch_l1_block_ops l1_node_endpoint block =
   let open Lwt_result_syntax in
   let uri =
@@ -205,13 +231,33 @@ let mark_executed_outbox_messages db ~l1_node_endpoint ~rollup_address ~block =
       ~block:(`Level block)
       ()
   in
-  List.iter_es
-    (fun ({outbox_level; message_index}, operation_hash) ->
-      Db.Executions.store
-        db
-        ~outbox_level
-        ~message_index
-        ~operation_hash
-        ~l1_block:block
-        ~timestamp:header.timestamp)
-    executed
+  let* () =
+    List.iter_es
+      (fun ({outbox_level; message_index}, operation_hash) ->
+        Db.Executions.store
+          db
+          ~outbox_level
+          ~message_index
+          ~operation_hash
+          ~l1_block:block
+          ~timestamp:header.timestamp)
+      executed
+  in
+  let* executed_withdrawals =
+    Db.Executions.withdrawals_executed_in_l1_block db ~l1_block:block
+  in
+  let*! () =
+    List.iter_s
+      (fun ( (w : Db.withdrawal_log),
+             (_outbox_index : Db.outbox_index),
+             (execution : Db.execution_short_info) ) ->
+        Event.(emit executed_withdrawal)
+          ( w.withdrawal.withdrawal_id,
+            w.withdrawal.amount,
+            w.withdrawal.kind,
+            execution.operation_hash,
+            execution.l1_block,
+            execution.timestamp ))
+      executed_withdrawals
+  in
+  return_unit
