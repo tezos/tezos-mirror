@@ -52,6 +52,8 @@ type options = {
   service_name : string option;
       (** Name of the service provided by this node. *)
   service_namespace : string option;  (** Namespace for the service. *)
+  verbose : bool;
+      (** Emit events related to connections. Default value is false. *)
 }
 
 (** Subcommands that can be used by the DAL node. In the future this type

@@ -61,6 +61,9 @@ type t = {
   service_name : string option;
       (** Name of the service provided by this node. *)
   service_namespace : string option;  (** Namespace for the service *)
+  verbose : bool;
+      (** Whether to emit detailed events for frequently received control
+          messages from remote peers. *)
 }
 
 (** [default] is the default configuration. *)
