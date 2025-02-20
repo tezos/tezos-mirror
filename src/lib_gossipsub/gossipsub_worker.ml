@@ -633,7 +633,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
      Add more verification/attacks protections as done in Rust. *)
 
-  let emit_pings state =
+  let may_emit_pings state =
     let gstate = state.gossip_state in
     let gstate_view = View.view gstate in
     let heartbeat_ping_interval =
@@ -655,7 +655,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | state, GS.Heartbeat {to_graft; to_prune; noPX_peers} ->
         let gstate = state.gossip_state in
         let gstate_view = View.view gstate in
-        emit_pings state ;
+        may_emit_pings state ;
         let iter pmap mk_msg =
           Peer.Map.iter
             (fun peer topicset ->
