@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: MIT
 
 use crate::evalhost::EvalHost;
-use crate::helpers::{parse_and_get_cmp, purify_network, LabelIndexes, OutputOptions};
+use crate::helpers::{
+    parse_and_get_cmp, purify_network, trim_trailing_zeros, LabelIndexes, OutputOptions,
+};
 use crate::models::spec::SpecId;
 use crate::models::{
     AccountInfoFiller, FillerResultIndexes, FillerSource, IndexKind, SpecName,
@@ -151,12 +153,15 @@ fn check_code(
     hex_address: &str,
 ) {
     if let Some(code) = &code {
+        let mut code = code.to_vec();
+        trim_trailing_zeros(&mut code);
         match account.code(host) {
             Ok(current_code) => {
-                let current_code: Bytes = current_code.into();
+                let mut current_code = current_code;
+                trim_trailing_zeros(&mut current_code);
                 if current_code != code {
                     *invalid_state = true;
-                    write_host!( host, "Account {}: code don't match current one, {:?} was expected, but got {:?}.", hex_address, code, current_code);
+                    write_host!( host, "Account {}: code don't match current one, {:02x?} was expected, but got {:02x?}.", hex_address, code, current_code);
                 } else {
                     write_host!(host, "Account {}: code matched.", hex_address);
                 }
