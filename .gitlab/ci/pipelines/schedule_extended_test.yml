@@ -895,6 +895,7 @@ teztale.build:static-x86_64:
   after_script:
   - ./scripts/ci/sccache-stop.sh
   variables:
+    PROFILE: static
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
@@ -935,6 +936,7 @@ teztale.build:static-arm64:
   after_script:
   - ./scripts/ci/sccache-stop.sh
   variables:
+    PROFILE: static
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G

@@ -166,6 +166,8 @@ teztale.build:static-arm64:
   - eval $(opam env)
   script:
   - make teztale
+  variables:
+    PROFILE: static
   artifacts:
     name: teztale-binaries
     expire_in: never
@@ -187,6 +189,8 @@ teztale.build:static-x86_64:
   - eval $(opam env)
   script:
   - make teztale
+  variables:
+    PROFILE: static
   artifacts:
     name: teztale-binaries
     expire_in: never

@@ -23,6 +23,7 @@ let job_build ?rules ?(expire_in = Gitlab_ci.Types.(Duration (Days 1))) ~arch ()
     ~image:Images.CI.build
     ~stage:Stages.build
     ?rules
+    ~variables:[("PROFILE", "static")]
     ~artifacts:
       (artifacts
          ~name:"teztale-binaries"
