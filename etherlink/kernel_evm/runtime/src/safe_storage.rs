@@ -20,9 +20,7 @@ use tezos_smart_rollup_host::{
 
 pub const TMP_PATH: RefPath = RefPath::assert_from(b"/tmp");
 pub const WORLD_STATE_PATH: RefPath = RefPath::assert_from(b"/evm/world_state");
-pub const TMP_WORLD_STATE_PATH: RefPath = RefPath::assert_from(b"/tmp/evm/world_state");
 pub const TRACE_PATH: RefPath = RefPath::assert_from(b"/evm/trace");
-pub const TMP_TRACE_PATH: RefPath = RefPath::assert_from(b"/tmp/evm/trace");
 
 pub fn safe_path<T: Path>(path: &T) -> Result<OwnedPath, RuntimeError> {
     concat(&TMP_PATH, path).map_err(|_| RuntimeError::PathNotFound)
@@ -236,20 +234,21 @@ impl<Host: Runtime> Verbosity for SafeStorage<&mut Host> {
 
 impl<Host: Runtime> SafeStorage<&mut Host> {
     pub fn start(&mut self) -> Result<(), RuntimeError> {
-        self.host
-            .store_copy(&WORLD_STATE_PATH, &TMP_WORLD_STATE_PATH)
+        let tmp_path = safe_path(&WORLD_STATE_PATH)?;
+        self.host.store_copy(&WORLD_STATE_PATH, &tmp_path)
     }
 
     pub fn promote(&mut self) -> Result<(), RuntimeError> {
-        self.host
-            .store_move(&TMP_WORLD_STATE_PATH, &WORLD_STATE_PATH)
+        let tmp_path = safe_path(&WORLD_STATE_PATH)?;
+        self.host.store_move(&tmp_path, &WORLD_STATE_PATH)
     }
 
     // Only used in tracing mode, so that the trace doesn't polute the world
     // state but is still promoted at the end and accessible from the node.
     pub fn promote_trace(&mut self) -> Result<(), RuntimeError> {
-        if let Ok(Some(_)) = self.host.store_has(&TMP_TRACE_PATH) {
-            self.host.store_move(&TMP_TRACE_PATH, &TRACE_PATH)?
+        let tmp_path = safe_path(&TRACE_PATH)?;
+        if let Ok(Some(_)) = self.host.store_has(&tmp_path) {
+            self.host.store_move(&tmp_path, &TRACE_PATH)?
         }
         Ok(())
     }
