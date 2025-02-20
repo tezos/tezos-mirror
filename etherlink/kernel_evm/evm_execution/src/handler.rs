@@ -2411,6 +2411,11 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             return Ok(false);
         }
 
+        // EIP-3651
+        if self.config.warm_coinbase_address && address == self.block_coinbase() {
+            return Ok(false);
+        }
+
         match index {
             Some(index) => {
                 let is_cold = self.is_storage_hot(address, index).map(|x| !x);
