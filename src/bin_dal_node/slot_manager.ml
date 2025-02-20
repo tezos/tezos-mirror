@@ -316,6 +316,10 @@ let publish_proved_shards ctxt (slot_id : Types.slot_id) ~level_committee
              in
              let store = Node_context.get_store ctxt in
              let traps_store = Store.traps store in
+             (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
+                The [proto_parameters] are those for the last known finalized
+                level, which may differ from those of the slot level. This will
+                be an issue when the value of the [traps_fraction] changes.*)
              let traps_fraction = proto_parameters.traps_fraction in
              let () =
                maybe_register_trap
