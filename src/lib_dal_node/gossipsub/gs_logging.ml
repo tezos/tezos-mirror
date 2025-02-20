@@ -216,7 +216,7 @@ let event ~verbose =
       | Disconnection {peer} -> emit disconnection peer
       | In_message {from_peer; p2p_message} -> (
           match p2p_message with
-          | Ping -> emit ping ()
+          | Ping -> if not verbose then Lwt.return_unit else emit ping ()
           | Message_with_header {message = _; topic; message_id} ->
               emit message_with_header (from_peer.peer_id, topic, message_id)
           | Subscribe {topic} -> emit subscribe (from_peer.peer_id, topic)
