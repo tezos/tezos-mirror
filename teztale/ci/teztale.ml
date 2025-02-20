@@ -13,10 +13,13 @@ module String_set = Set.Make (String)
 let changeset = Changeset.(make ["teztale/**/*"])
 
 (** Job that builds the Teztale executables *)
-let job_build ?rules ?(expire_in = Gitlab_ci.Types.(Duration (Days 1))) () =
+let job_build ?rules ?(expire_in = Gitlab_ci.Types.(Duration (Days 1))) ~arch ()
+    =
+  let arch_string = arch_to_string arch in
   job
     ~__POS__
-    ~name:"build_teztale"
+    ~arch
+    ~name:("teztale.build:static-" ^ arch_string)
     ~image:Images.CI.build
     ~stage:Stages.build
     ?rules

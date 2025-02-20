@@ -1214,7 +1214,7 @@ build_grafazos_dashboards:
     - grafazos/output/**/*.json
     when: on_success
 
-build_teztale:
+teztale.build:static-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -1227,6 +1227,49 @@ build_teztale:
     allow_failure: true
   dependencies:
   - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make teztale
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+  artifacts:
+    name: teztale-binaries
+    expire_in: 1 day
+    paths:
+    - octez-teztale-*
+    when: on_success
+
+teztale.build:static-arm64:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp_arm64
+  rules:
+  - changes:
+    - teztale/**/*
+    when: on_success
+  - when: manual
+    allow_failure: true
+  dependencies:
+  - oc.docker:ci:arm64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
