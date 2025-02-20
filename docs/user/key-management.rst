@@ -102,6 +102,8 @@ Signer
 A solution to decouple the client and the baker from the signing process is to
 use a *remote signer*.
 
+A complete manual page of the signer is available :ref:`here <signer_manual>`.
+
 In this configuration, the client sends signing requests over a
 communication channel towards ``octez-signer``, which can run on a
 different machine that stores the secret key.

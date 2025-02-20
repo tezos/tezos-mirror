@@ -46,6 +46,9 @@ whose verbosity can be increased with ``-v``, for example::
 
     octez-client man -v 3
 
+Note that the result of this command is also available online at :ref:`client_manual`,
+and this is true for the other binaries.
+
 It is also possible to get information on a specific command in the manual with ``man <command>``::
 
    octez-client man set
@@ -261,6 +264,7 @@ Client
 
 Octez client can be used to interact with the node, it can query its
 status or ask the node to perform some actions.
+A complete manual page of octez-client is available :ref:`here <client_manual>` (for the currently active protocol).
 
 .. note::
 
@@ -660,6 +664,8 @@ to:
 - force connections to known peers
 - ban/unban peers
 
+A complete manual page of admin client is available :ref:`here <admin_client_manual>`.
+
 A useful command to debug a node that is not syncing is:
 
 ::
@@ -667,6 +673,9 @@ A useful command to debug a node that is not syncing is:
    octez-admin-client p2p stat
 
 The admin client uses the same format of configuration file as the client (see :ref:`client_conf_file`).
+
+
+.. _octez-codec:
 
 Codec
 ~~~~~
