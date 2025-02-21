@@ -10,10 +10,7 @@ open Tezos_workers
 
 let two_seconds = Ptime.Span.of_int_s 2
 
-type parameters = {
-  relay_endpoint : Uri.t;
-  max_transaction_batch_length : int option;
-}
+type parameters = {evm_node_endpoint : Uri.t; config : Configuration.tx_queue}
 
 type callback =
   [`Accepted of Ethereum_types.hash | `Confirmed | `Dropped | `Refused] ->
@@ -29,7 +26,7 @@ module Pending_transactions = struct
 
   type t = pending S.t
 
-  let empty () = S.create 1000
+  let empty ~start_size = S.create start_size
 
   let add htbl (Hash (Hex hash)) callback =
     S.add htbl hash ({callback; since = Time.System.now ()} : pending)
@@ -56,10 +53,10 @@ module Pending_transactions = struct
 end
 
 type state = {
-  relay_endpoint : Uri.t;
+  evm_node_endpoint : Uri.t;
   mutable queue : request Queue.t;
   pending : Pending_transactions.t;
-  max_transaction_batch_length : int option;
+  config : Configuration.tx_queue;
 }
 
 module Types = struct
@@ -140,7 +137,7 @@ type worker = Worker.infinite Worker.queue Worker.t
 
 let uuid_seed = Random.get_state ()
 
-let send_transactions_batch ~relay_endpoint transactions =
+let send_transactions_batch ~evm_node_endpoint transactions =
   let open Lwt_result_syntax in
   let module M = Map.Make (String) in
   let module Srt = Rpc_encodings.Send_raw_transaction in
@@ -171,7 +168,7 @@ let send_transactions_batch ~relay_endpoint transactions =
     let* responses =
       Rollup_services.call_service
         ~keep_alive:true
-        ~base:relay_endpoint
+        ~base:evm_node_endpoint
         (Batch.dispatch_batch_service ~path:Resto.Path.root)
         ()
         ()
@@ -242,7 +239,7 @@ module Handlers = struct
     | Tick ->
         let all_transactions = Queue.to_seq state.queue in
         let* transactions_to_inject, remaining_transactions =
-          match state.max_transaction_batch_length with
+          match state.config.max_transaction_batch_length with
           | None -> return (all_transactions, Seq.empty)
           | Some max_transaction_batch_length ->
               let when_negative_length =
@@ -267,7 +264,7 @@ module Handlers = struct
 
         let+ () =
           send_transactions_batch
-            ~relay_endpoint:state.relay_endpoint
+            ~evm_node_endpoint:state.evm_node_endpoint
             transactions_to_inject
         in
 
@@ -278,15 +275,16 @@ module Handlers = struct
 
   type launch_error = tztrace
 
-  let on_launch _self ()
-      ({relay_endpoint; max_transaction_batch_length} : parameters) =
+  let on_launch _self () ({evm_node_endpoint; config} : parameters) =
     let open Lwt_result_syntax in
     return
       {
-        relay_endpoint;
+        evm_node_endpoint;
         queue = Queue.create ();
-        pending = Pending_transactions.empty ();
-        max_transaction_batch_length;
+        pending = Pending_transactions.empty ~start_size:(config.max_size / 4);
+        (* start with /4 and let it grow if necessary to not allocate
+           too much at start. *)
+        config;
       }
 
   let on_error (type a b) _self _status_request (_r : (a, b) Request.t)
@@ -360,14 +358,10 @@ let inject ?(callback = fun _ -> Lwt_syntax.return_unit)
 let confirm txn_hash =
   bind_worker @@ fun w -> push_request w (Confirm {txn_hash})
 
-let start ~relay_endpoint ~max_transaction_batch_length () =
+let start ~config ~evm_node_endpoint () =
   let open Lwt_result_syntax in
   let* worker =
-    Worker.launch
-      table
-      ()
-      {relay_endpoint; max_transaction_batch_length}
-      (module Handlers)
+    Worker.launch table () {evm_node_endpoint; config} (module Handlers)
   in
   Lwt.wakeup worker_waker worker ;
   let*! () = Tx_queue_events.is_ready () in

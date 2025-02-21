@@ -1288,7 +1288,10 @@ let patch_config_with_experimental_feature
          | Resto -> `String "resto"
          | Dream -> `String "dream")
   |> conditional_json_put enable_websocket ~name:"enable_websocket" (`Bool true)
-  |> conditional_json_put enable_tx_queue ~name:"enable_tx_queue" (`Bool true)
+  |> conditional_json_put
+       enable_tx_queue
+       ~name:"enable_tx_queue"
+       (`O [("max_size", `Float 1000.)])
   |> optional_json_put
        max_websocket_message_length
        ~name:"max_websocket_message_length"

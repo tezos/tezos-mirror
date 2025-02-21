@@ -177,8 +177,15 @@
         || null
         /* None */,
       "enable_tx_queue"?:
-        boolean
-        /* Replace the observer tx pool by a tx queue */ },
+        /* Replace the observer tx pool by a tx queue */
+        /* tx queue configuration */
+        { /* Some */
+          "max_size": integer ∈ [-2^30, 2^30],
+          "max_transaction_batch_length"?: integer ∈ [-2^30, 2^30] }
+        || null
+        /* None */
+        || boolean
+        /* tx queue enable */ },
   "proxy"?:
     { "finalized_view"?:
         boolean

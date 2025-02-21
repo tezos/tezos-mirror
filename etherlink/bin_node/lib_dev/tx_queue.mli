@@ -33,12 +33,12 @@ type callback =
 
 type request = {payload : Ethereum_types.hex; callback : callback}
 
-(** [start ~relay_endpoint ~max_transaction_batch_length ()] starts
+(** [start ~evm_node_endpoint ~max_transaction_batch_length ()] starts
     the worker, meaning it is possible to call {!inject}, {!confirm}
     and {!beacon}. *)
 val start :
-  relay_endpoint:Uri.t ->
-  max_transaction_batch_length:int option ->
+  config:Configuration.tx_queue ->
+  evm_node_endpoint:Uri.t ->
   unit ->
   unit tzresult Lwt.t
 

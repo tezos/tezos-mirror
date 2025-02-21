@@ -64,6 +64,37 @@ let chain_id_encoding : Ethereum_types.chain_id Data_encoding.t =
 
 type l2_chain = {chain_id : Ethereum_types.chain_id}
 
+type tx_queue = {max_size : int; max_transaction_batch_length : int option}
+
+let tx_queue_encoding =
+  let open Data_encoding in
+  conv
+    (fun {max_size; max_transaction_batch_length} ->
+      (max_size, max_transaction_batch_length))
+    (fun (max_size, max_transaction_batch_length) ->
+      {max_size; max_transaction_batch_length})
+    (obj2 (req "max_size" int31) (opt "max_transaction_batch_length" int31))
+
+let default_tx_queue = {max_size = 1000; max_transaction_batch_length = None}
+
+let tx_queue_opt_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"tx queue configuration"
+        Json_only
+        (option tx_queue_encoding)
+        (function Some tx_queue -> Some (Some tx_queue) | None -> Some None)
+        Fun.id;
+      case
+        ~title:"tx queue enable"
+        Json_only
+        bool
+        (function _ -> None)
+        (function true -> Some default_tx_queue | _ -> None);
+    ]
+
 type experimental_features = {
   drop_duplicate_on_injection : bool;
   blueprints_publisher_order_enabled : bool;
@@ -75,7 +106,7 @@ type experimental_features = {
   monitor_websocket_heartbeat : monitor_websocket_heartbeat option;
   spawn_rpc : int option;
   l2_chains : l2_chain list option;
-  enable_tx_queue : bool;
+  enable_tx_queue : tx_queue option;
 }
 
 type sequencer = {
@@ -153,6 +184,9 @@ type t = {
   history_mode : history_mode option;
 }
 
+let is_tx_queue_enabled {experimental_features = {enable_tx_queue; _}; _} =
+  Option.is_some enable_tx_queue
+
 let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
   {
     max_nb_blocks = Option.value ~default:100 max_nb_blocks;
@@ -218,7 +252,7 @@ let default_experimental_features =
     monitor_websocket_heartbeat = default_monitor_websocket_heartbeat;
     spawn_rpc = None;
     l2_chains = default_l2_chains;
-    enable_tx_queue = false;
+    enable_tx_queue = None;
   }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".octez-evm-node"
@@ -980,7 +1014,7 @@ let experimental_features_encoding =
           (dft
              "enable_tx_queue"
              ~description:"Replace the observer tx pool by a tx queue"
-             bool
+             tx_queue_opt_encoding
              default_experimental_features.enable_tx_queue)))
 
 let proxy_encoding =
