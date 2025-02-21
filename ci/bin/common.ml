@@ -947,6 +947,7 @@ let job_build_layer1_profiling ?(expire_in = Duration (Days 1)) () =
     ~stage:Stages.build
     ~image:Images.CI.build
     ~name:"build-layer1-profiling"
+    ~cpu:Very_high
     ~artifacts:(artifacts ~expire_in ["./octez-binaries/x86_64/octez-node"])
     ~before_script:
       (before_script
