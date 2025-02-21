@@ -67,8 +67,8 @@ configure)
     true)
       db_get octez-baker/dal-node-url
       DALURL=${RET}
-      echo "RUNTIME_OPTS=--dal-node $DALURL" >> /etc/default/octez-baker-next
-      echo "RUNTIME_OPTS=--dal-node $DALURL" >> /etc/default/octez-baker-active
+      echo "RUNTIME_OPTS=\"--dal-node $DALURL\"" >> /etc/default/octez-baker-next
+      echo "RUNTIME_OPTS=\"--dal-node $DALURL\"" >> /etc/default/octez-baker-active
       ;;
     false)
       echo "RUNTIME_OPTS=--without-dal" >> /etc/default/octez-baker-next
@@ -88,7 +88,7 @@ configure)
       : noop
       ;;
     *)
-      echoerr "Setting new defaults in /etc/default/octez-baker-*"
+      echoerr "Setting defaults in /etc/default/octez-baker-*"
       echoerr "Migrating values when possible"
 
       db_set octez-baker/baker-active-protocol "$ACTIVE_PROTOCOL"
@@ -110,14 +110,17 @@ configure)
       else
         echo "#PROTOCOL=${RET}" >> /etc/default/octez-baker-next
       fi
+      echoerr "PROTOCOL=${RET}"
 
       db_get octez-baker/liquidity-vote
       echo "LQVOTE=${RET}" >> /etc/default/octez-baker-active
       echo "LQVOTE=${RET}" >> /etc/default/octez-baker-next
+      echoerr "LQVOTE=${RET}"
 
       db_get octez-baker/baker-key
       echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-active
       echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-next
+      echoerr "BAKER_KEY=${RET}"
 
       db_get octez-baker/dal-node
       DAL=${RET}
@@ -125,12 +128,14 @@ configure)
       true)
         db_get octez-baker/dal-node-url
         DALURL=${RET}
-        echo "RUNTIME_OPTS=--dal-node $DALURL" >> /etc/default/octez-baker-next
-        echo "RUNTIME_OPTS=--dal-node $DALURL" >> /etc/default/octez-baker-active
+        echo "RUNTIME_OPTS=\"--dal-node $DALURL\"" >> /etc/default/octez-baker-next
+        echo "RUNTIME_OPTS=\"--dal-node $DALURL\"" >> /etc/default/octez-baker-active
+        echoerr "RUNTIME_OPTS=--dal-node $DALURL"
         ;;
       false)
         echo "RUNTIME_OPTS=--without-dal" >> /etc/default/octez-baker-next
         echo "RUNTIME_OPTS=--without-dal" >> /etc/default/octez-baker-active
+        echoerr "RUNTIME_OPTS=--without-dal"
         ;;
       esac
 
