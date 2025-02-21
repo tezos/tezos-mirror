@@ -1,5 +1,7 @@
-FROM debian:bookworm
-
+ARG IMAGE=invalid
+# The image with proper version is set as ARG
+#hadolint ignore=DL3006
+FROM ${IMAGE}
 
 #hadolint ignore=DL3008
 RUN apt-get update && \

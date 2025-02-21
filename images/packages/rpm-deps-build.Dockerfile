@@ -1,7 +1,7 @@
-ARG IMAGE
+ARG IMAGE=invalid
 # The image with proper version is set as ARG
 #hadolint ignore=DL3006
-FROM ${IMAGE}
+FROM $IMAGE
 
 ENV TZ=Etc/UTC
 # Build blst used by ocaml-bls12-381 without ADX to support old CPU
