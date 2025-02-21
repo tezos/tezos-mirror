@@ -4797,18 +4797,30 @@ mod test {
 
         let initial_code = [1; 49153]; // MAX_INIT_CODE_SIZE + 1
 
-        let scheme = CreateScheme::Legacy { caller };
-        let address = handler.create_address(scheme).unwrap_or_default();
-
         handler
             .begin_initial_transaction(false, Some(150000))
             .unwrap();
 
-        let result = handler
-            .execute_create(caller, U256::zero(), initial_code.to_vec(), address)
-            .unwrap();
+        let capture = handler.create(
+            caller,
+            CreateScheme::Legacy { caller },
+            U256::zero(),
+            initial_code.to_vec(),
+            None,
+        );
 
-        assert_eq!(result.0, ExitReason::Error(ExitError::CreateContractLimit));
+        match capture {
+            Capture::Exit((
+                ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
+                    ExitError::CreateContractLimit,
+                )),
+                ..,
+            )) => (),
+            e => panic!(
+                "Create doesn't fail with error CreateContractLimit but with {:?}",
+                e
+            ),
+        }
     }
 
     #[test]
@@ -4833,6 +4845,8 @@ mod test {
             false,
             None,
         );
+
+        let _ = handler.begin_initial_transaction(false, None);
 
         set_balance(&mut handler, &caller, U256::from(1000000000));
         set_nonce(&mut handler, &caller, u64::MAX);
