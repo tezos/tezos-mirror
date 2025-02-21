@@ -4608,7 +4608,7 @@ tezt-memory-3k:
       junit: $JUNIT
     when: always
   retry: 2
-  parallel: 6
+  parallel: 12
 
 tezt-memory-4k:
   image: ${ci_image_name}/e2etest:${ci_image_tag}

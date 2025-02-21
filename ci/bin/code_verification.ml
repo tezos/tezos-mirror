@@ -1497,7 +1497,7 @@ let jobs pipeline_type =
           ~tag:Gcp_tezt_memory_3k
           ~tezt_tests:(Tezt.tests_tag_selector ~memory_3k:true [])
           ~tezt_variant:"-memory_3k"
-          ~parallel:(Vector 6)
+          ~parallel:(Vector 12)
           ~dependencies
           ?job_select_tezts
           ~rules
