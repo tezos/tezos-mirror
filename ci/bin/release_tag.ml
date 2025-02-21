@@ -104,6 +104,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ~dependencies:(Dependent [])
       ~__POS__
       ~arch:Amd64
+      ~cpu:Very_high
       ~release:true
       ()
   in
@@ -292,6 +293,7 @@ let octez_evm_node_jobs ?(test = false) () =
     job_build_static_binaries
       ~__POS__
       ~arch:Amd64
+      ~cpu:Very_high
       ~executable_files:"script-inputs/octez-evm-node-executable"
       ~release:true
       ~version_executable:"octez-evm-node"

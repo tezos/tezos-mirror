@@ -605,7 +605,7 @@ let jobs pipeline_type =
     job_build_dynamic_binaries
       ~__POS__
       ~arch:Amd64
-      ~cpu:High
+      ~cpu:Very_high
       ~retry:
         {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~dependencies:dependencies_needs_start
@@ -651,6 +651,7 @@ let jobs pipeline_type =
     job_build_static_binaries
       ~__POS__
       ~arch:Amd64
+      ~cpu:Very_high
         (* Even though not many tests depend on static executables, some
            of those that do are limiting factors in the total duration
            of pipelines. So we start this job as early as possible,
@@ -1196,6 +1197,7 @@ let jobs pipeline_type =
         ~name:"oc.script:snapshot_alpha_and_link"
         ~stage:Stages.test
         ~image:Images.CI.build
+        ~cpu:Very_high
         ~dependencies:order_after_build
           (* Since the above dependencies are only for ordering, we do not set [dependent] *)
         ~rules:(make_rules ~changes:changeset_script_snapshot_alpha_and_link ())
