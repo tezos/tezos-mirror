@@ -660,6 +660,14 @@ let jobs pipeline_type =
       ~rules:(make_rules ~changes:changeset_octez ())
       ()
   in
+  let job_static_arm64_experimental =
+    job_build_static_binaries
+      ~__POS__
+      ~arch:Arm64
+      ~dependencies:dependencies_needs_start (* See rationale above *)
+      ~rules:(make_rules ~manual:(On_changes changeset_octez) ())
+      ()
+  in
 
   (* Build jobs *)
   let build =
@@ -768,6 +776,7 @@ let jobs pipeline_type =
       job_build_arm64_release;
       job_build_arm64_exp_dev_extra;
       job_static_x86_64_experimental;
+      job_static_arm64_experimental;
       job_build_x86_64_release;
       job_build_x86_64_exp_dev_extra;
       wasm_runtime_check;

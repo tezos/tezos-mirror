@@ -580,6 +580,98 @@ oc.build:static-x86_64-linux-binaries:
     paths:
     - octez-binaries/$ARCH/*
 
+oc.build:static-arm64-linux-binaries:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp_arm64
+  rules:
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - CHANGES.rst
+    - LICENSES/**/*
+    - Makefile
+    - brassaia/**/*
+    - cohttp/**/*
+    - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - etherlink/**/*
+    - irmin/**/*
+    - michelson_test_scripts/**/*
+    - opam/**/*
+    - opentelemetry/**/*
+    - prometheus/**/*
+    - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
+    - sdk/**/*
+    - src/**/*
+    - tezt/**/*
+    - tzt_reference_test_suite/**/*
+    when: manual
+    allow_failure: true
+  needs:
+  - job: oc.docker:ci:arm64
+  - job: trigger
+  - job: sanity_ci
+    optional: true
+  - job: docker:hadolint
+    optional: true
+  - job: oc.ocaml_fmt
+    optional: true
+  - job: oc.semgrep
+    optional: true
+  - job: oc.misc_checks
+    optional: true
+  - job: check_jsonnet
+    optional: true
+  - job: check_rust_fmt
+    optional: true
+  - job: documentation:rst-check
+    optional: true
+  - job: nix
+    optional: true
+  - job: commit_titles
+    optional: true
+  dependencies:
+  - oc.docker:ci:arm64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: rust-deps-target-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_target
+    policy: pull-push
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/build_static_binaries.sh
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    ARCH: arm64
+    EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 2G
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target
+  artifacts:
+    paths:
+    - octez-binaries/$ARCH/*
+
 oc.build_x86_64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
