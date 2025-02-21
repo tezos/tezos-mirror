@@ -388,7 +388,7 @@ oc.build:static-x86_64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_very_high_cpu
   rules:
   - when: always
   dependencies:
@@ -490,7 +490,7 @@ oc.build_x86_64-exp-dev-extra:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_high_cpu
+  - gcp_very_high_cpu
   rules:
   - when: always
   dependencies:
@@ -866,7 +866,7 @@ build-layer1-profiling:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_very_high_cpu
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1817,7 +1817,7 @@ oc.script:snapshot_alpha_and_link:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_very_high_cpu
   rules:
   - when: always
   dependencies:
