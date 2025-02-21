@@ -164,6 +164,7 @@ let string_of_sockaddr addr =
 let id t = t.id
 
 let raw_socket () =
+  let open Lwt_syntax in
   let sock = Lwt_unix.socket ~cloexec:true PF_INET6 SOCK_STREAM 0 in
   (* By setting [SO_KEEPALIVE] to [true], the socket is configured to send
      periodic keep-alive probes to verify that the connection is still
@@ -172,16 +173,51 @@ let raw_socket () =
      It reset (send TCP RST message and close) if the peer is
      unresponsive. *)
   Lwt_unix.(setsockopt sock SO_KEEPALIVE true) ;
-  sock
+  (* By setting [TCP_USER_TIMEOUT], we ensure that a dead connection is reported
+     after at most [ms] milliseconds. This option allows the connection timeout
+     to be much shorter than the default behavior—which can last several minutes
+     (typically between 5 and 15 minutes) due to TCP retransmission timeouts (RTO).
 
-let socket () = create (raw_socket ())
+     Below, we set this value to 15 seconds. This value should not be
+     too low otherwise we may drop valid connection that were
+     temporarily busy. The higher it is, the longer it is to detect a
+     dead connection. We believe 15 seconds is reasonable in practice
+     (especially this acknowledgement is done at the OS level and so
+     is quite independent of the Lwt scheduler). *)
+  let ms_opt =
+    let default = 15000 (* 15s *) in
+    try
+      match Sys.getenv_opt "OCTEZ_P2P_TCP_USER_TIMEOUT" with
+      | None -> Some default
+      | Some "0" -> None
+      | Some value -> Some (int_of_string value)
+    with _ -> Some default
+  in
+  match ms_opt with
+  | None -> (* The user opt-out from the socket option *) Lwt.return sock
+  | Some ms -> (
+      match Socket.set_tcp_user_timeout (Lwt_unix.unix_file_descr sock) ~ms with
+      | Ok () | Error `Unsupported -> Lwt.return sock
+      | Error (`Unix_error exn) ->
+          (* Socket option [TCP_USER_TIMEOUT] is not mandatory, this is why we only emit an
+             event at [Info] level. *)
+          let* () =
+            Events.(emit set_socket_option_tcp_user_timeout_failed)
+              [Error_monad.error_of_exn exn]
+          in
+          Lwt.return sock)
+
+let socket () =
+  let open Lwt_syntax in
+  let* socket = raw_socket () in
+  create socket
 
 let create_listening_socket ?(reuse_port = false) ~backlog
     ?(addr = Ipaddr.V6.unspecified) port =
   let open Lwt_result_syntax in
   Lwt.catch
     (fun () ->
-      let sock = raw_socket () in
+      let*! sock = raw_socket () in
       (if reuse_port then Lwt_unix.(setsockopt sock SO_REUSEPORT true)) ;
       Lwt_unix.(setsockopt sock SO_REUSEADDR true) ;
       let*! () =
