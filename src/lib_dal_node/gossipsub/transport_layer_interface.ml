@@ -44,6 +44,11 @@ module P2p_message_V1 = struct
          (req "maybe_reachable_point" P2p_point.Id.encoding)
          (req "peer" P2p_peer.Id.encoding))
 
+  (* This ping payload is to be considered as a dummy one using is the
+     pkh zero address. *)
+  let ping_topic =
+    Types.Topic.{slot_index = 0; pkh = Signature.Public_key_hash.zero}
+
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5564
 
      DAL/GS: bound the lists/seqs in exchanged p2p messages. *)
@@ -95,14 +100,26 @@ module P2p_message_V1 = struct
            (req "message_ids" (list Types.Message_id.encoding)))
         (function IWant {message_ids} -> Some ((), message_ids) | _ -> None)
         (fun ((), message_ids) -> IWant {message_ids});
+      (* In the following encoding we introduce a special case such that the [Ping] is
+         encoded as a [Subscribe] using a dummy payload [ping_topic] and the p2p messages
+         encoding remain compatible.
+
+         FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/7768
+
+         Define a [Ping] own message encoding when bumping the p2p message version.
+      *)
       case
         ~tag:0x14
         ~title:"Subscribe"
         (obj2
            (req "kind" (constant "subscribe"))
            (req "topic" Types.Topic.encoding))
-        (function Subscribe {topic} -> Some ((), topic) | _ -> None)
-        (fun ((), topic) -> Subscribe {topic});
+        (function
+          | Subscribe {topic} -> Some ((), topic)
+          | Ping -> Some ((), ping_topic)
+          | _ -> None)
+        (fun ((), topic) ->
+          if Types.Topic.(topic = ping_topic) then Ping else Subscribe {topic});
       case
         ~tag:0x15
         ~title:"Unsubscribe"
@@ -177,6 +194,7 @@ module P2p_message_V1 = struct
           "FullMessage{message_id=%a}"
           Types.Message_id.pp
           message_id
+    | Ping -> Format.fprintf fmt "Ping"
 
   let distributed_db_version = Distributed_db_version.zero
 

@@ -130,6 +130,15 @@ module Events = struct
       ("peer", P2p_peer.Id.encoding)
       ("topic", Types.Topic.encoding)
 
+  let ping =
+    declare_1
+      ~section
+      ~name:(prefix "ping")
+      ~msg:"Process Ping from {peer}"
+      ~level:Info
+      ~pp1:P2p_peer.Id.pp
+      ("peer", P2p_peer.Id.encoding)
+
   let unsubscribe =
     declare_2
       ~section
@@ -211,6 +220,9 @@ let event ~verbose =
       | Disconnection {peer} -> emit disconnection peer.peer_id
       | In_message {from_peer; p2p_message} -> (
           match p2p_message with
+          | Ping ->
+              if not verbose then Lwt.return_unit
+              else emit ping from_peer.peer_id
           | Message_with_header {message = _; topic; message_id} ->
               emit message_with_header (from_peer.peer_id, topic, message_id)
           | Subscribe {topic} -> emit subscribe (from_peer.peer_id, topic)
