@@ -31,7 +31,7 @@ datadog_pipeline_trace:
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
 
-oc.docker-systemd_tests-debian:
+oc.docker-systemd_tests_debian:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: images
   tags:
@@ -60,6 +60,39 @@ oc.docker-systemd_tests-debian:
     - RELEASE:
       - unstable
       - bookworm
+      TAGS:
+      - gcp
+      - gcp_arm64
+
+oc.docker-systemd_tests_ubuntu:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - $TAGS
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/build-packages-dependencies.sh images/packages/debian-systemd-tests.Dockerfile
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    FLAVOUR: systemd-tests
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DISTRIBUTION: ubuntu
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
+  parallel:
+    matrix:
+    - RELEASE:
+      - noble
+      - jammy
       TAGS:
       - gcp
       - gcp_arm64
@@ -604,13 +637,13 @@ oc.upgrade_bin_debian_bookworm:
   script:
   - ./docs/introduction/upgrade-bin-deb.sh debian bookworm
 
-oc.install_bin_debian_bookworm-systemd:
+oc.install_bin_debian_bookworm_systemd_test:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: publishing_tests
   tags:
   - gcp
   needs:
-  - oc.docker-systemd_tests-debian
+  - oc.docker-systemd_tests_debian
   - apt_repo_debian
   dependencies: []
   timeout: 60 minutes
@@ -635,8 +668,9 @@ oc.upgrade_bin_debian_bookworm-systemd:
   tags:
   - gcp
   needs:
-  - oc.docker-systemd_tests-debian
+  - oc.docker-systemd_tests_debian
   - apt_repo_debian
+  - apt_repo_debian_old
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -675,7 +709,7 @@ oc.lintian_ubuntu:
   variables: {}
 
 oc.install_bin_ubunty_jammy:
-  image: debian:bookworm
+  image: public.ecr.aws/lts/ubuntu:22.04_stable
   stage: publishing_tests
   tags:
   - gcp
@@ -694,7 +728,7 @@ oc.install_bin_ubunty_jammy:
     - runner_system_failure
 
 oc.install_bin_ubunty_noble:
-  image: debian:bookworm
+  image: public.ecr.aws/lts/ubuntu:24.04_stable
   stage: publishing_tests
   tags:
   - gcp
@@ -724,3 +758,56 @@ oc.upgrade_bin_ubuntu_jammy:
   timeout: 60 minutes
   script:
   - ./docs/introduction/upgrade-bin-deb.sh ubuntu jammy
+
+oc.install_bin_ubuntu_noble_systemd:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - oc.docker-systemd_tests_ubuntu
+  - apt_repo_ubuntu
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/install-bin-deb.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    FLAVOUR: systemd-tests
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    PREFIX: ""
+    DISTRIBUTION: ubuntu
+    RELEASE: noble
+
+oc.upgrade_bin_ubuntu_noble_systemd_test:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - oc.docker-systemd_tests_ubuntu
+  - apt_repo_ubuntu
+  - apt_repo_ubuntu_old
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    FLAVOUR: systemd-tests
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    PREFIX: ""
+    DISTRIBUTION: ubuntu
+    RELEASE: noble
