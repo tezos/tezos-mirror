@@ -1195,29 +1195,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     ) -> Result<CreateOutcome, EthereumError> {
         log!(self.host, Debug, "Executing a contract create");
 
-        // We check that the maximum allowed init code size as specified by EIP-3860
-        // can not be reached.
-        if let Some(max_initcode_size) = self.config.max_initcode_size {
-            if initial_code.len() > max_initcode_size {
-                return Ok((
-                    ExitReason::Error(ExitError::CreateContractLimit),
-                    None,
-                    vec![],
-                ));
-            }
-        }
-
-        if let Err(err) = self.record_init_code_cost(&initial_code) {
-            log!(
-                self.host,
-                Debug,
-                "{:?}: Not enough gas for create. Cannot record init code cost.",
-                err
-            );
-
-            return Ok((ExitReason::Error(ExitError::OutOfGas), None, vec![]));
-        }
-
         let context = Context {
             address,
             caller,
@@ -1424,6 +1401,28 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         if self.mark_address_as_hot(address).is_err() {
             return Err(EthereumError::InconsistentState(Cow::from(
                 "Failed to mark callee address as hot",
+            )));
+        }
+
+        // We check that the maximum allowed init code size as specified by EIP-3860
+        // can not be reached.
+        if let Some(max_initcode_size) = self.config.max_initcode_size {
+            if input.len() > max_initcode_size {
+                return self.end_initial_transaction(Ok((
+                    ExitReason::Error(ExitError::CreateContractLimit),
+                    None,
+                    vec![],
+                )));
+            }
+        }
+
+        if let Err(err) = self.record_init_code_cost(&input) {
+            log!(self.host, Debug, "{:?}: Cannot record init code cost.", err);
+
+            return self.end_initial_transaction(Ok((
+                ExitReason::Error(ExitError::OutOfGas),
+                None,
+                vec![],
             )));
         }
 
@@ -2499,36 +2498,42 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         init_code: Vec<u8>,
         target_gas: Option<u64>,
     ) -> Capture<CreateOutcome, Self::CreateInterrupt> {
+        // We check that the maximum allowed init code size as specified by EIP-3860
+        // can not be reached.
+        if let Some(max_initcode_size) = self.config.max_initcode_size {
+            if init_code.len() > max_initcode_size {
+                // [MAX_INIT_CODE_SIZE_RETURN_HACK]
+                // The normal behavior stated by https://www.evm.codes/#f0?fork=shanghai
+                // would be to return a simple error.
+                // « Error cases: [..]
+                //  * size is greater than the chain's maximum initcode size (since Shanghai fork) »
+                //
+                // Unfortunately there is a bug in [evm-runtime-0.39.0] where the `finish_create`
+                // function will always consider error/revert/succed as a "Ok(()) => Control::Continue"
+                // flow which makes it that we can not rollback anything as it should in this case.
+                // The hack-ish way to be able to capture that error and rollback as it should is
+                // to consider this error as fatal and then catch it in `end_inter_transaction`,
+                // rollback what needs to be and then transform the outputed fatal error to a simple
+                // `ExitReason::Error(ExitError::CreateContractLimit)`.
+
+                return Capture::Exit((
+                    ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
+                        ExitError::CreateContractLimit,
+                    )),
+                    None,
+                    vec![],
+                ));
+            }
+        }
+
+        if let Err(err) = self.record_init_code_cost(&init_code) {
+            log!(self.host, Debug, "{:?}: Cannot record init code cost.", err);
+
+            return Capture::Exit((ExitReason::Error(ExitError::OutOfGas), None, vec![]));
+        }
+
         match self.can_begin_inter_transaction(caller, &value) {
             Precondition::PassPrecondition => {
-                // We check that the maximum allowed init code size as specified by EIP-3860
-                // can not be reached.
-                if let Some(max_initcode_size) = self.config.max_initcode_size {
-                    if init_code.len() > max_initcode_size {
-                        // [MAX_INIT_CODE_SIZE_RETURN_HACK]
-                        // The normal behavior stated by https://www.evm.codes/#f0?fork=shanghai
-                        // would be to return a simple error.
-                        // « Error cases: [..]
-                        //  * size is greater than the chain's maximum initcode size (since Shanghai fork) »
-                        //
-                        // Unfortunately there is a bug in [evm-runtime-0.39.0] where the `finish_create`
-                        // function will always consider error/revert/succed as a "Ok(()) => Control::Continue"
-                        // flow which makes it that we can not rollback anything as it should in this case.
-                        // The hack-ish way to be able to capture that error and rollback as it should is
-                        // to consider this error as fatal and then catch it in `end_inter_transaction`,
-                        // rollback what needs to be and then transform the outputed fatal error to a simple
-                        // `ExitReason::Error(ExitError::CreateContractLimit)`.
-
-                        return Capture::Exit((
-                            ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
-                                ExitError::CreateContractLimit,
-                            )),
-                            None,
-                            vec![],
-                        ));
-                    }
-                }
-
                 // The contract address is created before the increment of the nonce
                 // to generate a correct address when the scheme is `Legacy`.
                 let contract_address = match self.create_address(scheme) {
@@ -4792,18 +4797,30 @@ mod test {
 
         let initial_code = [1; 49153]; // MAX_INIT_CODE_SIZE + 1
 
-        let scheme = CreateScheme::Legacy { caller };
-        let address = handler.create_address(scheme).unwrap_or_default();
-
         handler
             .begin_initial_transaction(false, Some(150000))
             .unwrap();
 
-        let result = handler
-            .execute_create(caller, U256::zero(), initial_code.to_vec(), address)
-            .unwrap();
+        let capture = handler.create(
+            caller,
+            CreateScheme::Legacy { caller },
+            U256::zero(),
+            initial_code.to_vec(),
+            None,
+        );
 
-        assert_eq!(result.0, ExitReason::Error(ExitError::CreateContractLimit));
+        match capture {
+            Capture::Exit((
+                ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
+                    ExitError::CreateContractLimit,
+                )),
+                ..,
+            )) => (),
+            e => panic!(
+                "Create doesn't fail with error CreateContractLimit but with {:?}",
+                e
+            ),
+        }
     }
 
     #[test]
@@ -4828,6 +4845,8 @@ mod test {
             false,
             None,
         );
+
+        let _ = handler.begin_initial_transaction(false, None);
 
         set_balance(&mut handler, &caller, U256::from(1000000000));
         set_nonce(&mut handler, &caller, u64::MAX);
