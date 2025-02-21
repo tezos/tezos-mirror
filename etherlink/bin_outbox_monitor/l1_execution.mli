@@ -14,3 +14,6 @@ val mark_executed_outbox_messages :
   rollup_address:Octez_smart_rollup.Address.t ->
   block:int32 ->
   unit tzresult Lwt.t
+
+(** Report all withdrawals which are overdue for execution. *)
+val check_overdue : Db.t -> l1_node_endpoint:Uri.t -> unit tzresult Lwt.t

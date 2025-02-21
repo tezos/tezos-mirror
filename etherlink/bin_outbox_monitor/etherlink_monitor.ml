@@ -587,6 +587,7 @@ let monitor_l2_l1_levels db ws_client ~rollup_node_rpc ~l1_node_endpoint
             ~block:l1_level
         in
         let* () = Db.Levels.store db ~l1_level ~start_l2_level ~end_l2_level in
+        let* () = L1_execution.check_overdue db ~l1_node_endpoint in
         let* () = Matcher.run db in
         return_unit)
       levels_subscription.stream

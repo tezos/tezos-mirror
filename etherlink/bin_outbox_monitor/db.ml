@@ -505,6 +505,33 @@ module Withdrawals = struct
       AND transactionIndex = ?
       AND logIndex = ?
       |sql}
+
+    let get_overdue =
+      (int ->* t2 withdrawal_log int32)
+      @@ {sql|
+      SELECT
+        w.transactionHash,
+        w.transactionIndex, w.logIndex, w.blockHash, w.blockNumber,
+        w.removed, w.kind, w.ticket_owner, w.amount, w.sender, w.receiver,
+        CAST(w.withdrawal_id as integer),
+        l.l1
+      FROM withdrawals w
+      JOIN levels l ON
+        w.blockNumber > l.start_l2 AND
+        w.blockNumber <= l.end_l2
+      LEFT OUTER JOIN outbox_messages o ON
+        w.outbox_level = o.outbox_level AND
+        w.outbox_message_index = o.message_index AND
+        w.outbox_transaction_index = o.transaction_index
+      LEFT OUTER JOIN executions e ON
+        e.outbox_level = w.outbox_level AND
+        e.message_index = w.outbox_message_index
+      JOIN pointers lcc ON
+        lcc.name = "lcc"
+      WHERE
+        l.l1 <= lcc.value - ? AND
+        e.outbox_level IS NULL
+      |sql}
   end
 
   let store ?conn db log =
@@ -521,6 +548,10 @@ module Withdrawals = struct
       conn
       Q.set_outbox_index
       (outbox_index, transactionHash, transactionIndex, logIndex)
+
+  let get_overdue ?conn db ~challenge_window =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.collect_list conn Q.get_overdue challenge_window
 end
 
 module Levels = struct

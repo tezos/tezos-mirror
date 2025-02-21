@@ -30,18 +30,45 @@ module Event = struct
       ~pp3:Db.pp_withdrawal_kind
       ~pp4:Operation_hash.pp
       ~pp6:Time.Protocol.pp_hum
+
+  let overdue_count =
+    declare_1
+      ~section
+      ~name:"overdue_count"
+      ~msg:"There are {count} withdrawals that are overdue for execution on L1"
+      ~level:Warning
+      ("count", Data_encoding.int31)
+
+  let overdue_withdrawal =
+    declare_7
+      ~section
+      ~name:"overdue_withdrawal"
+      ~msg:
+        "Withdrawal {withdrawal_id} of {amount} {token} of transaction \
+         {transactionHash}({transactionIndex}) in outbox level {outbox_level} \
+         is overdue for {due_for_blocks} blocks"
+      ~level:Error
+      ("withdrawal_id", Db.quantity_hum_encoding)
+      ("amount", Db.quantity_hum_encoding)
+      ("token", Db.withdrawal_kind_encoding)
+      ("transactionHash", Ethereum_types.hash_encoding)
+      ("transactionIndex", Db.quantity_hum_encoding)
+      ("outbox_level", Data_encoding.int32)
+      ("due_for_blocks", Data_encoding.int32)
+      ~pp1:Ethereum_types.pp_quantity
+      ~pp2:Ethereum_types.pp_quantity
+      ~pp3:Db.pp_withdrawal_kind
+      ~pp4:Ethereum_types.pp_hash
+      ~pp5:Ethereum_types.pp_quantity
 end
 
-let fetch_l1_block_ops l1_node_endpoint block =
+let call_rpc_json l1_node_endpoint ?(query = []) path =
   let open Lwt_result_syntax in
   let uri =
     Uri.with_path l1_node_endpoint
-    @@ Format.sprintf
-         "%s/chains/main/blocks/%ld/operations/3"
-         (Uri.path l1_node_endpoint)
-         block
+    @@ String.concat "/" [Uri.path l1_node_endpoint; path]
   in
-  let uri = Uri.with_query uri [("metdata", ["always"])] in
+  let uri = Uri.with_query uri query in
   let* response =
     Tezos_rpc_http_client_unix.RPC_client_unix.generic_media_type_call
       ~accept:[Media_type.json]
@@ -51,10 +78,12 @@ let fetch_l1_block_ops l1_node_endpoint block =
   match response with
   | `Json (`Ok resp) -> return resp
   | `Binary _ ->
-      failwith "fetch_l1_block_ops: Expected JSON answer instead of binary"
+      failwith "%a: Expected JSON answer instead of binary" Uri.pp uri
   | `Other (ct, _) ->
       failwith
-        "fetch_l1_block_ops: Expected JSON answer instead of %a"
+        "%a: Expected JSON answer instead of %a"
+        Uri.pp
+        uri
         (Format.pp_print_option Format.pp_print_string)
         (Option.map snd ct)
   | `Json
@@ -65,7 +94,9 @@ let fetch_l1_block_ops l1_node_endpoint block =
        | `Forbidden resp
        | `Conflict resp ) as err) ->
       failwith
-        "fetch_l1_block_ops: RPC failed [%s] with %a"
+        "%a: RPC failed [%s] with %a"
+        Uri.pp
+        uri
         (match err with
         | `Unauthorized _ -> "unauthorized"
         | `Gone _ -> "gone"
@@ -75,6 +106,32 @@ let fetch_l1_block_ops l1_node_endpoint block =
         | `Conflict _ -> "conflict")
         (Format.pp_print_option Data_encoding.Json.pp)
         resp
+
+let fetch_l1_block_ops l1_node_endpoint block =
+  call_rpc_json
+    l1_node_endpoint
+    (Format.sprintf "chains/main/blocks/%ld/operations/3" block)
+    ~query:[("metdata", ["always"])]
+
+let fetch_constants l1_node_endpoint =
+  call_rpc_json l1_node_endpoint "chains/main/blocks/head/context/constants"
+
+let get_challenge_window l1_node_endpoint =
+  let open Lwt_result_syntax in
+  let+ constants = fetch_constants l1_node_endpoint in
+  Ezjsonm.find constants ["smart_rollup_challenge_window_in_blocks"]
+  |> Ezjsonm.get_int
+
+let get_challenge_window =
+  let challenge_window = ref None in
+  fun l1_node_endpoint ->
+    let open Lwt_result_syntax in
+    match !challenge_window with
+    | Some w -> return w
+    | None ->
+        let+ w = get_challenge_window l1_node_endpoint in
+        challenge_window := Some w ;
+        w
 
 type outbox_message_index = {outbox_level : int32; message_index : int}
 
@@ -259,5 +316,32 @@ let mark_executed_outbox_messages db ~l1_node_endpoint ~rollup_address ~block =
             execution.l1_block,
             execution.timestamp ))
       executed_withdrawals
+  in
+  return_unit
+
+let check_overdue db ~l1_node_endpoint =
+  let open Lwt_result_syntax in
+  let* challenge_window = get_challenge_window l1_node_endpoint in
+  let* lcc = Db.Pointers.LCC.get db in
+  let executable_level = Int32.sub lcc (Int32.of_int challenge_window) in
+  let* overdues = Db.Withdrawals.get_overdue db ~challenge_window in
+  let*! () =
+    if overdues <> [] then Event.(emit overdue_count) (List.length overdues)
+    else Lwt.return_unit
+  in
+  let*! () =
+    List.iter_s
+      (fun ((w : Db.withdrawal_log), outbox_level) ->
+        let due_for_blocks = Int32.sub executable_level outbox_level in
+        (* TODO: alert with overdue threshold. *)
+        Event.(emit overdue_withdrawal)
+          ( w.withdrawal.withdrawal_id,
+            w.withdrawal.amount,
+            w.withdrawal.kind,
+            w.transactionHash,
+            w.transactionIndex,
+            outbox_level,
+            due_for_blocks ))
+      overdues
   in
   return_unit

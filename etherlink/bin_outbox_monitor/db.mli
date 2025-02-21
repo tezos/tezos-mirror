@@ -81,6 +81,12 @@ module Withdrawals : sig
     logIndex:Ethereum_types.quantity ->
     outbox_index ->
     unit tzresult Lwt.t
+
+  val get_overdue :
+    ?conn:Sqlite.conn ->
+    t ->
+    challenge_window:int ->
+    (withdrawal_log * int32) list tzresult Lwt.t
 end
 
 module Levels : sig
