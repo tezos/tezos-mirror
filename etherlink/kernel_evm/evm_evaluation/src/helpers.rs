@@ -25,14 +25,14 @@ pub fn string_of_hexa(bytes: &bytes::Bytes) -> String {
 }
 
 pub fn parse_and_get_cmp(data: &str) -> impl Fn(&u8, &u8) -> bool {
-    if data.contains('>') {
-        u8::gt
-    } else if data.contains(">=") {
+    if data.contains(">=") {
         u8::ge
-    } else if data.contains('<') {
-        u8::lt
+    } else if data.contains('>') {
+        u8::gt
     } else if data.contains("<=") {
         u8::le
+    } else if data.contains('<') {
+        u8::lt
     } else {
         // By default, if there is not cmp prefix then it's supposed
         // to be (strictly) the data itself.
