@@ -432,6 +432,24 @@ let jobs pipeline_type =
           (Dependent [Job job_apt_repo_ubuntu_old; Job job_apt_repo_ubuntu])
         ~image:Images.ubuntu_jammy
         ["./docs/introduction/upgrade-bin-deb.sh ubuntu jammy"];
+      job_install_systemd_bin
+        ~__POS__
+        ~name:"oc.install_bin_ubuntu_noble_systemd"
+        ~dependencies:
+          (Dependent
+             [
+               Job job_docker_systemd_test_debian_dependencies;
+               Job job_apt_repo_ubuntu;
+             ])
+        ~variables:
+          (variables
+             ~kind:"systemd-tests"
+             [("PREFIX", ""); ("DISTRIBUTION", "ubuntu"); ("RELEASE", "noble")])
+        [
+          "./scripts/ci/systemd-packages-test.sh \
+           scripts/packaging/tests/deb/install-bin-deb.sh \
+           images/packages/debian-systemd-tests.Dockerfile";
+        ];
     ]
   in
   let test_debian_packages_jobs =

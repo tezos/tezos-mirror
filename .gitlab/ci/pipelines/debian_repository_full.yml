@@ -699,3 +699,29 @@ oc.upgrade_bin_ubuntu_jammy:
   timeout: 60 minutes
   script:
   - ./docs/introduction/upgrade-bin-deb.sh ubuntu jammy
+
+oc.install_bin_ubuntu_noble_systemd:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - oc.docker-systemd_tests-debian
+  - apt_repo_ubuntu
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/install-bin-deb.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    FLAVOUR: systemd-tests
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    PREFIX: ""
+    DISTRIBUTION: ubuntu
+    RELEASE: noble
