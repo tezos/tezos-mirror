@@ -315,7 +315,7 @@ let node_external_rpc_server =
     ~set_long:"node-external-rpc-server"
     ~unset_long:"no-node-external-rpc-server"
     ~description:"Use the external RPC server on the L1 nodes"
-    true
+    false
 
 let with_dal =
   Clap.flag
