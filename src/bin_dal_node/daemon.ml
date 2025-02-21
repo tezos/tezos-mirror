@@ -969,8 +969,8 @@ let get_proto_plugins cctxt profile_ctxt ~last_processed_level ~first_seen_level
    and we don't detect it if this code starts running just before the migration
    level, and the head changes meanwhile to be above the migration level.
 *)
-let clean_up_store ctxt cctxt ~last_processed_level ~first_seen_level head_level
-    proto_parameters =
+let clean_up_store_and_catch_up ctxt cctxt ~last_processed_level
+    ~first_seen_level head_level proto_parameters =
   let open Lwt_result_syntax in
   let store_skip_list_cells ~level =
     let*? (module Plugin) =
@@ -998,21 +998,26 @@ let clean_up_store ctxt cctxt ~last_processed_level ~first_seen_level head_level
        the plugin. *)
     Int32.(sub level (of_int period))
   in
-  let should_store_skip_list_cells ~head_level ~level =
-    let profile_ctxt = Node_context.get_profile_ctxt ctxt in
-    let period =
-      get_storage_period
-        profile_ctxt
-        proto_parameters
-        head_level
-        first_seen_level
-      + skip_list_offset proto_parameters
-    in
-    supports_refutations
-    && level >= first_level_for_skip_list_storage period head_level
+  let should_store_skip_list_cells ~head_level =
+    if not supports_refutations then fun ~level:_ -> false
+    else
+      let profile_ctxt = Node_context.get_profile_ctxt ctxt in
+      let period =
+        get_storage_period
+          profile_ctxt
+          proto_parameters
+          head_level
+          first_seen_level
+        + skip_list_offset proto_parameters
+      in
+      let first_level = first_level_for_skip_list_storage period head_level in
+      fun ~level -> level >= first_level
   in
   let rec do_clean_up last_processed_level head_level =
     let last_level = target_level head_level in
+    let should_store_skip_list_cells =
+      should_store_skip_list_cells ~head_level
+    in
     let rec clean_up_at_level level =
       if level > last_level then return_unit
       else
@@ -1020,12 +1025,16 @@ let clean_up_store ctxt cctxt ~last_processed_level ~first_seen_level head_level
           Handler.remove_old_level_stored_data proto_parameters ctxt level
         in
         let* () =
-          if should_store_skip_list_cells ~head_level ~level then
+          if should_store_skip_list_cells ~level then
             store_skip_list_cells ~level
           else return_unit
         in
         let* () =
           Store.Last_processed_level.save store.last_processed_level level
+        in
+        let*! () =
+          if Int32.to_int level mod 1000 = 0 then Event.(emit catching_up level)
+          else Lwt.return_unit
         in
         clean_up_at_level (Int32.succ level)
     in
@@ -1038,9 +1047,21 @@ let clean_up_store ctxt cctxt ~last_processed_level ~first_seen_level head_level
     in
     let new_head_level = header.Block_header.level in
     if new_head_level > head_level then do_clean_up last_level new_head_level
-    else return_unit
+    else
+      let*! () = Event.(emit end_catchup ()) in
+      return_unit
   in
-  do_clean_up last_processed_level head_level
+  let*! () =
+    let levels_to_clean_up =
+      Int32.(succ @@ sub head_level last_processed_level)
+    in
+    if levels_to_clean_up > 0l then
+      Event.(
+        emit start_catchup (last_processed_level, head_level, levels_to_clean_up))
+    else Lwt.return_unit
+  in
+  let* () = do_clean_up last_processed_level head_level in
+  return_unit
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
    Improve general architecture, handle L1 disconnection etc
@@ -1311,7 +1332,7 @@ let run ~data_dir ~configuration_override =
     match last_processed_level with
     | None -> (* there's nothing to clean up *) return_unit
     | Some last_processed_level ->
-        clean_up_store
+        clean_up_store_and_catch_up
           ctxt
           cctxt
           ~last_processed_level

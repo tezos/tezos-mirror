@@ -710,3 +710,31 @@ let warn_attester_did_not_attest_slot =
     ("slot_index", Data_encoding.int31)
     ("attested_level", Data_encoding.int32)
     ~pp1:Signature.Public_key_hash.pp_short
+
+let start_catchup =
+  declare_3
+    ~section
+    ~name:"start_catchup"
+    ~msg:
+      "catching up to level {end_level}, from last processed level \
+       {start_level} (that is, {levels_to_clean_up} levels to process)"
+    ~level:Notice
+    ("start_level", Data_encoding.int32)
+    ("end_level", Data_encoding.int32)
+    ("levels_to_clean_up", Data_encoding.int32)
+
+let catching_up =
+  declare_1
+    ~section
+    ~name:"catching_up"
+    ~msg:"caught up the store up to level {current_level}"
+    ~level:Notice
+    ("current_level", Data_encoding.int32)
+
+let end_catchup =
+  declare_0
+    ~section
+    ~name:"end_catchup"
+    ~msg:"done catching up"
+    ~level:Notice
+    ()
