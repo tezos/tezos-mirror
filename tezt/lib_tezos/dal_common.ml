@@ -120,25 +120,19 @@ module Parameters = struct
     let blocks_per_cycle =
       JSON.(proto_parameters |-> "blocks_per_cycle" |> as_int)
     in
-    let attestation_lag =
-      JSON.(
-        proto_parameters |-> "dal_parametric" |-> "attestation_lag" |> as_int)
-    in
-    let blocks = (3 * attestation_lag) + 1 in
-    if blocks mod blocks_per_cycle = 0 then blocks / blocks_per_cycle
-    else 1 + (blocks / blocks_per_cycle)
+    let default_block_storage = 150 in
+    if default_block_storage mod blocks_per_cycle = 0 then
+      default_block_storage / blocks_per_cycle
+    else 1 + (default_block_storage / blocks_per_cycle)
 
   let storage_period_without_refutation_in_cycles ~proto_parameters =
     let blocks_per_cycle =
       JSON.(proto_parameters |-> "blocks_per_cycle" |> as_int)
     in
-    let attestation_lag =
-      JSON.(
-        proto_parameters |-> "dal_parametric" |-> "attestation_lag" |> as_int)
-    in
-    let blocks = 2 * attestation_lag in
-    if blocks mod blocks_per_cycle = 0 then blocks / blocks_per_cycle
-    else 1 + (blocks / blocks_per_cycle)
+    let default_block_storage = 150 in
+    if default_block_storage mod blocks_per_cycle = 0 then
+      default_block_storage / blocks_per_cycle
+    else 1 + (default_block_storage / blocks_per_cycle)
 end
 
 module Committee = struct
