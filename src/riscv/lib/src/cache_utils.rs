@@ -7,7 +7,7 @@ use std::{convert::Infallible, marker::PhantomData};
 
 use crate::{
     default::ConstDefault,
-    machine_state::main_memory::Address,
+    machine_state::memory::Address,
     state_backend::{
         AllocatedOf, CommitmentLayout, FromProofResult, Layout, ManagerAlloc, ManagerBase,
         ManagerSerialise, Many, ProofLayout, ProofTree,

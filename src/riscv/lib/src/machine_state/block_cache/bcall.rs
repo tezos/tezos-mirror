@@ -14,7 +14,7 @@ use crate::{
     machine_state::{
         MachineCoreState, ProgramCounterUpdate,
         instruction::Instruction,
-        main_memory::{Address, MainMemoryLayout},
+        memory::{Address, MemoryConfig},
     },
     state_backend::{
         AllocatedOf, Atom, Cell, EnrichedCell, FnManager, ManagerBase, ManagerClone, ManagerRead,
@@ -28,7 +28,7 @@ use crate::{
 ///
 /// This allows static dispatch of this block, via different strategies. Namely:
 /// interpretation and Just-In-Time compilation.
-pub trait BCall<ML: MainMemoryLayout, M: ManagerBase> {
+pub trait BCall<MC: MemoryConfig, M: ManagerBase> {
     /// The number of instructions contained in the block.
     ///
     /// Executing a block will consume up to `num_instr` steps.
@@ -45,7 +45,7 @@ pub trait BCall<ML: MainMemoryLayout, M: ManagerBase> {
     /// There _must_ also be sufficient steps remaining, to execute the block in full.
     fn run_block(
         &self,
-        core: &mut MachineCoreState<ML, M>,
+        core: &mut MachineCoreState<MC, M>,
         instr_pc: Address,
         steps: &mut usize,
     ) -> Result<(), EnvironException>
@@ -54,25 +54,25 @@ pub trait BCall<ML: MainMemoryLayout, M: ManagerBase> {
 }
 
 /// State Layout for Blocks
-pub type BlockLayout<ML> = (Atom<u8>, [ICallLayout<ML>; CACHE_INSTR]);
+pub type BlockLayout<MC> = (Atom<u8>, [ICallLayout<MC>; CACHE_INSTR]);
 
 /// Functionality required to construct & execute blocks.
 ///
 /// A block is a sequence of at least one instruction, which may be executed sequentially.
 /// Blocks will never contain more than [`CACHE_INSTR`] instructions.
-pub trait Block<ML: MainMemoryLayout, M: ManagerBase> {
+pub trait Block<MC: MemoryConfig, M: ManagerBase> {
     /// Block construction may require additional state not kept in storage,
     /// this is then passed as a parameter to [`Block::complete_block`].
     type BlockBuilder: Default;
 
     /// Bind the block to the given allocated state.
-    fn bind(allocated: AllocatedOf<BlockLayout<ML>, M>) -> Self;
+    fn bind(allocated: AllocatedOf<BlockLayout<MC>, M>) -> Self;
 
     /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
     /// the constituents of `N` that were produced from the constituents of `&M`.
     fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
         &'a self,
-    ) -> AllocatedOf<BlockLayout<ML>, F::Output>;
+    ) -> AllocatedOf<BlockLayout<MC>, F::Output>;
 
     /// Ready a block for construction.
     ///
@@ -108,7 +108,7 @@ pub trait Block<ML: MainMemoryLayout, M: ManagerBase> {
         M: ManagerReadWrite;
 
     /// Returns the underlying slice of instructions stored in the block.
-    fn instr(&self) -> &[EnrichedCell<ICallPlaced<ML>, M>]
+    fn instr(&self) -> &[EnrichedCell<ICallPlaced<MC>, M>]
     where
         M: ManagerRead;
 
@@ -125,7 +125,7 @@ pub trait Block<ML: MainMemoryLayout, M: ManagerBase> {
     unsafe fn callable<'a>(
         &mut self,
         block_builder: &'a Self::BlockBuilder,
-    ) -> Option<&mut (impl BCall<ML, M> + ?Sized + 'a)>
+    ) -> Option<&mut (impl BCall<MC, M> + ?Sized + 'a)>
     where
         M: ManagerRead + 'a;
 }
@@ -141,12 +141,12 @@ pub struct InterpretedBlockBuilder;
 /// dispatching on every 'instruction run'. See [`ICall`] for more information.
 ///
 /// [`ICall`]: super::ICall
-pub struct Interpreted<ML: MainMemoryLayout, M: ManagerBase> {
-    instr: [EnrichedCell<ICallPlaced<ML>, M>; CACHE_INSTR],
+pub struct Interpreted<MC: MemoryConfig, M: ManagerBase> {
+    instr: [EnrichedCell<ICallPlaced<MC>, M>; CACHE_INSTR],
     len_instr: Cell<u8, M>,
 }
 
-impl<ML: MainMemoryLayout, M: ManagerBase> BCall<ML, M> for [EnrichedCell<ICallPlaced<ML>, M>] {
+impl<MC: MemoryConfig, M: ManagerBase> BCall<MC, M> for [EnrichedCell<ICallPlaced<MC>, M>] {
     #[inline]
     fn num_instr(&self) -> usize
     where
@@ -157,7 +157,7 @@ impl<ML: MainMemoryLayout, M: ManagerBase> BCall<ML, M> for [EnrichedCell<ICallP
 
     fn run_block(
         &self,
-        core: &mut MachineCoreState<ML, M>,
+        core: &mut MachineCoreState<MC, M>,
         mut instr_pc: Address,
         steps: &mut usize,
     ) -> Result<(), EnvironException>
@@ -174,7 +174,7 @@ impl<ML: MainMemoryLayout, M: ManagerBase> BCall<ML, M> for [EnrichedCell<ICallP
     }
 }
 
-impl<ML: MainMemoryLayout, M: ManagerBase> Block<ML, M> for Interpreted<ML, M> {
+impl<MC: MemoryConfig, M: ManagerBase> Block<MC, M> for Interpreted<MC, M> {
     type BlockBuilder = InterpretedBlockBuilder;
 
     fn num_instr(&self) -> usize
@@ -193,7 +193,7 @@ impl<ML: MainMemoryLayout, M: ManagerBase> Block<ML, M> for Interpreted<ML, M> {
     }
 
     #[inline]
-    fn instr(&self) -> &[EnrichedCell<ICallPlaced<ML>, M>]
+    fn instr(&self) -> &[EnrichedCell<ICallPlaced<MC>, M>]
     where
         M: ManagerRead,
     {
@@ -233,13 +233,13 @@ impl<ML: MainMemoryLayout, M: ManagerBase> Block<ML, M> for Interpreted<ML, M> {
         self.len_instr.write(0);
     }
 
-    fn bind((len_instr, instr): AllocatedOf<BlockLayout<ML>, M>) -> Self {
+    fn bind((len_instr, instr): AllocatedOf<BlockLayout<MC>, M>) -> Self {
         Self { len_instr, instr }
     }
 
     fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
         &'a self,
-    ) -> AllocatedOf<BlockLayout<ML>, F::Output> {
+    ) -> AllocatedOf<BlockLayout<MC>, F::Output> {
         (
             self.len_instr.struct_ref::<F>(),
             self.instr.each_ref().map(|entry| entry.struct_ref::<F>()),
@@ -253,7 +253,7 @@ impl<ML: MainMemoryLayout, M: ManagerBase> Block<ML, M> for Interpreted<ML, M> {
     unsafe fn callable<'a>(
         &mut self,
         _bb: &'a Self::BlockBuilder,
-    ) -> Option<&mut (impl BCall<ML, M> + ?Sized + 'a)>
+    ) -> Option<&mut (impl BCall<MC, M> + ?Sized + 'a)>
     where
         M: ManagerRead + 'a,
     {
@@ -266,7 +266,7 @@ impl<ML: MainMemoryLayout, M: ManagerBase> Block<ML, M> for Interpreted<ML, M> {
     }
 }
 
-impl<ML: MainMemoryLayout, M: ManagerClone> Clone for Interpreted<ML, M> {
+impl<MC: MemoryConfig, M: ManagerClone> Clone for Interpreted<MC, M> {
     fn clone(&self) -> Self {
         Self {
             len_instr: self.len_instr.clone(),
@@ -281,13 +281,13 @@ impl<ML: MainMemoryLayout, M: ManagerClone> Clone for Interpreted<ML, M> {
 /// unsupported instructions, a fallback to [`Interpreted`] mode occurs.
 ///
 /// Blocks are compiled upon calling [`Block::complete_block`], in a *stop the world* fashion.
-pub struct InlineJit<ML: MainMemoryLayout, M: JitStateAccess> {
-    fallback: Interpreted<ML, M>,
-    jit_fn: Option<JCall<ML, M>>,
+pub struct InlineJit<MC: MemoryConfig, M: JitStateAccess> {
+    fallback: Interpreted<MC, M>,
+    jit_fn: Option<JCall<MC, M>>,
 }
 
-impl<ML: MainMemoryLayout, M: JitStateAccess> Block<ML, M> for InlineJit<ML, M> {
-    type BlockBuilder = (JIT<ML, M>, InterpretedBlockBuilder);
+impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
+    type BlockBuilder = (JIT<MC, M>, InterpretedBlockBuilder);
 
     fn start_block(&mut self)
     where
@@ -321,14 +321,14 @@ impl<ML: MainMemoryLayout, M: JitStateAccess> Block<ML, M> for InlineJit<ML, M> 
         self.fallback.push_instr(instr)
     }
 
-    fn instr(&self) -> &[EnrichedCell<ICallPlaced<ML>, M>]
+    fn instr(&self) -> &[EnrichedCell<ICallPlaced<MC>, M>]
     where
         M: ManagerRead,
     {
         self.fallback.instr()
     }
 
-    fn bind(allocated: AllocatedOf<BlockLayout<ML>, M>) -> Self {
+    fn bind(allocated: AllocatedOf<BlockLayout<MC>, M>) -> Self {
         Self {
             fallback: Interpreted::bind(allocated),
             jit_fn: None,
@@ -337,19 +337,19 @@ impl<ML: MainMemoryLayout, M: JitStateAccess> Block<ML, M> for InlineJit<ML, M> 
 
     fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
         &'a self,
-    ) -> AllocatedOf<BlockLayout<ML>, F::Output> {
+    ) -> AllocatedOf<BlockLayout<MC>, F::Output> {
         self.fallback.struct_ref::<F>()
     }
 
     fn complete_block(&mut self, jit: &mut Self::BlockBuilder) {
         self.fallback.complete_block(&mut jit.1);
 
-        if <Self as Block<ML, M>>::num_instr(self) > 0 {
+        if <Self as Block<MC, M>>::num_instr(self) > 0 {
             let instr = self
                 .fallback
                 .instr
                 .iter()
-                .take(<Self as Block<ML, M>>::num_instr(self))
+                .take(<Self as Block<MC, M>>::num_instr(self))
                 .map(|i| i.read_ref_stored());
 
             let jitfn = jit.0.compile(instr);
@@ -368,7 +368,7 @@ impl<ML: MainMemoryLayout, M: JitStateAccess> Block<ML, M> for InlineJit<ML, M> 
     unsafe fn callable<'a>(
         &mut self,
         block_builder: &'a Self::BlockBuilder,
-    ) -> Option<&mut (impl BCall<ML, M> + ?Sized + 'a)>
+    ) -> Option<&mut (impl BCall<MC, M> + ?Sized + 'a)>
     where
         M: ManagerRead + 'a,
     {
@@ -387,7 +387,7 @@ impl<ML: MainMemoryLayout, M: JitStateAccess> Block<ML, M> for InlineJit<ML, M> 
     }
 }
 
-impl<ML: MainMemoryLayout, M: JitStateAccess> BCall<ML, M> for InlineJit<ML, M> {
+impl<MC: MemoryConfig, M: JitStateAccess> BCall<MC, M> for InlineJit<MC, M> {
     fn num_instr(&self) -> usize
     where
         M: ManagerRead,
@@ -397,7 +397,7 @@ impl<ML: MainMemoryLayout, M: JitStateAccess> BCall<ML, M> for InlineJit<ML, M> 
 
     fn run_block(
         &self,
-        core: &mut MachineCoreState<ML, M>,
+        core: &mut MachineCoreState<MC, M>,
         instr_pc: Address,
         steps: &mut usize,
     ) -> Result<(), EnvironException>
@@ -417,9 +417,9 @@ impl<ML: MainMemoryLayout, M: JitStateAccess> BCall<ML, M> for InlineJit<ML, M> 
     }
 }
 
-fn run_block_inner<ML: MainMemoryLayout, M: ManagerReadWrite>(
-    instr: &[EnrichedCell<ICallPlaced<ML>, M>],
-    core: &mut MachineCoreState<ML, M>,
+fn run_block_inner<MC: MemoryConfig, M: ManagerReadWrite>(
+    instr: &[EnrichedCell<ICallPlaced<MC>, M>],
+    core: &mut MachineCoreState<MC, M>,
     instr_pc: &mut Address,
     steps: &mut usize,
 ) -> Result<(), Exception>

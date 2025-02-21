@@ -10,14 +10,14 @@
 use std::ops::{BitAnd, BitOr, BitXor};
 
 use crate::{
-    machine_state::{MachineCoreState, main_memory::MainMemoryLayout, registers::XRegister},
+    machine_state::{MachineCoreState, memory, registers::XRegister},
     state_backend as backend,
     traps::Exception,
 };
 
-impl<ML, M> MachineCoreState<ML, M>
+impl<MC, M> MachineCoreState<MC, M>
 where
-    ML: MainMemoryLayout,
+    MC: memory::MemoryConfig,
     M: backend::ManagerReadWrite,
 {
     /// `LR.W` R-type instruction
@@ -228,7 +228,6 @@ mod test {
         interpreter::atomics::{SC_FAILURE, SC_SUCCESS},
         machine_state::{
             MachineCoreState, MachineCoreStateLayout,
-            main_memory::tests::T1K,
             registers::{a0, a1, a2},
         },
     };
@@ -238,7 +237,9 @@ mod test {
         ($name:ident, $lr: ident, $sc: ident, $align: expr, $t: ident) => {
             backend_test!($name, F, {
                 use $crate::machine_state::registers::nz;
-                let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+                use $crate::machine_state::memory::M1K;
+
+                let state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
                 let state_cell = std::cell::RefCell::new(state);
 
                 proptest!(|(
@@ -280,7 +281,9 @@ mod test {
     macro_rules! test_amo {
         ($instr: ident, $f: expr, $align: expr, $t: ident) => {
             backend_test!($instr, F, {
-                let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+                use $crate::machine_state::memory::M1K;
+
+                let state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
                 let state_cell = std::cell::RefCell::new(state);
 
                 proptest!(|(

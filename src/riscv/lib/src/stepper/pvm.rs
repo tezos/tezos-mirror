@@ -12,14 +12,14 @@ use serde::{Serialize, de::DeserializeOwned};
 use tezos_smart_rollup_utils::inbox::Inbox;
 
 use super::{Stepper, StepperStatus};
-use crate::machine_state::block_cache::bcall::{Block, Interpreted, InterpretedBlockBuilder};
+use crate::machine_state::{
+    block_cache::bcall::{Block, Interpreted, InterpretedBlockBuilder},
+    memory::{M1G, MemoryConfig},
+};
 use crate::state_backend::{ManagerBase, ManagerReadWrite};
 use crate::{
     kernel_loader,
-    machine_state::{
-        CacheLayouts, DefaultCacheLayouts, MachineCoreState, MachineError,
-        main_memory::{M1G, MainMemoryLayout},
-    },
+    machine_state::{CacheLayouts, DefaultCacheLayouts, MachineCoreState, MachineError},
     program::Program,
     pvm::{Pvm, PvmHooks, PvmLayout, PvmStatus},
     range_utils::bound_saturating_sub,
@@ -46,12 +46,12 @@ pub enum PvmStepperError {
 /// Wrapper over a PVM that lets you step through it
 pub struct PvmStepper<
     'hooks,
-    ML: MainMemoryLayout = M1G,
+    MC: MemoryConfig = M1G,
     CL: CacheLayouts = DefaultCacheLayouts,
     M: ManagerBase = Owned,
-    B: Block<ML, M> = Interpreted<ML, M>,
+    B: Block<MC, M> = Interpreted<MC, M>,
 > {
-    pvm: Pvm<ML, CL, B, M>,
+    pvm: Pvm<MC, CL, B, M>,
     hooks: PvmHooks<'hooks>,
     inbox: Inbox,
     rollup_address: [u8; 20],
@@ -59,8 +59,8 @@ pub struct PvmStepper<
     reveal_request_response_map: RevealRequestResponseMap,
 }
 
-impl<'hooks, ML: MainMemoryLayout, B: Block<ML, Owned>, CL: CacheLayouts>
-    PvmStepper<'hooks, ML, CL, Owned, B>
+impl<'hooks, MC: MemoryConfig, B: Block<MC, Owned>, CL: CacheLayouts>
+    PvmStepper<'hooks, MC, CL, Owned, B>
 {
     /// Create a new PVM stepper.
     pub fn new(
@@ -72,10 +72,10 @@ impl<'hooks, ML: MainMemoryLayout, B: Block<ML, Owned>, CL: CacheLayouts>
         origination_level: u32,
         block_builder: B::BlockBuilder,
     ) -> Result<Self, PvmStepperError> {
-        let space = Owned::allocate::<PvmLayout<ML, CL>>();
+        let space = Owned::allocate::<PvmLayout<MC, CL>>();
         let mut pvm = Pvm::bind(space, block_builder);
 
-        let program = Program::<ML>::from_elf(program)?;
+        let program = Program::<MC>::from_elf(program)?;
 
         #[cfg(feature = "supervisor")]
         {
@@ -108,11 +108,11 @@ impl<'hooks, ML: MainMemoryLayout, B: Block<ML, Owned>, CL: CacheLayouts>
     /// Obtain the root hash for the PVM state.
     pub fn hash(&self) -> Hash {
         let refs = self.pvm.struct_ref::<FnManagerIdent>();
-        PvmLayout::<ML, CL>::state_hash(refs).unwrap()
+        PvmLayout::<MC, CL>::state_hash(refs).unwrap()
     }
 }
 
-impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL, Owned> {
+impl<'hooks, MC: MemoryConfig, CL: CacheLayouts> PvmStepper<'hooks, MC, CL, Owned> {
     /// Produce the Merkle proof for evaluating one step on the given PVM state.
     /// The given stepper takes one step.
     pub fn produce_proof(&mut self) -> Option<Proof> {
@@ -123,21 +123,21 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL, 
             let refs = proof_stepper
                 .pvm
                 .struct_ref::<crate::state_backend::FnManagerIdent>();
-            let merkle_proof = PvmLayout::<ML, CL>::to_merkle_tree(refs)
+            let merkle_proof = PvmLayout::<MC, CL>::to_merkle_tree(refs)
                 .expect("Obtaining the Merkle tree of a proof-gen state should not fail")
                 .to_merkle_proof()
                 .expect("Converting a Merkle tree to a compressed Merkle proof should not fail");
 
             let refs = proof_stepper.struct_ref();
-            let final_hash = PvmLayout::<ML, CL>::state_hash(refs)
+            let final_hash = PvmLayout::<MC, CL>::state_hash(refs)
                 .expect("Obtaining the final hash of the proof-gen state should not fail");
             Proof::new(merkle_proof, final_hash)
         })
     }
 }
 
-impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: ManagerReadWrite>
-    PvmStepper<'hooks, ML, CL, M, B>
+impl<'hooks, MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerReadWrite>
+    PvmStepper<'hooks, MC, CL, M, B>
 {
     /// Non-continuing variant of [`Stepper::step_max`]
     fn step_max_once(&mut self, steps: Bound<usize>) -> StepperStatus {
@@ -260,7 +260,7 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: Manager
 
     /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
     /// the constituents of `N` that were produced from the constituents of `&M`.
-    pub fn struct_ref(&self) -> AllocatedOf<PvmLayout<ML, CL>, Ref<'_, M>> {
+    pub fn struct_ref(&self) -> AllocatedOf<PvmLayout<MC, CL>, Ref<'_, M>> {
         self.pvm.struct_ref::<FnManagerIdent>()
     }
 
@@ -273,8 +273,8 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: Manager
     /// [`BlockBuilder`]: Block::BlockBuilder
     pub fn rebind_via_serde(&mut self, block_builder: B::BlockBuilder)
     where
-        for<'a> AllocatedOf<PvmLayout<ML, CL>, Ref<'a, M>>: Serialize,
-        AllocatedOf<PvmLayout<ML, CL>, M>: DeserializeOwned,
+        for<'a> AllocatedOf<PvmLayout<MC, CL>, Ref<'a, M>>: Serialize,
+        AllocatedOf<PvmLayout<MC, CL>, M>: DeserializeOwned,
     {
         let space = {
             let refs = self.pvm.struct_ref::<FnManagerIdent>();
@@ -286,13 +286,13 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: Manager
     }
 }
 
-impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
-    PvmStepper<'hooks, ML, CL, M>
+impl<'hooks, MC: MemoryConfig, CL: CacheLayouts, M: ManagerReadWrite>
+    PvmStepper<'hooks, MC, CL, M>
 {
     /// Create a new stepper in which the existing PVM is managed by
     /// the proof-generating backend.
-    pub fn start_proof_mode<'a>(&'a self) -> PvmStepper<'hooks, ML, CL, ProofGen<Ref<'a, M>>> {
-        PvmStepper::<'hooks, ML, CL, ProofGen<Ref<'a, M>>> {
+    pub fn start_proof_mode<'a>(&'a self) -> PvmStepper<'hooks, MC, CL, ProofGen<Ref<'a, M>>> {
+        PvmStepper::<'hooks, MC, CL, ProofGen<Ref<'a, M>>> {
             pvm: self.pvm.start_proof(),
             rollup_address: self.rollup_address,
             origination_level: self.origination_level,
@@ -316,11 +316,11 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
         #![allow(unreachable_code, unused_variables, clippy::diverging_sub_expression)]
 
         let proof_tree = ProofTree::Present(proof.tree());
-        let Some(space) = PvmLayout::<ML, CL>::from_proof(proof_tree).ok() else {
+        let Some(space) = PvmLayout::<MC, CL>::from_proof(proof_tree).ok() else {
             return false;
         };
 
-        let pvm = Pvm::<ML, CL, Interpreted<_, _>, Verifier>::bind(space, InterpretedBlockBuilder);
+        let pvm = Pvm::<MC, CL, Interpreted<_, _>, Verifier>::bind(space, InterpretedBlockBuilder);
         let mut stepper = PvmStepper {
             pvm,
             rollup_address: self.rollup_address,
@@ -346,8 +346,8 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
     }
 }
 
-impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
-    PvmStepper<'hooks, ML, CL, M>
+impl<'hooks, MC: MemoryConfig, CL: CacheLayouts, M: ManagerReadWrite>
+    PvmStepper<'hooks, MC, CL, M>
 {
     /// Perform one evaluation step.
     pub fn eval_one(&mut self) {
@@ -355,16 +355,16 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts, M: ManagerReadWrite>
     }
 }
 
-impl<'hooks, ML: MainMemoryLayout, B: Block<ML, Owned>, CL: CacheLayouts> Stepper
-    for PvmStepper<'hooks, ML, CL, Owned, B>
+impl<'hooks, MC: MemoryConfig, B: Block<MC, Owned>, CL: CacheLayouts> Stepper
+    for PvmStepper<'hooks, MC, CL, Owned, B>
 {
-    type MainMemoryLayout = ML;
+    type MemoryConfig = MC;
 
     type CacheLayouts = CL;
 
     type Manager = Owned;
 
-    fn machine_state(&self) -> &MachineCoreState<Self::MainMemoryLayout, Self::Manager> {
+    fn machine_state(&self) -> &MachineCoreState<Self::MemoryConfig, Self::Manager> {
         &self.pvm.machine_state.core
     }
 

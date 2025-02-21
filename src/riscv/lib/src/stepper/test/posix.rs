@@ -6,7 +6,7 @@ use crate::{
     machine_state::{
         CacheLayouts, MachineState,
         block_cache::bcall::Block,
-        main_memory::MainMemoryLayout,
+        memory::MemoryConfig,
         mode::Mode,
         registers::{a0, a7},
     },
@@ -62,9 +62,9 @@ impl<M: ManagerBase> PosixState<M> {
     }
 
     /// Handle a POSIX system call. Returns `Ok(true)` if it makes sense to continue execution.
-    pub fn handle_call<ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>>(
+    pub fn handle_call<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>>(
         &mut self,
-        machine: &mut MachineState<ML, CL, B, M>,
+        machine: &mut MachineState<MC, CL, B, M>,
         env_exception: EnvironException,
     ) -> Result<bool, String>
     where

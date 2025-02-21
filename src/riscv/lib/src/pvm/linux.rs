@@ -15,7 +15,7 @@ use crate::{
     machine_state::{
         CacheLayouts, MachineCoreState, MachineError, MachineState,
         block_cache::bcall::Block,
-        main_memory::{Address, MainMemoryLayout},
+        memory::{Address, Memory, MemoryConfig},
         mode::Mode,
         registers,
     },
@@ -90,8 +90,8 @@ enum AuxVectorKey {
     ProgramHeadersPtr = 3,
 }
 
-impl<ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: ManagerBase>
-    MachineState<ML, CL, B, M>
+impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase>
+    MachineState<MC, CL, B, M>
 {
     /// Add data to the stack, returning the updated stack pointer.
     fn push_stack(&mut self, align: u64, data: impl AsRef<[u8]>) -> Result<Address, MachineError>
@@ -116,7 +116,7 @@ impl<ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: ManagerBase>
     where
         M: ManagerWrite,
     {
-        let mem_size = ML::BYTES as u64;
+        let mem_size = MC::TOTAL_BYTES as u64;
         let init_stack_ptr = mem_size.saturating_sub(mem_size % PAGE_SIZE);
         self.core
             .hart
@@ -180,7 +180,7 @@ impl<ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: ManagerBase>
     }
 
     /// Load the program into memory and set the PC to its entrypoint.
-    fn load_program(&mut self, program: &Program<ML>) -> Result<(), MachineError>
+    fn load_program(&mut self, program: &Program<MC>) -> Result<(), MachineError>
     where
         M: ManagerWrite,
     {
@@ -196,7 +196,7 @@ impl<ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: ManagerBase>
     }
 
     /// Install a Linux program and configure the Hart to start it.
-    pub fn setup_linux_process(&mut self, program: &Program<ML>) -> Result<(), MachineError>
+    pub fn setup_linux_process(&mut self, program: &Program<MC>) -> Result<(), MachineError>
     where
         M: ManagerReadWrite,
     {
@@ -228,7 +228,7 @@ impl<ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: ManagerBase>
     }
 }
 
-impl<ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: ManagerBase> Pvm<ML, CL, B, M> {
+impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase> Pvm<MC, CL, B, M> {
     /// Check if the supervised process has requested an exit.
     pub fn has_exited(&self) -> Option<u64>
     where
@@ -278,7 +278,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// Handle a Linux system call.
     pub fn handle_system_call(
         &mut self,
-        core: &mut MachineCoreState<impl MainMemoryLayout, M>,
+        core: &mut MachineCoreState<impl MemoryConfig, M>,
         hooks: &mut PvmHooks,
     ) -> bool
     where
@@ -329,10 +329,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// Handle `set_tid_address` system call.
     ///
     /// See: <https://www.man7.org/linux/man-pages/man2/set_tid_address.2.html>
-    fn handle_set_tid_address(
-        &mut self,
-        core: &mut MachineCoreState<impl MainMemoryLayout, M>,
-    ) -> bool
+    fn handle_set_tid_address(&mut self, core: &mut MachineCoreState<impl MemoryConfig, M>) -> bool
     where
         M: ManagerRead + ManagerWrite,
     {
@@ -351,7 +348,7 @@ impl<M: ManagerBase> SupervisorState<M> {
         true
     }
 
-    fn handle_exit(&mut self, core: &mut MachineCoreState<impl MainMemoryLayout, M>) -> bool
+    fn handle_exit(&mut self, core: &mut MachineCoreState<impl MemoryConfig, M>) -> bool
     where
         M: ManagerReadWrite,
     {
@@ -364,7 +361,7 @@ impl<M: ManagerBase> SupervisorState<M> {
 
     /// Handle `sigaltstack` system call. The new signal stack configuration is discarded. If the
     /// old signal stack configuration is requested, it will be zeroed out.
-    fn handle_sigaltstack(&mut self, core: &mut MachineCoreState<impl MainMemoryLayout, M>) -> bool
+    fn handle_sigaltstack(&mut self, core: &mut MachineCoreState<impl MemoryConfig, M>) -> bool
     where
         M: ManagerRead + ManagerWrite,
     {
@@ -390,7 +387,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// retrieving the previous handler for a signal - it just zeroes out the memory.
     ///
     /// See: <https://www.man7.org/linux/man-pages/man2/rt_sigaction.2.html>
-    fn handle_rt_sigaction(&mut self, core: &mut MachineCoreState<impl MainMemoryLayout, M>) -> bool
+    fn handle_rt_sigaction(&mut self, core: &mut MachineCoreState<impl MemoryConfig, M>) -> bool
     where
         M: ManagerRead + ManagerWrite,
     {
@@ -428,10 +425,7 @@ impl<M: ManagerBase> SupervisorState<M> {
 
     /// Handle `rt_sigprocmask` system call. This does nothing effectively. If the previous mask is
     /// requested, it will simply be zeroed out.
-    fn handle_rt_sigprocmask(
-        &mut self,
-        core: &mut MachineCoreState<impl MainMemoryLayout, M>,
-    ) -> bool
+    fn handle_rt_sigprocmask(&mut self, core: &mut MachineCoreState<impl MemoryConfig, M>) -> bool
     where
         M: ManagerRead + ManagerWrite,
     {
@@ -466,7 +460,7 @@ impl<M: ManagerBase> SupervisorState<M> {
 
     /// Handle `tkill` system call. As there is only one thread at the moment, this system call
     /// will return an error if the thread ID is not the main thread ID.
-    fn handle_tkill(&mut self, core: &mut MachineCoreState<impl MainMemoryLayout, M>) -> bool
+    fn handle_tkill(&mut self, core: &mut MachineCoreState<impl MemoryConfig, M>) -> bool
     where
         M: ManagerReadWrite,
     {
@@ -516,13 +510,14 @@ mod tests {
 
     use super::*;
     use crate::{
-        backend_test, create_state, machine_state::MachineCoreStateLayout, state_backend::DynArray,
+        backend_test, create_state,
+        machine_state::{MachineCoreStateLayout, memory::M1K},
     };
 
     // Check that the `set_tid_address` system call is working correctly.
     backend_test!(set_tid_address, F, {
-        const MEM_BYTES: usize = 1024;
-        type MemLayout = DynArray<MEM_BYTES>;
+        type MemLayout = M1K;
+        const MEM_BYTES: usize = MemLayout::TOTAL_BYTES;
 
         let mut machine_state = create_state!(
             MachineCoreState,
@@ -553,8 +548,7 @@ mod tests {
 
     // Check `ppoll` system call the way it is used in Musl and Rust's initialisation code.
     backend_test!(ppoll_init_fds, F, {
-        const MEM_BYTES: usize = 1024;
-        type MemLayout = DynArray<MEM_BYTES>;
+        type MemLayout = M1K;
 
         let mut machine_state = create_state!(
             MachineCoreState,
@@ -603,8 +597,7 @@ mod tests {
 
     // Check that the `rt_sigaction` system call is working correctly for a basic case.
     backend_test!(rt_sigaction_no_handler, F, {
-        const MEM_BYTES: usize = 1024;
-        type MemLayout = DynArray<MEM_BYTES>;
+        type MemLayout = M1K;
 
         let mut machine_state = create_state!(
             MachineCoreState,

@@ -9,7 +9,7 @@ use crate::{
     default::ConstDefault,
     machine_state::{
         csregisters::{self, CSRegister, xstatus},
-        main_memory::Address,
+        memory::Address,
         mode::{Mode, TrapMode},
         registers,
         reservation_set::{self, ReservationSet},

@@ -23,7 +23,7 @@ use tagged_instruction::{ArgsShape, TaggedInstruction, opcode_to_argsshape};
 use super::{
     MachineCoreState, ProgramCounterUpdate,
     csregisters::CSRegister,
-    main_memory::MainMemoryLayout,
+    memory::MemoryConfig,
     registers::{FRegister, NonZeroXRegister, XRegister},
 };
 use crate::{
@@ -368,9 +368,9 @@ impl OpCode {
     /// Calling the returned function **must** correspond to an `Args` belonging to an
     /// instruction where the `OpCode` is the same as the `OpCode` of the current instruction.
     #[inline(always)]
-    pub(super) fn to_run<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    pub(super) fn to_run<MC: MemoryConfig, M: ManagerReadWrite>(
         self,
-    ) -> unsafe fn(&Args, &mut MachineCoreState<ML, M>) -> Result<ProgramCounterUpdate, Exception>
+    ) -> unsafe fn(&Args, &mut MachineCoreState<MC, M>) -> Result<ProgramCounterUpdate, Exception>
     {
         match self {
             Self::Add => Args::run_add,
@@ -578,9 +578,9 @@ impl OpCode {
 
 impl Instruction {
     /// Run an instruction over the machine core state.
-    pub(super) fn run<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    pub(super) fn run<MC: MemoryConfig, M: ManagerReadWrite>(
         &self,
-        core: &mut MachineCoreState<ML, M>,
+        core: &mut MachineCoreState<MC, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
         // SAFETY: Unsafe accesses in this function are due to using the [Register] union,
         // which is safe as the registers used are validated against the opcode.
@@ -665,9 +665,9 @@ macro_rules! impl_r_type {
     ($fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart.xregisters.$fn(self.rs1.x, self.rs2.x, self.rd.x);
             Ok(Next(self.width))
@@ -677,9 +677,9 @@ macro_rules! impl_r_type {
     ($fn: ident, non_zero) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .xregisters
@@ -691,9 +691,9 @@ macro_rules! impl_r_type {
     ($fn: ident, non_zero_rd) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .xregisters
@@ -716,9 +716,9 @@ macro_rules! impl_i_type {
     ($fn: ident, non_zero) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .xregisters
@@ -730,9 +730,9 @@ macro_rules! impl_i_type {
     ($fn: ident, non_zero_rd) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart.xregisters.$fn(self.imm, self.rs1.x, self.rd.nzx);
             Ok(Next(self.width))
@@ -744,9 +744,9 @@ macro_rules! impl_fload_type {
     ($fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.imm, self.rs1.x, self.rd.f)
                 .map(|_| Next(self.width))
@@ -757,9 +757,9 @@ macro_rules! impl_load_type {
     ($fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.imm, self.rs1.x, self.rd.x)
                 .map(|_| Next(self.width))
@@ -770,9 +770,9 @@ macro_rules! impl_cload_sp_type {
     ($fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.imm, self.rd.nzx).map(|_| Next(self.width))
         }
@@ -782,9 +782,9 @@ macro_rules! impl_cfload_sp_type {
     ($fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.imm, self.rd.f).map(|_| Next(self.width))
         }
@@ -795,9 +795,9 @@ macro_rules! impl_store_type {
     ($fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.imm, self.rs1.x, self.rs2.x)
                 .map(|_| Next(self.width))
@@ -808,9 +808,9 @@ macro_rules! impl_fstore_type {
     ($fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.imm, self.rs1.x, self.rs2.f)
                 .map(|_| Next(self.width))
@@ -822,9 +822,9 @@ macro_rules! impl_b_type {
     ($fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             Ok(core.hart.$fn(self.imm, self.rs1.x, self.rs2.x, self.width))
         }
@@ -833,9 +833,9 @@ macro_rules! impl_b_type {
     ($fn: ident, non_zero) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             Ok(core
                 .hart
@@ -848,9 +848,9 @@ macro_rules! impl_amo_type {
     ($fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.rs1.x, self.rs2.x, self.rd.x, self.rl, self.aq)
                 .map(|_| Next(self.width))
@@ -862,9 +862,9 @@ macro_rules! impl_ci_type {
     ($fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart.xregisters.$fn(self.imm, self.rd.x);
             Ok(ProgramCounterUpdate::Next(self.width))
@@ -874,9 +874,9 @@ macro_rules! impl_ci_type {
     ($fn: ident, non_zero) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart.xregisters.$fn(self.imm, self.rd.nzx);
             Ok(ProgramCounterUpdate::Next(self.width))
@@ -897,9 +897,9 @@ macro_rules! impl_cr_type {
     ($fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart.xregisters.$fn(self.rd.x, self.rs2.x);
             Ok(ProgramCounterUpdate::Next(self.width))
@@ -909,9 +909,9 @@ macro_rules! impl_cr_type {
     ($fn: ident, non_zero) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart.xregisters.$fn(self.rd.nzx, self.rs2.nzx);
             Ok(ProgramCounterUpdate::Next(self.width))
@@ -934,9 +934,9 @@ macro_rules! impl_cb_type {
     ($fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             Ok(core.hart.$fn(self.imm, self.rs1.nzx, self.width))
         }
@@ -947,9 +947,9 @@ macro_rules! impl_css_type {
     ($fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.imm, self.rs2.x).map(|_| Next(self.width))
         }
@@ -960,9 +960,9 @@ macro_rules! impl_fcss_type {
     ($fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.imm, self.rs2.f).map(|_| Next(self.width))
         }
@@ -973,9 +973,9 @@ macro_rules! impl_csr_type {
     ($fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.csr, self.rs1.x, self.rd.x)
@@ -988,9 +988,9 @@ macro_rules! impl_csr_imm_type {
     ($fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.csr, self.imm as u64, self.rd.x)
@@ -1003,9 +1003,9 @@ macro_rules! impl_f_x_type {
     ($fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.x, self.rd.f)
@@ -1016,9 +1016,9 @@ macro_rules! impl_f_x_type {
     ($fn:ident, rm) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.x, self.rm, self.rd.f)
@@ -1031,9 +1031,9 @@ macro_rules! impl_x_f_type {
     ($fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rd.x)
@@ -1044,9 +1044,9 @@ macro_rules! impl_x_f_type {
     ($fn:ident, rm) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rm, self.rd.x)
@@ -1059,9 +1059,9 @@ macro_rules! impl_f_r_type {
     ($fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rs2.f, self.rd.f)
@@ -1072,9 +1072,9 @@ macro_rules! impl_f_r_type {
     ($fn: ident, (rd, x)) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rs2.f, self.rd.x)
@@ -1085,9 +1085,9 @@ macro_rules! impl_f_r_type {
     ($fn: ident, rm) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rm, self.rd.f)
@@ -1098,9 +1098,9 @@ macro_rules! impl_f_r_type {
     ($fn: ident, (rs2, f), $($field: ident),+) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<ML: MainMemoryLayout, M: ManagerReadWrite>(
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
-            core: &mut MachineCoreState<ML, M>,
+            core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rs2.f, $(self.$field,)* self.rd.f)
@@ -1166,9 +1166,9 @@ impl Args {
     // RV64I U-type instructions
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
-    unsafe fn run_auipc<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    unsafe fn run_auipc<MC: MemoryConfig, M: ManagerReadWrite>(
         &self,
-        core: &mut MachineCoreState<ML, M>,
+        core: &mut MachineCoreState<MC, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
         core.hart.run_auipc(self.imm, self.rd.nzx);
         Ok(Next(self.width))
@@ -1178,18 +1178,18 @@ impl Args {
     //
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
-    unsafe fn run_jal<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    unsafe fn run_jal<MC: MemoryConfig, M: ManagerReadWrite>(
         &self,
-        core: &mut MachineCoreState<ML, M>,
+        core: &mut MachineCoreState<MC, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
         Ok(Set(core.hart.run_jal(self.imm, self.rd.nzx, self.width)))
     }
 
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
-    unsafe fn run_jalr<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    unsafe fn run_jalr<MC: MemoryConfig, M: ManagerReadWrite>(
         &self,
-        core: &mut MachineCoreState<ML, M>,
+        core: &mut MachineCoreState<MC, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
         Ok(Set(core.hart.run_jalr(self.imm, self.rs1.x, self.rd.x)))
     }
@@ -1318,27 +1318,27 @@ impl Args {
     impl_cr_type!(run_neg, non_zero);
     impl_css_type!(run_cswsp);
 
-    fn run_j<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    fn run_j<MC: MemoryConfig, M: ManagerReadWrite>(
         &self,
-        core: &mut MachineCoreState<ML, M>,
+        core: &mut MachineCoreState<MC, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
         Ok(Set(core.hart.run_j(self.imm)))
     }
 
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
-    unsafe fn run_cjr<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    unsafe fn run_cjr<MC: MemoryConfig, M: ManagerReadWrite>(
         &self,
-        core: &mut MachineCoreState<ML, M>,
+        core: &mut MachineCoreState<MC, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
         Ok(Set(core.hart.run_cjr(self.rs1.nzx)))
     }
 
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
-    unsafe fn run_cjalr<ML: MainMemoryLayout, M: ManagerReadWrite>(
+    unsafe fn run_cjalr<MC: MemoryConfig, M: ManagerReadWrite>(
         &self,
-        core: &mut MachineCoreState<ML, M>,
+        core: &mut MachineCoreState<MC, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
         Ok(Set(core.hart.run_cjalr(self.rs1.nzx)))
     }
@@ -1364,9 +1364,9 @@ impl Args {
     impl_fcss_type!(run_cfsdsp);
 
     // Unknown
-    fn run_illegal<ML: MainMemoryLayout, M: ManagerBase>(
+    fn run_illegal<MC: MemoryConfig, M: ManagerBase>(
         &self,
-        _core: &mut MachineCoreState<ML, M>,
+        _core: &mut MachineCoreState<MC, M>,
     ) -> Result<ProgramCounterUpdate, Exception> {
         Err(Exception::IllegalInstruction)
     }

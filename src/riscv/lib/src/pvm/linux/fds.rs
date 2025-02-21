@@ -6,7 +6,11 @@
 
 use super::{SupervisorState, error::Error};
 use crate::{
-    machine_state::{MachineCoreState, main_memory::MainMemoryLayout, registers},
+    machine_state::{
+        MachineCoreState,
+        memory::{Memory, MemoryConfig},
+        registers,
+    },
     pvm::{PvmHooks, linux::PAGE_SIZE},
     state_backend::{ManagerBase, ManagerRead, ManagerReadWrite},
 };
@@ -23,7 +27,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// Write to a file descriptor.
     fn write_to_fd(
         &self,
-        core: &mut MachineCoreState<impl MainMemoryLayout, M>,
+        core: &mut MachineCoreState<impl MemoryConfig, M>,
         hooks: &mut PvmHooks,
         fd: i32,
         addr: u64,
@@ -65,7 +69,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// See <https://man7.org/linux/man-pages/man2/write.2.html>
     pub(super) fn handle_write(
         &mut self,
-        core: &mut MachineCoreState<impl MainMemoryLayout, M>,
+        core: &mut MachineCoreState<impl MemoryConfig, M>,
         hooks: &mut PvmHooks,
     ) -> bool
     where
@@ -89,7 +93,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// See <https://man7.org/linux/man-pages/man3/writev.3p.html>
     pub(super) fn handle_writev(
         &mut self,
-        core: &mut MachineCoreState<impl MainMemoryLayout, M>,
+        core: &mut MachineCoreState<impl MemoryConfig, M>,
         hooks: &mut PvmHooks,
     ) -> bool
     where
@@ -169,10 +173,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// example, the `timeout` parameter is ignored entirely.
     ///
     /// See: <https://man7.org/linux/man-pages/man2/poll.2.html>
-    pub(super) fn handle_ppoll(
-        &mut self,
-        core: &mut MachineCoreState<impl MainMemoryLayout, M>,
-    ) -> bool
+    pub(super) fn handle_ppoll(&mut self, core: &mut MachineCoreState<impl MemoryConfig, M>) -> bool
     where
         M: ManagerReadWrite,
     {

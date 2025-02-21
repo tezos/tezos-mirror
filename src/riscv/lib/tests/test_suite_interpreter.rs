@@ -9,7 +9,7 @@ use goldenfile::Mint;
 use octez_riscv::{
     machine_state::{
         block_cache::bcall::InterpretedBlockBuilder,
-        main_memory::M1M,
+        memory::M1M,
         mode::Mode,
         registers::{XRegister, XValue, gp},
     },

@@ -28,14 +28,14 @@ use gdbstub::target::ext::breakpoints::{
 use gdbstub::target::ext::exec_file::ExecFile;
 use gdbstub::target::{Target, TargetError, TargetResult};
 use gdbstub_arch::riscv::reg::RiscvCoreRegs;
-use octez_riscv::machine_state::block_cache::bcall::InterpretedBlockBuilder;
+use octez_riscv::machine_state::{
+    block_cache::bcall::InterpretedBlockBuilder,
+    memory::{M1G, Memory, OutOfBounds},
+};
 use octez_riscv::pvm::PvmHooks;
+use octez_riscv::state_backend::FnManagerIdent;
 use octez_riscv::stepper::pvm::PvmStepper;
 use octez_riscv::stepper::{StepResult, Stepper, StepperStatus};
-use octez_riscv::{
-    machine_state::main_memory::{M1G, OutOfBounds},
-    state_backend::FnManagerIdent,
-};
 use tezos_smart_rollup::utils::inbox::InboxBuilder;
 
 use crate::cli::GdbServerOptions;

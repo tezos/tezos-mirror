@@ -24,23 +24,22 @@ use self::builder::Builder;
 use self::state_access::JsaCalls;
 use self::state_access::JsaImports;
 use self::state_access::register_jsa_symbols;
-use crate::machine_state::MachineCoreState;
 use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::instruction::Instruction;
-use crate::machine_state::main_memory::MainMemoryLayout;
+use crate::machine_state::{MachineCoreState, memory::MemoryConfig};
 use crate::traps::EnvironException;
 
 /// Alias for the function signature produced by the JIT compilation.
-type JitFn<ML, JSA> = unsafe extern "C" fn(&mut MachineCoreState<ML, JSA>, u64, &mut usize);
+type JitFn<MC, JSA> = unsafe extern "C" fn(&mut MachineCoreState<MC, JSA>, u64, &mut usize);
 
 /// A jit-compiled function that can be [called] over [`MachineCoreState`].
 ///
 /// [called]: Self::call
-pub struct JCall<ML: MainMemoryLayout, JSA: JitStateAccess> {
-    fun: JitFn<ML, JSA>,
+pub struct JCall<MC: MemoryConfig, JSA: JitStateAccess> {
+    fun: JitFn<MC, JSA>,
 }
 
-impl<ML: MainMemoryLayout, JSA: JitStateAccess> JCall<ML, JSA> {
+impl<MC: MemoryConfig, JSA: JitStateAccess> JCall<MC, JSA> {
     /// Run the jit-compiled function over the state.
     ///
     /// # Safety
@@ -49,7 +48,7 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JCall<ML, JSA> {
     /// still be alive.
     pub unsafe fn call(
         &self,
-        core: &mut MachineCoreState<ML, JSA>,
+        core: &mut MachineCoreState<MC, JSA>,
         pc: u64,
         steps: &mut usize,
     ) -> Result<(), EnvironException> {
@@ -77,7 +76,7 @@ pub enum JitError {
 
 /// The JIT is responsible for compiling blocks of instructions to machine code,
 /// returning a function that can be run over the [`MachineCoreState`].
-pub struct JIT<ML: MainMemoryLayout, JSA: JitStateAccess> {
+pub struct JIT<MC: MemoryConfig, JSA: JitStateAccess> {
     /// The function builder context, which is reused across multiple
     /// [`FunctionBuilder`] instances.
     builder_context: FunctionBuilderContext,
@@ -92,16 +91,16 @@ pub struct JIT<ML: MainMemoryLayout, JSA: JitStateAccess> {
     module: JITModule,
 
     /// Imported [JitStateAccess] functions.
-    jsa_imports: JsaImports<ML, JSA>,
+    jsa_imports: JsaImports<MC, JSA>,
 
     /// Counter for naming of functions
     next_id: usize,
 }
 
-impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
+impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
     /// Create a new instance of the JIT, which will be able to
     /// produce functions that can be run over the current
-    /// memory layout & manager.
+    /// memory configuration and manager.
     pub fn new() -> Result<Self, JitError> {
         let mut flag_builder = settings::builder();
         flag_builder.set("use_colocated_libcalls", "false")?;
@@ -111,7 +110,7 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
         let isa = isa_builder.finish(settings::Flags::new(flag_builder))?;
 
         let mut builder = JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
-        register_jsa_symbols::<ML, JSA>(&mut builder);
+        register_jsa_symbols::<MC, JSA>(&mut builder);
 
         let mut module = JITModule::new(builder);
         let jsa_imports = JsaImports::declare_in_module(&mut module)?;
@@ -132,7 +131,7 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
     pub fn compile<'a>(
         &mut self,
         instr: impl IntoIterator<Item = &'a Instruction>,
-    ) -> Option<JCall<ML, JSA>> {
+    ) -> Option<JCall<MC, JSA>> {
         let mut builder = self.start();
 
         for i in instr {
@@ -174,7 +173,7 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
     /// # Return
     ///
     /// | `steps: usize`                | `int`                           |
-    fn start(&mut self) -> Builder<'_, ML, JSA> {
+    fn start(&mut self) -> Builder<'_, MC, JSA> {
         let ptr = self.module.target_config().pointer_type();
 
         self.ctx.func.signature.params.push(AbiParam::new(ptr));
@@ -195,7 +194,7 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
 
         let jsa_call = JsaCalls::func_calls(&mut self.module, &self.jsa_imports);
 
-        Builder::<'_, ML, JSA> {
+        Builder::<'_, MC, JSA> {
             builder,
             ptr,
             core_ptr_val,
@@ -215,7 +214,7 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
     }
 
     /// Finalise the function currently under construction.
-    fn finalise(&mut self) -> JitFn<ML, JSA> {
+    fn finalise(&mut self) -> JitFn<MC, JSA> {
         let name = self.name();
         let id = self
             .module
@@ -247,7 +246,7 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
 // TODO: https://linear.app/tezos/issue/RV-496
 //       `Block::BlockBuilder` should not require Default, as it
 //         does not allow for potential fallilibility
-impl<ML: MainMemoryLayout, M: JitStateAccess> Default for JIT<ML, M> {
+impl<MC: MemoryConfig, M: JitStateAccess> Default for JIT<MC, M> {
     fn default() -> Self {
         Self::new().expect("JIT is supported on all octez-riscv supported platforms")
     }
@@ -256,17 +255,17 @@ impl<ML: MainMemoryLayout, M: JitStateAccess> Default for JIT<ML, M> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::machine_state::block_cache::bcall::{
-        BCall, Block, BlockLayout, Interpreted, InterpretedBlockBuilder,
+    use crate::machine_state::{MachineCoreState, MachineCoreStateLayout, memory::M1K};
+    use crate::machine_state::{
+        block_cache::bcall::{BCall, Block, BlockLayout, Interpreted, InterpretedBlockBuilder},
+        memory::MemoryConfig,
     };
-    use crate::machine_state::main_memory::tests::T1K;
-    use crate::machine_state::{MachineCoreState, MachineCoreStateLayout};
     use crate::parser::instruction::InstrWidth::*;
     use crate::state_backend::test_helpers::assert_eq_struct;
     use crate::state_backend::{FnManagerIdent, ManagerRead};
     use crate::{backend_test, create_state};
 
-    fn instructions<ML: MainMemoryLayout, M>(block: &Interpreted<ML, M>) -> Vec<Instruction>
+    fn instructions<MC: MemoryConfig, M>(block: &Interpreted<MC, M>) -> Vec<Instruction>
     where
         M: ManagerRead,
     {
@@ -289,14 +288,14 @@ mod tests {
             ],
         ];
 
-        let mut jit = JIT::<T1K, F::Manager>::new().unwrap();
+        let mut jit = JIT::<M1K, F::Manager>::new().unwrap();
         let interpreted_bb = InterpretedBlockBuilder;
 
         for scenario in scenarios {
             let mut interpreted =
-                create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
-            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
-            let mut block = create_state!(Interpreted, BlockLayout<T1K>, F, T1K);
+                create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+            let mut block = create_state!(Interpreted, BlockLayout<M1K>, F, M1K);
 
             block.start_block();
             for instr in scenario.iter() {
@@ -362,14 +361,14 @@ mod tests {
             ],
         ];
 
-        let mut jit = JIT::<T1K, F::Manager>::new().unwrap();
+        let mut jit = JIT::<M1K, F::Manager>::new().unwrap();
         let interpreted_bb = InterpretedBlockBuilder;
 
         for scenario in scenarios {
             let mut interpreted =
-                create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
-            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
-            let mut block = create_state!(Interpreted, BlockLayout<T1K>, F, T1K);
+                create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+            let mut block = create_state!(Interpreted, BlockLayout<M1K>, F, M1K);
 
             block.start_block();
             for instr in scenario.iter() {
@@ -436,12 +435,12 @@ mod tests {
             I::new_add(x1, x1, x2, Compressed),
         ];
 
-        let mut jit = JIT::<T1K, F::Manager>::new().unwrap();
+        let mut jit = JIT::<M1K, F::Manager>::new().unwrap();
         let interpreted_bb = InterpretedBlockBuilder;
 
-        let mut interpreted = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
-        let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
-        let mut block = create_state!(Interpreted, BlockLayout<T1K>, F, T1K);
+        let mut interpreted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+        let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+        let mut block = create_state!(Interpreted, BlockLayout<M1K>, F, M1K);
 
         block.start_block();
         for instr in scenario.iter() {
@@ -512,10 +511,10 @@ mod tests {
         let success: &[I] = &[I::new_nop(Compressed)];
 
         for failure in failure_scenarios.iter() {
-            let mut jit = JIT::<T1K, F::Manager>::new().unwrap();
+            let mut jit = JIT::<M1K, F::Manager>::new().unwrap();
 
-            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
-            let mut block = create_state!(Interpreted, BlockLayout<T1K>, F, T1K);
+            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+            let mut block = create_state!(Interpreted, BlockLayout<M1K>, F, M1K);
 
             block.start_block();
             for instr in failure.iter() {

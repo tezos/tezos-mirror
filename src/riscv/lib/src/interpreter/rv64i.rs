@@ -8,8 +8,7 @@
 
 use crate::{
     machine_state::{
-        MachineCoreState,
-        main_memory::MainMemoryLayout,
+        MachineCoreState, memory,
         registers::{NonZeroXRegister, XRegister, XRegisters},
     },
     state_backend as backend,
@@ -238,9 +237,9 @@ where
     }
 }
 
-impl<ML, M> MachineCoreState<ML, M>
+impl<MC, M> MachineCoreState<MC, M>
 where
-    ML: MainMemoryLayout,
+    MC: memory::MemoryConfig,
     M: backend::ManagerReadWrite,
 {
     /// `LD` I-type instruction
@@ -364,7 +363,7 @@ mod tests {
         machine_state::{
             MachineCoreState, MachineCoreStateLayout,
             hart_state::{HartState, HartStateLayout},
-            main_memory::tests::T1K,
+            memory::M1K,
             registers::{a0, a1, a2, a3, a4, nz, t0, t1, t2, t3, t4},
         },
         traps::Exception,
@@ -834,7 +833,7 @@ mod tests {
     });
 
     backend_test!(test_load_store, F, {
-        let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(

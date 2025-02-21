@@ -16,7 +16,7 @@ use crate::{
     bits::{ones, u64},
     machine_state::{
         csregisters::{CSRRepr, satp::SvLength},
-        main_memory::Address,
+        memory::Address,
     },
 };
 

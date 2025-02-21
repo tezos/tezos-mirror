@@ -9,7 +9,7 @@ use octez_riscv::{
     machine_state::{
         DefaultCacheLayouts,
         block_cache::bcall::{Block, InlineJit, Interpreted, InterpretedBlockBuilder},
-        main_memory::M64M,
+        memory::M64M,
     },
     pvm::PvmHooks,
     state_backend::owned_backend::Owned,

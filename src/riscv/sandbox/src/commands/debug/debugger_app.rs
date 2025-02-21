@@ -19,7 +19,7 @@ use octez_riscv::{
         AccessType, CacheLayouts, MachineCoreState,
         block_cache::bcall::InterpretedBlockBuilder,
         csregisters::satp::{Satp, SvLength, TranslationAlgorithm},
-        main_memory::{self, Address, MainMemoryLayout},
+        memory::{self, Address},
         mode::Mode,
     },
     program::Program,
@@ -173,7 +173,7 @@ fn get_elf_symbols(
     let offset = if elf.header.e_type == ET_DYN {
         // Symbol addresses in relocatable executables are relative addresses. We need to offset
         // them by the start address of the main memory where the executable is loaded.
-        main_memory::FIRST_ADDRESS
+        memory::FIRST_ADDRESS
     } else {
         0
     };
@@ -195,7 +195,7 @@ fn get_elf_symbols(
     Ok(symbols)
 }
 
-impl<'a, ML: MainMemoryLayout> DebuggerApp<'a, TestStepper<ML>> {
+impl<'a, MC: memory::MemoryConfig> DebuggerApp<'a, TestStepper<MC>> {
     pub fn launch(
         fname: &str,
         program: &[u8],
@@ -207,7 +207,7 @@ impl<'a, ML: MainMemoryLayout> DebuggerApp<'a, TestStepper<ML>> {
         let block_builder = InterpretedBlockBuilder;
 
         let (mut interpreter, prog) =
-            TestStepper::<ML>::new_with_parsed_program(program, initrd, exit_mode, block_builder)?;
+            TestStepper::<MC>::new_with_parsed_program(program, initrd, exit_mode, block_builder)?;
         let symbols = get_elf_symbols(program, demangle_sybols)?;
         errors::install_hooks()?;
         let terminal = tui::init()?;
@@ -218,7 +218,9 @@ impl<'a, ML: MainMemoryLayout> DebuggerApp<'a, TestStepper<ML>> {
     }
 }
 
-impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> DebuggerApp<'_, PvmStepper<'hooks, ML, CL>> {
+impl<'hooks, MC: memory::MemoryConfig, CL: CacheLayouts>
+    DebuggerApp<'_, PvmStepper<'hooks, MC, CL>>
+{
     /// Launch the Debugger app for a PVM.
     pub fn launch(
         fname: &str,
@@ -231,7 +233,7 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> DebuggerApp<'_, PvmStepper<
         let hooks = PvmHooks::new(|_| {});
         let block_builder = InterpretedBlockBuilder;
 
-        let mut stepper = PvmStepper::<'_, ML, CL>::new(
+        let mut stepper = PvmStepper::<'_, MC, CL>::new(
             program,
             initrd,
             inbox,
@@ -242,7 +244,7 @@ impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> DebuggerApp<'_, PvmStepper<
         )?;
 
         let symbols = get_elf_symbols(program, opts.demangle)?;
-        let program = Program::<ML>::from_elf(program)?.parsed();
+        let program = Program::<MC>::from_elf(program)?.parsed();
 
         errors::install_hooks()?;
         let terminal = tui::init()?;
@@ -495,7 +497,7 @@ impl<'a> ProgramView<'a> {
 mod test {
     use std::fs;
 
-    use octez_riscv::machine_state::main_memory::M1G;
+    use octez_riscv::machine_state::memory::M1G;
 
     use super::*;
     use crate::{ExitMode, posix_exit_mode};

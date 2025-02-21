@@ -9,7 +9,7 @@ use std::ops::Bound;
 
 use common::*;
 use octez_riscv::{
-    machine_state::{DefaultCacheLayouts, main_memory::M64M},
+    machine_state::{DefaultCacheLayouts, memory::M64M},
     state_backend::hash,
     stepper::{Stepper, StepperStatus, pvm::PvmStepper},
 };

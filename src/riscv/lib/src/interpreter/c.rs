@@ -44,11 +44,11 @@ pub fn run_nop(_icb: &mut impl ICB) {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::machine_state::MachineCoreState;
+    use crate::machine_state::{MachineCoreState, memory::M1K};
     use crate::{
         backend_test, create_state,
         interpreter::i::run_add,
-        machine_state::{MachineCoreStateLayout, main_memory::tests::T1K, registers::nz},
+        machine_state::{MachineCoreStateLayout, registers::nz},
     };
 
     backend_test!(test_add_mv, F, {
@@ -62,7 +62,7 @@ mod tests {
         ];
 
         for (imm, rs1, res) in imm_rs1_res {
-            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
 
             state.hart.xregisters.write_nz(nz::a3, rs1);
             state.hart.xregisters.write_nz(nz::a4, imm as u64);

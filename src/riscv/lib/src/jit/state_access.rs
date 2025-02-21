@@ -35,7 +35,7 @@ use cranelift_module::{FuncId, Linkage, Module, ModuleResult};
 use crate::{
     machine_state::{
         MachineCoreState,
-        main_memory::MainMemoryLayout,
+        memory::MemoryConfig,
         registers::{NonZeroXRegister, XValue},
     },
     state_backend::{ManagerReadWrite, owned_backend::Owned},
@@ -54,36 +54,36 @@ const XREG_WRITE_SYMBOL: &str = "JSA::xreg_write";
 /// - a way of calling those functions from within JIT-compiled code
 pub trait JitStateAccess: ManagerReadWrite {
     /// Update the instruction pc in the state.
-    extern "C" fn pc_write<ML: MainMemoryLayout>(core: &mut MachineCoreState<ML, Self>, pc: u64);
+    extern "C" fn pc_write<MC: MemoryConfig>(core: &mut MachineCoreState<MC, Self>, pc: u64);
 
     /// Read the value of the given [`NonZeroXRegister`].
-    extern "C" fn xregister_read<ML: MainMemoryLayout>(
-        core: &mut MachineCoreState<ML, Self>,
+    extern "C" fn xregister_read<MC: MemoryConfig>(
+        core: &mut MachineCoreState<MC, Self>,
         reg: NonZeroXRegister,
     ) -> XValue;
 
     /// Write the given value to the given [`NonZeroXRegister`].
-    extern "C" fn xregister_write<ML: MainMemoryLayout>(
-        core: &mut MachineCoreState<ML, Self>,
+    extern "C" fn xregister_write<MC: MemoryConfig>(
+        core: &mut MachineCoreState<MC, Self>,
         reg: NonZeroXRegister,
         val: XValue,
     );
 }
 
 impl JitStateAccess for Owned {
-    extern "C" fn pc_write<ML: MainMemoryLayout>(core: &mut MachineCoreState<ML, Self>, pc: u64) {
+    extern "C" fn pc_write<MC: MemoryConfig>(core: &mut MachineCoreState<MC, Self>, pc: u64) {
         core.hart.pc.write(pc)
     }
 
-    extern "C" fn xregister_read<ML: MainMemoryLayout>(
-        core: &mut MachineCoreState<ML, Self>,
+    extern "C" fn xregister_read<MC: MemoryConfig>(
+        core: &mut MachineCoreState<MC, Self>,
         reg: NonZeroXRegister,
     ) -> XValue {
         core.hart.xregisters.read_nz(reg)
     }
 
-    extern "C" fn xregister_write<ML: MainMemoryLayout>(
-        core: &mut MachineCoreState<ML, Self>,
+    extern "C" fn xregister_write<MC: MemoryConfig>(
+        core: &mut MachineCoreState<MC, Self>,
         reg: NonZeroXRegister,
         val: XValue,
     ) {
@@ -92,34 +92,34 @@ impl JitStateAccess for Owned {
 }
 
 /// Register state access symbols in the builder.
-pub(super) fn register_jsa_symbols<ML: MainMemoryLayout, JSA: JitStateAccess>(
+pub(super) fn register_jsa_symbols<MC: MemoryConfig, JSA: JitStateAccess>(
     builder: &mut JITBuilder,
 ) {
     builder.symbol(
         PC_WRITE_SYMBOL,
-        <JSA as JitStateAccess>::pc_write::<ML> as *const u8,
+        <JSA as JitStateAccess>::pc_write::<MC> as *const u8,
     );
 
     builder.symbol(
         XREG_READ_SYMBOL,
-        <JSA as JitStateAccess>::xregister_read::<ML> as *const u8,
+        <JSA as JitStateAccess>::xregister_read::<MC> as *const u8,
     );
 
     builder.symbol(
         XREG_WRITE_SYMBOL,
-        <JSA as JitStateAccess>::xregister_write::<ML> as *const u8,
+        <JSA as JitStateAccess>::xregister_write::<MC> as *const u8,
     );
 }
 
 /// Identifications of globally imported [`JitStateAccess`] methods.
-pub(super) struct JsaImports<ML: MainMemoryLayout, JSA: JitStateAccess> {
+pub(super) struct JsaImports<MC: MemoryConfig, JSA: JitStateAccess> {
     pc_write: FuncId,
     xreg_read: FuncId,
     xreg_write: FuncId,
-    _pd: PhantomData<(ML, JSA)>,
+    _pd: PhantomData<(MC, JSA)>,
 }
 
-impl<ML: MainMemoryLayout, JSA: JitStateAccess> JsaImports<ML, JSA> {
+impl<MC: MemoryConfig, JSA: JitStateAccess> JsaImports<MC, JSA> {
     /// Register external functions within the JIT Module.
     pub(super) fn declare_in_module(module: &mut JITModule) -> ModuleResult<Self> {
         let call_conv = module.target_config().default_call_conv;
@@ -168,18 +168,18 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JsaImports<ML, JSA> {
 
 /// References to locally imported [`JitStateAccess`] methods, used to directly call
 /// these accessor methods in the JIT-compilation context.
-pub(super) struct JsaCalls<'a, ML: MainMemoryLayout, JSA: JitStateAccess> {
+pub(super) struct JsaCalls<'a, MC: MemoryConfig, JSA: JitStateAccess> {
     module: &'a mut JITModule,
-    imports: &'a JsaImports<ML, JSA>,
+    imports: &'a JsaImports<MC, JSA>,
     pc_write: Option<FuncRef>,
     xreg_read: Option<FuncRef>,
     xreg_write: Option<FuncRef>,
-    _pd: PhantomData<(ML, JSA)>,
+    _pd: PhantomData<(MC, JSA)>,
 }
 
-impl<'a, ML: MainMemoryLayout, JSA: JitStateAccess> JsaCalls<'a, ML, JSA> {
+impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
     /// Wrapper to simplify calling JSA methods from within the function under construction.
-    pub(super) fn func_calls(module: &'a mut JITModule, imports: &'a JsaImports<ML, JSA>) -> Self {
+    pub(super) fn func_calls(module: &'a mut JITModule, imports: &'a JsaImports<MC, JSA>) -> Self {
         Self {
             module,
             imports,

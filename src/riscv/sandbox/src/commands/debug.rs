@@ -6,7 +6,7 @@
 use std::{error::Error, fs};
 
 use octez_riscv::{
-    machine_state::main_memory::M1G,
+    machine_state::memory::M1G,
     stepper::{pvm::PvmStepper, test::TestStepper},
 };
 use tezos_smart_rollup::utils::inbox::InboxBuilder;

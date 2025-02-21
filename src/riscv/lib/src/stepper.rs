@@ -5,7 +5,7 @@
 use std::ops::{AddAssign, Bound};
 
 use crate::{
-    machine_state::{CacheLayouts, MachineCoreState, main_memory::MainMemoryLayout},
+    machine_state::{CacheLayouts, MachineCoreState, memory::MemoryConfig},
     state_backend::{ManagerBase, ManagerRead},
 };
 
@@ -83,8 +83,8 @@ impl StepResult for StepperStatus {
 
 /// Interface for a debuggable stepper
 pub trait Stepper {
-    /// Memory layout of the underlying machine state
-    type MainMemoryLayout: MainMemoryLayout;
+    /// Memory config of the underlying machine state
+    type MemoryConfig: MemoryConfig;
 
     /// Layout of the instruction cache
     type CacheLayouts: CacheLayouts;
@@ -93,7 +93,7 @@ pub trait Stepper {
     type Manager: ManagerBase + ManagerRead;
 
     /// Obtain a reference to the underlying machine state.
-    fn machine_state(&self) -> &MachineCoreState<Self::MainMemoryLayout, Self::Manager>;
+    fn machine_state(&self) -> &MachineCoreState<Self::MemoryConfig, Self::Manager>;
 
     /// Result of one or more steps
     type StepResult: StepResult;

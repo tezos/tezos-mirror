@@ -22,7 +22,7 @@ use self::{
     values::CSRValue,
     xstatus::{ExtensionValue, MNStatus, MStatus, SStatus},
 };
-use super::{hart_state::HartState, main_memory::Address, mode::TrapMode};
+use super::{hart_state::HartState, memory::Address, mode::TrapMode};
 use crate::{
     bits::{Bits64, ones, u64},
     machine_state::mode::Mode,

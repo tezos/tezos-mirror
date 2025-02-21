@@ -15,23 +15,23 @@ use super::state_access::{JitStateAccess, JsaCalls};
 use crate::{
     instruction_context::ICB,
     machine_state::{
-        main_memory::{Address, MainMemoryLayout},
+        memory::{Address, MemoryConfig},
         registers::NonZeroXRegister as XRegister,
     },
 };
 
 /// Builder context used when lowering individual instructions within a block.
-pub(super) struct Builder<'a, ML: MainMemoryLayout, JSA: JitStateAccess> {
+pub(super) struct Builder<'a, MC: MemoryConfig, JSA: JitStateAccess> {
     /// Cranelift function builder
     pub builder: FunctionBuilder<'a>,
 
     /// Helpers for calling locally imported [JitStateAccess] methods.
-    pub jsa_call: JsaCalls<'a, ML, JSA>,
+    pub jsa_call: JsaCalls<'a, MC, JSA>,
 
     /// The IR-type of pointers on the current native platform
     pub ptr: Type,
 
-    /// Value representing a pointer to `MachineCoreState<ML, JSA>`
+    /// Value representing a pointer to `MachineCoreState<MC, JSA>`
     pub core_ptr_val: Value,
 
     /// Value representing a pointer to `steps: usize`
@@ -47,7 +47,7 @@ pub(super) struct Builder<'a, ML: MainMemoryLayout, JSA: JitStateAccess> {
     pub pc_offset: Address,
 }
 
-impl<'a, ML: MainMemoryLayout, JSA: JitStateAccess> Builder<'a, ML, JSA> {
+impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
     /// Consume the builder, allowing for the function under construction to be [`finalised`].
     ///
     /// [`finalised`]: super::JIT::finalise
@@ -92,7 +92,7 @@ impl<'a, ML: MainMemoryLayout, JSA: JitStateAccess> Builder<'a, ML, JSA> {
     }
 }
 
-impl<'a, ML: MainMemoryLayout, JSA: JitStateAccess> ICB for Builder<'a, ML, JSA> {
+impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
     type XValue = Value;
     type IResult<Value> = Value;
 

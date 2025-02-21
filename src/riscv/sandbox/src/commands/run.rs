@@ -6,10 +6,11 @@
 use std::{error::Error, fs, io::Write, ops::Bound};
 
 use octez_riscv::{
-    machine_state::{DefaultCacheLayouts, main_memory::M1G},
+    machine_state::DefaultCacheLayouts,
     machine_state::{
         TestCacheLayouts,
         block_cache::bcall::{self, Block},
+        memory::M1G,
     },
     pvm::PvmHooks,
     state_backend::owned_backend::Owned,

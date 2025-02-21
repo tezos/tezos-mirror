@@ -11,7 +11,7 @@ use crate::{
     machine_state::{
         MachineCoreState, ProgramCounterUpdate,
         instruction::Args,
-        main_memory::MainMemoryLayout,
+        memory::MemoryConfig,
         registers::{NonZeroXRegister, XValue},
     },
     state_backend::ManagerReadWrite,
@@ -66,7 +66,7 @@ pub trait ICB {
         F: FnOnce(Value) -> Self::IResult<Next>;
 }
 
-impl<ML: MainMemoryLayout, M: ManagerReadWrite> ICB for MachineCoreState<ML, M> {
+impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
     type XValue = XValue;
 
     #[inline(always)]

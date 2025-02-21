@@ -9,7 +9,7 @@ use std::ops::Bound;
 use common::*;
 use octez_riscv::{
     machine_state::{
-        DefaultCacheLayouts, block_cache::bcall::InterpretedBlockBuilder, main_memory::M64M,
+        DefaultCacheLayouts, block_cache::bcall::InterpretedBlockBuilder, memory::M64M,
     },
     pvm::PvmLayout,
     state_backend::{RefOwnedAlloc, hash},

@@ -10,12 +10,12 @@ use super::{
         CSRRepr, CSRegister,
         satp::{Satp, SvLength, TranslationAlgorithm},
     },
-    main_memory::{self, Address},
+    memory::{self, Address, OutOfBounds},
     mode::Mode,
 };
 use crate::{
     bits::Bits64,
-    machine_state::{address_translation::pte::PageTableEntry, main_memory::OutOfBounds},
+    machine_state::{address_translation::pte::PageTableEntry, memory::Memory},
     state_backend::{self as backend},
     traps::Exception,
 };
@@ -74,15 +74,14 @@ impl SvLength {
 }
 
 /// Implementation of the virtual address translation as explained in section 5.3.2.
-fn sv_translate_impl<ML, M>(
-    bus: &main_memory::MainMemory<ML, M>,
+fn sv_translate_impl<M>(
+    bus: &impl Memory<M>,
     v_addr: Address,
     satp: Satp,
     sv_length: SvLength,
     access_type: AccessType,
 ) -> Result<Address, Exception>
 where
-    ML: main_memory::MainMemoryLayout,
     M: backend::ManagerRead,
 {
     use physical_address as p_addr;
@@ -190,7 +189,7 @@ where
     p_addr.ok_or(access_type.exception(v_addr))
 }
 
-impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreState<ML, M> {
+impl<MC: memory::MemoryConfig, M: backend::ManagerBase> MachineCoreState<MC, M> {
     /// Get the effective hart mode when addressing memory.
     /// Section P:M-ISA-1.6.3
     /// The MPRV (Modify PRiVilege) bit modifies the effective privilege mode, i.e.,

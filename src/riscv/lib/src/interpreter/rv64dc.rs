@@ -9,17 +9,16 @@
 
 use crate::{
     machine_state::{
-        MachineCoreState,
-        main_memory::MainMemoryLayout,
+        MachineCoreState, memory,
         registers::{FRegister, XRegister, sp},
     },
     state_backend as backend,
     traps::Exception,
 };
 
-impl<ML, M> MachineCoreState<ML, M>
+impl<MC, M> MachineCoreState<MC, M>
 where
-    ML: MainMemoryLayout,
+    MC: memory::MemoryConfig,
     M: backend::ManagerReadWrite,
 {
     /// `C.FLD` CL-type compressed instruction
@@ -86,7 +85,7 @@ mod test {
                 CSRegister,
                 xstatus::{ExtensionValue, MStatus},
             },
-            main_memory::tests::T1K,
+            memory::M1K,
             registers::{fa2, fa3, parse_xregister, sp},
         },
         traps::Exception,
@@ -96,7 +95,7 @@ mod test {
     const OUT_OF_BOUNDS_OFFSET: i64 = 1024;
 
     backend_test!(test_cfsd_cfld, F, {
-        let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -135,7 +134,7 @@ mod test {
     });
 
     backend_test!(test_cfsdsp_cfldsp, F, {
-        let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
