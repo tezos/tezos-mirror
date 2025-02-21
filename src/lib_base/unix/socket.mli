@@ -72,3 +72,19 @@ val handshake : Lwt_unix.file_descr -> bytes -> unit tzresult Lwt.t
     environment variable is defined. Otherwise, the default temporary
     directory is used. *)
 val get_temporary_socket_dir : unit -> string
+
+(** [set_tcp_user_timeout fd ~ms] sets the TCP user timeout on socket [fd]. If a message sent
+    on this socket is not acknowledged within [ms] milliseconds, the connection is considered dead.
+    This function uses the [TCP_USER_TIMEOUT] socket option.
+
+    @param fd the file descriptor of the socket.
+    @param ms the timeout value in milliseconds.
+    @return [Ok ()] if the option was successfully set, or [Error
+      (`Unix_error exn)] if a Unix error occurred, or [Error
+      `Unsupported] if the TCP_USER_TIMEOUT option is not supported on
+      this platform.
+*)
+val set_tcp_user_timeout :
+  Unix.file_descr ->
+  ms:int ->
+  (unit, [`Unix_error of exn | `Unsupported]) result
