@@ -757,9 +757,22 @@ open struct
       ~section
       ~name:"attester_did_not_attest_slot"
       ~msg:
-        "At level {attested_level}, slot index {slot_index} was attested but \
-         shards from {attester} are missing"
+        "At level {attested_level}, slot index {slot_index} was sufficiently \
+         attested, but shards from {attester} are missing"
       ~level:Warning
+      ("attester", Signature.Public_key_hash.encoding)
+      ("slot_index", Data_encoding.int31)
+      ("attested_level", Data_encoding.int32)
+      ~pp1:Signature.Public_key_hash.pp_short
+
+  let attester_did_not_attest_slot_because_of_traps =
+    declare_3
+      ~section
+      ~name:"attester_did_not_attest_slot_with_traps"
+      ~msg:
+        "At level {attested_level}, slot index {slot_index} was sufficiently \
+         attested, but {attester} did not attest because of traps"
+      ~level:Notice
       ("attester", Signature.Public_key_hash.encoding)
       ("slot_index", Data_encoding.int31)
       ("attested_level", Data_encoding.int32)
@@ -1078,6 +1091,12 @@ let emit_warn_attester_not_dal_attesting ~attester ~attested_level =
 let emit_warn_attester_did_not_attest_slot ~attester ~slot_index ~attested_level
     =
   emit warn_attester_did_not_attest_slot (attester, slot_index, attested_level)
+
+let emit_attester_did_not_attest_slot_because_of_traps ~attester ~slot_index
+    ~attested_level =
+  emit
+    attester_did_not_attest_slot_because_of_traps
+    (attester, slot_index, attested_level)
 
 let emit_trap_injection ~delegate ~published_level ~attested_level ~slot_index
     ~shard_index =

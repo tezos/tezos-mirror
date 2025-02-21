@@ -444,7 +444,8 @@ module Handler = struct
       cells_of_level
 
   (* This functions counts, for each slot, the number of shards attested by the bakers. *)
-  let get_attestable_slots attestations committee ~number_of_slots is_attested =
+  let attested_shards_per_slot attestations committee ~number_of_slots
+      is_attested =
     let count_per_slot = Array.make number_of_slots 0 in
     List.iter
       (fun (_tb_slot, delegate_opt, _attestation_op, dal_attestation_opt) ->
@@ -479,8 +480,8 @@ module Handler = struct
         Node_context.fetch_committee node_ctxt ~level:attestation_level
       in
       let attestations = get_attestations () in
-      let attestable_slots =
-        get_attestable_slots
+      let attested_shards_per_slot =
+        attested_shards_per_slot
           attestations
           committee
           ~number_of_slots:parameters.Types.number_of_slots
@@ -491,8 +492,22 @@ module Handler = struct
         / parameters.cryptobox_parameters.redundancy_factor
       in
       let should_be_attested index =
-        let num_attested_shards = attestable_slots.(index) in
+        let num_attested_shards = attested_shards_per_slot.(index) in
         num_attested_shards >= threshold
+      in
+      let contains_traps =
+        let store = Node_context.get_store node_ctxt in
+        let traps_store = Store.traps store in
+        let published_level =
+          Int32.(sub block_level (of_int parameters.attestation_lag))
+        in
+        fun pkh index ->
+          if published_level <= 1l then false
+          else
+            Store.Traps.find traps_store ~level:published_level
+            |> List.exists (fun Store.Traps.{delegate; slot_index; _} ->
+                   index = slot_index
+                   && Signature.Public_key_hash.equal delegate pkh)
       in
       let*! () =
         List.iter_s
@@ -522,10 +537,17 @@ module Handler = struct
                           should_be_attested index
                           && not (is_attested bitset index)
                         then
-                          Event.emit_warn_attester_did_not_attest_slot
-                            ~attester:delegate
-                            ~slot_index:index
-                            ~attested_level:block_level
+                          if not (contains_traps delegate index) then
+                            Event.emit_warn_attester_did_not_attest_slot
+                              ~attester:delegate
+                              ~slot_index:index
+                              ~attested_level:block_level
+                          else
+                            Event
+                            .emit_attester_did_not_attest_slot_because_of_traps
+                              ~attester:delegate
+                              ~slot_index:index
+                              ~attested_level:block_level
                         else Lwt.return_unit)
                       (0 -- (parameters.number_of_slots - 1)))
             | None | Some _ ->
