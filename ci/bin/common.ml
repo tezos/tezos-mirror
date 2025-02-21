@@ -617,7 +617,7 @@ let changeset_mir_tzt =
    - released variants exist, that are used in release tag pipelines
      (they do not build experimental executables) *)
 let job_build_static_binaries ~__POS__ ~arch ?(cpu = Normal)
-    ?(executable_files = "script-inputs/released-executables")
+    ?(executable_files = "script-inputs/octez-released-executables")
     ?version_executable ?(release = false) ?rules ?dependencies () : tezos_job =
   let arch_string = arch_to_string arch in
   let name = "oc.build:static-" ^ arch_string ^ "-linux-binaries" in
@@ -628,7 +628,8 @@ let job_build_static_binaries ~__POS__ ~arch ?(cpu = Normal)
   in
   let executable_files =
     executable_files
-    ^ if not release then " script-inputs/experimental-executables" else ""
+    ^
+    if not release then " script-inputs/octez-experimental-executables" else ""
   in
   let version_executable =
     match version_executable with
