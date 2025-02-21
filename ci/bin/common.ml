@@ -179,17 +179,28 @@ let enable_sccache ?key ?error_log ?idle_timeout ?log
   |> append_before_script [". ./scripts/ci/sccache-start.sh"]
   |> append_after_script ["./scripts/ci/sccache-stop.sh"]
 
-let enable_octez_rust_deps_target_dir ?key job =
+(** Enable caching of Cargo's target folder which stores files which
+    can speed up subsequent compilation passes. 
+        
+    All folders are stored in a single cacheable directory to work
+    around GitLab's restriction on the number caches a job may have. *)
+let enable_cargo_target_caches ?key job =
   let key =
     Option.value
       ~default:
-        ("rust-deps-target-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
+        ("rust-targets-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
       key
   in
-  let path = "$CI_PROJECT_DIR/_target" in
+  let cache_dir = "$CI_PROJECT_DIR" // "_target" in
   job
-  |> append_variables [("OCTEZ_RUST_DEPS_TARGET_DIR", path)]
-  |> append_cache (cache ~key [path])
+  |> append_variables
+       [
+         ("OCTEZ_RUST_DEPS_TARGET_DIR", cache_dir // "rust_deps");
+         ("OCTEZ_RUSTZCASH_DEPS_TARGET_DIR", cache_dir // "rustzcash_deps");
+         ( "OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR",
+           cache_dir // "etherlink_wasm_runtime" );
+       ]
+  |> append_cache (cache ~key [cache_dir])
 
 (** Allow cargo to access the network by setting [CARGO_NET_OFFLINE=false].
 
@@ -653,7 +664,7 @@ let job_build_static_binaries ~__POS__ ~arch ?(cpu = Normal)
     ["./scripts/ci/build_static_binaries.sh"]
   |> enable_cargo_cache
   |> enable_sccache ~cache_size:"2G"
-  |> enable_octez_rust_deps_target_dir
+  |> enable_cargo_target_caches
 
 (** Type of Docker build jobs.
 
@@ -846,7 +857,7 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu
       ~variables
       ~artifacts
       ["./scripts/ci/build_full_unreleased.sh"]
-    |> enable_cargo_cache |> enable_sccache |> enable_octez_rust_deps_target_dir
+    |> enable_cargo_cache |> enable_sccache |> enable_cargo_target_caches
   in
   (* Disable coverage for arm64 *)
   if arch = Amd64 then enable_coverage_instrumentation job else job
