@@ -68,6 +68,9 @@ type t = {
   experimental_features : experimental_features;  (** Experimental features.  *)
   fetch_trusted_setup : bool;
       (** Should the trusted setup be downloaded if not found or has invalid hash. *)
+  verbose : bool;
+      (** Whether to emit detailed events for frequently received control
+          messages from remote peers. *)
 }
 
 (** [default] is the default configuration. *)
