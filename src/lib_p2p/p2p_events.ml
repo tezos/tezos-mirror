@@ -535,6 +535,15 @@ module P2p_fd = struct
       ~level:Debug
       ("connection_id", Data_encoding.int31)
       ("socket", Data_encoding.string)
+
+  let set_socket_option_tcp_user_timeout_failed =
+    declare_1
+      ~section
+      ~name:"set_socket_option_tcp_user_timeout_failed"
+      ~msg:"Could not set the TCP_USER_TIMEOUT socket option: {error}"
+      ~level:Info
+      ~pp1:Error_monad.pp_print_trace
+      ("error", Error_monad.trace_encoding)
 end
 
 module P2p_maintainance = struct

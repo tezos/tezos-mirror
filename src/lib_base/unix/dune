@@ -26,4 +26,5 @@
   -open Tezos_stdlib
   -open Tezos_stdlib_unix
   -open Data_encoding
-  -open Tezos_event_logging))
+  -open Tezos_event_logging)
+ (foreign_stubs (language c) (flags (:standard)) (names socket)))
