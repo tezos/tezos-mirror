@@ -15,6 +15,8 @@
   `--native-execution-policy never` or with
   `kernel_execution.native_execution_policy: never` in the configuration file).
   (!16881)
+- Add `octez_evm_node_pruning_history` which is set to 1.0 when the node is
+  pruning its last day of history, and 0.0 otherwise. (!16908)
 
 ### Bug fixes
 
