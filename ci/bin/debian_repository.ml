@@ -116,9 +116,16 @@ let jobs pipeline_type =
   let job_docker_systemd_test_debian_dependencies : tezos_job =
     make_job_docker_systemd_tests
       ~__POS__
-      ~name:"oc.docker-systemd_tests-debian"
+      ~name:"oc.docker-systemd_tests_debian"
       ~distribution:"debian"
       ~matrix:(debian_package_release_matrix pipeline_type)
+  in
+  let job_docker_systemd_test_ubuntu_dependencies : tezos_job =
+    make_job_docker_systemd_tests
+      ~__POS__
+      ~name:"oc.docker-systemd_tests_ubuntu"
+      ~distribution:"ubuntu"
+      ~matrix:(ubuntu_package_release_matrix pipeline_type)
   in
 
   let make_job_docker_build_debian_dependencies ~__POS__ ~name ~matrix
@@ -416,14 +423,14 @@ let jobs pipeline_type =
         ~name:"oc.install_bin_ubunty_jammy"
         ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
         ~variables:[("PREFIX", "")]
-        ~image:Images.debian_bookworm
+        ~image:Images.ubuntu_jammy
         ["./docs/introduction/install-bin-deb.sh ubuntu jammy"];
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_ubunty_noble"
         ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
         ~variables:[("PREFIX", "")]
-        ~image:Images.debian_bookworm
+        ~image:Images.ubuntu_noble
         ["./docs/introduction/install-bin-deb.sh ubuntu noble"];
       job_upgrade_bin
         ~__POS__
@@ -438,7 +445,7 @@ let jobs pipeline_type =
         ~dependencies:
           (Dependent
              [
-               Job job_docker_systemd_test_debian_dependencies;
+               Job job_docker_systemd_test_ubuntu_dependencies;
                Job job_apt_repo_ubuntu;
              ])
         ~variables:
@@ -448,6 +455,25 @@ let jobs pipeline_type =
         [
           "./scripts/ci/systemd-packages-test.sh \
            scripts/packaging/tests/deb/install-bin-deb.sh \
+           images/packages/debian-systemd-tests.Dockerfile";
+        ];
+      job_install_systemd_bin
+        ~__POS__
+        ~name:"oc.upgrade_bin_ubuntu_noble_systemd_test"
+        ~dependencies:
+          (Dependent
+             [
+               Job job_docker_systemd_test_ubuntu_dependencies;
+               Job job_apt_repo_ubuntu;
+               Job job_apt_repo_ubuntu_old;
+             ])
+        ~variables:
+          (variables
+             ~kind:"systemd-tests"
+             [("PREFIX", ""); ("DISTRIBUTION", "ubuntu"); ("RELEASE", "noble")])
+        [
+          "./scripts/ci/systemd-packages-test.sh \
+           scripts/packaging/tests/deb/upgrade-systemd-test.sh \
            images/packages/debian-systemd-tests.Dockerfile";
         ];
     ]
@@ -476,7 +502,7 @@ let jobs pipeline_type =
         ["./docs/introduction/upgrade-bin-deb.sh debian bookworm"];
       job_install_systemd_bin
         ~__POS__
-        ~name:"oc.install_bin_debian_bookworm-systemd"
+        ~name:"oc.install_bin_debian_bookworm_systemd_test"
         ~dependencies:
           (Dependent
              [
@@ -504,6 +530,7 @@ let jobs pipeline_type =
              [
                Job job_docker_systemd_test_debian_dependencies;
                Job job_apt_repo_debian;
+               Job job_apt_repo_debian_old;
              ])
         ~variables:
           (variables
@@ -550,7 +577,8 @@ let jobs pipeline_type =
         job_build_ubuntu_package_old_b,
         job_build_debian_package_old_b )
   | Full ->
-      ( (job_docker_systemd_test_debian_dependencies :: debian_jobs)
+      ( job_docker_systemd_test_debian_dependencies
+        :: job_docker_systemd_test_ubuntu_dependencies :: debian_jobs
         @ ubuntu_jobs @ test_debian_packages_jobs @ test_ubuntu_packages_jobs,
         job_build_ubuntu_package_old_a,
         job_build_debian_package_old_a,
