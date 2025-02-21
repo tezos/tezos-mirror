@@ -1913,14 +1913,6 @@ let jobs pipeline_type =
        and tested. There is a similar job job_debian_repository_trigger_auto
        in the test stage that is started automatically if any files related to
        packaging is changed. *)
-    let job_ocaml4_octez_trigger_auto =
-      trigger_job
-        ~__POS__
-        ~rules:(make_rules ~manual:Yes ())
-        ~dependencies:(Dependent [])
-        ~stage:Stages.manual
-        Ocaml4_build.child_pipeline_ocaml4
-    in
     let job_debian_repository_trigger_partial : tezos_job =
       (* Same as [job_debian_repository_trigger_auto] but manual,
          so that one can trigger it without triggering the whole main pipeline.
@@ -2005,8 +1997,7 @@ let jobs pipeline_type =
         in
         if pipeline_type = Merge_train then jobs
         else
-          job_ocaml4_octez_trigger_auto :: job_homebrew_repository_trigger
-          :: job_rpm_repository_trigger_partial
+          job_homebrew_repository_trigger :: job_rpm_repository_trigger_partial
           :: job_debian_repository_trigger_partial :: jobs
     (* No manual jobs on the scheduled pipeline *)
     | Schedule_extended_test -> []
