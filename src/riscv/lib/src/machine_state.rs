@@ -10,6 +10,7 @@ pub mod csregisters;
 pub mod hart_state;
 pub mod instruction;
 pub mod main_memory;
+pub mod memory;
 pub mod mode;
 pub mod registers;
 pub mod reservation_set;
