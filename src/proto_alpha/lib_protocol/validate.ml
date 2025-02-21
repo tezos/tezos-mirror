@@ -32,6 +32,8 @@ type consensus_info = {
   predecessor_round : Round.t;
   preattestation_slot_map : (Consensus_key.pk * int * int) Slot.Map.t option;
   attestation_slot_map : (Consensus_key.pk * int * int) Slot.Map.t option;
+  consensus_slot_map :
+    (Consensus_key.pk * int * int) Slot.Map.t Level.Map.t option;
 }
 
 let init_consensus_info ctxt (predecessor_level, predecessor_round) =
@@ -40,6 +42,7 @@ let init_consensus_info ctxt (predecessor_level, predecessor_round) =
     predecessor_round;
     preattestation_slot_map = Consensus.allowed_preattestations ctxt;
     attestation_slot_map = Consensus.allowed_attestations ctxt;
+    consensus_slot_map = Consensus.allowed_consensus ctxt;
   }
 
 (** Map used to detect consensus operation conflicts. Each delegate may
@@ -603,10 +606,27 @@ module Consensus = struct
           (Consensus_operation_for_future_level {kind; expected; provided})
       else ok_unit
     in
-    let* (_ctxt : t), consensus_key =
-      Stake_distribution.slot_owner vi.ctxt (Level.from_raw vi.ctxt level) slot
-    in
-    return (consensus_key, 0 (* Fake voting power *))
+    if Constants.aggregate_attestation vi.ctxt then
+      (* Under feature flag, minimal slots are pre-computed for all accepted
+         levels and stored in consensus_info.consensus_slot_map *)
+      let level = Level.from_raw vi.ctxt level in
+      match consensus_info.consensus_slot_map with
+      | None -> tzfail (Consensus.Slot_map_not_found {loc = __LOC__})
+      | Some level_map ->
+          let slot_map = Level.Map.find level level_map in
+          let*? consensus_key, voting_power, _dal_power =
+            get_delegate_details slot_map kind slot
+          in
+          return (consensus_key, voting_power)
+    else
+      let* (_ctxt : t), consensus_key =
+        Stake_distribution.slot_owner
+          vi.ctxt
+          (Level.from_raw vi.ctxt level)
+          slot
+      in
+      return (consensus_key, 0 (* Fake voting power *))
+
   (* We do not check that the frozen deposits are positive because this
      only needs to be true in the context of a block that actually
      contains the operation, which may not be the same as the current

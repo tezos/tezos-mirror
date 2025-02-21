@@ -31,11 +31,14 @@ type t = {
   expected_commitment : bool;
 }
 
-include Compare.Make (struct
+module Ordered = struct
   type nonrec t = t
 
   let compare {level = l1; _} {level = l2; _} = Raw_level_repr.compare l1 l2
-end)
+end
+
+include Compare.Make (Ordered)
+module Map = Map.Make (Ordered)
 
 type level = t
 

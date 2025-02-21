@@ -3760,6 +3760,104 @@ module Revamped = struct
           client)
     in
     unit
+
+  let consensus_minimal_slots_feature_flag =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Mempool filters attestations with non-minimal slots"
+      ~tags:[team; "mempool"; "attestations"; "minimal"; "slots"]
+      ~supports:(Protocol.From_protocol 023)
+    @@ fun protocol ->
+    log_step 1 "Initialize node and activate protocol" ;
+    let* node, client =
+      Client.init_with_node
+        ~nodes_args:[Synchronisation_threshold 0; Private_mode; Connections 0]
+        `Client
+        ()
+    in
+    let* parameter_file =
+      Protocol.write_parameter_file
+        ~base:(Either.Right (protocol, None))
+        [(["aggregate_attestation"], `Bool true)]
+    in
+    let* () =
+      Client.activate_protocol_and_wait ~protocol ~parameter_file client
+    in
+    log_step 2 "Bake 3 blocks to have multiple valid levels to attest for" ;
+    let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
+    let* level =
+      bake_for ~empty:true ~protocol ~wait_for_flush:true node client
+    in
+    let* block_payload_hash =
+      Operation.Consensus.get_block_payload_hash client
+    in
+    log_step 3 "Inject attestations for all accepted levels " ;
+    (* Mempool is expected to accept attestations for the following three levels *)
+    let accepted_levels = [level - 1; level; level + 1] in
+    let* validated, refused =
+      Lwt_list.fold_left_s
+        (fun (validated, refused) level ->
+          let* attesting_rights = Operation.Consensus.get_slots ~level client in
+          (* Look for a delegate that has more than one slot *)
+          let delegate, slots =
+            let delegate_opt =
+              Array.find_map
+                (fun account ->
+                  match
+                    List.assoc_opt
+                      account.Account.public_key_hash
+                      attesting_rights
+                  with
+                  | Some (_ :: _ :: _ as slots) -> Some (account, slots)
+                  | _ -> None)
+                Account.Bootstrap.keys
+            in
+            match delegate_opt with
+            | Some (delegate, slots) -> (delegate, slots)
+            | None ->
+                Test.fail
+                  "found no delegate with more than one slot at level %d"
+                  level
+          in
+          (* Inject an attestation with a non-minimal slot *)
+          let* (`OpHash op_refused) =
+            Operation.Consensus.(
+              inject
+                (attestation
+                   ~slot:(List.nth slots 1)
+                   ~level
+                   ~round:0
+                   ~block_payload_hash
+                   ())
+                ~force:true
+                ~protocol
+                ~signer:delegate
+                client)
+          in
+          (* Inject an attestation with a minimal slot *)
+          let* (`OpHash op_valid) =
+            Operation.Consensus.(
+              inject
+                (attestation
+                   ~slot:(List.hd slots)
+                   ~level
+                   ~round:0
+                   ~block_payload_hash
+                   ())
+                ~force:true
+                ~protocol
+                ~signer:delegate
+                client)
+          in
+          return (op_valid :: validated, op_refused :: refused))
+        ([], [])
+        accepted_levels
+    in
+    log_step 4 "Check that operations where correctly filtered by the mempool" ;
+    (* Check that all attestations with non-minimal slots where refused, and all
+       attestations with a minimal slot where validated *)
+    let* () = check_mempool ~validated ~refused client in
+    unit
 end
 
 let check_operation_is_in_validated_mempool ops oph =
@@ -4271,4 +4369,5 @@ let register ~protocols =
   Revamped.refused_operations_are_not_reclassified protocols ;
   Revamped.request_operations_from_peer protocols ;
   force_operation_injection protocols ;
-  Revamped.injecting_old_operation_fails protocols
+  Revamped.injecting_old_operation_fails protocols ;
+  Revamped.consensus_minimal_slots_feature_flag protocols
