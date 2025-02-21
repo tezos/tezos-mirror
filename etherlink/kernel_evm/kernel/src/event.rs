@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{inbox::Transaction, storage, upgrade};
+use crate::{storage, transaction::Transaction, upgrade};
 use primitive_types::{H256, U256};
 use rlp::{Encodable, RlpStream};
 use tezos_ethereum::rlp_helpers::{append_timestamp, append_u256_le};

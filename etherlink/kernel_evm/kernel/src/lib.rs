@@ -64,6 +64,7 @@ mod simulation;
 mod stage_one;
 mod storage;
 mod tick_model;
+mod transaction;
 mod upgrade;
 
 extern crate alloc;
@@ -379,7 +380,7 @@ mod tests {
     };
     use crate::{
         blueprint::Blueprint,
-        inbox::{Transaction, TransactionContent},
+        transaction::{Transaction, TransactionContent},
         upgrade::KernelUpgrade,
     };
     use evm::Config;

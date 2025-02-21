@@ -10,9 +10,9 @@ use crate::block_storage;
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
 use crate::gas_price::base_fee_per_gas;
-use crate::inbox::Transaction;
 use crate::storage::{self, object_path, receipt_path};
 use crate::tick_model;
+use crate::transaction::Transaction;
 use anyhow::Context;
 use evm_execution::account_storage::EVM_ACCOUNTS_PATH;
 use primitive_types::{H160, H256, U256};
@@ -577,7 +577,7 @@ mod tests {
 
     use super::BlockInProgress;
     use crate::bridge::Deposit;
-    use crate::inbox::{Transaction, TransactionContent};
+    use crate::transaction::{Transaction, TransactionContent};
     use primitive_types::{H160, H256, U256};
     use rlp::{Decodable, Encodable, Rlp};
     use tezos_ethereum::{

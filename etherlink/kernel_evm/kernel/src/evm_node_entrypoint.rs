@@ -8,7 +8,7 @@
 //! only. It allows to call specific functions of the kernel without
 //! using the inbox and a specific message.
 
-use crate::{delayed_inbox::DelayedInbox, inbox::Transaction};
+use crate::{delayed_inbox::DelayedInbox, transaction::Transaction};
 use tezos_ethereum::rlp_helpers::FromRlpBytes;
 use tezos_evm_runtime::runtime::KernelHost;
 use tezos_smart_rollup_core::rollup_host::RollupHost;

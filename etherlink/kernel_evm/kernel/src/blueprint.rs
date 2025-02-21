@@ -5,7 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::inbox::Transaction;
+use crate::transaction::Transaction;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_ethereum::rlp_helpers::{self, append_timestamp, decode_timestamp};
 
@@ -51,7 +51,7 @@ impl Decodable for Blueprint {
 mod tests {
 
     use super::*;
-    use crate::inbox::TransactionContent::Ethereum;
+    use crate::transaction::TransactionContent::Ethereum;
     use primitive_types::{H160, U256};
     use rlp::Rlp;
     use tezos_ethereum::{

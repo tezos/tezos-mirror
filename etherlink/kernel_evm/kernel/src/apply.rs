@@ -35,7 +35,7 @@ use tezos_smart_rollup_host::path::{Path, RefPath};
 use crate::bridge::{execute_deposit, Deposit};
 use crate::error::Error;
 use crate::fees::{tx_execution_gas_limit, FeeUpdates};
-use crate::inbox::{Transaction, TransactionContent};
+use crate::transaction::{Transaction, TransactionContent};
 
 // This implementation of `Transaction` is used to share the logic of
 // transaction receipt and transaction object making. The functions

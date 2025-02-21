@@ -6,11 +6,11 @@
 use crate::blueprint::Blueprint;
 use crate::configuration::{Configuration, ConfigurationMode};
 use crate::error::{Error, StorageError};
-use crate::inbox::{Transaction, TransactionContent};
 use crate::sequencer_blueprint::{
     BlueprintWithDelayedHashes, UnsignedSequencerBlueprint,
 };
 use crate::storage::read_last_info_per_level_timestamp;
+use crate::transaction::{Transaction, TransactionContent};
 use crate::{delayed_inbox, DelayedInbox};
 use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
