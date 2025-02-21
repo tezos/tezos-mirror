@@ -574,18 +574,15 @@ module Handler = struct
       Node_context.get_plugin_for_level ctxt ~level:pred_level
     in
     let* block_info = Plugin.block_info cctxt ~block ~metadata:`Always in
-    let* dal_constants =
-      Node_context.get_proto_parameters ctxt ~level:block_level
-    in
     let* () =
-      if dal_constants.Types.feature_enable then
+      if proto_parameters.Types.feature_enable then
         let* slot_headers = Plugin.get_published_slot_headers block_info in
         let* () =
           if supports_refutations ctxt then
             store_skip_list_cells
               ctxt
               cctxt
-              dal_constants
+              proto_parameters
               block_info
               block_level
               (module Plugin : Dal_plugin.T
