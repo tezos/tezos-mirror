@@ -99,6 +99,14 @@ let legacy_mode =
        snapshot to start using the new block storage"
     ()
 
+let spawn_rpc_is_ready =
+  Internal_event.Simple.declare_0
+    ~section
+    ~name:"spawn_rpc_is_ready"
+    ~level:Notice
+    ~msg:"the rpc process is ready"
+    ()
+
 let event_private_server_is_ready =
   declare_4
     ~section
@@ -422,6 +430,8 @@ let is_ready ~rpc_addr ~rpc_port ~websockets ~backend =
   emit event_is_ready (rpc_addr, rpc_port, backend, websockets)
 
 let legacy_mode () = emit legacy_mode ()
+
+let spawn_rpc_is_ready () = emit spawn_rpc_is_ready ()
 
 let private_server_is_ready ~rpc_addr ~rpc_port ~websockets ~backend =
   emit event_private_server_is_ready (rpc_addr, rpc_port, backend, websockets)

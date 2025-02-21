@@ -6,12 +6,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let install_finalizer_seq server_public_finalizer server_private_finalizer =
+let install_finalizer_seq server_public_finalizer server_private_finalizer
+    finalizer_rpc_process =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = Events.shutdown_node ~exit_status in
   let* () = server_public_finalizer () in
   let* () = server_private_finalizer () in
+  let* () = Option.iter_s (fun f -> f ()) finalizer_rpc_process in
   Misc.unwrap_error_monad @@ fun () ->
   let open Lwt_result_syntax in
   let* () = Tx_pool.shutdown () in
@@ -203,8 +205,30 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       configuration
       (backend, smart_rollup_address_typed)
   in
+  let finalizer_rpc_process =
+    Option.map
+      (fun port ->
+        let protected_endpoint =
+          Uri.make ~scheme:"http" ~host:configuration.public_rpc.addr ~port ()
+        in
+        let private_endpoint =
+          Option.map
+            (fun {addr; port; _} -> Uri.make ~scheme:"http" ~host:addr ~port ())
+            configuration.private_rpc
+        in
+        Rpc.spawn_main
+          ~exposed_port:configuration.public_rpc.port
+          ~protected_endpoint
+          ?private_endpoint
+          ~data_dir
+          ())
+      configuration.experimental_features.spawn_rpc
+  in
   let (_ : Lwt_exit.clean_up_callback_id) =
-    install_finalizer_seq finalizer_public_server finalizer_private_server
+    install_finalizer_seq
+      finalizer_public_server
+      finalizer_private_server
+      finalizer_rpc_process
   in
   let* () = loop_sequencer sequencer_config in
   return_unit

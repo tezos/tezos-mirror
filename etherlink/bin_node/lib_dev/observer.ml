@@ -70,12 +70,13 @@ let on_new_blueprint evm_node_endpoint next_blueprint_number
   else return `Continue
 
 let install_finalizer_observer ~rollup_node_tracking finalizer_public_server
-    finalizer_private_server =
+    finalizer_private_server finalizer_rpc_process =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = Events.shutdown_node ~exit_status in
   let* () = finalizer_public_server () in
   let* () = finalizer_private_server () in
+  let* () = Option.iter_s (fun f -> f ()) finalizer_rpc_process in
   Misc.unwrap_error_monad @@ fun () ->
   let open Lwt_result_syntax in
   let* () = Tx_pool.shutdown () in
@@ -126,6 +127,7 @@ let interpolate_snapshot_provider rollup_address network provider =
 let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     ~init_from_snapshot () =
   let open Lwt_result_syntax in
+  let open Configuration in
   let*? {
           evm_node_endpoint;
           threshold_encryption_bundler_endpoint;
@@ -262,11 +264,31 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       return_unit
   in
 
+  let finalizer_rpc_process =
+    Option.map
+      (fun port ->
+        let protected_endpoint =
+          Uri.make ~scheme:"http" ~host:config.public_rpc.addr ~port ()
+        in
+        let private_endpoint =
+          Option.map
+            (fun {addr; port; _} -> Uri.make ~scheme:"http" ~host:addr ~port ())
+            config.private_rpc
+        in
+        Rpc.spawn_main
+          ~exposed_port:config.public_rpc.port
+          ~protected_endpoint
+          ?private_endpoint
+          ~data_dir
+          ())
+      config.experimental_features.spawn_rpc
+  in
   let (_ : Lwt_exit.clean_up_callback_id) =
     install_finalizer_observer
       ~rollup_node_tracking
       finalizer_public_server
       finalizer_private_server
+      finalizer_rpc_process
   in
 
   let*! next_blueprint_number = Evm_context.next_blueprint_number () in

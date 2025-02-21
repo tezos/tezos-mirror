@@ -73,6 +73,7 @@ type experimental_features = {
   enable_websocket : bool;
   max_websocket_message_length : int;
   monitor_websocket_heartbeat : monitor_websocket_heartbeat option;
+  spawn_rpc : int option;
   l2_chains : l2_chain list option;
   enable_tx_queue : bool;
 }
@@ -215,6 +216,7 @@ let default_experimental_features =
     enable_websocket = false;
     max_websocket_message_length = default_max_socket_message_length;
     monitor_websocket_heartbeat = default_monitor_websocket_heartbeat;
+    spawn_rpc = None;
     l2_chains = default_l2_chains;
     enable_tx_queue = false;
   }
@@ -845,6 +847,7 @@ let experimental_features_encoding =
            enable_websocket;
            max_websocket_message_length;
            monitor_websocket_heartbeat;
+           spawn_rpc;
            l2_chains : l2_chain list option;
            enable_tx_queue;
          } ->
@@ -858,6 +861,7 @@ let experimental_features_encoding =
           enable_websocket,
           max_websocket_message_length,
           monitor_websocket_heartbeat,
+          spawn_rpc,
           l2_chains,
           enable_tx_queue ) ))
     (fun ( ( drop_duplicate_on_injection,
@@ -870,6 +874,7 @@ let experimental_features_encoding =
              enable_websocket,
              max_websocket_message_length,
              monitor_websocket_heartbeat,
+             spawn_rpc,
              l2_chains,
              enable_tx_queue ) ) ->
       {
@@ -881,6 +886,7 @@ let experimental_features_encoding =
         enable_websocket;
         max_websocket_message_length;
         monitor_websocket_heartbeat;
+        spawn_rpc;
         l2_chains;
         enable_tx_queue;
       })
@@ -933,7 +939,7 @@ let experimental_features_encoding =
                 DEPRECATED: You should remove this option from your \
                 configuration file."
              bool))
-       (obj6
+       (obj7
           (dft
              "rpc_server"
              ~description:
@@ -958,6 +964,11 @@ let experimental_features_encoding =
              ~description:"Parameters to monitor websocket connections"
              opt_monitor_websocket_heartbeat_encoding
              default_monitor_websocket_heartbeat)
+          (dft
+             "spawn_rpc"
+             ~description:"Spawn a RPC node listening on the given port"
+             (option @@ obj1 (req "protected_port" (ranged_int 1 65535)))
+             None)
           (dft
              "l2_chains"
              ~description:

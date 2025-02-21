@@ -5,6 +5,35 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let spawn_main ~exposed_port ~protected_endpoint ?private_endpoint ~data_dir ()
+    =
+  let p_name = Sys.executable_name in
+  let base_cmd =
+    [|
+      Filename.basename p_name;
+      "experimental";
+      "run";
+      "rpc";
+      "--rpc-port";
+      string_of_int exposed_port;
+      "--evm-node-endpoint";
+      Uri.to_string protected_endpoint;
+      "--data-dir";
+      data_dir;
+    |]
+  in
+  let private_cmd =
+    Option.fold
+      ~none:[||]
+      ~some:(fun uri -> [|"--evm-node-private-endpoint"; Uri.to_string uri|])
+      private_endpoint
+  in
+  let process =
+    Lwt_process.open_process_none (p_name, Array.concat [base_cmd; private_cmd])
+  in
+  let finalizer () = Lwt.return process#terminate in
+  finalizer
+
 let install_finalizer_rpc server_public_finalizer =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
@@ -84,6 +113,15 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
     ~tx_pool_size_info:Tx_pool.size_info
     ~smart_rollup_address:ctxt.smart_rollup_address ;
 
+  (* Never spawn from an RPC node *)
+  let rpc_config =
+    {
+      config with
+      experimental_features =
+        {config.experimental_features with spawn_rpc = None};
+    }
+  in
+
   let* server_public_finalizer =
     Rpc_server.start_public_server
       ~delegate_health_check_to:evm_node_endpoint
@@ -91,12 +129,17 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
         Evm_ro_context.(evm_services_methods ctxt time_between_blocks)
       ~data_dir
       Stateless
-      config
+      rpc_config
       (rpc_backend, ctxt.smart_rollup_address)
   in
 
   let (_ : Lwt_exit.clean_up_callback_id) =
     install_finalizer_rpc server_public_finalizer
+  in
+
+  let* () =
+    when_ (Option.is_some config.experimental_features.spawn_rpc) @@ fun () ->
+    Lwt_result.ok (Events.spawn_rpc_is_ready ())
   in
 
   let* next_blueprint_number = Evm_ro_context.next_blueprint_number ctxt in

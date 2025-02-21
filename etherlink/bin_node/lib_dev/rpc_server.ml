@@ -143,21 +143,24 @@ let start_public_server ?delegate_health_check_to ?evm_services ?data_dir
           impl.smart_rollup_address
           impl.time_between_blocks
   in
+
+  (* If spawn_rpc is defined, use it as intermediate *)
+  let rpc =
+    match config.experimental_features.spawn_rpc with
+    | Some port -> {config.public_rpc with port}
+    | _ -> config.public_rpc
+  in
+
   let directory =
-    Services.directory
-      ?delegate_health_check_to
-      config.public_rpc
-      validation
-      config
-      ctxt
+    Services.directory ?delegate_health_check_to rpc validation config ctxt
     |> register_evm_services
     |> Evm_directory.register_metrics "/metrics"
   in
-  let* finalizer = start_server config.public_rpc directory in
+  let* finalizer = start_server rpc directory in
   let*! () =
     Events.is_ready
-      ~rpc_addr:config.public_rpc.addr
-      ~rpc_port:config.public_rpc.port
+      ~rpc_addr:rpc.addr
+      ~rpc_port:rpc.port
       ~backend:config.experimental_features.rpc_server
       ~websockets:config.experimental_features.enable_websocket
   in

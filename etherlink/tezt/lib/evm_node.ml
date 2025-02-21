@@ -423,6 +423,10 @@ let wait_for_successful_upgrade ?timeout evm_node =
          let level = json |-> "level" |> as_int in
          Some (root_hash, level))
 
+let wait_for_spawn_rpc_ready ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"spawn_rpc_is_ready.v0"
+  @@ Fun.const (Some ())
+
 let wait_for_block_producer_locked ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"block_producer_locked.v0"
   @@ Fun.const (Some ())
@@ -1265,7 +1269,7 @@ let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false)
     ?(blueprints_publisher_order_enabled = false) ?(next_wasm_runtime = true)
     ?rpc_server ?(enable_websocket = false) ?max_websocket_message_length
-    ?(enable_tx_queue = false) () =
+    ?(enable_tx_queue = false) ?spawn_rpc () =
   JSON.update "experimental_features" @@ fun json ->
   conditional_json_put
     drop_duplicate_when_injection
@@ -1295,6 +1299,8 @@ let patch_config_with_experimental_feature
        enable_websocket
        ~name:"monitor_websocket_heartbeat"
        (`O [("ping_interval", `Float 0.5); ("ping_timeout", `Float 2.)])
+  |> optional_json_put spawn_rpc ~name:"spawn_rpc" (fun port ->
+         `O [("protected_port", `Float (float_of_int port))])
 
 let patch_config_gc ?history_mode json =
   json

@@ -205,7 +205,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     ?(drop_duplicate_when_injection = true)
     ?(blueprints_publisher_order_enabled = true) ?rollup_history_mode
     ~enable_dal ?dal_slots ~enable_multichain ?rpc_server ?websockets
-    ?history_mode ?enable_tx_queue protocol =
+    ?history_mode ?enable_tx_queue ?spawn_rpc protocol =
   let* node, client =
     setup_l1
       ?commitment_period
@@ -285,7 +285,19 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     | Some p -> Some p
     | None -> Some (Port.fresh ())
   in
-  let patch_config ?enable_tx_queue =
+  let seq_patch_config =
+    Evm_node.patch_config_with_experimental_feature
+      ~drop_duplicate_when_injection
+      ~blueprints_publisher_order_enabled
+      ?next_wasm_runtime
+      ?rpc_server
+      ?enable_websocket:websockets
+      ?spawn_rpc
+      (* When adding new experimental feature please make sure it's a
+         good idea to activate it for all test or not. *)
+      ()
+  in
+  let obs_patch_config =
     Evm_node.patch_config_with_experimental_feature
       ~drop_duplicate_when_injection
       ~blueprints_publisher_order_enabled
@@ -293,8 +305,6 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ?rpc_server
       ?enable_websocket:websockets
       ?enable_tx_queue
-      (* When adding new experimental feature please make sure it's a
-         good idea to activate it for all test or not. *)
       ()
   in
   let* sequencer_mode =
@@ -347,14 +357,19 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
   let* sequencer =
     Evm_node.init
       ?rpc_port:sequencer_rpc_port
-      ~patch_config:(patch_config ~enable_tx_queue:false)
+      ~patch_config:seq_patch_config
       ~mode:sequencer_mode
       ?history_mode
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
+  let* _ =
+    match spawn_rpc with
+    | Some _ -> Evm_node.wait_for_spawn_rpc_ready sequencer
+    | None -> unit
+  in
   let* observer =
     run_new_observer_node
-      ~patch_config:(patch_config ?enable_tx_queue)
+      ~patch_config:obs_patch_config
       ~sc_rollup_node
       ?rpc_server
       ?websockets
@@ -363,7 +378,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
   in
   let* proxy =
     Evm_node.init
-      ~patch_config
+      ~patch_config:obs_patch_config
       ~mode:Proxy
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
@@ -397,7 +412,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?rollup_history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None)
     ~enable_multichain ?rpc_server ?websockets ?history_mode ?enable_tx_queue
-    body ~title ~tags protocols =
+    ?spawn_rpc body ~title ~tags protocols =
   let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
   let tags = kernel_tag :: tags in
   let additional_uses =
@@ -451,6 +466,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ~enable_multichain
         ?rpc_server
         ?enable_tx_queue
+        ?spawn_rpc
         protocol
     in
     body sequencer_setup protocol
@@ -495,7 +511,7 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
     ?additional_uses ~threshold_encryption ~enable_dal ?dal_slots
     ~enable_multichain ?rpc_server ?websockets ?enable_fast_withdrawal
-    ?history_mode ?enable_tx_queue ~title ~tags body protocols =
+    ?history_mode ?enable_tx_queue ?spawn_rpc ~title ~tags body protocols =
   List.iter
     (fun kernel ->
       register_test
@@ -536,6 +552,7 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?dal_slots
         ~enable_multichain
         ?enable_tx_queue
+        ?spawn_rpc
         ~title
         ~tags
         body
