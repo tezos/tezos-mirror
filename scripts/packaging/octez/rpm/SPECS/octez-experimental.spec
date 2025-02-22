@@ -19,13 +19,9 @@ License: MIT
     the fly, and that can be used for developing new protocols.
 %install
 mkdir -p %{buildroot}/usr/bin/
-install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-protocol-compiler %{buildroot}/usr/bin/
 install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-smart-rollup-wasm-debugger %{buildroot}/usr/bin/
-install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-snoop %{buildroot}/usr/bin/
 %files
-/usr/bin/octez-protocol-compiler
 /usr/bin/octez-smart-rollup-wasm-debugger
-/usr/bin/octez-snoop
 %postun
 %post
 %preun
