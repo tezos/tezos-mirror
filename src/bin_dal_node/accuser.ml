@@ -34,7 +34,7 @@ let filter_injectable_traps ~attested_level ~published_level attestation_map
   let open Lwt_result_syntax in
   List.filter_map_s
     (fun trap ->
-      let Store.Traps.{delegate; slot_index; shard; shard_proof} = trap in
+      let Types.{delegate; slot_index; shard; shard_proof} = trap in
       let attestation_opt =
         Signature.Public_key_hash.Map.find delegate attestation_map
       in

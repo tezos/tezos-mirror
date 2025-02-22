@@ -193,6 +193,18 @@ val get_attestable_slots :
   ; query : unit >
   service
 
+(** For a given published level, return all the traps known by the node. *)
+val get_traps :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Types.trap list
+  ; prefix : unit
+  ; params : unit * Types.level
+  ; query :
+      < delegate : Signature.public_key_hash option
+      ; slot_index : Types.slot_index option > >
+  service
+
 (** Return the shard associated to the given index. *)
 val get_slot_shard :
   < meth : [`GET]
