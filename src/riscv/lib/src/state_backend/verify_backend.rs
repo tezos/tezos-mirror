@@ -55,6 +55,16 @@ impl ManagerBase for Verifier {
     type EnrichedCell<V: EnrichedValue> = EnrichedCell<V>;
 
     type ManagerRoot = Self;
+
+    fn enrich_cell<V: super::EnrichedValueLinked<Self>>(
+        underlying: Self::Region<V::E, 1>,
+    ) -> Self::EnrichedCell<V> {
+        EnrichedCell { underlying }
+    }
+
+    fn as_devalued_cell<V: EnrichedValue>(cell: &Self::EnrichedCell<V>) -> &Self::Region<V::E, 1> {
+        &cell.underlying
+    }
 }
 
 impl ManagerRead for Verifier {
@@ -136,10 +146,7 @@ impl ManagerRead for Verifier {
     where
         V: EnrichedValue,
     {
-        match cell {
-            EnrichedCell::Absent => not_found(),
-            EnrichedCell::Present(cell) => cell,
-        }
+        Self::region_ref(&cell.underlying, 0)
     }
 }
 
@@ -205,10 +212,7 @@ impl ManagerWrite for Verifier {
     where
         V: super::EnrichedValueLinked<Self>,
     {
-        match cell {
-            EnrichedCell::Absent => *cell = EnrichedCell::Present(value),
-            EnrichedCell::Present(stored) => *stored = value,
-        }
+        Self::region_write(&mut cell.underlying, 0, value);
     }
 }
 
@@ -458,9 +462,8 @@ impl<const LEAF_SIZE: usize, const LEN: usize> Default for DynRegion<LEAF_SIZE, 
 }
 
 /// Verifier enriched cell
-pub enum EnrichedCell<V: EnrichedValue> {
-    Absent,
-    Present(V::E),
+pub struct EnrichedCell<V: EnrichedValue> {
+    underlying: Region<V::E, 1>,
 }
 
 impl<E> Cell<E, Verifier> {
@@ -482,9 +485,8 @@ where
     V::E: Clone,
 {
     fn clone(&self) -> Self {
-        match self {
-            Self::Absent => Self::Absent,
-            Self::Present(value) => Self::Present(value.clone()),
+        Self {
+            underlying: self.underlying.clone(),
         }
     }
 }
@@ -584,13 +586,14 @@ mod tests {
     }
 
     /// Construct a [`state_backend::EnrichedCell`] from a proptest value.
-    fn arb_to_enriched_cell<V: EnrichedValue>(
+    fn arb_to_enriched_cell<V: EnrichedValueLinked<Verifier>>(
         value: Option<V::E>,
     ) -> state_backend::EnrichedCell<V, Verifier> {
         let cell = match value {
-            Some(value) => EnrichedCell::Present(value),
-            None => EnrichedCell::Absent,
+            Some(value) => Region::Partial(Box::new([Some(value)])),
+            None => Region::Absent,
         };
+        let cell = Cell::bind(cell);
         state_backend::EnrichedCell::bind(cell)
     }
 

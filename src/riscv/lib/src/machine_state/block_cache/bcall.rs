@@ -66,7 +66,9 @@ pub trait Block<MC: MemoryConfig, M: ManagerBase> {
     type BlockBuilder: Default;
 
     /// Bind the block to the given allocated state.
-    fn bind(allocated: AllocatedOf<BlockLayout<MC>, M>) -> Self;
+    fn bind(allocated: AllocatedOf<BlockLayout<MC>, M>) -> Self
+    where
+        M::ManagerRoot: ManagerReadWrite;
 
     /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
     /// the constituents of `N` that were produced from the constituents of `&M`.
@@ -233,8 +235,14 @@ impl<MC: MemoryConfig, M: ManagerBase> Block<MC, M> for Interpreted<MC, M> {
         self.len_instr.write(0);
     }
 
-    fn bind((len_instr, instr): AllocatedOf<BlockLayout<MC>, M>) -> Self {
-        Self { len_instr, instr }
+    fn bind(space: AllocatedOf<BlockLayout<MC>, M>) -> Self
+    where
+        M::ManagerRoot: ManagerReadWrite,
+    {
+        Self {
+            len_instr: space.0,
+            instr: space.1.map(EnrichedCell::bind),
+        }
     }
 
     fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(

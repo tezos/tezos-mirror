@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use std::{
-    fmt,
+    array, fmt,
     marker::PhantomData,
     mem::{self, MaybeUninit},
 };
@@ -36,6 +36,18 @@ impl ManagerBase for Owned {
     type EnrichedCell<V: EnrichedValue> = (V::E, V::D<Self>);
 
     type ManagerRoot = Self;
+
+    fn enrich_cell<V: EnrichedValueLinked<Self>>(
+        cell: Self::Region<V::E, 1>,
+    ) -> Self::EnrichedCell<V> {
+        let [value] = cell;
+        let derived = V::derive(&value);
+        (value, derived)
+    }
+
+    fn as_devalued_cell<V: EnrichedValue>(cell: &Self::EnrichedCell<V>) -> &Self::Region<V::E, 1> {
+        array::from_ref(&cell.0)
+    }
 }
 
 impl ManagerAlloc for Owned {
@@ -54,14 +66,6 @@ impl ManagerAlloc for Owned {
             let alloc = std::alloc::alloc_zeroed(layout);
             Box::from_raw(alloc.cast())
         }
-    }
-
-    fn allocate_enriched_cell<V: EnrichedValueLinked<Self>>(
-        &mut self,
-        value: V::E,
-    ) -> Self::EnrichedCell<V> {
-        let derived = V::derive(&value);
-        (value, derived)
     }
 }
 
@@ -239,17 +243,6 @@ impl ManagerSerialise for Owned {
     ) -> Result<S::Ok, S::Error> {
         serializer.serialize_bytes(region.as_slice())
     }
-
-    fn serialise_enriched_cell<V: EnrichedValue, S: serde::Serializer>(
-        cell: &Self::EnrichedCell<V>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
-    where
-        V::E: serde::Serialize,
-    {
-        use serde::Serialize;
-        cell.0.serialize(serializer)
-    }
 }
 
 impl ManagerDeserialise for Owned {
@@ -288,8 +281,7 @@ impl ManagerDeserialise for Owned {
             where
                 A: serde::de::SeqAccess<'de>,
             {
-                let mut values: [MaybeUninit<E>; LEN] =
-                    std::array::from_fn(|_| MaybeUninit::uninit());
+                let mut values: [MaybeUninit<E>; LEN] = array::from_fn(|_| MaybeUninit::uninit());
 
                 for value in values.iter_mut() {
                     value.write(seq.next_element::<E>()?.ok_or_else(|| {
@@ -320,19 +312,6 @@ impl ManagerDeserialise for Owned {
         vec.try_into()
             .map_err(|_err| serde::de::Error::custom("Dynamic region of mismatching length"))
     }
-
-    fn deserialise_enriched_cell<'de, V, D: serde::Deserializer<'de>>(
-        deserializer: D,
-    ) -> Result<Self::EnrichedCell<V>, D::Error>
-    where
-        V: EnrichedValueLinked<Self>,
-        V::E: serde::Deserialize<'de>,
-    {
-        use serde::Deserialize;
-        let value = V::E::deserialize(deserializer)?;
-        let derived = V::derive(&value);
-        Ok((value, derived))
-    }
 }
 
 impl ManagerClone for Owned {
@@ -361,7 +340,7 @@ impl ManagerClone for Owned {
 pub mod test_helpers {
     use super::*;
     use crate::state_backend::{
-        Cell, Cells, DynCells, EnrichedCell, Ref,
+        Cell, Cells, DynCells, EnrichedCell, FnManagerIdent, Ref,
         proof_backend::{ProofDynRegion, ProofGen, ProofRegion},
         test_helpers::TestBackendFactory,
     };
@@ -469,7 +448,8 @@ pub mod test_helpers {
         }
 
         proptest::proptest!(|(value: u64)| {
-            let mut cell: EnrichedCell<Enriching, Owned> = EnrichedCell::bind((0u64, T::from(&0)));
+            let cell = Cell::bind([0u64]);
+            let mut cell: EnrichedCell<Enriching, Owned> = EnrichedCell::bind(cell);
             cell.write(value);
 
             let read_value = cell.read_ref_stored();
@@ -488,8 +468,7 @@ pub mod test_helpers {
             assert_eq!(derived.0, derived_after.0);
 
             // Serialisation is consistent with that of the `ProofGen` backend.
-            let proof_cell: EnrichedCell<Enriching, Ref<'_, Owned>> =
-                EnrichedCell::bind(cell.cell_ref());
+            let proof_cell: EnrichedCell<Enriching, Ref<'_, Owned>> = EnrichedCell::bind(cell.struct_ref::<FnManagerIdent>());
             let proof_bytes = bincode::serialize(&proof_cell).unwrap();
             assert_eq!(bytes, proof_bytes);
         });
@@ -513,7 +492,8 @@ pub mod test_helpers {
         }
 
         proptest::proptest!(|(value: u64)| {
-            let mut ecell: EnrichedCell<Enriching, Owned> = EnrichedCell::bind((0u64, Fun::from(&0)));
+            let cell = Cell::bind([0u64]);
+            let mut ecell: EnrichedCell<Enriching, Owned> = EnrichedCell::bind(cell);
             let mut cell: Cell<u64, Owned> = Cell::bind([0; 1]);
             ecell.write(value);
             cell.write(value);

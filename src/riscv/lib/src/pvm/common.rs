@@ -18,7 +18,7 @@ use crate::{
     pvm::sbi,
     state_backend::{
         self, Atom, Cell,
-        proof_backend::{ProofDynRegion, ProofEnrichedCell, ProofGen, ProofRegion},
+        proof_backend::{ProofDynRegion, ProofGen, ProofRegion},
     },
     traps::EnvironException,
 };
@@ -153,7 +153,10 @@ impl<
     pub fn bind(
         space: state_backend::AllocatedOf<PvmLayout<MC, CL>, M>,
         block_builder: B::BlockBuilder,
-    ) -> Self {
+    ) -> Self
+    where
+        M::ManagerRoot: state_backend::ManagerReadWrite,
+    {
         Self {
             version: space.0,
             machine_state: machine_state::MachineState::bind(space.1, block_builder),
@@ -180,7 +183,10 @@ impl<
     }
 
     /// Generate a proof-generating version of this PVM.
-    pub fn start_proof(&self) -> PvmProofGen<'_, MC, CL, M> {
+    pub fn start_proof(&self) -> PvmProofGen<'_, MC, CL, M>
+    where
+        M: state_backend::ManagerRead,
+    {
         enum ProofWrapper {}
 
         impl<M: state_backend::ManagerBase> state_backend::FnManager<M> for ProofWrapper {
@@ -197,18 +203,10 @@ impl<
             ) -> <ProofGen<M> as state_backend::ManagerBase>::DynRegion<LEN> {
                 ProofDynRegion::bind(input)
             }
-
-            fn map_enriched_cell<V: state_backend::EnrichedValue>(
-                input: <M as state_backend::ManagerBase>::EnrichedCell<V>,
-            ) -> <ProofGen<M> as state_backend::ManagerBase>::EnrichedCell<V> {
-                ProofEnrichedCell::bind(input)
-            }
         }
 
-        Pvm::bind(
-            self.struct_ref::<ProofWrapper>(),
-            bcall::InterpretedBlockBuilder,
-        )
+        let space = self.struct_ref::<ProofWrapper>();
+        Pvm::bind(space, bcall::InterpretedBlockBuilder)
     }
 
     /// Reset the PVM state.

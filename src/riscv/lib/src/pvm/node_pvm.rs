@@ -19,9 +19,7 @@ use crate::{
     state_backend::{
         self, AllocatedOf, CommitmentLayout, ProofLayout, ProofTree, Ref,
         owned_backend::Owned,
-        proof_backend::{
-            ProofDynRegion, ProofEnrichedCell, ProofGen, ProofRegion, proof::MerkleProof,
-        },
+        proof_backend::{ProofDynRegion, ProofGen, ProofRegion, proof::MerkleProof},
         verify_backend::Verifier,
     },
     storage::{self, Hash, Repo},
@@ -44,7 +42,10 @@ pub struct State<M: state_backend::ManagerBase> {
 }
 
 impl<M: state_backend::ManagerBase> State<M> {
-    pub fn bind(space: state_backend::AllocatedOf<StateLayout, M>) -> Self {
+    pub fn bind(space: state_backend::AllocatedOf<StateLayout, M>) -> Self
+    where
+        M::ManagerRoot: state_backend::ManagerReadWrite,
+    {
         Self {
             pvm: Pvm::<M64M, _, _, M>::bind(space.0, InterpretedBlockBuilder),
             level_is_set: space.1,
@@ -69,7 +70,10 @@ impl<M: state_backend::ManagerBase> State<M> {
     }
 
     /// Generate a proof-generating version of this state.
-    pub fn start_proof(&self) -> State<ProofGen<Ref<'_, M>>> {
+    pub fn start_proof(&self) -> State<ProofGen<Ref<'_, M>>>
+    where
+        M: state_backend::ManagerRead,
+    {
         enum ProofWrapper {}
 
         impl<M: state_backend::ManagerBase> state_backend::FnManager<M> for ProofWrapper {
@@ -85,12 +89,6 @@ impl<M: state_backend::ManagerBase> State<M> {
                 input: <M as state_backend::ManagerBase>::DynRegion<LEN>,
             ) -> <ProofGen<M> as state_backend::ManagerBase>::DynRegion<LEN> {
                 ProofDynRegion::bind(input)
-            }
-
-            fn map_enriched_cell<V: state_backend::EnrichedValue>(
-                input: <M as state_backend::ManagerBase>::EnrichedCell<V>,
-            ) -> <ProofGen<M> as state_backend::ManagerBase>::EnrichedCell<V> {
-                ProofEnrichedCell::bind(input)
             }
         }
 
