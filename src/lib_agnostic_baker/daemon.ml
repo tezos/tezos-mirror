@@ -22,16 +22,15 @@ let shutdown baker =
     running thread for the baker given its corresponding [plugin], with the command
     line arguments given by [~baker_args] and cancellation Lwt promise
     [~cancel_promise]. The event logs are stored according to [~logs_path]. *)
-let run_thread
-    (module Agnostic_baker_plugin : Protocol_plugin.AGNOSTIC_BAKER_PLUGIN)
-    ~baker_args ~cancel_promise ~logs_path =
+let run_thread (module Plugin : Protocol_plugin_sig.S) ~baker_args
+    ~cancel_promise ~logs_path =
   let () =
-    Client_commands.register Agnostic_baker_plugin.hash @@ fun _network ->
-    Agnostic_baker_plugin.map_commands ()
+    Client_commands.register Plugin.protocol_hash @@ fun _network ->
+    Plugin.Baker_commands_helpers.map_commands ()
   in
 
   let select_commands _ _ =
-    Lwt_result_syntax.return @@ Agnostic_baker_plugin.map_commands ()
+    Lwt_result_syntax.return @@ Plugin.Baker_commands_helpers.map_commands ()
   in
 
   (* This call is not strictly necessary as the parameters are initialized
@@ -78,21 +77,16 @@ let spawn_baker protocol_hash ~baker_args =
   let baker_args = "./mock-binary" :: baker_args in
   let cancel_promise, canceller = Lwt.wait () in
   let* thread =
-    match Protocol_plugin.find_agnostic_baker_plugin protocol_hash with
-    | Some plugin ->
-        (* The internal event logging needs to be closed, because another one will be
-           initialised in the [run_baker_binary]. *)
-        let*! () = Tezos_base_unix.Internal_event_unix.close () in
-        return
-        @@ run_thread
-             plugin
-             ~baker_args
-             ~cancel_promise
-             ~logs_path:Parameters.default_daily_logs_path
-    | None ->
-        tzfail
-          (Missing_agnostic_baker_plugin
-             (Protocol_hash.to_short_b58check protocol_hash))
+    let*? plugin = Protocol_plugins.proto_plugin_for_protocol protocol_hash in
+    (* The internal event logging needs to be closed, because another one will be
+       initialised in the [run_baker_binary]. *)
+    let*! () = Tezos_base_unix.Internal_event_unix.close () in
+    return
+    @@ run_thread
+         plugin
+         ~baker_args
+         ~cancel_promise
+         ~logs_path:Parameters.default_daily_logs_path
   in
   let*! () = Agnostic_baker_events.(emit baker_running) protocol_hash in
   return {protocol_hash; process = {thread; canceller}}

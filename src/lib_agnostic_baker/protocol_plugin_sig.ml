@@ -5,10 +5,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Plugin : Protocol_plugin_sig.S = struct
-  let protocol_hash = Protocol.hash
-
-  module Baker_commands_helpers = Baker_commands_helpers
+module type BAKER_COMMANDS_HELPERS = sig
+  val map_commands :
+    unit -> Tezos_client_base.Client_context.full Tezos_clic.command list
 end
 
-let () = Protocol_plugins.register (module Plugin)
+module type S = sig
+  val protocol_hash : Protocol_hash.t
+
+  module Baker_commands_helpers : BAKER_COMMANDS_HELPERS
+end

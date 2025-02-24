@@ -5,10 +5,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Plugin : Protocol_plugin_sig.S = struct
-  let protocol_hash = Protocol.hash
-
-  module Baker_commands_helpers = Baker_commands_helpers
-end
-
-let () = Protocol_plugins.register (module Plugin)
+include Protocol_plugin_sig.BAKER_COMMANDS_HELPERS

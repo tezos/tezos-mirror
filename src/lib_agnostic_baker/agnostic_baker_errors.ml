@@ -11,7 +11,6 @@ type error +=
   | Cannot_connect_to_node of string
   | Cannot_decode_node_data of string
   | Missing_current_baker
-  | Missing_agnostic_baker_plugin of string
   | Baker_process_error
 
 let () =
@@ -55,20 +54,6 @@ let () =
     Data_encoding.(unit)
     (function Missing_current_baker -> Some () | _ -> None)
     (fun () -> Missing_current_baker) ;
-  Error_monad.register_error_kind
-    `Permanent
-    ~id:"agnostic_baker.missing_agnostic_baker_plugin"
-    ~title:"Missing agnostic baker plugin"
-    ~description:"Missing agnostic baker plugin."
-    ~pp:(fun ppf proto_hash ->
-      Format.fprintf
-        ppf
-        "Cannot find agnostic baker plugin for protocol %s"
-        proto_hash)
-    Data_encoding.(obj1 (req "proto_hash" string))
-    (function
-      | Missing_agnostic_baker_plugin proto_hash -> Some proto_hash | _ -> None)
-    (fun proto_hash -> Missing_agnostic_baker_plugin proto_hash) ;
   Error_monad.register_error_kind
     `Permanent
     ~id:"agnostic_baker.baker_process_error"

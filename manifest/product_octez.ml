@@ -5354,7 +5354,6 @@ let octez_experimental_agnostic_baker_lib =
         data_encoding |> open_;
         octez_base |> open_ ~m:"TzPervasives" |> open_;
         octez_base_unix |> open_;
-        octez_validation |> open_;
         octez_client_base_unix |> open_;
         octez_node_config;
         octez_client_commands |> open_;

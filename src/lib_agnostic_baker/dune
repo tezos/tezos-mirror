@@ -11,7 +11,6 @@
   octez-libs.data-encoding
   octez-libs.base
   octez-libs.base.unix
-  octez-shell-libs.validation
   octez-shell-libs.client-base-unix
   octez-node-config
   octez-shell-libs.client-commands)
@@ -21,6 +20,5 @@
   -open Tezos_base.TzPervasives
   -open Tezos_base
   -open Tezos_base_unix
-  -open Tezos_validation
   -open Tezos_client_base_unix
   -open Tezos_client_commands))

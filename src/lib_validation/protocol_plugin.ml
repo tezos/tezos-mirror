@@ -165,13 +165,6 @@ module type SHELL_HELPERS = sig
     Tezos_protocol_environment.Context.t -> int32 option Lwt.t
 end
 
-module type AGNOSTIC_BAKER_PLUGIN = sig
-  val hash : Protocol_hash.t
-
-  val map_commands :
-    unit -> Tezos_client_base.Client_context.full Tezos_clic.command list
-end
-
 let rpc_table : (module RPC) Protocol_hash.Table.t =
   Protocol_hash.Table.create 5
 
@@ -183,10 +176,6 @@ let http_cache_headers_table : (module HTTP_CACHE_HEADERS) Protocol_hash.Table.t
   Protocol_hash.Table.create 5
 
 let shell_helpers_table : (module SHELL_HELPERS) Protocol_hash.Table.t =
-  Protocol_hash.Table.create 5
-
-let agnostic_baker_plugin_table :
-    (module AGNOSTIC_BAKER_PLUGIN) Protocol_hash.Table.t =
   Protocol_hash.Table.create 5
 
 let register_rpc (module Rpc : RPC) =
@@ -213,18 +202,6 @@ let register_shell_helpers (module Shell_helpers : SHELL_HELPERS) =
     Shell_helpers.hash
     (module Shell_helpers)
 
-let register_agnostic_baker_plugin
-    (module Agnostic_baker_plugin : AGNOSTIC_BAKER_PLUGIN) =
-  assert (
-    not
-      (Protocol_hash.Table.mem
-         agnostic_baker_plugin_table
-         Agnostic_baker_plugin.hash)) ;
-  Protocol_hash.Table.add
-    agnostic_baker_plugin_table
-    Agnostic_baker_plugin.hash
-    (module Agnostic_baker_plugin)
-
 let find_rpc = Protocol_hash.Table.find rpc_table
 
 let find_metrics = Protocol_hash.Table.find metrics_table
@@ -232,9 +209,6 @@ let find_metrics = Protocol_hash.Table.find metrics_table
 let find_http_cache_headers = Protocol_hash.Table.find http_cache_headers_table
 
 let find_shell_helpers = Protocol_hash.Table.find shell_helpers_table
-
-let find_agnostic_baker_plugin =
-  Protocol_hash.Table.find agnostic_baker_plugin_table
 
 let safe_find_metrics hash =
   match find_metrics hash with
