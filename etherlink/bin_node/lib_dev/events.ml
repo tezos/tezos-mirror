@@ -347,6 +347,16 @@ let predownload_kernel =
     ~msg:"kernel {version} successfully predownloaded"
     ("version", Data_encoding.string)
 
+let predownload_kernel_failed =
+  Internal_event.Simple.declare_2
+    ~level:Warning
+    ~section
+    ~name:"predownload_kernel_failed"
+    ~msg:"failed to predownload kernel {version} due to: {error}"
+    ~pp2:Error_monad.pp_print_trace
+    ("version", Data_encoding.string)
+    ("error", trace_encoding)
+
 let sandbox_started =
   Internal_event.Simple.declare_1
     ~level:Notice
@@ -443,6 +453,9 @@ let retrying_connect ~endpoint ~delay =
 let preload_kernel commit = emit preload_kernel commit
 
 let patched_state key level = emit patched_state (key, level)
+
+let predownload_kernel_failed root_hash error =
+  emit predownload_kernel_failed (Hex.show root_hash, error)
 
 let predownload_kernel root_hash = emit predownload_kernel (Hex.show root_hash)
 

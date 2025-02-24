@@ -204,6 +204,9 @@ val wait_for_blueprint_finalized : ?timeout:float -> t -> int -> unit Lwt.t
 val wait_for_predownload_kernel :
   ?timeout:float -> t -> root_hash:string -> unit Lwt.t
 
+val wait_for_predownload_kernel_failed :
+  ?timeout:float -> t -> root_hash:string -> unit Lwt.t
+
 (** [wait_for_blueprint_invalid ~timeout evm_node] waits until
     [evm_node] has seen an invalid blueprint. *)
 val wait_for_blueprint_invalid : ?timeout:float -> t -> unit Lwt.t

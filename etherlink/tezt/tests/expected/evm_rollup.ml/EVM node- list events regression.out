@@ -1483,6 +1483,20 @@ sandbox_started:
          Decimal representation of a big number */
       string
 
+predownload_kernel_failed:
+  description: failed to predownload kernel {version} due to: {error}
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* predownload_kernel_failed version 0 */
+      "predownload_kernel_failed.v0": { "version": $unistring,
+                                        "error": any } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+
 predownload_kernel:
   description: kernel {version} successfully predownloaded
   level: notice

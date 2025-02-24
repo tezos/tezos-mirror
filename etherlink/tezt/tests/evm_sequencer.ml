@@ -6681,6 +6681,97 @@ let test_preimages_endpoint =
     ~error_msg:"The sequencer should have used the file server" ;
   unit
 
+let test_preimages_endpoint_retry =
+  (* Add a delay between first block and activation timestamp. *)
+  let genesis_timestamp =
+    Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
+  in
+  let activation_timestamp = "2020-01-01T00:00:10Z" in
+  register_all
+    ~sequencer:Constant.bootstrap1
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "sequencer"; "preimages_endpoint"; "retry"; Tag.slow]
+    ~title:"Sequencer use remote server to get preimages with retries"
+    ~kernels:[Latest]
+    ~additional_uses:[Constant.WASM.ghostnet_evm_kernel]
+    ~genesis_timestamp
+  @@ fun {
+           sc_rollup_node;
+           l1_contracts;
+           sc_rollup_address;
+           client;
+           sequencer;
+           proxy;
+           _;
+         }
+             _protocol ->
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = Evm_node.terminate sequencer in
+  let finalizeL1 () =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  (* Prepares the sequencer without [preimages-dir], to force the use of
+     preimages endpoint. *)
+  let sequencer_mode_without_preimages_dir =
+    match Evm_node.mode sequencer with
+    | Evm_node.Sequencer mode ->
+        Evm_node.Sequencer {mode with preimage_dir = None}
+    | Evm_node.Threshold_encryption_sequencer mode ->
+        Evm_node.Threshold_encryption_sequencer {mode with preimage_dir = None}
+    | _ -> assert false
+  in
+  let new_sequencer =
+    Evm_node.create
+      ~mode:sequencer_mode_without_preimages_dir
+      (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+  let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
+  let* () = finalizeL1 () in
+  let* () =
+    Evm_node.init_from_rollup_node_data_dir new_sequencer sc_rollup_node
+  in
+  (* Sends an upgrade with new preimages. *)
+  let* root_hash =
+    upgrade
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~admin:Constant.bootstrap2.public_key_hash
+      ~admin_contract:l1_contracts.admin
+      ~client
+      ~upgrade_to:Constant.WASM.ghostnet_evm_kernel
+      ~activation_timestamp
+  in
+  let* () = finalizeL1 () in
+  let provider_port = Port.fresh () in
+  let preimages_endpoint =
+    sf "http://%s:%d" Constant.default_host provider_port
+  in
+  let* () =
+    Evm_node.run
+      ~extra_arguments:["--preimages-endpoint"; preimages_endpoint]
+      new_sequencer
+  in
+  let* () =
+    Evm_node.wait_for_predownload_kernel_failed new_sequencer ~root_hash
+  in
+  (* Create a file server that serves the preimages. *)
+  let served = ref false in
+  Sc_rollup_helpers.serve_files
+    ~name:"preimages_server"
+    ~port:provider_port
+    ~root:(Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0")
+    ~on_request:(fun _ -> served := true)
+  @@ fun () ->
+  let* _ =
+    Evm_node.wait_for_predownload_kernel ~timeout:90. new_sequencer ~root_hash
+  in
+  Check.is_true
+    !served
+    ~error_msg:"The sequencer should have used the file server" ;
+  unit
+
 let test_store_smart_rollup_address =
   register_all
     ~time_between_blocks:Nothing
@@ -10255,6 +10346,7 @@ let () =
   test_blueprint_limit_with_delayed_inbox protocols ;
   test_reset protocols ;
   test_preimages_endpoint protocols ;
+  test_preimages_endpoint_retry protocols ;
   test_store_smart_rollup_address protocols ;
   test_replay_rpc protocols ;
   test_trace_transaction protocols ;
