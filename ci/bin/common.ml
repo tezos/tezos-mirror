@@ -180,8 +180,8 @@ let enable_sccache ?key ?error_log ?idle_timeout ?log
   |> append_after_script ["./scripts/ci/sccache-stop.sh"]
 
 (** Enable caching of Cargo's target folder which stores files which
-    can speed up subsequent compilation passes. 
-        
+    can speed up subsequent compilation passes.
+
     All folders are stored in a single cacheable directory to work
     around GitLab's restriction on the number caches a job may have. *)
 let enable_cargo_target_caches ?key job =
@@ -629,6 +629,7 @@ let changeset_mir_tzt =
      (they do not build experimental executables) *)
 let job_build_static_binaries ~__POS__ ~arch ?(cpu = Normal)
     ?(executable_files = "script-inputs/octez-released-executables")
+    ?(experimental_executables = "script-inputs/octez-experimental-executables")
     ?version_executable ?(release = false) ?rules ?dependencies () : tezos_job =
   let arch_string = arch_to_string arch in
   let name = "oc.build:static-" ^ arch_string ^ "-linux-binaries" in
@@ -639,8 +640,7 @@ let job_build_static_binaries ~__POS__ ~arch ?(cpu = Normal)
   in
   let executable_files =
     executable_files
-    ^
-    if not release then " script-inputs/octez-experimental-executables" else ""
+    ^ if not release then " " ^ experimental_executables else ""
   in
   let version_executable =
     match version_executable with
