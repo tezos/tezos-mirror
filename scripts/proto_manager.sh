@@ -14,8 +14,16 @@ commits=0
 is_snapshot=false
 source_hash=""
 source_label=""
+long_hash=""
 short_hash=""
 capitalized_label=""
+
+skip_copy_source=""
+skip_update_protocol_tests=""
+skip_update_source=""
+skip_update_tezt_tests=""
+skip_misc_updates=""
+skip_generate_doc=""
 
 ## Log colors:
 if [[ -t 1 ]]; then
@@ -260,6 +268,7 @@ while true; do
     ;;
   -f | --from)
     protocol_source="$2"
+    source_hash=$(grep -oP '(?<="hash": ")[^"]*' "src/proto_${protocol_source}/lib_protocol/TEZOS_PROTOCOL")
     shift 2
     ;;
   -t | --to)
@@ -276,6 +285,30 @@ while true; do
     ;;
   --force-snapshot | -F)
     is_snapshot=true
+    shift
+    ;;
+  --skip-copy-source)
+    skip_copy_source=true
+    shift
+    ;;
+  --skip-protocol-tests)
+    skip_update_protocol_tests=true
+    shift
+    ;;
+  --skip-update-source)
+    skip_update_source=true
+    shift
+    ;;
+  --skip-update-tezt-tests)
+    skip_update_tezt_tests=true
+    shift
+    ;;
+  --skip-misc-updates)
+    skip_misc_updates=true
+    shift
+    ;;
+  --skip-generate-doc)
+    skip_generate_doc=true
     shift
     ;;
   *)
@@ -493,12 +526,12 @@ function sanity_check_before_script() {
   fi
   case ${command} in
   stabilise | snapshot | copy)
-    if [[ -d "src/proto_${version}" ]]; then
+    if [[ -d "src/proto_${version}" && ! ${skip_copy_source} ]]; then
       error "'src/proto_${version}'" "already exists, you should remove it."
       print_and_exit 1 "${LINENO}"
     fi
 
-    if [[ -d "docs/${label}" ]]; then
+    if [[ -d "docs/${label}" && ! ${skip_generate_doc} ]]; then
       error "'docs/${label}'" "already exists, you should remove it."
       print_and_exit 1 "${LINENO}"
     fi
@@ -512,7 +545,40 @@ function sanity_check_before_script() {
   esac
 }
 
+# Assert that ${version} and ${label} are already defined
+function update_hashes() {
+  if [[ -n "${long_hash}" && -n "${short_hash}" ]]; then
+    log_cyan "Hashes already known"
+    log_cyan "Long hash: ${long_hash}"
+    log_cyan "Short hash: ${short_hash}"
+  elif [ -e "src/proto_${version}/lib_protocol" ]; then
+    log_cyan "Computing hash"
+    long_hash=$(./octez-protocol-compiler -hash-only "src/proto_${version}/lib_protocol")
+    short_hash=$(echo "${long_hash}" | head -c 8)
+    log_magenta "Long hash computed: ${long_hash}"
+    log_magenta "Short hash: ${short_hash}"
+    log_cyan "Updating protocol name and version variables"
+    if [[ ${is_snapshot} == true ]]; then
+      new_protocol_name="${version}_${short_hash}"
+      new_tezos_protocol="${version}-${short_hash}"
+      new_versioned_name="${version}_${label}"
+    else
+      new_protocol_name="${version}"
+      new_tezos_protocol="${version}"
+      new_versioned_name="${label}"
+    fi
+  else
+    log_magenta "Can't find src/proto_${version}/lib_protocol"
+    exit 1
+  fi
+}
+
 function copy_source() {
+
+  if [[ $skip_copy_source ]]; then
+    echo "Skipping copy_source step"
+    return 0
+  fi
 
   # Create proto_beta source-code
 
@@ -576,11 +642,7 @@ function copy_source() {
     commit_if_changes "src: restore default vanity nonce"
   fi
 
-  log_cyan "Computing hash"
-  long_hash=$(./octez-protocol-compiler -hash-only "src/proto_${version}/lib_protocol")
-  short_hash=$(echo "${long_hash}" | head -c 8)
-  log_magenta "Hash computed: ${long_hash}"
-  log_magenta "Short hash: ${short_hash}"
+  update_hashes
 
   if [[ ${is_snapshot} == true ]]; then
     echo "Current hash is: ${long_hash}"
@@ -616,8 +678,6 @@ function copy_source() {
     fi
   fi
   cd "src/proto_${version}/lib_protocol"
-  # extract hash from  src/${protocol_source}/TEZOS_PROTOCOL in line "hash": "..."
-  source_hash=$(grep -oP '(?<="hash": ")[^"]*' "TEZOS_PROTOCOL")
   # replace fake hash with real hash, this file doesn't influence the hash
   sed -i.old -e 's/"hash": "[^"]*",/"hash": "'"${long_hash}"'",/' \
     TEZOS_PROTOCOL
@@ -626,10 +686,7 @@ function copy_source() {
   cd ../../..
 
   if [[ ${is_snapshot} == true ]]; then
-    echo "Renaming src/proto_${version} to src/proto_${version}_${short_hash}"
-    new_protocol_name="${version}_${short_hash}"
-    new_tezos_protocol="${version}-${short_hash}"
-    new_versioned_name="${version}_${label}"
+    echo "Renaming src/proto_${version} to src/proto_${new_protocol_name}"
 
     if [[ -d "src/proto_${new_protocol_name}" ]]; then
       error "'src/proto_${new_protocol_name}' already exists, you should remove it"
@@ -638,10 +695,6 @@ function copy_source() {
 
     git mv "src/proto_${version}" "src/proto_${new_protocol_name}"
     commit_no_hooks "src: rename proto_${version} to proto_${new_protocol_name}"
-  else
-    new_protocol_name="${version}"
-    new_tezos_protocol="${version}"
-    new_versioned_name="${label}"
   fi
 
   # switch protocol_source with protocol_source_original if it was changed
@@ -723,9 +776,6 @@ function copy_source() {
     commit_no_hooks "src: remove proto_${protocol_source}"
   fi
 
-  # modify the first_argument variable directly
-  eval "$1=$long_hash"
-
   ## update agnostic_baker
   ## add protocol as active before alpha in parameters.ml
   if ! grep -q "${long_hash}" src/bin_agnostic_baker/parameters.ml; then
@@ -739,6 +789,12 @@ function copy_source() {
 }
 
 function update_protocol_tests() {
+
+  if [[ $skip_update_protocol_tests ]]; then
+    echo "Skipping protocol tests update"
+    return 0
+  fi
+
   # Update protocol tests
 
   # Replace test invocation headers that mention protocol_source
@@ -816,6 +872,11 @@ function update_protocol_tests() {
 }
 
 function update_source() {
+
+  if [[ $skip_update_source ]]; then
+    echo "Skipping source update"
+    return 0
+  fi
 
   log_blue "update teztale"
   #  Teztale
@@ -985,6 +1046,11 @@ let register () =
 }
 
 function update_tezt_tests() {
+
+  if [[ $skip_update_tezt_tests ]]; then
+    echo "Skipping tezt tests update"
+    return 0
+  fi
 
   # ensure protocols compile and parameter files are generated
   make
@@ -1188,6 +1254,12 @@ function update_tezt_tests() {
 }
 
 function misc_updates() {
+
+  if [[ $skip_misc_updates ]]; then
+    echo "Skipping miscellaneous updates"
+    return 0
+  fi
+
   # Misc. updates
 
   log_blue "Update kaitai structs"
@@ -1234,6 +1306,11 @@ function misc_updates() {
 }
 
 function generate_doc() {
+
+  if [[ $skip_generate_doc ]]; then
+    echo "Skipping doc generation"
+    return 0
+  fi
 
   if [[ ${command} == "copy" ]]; then
     doc_path="${source_label}"
@@ -1445,8 +1522,9 @@ function snapshot_protocol() {
 
   sanity_check_before_script
 
-  copy_source long_hash
-  short_hash=$(echo "${long_hash}" | head -c 8)
+  copy_source
+
+  update_hashes
 
   update_protocol_tests
 
@@ -1457,6 +1535,7 @@ function snapshot_protocol() {
   misc_updates
 
   generate_doc
+
 }
 
 function delete_from_build() {
@@ -1721,8 +1800,6 @@ function hash() {
 
   log_cyan "Computing hash"
 
-  # extract hash from  src/${protocol_source}/TEZOS_PROTOCOL in line "hash": "..."
-  source_hash=$(grep -oP '(?<="hash": ")[^"]*' "src/proto_${protocol_source}/lib_protocol/TEZOS_PROTOCOL")
   source_short_hash=$(echo "${source_hash}" | head -c 8)
   previous_tag=$(grep "${protocol_source}" tezt/lib_alcotezt/alcotezt_utils.ml | sed -e 's/.*->\s*\["\([^"]*\)"\].*/\1/')
   capitalized_previous_tag=$(tr '[:lower:]' '[:upper:]' <<< "${previous_tag:0:1}")${previous_tag:1}
