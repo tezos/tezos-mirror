@@ -96,4 +96,17 @@ Packages
 
 In Octez v22, the new set of packages, that was introduced in the previous version of Octez, **replaces** the old one in the APT repository. Check :ref:`the documentation <installing_packages>` for more details.
 
-Futhermore, RPM packages are now available in a **dnf repository**. Installation instructions are detailed in :ref:`the documentation <installing_packages>`.
+Therefore, upgrading to the new packages is done as usual with ``apt``.
+Note just that the handling of Zcash parameters is done automatically in the new packages, hence the need to overwrite the old settings::
+
+    $ sudo apt update
+    $ sudo apt upgrade octez-baker -o DPkg::options::="--force-overwrite"
+
+Furthermore, RPM packages are now available in a **dnf repository**. Installation instructions are detailed in :ref:`the documentation <installing_packages>`.
+
+When upgrading to v22, also note that the name of the baker service has changed.
+To restart the baker manually, do::
+
+    $ sudo systemctl stop octez-baker
+    $ sudo systemctl start octez-baker-active
+
