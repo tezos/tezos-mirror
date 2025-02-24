@@ -110,3 +110,7 @@ To restart the baker manually, do::
     $ sudo systemctl stop octez-baker
     $ sudo systemctl start octez-baker-active
 
+Changelog
+---------
+
+- `Version 22.0~rc1 <../CHANGES.html#version-22-0-rc1>`_

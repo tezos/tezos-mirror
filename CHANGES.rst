@@ -25,17 +25,6 @@ be documented here either.
 General
 -------
 
-- Changed the compiler version to 5.2.1 and added a manual job to compile with
-  ocaml 4.14.2. (MR :gl:`!15404`)
-
-- Logging output on TTYs now adapt to the terminal width. (MR :gl:`!12348`)
-
-- Logging output can now advertise the level associated to each events, by
-  enabling the ``advertise-levels`` option in the file-descriptor sink URI. (MR
-  :gl:`!16190`)
-
-- Removed binaries for ParisC. (MR :gl:`!16427`)
-
 Node
 ----
 
@@ -60,48 +49,11 @@ Node
 Client
 ------
 
-- Registered ``operation.bls_mode_unsigned`` encoding. (MR :gl:`!16655`)
-
-- Allow tz4 (BLS) addresses to be registered as delegate and or as consensus
-  keys. (MR :gl:`!15302`)
-
- - **Breaking change** Removed read-write commands specific to ParisC. (MR :gl:`!16431`)
-
 Baker
 -----
 
-- The baker emits a warning when it is started with ``--dal-node``, but the DAL
-  node has no registered attester, that is, it was not started with
-  ``--attester-profiles <manager_key>``. (MR :gl:`!16333`)
-
-- **Breaking change** For ``proto_alpha``, providing the endpoint of a running
-  DAL node is required for the baker to be launched, unless opted out with the
-  newly introduced ``--without-dal`` option. (MR :gl:`!16049`)
-
-- **Breaking change** The baker daemon ``--dal-node-timeout-percentage``
-  argument has been removed. (MR :gl:`!15554`)
-
 Agnostic Baker
 --------------
-
-- Release agnostic baker binary as experimental. (MR :gl:`!16318`)
-
-- Use of a generic watchdog. (MR :gl:`!15508`)
-
-- Change the binary name to ``octez-experimental-agnostic-baker``. (MR :gl:`!16434`)
-
-- Added a mechanism for the agnostic baker to switch on new protocol. (MR :gl:`!15305`)
-
-- Introduced a dummy agnostic baker. (MR :gl:`!15029`)
-
-Overview: The Agnostic Baker is a protocol-independent binary that dynamically determines
-and executes the appropriate baking binary based on the active protocol. It continuously
-monitors the blockchain state and automatically transitions to the correct binary whenever
-a new protocol is detected, such as during migrations or at startup.
-
-Please note that this feature is in an EXPERIMENTAL phase, as clearly suggested by its name.
-Therefore, it should NOT be used on ``mainnet``. For further clarifications, you can consult
-the README from ``src/bin_agnostic_baker``.
 
 Accuser
 -------
@@ -112,151 +64,17 @@ Proxy Server
 Protocol Compiler And Environment
 ---------------------------------
 
-- Added a new version of the protocol environment (V14). (MR :gl:`!15345`)
-
-- Added a new version of the protocol environment (V15). (MR :gl:`!16599`)
-
 Codec
 -----
 
 Docker Images
 -------------
 
-- Fixed the Docker ``octez-snapshot-import`` command to properly pass
-  arguments to the snapshot import process. (MR :gl:`!11259`)
-
 Smart Rollup node
 -----------------
 
-- In the bailout mode there was a bug where the wrong key was used
-  when recovering the bond. The node uses the ``cementing`` key and not
-  the ``operating`` key. (MR :gl:`!16016`).
-
-- updated RPC ``DELETE /admin/injector/queues`` with new query to
-  clear injector queues based on priority order. The RPC can takes two
-  optional arguments:
-
-  + ``order_below``: an integer that filters out all operations with
-    order strictly inferior to it.
-
-  + ``drop_no_order``: a boolean that if true remove all operations
-    that has no order specified. ``false`` by default.
-
-  When ``tag`` is specified only operation of that type will be
-  considered, else all operations are considered.(MR :gl:`!15929`)
-
-- Added RPC ``DELETE /admin/batcher/queue``, which can take two optional
-  arguments:
-
-  + ``order_below``: an integer that filters all messages with order
-    inferior to it.
-
-  + ``drop_no_order``: a boolean that if true remove all messages that
-    has no order specified. ``false` by default. If no ``order_below``
-    is specified it completely clear the queue.
-
-  (MR :gl:`!15929`)
-
-- Updated RPC ``/local/batcher/injection`` with a new query argument
-  possibility. When the rpc contains ``"drop_duplicate": true`` then
-  the batcher will drop the messages that were already injected with a
-  previous RPC call.  If ``"drop_duplicate": false`` then the rollup
-  node defaults to its the previous behavior, where messages are
-  injected again, even if the exact same one was previously
-  injected. By default ``"drop_duplicate": false``. (MR :gl:`!13165`)
-
-- RPC ``/health`` now returns meaningful health related data to asses if the
-  rollup node operates correctly. Old ``/health`` RPC is renamed to ``/ping``.
-  (MR :gl:`!12940`)
-
-- Use a local cache per game for intermediate states of dissections. (MR
-  :gl:`!12899`)
-
-- Introduce the 5th version of the WASM PVM, which defaults to a higher tick
-  limits to delegate refutability to the kernels. (MR :gl:`!12999`)
-
-- Trigger GC every 1000 blocks (instead of 100) by default to reduce CPU
-  consumption. (MR :gl:`!13177`)
-
-- Default history mode is now "full". (MR :gl:`!13178`)
-
-- Allow to import archive snapshots in "full" rollup node. (MR :gl:`!13186`)
-
-- Fix a bug in how commitments are computed after a protocol migration
-  where the the commitment period changes. (MR :gl:`!13588`)
-
-- Ensure penultimate commitment is published on snapshot export as a
-  failsafe. (MR :gl:`!13544`)
-
-- Include commitment publication information in snapshots. (MR :gl:`!13724`)
-
-- Under-approximate publication level for cementation when it is missing. (MR
-  :gl:`!13725`)
-
-- New metrics for the rollup node, including performance ones which can be
-  enabled with the flag ``--enable-performance-metrics`` (requires
-  ``lsof``). (MR :gl:`!12290`)
-
-- Addition of ``elapsed_time`` to performance metrics,
-  which exposes in seconds the time since the node started. (MR :gl:`!16551`)
-
-- Rotate multiple batcher keys in injector so that they are used evenly. (MR
-  :gl:`!14194`)
-
-- RPC ``/global/block/<block_id>?outbox=true`` now returns the outbox messages
-  produced by the PVM for ``block_id`` if the query parameter ``outbox`` is
-  present. (MR :gl:`!14140`)
-
-- Introduce the 6th version of the WASM PVM. (MR :gl:`!14493`)
-
-- New RPC ``GET /admin/cancel_gc`` to cancel any on-going garbage collection in
-  the rollup node. (MR :gl:`!14693`)
-
-- Refined GC for rollup node is now triggered every ~3 days to make it less
-  wasteful on resources. Gc is not run anymore after importing an archive
-  snapshot in a full node. (MR :gl:`!14717`)
-
-- The command ``snapshot export`` tries to cancel ongoing GC, if any. Add
-  ``--rollup-node-endpoint`` to specify the RPC server endpoint, if the address
-  and port of the running node have been changed via command-line arguments. (MR
-  :gl:`!14694`)
-
-- Fixed an issue which could introduce a discrepancy between the snapshot header
-  and its content. (MR :gl:`!14777`)
-
-- RPC ``/global/block/<block_id>/outbox/<outbox_level>/messages`` now fails if
-  ``outbox_level`` is above the level of ``block_id``. (MR :gl:`!14911`)
-
-- Improved error messages for RPC
-  ``/global/block/<block_id>/helpers/proofs/outbox/<outbox_level>/messages?index=<message_index>``. (MR :gl:`!15507`)
-
-- Paginate RPC for durable storage subkeys
-  ``/global/block/<block_id>/durable/wasm_2_0_0/subkeys?key=<key>&offset=<offset>&length=<length>``,
-  with new query parameters ``offset`` and ``length``. (MR :gl:`!15625`)
-
-- Fixed file descriptor leak in resto for connections with the L1 node.
-  (MR :gl:`!15322`)
-
-- Fixed potential issue with store with SQLite < 3.35. (MR :gl:`!15631`)
-- Improved error messages for RPC
-  ``/global/block/<block_id>/helpers/proofs/outbox/<outbox_level>/messages?index=<message_index>``. (MR :gl:`!15507`)
-
-- Fix potential issue with store with SQLite < 3.35. (MR :gl:`!15631`)
-
-- New CLI switch ``--unsafe-disable-wasm-kernel-checks`` which allows to bypass
-  invalid kernel checks in the WASM VM, for use by jstz. (MR :gl:`!15910`)
-
-- Support ``remote`` signer scheme and check remote signer available on
-  startup. (MR :gl:`!16651`)
-
 Smart Rollup WASM Debugger
 --------------------------
-
-Data Availability Committee (DAC)
----------------------------------
-
-- **Breaking_change** DAC node and client have been removed to
-  simplify the codebase. (MR :gl:`!14862`)
 
 Data Availability Layer (DAL)
 -----------------------------
@@ -332,5 +150,3 @@ Protocol
 
 Miscellaneous
 -------------
-
-- Renamed ``Bls`` file from the crypto library in ``Bls_aug.ml``. (MR :gl:`!16683`).
