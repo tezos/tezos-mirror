@@ -29,7 +29,7 @@ use super::{
 use crate::{
     default::ConstDefault,
     instruction_context::{ICB, IcbLoweringFn},
-    interpreter::{c, i, load_store},
+    interpreter::{c, i, integer, load_store},
     machine_state::ProgramCounterUpdate::{Next, Set},
     parser::instruction::{
         AmoArgs, CIBDTypeArgs, CIBNZTypeArgs, CIBTypeArgs, CJTypeArgs, CNZRTypeArgs, CRJTypeArgs,
@@ -598,6 +598,7 @@ impl OpCode {
             Self::Mv => Some(Args::run_mv),
             Self::Nop => Some(Args::run_nop),
             Self::Add => Some(Args::run_add),
+            Self::And => Some(Args::run_and),
             Self::Li => Some(Args::run_li),
             _ => None,
         }
@@ -1132,7 +1133,7 @@ impl Args {
     impl_r_type!(run_sub, non_zero);
     impl_r_type!(run_xor, non_zero);
     impl_r_type!(run_or, non_zero);
-    impl_r_type!(run_and, non_zero);
+    impl_r_type!(integer::run_and, run_and, non_zero);
     impl_r_type!(run_sll, non_zero);
     impl_r_type!(run_srl, non_zero);
     impl_r_type!(run_sra, non_zero);

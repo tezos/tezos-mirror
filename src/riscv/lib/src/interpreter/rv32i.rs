@@ -79,16 +79,6 @@ where
         self.write_nz(rd, result)
     }
 
-    /// Saves in `rd` the bitwise AND between the value in `rs1` and `rs2`
-    ///
-    /// Relevant RISC-V opcodes:
-    /// - `AND`
-    /// - `C.AND`
-    pub fn run_and(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
-        let result = self.read_nz(rs1) & self.read_nz(rs2);
-        self.write_nz(rd, result)
-    }
-
     /// Saves in `rd` the bitwise OR between the value in `rs1` and `rs2`
     ///
     /// Relevant RISC-V opcodes:
@@ -405,7 +395,7 @@ mod tests {
 
     use crate::{
         backend_test, create_state,
-        interpreter::i::run_add,
+        interpreter::{i::run_add, integer::run_and},
         machine_state::{
             MachineCoreState, MachineCoreStateLayout, ProgramCounterUpdate,
             csregisters::{
@@ -667,32 +657,33 @@ mod tests {
     });
 
     backend_test!(test_bitwise_reg, F, {
+        // TODO: RV-512: move to integer.rs once all are supported.
         proptest!(|(v1 in any::<u64>(), v2 in any::<u64>())| {
-            let mut state = create_state!(XRegisters, F);
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
 
-            state.write(a0, v1);
-            state.write(t3, v2);
-            state.run_and(nz::t3, nz::a0, nz::a1);
-            prop_assert_eq!(state.read(a1), v1 & v2);
+            state.hart.xregisters.write(a0, v1);
+            state.hart.xregisters.write(t3, v2);
+            run_and(&mut state, nz::t3, nz::a0, nz::a1);
+            prop_assert_eq!(state.hart.xregisters.read(a1), v1 & v2);
 
-            state.write(a0, v1);
-            state.write(t3, v2);
-            state.run_or(nz::t3, nz::a0, nz::a0);
-            prop_assert_eq!(state.read(a0), v1 | v2);
+            state.hart.xregisters.write(a0, v1);
+            state.hart.xregisters.write(t3, v2);
+            state.hart.xregisters.run_or(nz::t3, nz::a0, nz::a0);
+            prop_assert_eq!(state.hart.xregisters.read(a0), v1 | v2);
 
-            state.write(t2, v1);
-            state.write(t3, v2);
-            state.run_xor(nz::t3, nz::t2, nz::t1);
-            prop_assert_eq!(state.read(t1), v1 ^ v2);
+            state.hart.xregisters.write(t2, v1);
+            state.hart.xregisters.write(t3, v2);
+            state.hart.xregisters.run_xor(nz::t3, nz::t2, nz::t1);
+            prop_assert_eq!(state.hart.xregisters.read(t1), v1 ^ v2);
 
             // Same register
-            state.write(a0, v1);
-            state.run_and(nz::a0, nz::a0, nz::a1);
-            prop_assert_eq!(state.read(a1), v1);
-            state.run_or(nz::a0, nz::a0, nz::a1);
-            prop_assert_eq!(state.read(a1), v1);
-            state.run_xor(nz::a0, nz::a0, nz::a0);
-            prop_assert_eq!(state.read(a0), 0);
+            state.hart.xregisters.write(a0, v1);
+            run_and(&mut state, nz::a0, nz::a0, nz::a1);
+            prop_assert_eq!(state.hart.xregisters.read(a1), v1);
+            state.hart.xregisters.run_or(nz::a0, nz::a0, nz::a1);
+            prop_assert_eq!(state.hart.xregisters.read(a1), v1);
+            state.hart.xregisters.run_xor(nz::a0, nz::a0, nz::a0);
+            prop_assert_eq!(state.hart.xregisters.read(a0), 0);
         });
     });
 
