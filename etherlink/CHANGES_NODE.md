@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Configuration changes
+
+### RPCs changes
+
+### Metrics changes
+
+### Execution changes
+
+### Storage changes
+
 ## Version 0.18 (2025-02-24)
 
 This releases notably includes support for executing the Calypso kernel
