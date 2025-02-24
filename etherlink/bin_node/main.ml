@@ -515,7 +515,8 @@ let init_from_snapshot_arg =
        built-in provider `https://snapshotter-sandbox.nomadic-labs.eu`. %r is \
        replaced by the short form of the Smart Rollup address, %R by the \
        complete Smart Rollup address, %n by the network (given by the argument \
-       --network), and %% by %. Also accepts a path to an existing snapshot."
+       --network), %h by the history mode used by the node, and %% by %. Also \
+       accepts a path to an existing snapshot."
     ~default:
       "https://snapshotter-sandbox.nomadic-labs.eu/etherlink-%n/evm-snapshot-%r-latest.gz"
     ~placeholder:"snapshot url"
@@ -818,9 +819,10 @@ let snapshot_file_arg =
     ~doc:
       "Path to the snapshot file to create, with string interpolation. %r is \
        replaced by the short form of the Smart Rollup address, %R by the \
-       complete Smart Rollup address, %l by the current head of the node, and \
-       %% by %. Default is located in the current directory, and the filename \
-       is based on the snapshot information."
+       complete Smart Rollup address, %l by the current head of the node, %h \
+       by the history mode used by the node, and %% by %. Default is located \
+       in the current directory, and the filename is based on the snapshot \
+       information."
     Params.string
 
 let websocket_checks config =

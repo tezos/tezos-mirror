@@ -26,7 +26,7 @@ Snapshots commands:
                      [--uncompressed]
     Export a snapshot of the EVM node.
     --data-dir <data-dir>: The path to the EVM node data directory
-    -s --snapshot-file <path>: Path to the snapshot file to create, with string interpolation. %r is replaced by the short form of the Smart Rollup address, %R by the complete Smart Rollup address, %l by the current head of the node, and %% by %. Default is located in the current directory, and the filename is based on the snapshot information.
+    -s --snapshot-file <path>: Path to the snapshot file to create, with string interpolation. %r is replaced by the short form of the Smart Rollup address, %R by the complete Smart Rollup address, %l by the current head of the node, %h by the history mode used by the node, and %% by %. Default is located in the current directory, and the filename is based on the snapshot information.
     --compress-on-the-fly: Produce a compressed snapshot on the fly. The rollup node will use less disk space to produce the snapshot but will lock the rollup node (if running) for a longer time. Without this option, producing a snaphsot requires the available disk space to be around the size of the data dir.
     --uncompressed: Produce an uncompressed snapshot.
   
@@ -245,7 +245,7 @@ Miscellaneous commands:
     --initial-kernel <evm_installer.wasm>: Path to the EVM kernel used to launch the PVM, it will be loaded from storage afterward
     --dont-track-rollup-node: Disable tracking the head of the rollup node. Tracking the state of a rollup node allows to confirm the blocks received from the upstream EVM node.
     --no-sync: Disable tracking the head of the EVM node endpoint
-    --init-from-snapshot [snapshot url]: Automatically download and import a recent snapshot for supported networks on fresh data directories. If no snapshot provider is given e.g. `--init-from-snapshot` with no argument, then it uses the default built-in provider `https://snapshotter-sandbox.nomadic-labs.eu`. %r is replaced by the short form of the Smart Rollup address, %R by the complete Smart Rollup address, %n by the network (given by the argument --network), and %% by %. Also accepts a path to an existing snapshot.
+    --init-from-snapshot [snapshot url]: Automatically download and import a recent snapshot for supported networks on fresh data directories. If no snapshot provider is given e.g. `--init-from-snapshot` with no argument, then it uses the default built-in provider `https://snapshotter-sandbox.nomadic-labs.eu`. %r is replaced by the short form of the Smart Rollup address, %R by the complete Smart Rollup address, %n by the network (given by the argument --network), %h by the history mode used by the node, and %% by %. Also accepts a path to an existing snapshot.
     --network <network>: The network the EVM node will be connecting to. Can be `mainnet` or `testnet`. If set, additional sanity checks are performed on the node’s startup.
   
   octez-evm-node experimental run rpc [--data-dir <data-dir>]

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Breaking changes
+
+- The default snapshot filename has been changed from
+  `evm-snapshot-<rollup_address>-<head>` to
+  `evm-<history_mode>-snapshot-<rollup_address>-<head>`. (!16946)
+
 ### Configuration changes
 
 - Observer `--init-from-snapshot` now also accepts a path to an existing
@@ -14,6 +20,10 @@
 ### Execution changes
 
 ### Storage changes
+
+- Adds support for the `%h` variable in the `snapshot export` and `run observer
+  --init-from-snapshot` commands, to generalize over the current history mode
+  of the node. (!16946)
 
 ## Version 0.18 (2025-02-24)
 
