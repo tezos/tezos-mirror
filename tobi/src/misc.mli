@@ -7,6 +7,9 @@
 
 (** Miscellaneous definitions. *)
 
+(** Same as [Printf.sprintf]. *)
+val sf : ('a, Format.formatter, unit, string) format4 -> 'a
+
 (** Same as [Filename.concat]. *)
 val ( // ) : string -> string -> string
 
@@ -40,6 +43,9 @@ val memoize : ('a -> 'b) -> 'a -> 'b
     - [str_split_once "a,bc" ','] is [Some ("a", "bc")].
     - [str_split_once "a,b,c" ','] is [Some ("a", "b,c")]. *)
 val str_split_once : string -> char -> (string * string) option
+
+(** Same as [Unix.close], but ignore errors. *)
+val close : Unix.file_descr -> unit
 
 (** {2 Error Handling} *)
 

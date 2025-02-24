@@ -24,6 +24,16 @@ let find_project_root () =
 
 (* Command-line options. *)
 module CLI = struct
+  (* Custom argument types. *)
+  module Type = struct
+    let version =
+      Clap.typ
+        ~name:"version"
+        ~dummy:Version.Dev
+        ~parse:(fun s -> Some (Version.parse s))
+        ~show:Version.show
+  end
+
   let verbose =
     Clap.flag
       ~set_long:"verbose"
@@ -34,7 +44,19 @@ module CLI = struct
   (* Subcommands. *)
   module Command = struct
     let list =
-      Clap.case "list" ~description:"List components." @@ fun () -> `list
+      Clap.case "list" ~description:"List components." @@ fun () ->
+      let version =
+        Clap.default
+          Type.version
+          ~long:"version"
+          ~placeholder:"VERSION"
+          ~description:
+            "List components that are available in VERSION, which can be 'dev' \
+             or a Git commit hash, branch name or tag. 'dev' denotes the \
+             version in the working directory."
+          Dev
+      in
+      `list version
   end
 
   let command = Clap.subcommand Command.[list]
@@ -50,7 +72,8 @@ let main () =
   Sys.chdir project_root ;
 
   (* Dispatch commands. *)
-  match CLI.command with `list -> Cmd_list.run ~verbose:CLI.verbose
+  match CLI.command with
+  | `list version -> Cmd_list.run ~verbose:CLI.verbose version
 
 (* Entrypoint: call [main] and handle errors. *)
 let () =

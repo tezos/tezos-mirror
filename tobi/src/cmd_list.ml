@@ -7,8 +7,8 @@
 
 open Misc
 
-let run ~verbose =
-  let* config = Config.load () in
+let run ~verbose version =
+  let* config = Config.load version in
   list_iter_r (Config.components config) @@ fun component ->
   (* Output component name. *)
   echo "%s" component.name ;

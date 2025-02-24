@@ -5,7 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Misc
+type t = Dev | Old of string
 
-(** Run the [list] CLI command. *)
-val run : verbose:bool -> Version.t -> (unit, [> `failed] error) result
+let parse = function "dev" -> Dev | v -> Old v
+
+let show = function Dev -> "dev" | Old v -> v

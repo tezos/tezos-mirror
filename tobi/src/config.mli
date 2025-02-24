@@ -74,4 +74,4 @@ val components : t -> component list
 
     This fetches file ["tobi/config"] for the given version and parses it.
     In particular this can fetch versions from older commits. *)
-val load : unit -> (t, [> `failed]) r
+val load : Version.t -> (t, [> `failed]) r

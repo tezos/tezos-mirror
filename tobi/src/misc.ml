@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let sf = Format.asprintf
+
 let ( // ) = Filename.concat
 
 let default x = function None -> x | Some x -> x
@@ -31,6 +33,8 @@ let str_split_once str char =
       let left = String.sub str 0 pos in
       let right = String.sub str (pos + 1) (String.length str - pos - 1) in
       Some (left, right)
+
+let close fd = try Unix.close fd with Unix.Unix_error _ -> ()
 
 type 'a error = {code : 'a; message : string list}
 
