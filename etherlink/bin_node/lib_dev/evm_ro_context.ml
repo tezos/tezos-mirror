@@ -130,7 +130,7 @@ let find_finalized_hash ctxt =
   | Some (_, hash) -> return hash
   | None -> failwith "No state available"
 
-let find_irmin_hash_from_number ctxt number =
+let get_irmin_hash_from_number ctxt number =
   let open Lwt_result_syntax in
   let* res =
     Evm_store.(use ctxt.store @@ fun conn -> Context_hashes.find conn number)
@@ -143,7 +143,7 @@ let find_irmin_hash_from_number ctxt number =
         Ethereum_types.pp_quantity
         number
 
-let find_irmin_hash_from_block_hash ctxt hash =
+let get_irmin_hash_from_block_hash ctxt hash =
   let open Lwt_result_syntax in
   (* we use the latest state to read the contents of the block *)
   let* latest_hash = find_latest_hash ctxt in
@@ -154,7 +154,7 @@ let find_irmin_hash_from_block_hash ctxt hash =
   match res with
   | Some block_bytes ->
       let block = Ethereum_types.block_from_rlp block_bytes in
-      find_irmin_hash_from_number ctxt block.number
+      get_irmin_hash_from_number ctxt block.number
   | None -> failwith "Unknown block %a" Ethereum_types.pp_block_hash hash
 
 let find_irmin_hash ctxt (block : Ethereum_types.Block_parameter.extended) =
@@ -190,7 +190,7 @@ let find_irmin_hash ctxt (block : Ethereum_types.Block_parameter.extended) =
         match context_hash_opt with
         | Some context_hash -> return context_hash
         | None -> failwith "Unknown block %a" Ethereum_types.pp_block_hash hash
-      else find_irmin_hash_from_block_hash ctxt hash
+      else get_irmin_hash_from_block_hash ctxt hash
 
 module MakeBackend (Ctxt : sig
   val ctxt : t
@@ -394,7 +394,7 @@ let pvm_config ctxt =
 let replay ctxt ?(log_file = "replay") ?profile
     ?(alter_evm_state = Lwt_result_syntax.return) (Ethereum_types.Qty number) =
   let open Lwt_result_syntax in
-  let* hash = find_irmin_hash_from_number ctxt (Qty (Z.pred number)) in
+  let* hash = get_irmin_hash_from_number ctxt (Qty (Z.pred number)) in
   let* evm_state = get_evm_state ctxt hash in
   let* evm_state = alter_evm_state evm_state in
   let* blueprint =
@@ -587,10 +587,15 @@ let next_blueprint_number ctxt =
 
 let preload_kernel_from_level ctxt level =
   let open Lwt_result_syntax in
-  let* hash = find_irmin_hash_from_number ctxt level in
-  let* evm_state = get_evm_state ctxt hash in
-  let*! () = Evm_state.preload_kernel evm_state in
-  return_unit
+  let* hash =
+    Evm_store.(use ctxt.store @@ fun conn -> Context_hashes.find conn level)
+  in
+  match hash with
+  | Some hash ->
+      let* evm_state = get_evm_state ctxt hash in
+      let*! () = Evm_state.preload_kernel evm_state in
+      return_unit
+  | None -> return_unit
 
 let preload_known_kernels ctxt =
   let open Lwt_result_syntax in
