@@ -6,7 +6,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let make_instr ?(path_prefix = "/evm/") ?(convert = Fun.id) arg_opt =
+let make_path = function [] -> "" | l -> "/" ^ String.concat "/" l ^ "/"
+
+let make_instr ?(path_prefix = ["evm"]) ?(convert = Fun.id) arg_opt =
+  let path_prefix = make_path path_prefix in
   arg_opt
   |> Option.map (fun (key, value) ->
          Installer_config.make ~key:(path_prefix ^ key) ~value:(convert value))
@@ -44,8 +47,8 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
         List.map
           (fun address ->
             make_instr
-              ~path_prefix:"/evm/world_state/eth_accounts/"
-              (Some (address ^ "/balance", balance)))
+              ~path_prefix:["evm"; "world_state"; "eth_accounts"; address]
+              (Some ("balance", balance)))
           bootstrap_accounts
         |> List.flatten
   in
@@ -57,8 +60,8 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
           (fun (address, code) ->
             make_instr
               ~convert:encode_hexa
-              ~path_prefix:"/evm/world_state/eth_accounts/"
-              (Some (address ^ "/code", code)))
+              ~path_prefix:["evm"; "world_state"; "eth_accounts"; address]
+              (Some ("code", code)))
           set_account_codes
         |> List.flatten
   in
@@ -70,10 +73,10 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
     |> String.of_seq
   in
   let instrs =
-    (if mainnet_compat then make_instr ~path_prefix:"/evm/" ticketer
+    (if mainnet_compat then make_instr ticketer
      else
        (* For compatibility reason for Mainnet and Ghostnet *)
-       make_instr ~path_prefix:"/evm/world_state/" ticketer)
+       make_instr ~path_prefix:["evm"; "world_state"] ticketer)
     @ make_instr
         ~convert:(fun s -> Hex.to_bytes_exn (`Hex s) |> Bytes.to_string)
         kernel_root_hash
@@ -83,11 +86,11 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
     @ make_instr kernel_governance
     @ make_instr kernel_security_governance
     @ make_instr
-        ~path_prefix:"/evm/world_state/fees/"
+        ~path_prefix:["evm"; "world_state"; "fees"]
         ~convert:parse_z_to_padded_32_le_int_bytes
         minimum_base_fee_per_gas
     @ make_instr
-        ~path_prefix:"/evm/world_state/fees/"
+        ~path_prefix:["evm"; "world_state"; "fees"]
         ~convert:parse_z_to_padded_32_le_int_bytes
         da_fee_per_byte
     @ make_instr ~convert:le_int64_bytes delayed_inbox_timeout
@@ -102,13 +105,13 @@ let make ~mainnet_compat ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash
     @ make_instr ~convert:le_int64_bytes max_blueprint_lookahead_in_seconds
     @ bootstrap_accounts @ set_account_code
     @ make_instr remove_whitelist
-    @ make_instr ~path_prefix:"/evm/feature_flags/" enable_fa_bridge
-    @ make_instr ~path_prefix:"/evm/feature_flags/" enable_dal
+    @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_fa_bridge
+    @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_dal
     @ make_instr
-        ~path_prefix:"/evm/world_state/feature_flags/"
+        ~path_prefix:["evm"; "world_state"; "feature_flags"]
         enable_fast_withdrawal
     @ make_instr ~convert:decimal_list_to_bytes dal_slots
-    @ make_instr ~path_prefix:"/evm/feature_flags/" enable_multichain
+    @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_multichain
     @ make_instr
         ~convert:(fun s -> Ethereum_types.u16_to_bytes (int_of_string s))
         max_delayed_inbox_blueprint_length
