@@ -40,6 +40,8 @@ OCTEZ_ONLY_LAYER1_EXECUTABLES := $(filter-out etherlink-governance-observer octe
 
 TEZTALE_EXECUTABLES := $(shell cat script-inputs/teztale-experimental-executables)
 
+EVM_EXECUTABLES := $(shell cat script-inputs/etherlink-experimental-executables)
+
 # Set of Dune targets to build, in addition to OCTEZ_EXECUTABLES, in
 # the `build` target's Dune invocation. This is used in the CI to
 # build the TPS evaluation tool, Octogram and the Tezt test suite in the
@@ -600,3 +602,6 @@ wasm_runtime_gen_files::
 	@cd etherlink/lib_wasm_runtime; cargo build 2> /dev/null
 
 octez-evm-node: wasm_runtime_gen_files
+
+evm-node-static:
+	@$(MAKE) PROFILE=static build OCTEZ_EXECUTABLES?="$(EVM_EXECUTABLES)"
