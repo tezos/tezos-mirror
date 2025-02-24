@@ -377,24 +377,27 @@ let test_enough_active_stake_to_bake ~has_active_stake () =
 
 let test_committee_sampling () =
   let open Lwt_result_syntax in
-  let test_distribution max_round distribution =
-    let bootstrap_balances, bounds = List.split distribution in
+  let test_distribution ~committee_size distribution =
+    (* [committee_size] will be the number of slots available in the
+       consensus committee, and also the number of rounds over which
+       we will count the occurrences of each delegate being the
+       selected baker for a round. *)
+    let bootstrap_balances, _bounds = List.split distribution in
     let*? accounts =
       Account.generate_accounts (List.length bootstrap_balances)
     in
     let bootstrap_accounts =
       Account.make_bootstrap_accounts ~bootstrap_balances accounts
     in
-    let consensus_committee_size = max_round in
     assert (
       (* Enforce that we are not mistakenly testing a value for committee_size
          that violates invariants of module Slot_repr. *)
       Result.is_ok
-        (Slot_repr.of_int consensus_committee_size)) ;
+        (Slot_repr.of_int committee_size)) ;
     let constants =
       {
         Default_parameters.constants_test with
-        consensus_committee_size;
+        consensus_committee_size = committee_size;
         consensus_threshold_size = 0;
       }
     in
@@ -403,76 +406,93 @@ let test_committee_sampling () =
     in
     let* genesis = Block.genesis_with_parameters parameters in
     let+ bakers =
-      Plugin.RPC.Baking_rights.get Block.rpc_ctxt ~all:true ~max_round genesis
+      Plugin.RPC.Baking_rights.get
+        Block.rpc_ctxt
+        ~all:true
+        ~max_round:committee_size
+        genesis
     in
     let stats = Stdlib.Hashtbl.create 10 in
     Stdlib.List.iter2
-      (fun acc bounds -> Stdlib.Hashtbl.add stats acc.Account.pkh (bounds, 0))
+      (fun acc specs -> Stdlib.Hashtbl.add stats acc.Account.pkh (specs, 0))
       accounts
-      bounds ;
+      distribution ;
     List.iter
       (fun {Plugin.RPC.Baking_rights.delegate = pkh; _} ->
-        let bounds, n = Stdlib.Hashtbl.find stats pkh in
-        Stdlib.Hashtbl.replace stats pkh (bounds, n + 1))
+        let specs, n = Stdlib.Hashtbl.find stats pkh in
+        Stdlib.Hashtbl.replace stats pkh (specs, n + 1))
       bakers ;
     let one_failed = ref false in
 
-    Format.eprintf
-      "@[<hov>Testing with baker distribution [%a],@ committee size %d.@]@."
-      (Format.pp_print_list
-         ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
-         (fun ppf (tez, _) -> Format.fprintf ppf "%Ld" tez))
-      distribution
-      max_round ;
-
-    Format.eprintf
-      "@[<v 2>@,%a@]@."
+    Log.info
+      "@[<hov 2>Testing with %d bakers and committee size %#d:%a@]"
+      (List.length distribution)
+      committee_size
       (fun ppf stats ->
         Stdlib.Hashtbl.iter
-          (fun pkh ((min_p, max_p), n) ->
+          (fun pkh ((balance, (min_p, max_p)), n) ->
             let failed = not (n >= min_p && n <= max_p) in
             Format.fprintf
               ppf
-              "@[<h>- %a %d%a@]@,"
-              Signature.Public_key_hash.pp
+              "@,\
+               - %a init balance: %#Ld mutez, expected #slots: [%d, %d], \
+               actual #slots: %d"
+              Signature.Public_key_hash.pp_short
               pkh
-              n
-              (fun ppf failed ->
-                if failed then
-                  Format.fprintf ppf " [FAIL] should be in [%d, %d]" min_p max_p
-                else Format.fprintf ppf "")
-              failed ;
+              balance
+              min_p
+              max_p
+              n ;
+            if failed then Format.fprintf ppf "@,    --> FAIL" ;
             one_failed := failed || !one_failed)
           stats)
       stats ;
-
     if !one_failed then
-      Stdlib.failwith
+      Test.fail
         "The proportion of bakers marked as [FAILED] in the log output appear \
          in the wrong proportion in the committee."
-    else Format.eprintf "Test succesful.@."
+    else Log.info "Test successful.@."
   in
+
   (* The tests below are not deterministic, but the probability that
      they fail is infinitesimal. *)
-  let accounts =
-    let expected_lower_bound = 6_100 and expected_upper_bound = 6_900 in
-    let balance = 8_000_000_000L in
-    let account = (balance, (expected_lower_bound, expected_upper_bound)) in
-    Array.(make 10 account |> to_list)
+  let expected_bounds average =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7979
+       Determine a proper margin considering the expected
+       distribution. *)
+    let margin = max (average / 20) 50 in
+    (average - margin, average + margin)
   in
-  let* () = test_distribution 65535 accounts in
+  (* 10 accounts with the same balance *)
+  let* () =
+    let committee_size = 65_535 in
+    let accounts =
+      let n_accounts = 10 in
+      let account =
+        (8_000_000_000L, expected_bounds (committee_size / n_accounts))
+      in
+      Array.(make n_accounts account |> to_list)
+    in
+    test_distribution ~committee_size accounts
+  in
   let* () =
     test_distribution
-      10_000
+      ~committee_size:10_000
       [
-        (16_000_000_000L, (4_600, 5_400));
-        (8_000_000_000L, (2_200, 2_800));
-        (8_000_000_000L, (2_200, 2_800));
+        (16_000_000_000L, expected_bounds 5_000);
+        (8_000_000_000L, expected_bounds 2_500);
+        (8_000_000_000L, expected_bounds 2_500);
       ]
   in
-  test_distribution
-    10_000
-    [(792_000_000_000L, (9_830, 9_970)); (8_000_000_000L, (40, 160))]
+  let* () =
+    test_distribution
+      ~committee_size:10_000
+      [
+        (792_000_000_000L, expected_bounds 9_900);
+        (8_000_000_000L, expected_bounds 100);
+      ]
+  in
+  return_unit
 
 let tests =
   [
