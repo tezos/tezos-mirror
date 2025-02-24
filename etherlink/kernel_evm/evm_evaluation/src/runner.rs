@@ -17,6 +17,7 @@ use tezos_ethereum::block::{BlockConstants, BlockFees};
 use hex_literal::hex;
 use primitive_types::{H160, H256, U256};
 use std::cell::RefCell;
+use std::cmp::min;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
@@ -171,13 +172,18 @@ fn initialize_env(unit: &TestUnit) -> Result<Env, TestError> {
         let private_key = unit.transaction.secret_key.unwrap();
         return Err(TestError::UnknownPrivateKey { private_key });
     };
-    env.tx.gas_price = unit.transaction.gas_price.unwrap_or(
-        env.block.basefee
-            + unit
-                .transaction
-                .max_priority_fee_per_gas
-                .unwrap_or_default(),
-    );
+
+    let base_fee = env.block.basefee;
+    let max_fee_per_gas = unit.transaction.max_fee_per_gas.unwrap_or_default();
+    let max_priority_fee_per_gas = unit
+        .transaction
+        .max_priority_fee_per_gas
+        .unwrap_or_default();
+
+    env.tx.gas_price = unit
+        .transaction
+        .gas_price
+        .unwrap_or(min(max_fee_per_gas, base_fee + max_priority_fee_per_gas));
     Ok(env)
 }
 
