@@ -152,10 +152,11 @@ tez. It is the sum of the following balances:
   freely access and spend at the current time. It can be queried with
   RPC ``.../contracts/<contract_id>/spendable`` (in mutez).
 
-- The **unstaked balance** is the sum of tez contained in **unstake
-  requests**. These tez have been removed from the staked balance via
-  an ``unstake`` operation, but have not been added back to the
-  spendable balance yet; see
+- The **unstaked balance** is the sum of the tez amounts contained in
+  all of the account's **unstake requests** (both unfinalizable and
+  finalizable unstake requests). These tez have been removed from the
+  staked balance via an ``unstake`` operation, but have not been added
+  back to the spendable balance yet; see
   :ref:`staked_funds_management_quebec`. Unstake requests can be
   queried with RPC ``.../contracts/<contract_id>/unstake_requests``
   (returns a detailed view with unfinalizable/finalizable status,
