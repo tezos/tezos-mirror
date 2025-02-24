@@ -557,9 +557,9 @@ module Handler = struct
       let*! () =
         Signature.Public_key_hash.Set.iter_s
           (fun delegate ->
-            if not @@ Signature.Public_key_hash.Map.mem delegate committee then
-              Lwt.return_unit
-            else check_attester delegate)
+            if Signature.Public_key_hash.Map.mem delegate committee then
+              check_attester delegate
+            else Lwt.return_unit)
           attesters
       in
       return_unit
