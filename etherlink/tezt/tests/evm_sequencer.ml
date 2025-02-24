@@ -348,6 +348,124 @@ let register_upgrade_all ~title ~tags ~genesis_timestamp
         protocols)
     kernels
 
+let test_make_l2_kernel_installer_config =
+  Protocol.register_test
+    ~__FILE__
+    ~title:
+      "Test that the command make_l2_kernel_installer setup bootstrap account \
+       at the right path"
+    ~tags:["evm"; "multichain"; "installer"]
+    ~uses_admin_client:true
+    ~uses_client:true
+    ~uses_node:true
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_evm_node;
+        Constant.octez_smart_rollup_node;
+        Constant.WASM.evm_kernel;
+        Constant.smart_rollup_installer;
+      ])
+  @@ fun protocol ->
+  let* node, client = setup_l1 protocol in
+
+  (* Random chain id, let's not take one that could have been set by default (1, 42, 1337) *)
+  let chain_id = 2988 in
+
+  (* Configuration files for an l2 chain and for the rollup *)
+  let l2_config = Temp.file "l2-chain-config.yaml" in
+  let rollup_config = Temp.file "rollup-chain-config.yaml" in
+
+  (* Argument for the l2 chain, a bootstrap account and a new world_state_path *)
+  let world_state_path = "/test/chain/" in
+  let address = Eth_account.bootstrap_accounts.(0).address in
+  let*! () =
+    Evm_node.make_l2_kernel_installer_config
+      ~chain_id
+      ~world_state_path
+      ~bootstrap_accounts:[address]
+      ~output:l2_config
+      ()
+  in
+  let*! () =
+    Evm_node.make_kernel_installer_config
+    (* No need for a real sequencer governance *)
+      ~sequencer_governance:"KT1"
+      ~output:rollup_config
+      ()
+  in
+
+  (* Setup the rollup (Origination and Start a rollup node) *)
+  let sc_rollup_node =
+    Sc_rollup_node.create
+      ~default_operator:Constant.bootstrap1.public_key_hash
+      Batcher
+      node
+      ~base_dir:(Client.base_dir client)
+  in
+
+  let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
+  let kernel = Constant.WASM.evm_kernel in
+  let* {output = kernel; _} =
+    prepare_installer_kernel_with_multiple_setup_file
+      ~output:(Temp.file "kernel.hex")
+      ~preimages_dir
+      ~configs:[rollup_config; l2_config]
+      (Uses.path kernel)
+  in
+  let* sc_rollup_address =
+    originate_sc_rollup
+      ~keys:[]
+      ~kind:"wasm_2_0_0"
+      ~boot_sector:("file:" ^ kernel)
+      ~parameters_ty:Helpers.evm_type
+      client
+  in
+  let* () =
+    Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
+  in
+
+  (* Setup a sequencer with a private rpc port to verify the durable storage. *)
+  let sequencer =
+    Evm_node.Sequencer
+      {
+        initial_kernel = kernel;
+        preimage_dir = Some preimages_dir;
+        private_rpc_port = Some (Port.fresh ());
+        time_between_blocks = Some Nothing;
+        sequencer = Constant.bootstrap1.alias;
+        genesis_timestamp = None;
+        max_blueprints_lag = None;
+        max_blueprints_ahead = None;
+        max_blueprints_catchup = None;
+        catchup_cooldown = None;
+        max_number_of_chunks = None;
+        wallet_dir = Some (Client.base_dir client);
+        tx_pool_timeout_limit = None;
+        tx_pool_addr_limit = None;
+        tx_pool_tx_per_addr_limit = None;
+        dal_slots = None;
+      }
+  in
+  let* sequencer =
+    Evm_node.init ~mode:sequencer (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+
+  (* Verify that the balance of the bootstrap account is set by the command
+     `make_l2_kernel_installer_config` *)
+  let address_in_durable = Helpers.remove_0x (String.lowercase_ascii address) in
+  let address_balance =
+    world_state_path ^ "eth_accounts/" ^ address_in_durable ^ "/balance"
+  in
+  let*@ rpc = Rpc.state_value sequencer address_balance in
+  match rpc with
+  | None ->
+      Test.fail
+        ~__LOC__
+        "There should be a value at %s setup by the \
+         make_l2_kernel_installer_config"
+        address_balance
+  | Some _bootstrap_value -> return ()
+
 (* The test uses a very specific setup, so it doesn't use general helpers. *)
 let test_observer_reset =
   Protocol.register_test
@@ -10145,6 +10263,7 @@ let () =
   test_miner protocols ;
   test_fa_bridge_feature_flag protocols ;
   test_multichain_feature_flag protocols ;
+  test_make_l2_kernel_installer_config protocols ;
   test_fast_withdrawal_feature_flag protocols ;
   test_trace_call protocols ;
   test_trace_empty_block protocols ;

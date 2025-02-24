@@ -4,7 +4,7 @@
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -560,6 +560,22 @@ val import_snapshot :
 val snapshot_info : snapshot_file:string -> (Process.t, string) runnable
 
 val wait_termination : t -> unit Lwt.t
+
+(** [make_l2_kernel_installer_config ~output ()] create the config needed for 
+    a l2 chain in a multichain kernel *)
+val make_l2_kernel_installer_config :
+  ?chain_id:int ->
+  ?bootstrap_balance:Wei.t ->
+  ?bootstrap_accounts:string list ->
+  ?minimum_base_fee_per_gas:Wei.t ->
+  ?da_fee_per_byte:Wei.t ->
+  ?sequencer_pool_address:string ->
+  ?maximum_gas_per_transaction:int64 ->
+  ?set_account_code:(string * string) list ->
+  ?world_state_path:string ->
+  output:string ->
+  unit ->
+  (Process.t, unit) runnable
 
 (** [make_kernel_installer_config ~output ()] create the config needed for the
     evm kernel used by the installer *)

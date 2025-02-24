@@ -4,7 +4,7 @@
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1670,6 +1670,49 @@ let make_kernel_installer_config ?max_delayed_inbox_blueprint_length
         "dal-slots"
         (fun l -> String.concat "," (List.map string_of_int l))
         dal_slots
+    @ Cli_arg.optional_arg "bootstrap-balance" Wei.to_string bootstrap_balance
+    @
+    match bootstrap_accounts with
+    | None -> []
+    | Some bootstrap_accounts ->
+        List.flatten
+        @@ List.map
+             (fun bootstrap_account ->
+               ["--bootstrap-account"; bootstrap_account])
+             bootstrap_accounts
+  in
+  let process = Process.spawn (Uses.path Constant.octez_evm_node) cmd in
+  Runnable.{value = process; run = Process.check}
+
+let make_l2_kernel_installer_config ?chain_id ?bootstrap_balance
+    ?bootstrap_accounts ?minimum_base_fee_per_gas ?(da_fee_per_byte = Wei.zero)
+    ?sequencer_pool_address ?maximum_gas_per_transaction
+    ?(set_account_code = []) ?world_state_path ~output () =
+  let set_account_code =
+    List.flatten
+    @@ List.map
+         (fun (address, code) ->
+           ["--set-code"; Format.sprintf "%s,%s" address code])
+         set_account_code
+  in
+  let cmd =
+    ["make"; "l2"; "kernel"; "installer"; "config"; output]
+    @ Cli_arg.optional_arg "l2-chain-id" string_of_int chain_id
+    @ Cli_arg.optional_arg
+        "minimum-base-fee-per-gas"
+        Wei.to_string
+        minimum_base_fee_per_gas
+    @ Cli_arg.optional_arg "world-state-path" Fun.id world_state_path
+    @ ["--da-fee-per-byte"; Wei.to_string da_fee_per_byte]
+    @ Cli_arg.optional_arg
+        "sequencer-pool-address"
+        Fun.id
+        sequencer_pool_address
+    @ set_account_code
+    @ Cli_arg.optional_arg
+        "maximum-gas-per-transaction"
+        Int64.to_string
+        maximum_gas_per_transaction
     @ Cli_arg.optional_arg "bootstrap-balance" Wei.to_string bootstrap_balance
     @
     match bootstrap_accounts with
