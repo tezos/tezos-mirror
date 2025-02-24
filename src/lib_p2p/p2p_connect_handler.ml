@@ -236,7 +236,7 @@ let create_connection t p2p_conn id_point point_info peer_info
   return conn
 
 let is_acceptable t connection_point_info peer_info incoming version =
-  let open Lwt_result_syntax in
+  let open Result_syntax in
   (* Private mode only accept trusted *)
   let unexpected =
     t.config.private_mode
@@ -247,9 +247,9 @@ let is_acceptable t connection_point_info peer_info incoming version =
              connection_point_info))
     && not (t.dependencies.peer_state_info_trusted peer_info)
   in
-  if unexpected then
-    let*! () = Events.(emit peer_rejected) () in
-    tzfail P2p_errors.Private_mode
+  if unexpected then (
+    Events.(emit__dont_wait__use_with_care peer_rejected) () ;
+    tzfail P2p_errors.Private_mode)
   else
     (* checking if point is acceptable *)
     let* version =
@@ -258,26 +258,9 @@ let is_acceptable t connection_point_info peer_info incoming version =
       | Some connection_point_info -> (
           match P2p_point_state.get connection_point_info with
           | Accepted _ | Running _ ->
-              Lwt.return P2p_rejection.(rejecting Already_connected)
-          | Requested {cancel} when incoming ->
-              (* Prioritise incoming connections. *)
-              let*! exns_opt =
-                Lwt.catch
-                  (fun () ->
-                    Lwt.bind (Lwt_canceler.cancel cancel) (fun result ->
-                        match result with
-                        | Error exns -> Lwt.return_some exns
-                        | Ok () -> Lwt.return_none))
-                  (fun exn -> Lwt.return_some [exn])
-              in
-              let*! () =
-                Option.iter_s
-                  (fun exns ->
-                    List.map Error_monad.error_of_exn exns
-                    |> Events.(emit unexpected_cancellation_error))
-                  exns_opt
-              in
-              return version
+              P2p_rejection.(rejecting Already_connected)
+          | Requested _ when incoming ->
+              P2p_rejection.(rejecting Already_connected)
           | Requested _ | Disconnected -> return version)
     in
     (* Point is acceptable, checking if peer is. *)
@@ -286,7 +269,7 @@ let is_acceptable t connection_point_info peer_info incoming version =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4679
        in some circumstances cancel and accept... *)
     | Running _ ->
-        Lwt.return P2p_rejection.(rejecting Already_connected)
+        P2p_rejection.(rejecting Already_connected)
     (* All right, welcome ! *)
     | Disconnected -> return version
 
@@ -445,8 +428,9 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
   let peer_info = P2p_pool.register_peer t.pool info.peer_id in
   (* [acceptable] is either Ok with a network version, or a Rejecting
      error with a motive *)
-  let*! acceptable =
-    let*? version =
+  let acceptable =
+    let open Result_syntax in
+    let* version =
       select
         ~chain_name:t.message_config.chain_name
         ~distributed_db_versions:t.message_config.distributed_db_versions
@@ -460,7 +444,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
         t.config.max_connections + Random.int 2
         > P2p_pool.active_connections t.pool
       then return_unit
-      else Lwt.return P2p_rejection.(rejecting Too_many_connections)
+      else P2p_rejection.(rejecting Too_many_connections)
     in
     (* we have a slot, checking if point and peer are acceptable *)
     is_acceptable t connection_point_info peer_info incoming version
