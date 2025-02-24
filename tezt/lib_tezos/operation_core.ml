@@ -88,7 +88,16 @@ let hex ?protocol ?signature t client =
   match signature with
   | None -> return (`Hex raw)
   | Some signature ->
+      let is_tz4 =
+        String.starts_with
+          ~prefix:"BLsig"
+          (Tezos_crypto.Signature.to_b58check signature)
+      in
       let (`Hex signature) = Tezos_crypto.Signature.to_hex signature in
+      (* "ff" is a signature prefix tag and "03" is a tag for BLS, see
+         the details here:
+         https://gitlab.com/tezos/tezos/-/blob/ff1c4ed047d21e16eeac7f87e952acdaf43c8d71/src/proto_alpha/lib_protocol/operation_repr.ml?page=2#L1729 *)
+      let signature = if is_tz4 then "ff" ^ "03" ^ signature else signature in
       return (`Hex (raw ^ signature))
 
 let bls_mode_raw t client : Hex.t Lwt.t =
