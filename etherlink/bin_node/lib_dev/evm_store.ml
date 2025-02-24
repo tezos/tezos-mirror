@@ -409,6 +409,21 @@ module Q = struct
            FROM l1_l2_finalized_levels
            ORDER BY l1_level DESC LIMIT 1|}
 
+    let list_by_l2_levels =
+      (t2 level level ->* t2 l1_level finalized_levels)
+      @@ {|SELECT l1_level, start_l2_level, end_l2_level
+           FROM l1_l2_finalized_levels
+           WHERE start_l2_level >= ?
+           AND end_l2_level <= ?
+           ORDER BY l1_level ASC|}
+
+    let list_by_l1_levels =
+      (t2 l1_level l1_level ->* t2 l1_level finalized_levels)
+      @@ {|SELECT l1_level, start_l2_level, end_l2_level
+           FROM l1_l2_finalized_levels
+           WHERE l1_level BETWEEN ? AND ?
+           ORDER BY l1_level ASC|}
+
     let clear_before =
       (level ->. unit)
       @@ {|DELETE FROM l1_l2_finalized_levels
@@ -885,6 +900,13 @@ module L1_l2_levels_relationships = struct
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.L1_l2_levels_relationships.get ()
 
+  let list_from store ~finalized_l2_level =
+    with_connection store @@ fun conn ->
+    Db.collect_list
+      conn
+      Q.L1_l2_levels_relationships.list_until
+      finalized_l2_level
+
   let clear_after store l2_level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.L1_l2_levels_relationships.clear_after l2_level
@@ -914,6 +936,58 @@ module L1_l2_finalized_levels = struct
   let last store =
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.L1_l2_finalized_levels.last ()
+
+  let list_by_l2_levels store ~start_l2_level ~end_l2_level =
+    with_connection store @@ fun conn ->
+    Db.collect_list
+      conn
+      Q.L1_l2_finalized_levels.list_by_l2_levels
+      (start_l2_level, end_l2_level)
+
+  let list_by_l1_levels store ~start_l1_level ~end_l1_level =
+    with_connection store @@ fun conn ->
+    Db.collect_list
+      conn
+      Q.L1_l2_finalized_levels.list_by_l1_levels
+      (start_l1_level, end_l1_level)
+
+  let max_blocks = 10_000
+
+  let make_l1_bounds x y =
+    let max = Int32.of_int (max_blocks - 1) in
+    let rec aux acc x y =
+      let prev_x = Int32.sub y max in
+      if prev_x <= x then (x, y) :: acc
+      else aux ((prev_x, y) :: acc) x (Int32.pred prev_x)
+    in
+    aux [] x y
+
+  let make_l2_bounds x y =
+    let max = Z.of_int (max_blocks - 1) in
+    let rec aux acc x y =
+      let prev_x = Z.sub y max in
+      if Z.Compare.(prev_x <= x) then (x, y) :: acc
+      else aux ((prev_x, y) :: acc) x (Z.pred prev_x)
+    in
+    aux [] x y
+
+  (* Paginated version of list_by_l2_levels *)
+  let list_by_l2_levels store
+      ~start_l2_level:(Ethereum_types.Qty start_l2_level)
+      ~end_l2_level:(Ethereum_types.Qty end_l2_level) =
+    let levels = make_l2_bounds start_l2_level end_l2_level in
+    List.concat_map_es
+      (fun (x, y) ->
+        list_by_l2_levels store ~start_l2_level:(Qty x) ~end_l2_level:(Qty y))
+      levels
+
+  (* Paginated version of list_by_l1_levels *)
+  let list_by_l1_levels store ~start_l1_level ~end_l1_level =
+    let levels = make_l1_bounds start_l1_level end_l1_level in
+    List.concat_map_es
+      (fun (start_l1_level, end_l1_level) ->
+        list_by_l1_levels store ~start_l1_level ~end_l1_level)
+      levels
 
   let clear_before store l2_level =
     with_connection store @@ fun conn ->

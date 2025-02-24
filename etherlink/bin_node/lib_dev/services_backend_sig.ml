@@ -104,6 +104,10 @@ module type S = sig
       to the durable storage. *)
   val is_multichain_enabled : unit -> bool tzresult Lwt.t
 
+  val list_l1_l2_levels :
+    from_l1_level:int32 ->
+    (int32 * Evm_store.L1_l2_finalized_levels.t) list tzresult Lwt.t
+
   include Tracer_sig.S
 end
 
@@ -125,6 +129,10 @@ module type Backend = sig
   module Tracer : Tracer_sig.Backend
 
   val smart_rollup_address : string
+
+  val list_l1_l2_levels :
+    from_l1_level:int32 ->
+    (int32 * Evm_store.L1_l2_finalized_levels.t) list tzresult Lwt.t
 end
 
 module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
@@ -148,4 +156,6 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
     | Apply_failure -> failwith "Could not replay the block"
 
   let smart_rollup_address = Backend.smart_rollup_address
+
+  let list_l1_l2_levels = Backend.list_l1_l2_levels
 end

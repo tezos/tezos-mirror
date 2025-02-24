@@ -261,6 +261,30 @@ module L1_l2_finalized_levels : sig
       store. *)
   val last : conn -> (int32 * t) option tzresult Lwt.t
 
+  (** [list_by_l2_levels conn ~start_l2_level ~end_l2_level] returns all
+      finalized L1-L2 level relationships where the end L2 level is between
+      [start_l2_level] and [end_l2_level]. Requests are paginated by 10000
+      blocks.  Each relationship maps an L1 level to a range (strict on the
+      left, inclusive on the right) of L2 levels that were finalized at that L1
+      level. *)
+  val list_by_l2_levels :
+    conn ->
+    start_l2_level:Ethereum_types.quantity ->
+    end_l2_level:Ethereum_types.quantity ->
+    (int32 * t) list tzresult Lwt.t
+
+  (** [list_by_l1_levels conn ~start_l1_level ~end_l1_level] returns all
+      finalized L1-L2 level relationships where the L1 level is is between
+      [start_l1_level] and [end_l1_level]. Requests are paginated by 10000
+      blocks.  Each relationship maps an L1 level to a range (strict on the
+      left, inclusive on the right) of L2 levels that were finalized at that L1
+      level. *)
+  val list_by_l1_levels :
+    conn ->
+    start_l1_level:int32 ->
+    end_l1_level:int32 ->
+    (int32 * t) list tzresult Lwt.t
+
   val clear_before : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 

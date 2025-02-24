@@ -387,7 +387,7 @@ module Subscription : sig
     topics : Filter.topic option list option;
   }
 
-  type etherlink_extension = L1_L2_levels
+  type etherlink_extension = L1_L2_levels of int32 option
 
   type kind =
     | NewHeads

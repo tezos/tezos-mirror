@@ -1290,7 +1290,7 @@ module Subscription = struct
          (opt "address" Filter.filter_address_encoding)
          (opt "topics" (list @@ option Filter.topic_encoding)))
 
-  type etherlink_extension = L1_L2_levels
+  type etherlink_extension = L1_L2_levels of int32 option
 
   type kind =
     | NewHeads
@@ -1299,34 +1299,76 @@ module Subscription = struct
     | Syncing
     | Etherlink of etherlink_extension
 
+  let etherlink_extension_encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"tez_l1_l2_levels"
+          (Tag 0)
+          (tup1 (constant "tez_l1L2Levels"))
+          (function L1_L2_levels None -> Some () | _ -> None)
+          (fun () -> L1_L2_levels None);
+        case
+          ~title:"tez_l1_l2_levels_with_history"
+          (Tag 1)
+          (tup2
+             (constant "tez_l1L2Levels")
+             (obj1
+                (req
+                   "fromL1Level"
+                   ~description:
+                     "When provided all L1 levels with their associated L2 \
+                      levels will be notified starting from this value. If it \
+                      is below the earliest level known by the EVM node, only \
+                      levels starting from the earliest known L1 level will be \
+                      notified."
+                   int32)))
+          (function L1_L2_levels (Some start) -> Some ((), start) | _ -> None)
+          (fun ((), start) -> L1_L2_levels (Some start));
+      ]
+
   let kind_encoding =
     let open Data_encoding in
     union
       [
         case
-          ~title:"params_size_two"
+          ~title:"newHead"
           (Tag 0)
-          (tup2 string logs_encoding)
-          (function Logs logs -> Some ("logs", logs) | _ -> None)
-          (function
-            | "logs", logs -> Logs logs | _ -> raise Unknown_subscription);
+          (tup1 (constant "newHeads"))
+          (function NewHeads -> Some () | _ -> None)
+          (fun () -> NewHeads);
         case
-          ~title:"params_size_one"
+          ~title:"newPendingTransactions"
           (Tag 1)
-          (tup1 string)
+          (tup1 (constant "newPendingTransactions"))
+          (function NewPendingTransactions -> Some () | _ -> None)
+          (fun () -> NewPendingTransactions);
+        case
+          ~title:"logs"
+          (Tag 2)
+          (tup2 (constant "logs") logs_encoding)
+          (function Logs logs -> Some ((), logs) | _ -> None)
+          (fun ((), logs) -> Logs logs);
+        case
+          ~title:"logs_all"
+          (Tag 3)
+          (tup1 (constant "logs"))
           (function
-            | NewHeads -> Some "newHeads"
-            | NewPendingTransactions -> Some "newPendingTransactions"
-            | Syncing -> Some "syncing"
-            | Logs _ -> Some "logs"
-            | Etherlink L1_L2_levels -> Some "tez_l1L2Levels")
-          (function
-            | "newHeads" -> NewHeads
-            | "newPendingTransactions" -> NewPendingTransactions
-            | "syncing" -> Syncing
-            | "logs" -> Logs {address = None; topics = None}
-            | "tez_l1L2Levels" -> Etherlink L1_L2_levels
-            | _ -> raise Unknown_subscription);
+            | Logs {address = None; topics = None} -> Some () | _ -> None)
+          (fun () -> Logs {address = None; topics = None});
+        case
+          ~title:"syncing"
+          (Tag 4)
+          (tup1 (constant "syncing"))
+          (function Syncing -> Some () | _ -> None)
+          (fun () -> Syncing);
+        case
+          ~title:"etherlink_extension"
+          (Tag 0xff)
+          etherlink_extension_encoding
+          (function Etherlink e -> Some e | _ -> None)
+          (fun e -> Etherlink e);
       ]
 
   type id = Id of hex [@@ocaml.unboxed]
