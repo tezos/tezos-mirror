@@ -176,6 +176,8 @@ let interpolate_snapshot_file current_level rollup_address filename =
          [percent; rollup_address_short; rollup_address_long; current_level])
   with _ -> Result_syntax.tzfail (Invalid_snapshot_file filename)
 
+let default_snapshot_file = "evm-snapshot-%r-%l"
+
 let export ?snapshot_file ~compression ~data_dir () =
   let open Lwt_result_syntax in
   let* () = Data_dir.lock ~data_dir in
@@ -215,30 +217,15 @@ let export ?snapshot_file ~compression ~data_dir () =
       | On_the_fly -> gzip_writer
       | No | After -> stdlib_writer
     in
+    let snapshot_file =
+      match (snapshot_file, compression) with
+      | Some f, After -> f ^ ".uncompressed"
+      | Some f, (No | On_the_fly) -> f
+      | None, On_the_fly -> default_snapshot_file
+      | None, (No | After) -> default_snapshot_file ^ ".uncompressed"
+    in
     let*? dest_file =
-      let open Result_syntax in
-      match snapshot_file with
-      | Some f -> (
-          let+ f = interpolate_snapshot_file current_level rollup_address f in
-          match compression with
-          | No | On_the_fly -> f
-          | After -> f ^ ".uncompressed")
-      | None ->
-          let suffix =
-            match compression with
-            | On_the_fly -> ""
-            | No | After -> ".uncompressed"
-          in
-          let filename =
-            Format.asprintf
-              "evm-snapshot-%a-%a%s"
-              Address.pp_short
-              rollup_address
-              Ethereum_types.pp_quantity
-              current_level
-              suffix
-          in
-          return filename
+      interpolate_snapshot_file current_level rollup_address snapshot_file
     in
     let*! () = Lwt_utils_unix.create_dir (Filename.dirname dest_file) in
     create stdlib_reader writer header ~files ~dest:dest_file ;
