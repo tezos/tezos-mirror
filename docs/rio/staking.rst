@@ -131,6 +131,12 @@ Stakers (and delegates) can use the ``stake``, ``unstake``, and
 while these pseudo-operations change the *state* of the involved funds,
 they remain otherwise within the staker’s account at all times.
 
+.. note::
+
+  Due to rounding that occurs at various stages of fund management,
+  stakers' staked balances may deviate by a few mutez (millionth of
+  tez) with respect to transferred amounts.
+
 .. figure:: staked_funds_transitions.png
 
   Figure 1: staked funds management using pseudo-operations.
