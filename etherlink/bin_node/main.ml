@@ -1850,6 +1850,75 @@ let set_account_code =
              Lwt.return_ok (address, code)
          | _ -> failwith "Parsing error for set-code")
 
+let make_l2_kernel_config_command =
+  let open Tezos_clic in
+  let open Lwt_result_syntax in
+  let open Evm_node_lib_dev_encoding.Ethereum_types in
+  command
+    ~desc:
+      "Produce a file containing the part of the kernel configuration \
+       instructions related to a particular L2 chain."
+    (args9
+       (config_key_arg ~name:"minimum_base_fee_per_gas" ~placeholder:"111...")
+       (config_key_arg ~name:"da_fee_per_byte" ~placeholder:"111...")
+       (config_key_arg ~name:"sequencer_pool_address" ~placeholder:"0x...")
+       (config_key_arg
+          ~name:"maximum_gas_per_transaction"
+          ~placeholder:"30000...")
+       (Tezos_clic.default_arg
+          ~long:"bootstrap-balance"
+          ~doc:"balance of the bootstrap accounts"
+          ~default:"9999000000000000000000"
+          ~placeholder:"9999000000000000000000"
+       @@ Tezos_clic.parameter (fun _ s -> return @@ Z.of_string s))
+       bootstrap_account_arg
+       set_account_code
+       (config_key_arg
+          ~name:"world_state_path"
+          ~placeholder:"/evm/world_state/<chain_id>")
+       (Tezos_clic.arg
+          ~long:"l2-chain-id"
+          ~doc:"L2 chain id"
+          ~placeholder:"1"
+          (Tezos_clic.parameter (fun _ s -> return @@ Chain_id.of_string_exn s))))
+    (prefixes ["make"; "l2"; "kernel"; "installer"; "config"]
+    @@ param
+         ~name:"kernel config file"
+         ~desc:"file path where the config will be written to"
+         Params.string
+    @@ stop)
+    (fun ( minimum_base_fee_per_gas,
+           da_fee_per_byte,
+           sequencer_pool_address,
+           maximum_gas_per_transaction,
+           boostrap_balance,
+           bootstrap_accounts,
+           set_account_code,
+           world_state_path,
+           l2_chain_id )
+         output
+         () ->
+      let* l2_chain_id =
+        match l2_chain_id with
+        | None ->
+            failwith
+              "Chain_id is mandatory when trying to setup an l2 chain, use \
+               --l2-chain-id to set it."
+        | Some l2_chain_id -> return (Chain_id.to_string l2_chain_id)
+      in
+      Evm_node_lib_dev.Kernel_config.make_l2
+        ?minimum_base_fee_per_gas
+        ?da_fee_per_byte
+        ?sequencer_pool_address
+        ?maximum_gas_per_transaction
+        ~boostrap_balance
+        ?bootstrap_accounts
+        ?set_account_code
+        ?world_state_path
+        ~l2_chain_id
+        ~output
+        ())
+
 let make_kernel_config_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
@@ -2695,6 +2764,7 @@ let commands =
     check_config_command;
     describe_config_command;
     make_kernel_config_command;
+    make_l2_kernel_config_command;
     patch_state_command;
     preemptive_kernel_download_command;
     debug_print_store_schemas_command;
