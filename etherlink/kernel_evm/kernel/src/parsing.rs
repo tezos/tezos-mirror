@@ -162,10 +162,10 @@ pub type RollupType = MichelsonOr<
 /// verifications have already been done:
 ///
 /// - The original inputs are prefixed by the frame protocol for the correct
-/// rollup, and the prefix has been removed
+///   rollup, and the prefix has been removed
 ///
 /// - The internal message was addressed to the rollup, and `parse_internal`
-/// expects the bytes from `Left (Right <bytes>)`
+///   expects the bytes from `Left (Right <bytes>)`
 pub trait Parsable {
     type Context;
 

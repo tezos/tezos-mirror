@@ -1319,7 +1319,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
             let result = self.execute(&mut runtime)?;
 
-            return Ok((result, None, runtime.machine().return_value()));
+            Ok((result, None, runtime.machine().return_value()))
         }
     }
 
@@ -2260,7 +2260,7 @@ fn cached_storage_access<Host: Runtime>(
 }
 
 #[allow(unused_variables)]
-impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
+impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
     type CreateInterrupt = Infallible;
     type CreateFeedback = Infallible;
     type CallInterrupt = Infallible;

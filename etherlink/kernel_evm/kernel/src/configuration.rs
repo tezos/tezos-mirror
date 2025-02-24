@@ -123,7 +123,7 @@ impl std::fmt::Display for TezosContracts {
     }
 }
 fn contains(contract: &Option<ContractKt1Hash>, expected: &ContractKt1Hash) -> bool {
-    contract.as_ref().map_or(false, |kt1| kt1 == expected)
+    contract.as_ref() == Some(expected)
 }
 
 impl TezosContracts {

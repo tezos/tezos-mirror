@@ -406,10 +406,9 @@ impl EthereumTransactionCommon {
         append_vec(stream, &self.data);
         stream.append_list(&self.access_list);
 
-        match &self.signature {
-            Some(sig) => sig.rlp_append(stream),
-            // If tx is NOT legacy and unsigned: DON'T append anything like (0, 0, 0)
-            None => (),
+        // If tx is NOT legacy and unsigned: DON'T append anything like (0, 0, 0)
+        if let Some(sig) = &self.signature {
+            sig.rlp_append(stream)
         }
     }
 
@@ -433,10 +432,9 @@ impl EthereumTransactionCommon {
         append_vec(stream, &self.data);
         stream.append_list(&self.access_list);
 
-        match &self.signature {
-            Some(sig) => sig.rlp_append(stream),
-            // If tx is NOT legacy and unsigned: DON'T append anything like (0, 0, 0)
-            None => (),
+        // If tx is NOT legacy and unsigned: DON'T append anything like (0, 0, 0)
+        if let Some(sig) = &self.signature {
+            sig.rlp_append(stream)
         }
     }
 

@@ -160,7 +160,7 @@ impl FaDeposit {
     /// pseudo transaction.
     pub fn hash(&self, seed: &[u8]) -> H256 {
         let mut hasher = Keccak256::new();
-        hasher.update(&self.rlp_bytes());
+        hasher.update(self.rlp_bytes());
         hasher.update(seed);
         H256(hasher.finalize().into())
     }
