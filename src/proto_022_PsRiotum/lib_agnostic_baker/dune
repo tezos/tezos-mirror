@@ -13,7 +13,8 @@
   octez-shell-libs.validation
   octez-protocol-022-PsRiotum-libs.baking-commands
   octez-shell-libs.client-commands
-  octez-shell-libs.client-base-unix)
+  octez-shell-libs.client-base-unix
+  octez-experimental-agnostic-baker-lib)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -24,4 +25,5 @@
   -open Tezos_validation
   -open Tezos_baking_022_PsRiotum_commands
   -open Tezos_client_commands
-  -open Tezos_client_base_unix))
+  -open Tezos_client_base_unix
+  -open Octez_experimental_agnostic_baker))

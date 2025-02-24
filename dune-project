@@ -34,6 +34,7 @@
 (package (name octez-evm-node-tests)(allow_empty))
 (package (name octez-evm-wasm-runtime-tests)(allow_empty))
 (package (name octez-experimental-agnostic-baker))
+(package (name octez-experimental-agnostic-baker-lib))
 (package (name octez-injector))
 (package (name octez-injector-server))
 (package (name octez-internal-libs))
