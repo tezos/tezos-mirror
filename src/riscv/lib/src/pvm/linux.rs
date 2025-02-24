@@ -4,6 +4,7 @@
 
 mod error;
 mod fds;
+mod fs;
 
 use super::{Pvm, PvmHooks};
 use crate::{
@@ -29,6 +30,9 @@ pub const PAGE_SIZE: u64 = 4096;
 /// Thread identifier for the main thread
 const MAIN_THREAD_ID: u64 = 1;
 
+/// System call number for `openat` on RISC-V
+const OPENAT: u64 = 56;
+
 /// System call number for `write` on RISC-V
 const WRITE: u64 = 64;
 
@@ -37,6 +41,9 @@ const WRITEV: u64 = 66;
 
 /// System call number for `ppoll` on RISC-V
 const PPOLL: u64 = 73;
+
+/// System call number for `readlinkat` on RISC-V
+const READLINKAT: u64 = 78;
 
 /// System call number for `exit` on RISC-V
 const EXIT: u64 = 93;
@@ -284,9 +291,11 @@ impl<M: ManagerBase> SupervisorState<M> {
         let system_call_no = core.hart.xregisters.read(registers::a7);
 
         match system_call_no {
+            OPENAT => return self.handle_openat(core),
             WRITE => return self.handle_write(core, hooks),
             WRITEV => return self.handle_writev(core, hooks),
             PPOLL => return self.handle_ppoll(core),
+            READLINKAT => return self.handle_readlinkat(core),
             EXIT | EXITGROUP => return self.handle_exit(core),
             SET_TID_ADDRESS => return self.handle_set_tid_address(core),
             TKILL => return self.handle_tkill(core),
