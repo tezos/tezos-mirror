@@ -69,7 +69,7 @@ let namespace = Tezos_version.Octez_node_version.namespace
 let subsystem = "evm_node"
 
 module Health = struct
-  type t = {bootstrapping : Gauge.t}
+  type t = {bootstrapping : Gauge.t; pruning : Gauge.t}
 
   let init name =
     let bootstrapping =
@@ -82,7 +82,19 @@ module Health = struct
         "bootstrapping"
         name
     in
-    {bootstrapping}
+    let pruning =
+      Gauge.v_label
+        ~registry
+        ~label_name:"pruning_history"
+        ~help:
+          "1.0 if the EVM node is currently pruning data past its retention \
+           period"
+        ~namespace
+        ~subsystem
+        "pruning_history"
+        name
+    in
+    {bootstrapping; pruning}
 end
 
 module Chain = struct
@@ -366,6 +378,10 @@ let set_l1_level ~level = Gauge.set metrics.l1_level (Int32.to_float level)
 let start_bootstrapping () = Gauge.set metrics.health.bootstrapping 1.
 
 let stop_bootstrapping () = Gauge.set metrics.health.bootstrapping 0.
+
+let start_pruning () = Gauge.set metrics.health.pruning 1.
+
+let stop_pruning () = Gauge.set metrics.health.pruning 0.
 
 let inc_time_waiting span =
   let _, time = Ptime.Span.to_d_ps span in

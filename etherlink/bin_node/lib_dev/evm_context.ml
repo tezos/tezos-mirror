@@ -294,16 +294,20 @@ module State = struct
     in
     let* () = Evm_store.reset_before conn ~l2_level:gc_level ~history_mode in
     let*! () = Irmin_context.gc ctxt.index hash in
+    Metrics.start_pruning () ;
     let gc_waiter () =
       let open Lwt_syntax in
       let* () = Irmin_context.wait_gc_completion ctxt.index in
       let stop_timestamp = Time.System.now () in
+      Metrics.stop_pruning () ;
       Evm_context_events.gc_finished
         ~gc_level
         ~head_level
         (Ptime.diff stop_timestamp start_timestamp)
     in
-    Lwt.dont_wait gc_waiter Evm_context_events.gc_waiter_failed ;
+    Lwt.dont_wait gc_waiter (fun exn ->
+        Metrics.stop_pruning () ;
+        Evm_context_events.gc_waiter_failed exn) ;
     return_unit
 
   let maybe_split_context ctxt conn timestamp level =

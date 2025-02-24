@@ -42,6 +42,10 @@ val start_bootstrapping : unit -> unit
 
 val stop_bootstrapping : unit -> unit
 
+val start_pruning : unit -> unit
+
+val stop_pruning : unit -> unit
+
 (** [inc_time_waiting dt] registers that a caller had to wait [dt] seconds in
     the queue before its WASM execution could start. *)
 val inc_time_waiting : Ptime.span -> unit
