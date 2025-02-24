@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 # SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
-# SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
+# SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>
 #
 # SPDX-License-Identifier: MIT
 
@@ -23,7 +23,7 @@ endif
 
 .PHONY: build-evm-execution
 build-evm-execution:
-	@cargo build --target wasm32-unknown-unknown --release --package evm-execution
+	@cargo build --target wasm32-unknown-unknown --release --package evm-execution-latest
 
 .PHONY: build-evm-evaluation
 build-evm-evaluation:
