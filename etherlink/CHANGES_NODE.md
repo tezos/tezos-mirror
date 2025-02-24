@@ -1,22 +1,40 @@
 # Changelog
 
-## Unreleased
+## Version 0.18 (2025-02-24)
+
+This releases notably includes support for executing the Calypso kernel
+natively. Besides, the EVM node now uses native execution for RPCs by default
+(was disabled before).
+
+This release will not apply any migration to the node’s store (version 19),
+meaning it is possible to downgrade to the previous version.
 
 ### Features
 
-- Split validation logic for transactions into 3 modes, `With_state`, `Stateless`
-  and `Full`. This is preparatory work for the transaction pool refactor;
-  functional behavior in the current workflow remains unchanged. (!16713)
-- RPC node uses a private injector to bypass the excessive validations of
-  going through the public endpoint. Reads `--evm-node-private-endpoint` if
-  specified or the RW config private rpc if not. (!16664)
+- Observer nodes now perform a lighter validation on submitted transactions.
+  (!16713)
 - Supports native execution for the Calypso kernel. (!16728 !16729 !16734)
 - Native execution is now enabled by default for RPCs (can be disabled with
   `--native-execution-policy never` or with
   `kernel_execution.native_execution_policy: never` in the configuration file).
   (!16881)
-- Add `octez_evm_node_pruning_history` which is set to 1.0 when the node is
-  pruning its last day of history, and 0.0 otherwise. (!16908)
+- Adds the `octez_evm_node_pruning_history` metrics which is set to 1.0 when
+  the node is pruning the history past its specified retention period, and 0.0
+  otherwise. (!16908)
+
+#### Experimental
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- RPC nodes now perform a lighter validation on submitted transactions.
+  (!16713)
+- RPC nodes can bypass transaction validation of their read/write node if it
+  exposes a private RPC server. (!16664)
+- Adds a new experimental feature `enable_tx_queue` to replace the tx pool by a
+  tx queue to improve performance and simplify the code. (!16812)
 
 ### Bug fixes
 
@@ -27,14 +45,8 @@
   previous retention period. (!16798)
 - Fixes exporting a snapshot using the `/tmp` directory to generate temporary
   files. (!16919)
-
-### Internals
-
-### Experimental
-
-- Adds a new experimental feature `enable_tx_queue` to replace the tx
-  pool by a tx queue to improve performance and simplify the
-  code. (!16812)
+- Fixes the node crashing when it cannot predownload a kernel ahead of an
+  upgrade activation. It will now retry a minute later. (!16911)
 
 ## Version 0.17 (2025-02-14)
 
