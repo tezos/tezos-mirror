@@ -54,7 +54,7 @@ pub fn create_address_legacy(caller: &H160, nonce: &u64) -> H160 {
     let mut stream = rlp::RlpStream::new_list(2);
     stream.append(caller);
     stream.append(nonce);
-    H256::from_slice(Keccak256::digest(&stream.out()).as_slice()).into()
+    H256::from_slice(Keccak256::digest(stream.out()).as_slice()).into()
 }
 
 /// Compute Keccak 256 for some bytes
