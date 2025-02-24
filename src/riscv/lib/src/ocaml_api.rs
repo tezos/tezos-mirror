@@ -19,6 +19,7 @@ use crate::{
     state_backend::proof_backend::proof,
     storage::{self, StorageError},
 };
+use arbitrary_int::u31;
 use move_semantics::{ImmutableState, MutableState};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use ocaml::{Pointer, ToValue};
@@ -109,6 +110,15 @@ pub enum RevealData<'a> {
     Metadata(&'a [u8], u32),
 }
 
+/// Wrapper to convert a Rust allocated byte-array to an OCaml allocated Bytes type
+pub struct BytesWrapper(Box<[u8]>);
+
+unsafe impl ocaml::ToValue for BytesWrapper {
+    fn to_value(&self, _rt: &ocaml::Runtime) -> ocaml::Value {
+        unsafe { ocaml::Value::bytes(&self.0) }
+    }
+}
+
 #[derive(ocaml::FromValue, ocaml::ToValue)]
 #[ocaml::sig("InboxMessage of int32 * int64 * string | Reveal of reveal_data")]
 pub enum Input<'a> {
@@ -124,12 +134,39 @@ pub struct InputRequest;
 
 ocaml::custom!(InputRequest);
 
-// TODO RV-365 Implement Output & OutputProof types
-#[ocaml::sig]
-pub struct Output;
+// This representation guarantees that on the OCaml side, when converting to `Raw_level_repr.t`
+// no runtime exceptions will be thrown.
+/// Wrapper to convert a Rust unsigned 31 bit value to an OCaml int32 type
+pub struct RawLevel(u31);
 
-ocaml::custom!(Output);
+unsafe impl ocaml::ToValue for RawLevel {
+    fn to_value(&self, _rt: &ocaml::Runtime) -> ocaml::Value {
+        // Make sure the underlying type is u32 to ensure a no-op conversion to OCaml values
+        let wrapped_value: u32 = self.0.value();
+        // Make sure the ocaml-rs conversion is for precisely converting into an OCaml i32
+        unsafe { ocaml::Value::int32(wrapped_value as i32) }
+    }
+}
 
+/// Metadata of an output message
+#[derive(ocaml::ToValue)]
+#[ocaml::sig("{message_index : int64; outbox_level : int32}")]
+pub struct OutputInfo {
+    pub message_index: u64,
+    pub outbox_level: RawLevel,
+}
+
+ocaml::custom!(OutputInfo);
+
+/// A value of this type could only be returned as part of successfully verifying an output proof.
+#[derive(ocaml::ToValue)]
+#[ocaml::sig("{info : output_info; encoded_message : bytes}")]
+pub struct Output {
+    pub info: OutputInfo,
+    pub encoded_message: BytesWrapper,
+}
+
+// TODO RV-365 Implement OutputProof types
 #[ocaml::sig]
 pub struct OutputProof;
 
@@ -524,10 +561,10 @@ pub fn octez_riscv_deserialise_proof(_bytes: &[u8]) -> Result<Pointer<Proof>, St
 }
 
 #[ocaml::func]
-#[ocaml::sig("output_proof -> output")]
-pub fn octez_riscv_output_of_output_proof(
+#[ocaml::sig("output_proof -> output_info")]
+pub fn octez_riscv_output_info_of_output_proof(
     _output_proof: Pointer<OutputProof>,
-) -> Result<Pointer<Proof>, String> {
+) -> Result<Pointer<OutputInfo>, String> {
     todo!()
 }
 

@@ -28,10 +28,32 @@ type proof = Api.proof
 
 type output_proof = Api.output_proof
 
-type output = Api.output
+type output_info = {
+  message_index : Z.t;
+  outbox_level : Bounded.Non_negative_int32.t;
+}
+
+type output = {info : output_info; encoded_message : string}
 
 let riscv_hash_to_rollup_state_hash (bytes : bytes) : hash =
   Tezos_crypto.Hashed.Smart_rollup_state_hash.of_bytes_exn bytes
+
+let from_api_output_info : Api.output_info -> output_info =
+ fun {message_index; outbox_level} ->
+  let outbox_level =
+    (* The Rust api guarantees this is a valid unsigned 31 bits integer *)
+    match Bounded.Non_negative_int32.of_value outbox_level with
+    | None -> assert false
+    | Some level -> level
+  in
+  {message_index = Z.of_int64 message_index; outbox_level}
+
+let from_api_output : Api.output -> output =
+ fun {info; encoded_message} ->
+  {
+    info = from_api_output_info info;
+    encoded_message = String.of_bytes encoded_message;
+  }
 
 (* The kernel debug logging function (`string -> unit Lwt.t`) passed by the node
  * to [compute_step] and [compute_step_many] cannot be passed directly
@@ -133,15 +155,18 @@ let serialise_proof proof = Api.octez_riscv_serialise_proof proof
 
 let deserialise_proof proof = Api.octez_riscv_deserialise_proof proof
 
-let output_of_output_proof output_proof =
-  Api.octez_riscv_output_of_output_proof output_proof
+let output_info_of_output_proof output_proof =
+  from_api_output_info
+  @@ Api.octez_riscv_output_info_of_output_proof output_proof
 
 let state_of_output_proof output_proof =
   riscv_hash_to_rollup_state_hash
   @@ Api.octez_riscv_state_of_output_proof output_proof
 
 let verify_output_proof output_proof =
-  Api.octez_riscv_verify_output_proof output_proof
+  let open Option_syntax in
+  let+ output = Api.octez_riscv_verify_output_proof output_proof in
+  from_api_output output
 
 let serialise_output_proof output_proof =
   Api.octez_riscv_serialise_output_proof output_proof
