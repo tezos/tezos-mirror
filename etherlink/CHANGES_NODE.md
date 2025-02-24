@@ -23,6 +23,8 @@
 - Fixes switching to a history mode with a smaller retention period.
   Previously, the command would succeed, but the node would keep using the
   previous retention period. (!16798)
+- Fixes exporting a snapshot using the `/tmp` directory to generate temporary
+  files. (!16919)
 
 ### Internals
 
