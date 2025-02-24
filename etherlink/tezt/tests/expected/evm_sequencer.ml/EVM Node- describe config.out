@@ -169,7 +169,10 @@
         [ { "chain_id": $bignum /* The id of the l2 chain */ } ... ]
         /* Some */
         || null
-        /* None */ },
+        /* None */,
+      "enable_tx_queue"?:
+        boolean
+        /* Replace the observer tx pool by a tx queue */ },
   "proxy"?:
     { "finalized_view"?:
         boolean

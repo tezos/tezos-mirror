@@ -306,6 +306,7 @@ val patch_config_with_experimental_feature :
   ?rpc_server:rpc_server ->
   ?enable_websocket:bool ->
   ?max_websocket_message_length:int ->
+  ?enable_tx_queue:bool ->
   unit ->
   JSON.t ->
   JSON.t
@@ -390,6 +391,16 @@ val wait_for_rollup_node_ahead : t -> int Lwt.t
     [tx_pool_add_transaction.v0] using {!wait_for} and returns the transaction
     hash. *)
 val wait_for_tx_pool_add_transaction : ?timeout:float -> t -> string Lwt.t
+
+(** [wait_for_tx_queue_add_transaction ?timeout evm_node] waits for the event
+    [tx_queue_add_transaction.v0] using {!wait_for} and returns the transaction
+    hash. *)
+val wait_for_tx_queue_add_transaction : ?timeout:float -> t -> string Lwt.t
+
+(** [wait_for_tx_queue_injecting_transaction ?timeout evm_node] waits
+    for the event [tx_queue_injecting_transaction.v0] using
+    {!wait_for} and returns the number of transactions injected. *)
+val wait_for_tx_queue_injecting_transaction : ?timeout:float -> t -> int Lwt.t
 
 (** [wait_for_shutdown ?can_terminate evm_node] waits until a node terminates
     and return its status. If the node is not running, make the test fail. If

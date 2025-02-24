@@ -1383,6 +1383,39 @@ tx_pool_started:
     { /* tx_pool_started version 0 */
       "tx_pool_started.v0": any }
 
+tx_queue_rpc_error:
+  description: an RPC produced the error :
+	code:{code},
+	message:{message}
+  level: error
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_rpc_error version 0 */
+      "tx_queue_rpc_error.v0":
+        { "code": integer ∈ [-2^31-1, 2^31],
+          "message": $unistring } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+
+shutting_down_tx_queue:
+  description: stopping the tx queue
+  level: notice
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* shutting_down_tx_queue version 0 */
+      "shutting_down_tx_queue.v0": any }
+
+tx_queue_is_ready:
+  description: tx queue is ready
+  level: notice
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_is_ready version 0 */
+      "tx_queue_is_ready.v0": any }
+
 counter_inc_assertion_warning:
   description: assertion failed while updating a Counter metric: the increment ({increment} occuring at {label}) is negative; the value will not be updated
   level: warning
@@ -2242,6 +2275,23 @@ tx_pool_transaction_injection_failed:
   json format:
     { /* tx_pool_transaction_injection_failed version 0 */
       "tx_pool_transaction_injection_failed.v0": any }
+
+tx_queue_rpc_error:
+  description: an RPC produced the error :
+	code:{code},
+	message:{message}
+  level: error
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_rpc_error version 0 */
+      "tx_queue_rpc_error.v0":
+        { "code": integer ∈ [-2^31-1, 2^31],
+          "message": $unistring } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
 
 node_da_fees:
   description: internal: node gives {node_da_fees} DA fees, whereas kernel gives {kernel_da_fees} on block {block_number} with {call}

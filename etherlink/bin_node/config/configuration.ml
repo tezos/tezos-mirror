@@ -74,6 +74,7 @@ type experimental_features = {
   max_websocket_message_length : int;
   monitor_websocket_heartbeat : monitor_websocket_heartbeat option;
   l2_chains : l2_chain list option;
+  enable_tx_queue : bool;
 }
 
 type sequencer = {
@@ -215,6 +216,7 @@ let default_experimental_features =
     max_websocket_message_length = default_max_socket_message_length;
     monitor_websocket_heartbeat = default_monitor_websocket_heartbeat;
     l2_chains = default_l2_chains;
+    enable_tx_queue = false;
   }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".octez-evm-node"
@@ -844,6 +846,7 @@ let experimental_features_encoding =
            max_websocket_message_length;
            monitor_websocket_heartbeat;
            l2_chains : l2_chain list option;
+           enable_tx_queue;
          } ->
       ( ( drop_duplicate_on_injection,
           blueprints_publisher_order_enabled,
@@ -855,7 +858,8 @@ let experimental_features_encoding =
           enable_websocket,
           max_websocket_message_length,
           monitor_websocket_heartbeat,
-          l2_chains ) ))
+          l2_chains,
+          enable_tx_queue ) ))
     (fun ( ( drop_duplicate_on_injection,
              blueprints_publisher_order_enabled,
              enable_send_raw_transaction,
@@ -866,7 +870,8 @@ let experimental_features_encoding =
              enable_websocket,
              max_websocket_message_length,
              monitor_websocket_heartbeat,
-             l2_chains ) ) ->
+             l2_chains,
+             enable_tx_queue ) ) ->
       {
         drop_duplicate_on_injection;
         blueprints_publisher_order_enabled;
@@ -877,6 +882,7 @@ let experimental_features_encoding =
         max_websocket_message_length;
         monitor_websocket_heartbeat;
         l2_chains;
+        enable_tx_queue;
       })
     (merge_objs
        (obj6
@@ -927,7 +933,7 @@ let experimental_features_encoding =
                 DEPRECATED: You should remove this option from your \
                 configuration file."
              bool))
-       (obj5
+       (obj6
           (dft
              "rpc_server"
              ~description:
@@ -959,7 +965,12 @@ let experimental_features_encoding =
                \                 If not set, the node will adopt a single \
                 chain behaviour."
              (option (list l2_chain_encoding))
-             default_l2_chains)))
+             default_l2_chains)
+          (dft
+             "enable_tx_queue"
+             ~description:"Replace the observer tx pool by a tx queue"
+             bool
+             default_experimental_features.enable_tx_queue)))
 
 let proxy_encoding =
   let open Data_encoding in
