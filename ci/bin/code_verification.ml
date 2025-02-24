@@ -647,6 +647,7 @@ let jobs pipeline_type =
              ())
     | Schedule_extended_test -> None
   in
+  (* Octez static binaries *)
   let job_static_x86_64_experimental =
     job_build_static_binaries
       ~__POS__
@@ -667,6 +668,58 @@ let jobs pipeline_type =
       ~dependencies:dependencies_needs_start (* See rationale above *)
       ~rules:(make_rules ~manual:(On_changes changeset_octez) ())
       ()
+  in
+
+  (* EVM static binaires *)
+  let job_evm_static_x86_64_experimental =
+    job
+      ~__POS__
+      ~arch:Amd64
+      ~name:("etherlink.build:static-" ^ arch_to_string Amd64)
+      ~image:Images.CI.build
+      ~stage:Stages.build
+      ~rules:(make_rules ~manual:(On_changes changeset_etherlink) ())
+      ~artifacts:
+        (artifacts
+           ~name:"evm-binaries"
+           ~when_:On_success
+           ["octez-evm-*"; "etherlink-*"])
+      ~cpu:Very_high
+      ~before_script:
+        [
+          "./scripts/ci/take_ownership.sh";
+          ". ./scripts/version.sh";
+          "eval $(opam env)";
+        ]
+      ["make evm-node-static"]
+    |> enable_cargo_cache
+    |> enable_sccache ~cache_size:"2G"
+    |> enable_cargo_target_caches
+  in
+
+  let job_evm_static_arm64_experimental =
+    job
+      ~__POS__
+      ~arch:Arm64
+      ~name:("etherlink.build:static-" ^ arch_to_string Arm64)
+      ~image:Images.CI.build
+      ~stage:Stages.build
+      ~rules:(make_rules ~manual:(On_changes changeset_etherlink) ())
+      ~artifacts:
+        (artifacts
+           ~name:"evm-binaries"
+           ~when_:On_success
+           ["octez-evm-*"; "etherlink-*"])
+      ~before_script:
+        [
+          "./scripts/ci/take_ownership.sh";
+          ". ./scripts/version.sh";
+          "eval $(opam env)";
+        ]
+      ["make evm-node-static"]
+    |> enable_cargo_cache
+    |> enable_sccache ~cache_size:"2G"
+    |> enable_cargo_target_caches
   in
 
   (* Build jobs *)
@@ -789,6 +842,8 @@ let jobs pipeline_type =
       job_build_grafazos;
       job_build_teztale ~arch:Amd64;
       job_build_teztale ~arch:Arm64;
+      job_evm_static_x86_64_experimental;
+      job_evm_static_arm64_experimental;
       job_build_layer1_profiling ();
     ]
     @ Option.to_list job_select_tezts
