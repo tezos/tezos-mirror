@@ -46,7 +46,7 @@ PROTOCOL=$(octez-client --protocol PtParisBxoLz list understood protocols | tee 
 sudo su tezos -c "octez-client -p $PROTOCOL gen keys baker"
 BAKER_KEY=$(sudo su tezos -c "octez-client -p $PROTOCOL show address baker" | head -1 | awk '{print $2}')
 echo "baking_key=$BAKER_KEY" >> /etc/octez/baker.conf
-echo "lq_vote=yes" >> /etc/octez/baker.conf
+echo "lq_vote=on" >> /etc/octez/baker.conf
 
 # ideally we should also start the baker, but it will timeout
 # waiting for the node to sync
@@ -79,12 +79,61 @@ sudo systemctl status octez-node.service
 sudo systemctl restart octez-baker-active.service
 sudo systemctl status octez-baker-active.service
 
+ERR=0
+
 # [ check configuration after the upgrade ]
 # we check the debconf parameters
-sudo debconf-get-selections | grep octez
+
+#shellcheck disable=SC1091
+. /etc/default/octez-baker-active
+
 # we check if the configuration of octez did not change
-sudo su tezos -c "octez-client -p $PROTOCOL show address baker"
-sudo su tezos -c "octez-node config show"
+BAKER_KEY_AFTER=$(sudo su tezos -c "octez-client -p $PROTOCOL show address baker" | head -1 | awk '{print $2}')
+if [ "$BAKER_KEY" != "$BAKER_KEY_AFTER" ]; then
+  echo "Client key differ $BAKER_KEY <> $BAKER_KEY_AFTER"
+  ERR=1
+fi
+
+BAKER_KEY_DEBCONF=$(sudo debconf-get-selections | grep octez-baker/baker-key | awk '{print $4}')
+if [ "$BAKER_KEY_DEBCONF" != "$BAKER_KEY_AFTER" ]; then
+  echo "Debconf baker key differ $BAKER_KEY <> $BAKER_KEY_AFTER"
+  ERR=1
+else
+  echo "Debconf baker key differ migrated successfully $BAKER_KEY"
+fi
+
+LQVOTE_DEBCONF=$(sudo debconf-get-selections | grep octez-baker/liquidity-vote | awk '{print $4}')
+if [ "$LQVOTE_DEBCONF" != "on" ]; then
+  echo "Debconf liquidity vote differ $LQVOTE_DEBCONF <> on"
+  ERR=1
+else
+  echo "Debconf liquidity vote migrated successfully \"$LQVOTE_DEBCONF\""
+fi
+
+if [ "$LQVOTE" != "on" ]; then
+  echo "Liquidity vote differ $LQVOTE <> on"
+  ERR=1
+else
+  echo "Liquidity vote migrated successfully \"$LQVOTE\""
+fi
+
+NETWORK_AFTER=$(sudo su tezos -c "octez-node config show" | jq -r .network)
+if [ "$NETWORK_AFTER" != "ghostnet" ]; then
+  echo "Node network differ $NETWORK_AFTER <> ghostnet"
+  ERR=1
+else
+  echo "Node network migrated successfully $NETWORK_AFTER"
+fi
+
+HISTORY_AFTER=$(sudo su tezos -c "octez-node config show" | jq -r .shell.history_mode)
+if [ "$HISTORY_AFTER" != "rolling" ]; then
+  echo "Node history mode differ $HISTORY_AFTER <> rolling"
+  ERR=1
+else
+  echo "Node history mode migrated successfully $HISTORY_AFTER"
+fi
 
 # [check executables version]
 dpkg -l octez-\*
+
+exit "$ERR"
