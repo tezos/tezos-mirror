@@ -2,12 +2,13 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::marker::PhantomData;
+
 use super::{
     AllocatedOf, Atom, Cell, FnManager, ManagerBase, ManagerClone, ManagerRead, ManagerReadWrite,
     ManagerWrite, Ref, StaticCopy,
 };
 use crate::default::ConstDefault;
-use std::marker::PhantomData;
 
 /// XXX: Workaround trait for not having enum variants as const-generics
 pub trait EffectGetter {

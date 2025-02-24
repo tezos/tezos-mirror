@@ -4,12 +4,13 @@
 
 //! Core logic for atomic instructions
 
+use std::mem;
+
 use crate::{
     machine_state::{MachineCoreState, main_memory::MainMemoryLayout, registers::XRegister},
     state_backend as backend,
     traps::Exception,
 };
-use std::mem;
 
 pub const SC_SUCCESS: u64 = 0;
 pub const SC_FAILURE: u64 = 1;

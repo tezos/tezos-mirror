@@ -2,10 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::cli::BenchParserRunOptions;
-use octez_riscv::parser::parse_block;
 use std::error::Error;
 use std::ops::Div;
+
+use octez_riscv::parser::parse_block;
+
+use crate::cli::BenchParserRunOptions;
 
 pub fn bench(opts: BenchParserRunOptions) -> Result<(), Box<dyn Error>> {
     let runs = opts.repeat;

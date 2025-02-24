@@ -3,8 +3,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{errors, tui};
-use crate::commands::debug::DebugOptions;
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, HashMap, HashSet},
+    ops::Bound,
+};
+
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use goblin::{elf, elf::Elf, elf::header::ET_DYN};
@@ -25,12 +29,10 @@ use octez_riscv::{
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
 use rustc_demangle::demangle;
-use std::{
-    borrow::Cow,
-    collections::{BTreeMap, HashMap, HashSet},
-    ops::Bound,
-};
 use tezos_smart_rollup::utils::inbox::Inbox;
+
+use super::{errors, tui};
+use crate::commands::debug::DebugOptions;
 mod render;
 mod updates;
 
@@ -491,10 +493,12 @@ impl<'a> ProgramView<'a> {
 
 #[cfg(test)]
 mod test {
+    use std::fs;
+
+    use octez_riscv::machine_state::main_memory::M1G;
+
     use super::*;
     use crate::{ExitMode, posix_exit_mode};
-    use octez_riscv::machine_state::main_memory::M1G;
-    use std::fs;
 
     #[test]
     fn test_max_steps_respected() {

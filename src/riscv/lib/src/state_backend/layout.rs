@@ -3,8 +3,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::default::ConstDefault;
 use std::marker::PhantomData;
+
+use crate::default::ConstDefault;
 
 /// Structural description of a state type
 pub trait Layout {

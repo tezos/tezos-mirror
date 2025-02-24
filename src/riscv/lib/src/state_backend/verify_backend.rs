@@ -2,11 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{
-    Cell, EnrichedValue, ManagerBase, ManagerClone, ManagerRead, ManagerReadWrite, ManagerWrite,
-};
-use crate::state_backend::{owned_backend::Owned, proof_backend::merkle::MERKLE_LEAF_SIZE};
-use range_collections::RangeSet2;
 use std::{
     array,
     collections::BTreeMap,
@@ -15,6 +10,13 @@ use std::{
     panic::resume_unwind,
     slice,
 };
+
+use range_collections::RangeSet2;
+
+use super::{
+    Cell, EnrichedValue, ManagerBase, ManagerClone, ManagerRead, ManagerReadWrite, ManagerWrite,
+};
+use crate::state_backend::{owned_backend::Owned, proof_backend::merkle::MERKLE_LEAF_SIZE};
 
 /// Panic payload that is raised when a value isn't present in a part of the Verifier backend.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

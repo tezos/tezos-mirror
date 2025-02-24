@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use strum::{EnumCount, EnumIter};
+
 use super::{
     MachineCoreState,
     csregisters::{
@@ -17,7 +19,6 @@ use crate::{
     state_backend::{self as backend},
     traps::Exception,
 };
-use strum::{EnumCount, EnumIter};
 
 mod physical_address;
 pub mod pte;

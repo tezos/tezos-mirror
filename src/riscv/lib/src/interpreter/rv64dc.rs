@@ -73,6 +73,9 @@ where
 
 #[cfg(test)]
 mod test {
+    use arbitrary_int::u5;
+    use proptest::prelude::*;
+
     use crate::{
         backend_test,
         bits::Bits64,
@@ -88,8 +91,6 @@ mod test {
         },
         traps::Exception,
     };
-    use arbitrary_int::u5;
-    use proptest::prelude::*;
 
     const ZERO_OFFSET: i64 = 0;
     const OUT_OF_BOUNDS_OFFSET: i64 = 1024;

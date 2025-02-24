@@ -2,11 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
+use tezos_smart_rollup_constants::riscv::REVEAL_REQUEST_MAX_SIZE;
+
 use crate::state_backend::{
     AllocatedOf, Atom, Cell, DynArray, DynCells, FnManager, ManagerBase, ManagerClone, ManagerRead,
     Ref,
 };
-use tezos_smart_rollup_constants::riscv::REVEAL_REQUEST_MAX_SIZE;
 
 /// Reveal request layout
 pub type RevealRequestLayout = (DynArray<REVEAL_REQUEST_MAX_SIZE>, Atom<u64>);

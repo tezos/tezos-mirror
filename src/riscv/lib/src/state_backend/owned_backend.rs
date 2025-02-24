@@ -3,16 +3,18 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{
-    AllocatedOf, Elem, EnrichedValue, EnrichedValueLinked, Layout, ManagerAlloc, ManagerBase,
-    ManagerClone, ManagerDeserialise, ManagerRead, ManagerReadWrite, ManagerSerialise,
-    ManagerWrite, StaticCopy,
-};
-use serde::ser::SerializeTuple;
 use std::{
     fmt,
     marker::PhantomData,
     mem::{self, MaybeUninit},
+};
+
+use serde::ser::SerializeTuple;
+
+use super::{
+    AllocatedOf, Elem, EnrichedValue, EnrichedValueLinked, Layout, ManagerAlloc, ManagerBase,
+    ManagerClone, ManagerDeserialise, ManagerRead, ManagerReadWrite, ManagerSerialise,
+    ManagerWrite, StaticCopy,
 };
 
 /// Manager that allows state binders to own the state storage

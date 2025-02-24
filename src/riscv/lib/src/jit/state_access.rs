@@ -20,14 +20,8 @@
 //! [function builder]: cranelift::frontend::FunctionBuilderContext
 //! [direct function call]: cranelift::codegen::ir::InstBuilder::call
 
-use crate::{
-    machine_state::{
-        MachineCoreState,
-        main_memory::MainMemoryLayout,
-        registers::{NonZeroXRegister, XValue},
-    },
-    state_backend::{ManagerReadWrite, owned_backend::Owned},
-};
+use std::marker::PhantomData;
+
 use cranelift::{
     codegen::ir::{
         AbiParam, FuncRef, InstBuilder, Signature, Value,
@@ -37,7 +31,15 @@ use cranelift::{
 };
 use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{FuncId, Linkage, Module, ModuleResult};
-use std::marker::PhantomData;
+
+use crate::{
+    machine_state::{
+        MachineCoreState,
+        main_memory::MainMemoryLayout,
+        registers::{NonZeroXRegister, XValue},
+    },
+    state_backend::{ManagerReadWrite, owned_backend::Owned},
+};
 
 const PC_WRITE_SYMBOL: &str = "JSA::pc_write";
 

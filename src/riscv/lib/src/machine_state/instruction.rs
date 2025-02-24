@@ -15,6 +15,11 @@
 mod constructors;
 pub mod tagged_instruction;
 
+use std::fmt::{self, Debug, Formatter};
+
+use serde::{Deserialize, Serialize};
+use tagged_instruction::{ArgsShape, TaggedInstruction, opcode_to_argsshape};
+
 use super::{
     MachineCoreState, ProgramCounterUpdate,
     csregisters::CSRegister,
@@ -37,9 +42,6 @@ use crate::{
     state_backend::{ManagerBase, ManagerReadWrite},
     traps::Exception,
 };
-use serde::{Deserialize, Serialize};
-use std::fmt::{self, Debug, Formatter};
-use tagged_instruction::{ArgsShape, TaggedInstruction, opcode_to_argsshape};
 
 /// An instruction formed of an opcode and flat arguments.
 ///

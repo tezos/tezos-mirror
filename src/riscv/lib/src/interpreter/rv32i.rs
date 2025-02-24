@@ -375,6 +375,11 @@ where
 
 #[cfg(test)]
 mod tests {
+    use proptest::{
+        prelude::{any, prop},
+        prop_assert_eq, prop_assume, proptest,
+    };
+
     use crate::{
         backend_test, create_state,
         interpreter::i::run_add,
@@ -393,10 +398,6 @@ mod tests {
         },
         parser::instruction::{FenceSet, InstrWidth},
         traps::Exception,
-    };
-    use proptest::{
-        prelude::{any, prop},
-        prop_assert_eq, prop_assume, proptest,
     };
 
     backend_test!(test_add_sub, F, {

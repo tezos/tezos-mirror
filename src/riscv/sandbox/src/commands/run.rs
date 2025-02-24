@@ -3,10 +3,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{
-    cli::{CommonOptions, RunOptions},
-    posix_exit_mode,
-};
+use std::{error::Error, fs, io::Write, ops::Bound};
+
 use octez_riscv::{
     machine_state::{DefaultCacheLayouts, main_memory::M1G},
     machine_state::{
@@ -17,9 +15,13 @@ use octez_riscv::{
     state_backend::owned_backend::Owned,
     stepper::{StepResult, Stepper, StepperStatus, pvm::PvmStepper, test::TestStepper},
 };
-use std::{error::Error, fs, io::Write, ops::Bound};
 use tezos_smart_rollup::utils::{console::Console, inbox::InboxBuilder};
 use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
+
+use crate::{
+    cli::{CommonOptions, RunOptions},
+    posix_exit_mode,
+};
 
 pub fn run(opts: RunOptions) -> Result<(), Box<dyn Error>> {
     let program = fs::read(&opts.input)?;

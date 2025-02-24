@@ -6,6 +6,8 @@
 //!
 //! Chapter 11 - "F" Standard Extension for Single-Precision Floating-Point
 
+use rustc_apfloat::{Float, Status, StatusAnd, ieee::Single};
+
 use super::float::FloatExt;
 use crate::{
     machine_state::{
@@ -18,7 +20,6 @@ use crate::{
     state_backend as backend,
     traps::Exception,
 };
-use rustc_apfloat::{Float, Status, StatusAnd, ieee::Single};
 
 impl From<Single> for FValue {
     fn from(f: Single) -> Self {
@@ -551,6 +552,10 @@ fn fvalue_to_f32_bits(f: FValue) -> u32 {
 
 #[cfg(test)]
 mod tests {
+    use arbitrary_int::u5;
+    use proptest::prelude::*;
+    use rustc_apfloat::{Float, ieee::Double, ieee::Single};
+
     use super::f32_to_fvalue;
     use crate::{
         backend_test,
@@ -568,11 +573,6 @@ mod tests {
         },
         traps::Exception,
     };
-
-    use arbitrary_int::u5;
-    use proptest::prelude::*;
-
-    use rustc_apfloat::{Float, ieee::Double, ieee::Single};
 
     backend_test!(test_fmv_f, F, {
         proptest!(|(

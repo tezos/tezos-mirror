@@ -68,11 +68,12 @@ csr! {
 
 #[cfg(test)]
 mod tests {
+    use proptest::{prop_assert_eq, proptest};
+
     use crate::{
         bits::Bits64,
         machine_state::{address_translation::pte::PageTableEntry, csregisters::satp::SvLength},
     };
-    use proptest::{prop_assert_eq, proptest};
 
     #[test]
     pub fn test_pte_fields() {

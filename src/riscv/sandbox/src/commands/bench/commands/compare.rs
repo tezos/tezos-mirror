@@ -1,6 +1,8 @@
-use crate::{cli::BenchCompareOptions, commands::bench::load_from_file, table};
-use itertools::Itertools;
 use std::error::Error;
+
+use itertools::Itertools;
+
+use crate::{cli::BenchCompareOptions, commands::bench::load_from_file, table};
 
 pub fn compare(opts: BenchCompareOptions) -> Result<(), Box<dyn Error>> {
     let files = opts.comparison_files()?;

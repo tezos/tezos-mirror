@@ -3,6 +3,10 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::{fmt, ops::Bound, path::Path};
+
+use thiserror::Error;
+
 use crate::{
     machine_state::{
         TestCacheLayouts,
@@ -22,8 +26,6 @@ use crate::{
     },
     storage::{self, Hash, Repo},
 };
-use std::{fmt, ops::Bound, path::Path};
-use thiserror::Error;
 
 pub type StateLayout = (
     PvmLayout<M64M, TestCacheLayouts>,

@@ -6,7 +6,13 @@
 //!
 //! This is achieved by implementing 'just enough' of the gdb server protocol to be useful.
 
-use crate::cli::GdbServerOptions;
+use std::collections::HashSet;
+use std::error::Error;
+use std::marker::PhantomData;
+use std::net::{TcpListener, TcpStream};
+use std::ops::Bound;
+use std::{fs, io};
+
 use gdbstub::arch::Arch;
 use gdbstub::common::Signal;
 use gdbstub::conn::{Connection, ConnectionExt};
@@ -30,13 +36,9 @@ use octez_riscv::{
     machine_state::main_memory::{M1G, OutOfBounds},
     state_backend::FnManagerIdent,
 };
-use std::collections::HashSet;
-use std::error::Error;
-use std::marker::PhantomData;
-use std::net::{TcpListener, TcpStream};
-use std::ops::Bound;
-use std::{fs, io};
 use tezos_smart_rollup::utils::inbox::InboxBuilder;
+
+use crate::cli::GdbServerOptions;
 
 /// Run a gdb server that can be used for debugging RISC-V programs.
 pub fn gdb_server(opts: GdbServerOptions) -> Result<(), Box<dyn Error>> {

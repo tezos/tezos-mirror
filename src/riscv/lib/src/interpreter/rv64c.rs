@@ -122,6 +122,10 @@ where
 }
 #[cfg(test)]
 mod tests {
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+
+    use proptest::{arbitrary::any, prop_assert, prop_assert_eq, proptest};
+
     use crate::{
         backend_test, create_state,
         machine_state::{
@@ -132,8 +136,6 @@ mod tests {
         },
         traps::Exception,
     };
-    use proptest::{arbitrary::any, prop_assert, prop_assert_eq, proptest};
-    use std::panic::{AssertUnwindSafe, catch_unwind};
 
     backend_test!(test_caddiw, F, {
         proptest!(|(

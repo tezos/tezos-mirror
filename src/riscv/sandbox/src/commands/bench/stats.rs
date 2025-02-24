@@ -2,13 +2,15 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::data::{BenchData, InstructionData};
-use crate::{format_status, table::utils::thousand_format};
 use core::fmt;
+use std::time::Duration;
+
 use itertools::Itertools;
 use meansd::MeanSD;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+
+use super::data::{BenchData, InstructionData};
+use crate::{format_status, table::utils::thousand_format};
 
 /// Serializable data for instruction-level statistics
 #[derive(Serialize, Deserialize, Debug, Clone)]

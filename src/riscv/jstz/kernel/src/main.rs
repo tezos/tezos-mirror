@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use std::sync::Once;
+
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_smart_rollup::prelude::Runtime;
 use tezos_smart_rollup::{entrypoint, storage::path::RefPath};

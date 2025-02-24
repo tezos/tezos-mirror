@@ -6,6 +6,7 @@
 //! Common type for hashes
 
 use std::num::NonZeroUsize;
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]

@@ -3,14 +3,16 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::mem;
+
+use serde::{Deserialize, Serialize};
+use tezos_smart_rollup_constants::riscv::SbiError;
+use thiserror::Error;
+
 use crate::{
     machine_state::registers::XValue,
     state_backend::{self as backend, ManagerDeserialise, ManagerSerialise},
 };
-use serde::{Deserialize, Serialize};
-use std::mem;
-use tezos_smart_rollup_constants::riscv::SbiError;
-use thiserror::Error;
 
 /// Bus address
 pub type Address = XValue;

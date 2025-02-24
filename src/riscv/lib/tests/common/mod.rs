@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::fs;
+
 use octez_riscv::{
     machine_state::{
         DefaultCacheLayouts, block_cache::bcall::InterpretedBlockBuilder, main_memory::M64M,
@@ -10,7 +12,6 @@ use octez_riscv::{
     stepper::pvm::PvmStepper,
 };
 use rand::{Rng, seq::SliceRandom};
-use std::fs;
 use tezos_smart_rollup_utils::inbox::InboxBuilder;
 
 pub fn make_stepper_factory() -> impl Fn() -> PvmStepper<'static, M64M, DefaultCacheLayouts> {

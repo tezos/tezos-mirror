@@ -81,6 +81,11 @@
 
 pub mod bcall;
 
+use std::marker::PhantomData;
+use std::u64;
+
+use bcall::{BCall, Block};
+
 use super::MachineCoreState;
 use super::address_translation::PAGE_OFFSET_WIDTH;
 use super::instruction::Instruction;
@@ -100,9 +105,6 @@ use crate::{
 };
 use crate::{default::ConstDefault, state_backend::verify_backend};
 use crate::{machine_state::instruction::Args, storage::binary};
-use bcall::{BCall, Block};
-use std::marker::PhantomData;
-use std::u64;
 
 /// Mask for getting the offset within a page
 const PAGE_OFFSET_MASK: usize = (1 << PAGE_OFFSET_WIDTH) - 1;

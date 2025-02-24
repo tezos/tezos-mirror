@@ -2,14 +2,16 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::fmt::Debug;
+
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
 use super::{
     Args, CSRegister, FRegister, InstrRoundingMode, Instruction, NonZeroXRegister, OpCode,
     XRegister,
 };
 use crate::{default::ConstDefault, parser::instruction::InstrWidth};
-use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
-use thiserror::Error;
 
 #[derive(Error, Debug)]
 /// Errors that may be returned when converting between tagged and untagged registers.

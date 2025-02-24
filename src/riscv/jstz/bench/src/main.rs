@@ -2,11 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::error::Error;
+use std::path::Path;
+
 use clap::{Parser, Subcommand};
 use generate::{handle_generate, handle_generate_script};
 use results::handle_results;
-use std::error::Error;
-use std::path::Path;
 
 mod generate;
 mod results;

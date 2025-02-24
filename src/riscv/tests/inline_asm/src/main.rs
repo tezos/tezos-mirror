@@ -9,6 +9,7 @@ mod syscalls;
 
 use core::arch::asm;
 use core::panic::PanicInfo;
+
 use syscalls::exit;
 
 #[no_mangle]

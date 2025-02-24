@@ -5,6 +5,12 @@
 
 mod reveals;
 
+use std::ops::Bound;
+
+use reveals::RevealRequestResponseMap;
+use serde::{Serialize, de::DeserializeOwned};
+use tezos_smart_rollup_utils::inbox::Inbox;
+
 use super::{Stepper, StepperStatus};
 use crate::machine_state::block_cache::bcall::{Block, Interpreted, InterpretedBlockBuilder};
 use crate::state_backend::{ManagerBase, ManagerReadWrite};
@@ -26,10 +32,6 @@ use crate::{
     },
     storage::binary,
 };
-use reveals::RevealRequestResponseMap;
-use serde::{Serialize, de::DeserializeOwned};
-use std::ops::Bound;
-use tezos_smart_rollup_utils::inbox::Inbox;
 
 /// Error during PVM stepping
 #[derive(Debug, derive_more::From, thiserror::Error, derive_more::Display)]

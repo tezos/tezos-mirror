@@ -2,6 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
+use comfy_table::{
+    Attribute, Cell, CellAlignment, Color, ContentArrangement, Table,
+    modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL,
+};
+use itertools::Itertools;
+
 use self::utils::{
     NamedBenchInstrStats, prepend_cell, tableify_bench_stats, thousand_format, vec_cell_factory_ref,
 };
@@ -10,11 +16,6 @@ use crate::{
     commands::bench::{BenchStats, NamedStats},
     table::utils::format_opt_duration,
 };
-use comfy_table::{
-    Attribute, Cell, CellAlignment, Color, ContentArrangement, Table,
-    modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL,
-};
-use itertools::Itertools;
 
 pub mod utils;
 

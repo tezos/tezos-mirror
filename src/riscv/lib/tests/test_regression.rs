@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::{fs, io::Write, ops::Bound};
+
 use octez_riscv::{
     machine_state::{
         DefaultCacheLayouts, block_cache::bcall::InterpretedBlockBuilder, main_memory::M64M,
@@ -10,7 +12,6 @@ use octez_riscv::{
     state_backend::owned_backend::Owned,
     stepper::{Stepper, StepperStatus, pvm::PvmStepper},
 };
-use std::{fs, io::Write, ops::Bound};
 use tezos_smart_rollup_utils::inbox::InboxBuilder;
 
 const GOLDEN_DIR: &str = "tests/expected/jstz";

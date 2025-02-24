@@ -141,11 +141,12 @@ where
 
 #[cfg(test)]
 mod test {
+    use proptest::{prelude::any, prop_assert_eq, proptest};
+
     use crate::{
         backend_test, create_state,
         machine_state::registers::{XRegisters, XRegistersLayout, a0, a1, a2, a3},
     };
-    use proptest::{prelude::any, prop_assert_eq, proptest};
 
     backend_test!(test_div_rem_invariant, F, {
         proptest!(|(

@@ -2,14 +2,16 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::Result;
-use regex::Regex;
-use serde::Deserialize;
 use std::fs::read_to_string;
 use std::path::Path;
 use std::time::Duration;
 use std::{collections::HashSet, fmt};
+
+use regex::Regex;
+use serde::Deserialize;
 use tezos_smart_rollup::utils::inbox::file::{InboxFile, Message};
+
+use crate::Result;
 
 // Three sets of messages:
 // 1. Deployment

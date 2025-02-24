@@ -6,6 +6,10 @@
 mod mstatus;
 mod xip;
 
+use mstatus::MStatusLayout;
+pub(super) use mstatus::MStatusValue;
+use xip::{XipCell, XipCellLayout};
+
 use super::{
     CSRegisters,
     effects::{NoEffect, handle_csr_effect},
@@ -26,9 +30,6 @@ use crate::{
     },
     storage::binary,
 };
-use mstatus::MStatusLayout;
-pub(super) use mstatus::MStatusValue;
-use xip::{XipCell, XipCellLayout};
 
 /// Representation of a value in a CSR
 pub type CSRRepr = u64;
@@ -1717,9 +1718,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
+
     use strum::IntoEnumIterator;
+
+    use super::*;
 
     /// Ensure that [`CSRValues::fold_ref`] and [`CSRValuesF::fold_mut`] refer to the same CSR
     /// value field provided the same [`RootCSRegister`].

@@ -7,12 +7,13 @@
 //!
 //! Chapter 8 - Unprivileged spec
 
+use std::ops::{BitAnd, BitOr, BitXor};
+
 use crate::{
     machine_state::{MachineCoreState, main_memory::MainMemoryLayout, registers::XRegister},
     state_backend as backend,
     traps::Exception,
 };
-use std::ops::{BitAnd, BitOr, BitXor};
 
 impl<ML, M> MachineCoreState<ML, M>
 where
@@ -218,6 +219,10 @@ where
 
 #[cfg(test)]
 mod test {
+    use std::ops::{BitAnd, BitOr, BitXor};
+
+    use proptest::prelude::*;
+
     use crate::{
         backend_test, create_state,
         interpreter::atomics::{SC_FAILURE, SC_SUCCESS},
@@ -228,8 +233,6 @@ mod test {
         },
         test_amo, test_lrsc,
     };
-    use proptest::prelude::*;
-    use std::ops::{BitAnd, BitOr, BitXor};
 
     test_lrsc!(test_lrd_scd, run_lrd, run_scd, 8, u64);
 

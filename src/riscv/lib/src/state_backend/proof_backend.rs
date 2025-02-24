@@ -14,16 +14,18 @@
 //! [`MerkleTree`]: merkle::MerkleTree
 //! [`ProofLayout`]: super::ProofLayout
 
-use super::{
-    EnrichedValue, EnrichedValueLinked, ManagerBase, ManagerRead, ManagerReadWrite,
-    ManagerSerialise, ManagerWrite,
-};
-use merkle::AccessInfo;
-use serde::{Serialize, ser::SerializeTuple};
 use std::{
     cell::{Cell, RefCell},
     collections::{BTreeMap, BTreeSet},
     mem, slice,
+};
+
+use merkle::AccessInfo;
+use serde::{Serialize, ser::SerializeTuple};
+
+use super::{
+    EnrichedValue, EnrichedValueLinked, ManagerBase, ManagerRead, ManagerReadWrite,
+    ManagerSerialise, ManagerWrite,
 };
 
 pub mod merkle;
@@ -455,15 +457,17 @@ impl DynAccess {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::VecDeque;
+
+    use proptest::{array, prop_assert_eq, proptest};
+    use tests::merkle::MerkleTree;
+
     use super::merkle::MERKLE_LEAF_SIZE;
     use super::*;
     use crate::state_backend::{
         Cells, CommitmentLayout, DynArray, DynCells, ProofLayout, Ref, layout::Array,
         owned_backend::Owned,
     };
-    use proptest::{array, prop_assert_eq, proptest};
-    use std::collections::VecDeque;
-    use tests::merkle::MerkleTree;
 
     const CELLS_SIZE: usize = 32;
 

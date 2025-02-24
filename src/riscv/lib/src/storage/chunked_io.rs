@@ -2,12 +2,13 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{CHUNK_SIZE, Hash, StorageError, Store, binary};
 use std::{
     cmp,
     collections::VecDeque,
     io::{self, Cursor},
 };
+
+use super::{CHUNK_SIZE, Hash, StorageError, Store, binary};
 
 /// Simple writer that stores data in chunks of size [`CHUNK_SIZE`]
 pub struct ChunkWriter<'a> {

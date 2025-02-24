@@ -6,6 +6,10 @@ mod error;
 mod fds;
 mod fs;
 
+use std::{ffi::CStr, num::NonZeroU64};
+
+use error::Error;
+
 use super::{Pvm, PvmHooks};
 use crate::{
     machine_state::{
@@ -21,8 +25,6 @@ use crate::{
         ManagerReadWrite, ManagerWrite, Ref,
     },
 };
-use error::Error;
-use std::{ffi::CStr, num::NonZeroU64};
 
 /// Size of a memory page in bytes
 pub const PAGE_SIZE: u64 = 4096;
@@ -508,12 +510,14 @@ impl<M: ManagerClone> Clone for SupervisorState<M> {
 
 #[cfg(test)]
 mod tests {
+    use std::array;
+
+    use rand::Rng;
+
     use super::*;
     use crate::{
         backend_test, create_state, machine_state::MachineCoreStateLayout, state_backend::DynArray,
     };
-    use rand::Rng;
-    use std::array;
 
     // Check that the `set_tid_address` system call is working correctly.
     backend_test!(set_tid_address, F, {

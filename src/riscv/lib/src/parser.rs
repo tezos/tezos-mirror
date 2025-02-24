@@ -7,16 +7,18 @@
 
 pub mod instruction;
 
+use core::ops::Range;
+use std::fmt::{self, Display, Formatter};
+
+use arbitrary_int::{u3, u5};
+use instruction::*;
+
 use crate::bits::u16;
 use crate::machine_state::registers::{NonZeroXRegister, x0};
 use crate::machine_state::{
     csregisters::CSRegister,
     registers::{FRegister, XRegister, parse_fregister, parse_xregister},
 };
-use arbitrary_int::{u3, u5};
-use core::ops::Range;
-use instruction::*;
-use std::fmt::{self, Display, Formatter};
 
 /// Given an instruction encoded as a little-endian `u32`, extract `n` bits
 /// starting at `pos`.

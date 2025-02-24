@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use strum::IntoEnumIterator;
+
 use crate::{
     machine_state::{
         AccessType, MachineCoreState,
@@ -18,7 +20,6 @@ use crate::{
     state_backend::{self as backend},
     traps::Exception,
 };
-use strum::IntoEnumIterator;
 
 impl<M> HartState<M>
 where

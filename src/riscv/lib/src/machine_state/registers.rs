@@ -6,9 +6,11 @@
 // specification.
 #![allow(non_upper_case_globals)]
 
-use crate::{default::ConstDefault, machine_state::backend};
-use arbitrary_int::u5;
 use std::fmt;
+
+use arbitrary_int::u5;
+
+use crate::{default::ConstDefault, machine_state::backend};
 
 /// Integer register index
 #[allow(non_camel_case_types)] // To make names consistent with specification
@@ -608,10 +610,11 @@ impl<M: backend::ManagerClone> Clone for FRegisters<M> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{backend_test, create_state};
     use arbitrary_int::Number;
     use strum::IntoEnumIterator;
+
+    use super::*;
+    use crate::{backend_test, create_state};
 
     backend_test!(test_zero, F, {
         let mut registers = create_state!(XRegisters, XRegistersLayout, F);

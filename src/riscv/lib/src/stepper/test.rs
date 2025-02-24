@@ -4,6 +4,11 @@
 
 mod posix;
 
+use std::{collections::BTreeMap, ops::Bound};
+
+use derive_more::{Error, From};
+use posix::{PosixState, PosixStateLayout};
+
 use super::{StepResult, Stepper, StepperStatus};
 use crate::{
     kernel_loader,
@@ -18,9 +23,6 @@ use crate::{
     state_backend::owned_backend::Owned,
     traps::EnvironException,
 };
-use derive_more::{Error, From};
-use posix::{PosixState, PosixStateLayout};
-use std::{collections::BTreeMap, ops::Bound};
 
 #[derive(Clone, Debug)]
 pub enum TestStepperResult {

@@ -3,13 +3,14 @@
 // SPDX-License-Identifier: MIT
 
 use core::fmt;
-use enum_tag::EnumTag;
-use octez_riscv::{parser::instruction::Instr, stepper::StepperStatus};
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
     time::Duration,
 };
+
+use enum_tag::EnumTag;
+use octez_riscv::{parser::instruction::Instr, stepper::StepperStatus};
 
 pub(super) type InstructionData = HashMap<InstrType, Vec<Duration>>;
 

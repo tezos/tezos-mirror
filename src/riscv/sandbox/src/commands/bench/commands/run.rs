@@ -2,6 +2,22 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::{
+    collections::HashSet,
+    error::Error,
+    fs,
+    ops::Bound,
+    path::{Path, PathBuf},
+};
+
+use enum_tag::EnumTag;
+use octez_riscv::{
+    machine_state::{AccessType, main_memory::Address},
+    parser::{instruction::Instr, parse},
+    state_backend::ManagerRead,
+    stepper::{StepResult, Stepper, StepperStatus},
+};
+
 use crate::{
     cli::{BenchMode, BenchRunOptions},
     commands::{
@@ -13,20 +29,6 @@ use crate::{
         run::{UseStepper, general_run},
     },
     format_status,
-};
-use enum_tag::EnumTag;
-use octez_riscv::{
-    machine_state::{AccessType, main_memory::Address},
-    parser::{instruction::Instr, parse},
-    state_backend::ManagerRead,
-    stepper::{StepResult, Stepper, StepperStatus},
-};
-use std::{
-    collections::HashSet,
-    error::Error,
-    fs,
-    ops::Bound,
-    path::{Path, PathBuf},
 };
 
 /// Helper function to look in the [`Stepper`] to peek for the current [`Instr`]
