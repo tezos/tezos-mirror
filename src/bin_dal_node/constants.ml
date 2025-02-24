@@ -26,16 +26,13 @@
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4458
 
    Better handling of this limitation. *)
-let shards_store_lru_size =
-  (* The size of the LRU is determined by the number of slots we remember in the
-     cache. Each entry in the cache maintains two open file descriptors (one via
-     regular file opening and one via mmap on the bitset region). Note that setting
-     a too high value causes a "Too many open files" error. *)
-  let irmin_internals_entries_per_toplevel_entry = 3 in
-  let number_of_slots = 256 in
-  let number_of_remembered_levels = 1 in
-  irmin_internals_entries_per_toplevel_entry * number_of_slots
-  * number_of_remembered_levels
+
+(* Each entry in the cache maintains two open file descriptors (one via
+   regular file opening and one via mmap on the bitset region).
+   So the selected value should be bigger than twice the number of slots per level,
+   since there are 32 slots, the selected value is 64.
+   Note that setting a too high value causes a "Too many open files" error. *)
+let shards_store_lru_size = 64
 
 (* There is no real rationale for the slot and status parts of the
    store; we just put low-enough values to avoid consuming too many
