@@ -6358,7 +6358,7 @@ module Garbage_collection = struct
         let* () = Lwt.join wait_block_p in
         bake_loop (n - 1)
     in
-    let* () = bake_loop 25 in
+    let* () = bake_loop 180 in
     Log.info "Blocks baked !" ;
 
     Log.info "Checking that the slot was attested" ;
@@ -6620,7 +6620,7 @@ module Garbage_collection = struct
         let* () = Lwt.join wait_block_p in
         bake_loop (n - 1)
     in
-    let* () = bake_loop 25 in
+    let* () = bake_loop 180 in
     Log.info "Blocks baked !" ;
 
     Log.info "Checking that the slot was attested" ;
