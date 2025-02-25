@@ -375,9 +375,11 @@ let test_enough_active_stake_to_bake ~has_active_stake () =
        get_next_baker_by_account fails with "No slots found for pkh1" *)
     Assert.error ~loc:__LOC__ b1 (fun _ -> true)
 
+type bootstrap_staking_config = Stake_everything | Default_for_bootstrap
+
 let test_committee_sampling () =
   let open Lwt_result_syntax in
-  let test_distribution ~committee_size distribution =
+  let test_distribution ~staking_config ~committee_size distribution =
     (* [committee_size] will be the number of slots available in the
        consensus committee, and also the number of rounds over which
        we will count the occurrences of each delegate being the
@@ -400,6 +402,19 @@ let test_committee_sampling () =
         consensus_committee_size = committee_size;
         consensus_threshold_size = 0;
       }
+    in
+    let constants =
+      match staking_config with
+      | Stake_everything ->
+          (* In the [init_account] function in
+             {!Protocol.Bootstrap_storage}, bootstrap accounts stake
+             just enough tez to meet the [minimal_stake] and
+             [minimal_frozen_stake] requirements, and to not be
+             over-delegated. Setting [limit_of_delegation_over_baking]
+             to 0 is a hack that will force them to stake everything
+             in order to not be over-delegated. *)
+          {constants with limit_of_delegation_over_baking = 0}
+      | Default_for_bootstrap -> constants
     in
     let parameters =
       Default_parameters.parameters_of_constants ~bootstrap_accounts constants
@@ -425,9 +440,13 @@ let test_committee_sampling () =
     let one_failed = ref false in
 
     Log.info
-      "@[<hov 2>Testing with %d bakers and committee size %#d:%a@]"
+      "@[<hov 2>Testing with %d bakers and committee size %#d (%s):%a@]"
       (List.length distribution)
       committee_size
+      (match staking_config with
+      | Stake_everything -> "accounts stake everything"
+      | Default_for_bootstrap ->
+          "default staking behavior for bootstrap accounts")
       (fun ppf stats ->
         Stdlib.Hashtbl.iter
           (fun pkh ((balance, (min_p, max_p)), n) ->
@@ -473,10 +492,19 @@ let test_committee_sampling () =
       in
       Array.(make n_accounts account |> to_list)
     in
-    test_distribution ~committee_size accounts
+    test_distribution
+      ~staking_config:Default_for_bootstrap
+        (* The staking config doesn't matter: all accounts will behave the
+           same way and end up with the same baking power as each other. *)
+      ~committee_size
+      accounts
   in
+  (* In the following tests, the bootstrap accounts stake everything,
+     so the average number of baking opportunities received is
+     directly proportial to the initial balance of each account. *)
   let* () =
     test_distribution
+      ~staking_config:Stake_everything
       ~committee_size:10_000
       [
         (16_000_000_000L, expected_bounds 5_000);
@@ -486,6 +514,7 @@ let test_committee_sampling () =
   in
   let* () =
     test_distribution
+      ~staking_config:Stake_everything
       ~committee_size:10_000
       [
         (792_000_000_000L, expected_bounds 9_900);
