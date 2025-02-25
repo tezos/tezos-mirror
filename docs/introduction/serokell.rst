@@ -39,7 +39,7 @@ If you were using RPM packages, use ``dnf`` instead of ``apt``.
    export distribution=debian
    export release=bookworm
 
-   sudo apt-get install -y sudo gpg curl
+   sudo apt-get install -y gpg curl
 
 .. literalinclude:: install-bin-deb.sh
    :language: shell
@@ -61,7 +61,12 @@ If needed, install the Dialog interface with ``sudo apt install dialog``.
 
 5. Relocate Data
 ----------------
-Copy your node and client data to the NL directory structure::
+The default data directory for NL packages is ``/var/tezos`` . To use a different
+location, change the value of the ``DATADIR`` variable in ``/etc/default/octez-node``,
+and relocate the home of the ``tezos`` user using the command ``usermod -m -d
+/custom tezos``. We recommend to keep the default.
+
+You can copy your node and client data to the new directory structure::
 
     sudo mkdir -p /var/tezos
     sudo cp -a /var/lib/tezos/<network> /var/tezos/.tezos-node
