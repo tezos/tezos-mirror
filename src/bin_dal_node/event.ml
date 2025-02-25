@@ -25,6 +25,13 @@
 
 open Internal_event.Simple
 
+let pp_int_list fmt l =
+  Format.pp_print_list
+    ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ")
+    Format.pp_print_int
+    fmt
+    l
+
 (* DAL node event definitions *)
 
 open struct
@@ -680,13 +687,6 @@ open struct
       ~level:Info
       ("query_id", Data_encoding.int31)
 
-  let pp_int_list fmt l =
-    Format.pp_print_list
-      ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ")
-      Format.pp_print_int
-      fmt
-      l
-
   let get_attestable_slots_ok_notice =
     declare_3
       ~section
@@ -740,6 +740,32 @@ open struct
       ("current_level", Data_encoding.int32)
       ("current_baker_level", Data_encoding.int32)
 
+  let warn_no_attestation =
+    declare_2
+      ~section
+      ~name:"no_attestation"
+      ~msg:
+        "An attestation operation was not included for {attester} at attested \
+         level {attested_level}."
+      ~level:Warning
+      ("attester", Signature.Public_key_hash.encoding)
+      ("attested_level", Data_encoding.int32)
+      ~pp1:Signature.Public_key_hash.pp_short
+
+  let attester_attested =
+    declare_3
+      ~section
+      ~name:"attester_attested"
+      ~msg:
+        "{attester} attested slot(s) {slot_indexes} at attested level \
+         {attested_level}."
+      ~level:Notice
+      ("attester", Signature.Public_key_hash.encoding)
+      ("attested_level", Data_encoding.int32)
+      ("slot_indexes", Data_encoding.(list int31))
+      ~pp1:Signature.Public_key_hash.pp_short
+      ~pp3:pp_int_list
+
   let warn_attester_not_dal_attesting =
     declare_2
       ~section
@@ -752,31 +778,35 @@ open struct
       ("attested_level", Data_encoding.int32)
       ~pp1:Signature.Public_key_hash.pp_short
 
-  let warn_attester_did_not_attest_slot =
+  let warn_attester_did_not_attest =
     declare_3
       ~section
-      ~name:"attester_did_not_attest_slot"
+      ~name:"attester_did_not_attest"
       ~msg:
-        "At level {attested_level}, slot index {slot_index} was sufficiently \
-         attested, but shards from {attester} are missing"
+        "At level {attested_level}, slot index(es) {slot_indexes} were \
+         sufficiently attested, but {attester} neither attested them nor \
+         identified them as traps."
       ~level:Warning
       ("attester", Signature.Public_key_hash.encoding)
-      ("slot_index", Data_encoding.int31)
       ("attested_level", Data_encoding.int32)
+      ("slot_indexes", Data_encoding.(list int31))
       ~pp1:Signature.Public_key_hash.pp_short
+      ~pp3:pp_int_list
 
-  let attester_did_not_attest_slot_because_of_traps =
+  let attester_did_not_attest_because_of_traps =
     declare_3
       ~section
-      ~name:"attester_did_not_attest_slot_with_traps"
+      ~name:"attester_did_not_attest_traps"
       ~msg:
-        "At level {attested_level}, slot index {slot_index} was sufficiently \
-         attested, but {attester} did not attest because of traps"
+        "At level {attested_level}, slot index(es) {slot_indexes} were \
+         sufficiently attested, but {attester} did not attest them because of \
+         traps"
       ~level:Notice
       ("attester", Signature.Public_key_hash.encoding)
-      ("slot_index", Data_encoding.int31)
       ("attested_level", Data_encoding.int32)
+      ("slot_indexes", Data_encoding.(list int31))
       ~pp1:Signature.Public_key_hash.pp_short
+      ~pp3:pp_int_list
 
   let trap_injection =
     declare_5
@@ -1113,18 +1143,23 @@ let emit_get_attestable_slots_future_level_warning ~current_level
     get_attestable_slots_future_level_warning
     (current_level, current_baker_level)
 
+let emit_warn_no_attestation ~attester ~attested_level =
+  emit warn_no_attestation (attester, attested_level)
+
+let emit_attester_attested ~attester ~attested_level ~slot_indexes =
+  emit attester_attested (attester, attested_level, slot_indexes)
+
 let emit_warn_attester_not_dal_attesting ~attester ~attested_level =
   emit warn_attester_not_dal_attesting (attester, attested_level)
 
-let emit_warn_attester_did_not_attest_slot ~attester ~slot_index ~attested_level
-    =
-  emit warn_attester_did_not_attest_slot (attester, slot_index, attested_level)
+let emit_warn_attester_did_not_attest ~attester ~attested_level ~slot_indexes =
+  emit warn_attester_did_not_attest (attester, attested_level, slot_indexes)
 
-let emit_attester_did_not_attest_slot_because_of_traps ~attester ~slot_index
-    ~attested_level =
+let emit_attester_did_not_attest_because_of_traps ~attester ~attested_level
+    ~slot_indexes =
   emit
-    attester_did_not_attest_slot_because_of_traps
-    (attester, slot_index, attested_level)
+    attester_did_not_attest_because_of_traps
+    (attester, attested_level, slot_indexes)
 
 let emit_trap_injection ~delegate ~published_level ~attested_level ~slot_index
     ~shard_index =

@@ -25,6 +25,8 @@
 
 module Infix = struct
   let ( -- ) i j = List.init (j - i + 1) (fun x -> x + i)
+
+  let ( --- ) j i = List.init (j - i + 1) (fun x -> j - x)
 end
 
 let cut ?(copy = false) sz bytes =
