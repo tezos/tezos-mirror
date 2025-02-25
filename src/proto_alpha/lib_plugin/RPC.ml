@@ -991,9 +991,6 @@ module Scripts = struct
           migration_balance_updates = [];
           liquidity_baking_toggle_ema =
             Per_block_votes.Liquidity_baking_toggle_EMA.zero;
-          adaptive_issuance_vote_ema =
-            Per_block_votes.Adaptive_issuance_launch_EMA.zero;
-          adaptive_issuance_launch_cycle = None;
           implicit_operations_results = [];
         }
     in
