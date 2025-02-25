@@ -1086,6 +1086,9 @@ let check_l1_history_mode profile_ctxt cctxt proto_parameters head_level
   match l1_history_mode with
   | `L1_archive -> return_unit
   | `L1_rolling l1_cycles ->
+      (* For the non-"refutation supporting" profiles, we don't currently need
+         that many levels in the past, because we don't for instance retrieve the
+         protocol parameters for such past levels; though we should. *)
       let dal_blocks =
         get_storage_period profile_ctxt proto_parameters head_level first_level
         +
