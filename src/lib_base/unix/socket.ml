@@ -232,3 +232,11 @@ let get_temporary_socket_dir () =
   match Sys.getenv_opt "XDG_RUNTIME_DIR" with
   | Some xdg_runtime_dir when xdg_runtime_dir <> "" -> xdg_runtime_dir
   | Some _ | None -> Filename.get_temp_dir_name ()
+
+external set_tcp_user_timeout : Unix.file_descr -> int -> unit
+  = "ocaml_set_tcp_user_timeout"
+
+let set_tcp_user_timeout fd ~ms =
+  try Ok (set_tcp_user_timeout fd ms) with
+  | Unix.Unix_error _ as exn -> Error (`Unix_error exn)
+  | Failure _ -> Error `Unsupported
