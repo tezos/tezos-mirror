@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -19,6 +20,8 @@ use super::ManagerClone;
 use super::ManagerRead;
 use super::ManagerReadWrite;
 use super::ManagerWrite;
+use super::PartialHashError;
+use super::Ref;
 use crate::state_backend::owned_backend::Owned;
 use crate::state_backend::proof_backend::merkle::MERKLE_LEAF_SIZE;
 
@@ -267,6 +270,76 @@ pub enum Region<E: 'static, const LEN: usize> {
     ),
 }
 
+/// Represents either a present and complete region of the `Verifier` state
+/// or specifies whether it is only partially present or completely absent.
+pub enum PartialState<T> {
+    /// A region is fully present
+    Complete(T),
+    /// A region is absent
+    Absent,
+    /// A region is only partially present
+    Incomplete,
+}
+
+/// Reference to a complete region of the Verifier backend
+pub struct CompleteRegionRef<'a, E, const LEN: usize> {
+    region: &'a [Option<E>; LEN],
+}
+
+impl<E: serde::Serialize, const LEN: usize> serde::Serialize for CompleteRegionRef<'_, E, LEN> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // Replicate [`<Owned as ManagerSerialise>::serialise_region`]
+
+        // A special encoding for single-element regions helps clean up encoding for serialisation
+        // formats that contain structures. For example, JSON, where single-element regions would
+        // be represented as array singletons.
+        if LEN == 1 {
+            return self
+                .region
+                .first()
+                .and_then(Option::as_ref)
+                .ok_or_else(|| <S::Error as serde::ser::Error>::custom("Region is not complete"))?
+                .serialize(serializer);
+        }
+
+        // We're serialising this as a fixed-sized tuple because otherwise `bincode` would prefix
+        // the length of this array, which is not needed.
+        let mut serializer = serializer.serialize_tuple(LEN)?;
+
+        for item in self.region.iter() {
+            serializer.serialize_element(item)?;
+        }
+
+        serializer.end()
+    }
+}
+
+impl<E, const LEN: usize> Region<E, LEN> {
+    /// Get the contents of the region if it is fully present or its status otherwise.
+    pub fn get_partial_region(&self) -> PartialState<Box<[E; LEN]>> {
+        match self {
+            Region::Absent => PartialState::Absent,
+            Region::Partial(region) => {
+                let values: Option<Vec<E>> = region.iter().copied().collect();
+                match values {
+                    Some(v) => {
+                        let region = Box::try_from(v)
+                            .map_err(|_| {
+                                unreachable!("Converting a vector to an array of the same size always succeeds")
+                            })
+                            .unwrap();
+                        PartialState::Complete(region)
+                    }
+                    None => PartialState::Incomplete,
+                }
+            }
+        }
+    }
+}
+
 impl<E, const LEN: usize> Index<usize> for Region<E, LEN> {
     type Output = E;
 
@@ -351,6 +424,11 @@ impl<const LEAF_SIZE: usize> Page<LEAF_SIZE> {
         self.data[start..][..data.len()].copy_from_slice(data);
 
         true
+    }
+
+    /// Returns true if every byte of the page is available.
+    fn is_fully_available(&self) -> bool {
+        self.available.boundaries() == [0, LEAF_SIZE]
     }
 }
 
@@ -457,6 +535,15 @@ impl<const LEAF_SIZE: usize, const LEN: usize> DynRegion<LEAF_SIZE, LEN> {
             buffer = &buffer[chunk_length..];
         }
     }
+
+    /// Get the contents of a page if it is fully present or its status otherwise.
+    pub fn get_partial_page(&self, id: PageId<LEAF_SIZE>) -> PartialState<&[u8; LEAF_SIZE]> {
+        match self.pages.get(&id) {
+            Some(page) if page.is_fully_available() => PartialState::Complete(page.data.as_ref()),
+            Some(_) => PartialState::Incomplete,
+            None => PartialState::Absent,
+        }
+    }
 }
 
 impl<const LEAF_SIZE: usize, const LEN: usize> Default for DynRegion<LEAF_SIZE, LEN> {
@@ -470,6 +557,17 @@ impl<const LEAF_SIZE: usize, const LEN: usize> Default for DynRegion<LEAF_SIZE, 
 /// Verifier enriched cell
 pub struct EnrichedCell<V: EnrichedValue> {
     underlying: Region<V::E, 1>,
+}
+
+impl<V: EnrichedValue> Clone for EnrichedCell<V>
+where
+    V::E: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            underlying: self.underlying.clone(),
+        }
+    }
 }
 
 impl<E> Cell<E, Verifier> {
@@ -486,13 +584,16 @@ impl<E> Cell<E, Verifier> {
     }
 }
 
-impl<V: EnrichedValue> Clone for EnrichedCell<V>
-where
-    V::E: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            underlying: self.underlying.clone(),
+impl<E: Clone> TryFrom<Cell<E, Ref<'_, Verifier>>> for Cell<E, Owned> {
+    type Error = PartialHashError;
+
+    fn try_from(cell: Cell<E, Ref<'_, Verifier>>) -> Result<Self, Self::Error> {
+        match cell.into_region() {
+            Region::Absent => Err(PartialHashError::PotentiallyRecoverable),
+            Region::Partial(value) => match value.as_ref() {
+                [Some(v)] => Ok(Cell::bind([v.clone()])),
+                [None] => Err(PartialHashError::PotentiallyRecoverable),
+            },
         }
     }
 }

@@ -212,6 +212,18 @@ macro_rules! struct_layout {
                         ),+
                     })
                 }
+
+                fn partial_state_hash(
+                    _state: $crate::state_backend::RefVerifierAlloc<Self>,
+                    _proof: $crate::state_backend::ProofTree,
+                ) -> Result<$crate::storage::Hash, $crate::state_backend::PartialHashError> {
+                    // TODO RV-503: Compute the final state hash of a Verifier-bound struct layout
+                    // This does not currently limit obtaining final hashes of Verifier states
+                    // because the only struct layout in the PVM state, `MStatusLayout`,
+                    // is handled by the implementation of `partial_state_hash` for `CSRValuesLayout`.
+                    todo!("Hashing of partial generic struct layouts not yet supported")
+                }
+
             }
         }
     };

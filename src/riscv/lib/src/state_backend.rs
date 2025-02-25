@@ -390,12 +390,20 @@ impl<M: ManagerRead> ManagerRead for Ref<'_, M> {
 }
 
 /// Alias for the allocated structure with references to regions of
-/// the [`owned_backend::Owned`] backend
+/// the [Owned] backend
+///
+/// [Owned]: owned_backend::Owned
 pub type RefOwnedAlloc<'a, L> = AllocatedOf<L, Ref<'a, owned_backend::Owned>>;
 
 /// Alias for the allocated structure with references to a proof-generating backend
 pub type RefProofGenOwnedAlloc<'a, 'b, L> =
     AllocatedOf<L, Ref<'a, proof_backend::ProofGen<Ref<'b, owned_backend::Owned>>>>;
+
+/// Alias for the allocated structure with references to regions of
+/// the [Verifier] backend
+///
+/// [Verifier]: verify_backend::Verifier
+pub type RefVerifierAlloc<'a, L> = AllocatedOf<L, Ref<'a, verify_backend::Verifier>>;
 
 #[cfg(test)]
 pub(crate) mod test_helpers {

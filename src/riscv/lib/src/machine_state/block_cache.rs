@@ -203,6 +203,13 @@ impl state_backend::ProofLayout for AddressCellLayout {
     fn from_proof(proof: state_backend::ProofTree) -> state_backend::FromProofResult<Self> {
         <Atom<Address> as state_backend::ProofLayout>::from_proof(proof)
     }
+
+    fn partial_state_hash(
+        state: state_backend::RefVerifierAlloc<Self>,
+        proof: state_backend::ProofTree,
+    ) -> Result<Hash, state_backend::PartialHashError> {
+        <Atom<Address> as state_backend::ProofLayout>::partial_state_hash(state, proof)
+    }
 }
 
 /// The layout of block cache entries, see [`Cached`] for more information.
