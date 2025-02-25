@@ -512,10 +512,10 @@ let init_from_snapshot_arg =
       "Automatically download and import a recent snapshot for supported \
        networks on fresh data directories. If no snapshot provider is given \
        e.g. `--init-from-snapshot` with no argument, then it uses the default \
-       built-in provider `https://snapshotter-sandbox.nomadic-labs.eu`.\n\
-       %r is replaced by the short form of the Smart Rollup address, %R by the \
+       built-in provider `https://snapshotter-sandbox.nomadic-labs.eu`. %r is \
+       replaced by the short form of the Smart Rollup address, %R by the \
        complete Smart Rollup address, %n by the network (given by the argument \
-       --network), and %% by %."
+       --network), and %% by %. Also accepts a path to an existing snapshot."
     ~default:
       "https://snapshotter-sandbox.nomadic-labs.eu/etherlink-%n/evm-snapshot-%r-latest.gz"
     ~placeholder:"snapshot url"
@@ -2439,34 +2439,19 @@ let import_snapshot_command =
     (prefixes ["snapshot"; "import"] @@ Params.snapshot_file_or_url @@ stop)
     (fun (data_dir, force) snapshot_file () ->
       let open Lwt_result_syntax in
-      let with_snapshot k =
-        if
-          String.starts_with ~prefix:"http://" snapshot_file
-          || String.starts_with ~prefix:"https://" snapshot_file
-        then
-          Lwt_utils_unix.with_tempdir ~temp_dir:data_dir ".download_"
-          @@ fun working_dir ->
-          let* snapshot_file =
-            Evm_node_lib_dev.Misc.download_file
-              ~keep_alive:false
-              ~working_dir
-              snapshot_file
-          in
-          k snapshot_file
-        else k snapshot_file
-      in
       let*! () =
         let open Tezos_base_unix.Internal_event_unix in
         let config = make_with_defaults ~verbosity:Notice () in
         init ~config ()
       in
-      Evm_node_lib_dev.Data_dir.use ~data_dir @@ fun () ->
-      with_snapshot @@ fun snapshot_file ->
-      Evm_node_lib_dev.Snapshots.import
+      Evm_node_lib_dev.Snapshots.import_from
         ~cancellable:true
         ~force
+        ~keep_alive:false
         ~data_dir
-        ~snapshot_file)
+        ~download_path:".download_"
+        ~snapshot_file
+        ())
 
 let snapshot_info_command =
   let open Tezos_clic in
