@@ -104,7 +104,7 @@ let register_default_signer ?other_registrations ?logger
             | _ -> None)
           keys
       with
-      | sk_uri :: _ -> Client_keys.sign cctxt sk_uri payload
+      | sk_uri :: _ -> Client_keys.V2.sign cctxt sk_uri payload
       | [] ->
           failwith
             "remote signer expects authentication signature, but no authorized \

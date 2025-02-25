@@ -23,23 +23,41 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let signature_descr =
+  "Must be provided if the signer requires authentication. In this case, it \
+   must be the signature of the public key hash and message concatenated, by \
+   one of the keys authorized by the signer."
+
 let query =
   let open Tezos_rpc.Query in
   query (fun signature -> signature)
   |+ opt_field
-       ~descr:
-         "Must be provided if the signer requires authentication. In this \
-          case, it must be the signature of the public key hash and message \
-          concatenated, by one of the keys authorized by the signer."
+       ~descr:signature_descr
        "authentication"
        Tezos_crypto.Signature.rpc_arg
        (fun signature -> signature)
   |> seal
 
+let sign_query =
+  let open Tezos_rpc.Query in
+  query (fun signature version -> (signature, version))
+  |+ opt_field
+       ~descr:signature_descr
+       "authentication"
+       Tezos_crypto.Signature.rpc_arg
+       fst
+  |+ opt_field
+       ~descr:
+         "Define the signature version that need to be used to sign the data"
+       "version"
+       Tezos_crypto.Signature.version_arg
+       snd
+  |> seal
+
 let sign =
   Tezos_rpc.Service.post_service
     ~description:"Sign a piece of data with a given remote key"
-    ~query
+    ~query:sign_query
     ~input:Data_encoding.bytes
     ~output:
       Data_encoding.(obj1 (req "signature" Tezos_crypto.Signature.encoding))

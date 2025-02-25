@@ -33,7 +33,14 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
     Tezos_rpc.Directory.register1
       dir
       Signer_services.sign
-      (fun pkh signature data ->
+      (fun pkh (signature, version) data ->
+        let pkh =
+          match (pkh, version) with
+          | _, None -> Signer_messages.Pkh pkh
+          | (Ed25519 _ | Secp256k1 _ | P256 _), Some _ ->
+              Signer_messages.Pkh pkh
+          | Bls _, Some version -> Pkh_with_version (pkh, version)
+        in
         Handler.sign
           ?magic_bytes
           ~check_high_watermark

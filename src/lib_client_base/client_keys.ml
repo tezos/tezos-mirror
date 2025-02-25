@@ -295,6 +295,8 @@ module type Signature_S = sig
 
   val concat : Bytes.t -> t -> Bytes.t
 
+  val version : Tezos_crypto.Signature.version
+
   module Adapter : sig
     val public_key_hash :
       Tezos_crypto.Signature.Public_key_hash.t -> Public_key_hash.t tzresult
@@ -310,6 +312,7 @@ module type SIMPLE_SIGNER = sig
   include COMMON_SIGNER with type pk_uri = pk_uri and type sk_uri = sk_uri
 
   val sign :
+    ?version:Tezos_crypto.Signature.version ->
     ?watermark:Tezos_crypto.Signature.watermark ->
     sk_uri ->
     Bytes.t ->
@@ -599,9 +602,9 @@ module Make (Signature : Signature_S) :
       let*? pk = Option.map_e Signature.Adapter.public_key pk in
       return (pkh, pk)
 
-    let sign ?watermark sk msg =
+    let sign ?version ?watermark sk msg =
       let open Lwt_result_syntax in
-      let* signature = S.sign ?watermark sk msg in
+      let* signature = S.sign ?version ?watermark sk msg in
       let*? signature = Signature.Adapter.signature signature in
       return signature
 
@@ -658,7 +661,9 @@ module Make (Signature : Signature_S) :
   let sign cctxt ?watermark sk_uri buf =
     let open Lwt_result_syntax in
     with_scheme_simple_signer sk_uri (fun (module Signer) ->
-        let* signature = Signer.sign ?watermark sk_uri buf in
+        let* signature =
+          Signer.sign ~version:Signature.version ?watermark sk_uri buf
+        in
         let* pk_uri = Signer.neuterize sk_uri in
         let* pubkey =
           let* o = Secret_key.rev_find cctxt sk_uri in

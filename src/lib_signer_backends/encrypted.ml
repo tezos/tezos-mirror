@@ -504,10 +504,35 @@ struct
     let*? v = Unencrypted.make_pk (Signature.Secret_key.to_public_key sk) in
     return v
 
-  let sign ?watermark sk_uri buf =
+  let sign ?version ?watermark sk_uri buf =
     let open Lwt_result_syntax in
     let* sk = decrypt C.cctxt sk_uri in
-    return (Signature.sign ?watermark sk buf)
+    match version with
+    | Some Tezos_crypto.Signature.Version_0 -> (
+        match Tezos_crypto.Signature.V0.Of_V_latest.secret_key sk with
+        | Some sk ->
+            let s = Tezos_crypto.Signature.V0.sign ?watermark sk buf in
+            return (Signature.V_latest.Of_V0.signature s)
+        | None ->
+            Error_monad.failwith
+              "Failed to handle secret key in Signature version 0")
+    | Some Version_1 -> (
+        match Tezos_crypto.Signature.V1.Of_V_latest.secret_key sk with
+        | Some sk ->
+            let s = Tezos_crypto.Signature.V1.sign ?watermark sk buf in
+            return (Signature.V_latest.Of_V1.signature s)
+        | None ->
+            Error_monad.failwith
+              "Failed to handle secret key in Signature version 1")
+    | Some Version_2 -> (
+        match Tezos_crypto.Signature.V2.Of_V_latest.secret_key sk with
+        | Some sk ->
+            let s = Tezos_crypto.Signature.V2.sign ?watermark sk buf in
+            return s
+        | None ->
+            Error_monad.failwith
+              "Failed to handle secret key in Signature version 2")
+    | None -> return (Tezos_crypto.Signature.V_latest.sign ?watermark sk buf)
 
   let deterministic_nonce sk_uri buf =
     let open Lwt_result_syntax in

@@ -160,7 +160,7 @@ struct
           return_some signature
       | None -> return_none
 
-    let sign ?watermark uri msg =
+    let sign ?version ?watermark uri msg =
       let open Lwt_result_syntax in
       let* base, pkh = parse (uri : sk_uri :> Uri.t) in
       let msg =
@@ -177,7 +177,7 @@ struct
         ~base
         Signer_services.sign
         ((), pkh)
-        signature
+        (signature, version)
         msg
 
     let deterministic_nonce uri msg =

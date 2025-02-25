@@ -105,10 +105,10 @@ struct
     let*? v = Client_keys.make_pk_uri (sk_uri : sk_uri :> Uri.t) in
     return v
 
-  let sign ?watermark sk_uri msg =
+  let sign ?version ?watermark sk_uri msg =
     let open Lwt_result_syntax in
     let*? sk_uri = Client_keys.make_sk_uri (key (sk_uri : sk_uri :> Uri.t)) in
-    Remote.sign ?watermark sk_uri msg
+    Remote.sign ?version ?watermark sk_uri msg
 
   let deterministic_nonce sk_uri msg =
     let open Lwt_result_syntax in

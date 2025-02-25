@@ -131,6 +131,7 @@ module type SIGNER = sig
   (** [sign ?watermark sk data] is signature obtained by signing [data] with
         [sk]. *)
   val sign :
+    ?version:Tezos_crypto.Signature.version ->
     ?watermark:Tezos_crypto.Signature.watermark ->
     sk_uri ->
     Bytes.t ->

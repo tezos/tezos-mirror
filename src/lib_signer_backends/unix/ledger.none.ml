@@ -60,7 +60,8 @@ module Signer_implementation : Client_keys.SIGNER = struct
 
   let import_secret_key ~io:_ _pk_uri = Lwt_result_syntax.tzfail NoLedgerSupport
 
-  let sign ?watermark:_k _sk_uri _msg = Lwt_result_syntax.tzfail NoLedgerSupport
+  let sign ?version:_v ?watermark:_k _sk_uri _msg =
+    Lwt_result_syntax.tzfail NoLedgerSupport
 
   let deterministic_nonce _sk_uri _msg =
     Lwt_result_syntax.tzfail NoLedgerSupport

@@ -23,9 +23,59 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type Authenticated_request = sig
+type pkh =
+  | Pkh_with_version of
+      Tezos_crypto.Signature.Public_key_hash.t * Tezos_crypto.Signature.version
+  | Pkh of Tezos_crypto.Signature.Public_key_hash.t
+
+(* This encoding should be kept compatible with the one in
+   [Lib_crypto.Signature_V<n>.raw_encoding] especially if a new case is
+   added. *)
+let pkh_encoding =
+  let open Data_encoding in
+  def
+    "signer_messages.public_key_hash"
+    ~description:"signer messages public key hash encoding"
+  @@ union
+       [
+         case
+           (Tag 0)
+           Tezos_crypto.Signature.Ed25519.Public_key_hash.encoding
+           ~title:"Ed25519"
+           (function Pkh (Ed25519 x) -> Some x | _ -> None)
+           (function x -> Pkh (Ed25519 x));
+         case
+           (Tag 1)
+           Tezos_crypto.Signature.Secp256k1.Public_key_hash.encoding
+           ~title:"Secp256k1"
+           (function Pkh (Secp256k1 x) -> Some x | _ -> None)
+           (function x -> Pkh (Secp256k1 x));
+         case
+           (Tag 2)
+           ~title:"P256"
+           Tezos_crypto.Signature.P256.Public_key_hash.encoding
+           (function Pkh (P256 x) -> Some x | _ -> None)
+           (function x -> Pkh (P256 x));
+         case
+           (Tag 3)
+           ~title:"Bls"
+           (conv
+              (fun (pkh, version) -> (pkh, version))
+              (fun (pkh, version) -> (pkh, version))
+              (obj2
+                 (req "pkh" Tezos_crypto.Signature.Public_key_hash.encoding)
+                 (req "version" Tezos_crypto.Signature.version_encoding)))
+           (function
+             | Pkh (Bls _ as x) ->
+                 Some (x, Tezos_crypto.Signature.V_latest.version)
+             | Pkh_with_version ((Bls _ as x), version) -> Some (x, version)
+             | _ -> None)
+           (function x, version -> Pkh_with_version (x, version));
+       ]
+
+module type Authenticated_signing_request = sig
   type t = {
-    pkh : Tezos_crypto.Signature.Public_key_hash.t;
+    pkh : pkh;
     data : Bytes.t;
     signature : Tezos_crypto.Signature.t option;
   }
@@ -38,6 +88,62 @@ end
 
 module type Tag = sig
   val tag : int
+end
+
+module Make_authenticated_signing_request (T : Tag) :
+  Authenticated_signing_request = struct
+  type t = {
+    pkh : pkh;
+    data : Bytes.t;
+    signature : Tezos_crypto.Signature.t option;
+  }
+
+  let x04 = Bytes.of_string "\x04"
+
+  let to_sign ~pkh ~data =
+    let tag = Bytes.make 1 '0' in
+    TzEndian.set_int8 tag 0 T.tag ;
+    Bytes.concat
+      Bytes.empty
+      [x04; tag; Tezos_crypto.Signature.Public_key_hash.to_bytes pkh; data]
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {pkh; data; signature} -> (pkh, data, signature))
+      (fun (pkh, data, signature) -> {pkh; data; signature})
+      (obj3
+         (req "pkh" pkh_encoding)
+         (req "data" bytes)
+         (opt "signature" Tezos_crypto.Signature.encoding))
+end
+
+module Sign = struct
+  module Request = Make_authenticated_signing_request (struct
+    let tag = 1
+  end)
+
+  module Response = struct
+    type t = Tezos_crypto.Signature.t
+
+    let encoding =
+      let open Data_encoding in
+      def "signer_messages.sign.response"
+      @@ obj1 (req "signature" Tezos_crypto.Signature.encoding)
+  end
+end
+
+module type Authenticated_request = sig
+  type t = {
+    pkh : Tezos_crypto.Signature.Public_key_hash.t;
+    data : Bytes.t;
+    signature : Tezos_crypto.Signature.t option;
+  }
+
+  val to_sign :
+    pkh:Tezos_crypto.Signature.Public_key_hash.t -> data:Bytes.t -> Bytes.t
+
+  val encoding : t Data_encoding.t
 end
 
 module Make_authenticated_request (T : Tag) : Authenticated_request = struct
@@ -65,21 +171,6 @@ module Make_authenticated_request (T : Tag) : Authenticated_request = struct
          (req "pkh" Tezos_crypto.Signature.Public_key_hash.encoding)
          (req "data" bytes)
          (opt "signature" Tezos_crypto.Signature.encoding))
-end
-
-module Sign = struct
-  module Request = Make_authenticated_request (struct
-    let tag = 1
-  end)
-
-  module Response = struct
-    type t = Tezos_crypto.Signature.t
-
-    let encoding =
-      let open Data_encoding in
-      def "signer_messages.sign.response"
-      @@ obj1 (req "signature" Tezos_crypto.Signature.encoding)
-  end
 end
 
 module Deterministic_nonce = struct
