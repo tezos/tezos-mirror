@@ -105,6 +105,9 @@ module type T = sig
       is one of the [dal_attestation] and [false] otherwise.  *)
   val is_attested : dal_attestation -> slot_index -> bool
 
+  (** [number_of_attested_slots] returns the number of slots attested in the [dal_attestation]. *)
+  val number_of_attested_slots : dal_attestation -> int
+
   (** [get_round fitness] returns the block round contained in [fitness]. *)
   val get_round : Fitness.t -> int32 tzresult
 
