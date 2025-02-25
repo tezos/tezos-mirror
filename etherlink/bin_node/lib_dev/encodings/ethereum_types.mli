@@ -70,6 +70,20 @@ module Chain_id : sig
   val decode_be : bytes -> chain_id
 end
 
+type chain_family = EVM | Michelson
+
+module Chain_family : sig
+  val encoding : chain_family Data_encoding.t
+
+  (** [of_string_exn s] returns the chain family corresponding to the string [s].
+      The comparison is case-insensitive, so ["Evm"], ["evm"], ["EVM"], etc. are all valid.
+      @raise Invalid_argument if [s] does not correspond to a recognized chain family.
+  *)
+  val of_string_exn : string -> chain_family
+
+  val to_string : chain_family -> string
+end
+
 (** Ethereum block hash (32 bytes) *)
 type block_hash = Block_hash of hex [@@unboxed]
 

@@ -564,10 +564,11 @@ val snapshot_info : snapshot_file:string -> (Process.t, string) runnable
 
 val wait_termination : t -> unit Lwt.t
 
-(** [make_l2_kernel_installer_config ~output ()] create the config needed for 
-    a l2 chain in a multichain kernel *)
+(** [make_l2_kernel_installer_config ~output ()] creates the config needed for
+    an l2 chain in a multichain kernel *)
 val make_l2_kernel_installer_config :
   ?chain_id:int ->
+  ?chain_family:string ->
   ?bootstrap_balance:Wei.t ->
   ?bootstrap_accounts:string list ->
   ?minimum_base_fee_per_gas:Wei.t ->

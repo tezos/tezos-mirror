@@ -348,12 +348,14 @@ let register_upgrade_all ~title ~tags ~genesis_timestamp
         protocols)
     kernels
 
-let test_make_l2_kernel_installer_config =
+let test_make_l2_kernel_installer_config chain_family =
   Protocol.register_test
     ~__FILE__
     ~title:
-      "Test that the command make_l2_kernel_installer setup bootstrap account \
-       at the right path"
+      (Printf.sprintf
+         "Test that the command make_l2_kernel_installer setup bootstrap \
+          account at the right path with %s family"
+         chain_family)
     ~tags:["evm"; "multichain"; "installer"]
     ~uses_admin_client:true
     ~uses_client:true
@@ -381,6 +383,7 @@ let test_make_l2_kernel_installer_config =
   let*! () =
     Evm_node.make_l2_kernel_installer_config
       ~chain_id
+      ~chain_family
       ~world_state_path
       ~bootstrap_accounts:[address]
       ~output:l2_config
@@ -449,6 +452,25 @@ let test_make_l2_kernel_installer_config =
   let* sequencer =
     Evm_node.init ~mode:sequencer (Sc_rollup_node.endpoint sc_rollup_node)
   in
+
+  (* Verify the chain_family is set to EVM *)
+  let family_path =
+    "/evm/chain_configurations/" ^ string_of_int chain_id ^ "/chain_family"
+  in
+  let*@ rpc = Rpc.state_value sequencer family_path in
+  let family_value =
+    match rpc with
+    | None ->
+        Test.fail
+          ~__LOC__
+          "There should be a value at %s setup by the \
+           make_l2_kernel_installer_config"
+          family_path
+    | Some family_value -> family_value
+  in
+  let (`Hex expected) = Hex.of_string chain_family in
+  Check.((family_value = expected) string)
+    ~error_msg:"Expected chain_family to be %R, got %L" ;
 
   (* Verify that the balance of the bootstrap account is set by the command
      `make_l2_kernel_installer_config` *)
@@ -10355,7 +10377,8 @@ let () =
   test_miner protocols ;
   test_fa_bridge_feature_flag protocols ;
   test_multichain_feature_flag protocols ;
-  test_make_l2_kernel_installer_config protocols ;
+  test_make_l2_kernel_installer_config "EVM" protocols ;
+  test_make_l2_kernel_installer_config "Michelson" protocols ;
   test_fast_withdrawal_feature_flag protocols ;
   test_trace_call protocols ;
   test_trace_empty_block protocols ;
