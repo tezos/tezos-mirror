@@ -10,6 +10,12 @@ set -e
 # wrapper script if available
 debsystemctl=$(command -v deb-systemd-invoke || echo systemctl)
 
+if [ -e /etc/default/octez-node ]; then
+  . /etc/default/octez-node
+  TEZOS_HOME=$(basedir $DATADIR)
+  DATADIR="$TEZOS_HOME/.tezos-node"
+fi
+
 case "${1}" in
 remove)
   # Clean up the temporary directory

@@ -62,7 +62,7 @@ docker exec \
   -e "CI_COMMIT_SHORT_SHA=$CI_COMMIT_SHORT_SHA" \
   -e "GCP_LINUX_PACKAGES_BUCKET=$GCP_LINUX_PACKAGES_BUCKET" \
   -i systemd \
-  /bin/sh -c "$TESTFILE $DISTRIBUTION $RELEASE"
+  /bin/sh -c "$TESTFILE $DISTRIBUTION $RELEASE ${DATADIR:-}"
 
 # Capture exit status
 EXIT=$?
