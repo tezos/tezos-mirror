@@ -4709,6 +4709,7 @@ let monitor_finalized_levels_events ~__LOC__ ~last_notified_level ~target_level
       let finalized_level = JSON.(e |-> "level" |> as_int) in
       Check.(
         (finalized_level = !next_finalized_level)
+          ~__LOC__
           int
           ~error_msg:"Expected next finalized level to be %R (got %L)") ;
       incr next_finalized_level ;
@@ -4794,9 +4795,9 @@ let test_dal_node_crawler_reconnects_to_l1 _protocol _dal_parameters _cryptobox
 
   let* head_level = Client.level client in
   (* before the crawler is started, the bootstrap phase advances the
-     [last_processed_level] (so [last_notified_level] to the following
+     [last_processed_level] (so [last_notified_level]) to the following
      value: *)
-  let last_notified_level = head_level - 2 in
+  let last_notified_level = head_level - 3 in
 
   (* Restart the DAL node, the finalized events watcher promise, and wait until
      the node is ready. We wait for the node to be ready after spawning an
@@ -10297,8 +10298,14 @@ let register ~protocols =
   Garbage_collection.test_gc_skip_list_cells ~protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["crawler"; "reconnection"]
-    "DAL node crawler reconnects to L1 without crashing"
+    "DAL node crawler reconnects to L1 without crashing (non-producer case)"
     ~prover:false
+    test_dal_node_crawler_reconnects_to_l1
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["crawler"; "reconnection"]
+    "DAL node crawler reconnects to L1 without crashing (producer case)"
+    ~producer_profiles:[0]
     test_dal_node_crawler_reconnects_to_l1
     protocols ;
   scenario_with_layer1_and_dal_nodes
