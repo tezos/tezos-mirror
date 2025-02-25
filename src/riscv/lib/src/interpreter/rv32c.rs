@@ -12,7 +12,7 @@ use crate::{
         MachineCoreState, ProgramCounterUpdate,
         hart_state::HartState,
         main_memory::{Address, MainMemoryLayout},
-        registers::{NonZeroXRegister, XRegister, XRegisters, sp},
+        registers::{NonZeroXRegister, XRegister, sp},
     },
     parser::instruction::InstrWidth,
     state_backend as backend,
@@ -115,44 +115,6 @@ where
     }
 }
 
-impl<M> XRegisters<M>
-where
-    M: backend::ManagerReadWrite,
-{
-    /// Loads the immediate `imm` into register `rd_rs1`.
-    ///
-    /// Relevant RISC-V opcodes:
-    /// - C.LI
-    /// - ADD
-    /// - ADDI
-    /// - ANDI
-    /// - ORI
-    /// - XORI
-    /// - SLLI
-    /// - SRLI
-    /// - SRAI
-    /// - AND
-    /// - C.AND
-    /// - OR
-    /// - XOR
-    /// - SLL
-    /// - SRL
-    /// - SRA
-    /// - SUB
-    pub fn run_li(&mut self, imm: i64, rd_rs1: NonZeroXRegister) {
-        self.write_nz(rd_rs1, imm as u64)
-    }
-
-    /// `C.LUI` CI-type compressed instruction
-    ///
-    /// Loads the non-zero 6-bit immediate into bits 17–12 of the
-    /// register `rd_rs1`, clears the bottom 12 bits, and sign-extends bit 17
-    /// into all higher bits of `rd_rs1`.
-    pub fn run_clui(&mut self, imm: i64, rd_rs1: NonZeroXRegister) {
-        self.write_nz(rd_rs1, imm as u64)
-    }
-}
-
 impl<ML, M> MachineCoreState<ML, M>
 where
     ML: MainMemoryLayout,
@@ -219,7 +181,6 @@ mod tests {
             hart_state::{HartState, HartStateLayout},
             main_memory::tests::T1K,
             registers::{
-                XRegisters, XRegistersLayout,
                 nz::{self, a0},
                 t1,
             },
@@ -285,37 +246,6 @@ mod tests {
             assert_eq!(state.pc.read(), init_pc);
             assert_eq!(new_pc, res_pc);
         }
-    });
-
-    backend_test!(test_run_cli, F, {
-        let imm_rdrs1_res = [
-            (0_i64, nz::t3, 0_u64),
-            (0xFFF0_0420, nz::t2, 0xFFF0_0420),
-            (-1, nz::t4, 0xFFFF_FFFF_FFFF_FFFF),
-        ];
-
-        for (imm, rd_rs1, res) in imm_rdrs1_res {
-            let mut state = create_state!(HartState, F);
-            state.xregisters.run_li(imm, rd_rs1);
-            assert_eq!(state.xregisters.read_nz(rd_rs1), res);
-        }
-    });
-
-    backend_test!(test_run_clui, F, {
-        proptest!(|(imm in any::<i64>())| {
-            let mut xregs = create_state!(XRegisters, F);
-            xregs.write_nz(nz::a2, 0);
-            xregs.write_nz(nz::a4, 0);
-
-            // U-type immediate sets imm[31:20]
-            let imm = imm & 0xFFFF_F000;
-            xregs.run_clui(imm, nz::a3);
-            // read value is the expected one
-            prop_assert_eq!(xregs.read_nz(nz::a3), imm as u64);
-            // it doesn't modify other registers
-            prop_assert_eq!(xregs.read_nz(nz::a2), 0);
-            prop_assert_eq!(xregs.read_nz(nz::a4), 0);
-        });
     });
 
     macro_rules! test_shift_instr {

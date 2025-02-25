@@ -337,9 +337,13 @@ mod tests {
 
         // Arrange
         let scenarios: &[&[I]] = &[
-            &[I::new_mv(x2, x1, Compressed)],
-            &[I::new_mv(x2, x1, Uncompressed)],
+            &[I::new_li(x1, 1, Compressed), I::new_mv(x2, x1, Compressed)],
             &[
+                I::new_li(x1, 1, Uncompressed),
+                I::new_mv(x2, x1, Uncompressed),
+            ],
+            &[
+                I::new_li(x1, 1, Uncompressed),
                 I::new_mv(x2, x1, Compressed),
                 I::new_mv(x3, x2, Uncompressed),
             ],
@@ -365,13 +369,10 @@ mod tests {
             interpreted.hart.pc.write(initial_pc);
             jitted.hart.pc.write(initial_pc);
 
-            interpreted.hart.xregisters.write_nz(x1, 1);
-            jitted.hart.xregisters.write_nz(x1, 1);
-
             // Act
             let fun = jit
                 .compile(instructions(&block).as_slice())
-                .expect("Compilation of CNop should succeed");
+                .expect("Compilation should succeed");
 
             let interpreted_res = block.callable().unwrap().run_block(
                 &mut interpreted,
@@ -413,6 +414,7 @@ mod tests {
 
         // calculate fibonacci(4) == 5
         let scenario: &[I] = &[
+            I::new_li(x1, 1, Uncompressed),
             I::new_add(x2, x2, x1, Compressed),
             I::new_add(x1, x1, x2, Uncompressed),
             I::new_add(x2, x2, x1, Uncompressed),
@@ -437,13 +439,10 @@ mod tests {
         interpreted.hart.pc.write(initial_pc);
         jitted.hart.pc.write(initial_pc);
 
-        interpreted.hart.xregisters.write_nz(x1, 1);
-        jitted.hart.xregisters.write_nz(x1, 1);
-
         // Act
         let fun = jit
             .compile(instructions(&block).as_slice())
-            .expect("Compilation of CNop should succeed");
+            .expect("Compilation should succeed");
 
         let interpreted_res = block.callable().unwrap().run_block(
             &mut interpreted,
@@ -502,8 +501,6 @@ mod tests {
 
         let initial_pc = 0;
         jitted.hart.pc.write(initial_pc);
-
-        jitted.hart.xregisters.write_nz(x1, 1);
 
         // Act
         let res = jit.compile(instructions(&block).as_slice());

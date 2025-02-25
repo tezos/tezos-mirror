@@ -7,7 +7,7 @@
 //! [instructions]: crate::machine_state::instruction::Instruction
 
 use cranelift::{
-    codegen::ir::{InstBuilder, MemFlags, Type, Value},
+    codegen::ir::{InstBuilder, MemFlags, Type, Value, types::I64},
     frontend::FunctionBuilder,
 };
 
@@ -95,6 +95,10 @@ impl<'a, ML: MainMemoryLayout, JSA: JitStateAccess> ICB for Builder<'a, ML, JSA>
     fn xregister_write(&mut self, reg: XRegister, value: Self::XValue) {
         self.jsa_call
             .xreg_write(&mut self.builder, self.core_ptr_val, reg, value)
+    }
+
+    fn xvalue_of_imm(&mut self, imm: i64) -> Self::XValue {
+        self.builder.ins().iconst(I64, imm)
     }
 
     fn xvalue_wrapping_add(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {

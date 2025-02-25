@@ -29,7 +29,7 @@ use super::{
 use crate::{
     default::ConstDefault,
     instruction_context::{ICB, IcbLoweringFn},
-    interpreter::{c, i},
+    interpreter::{c, i, load_store},
     machine_state::ProgramCounterUpdate::{Next, Set},
     parser::instruction::{
         AmoArgs, CIBDTypeArgs, CIBNZTypeArgs, CIBTypeArgs, CJTypeArgs, CNZRTypeArgs, CRJTypeArgs,
@@ -209,7 +209,6 @@ pub enum OpCode {
     Bgeu,
 
     // RV64I U-type instructions
-    Lui,
     Auipc,
 
     // RV64I jump instructions
@@ -336,7 +335,6 @@ pub enum OpCode {
     CSwsp,
     CJr,
     CJalr,
-    CLui,
     CAddw,
     CSubw,
 
@@ -421,7 +419,6 @@ impl OpCode {
             Self::Bge => Args::run_bge,
             Self::Bltu => Args::run_bltu,
             Self::Bgeu => Args::run_bgeu,
-            Self::Lui => Args::run_lui,
             Self::Auipc => Args::run_auipc,
             Self::Jal => Args::run_jal,
             Self::Jalr => Args::run_jalr,
@@ -538,7 +535,6 @@ impl OpCode {
             Self::Beqz => Args::run_beqz,
             Self::Bnez => Args::run_bnez,
             Self::Li => Args::run_li,
-            Self::CLui => Args::run_clui,
             Self::Mv => Args::run_mv,
             Self::CAddw => Args::run_caddw,
             Self::CSubw => Args::run_csubw,
@@ -574,6 +570,7 @@ impl OpCode {
             Self::Mv => Some(Args::run_mv),
             Self::Nop => Some(Args::run_nop),
             Self::Add => Some(Args::run_add),
+            Self::Li => Some(Args::run_li),
             _ => None,
         }
     }
@@ -885,6 +882,15 @@ macro_rules! impl_ci_type {
             Ok(ProgramCounterUpdate::Next(self.width))
         }
     };
+
+    ($impl: path, $fn: ident, non_zero) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
+            $impl(icb, self.imm, self.rd.nzx);
+            icb.ok(ProgramCounterUpdate::Next(self.width))
+        }
+    };
 }
 
 macro_rules! impl_cr_type {
@@ -1158,17 +1164,6 @@ impl Args {
     impl_b_type!(run_bgeu);
 
     // RV64I U-type instructions
-    //
-    /// SAFETY: This function must only be called on an `Args` belonging
-    /// to the same OpCode as the OpCode used to derive this function.
-    unsafe fn run_lui<ML: MainMemoryLayout, M: ManagerReadWrite>(
-        &self,
-        core: &mut MachineCoreState<ML, M>,
-    ) -> Result<ProgramCounterUpdate, Exception> {
-        core.hart.xregisters.run_lui(self.imm, self.rd.nzx);
-        Ok(Next(self.width))
-    }
-
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
     unsafe fn run_auipc<ML: MainMemoryLayout, M: ManagerReadWrite>(
@@ -1319,8 +1314,7 @@ impl Args {
     impl_store_type!(run_csw);
     impl_cb_type!(run_beqz);
     impl_cb_type!(run_bnez);
-    impl_ci_type!(run_li, non_zero);
-    impl_ci_type!(run_clui, non_zero);
+    impl_ci_type!(load_store::run_li, run_li, non_zero);
     impl_cr_type!(run_neg, non_zero);
     impl_css_type!(run_cswsp);
 
@@ -1518,10 +1512,9 @@ impl From<&InstrCacheable> for Instruction {
             },
 
             // RV64I U-type instructions
-            InstrCacheable::Lui(args) => Instruction {
-                opcode: OpCode::Lui,
-                args: args.into(),
-            },
+            InstrCacheable::Lui(args) => {
+                Instruction::new_li(args.rd, args.imm, InstrWidth::Uncompressed)
+            }
             InstrCacheable::Auipc(args) => Instruction {
                 opcode: OpCode::Auipc,
                 args: args.into(),
@@ -1987,10 +1980,9 @@ impl From<&InstrCacheable> for Instruction {
             InstrCacheable::CLi(args) => {
                 Instruction::new_li(args.rd_rs1, args.imm, InstrWidth::Compressed)
             }
-            InstrCacheable::CLui(args) => Instruction {
-                opcode: OpCode::CLui,
-                args: args.into(),
-            },
+            InstrCacheable::CLui(args) => {
+                Instruction::new_li(args.rd_rs1, args.imm, InstrWidth::Compressed)
+            }
             InstrCacheable::CAddi(args) => {
                 Instruction::new_addi(args.rd_rs1, args.rd_rs1, args.imm, InstrWidth::Compressed)
             }

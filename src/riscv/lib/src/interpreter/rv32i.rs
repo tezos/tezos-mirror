@@ -51,15 +51,6 @@ where
         self.write_nz(rd, result)
     }
 
-    /// `LUI` U-type instruction
-    ///
-    /// Set the upper 20 bits of the `rd` register with the `U-type` formatted immediate `imm`
-    pub fn run_lui(&mut self, imm: i64, rd: NonZeroXRegister) {
-        // Being a `U-type` operation, the immediate is correctly formatted
-        // (lower 12 bits cleared and the value is sign-extended)
-        self.write_nz(rd, imm as u64);
-    }
-
     /// Saves in `rd` the bitwise AND between the value in `rs1` and `imm`
     ///
     /// Relevant RISC-V opcodes:
@@ -392,9 +383,7 @@ mod tests {
             hart_state::{HartState, HartStateLayout},
             main_memory::{Address, tests::T1K},
             mode::Mode,
-            registers::{
-                XRegisters, XRegistersLayout, a0, a1, a2, a3, a4, fa0, nz, t0, t1, t2, t3,
-            },
+            registers::{XRegisters, XRegistersLayout, a0, a1, a2, fa0, nz, t0, t1, t2, t3},
         },
         parser::instruction::{FenceSet, InstrWidth},
         traps::Exception,
@@ -808,23 +797,6 @@ mod tests {
             assert_eq!(new_pc, res_pc);
             assert_eq!(state.xregisters.read_nz(rd), res_rd);
         }
-    });
-
-    backend_test!(test_lui, F, {
-        proptest!(|(imm in any::<i64>())| {
-            let mut xregs = create_state!(XRegisters, F);
-            xregs.write(a2, 0);
-            xregs.write(a4, 0);
-
-            // U-type immediate sets imm[31:20]
-            let imm = imm & 0xFFFF_F000;
-            xregs.run_lui(imm, nz::a3);
-            // read value is the expected one
-            prop_assert_eq!(xregs.read(a3), imm as u64);
-            // it doesn't modify other registers
-            prop_assert_eq!(xregs.read(a2), 0);
-            prop_assert_eq!(xregs.read(a4), 0);
-        });
     });
 
     backend_test!(test_slt, F, {

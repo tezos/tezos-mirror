@@ -1419,7 +1419,7 @@ mod tests {
         let jalr_bytes: u32 = 0x50067;
         let block_b = [
             Instruction::try_from(TaggedInstruction {
-                opcode: OpCode::CLui,
+                opcode: OpCode::Li,
                 args: TaggedArgs {
                     rd: nz::a1.into(),
                     imm: (u16::bits_subset(overwrite_bytes, 15, 12) as i64) << 12,
