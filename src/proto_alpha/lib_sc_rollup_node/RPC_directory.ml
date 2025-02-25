@@ -67,53 +67,10 @@ module Block_helpers_directory = Make_sub_directory (struct
     (node_ctxt, block)
 end)
 
-module Common = struct
-  let () =
-    Block_directory.register0 Sc_rollup_services.Block.block
-    @@ fun (node_ctxt, block) outbox () ->
-    let get_outbox_messages =
-      if not outbox then None else Some Pvm_plugin.get_outbox_messages
-    in
-    Node_context.get_full_l2_block ?get_outbox_messages node_ctxt block
-
-  let () =
-    Block_directory.register0 Sc_rollup_services.Block.num_messages
-    @@ fun (node_ctxt, block) () () ->
-    let open Lwt_result_syntax in
-    let* l2_block = Node_context.get_l2_block node_ctxt block in
-    let+ num_messages =
-      Node_context.get_num_messages node_ctxt l2_block.header.inbox_witness
-    in
-    Z.of_int num_messages
-
-  let () =
-    let open Lwt_result_syntax in
-    Block_directory.register0 Sc_rollup_services.Block.hash
-    @@ fun (_node_ctxt, block) () () -> return block
-
-  let () =
-    Block_directory.register0 Sc_rollup_services.Block.level
-    @@ fun (node_ctxt, block) () () ->
-    Node_context.level_of_hash node_ctxt block
-
-  let () =
-    Block_directory.register0 Sc_rollup_services.Block.inbox
-    @@ fun (node_ctxt, block) () () ->
-    Node_context.get_inbox_by_block_hash node_ctxt block
-
-  let () =
-    Block_directory.register0 Sc_rollup_services.Block.ticks
-    @@ fun (node_ctxt, block) () () ->
-    let open Lwt_result_syntax in
-    let+ l2_block = Node_context.get_l2_block node_ctxt block in
-    Z.of_int64 l2_block.num_ticks
-end
-
 let get_state (node_ctxt : _ Node_context.t) block_hash =
   let open Lwt_result_syntax in
   let* ctxt = Node_context.checkout_context node_ctxt block_hash in
   let*! state = Context.PVMState.find ctxt in
-  let (module PVM) = Pvm.of_kind node_ctxt.kind in
   match state with None -> failwith "No state" | Some state -> return state
 
 let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
@@ -190,48 +147,6 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
   return
     Sc_rollup_services.
       {state_hash; status; output; inbox_level; num_ticks; insights}
-
-let () =
-  Block_directory.register0 Sc_rollup_services.Block.total_ticks
-  @@ fun (node_ctxt, block) () () ->
-  let open Lwt_result_syntax in
-  let* state = get_state node_ctxt block in
-  let open (val Pvm.of_kind node_ctxt.kind) in
-  let*! tick = get_tick (Ctxt_wrapper.of_node_pvmstate state) in
-  return tick
-
-let () =
-  Block_directory.register0 Sc_rollup_services.Block.state_hash
-  @@ fun (node_ctxt, block) () () ->
-  let open Lwt_result_syntax in
-  let* state = get_state node_ctxt block in
-  let open (val Pvm.of_kind node_ctxt.kind) in
-  let*! hash = state_hash (Ctxt_wrapper.of_node_pvmstate state) in
-  return hash
-
-let () =
-  Block_directory.register0 Sc_rollup_services.Block.state_current_level
-  @@ fun (node_ctxt, block) () () ->
-  let open Lwt_result_syntax in
-  let* state = get_state node_ctxt block in
-  let open (val Pvm.of_kind node_ctxt.kind) in
-  let*! current_level =
-    get_current_level (Ctxt_wrapper.of_node_pvmstate state)
-  in
-  return current_level
-
-let () =
-  Block_directory.register0 Sc_rollup_services.Block.state_value
-  @@ fun (node_ctxt, block) {key} () ->
-  let open Lwt_result_syntax in
-  let* ctx = get_state node_ctxt block in
-  let path = String.split_on_char '/' key in
-  let*! value = Context.PVMState.lookup ctx path in
-  match value with
-  | None -> failwith "No such key in PVM state"
-  | Some value ->
-      Format.eprintf "Encoded %S\n@.%!" (Bytes.to_string value) ;
-      return value
 
 let () =
   Block_directory.register0 Sc_rollup_services.Block.status
@@ -325,19 +240,13 @@ let () =
     ~log_kernel_debug_file
     messages
 
-let () =
-  Block_directory.register0 Sc_rollup_services.Block.committed_status
-  @@ fun (node_ctxt, block) () () ->
-  let open Lwt_result_syntax in
-  let* block = Node_context.get_l2_block node_ctxt block in
-  Publisher.Helpers.committed_status node_ctxt block
-
 let block_directory (node_ctxt : _ Node_context.t) =
   let module PVM = (val Pvm_rpc.of_kind node_ctxt.kind) in
   List.fold_left
     (fun dir f -> Tezos_rpc.Directory.merge dir (f node_ctxt))
     Tezos_rpc.Directory.empty
     [
+      Rpc_directory.build_block_subdirectory;
       Block_directory.build_sub_directory;
       Block_helpers_directory.build_sub_directory;
       PVM.build_sub_directory;
