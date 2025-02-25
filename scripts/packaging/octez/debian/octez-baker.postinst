@@ -5,6 +5,8 @@ set -e
 # shellcheck disable=SC1091
 . /usr/share/debconf/confmodule
 
+echoerr() { echo "$@" 1>&2; }
+
 db_version 2.0
 
 # work directory to store temporary files associated to this package
@@ -20,6 +22,8 @@ for file in /usr/bin/octez-baker-*; do
   fi
 done
 
+# we guess the active protocol
+ACTIVE_PROTOCOL=$(echo "$PROTO_CHOICES" | tr ' ' '\n' | grep -v '^alpha$' | sort | head -n 1)
 db_subst octez-baker/baker-active-protocol choices "$PROTO_CHOICES"
 db_subst octez-baker/baker-next-protocol choices "none, $PROTO_CHOICES"
 
@@ -29,7 +33,7 @@ configure)
   # if $DPKG_RUNNING_VERSION" is empty a reconfigure
   # Otherwise we're upgrading
   if [ -z "${2:-}" ] || [ -z "$DPKG_RUNNING_VERSION" ]; then
-    echo "Fresh installation (or reconfigure) of the Octez baker"
+    echoerr "Fresh installation (or reconfigure) of the Octez baker"
 
     db_get octez-baker/liquidity-vote
     echo "LQVOTE=${RET}" > /etc/default/octez-baker-active
@@ -63,8 +67,8 @@ configure)
     true)
       db_get octez-baker/dal-node-url
       DALURL=${RET}
-      echo "RUNTIME_OPTS=--dal-node $DALURL" >> /etc/default/octez-baker-next
-      echo "RUNTIME_OPTS=--dal-node $DALURL" >> /etc/default/octez-baker-active
+      echo "RUNTIME_OPTS=\"--dal-node $DALURL\"" >> /etc/default/octez-baker-next
+      echo "RUNTIME_OPTS=\"--dal-node $DALURL\"" >> /etc/default/octez-baker-active
       ;;
     false)
       echo "RUNTIME_OPTS=--without-dal" >> /etc/default/octez-baker-next
@@ -75,7 +79,7 @@ configure)
     mkdir -p /var/tezos/.tezos-client
     chown tezos:tezos /var/tezos/.tezos-client
   else
-    echo "Upgrading octez-baker from version $2 ( postinst )"
+    echoerr "Upgrading octez-baker from version $2 ( postinst )"
     # the configure script is called with the version of the old
     # package in case of upgrade. We display a message to the user
     # in this case. See octez-node.postinst for a detailed explanation.
@@ -84,15 +88,39 @@ configure)
       : noop
       ;;
     *)
-      echo "Setting new defaults in /etc/default/octez-baker-*"
+      echoerr "Setting defaults in /etc/default/octez-baker-*"
+      echoerr "Migrating values when possible"
+
+      db_set octez-baker/baker-active-protocol "$ACTIVE_PROTOCOL"
+
+      db_input medium octez-baker/baker-active-protocol || true
+      # shellcheck disable=SC2119
+      db_go || true
+
+      db_input medium octez-baker/baker-next-protocol || true
+      # shellcheck disable=SC2119
+      db_go || true
+
+      db_get octez-baker/baker-active-protocol
+      echo "PROTOCOL=${RET}" >> /etc/default/octez-baker-active
+
+      db_get octez-baker/baker-next-protocol
+      if [ -n "${RET:-}" ]; then
+        echo "PROTOCOL=${RET}" >> /etc/default/octez-baker-next
+      else
+        echo "#PROTOCOL=${RET}" >> /etc/default/octez-baker-next
+      fi
+      echoerr "PROTOCOL=${RET}"
 
       db_get octez-baker/liquidity-vote
-      echo "LQVOTE=${RET}" > /etc/default/octez-baker-active
-      echo "LQVOTE=${RET}" > /etc/default/octez-baker-next
+      echo "LQVOTE=${RET}" >> /etc/default/octez-baker-active
+      echo "LQVOTE=${RET}" >> /etc/default/octez-baker-next
+      echoerr "LQVOTE=${RET}"
 
       db_get octez-baker/baker-key
       echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-active
       echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-next
+      echoerr "BAKER_KEY=${RET}"
 
       db_get octez-baker/dal-node
       DAL=${RET}
@@ -100,12 +128,14 @@ configure)
       true)
         db_get octez-baker/dal-node-url
         DALURL=${RET}
-        echo "RUNTIME_OPTS=--dal-node $DALURL" >> /etc/default/octez-baker-next
-        echo "RUNTIME_OPTS=--dal-node $DALURL" >> /etc/default/octez-baker-active
+        echo "RUNTIME_OPTS=\"--dal-node $DALURL\"" >> /etc/default/octez-baker-next
+        echo "RUNTIME_OPTS=\"--dal-node $DALURL\"" >> /etc/default/octez-baker-active
+        echoerr "RUNTIME_OPTS=--dal-node $DALURL"
         ;;
       false)
         echo "RUNTIME_OPTS=--without-dal" >> /etc/default/octez-baker-next
         echo "RUNTIME_OPTS=--without-dal" >> /etc/default/octez-baker-active
+        echoerr "RUNTIME_OPTS=--without-dal"
         ;;
       esac
 
@@ -117,7 +147,7 @@ configure)
   fi
   ;;
 *)
-  echo "postinst noop"
+  : nop
   ;;
 esac
 

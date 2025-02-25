@@ -24,6 +24,7 @@ Depends: adduser,
   debconf (>= 0.5) | debconf-2.0,
   curl,
   systemd
+Pre-Depends: jq
 Recommends: octez-client (= ${source:Version}),
 Suggests: lz4
 Description: L1 Octez node for the Tezos network
