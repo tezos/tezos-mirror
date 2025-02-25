@@ -244,10 +244,21 @@ impl<ML: MainMemoryLayout, JSA: JitStateAccess> JIT<ML, JSA> {
     }
 }
 
+// TODO: https://linear.app/tezos/issue/RV-496
+//       `Block::BlockBuilder` should not require Default, as it
+//         does not allow for potential fallilibility
+impl<ML: MainMemoryLayout, M: JitStateAccess> Default for JIT<ML, M> {
+    fn default() -> Self {
+        Self::new().expect("JIT is supported on all octez-riscv supported platforms")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::machine_state::block_cache::bcall::{BCall, Block, BlockLayout, Interpreted};
+    use crate::machine_state::block_cache::bcall::{
+        BCall, Block, BlockLayout, Interpreted, InterpretedBlockBuilder,
+    };
     use crate::machine_state::main_memory::tests::T1K;
     use crate::machine_state::{MachineCoreState, MachineCoreStateLayout};
     use crate::parser::instruction::InstrWidth::*;
@@ -279,6 +290,7 @@ mod tests {
         ];
 
         let mut jit = JIT::<T1K, F::Manager>::new().unwrap();
+        let interpreted_bb = InterpretedBlockBuilder;
 
         for scenario in scenarios {
             let mut interpreted =
@@ -303,11 +315,12 @@ mod tests {
                 .compile(instructions(&block).as_slice())
                 .expect("Compilation of CNop should succeed");
 
-            let interpreted_res = block.callable().unwrap().run_block(
-                &mut interpreted,
-                initial_pc,
-                &mut interpreted_steps,
-            );
+            let interpreted_res = unsafe {
+                // SAFETY: interpreted blocks are always callable
+                block.callable(&interpreted_bb)
+            }
+            .unwrap()
+            .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
             let jitted_res = unsafe {
                 // # Safety - the jit is not dropped until after we
                 //            exit the for loop
@@ -350,6 +363,7 @@ mod tests {
         ];
 
         let mut jit = JIT::<T1K, F::Manager>::new().unwrap();
+        let interpreted_bb = InterpretedBlockBuilder;
 
         for scenario in scenarios {
             let mut interpreted =
@@ -374,11 +388,12 @@ mod tests {
                 .compile(instructions(&block).as_slice())
                 .expect("Compilation should succeed");
 
-            let interpreted_res = block.callable().unwrap().run_block(
-                &mut interpreted,
-                initial_pc,
-                &mut interpreted_steps,
-            );
+            let interpreted_res = unsafe {
+                // SAFETY: interpreted blocks are always callable
+                block.callable(&interpreted_bb)
+            }
+            .unwrap()
+            .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
             let jitted_res = unsafe {
                 // # Safety - the jit is not dropped until after we
                 //            exit the for loop
@@ -422,6 +437,7 @@ mod tests {
         ];
 
         let mut jit = JIT::<T1K, F::Manager>::new().unwrap();
+        let interpreted_bb = InterpretedBlockBuilder;
 
         let mut interpreted = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
         let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
@@ -444,11 +460,12 @@ mod tests {
             .compile(instructions(&block).as_slice())
             .expect("Compilation should succeed");
 
-        let interpreted_res = block.callable().unwrap().run_block(
-            &mut interpreted,
-            initial_pc,
-            &mut interpreted_steps,
-        );
+        let interpreted_res = unsafe {
+            // SAFETY: interpreted blocks are always callable
+            block.callable(&interpreted_bb)
+        }
+        .unwrap()
+        .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
         let jitted_res = unsafe {
             // # Safety - the jit is not dropped until after we
             //            exit the block
@@ -480,51 +497,62 @@ mod tests {
         use crate::machine_state::registers::NonZeroXRegister::*;
 
         // Arrange
-        let failure: &[I] = &[
-            // does not currently lowering
-            I::new_andi(x1, x1, 13, Uncompressed),
+        let failure_scenarios: &[&[I]] = &[
+            &[
+                // does not currently lowering
+                I::new_andi(x1, x1, 13, Uncompressed),
+            ],
+            &[
+                I::new_nop(Uncompressed),
+                // does not currently lowering
+                I::new_andi(x1, x1, 13, Uncompressed),
+            ],
         ];
 
         let success: &[I] = &[I::new_nop(Compressed)];
 
-        let mut jit = JIT::<T1K, F::Manager>::new().unwrap();
+        for failure in failure_scenarios.iter() {
+            let mut jit = JIT::<T1K, F::Manager>::new().unwrap();
 
-        let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
-        let mut block = create_state!(Interpreted, BlockLayout<T1K>, F, T1K);
+            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+            let mut block = create_state!(Interpreted, BlockLayout<T1K>, F, T1K);
 
-        block.start_block();
-        for instr in failure.iter() {
-            block.push_instr(*instr);
+            block.start_block();
+            for instr in failure.iter() {
+                block.push_instr(*instr);
+            }
+
+            let mut jitted_steps = 0;
+
+            let initial_pc = 0;
+            jitted.hart.pc.write(initial_pc);
+
+            jitted.hart.xregisters.write_nz(x1, 1);
+
+            // Act
+            let res = jit.compile(instructions(&block).as_slice());
+
+            assert!(
+                res.is_none(),
+                "Compilation of unsupported instruction should fail"
+            );
+
+            block.start_block();
+            for instr in success.iter() {
+                block.push_instr(*instr);
+            }
+
+            let fun = jit
+                .compile(instructions(&block).as_slice())
+                .expect("Compilation of subsequent functions should succeed");
+            let jitted_res = unsafe {
+                // # Safety - the jit is not dropped until after we
+                //            exit the block.
+                fun.call(&mut jitted, initial_pc, &mut jitted_steps)
+            };
+
+            assert!(jitted_res.is_ok());
+            assert_eq!(jitted_steps, success.len());
         }
-
-        let mut jitted_steps = 0;
-
-        let initial_pc = 0;
-        jitted.hart.pc.write(initial_pc);
-
-        // Act
-        let res = jit.compile(instructions(&block).as_slice());
-
-        assert!(
-            res.is_none(),
-            "Compilation of unsupported instruction should fail"
-        );
-
-        block.start_block();
-        for instr in success.iter() {
-            block.push_instr(*instr);
-        }
-
-        let fun = jit
-            .compile(instructions(&block).as_slice())
-            .expect("Compilation of subsequent functions should succeed");
-        let jitted_res = unsafe {
-            // # Safety - the jit is not dropped until after we
-            //            exit the block.
-            fun.call(&mut jitted, initial_pc, &mut jitted_steps)
-        };
-
-        assert!(jitted_res.is_ok());
-        assert_eq!(jitted_steps, success.len());
     });
 }

@@ -39,3 +39,7 @@ rustc-demangle.workspace = true
 
 [dependencies.octez-riscv]
 path = "../lib"
+
+[features]
+default = []
+inline-jit = []

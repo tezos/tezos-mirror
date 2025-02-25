@@ -160,7 +160,7 @@ impl<ML: MainMemoryLayout, B: Block<ML, Owned>> TestStepper<ML, TestCacheLayouts
     }
 }
 
-impl<ML: MainMemoryLayout> Stepper for TestStepper<ML, TestCacheLayouts> {
+impl<ML: MainMemoryLayout, B: Block<ML, Owned>> Stepper for TestStepper<ML, TestCacheLayouts, B> {
     type MainMemoryLayout = ML;
 
     type CacheLayouts = TestCacheLayouts;

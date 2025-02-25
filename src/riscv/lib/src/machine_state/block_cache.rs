@@ -738,7 +738,11 @@ impl<
         if entry.address.read() == phys_addr
             && self.fence_counter.read() == entry.fence_counter.read()
         {
-            entry.block.callable()
+            unsafe {
+                // SAFETY: the block builder given to this function is the same as was given to the
+                //         'compile' function of this block.
+                entry.block.callable(&self.block_builder)
+            }
         } else {
             None
         }

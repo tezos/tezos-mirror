@@ -10,6 +10,7 @@
 use super::{CACHE_INSTR, ICallLayout, ICallPlaced, run_instr};
 use crate::{
     default::ConstDefault,
+    jit::{JCall, JIT, state_access::JitStateAccess},
     machine_state::{
         MachineCoreState, ProgramCounterUpdate,
         instruction::Instruction,
@@ -38,12 +39,10 @@ pub trait BCall<ML: MainMemoryLayout, M: ManagerBase> {
     /// Run a block against the machine state.
     ///
     /// When calling this function, there must be no partial block in progress. To ensure
-    /// this, you must always run [`complete_current_block`] prior to fetching
+    /// this, you must always run [`Block::complete_block`] prior to fetching
     /// and running a new block.
     ///
     /// There _must_ also be sufficient steps remaining, to execute the block in full.
-    ///
-    /// [`complete_current_block`]: super::BlockCache::complete_current_block
     fn run_block(
         &self,
         core: &mut MachineCoreState<ML, M>,
@@ -115,9 +114,20 @@ pub trait Block<ML: MainMemoryLayout, M: ManagerBase> {
 
     /// Get a callable block from an entry. The entry must have passed the address and fence
     /// checks.
-    fn callable(&mut self) -> Option<&mut (impl BCall<ML, M> + ?Sized)>
+    ///
+    /// # Safety
+    ///
+    /// The `block_builder` must be the same as the block builder given to the `compile` call that
+    /// (may) have natively compiled this block to machine code.
+    ///
+    /// This ensures that the builder in question is guaranteed to be alive, for at least as long
+    /// as this block may be run via `BCall::run_block`.
+    unsafe fn callable<'a>(
+        &mut self,
+        block_builder: &'a Self::BlockBuilder,
+    ) -> Option<&mut (impl BCall<ML, M> + ?Sized + 'a)>
     where
-        M: ManagerRead;
+        M: ManagerRead + 'a;
 }
 
 /// Interpreted blocks are built automatically, and require no additional context.
@@ -236,10 +246,16 @@ impl<ML: MainMemoryLayout, M: ManagerBase> Block<ML, M> for Interpreted<ML, M> {
         )
     }
 
+    /// # SAFETY
+    ///
+    /// This function is always safe to call.
     #[inline]
-    fn callable(&mut self) -> Option<&mut (impl BCall<ML, M> + ?Sized)>
+    unsafe fn callable<'a>(
+        &mut self,
+        _bb: &'a Self::BlockBuilder,
+    ) -> Option<&mut (impl BCall<ML, M> + ?Sized + 'a)>
     where
-        M: ManagerRead,
+        M: ManagerRead + 'a,
     {
         let len = self.len_instr.read();
         if len > 0 {
@@ -255,6 +271,148 @@ impl<ML: MainMemoryLayout, M: ManagerClone> Clone for Interpreted<ML, M> {
         Self {
             len_instr: self.len_instr.clone(),
             instr: self.instr.clone(),
+        }
+    }
+}
+
+/// Blocks that are compiled to native code for execution, when possible.
+///
+/// Not all instructions are currently supported, when a block contains
+/// unsupported instructions, a fallback to [`Interpreted`] mode occurs.
+///
+/// Blocks are compiled upon calling [`Block::complete_block`], in a *stop the world* fashion.
+pub struct InlineJit<ML: MainMemoryLayout, M: JitStateAccess> {
+    fallback: Interpreted<ML, M>,
+    jit_fn: Option<JCall<ML, M>>,
+}
+
+impl<ML: MainMemoryLayout, M: JitStateAccess> Block<ML, M> for InlineJit<ML, M> {
+    type BlockBuilder = (JIT<ML, M>, InterpretedBlockBuilder);
+
+    fn start_block(&mut self)
+    where
+        M: ManagerWrite,
+    {
+        self.jit_fn = None;
+        self.fallback.start_block()
+    }
+
+    fn invalidate(&mut self)
+    where
+        M: ManagerWrite,
+    {
+        self.jit_fn = None;
+        self.fallback.invalidate()
+    }
+
+    fn reset(&mut self)
+    where
+        M: ManagerReadWrite,
+    {
+        self.jit_fn = None;
+        self.fallback.reset()
+    }
+
+    fn push_instr(&mut self, instr: Instruction)
+    where
+        M: ManagerReadWrite,
+    {
+        self.jit_fn = None;
+        self.fallback.push_instr(instr)
+    }
+
+    fn instr(&self) -> &[EnrichedCell<ICallPlaced<ML>, M>]
+    where
+        M: ManagerRead,
+    {
+        self.fallback.instr()
+    }
+
+    fn bind(allocated: AllocatedOf<BlockLayout<ML>, M>) -> Self {
+        Self {
+            fallback: Interpreted::bind(allocated),
+            jit_fn: None,
+        }
+    }
+
+    fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
+        &'a self,
+    ) -> AllocatedOf<BlockLayout<ML>, F::Output> {
+        self.fallback.struct_ref::<F>()
+    }
+
+    fn complete_block(&mut self, jit: &mut Self::BlockBuilder) {
+        self.fallback.complete_block(&mut jit.1);
+
+        if <Self as Block<ML, M>>::num_instr(self) > 0 {
+            let instr = self
+                .fallback
+                .instr
+                .iter()
+                .take(<Self as Block<ML, M>>::num_instr(self))
+                .map(|i| i.read_ref_stored());
+
+            let jitfn = jit.0.compile(instr);
+
+            self.jit_fn = jitfn;
+        }
+    }
+
+    /// # SAFETY
+    ///
+    /// The `block_builder` must be the same as the block builder given to the `compile` call that
+    /// (may) have natively compiled this block to machine code.
+    ///
+    /// This ensures that the builder in question is guaranteed to be alive, for at least as long
+    /// as this block may be run via [`BCall::run_block`].
+    unsafe fn callable<'a>(
+        &mut self,
+        block_builder: &'a Self::BlockBuilder,
+    ) -> Option<&mut (impl BCall<ML, M> + ?Sized + 'a)>
+    where
+        M: ManagerRead + 'a,
+    {
+        if self.fallback.callable(&block_builder.1).is_some() {
+            Some(self)
+        } else {
+            None
+        }
+    }
+
+    fn num_instr(&self) -> usize
+    where
+        M: ManagerRead,
+    {
+        self.fallback.num_instr()
+    }
+}
+
+impl<ML: MainMemoryLayout, M: JitStateAccess> BCall<ML, M> for InlineJit<ML, M> {
+    fn num_instr(&self) -> usize
+    where
+        M: ManagerRead,
+    {
+        self.fallback.num_instr()
+    }
+
+    fn run_block(
+        &self,
+        core: &mut MachineCoreState<ML, M>,
+        instr_pc: Address,
+        steps: &mut usize,
+    ) -> Result<(), EnvironException>
+    where
+        M: ManagerReadWrite,
+    {
+        match &self.jit_fn {
+            // SAFETY: JIT is guaranteed to be alive here by the caller.
+            //         this is due to the only way to run a block being
+            //         by calling `Block::callable` first. That function
+            //         requires the caller uphold the invariant that
+            //         the builder be alive for the lifetime of the
+            //         `BCall`.
+            Some(jcall) => unsafe { jcall.call(core, instr_pc, steps) },
+            None => self.fallback.instr().run_block(core, instr_pc, steps),
         }
     }
 }

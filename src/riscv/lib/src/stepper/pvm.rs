@@ -104,15 +104,15 @@ impl<'hooks, ML: MainMemoryLayout, B: Block<ML, Owned>, CL: CacheLayouts>
             reveal_request_response_map,
         })
     }
-}
 
-impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL, Owned> {
     /// Obtain the root hash for the PVM state.
     pub fn hash(&self) -> Hash {
         let refs = self.pvm.struct_ref::<FnManagerIdent>();
         PvmLayout::<ML, CL>::state_hash(refs).unwrap()
     }
+}
 
+impl<'hooks, ML: MainMemoryLayout, CL: CacheLayouts> PvmStepper<'hooks, ML, CL, Owned> {
     /// Produce the Merkle proof for evaluating one step on the given PVM state.
     /// The given stepper takes one step.
     pub fn produce_proof(&mut self) -> Option<Proof> {

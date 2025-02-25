@@ -26,7 +26,7 @@ use crate::{
             data::{BenchData, FineBenchData, InstrGetError, InstrType, SimpleBenchData},
             save_to_file, show_results,
         },
-        run::{UseStepper, general_run},
+        run::{BlockImpl, UseStepper, general_run},
     },
     format_status,
 };
@@ -154,7 +154,7 @@ fn bench_iteration(path: &Path, opts: &BenchRunOptions) -> Result<BenchData, Box
         }
     }
 
-    general_run(&opts.common, program, initrd, Runner(opts))
+    general_run::<_, _, BlockImpl>(&opts.common, program, initrd, Runner(opts))
 }
 
 fn transform_folders(inputs: &[Box<Path>]) -> Result<Vec<PathBuf>, Box<dyn Error>> {
