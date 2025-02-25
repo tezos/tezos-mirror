@@ -1224,19 +1224,33 @@ module State = struct
 
   let irmin_load ?snapshot_url ~data_dir configuration =
     let open Lwt_result_syntax in
+    let open Configuration in
     let*! store_already_exists =
       Lwt_utils_unix.dir_exists (Evm_state.irmin_store_path ~data_dir)
     in
     let* () =
       match snapshot_url with
-      | Some snapshot_url when not store_already_exists ->
-          Snapshots.import_from
-            ~force:true
-            ~keep_alive:configuration.Configuration.keep_alive
-            ~data_dir
-            ~download_path:".download_snapshot_"
-            ~snapshot_file:snapshot_url
-            ()
+      | Some snapshot_url when not store_already_exists -> (
+          let* history_mode =
+            Snapshots.import_from
+              ~force:true
+              ~keep_alive:configuration.keep_alive
+              ?history_mode:configuration.history_mode
+              ~data_dir
+              ~download_path:".download_snapshot_"
+              ~snapshot_file:snapshot_url
+              ()
+          in
+          match history_mode with
+          | Some h ->
+              let* store = Evm_store.init ~data_dir ~perm:`Read_write () in
+              let* () =
+                Evm_store.use store @@ fun conn ->
+                Evm_store.Metadata.store_history_mode conn h
+              in
+              let*! () = Evm_store.close store in
+              return_unit
+          | None -> return_unit)
       | _ -> return_unit
     in
     Irmin_context.load

@@ -216,6 +216,7 @@ Miscellaneous commands:
                      [--initial-kernel <evm_installer.wasm>]
                      [--dont-track-rollup-node] [--no-sync]
                      [--init-from-snapshot [snapshot url]]
+                     [--history <archive | rolling:n | full:n>]
                      [--network <network>]
     Start the EVM node in observer mode
     --data-dir <data-dir>: The path to the EVM node data directory
@@ -246,6 +247,7 @@ Miscellaneous commands:
     --dont-track-rollup-node: Disable tracking the head of the rollup node. Tracking the state of a rollup node allows to confirm the blocks received from the upstream EVM node.
     --no-sync: Disable tracking the head of the EVM node endpoint
     --init-from-snapshot [snapshot url]: Automatically download and import a recent snapshot for supported networks on fresh data directories. If no snapshot provider is given e.g. `--init-from-snapshot` with no argument, then it uses the default built-in provider `https://snapshotter-sandbox.nomadic-labs.eu`. %r is replaced by the short form of the Smart Rollup address, %R by the complete Smart Rollup address, %n by the network (given by the argument --network), %h by the history mode used by the node, and %% by %. Also accepts a path to an existing snapshot.
+    --history <archive | rolling:n | full:n>: History mode for the EVM node. ':n' means n days of history.
     --network <network>: The network the EVM node will be connecting to. Can be `mainnet` or `testnet`. If set, additional sanity checks are performed on the node’s startup.
   
   octez-evm-node experimental run rpc [--data-dir <data-dir>]

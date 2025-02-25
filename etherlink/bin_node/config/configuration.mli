@@ -75,6 +75,9 @@ type history_mode =
       (** Keep all blocks and transactions. Keep operations and states for a period defined by
               {!type-garbage_collector_parameters}. *)
 
+(** Compare history modes and ignore [garbage_collector_parameters] *)
+val history_mode_partial_eq : history_mode -> history_mode -> bool
+
 (** RPC server implementation. *)
 type rpc_server =
   | Resto  (** Resto/Cohttp (default) *)

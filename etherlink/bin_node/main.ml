@@ -1156,7 +1156,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
     ?threshold_encryption_bundler_endpoint ?tx_pool_timeout_limit
     ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?log_filter_chunk_size
     ?log_filter_max_nb_logs ?log_filter_max_nb_blocks ?restricted_rpcs ?kernel
-    ~no_sync ~init_from_snapshot ~finalized_view ?network () =
+    ~no_sync ~init_from_snapshot ?history_mode ~finalized_view ?network () =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -1188,6 +1188,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?log_filter_max_nb_blocks
       ?restricted_rpcs
       ?dal_slots:None
+      ?history_mode
       ~finalized_view
       ?network
       ()
@@ -2249,7 +2250,7 @@ let sandbox_command =
         ())
 
 let observer_run_args =
-  Tezos_clic.args10
+  Tezos_clic.args11
     evm_node_endpoint_arg
     bundler_node_endpoint_arg
     preimages_arg
@@ -2259,6 +2260,7 @@ let observer_run_args =
     dont_track_rollup_node_arg
     no_sync_arg
     init_from_snapshot_arg
+    history_arg
     (supported_network_arg
        ~why:
          "If set, additional sanity checks are performed on the node’s startup."
@@ -2298,6 +2300,7 @@ let observer_command =
              dont_track_rollup_node,
              no_sync,
              init_from_snapshot,
+             history_mode,
              network ) )
          () ->
       let open Lwt_result_syntax in
@@ -2339,6 +2342,7 @@ let observer_command =
         ?kernel
         ~no_sync
         ~init_from_snapshot
+        ?history_mode
         ~finalized_view
         ?network
         ())
@@ -2390,17 +2394,16 @@ let import_snapshot_command =
     (prefixes ["snapshot"; "import"] @@ Params.snapshot_file_or_url @@ stop)
     (fun (data_dir, force) snapshot_file () ->
       let open Lwt_result_syntax in
-      let* configuration =
-        Configuration.Cli.create_or_read_config ~data_dir ()
+      let* _ =
+        Evm_node_lib_dev.Snapshots.import_from
+          ~force
+          ~keep_alive:false
+          ~data_dir
+          ~download_path:".download_"
+          ~snapshot_file
+          ()
       in
-      let*! () = init_logs ~daily_logs:false ~data_dir configuration in
-      Evm_node_lib_dev.Snapshots.import_from
-        ~force
-        ~keep_alive:false
-        ~data_dir
-        ~download_path:".download_"
-        ~snapshot_file
-        ())
+      return_unit)
 
 let snapshot_info_command =
   let open Tezos_clic in
