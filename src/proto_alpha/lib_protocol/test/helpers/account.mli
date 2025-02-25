@@ -66,6 +66,17 @@ val default_initial_staked_balance : Tez.t
 (** Default spendable balance of bootstrap accounts: 3_800_000 tez *)
 val default_initial_spendable_balance : Tez.t
 
+(** Initial staked balance of a newly created bootstrap account with a
+    given initial full balance. *)
+val bootstrap_initial_staked_balance :
+  constants:Constants.Parametric.t -> initial_full_balance:Tez.t -> Tez.t
+
+(** Initial baking power of a newly created bootstrap account, in
+    weighted tez (that is, staked tez count with weight 1 and
+    delegated tez with weight 1/edge_of_staking_over_delegation). *)
+val bootstrap_initial_baking_power :
+  constants:Constants.Parametric.t -> initial_full_balance:Tez.t -> Tez.t
+
 (** [generate_accounts ?algo ?rng_state n] first frees the global account state then
     generates [n] random accounts with [rng_state] to generate the seed and adds
     them to the global account state. When provided, all accounts key generation

@@ -521,6 +521,59 @@ let test_committee_sampling () =
         (8_000_000_000L, expected_bounds 100);
       ]
   in
+  (* Tests with default bootstrap staking behavior. *)
+  let compute_baking_power initial_balance =
+    Account.bootstrap_initial_baking_power
+      ~constants:Default_parameters.constants_test
+      ~initial_full_balance:(Tez.of_mutez_exn initial_balance)
+    |> Tez.to_mutez
+  in
+  let test_distribution_default_staking ~committee_size initial_balances =
+    let with_baking_powers =
+      List.map
+        (fun initial_balance ->
+          (initial_balance, compute_baking_power initial_balance))
+        initial_balances
+    in
+    let total_baking_power =
+      List.fold_left
+        (fun acc (_initial_balance, baking_power) -> Int64.add acc baking_power)
+        0L
+        with_baking_powers
+    in
+    let committee_size_int = Int64.of_int committee_size in
+    let distribution =
+      List.map
+        (fun (initial_balance, baking_power) ->
+          let average_baking_opportunities =
+            Int64.(
+              to_int
+                (div (mul baking_power committee_size_int) total_baking_power))
+          in
+          Log.info
+            "Initial balance: %#Ld mutez, baking power: %#Ld, average #slots: \
+             %d"
+            initial_balance
+            baking_power
+            average_baking_opportunities ;
+          (initial_balance, expected_bounds average_baking_opportunities))
+        with_baking_powers
+    in
+    test_distribution
+      ~staking_config:Default_for_bootstrap
+      ~committee_size
+      distribution
+  in
+  let* () =
+    test_distribution_default_staking
+      ~committee_size:10_000
+      [16_000_000_000L; 8_000_000_000L; 8_000_000_000L]
+  in
+  let* () =
+    test_distribution_default_staking
+      ~committee_size:10_000
+      [792_000_000_000L; 8_000_000_000L]
+  in
   return_unit
 
 let tests =
