@@ -146,3 +146,9 @@ Minor Changes
 
 Internal
 --------
+
+- When activating this protocol directly from Genesis (so only in
+  tests and on some test networks), baking rights of bootstrap
+  accounts for the first few cycles are now computed with Adaptive
+  Issuance enabled, meaning that delegated tez are already weighted
+  less than staked tez. (MR :gl:`!16945`)
