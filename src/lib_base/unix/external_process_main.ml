@@ -141,7 +141,7 @@ struct
     let* parameters, state = init input output in
     let*! () =
       (* if the external process is spawned in a standalone way and communicates
-         with the node through stdin/stdoud, we do no start the logging
+         with the node through stdin/stdout, we do no start the logging
          system. *)
       if using_std_channel then Lwt.return_unit
       else
