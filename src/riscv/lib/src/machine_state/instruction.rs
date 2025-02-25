@@ -23,13 +23,13 @@ use tagged_instruction::{ArgsShape, TaggedInstruction, opcode_to_argsshape};
 use super::{
     MachineCoreState, ProgramCounterUpdate,
     csregisters::CSRegister,
-    memory::MemoryConfig,
+    memory::{Address, MemoryConfig},
     registers::{FRegister, NonZeroXRegister, XRegister, nz},
 };
 use crate::{
     default::ConstDefault,
-    instruction_context::{ICB, IcbLoweringFn},
-    interpreter::{c, i, integer, load_store},
+    instruction_context::{ICB, IcbFnResult, IcbLoweringFn},
+    interpreter::{branching, c, i, integer, load_store},
     machine_state::ProgramCounterUpdate::{Next, Set},
     parser::instruction::{
         AmoArgs, CIBDTypeArgs, CIBNZTypeArgs, CIBTypeArgs, CJTypeArgs, CNZRTypeArgs, CRJTypeArgs,
@@ -148,6 +148,15 @@ impl ConstDefault for Instruction {
         args: Args::DEFAULT,
     };
 }
+
+/// alias for the function signature of an instruction run.
+///
+/// SAFETY: This function must be called with an `Args` belonging to the same `OpCode` as
+/// the one used to dispatch this function.
+pub type RunInstr<MC, M> = unsafe fn(
+    &Args,
+    &mut MachineCoreState<MC, M>,
+) -> Result<ProgramCounterUpdate<Address>, Exception>;
 
 /// Opcodes map to the operation performed over the state - allowing us to
 /// decouple these from the parsed instructions down the line.
@@ -395,10 +404,7 @@ impl OpCode {
     /// Calling the returned function **must** correspond to an `Args` belonging to an
     /// instruction where the `OpCode` is the same as the `OpCode` of the current instruction.
     #[inline(always)]
-    pub(super) fn to_run<MC: MemoryConfig, M: ManagerReadWrite>(
-        self,
-    ) -> unsafe fn(&Args, &mut MachineCoreState<MC, M>) -> Result<ProgramCounterUpdate, Exception>
-    {
+    pub(super) fn to_run<MC: MemoryConfig, M: ManagerReadWrite>(self) -> RunInstr<MC, M> {
         match self {
             Self::Add => Args::run_add,
             Self::Sub => Args::run_sub,
@@ -607,6 +613,7 @@ impl OpCode {
             Self::And => Some(Args::run_and),
             Self::Or => Some(Args::run_or),
             Self::Li => Some(Args::run_li),
+            Self::J => Some(Args::run_j),
             _ => None,
         }
     }
@@ -617,7 +624,7 @@ impl Instruction {
     pub(super) fn run<MC: MemoryConfig, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<MC, M>,
-    ) -> Result<ProgramCounterUpdate, Exception> {
+    ) -> Result<ProgramCounterUpdate<Address>, Exception> {
         // SAFETY: Unsafe accesses in this function are due to using the [Register] union,
         // which is safe as the registers used are validated against the opcode.
         unsafe { (self.opcode.to_run())(&self.args, core) }
@@ -704,7 +711,7 @@ macro_rules! impl_r_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart.xregisters.$fn(self.rs1.x, self.rs2.x, self.rd.x);
             Ok(Next(self.width))
         }
@@ -716,7 +723,7 @@ macro_rules! impl_r_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
                 .xregisters
                 .$fn(self.rs1.nzx, self.rs2.nzx, self.rd.nzx);
@@ -730,7 +737,7 @@ macro_rules! impl_r_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
                 .xregisters
                 .$fn(self.rs1.x, self.rs2.x, self.rd.nzx);
@@ -741,9 +748,10 @@ macro_rules! impl_r_type {
     ($impl: path, $fn: ident, non_zero) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
             $impl(icb, self.rs1.nzx, self.rs2.nzx, self.rd.nzx);
-            icb.ok(Next(self.width))
+            let pcu = ProgramCounterUpdate::Next(self.width);
+            icb.ok(pcu)
         }
     };
 }
@@ -755,7 +763,7 @@ macro_rules! impl_i_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
                 .xregisters
                 .$fn(self.imm, self.rs1.nzx, self.rd.nzx);
@@ -769,7 +777,7 @@ macro_rules! impl_i_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart.xregisters.$fn(self.imm, self.rs1.x, self.rd.nzx);
             Ok(Next(self.width))
         }
@@ -783,7 +791,7 @@ macro_rules! impl_fload_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.$fn(self.imm, self.rs1.x, self.rd.f)
                 .map(|_| Next(self.width))
         }
@@ -796,7 +804,7 @@ macro_rules! impl_load_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.$fn(self.imm, self.rs1.x, self.rd.x)
                 .map(|_| Next(self.width))
         }
@@ -808,7 +816,7 @@ macro_rules! impl_load_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.$fn(self.imm, self.rs1.nzx, self.rd.nzx)
                 .map(|_| Next(self.width))
         }
@@ -822,7 +830,7 @@ macro_rules! impl_cfload_sp_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.$fn(self.imm, self.rd.f).map(|_| Next(self.width))
         }
     };
@@ -835,7 +843,7 @@ macro_rules! impl_store_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.$fn(self.imm, self.rs1.x, self.rs2.x)
                 .map(|_| Next(self.width))
         }
@@ -847,7 +855,7 @@ macro_rules! impl_store_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.$fn(self.imm, self.rs1.nzx, self.rs2.nzx)
                 .map(|_| Next(self.width))
         }
@@ -860,7 +868,7 @@ macro_rules! impl_fstore_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.$fn(self.imm, self.rs1.x, self.rs2.f)
                 .map(|_| Next(self.width))
         }
@@ -874,7 +882,7 @@ macro_rules! impl_b_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             Ok(core
                 .hart
                 .$fn(self.imm, self.rs1.nzx, self.rs2.nzx, self.width))
@@ -889,7 +897,7 @@ macro_rules! impl_amo_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.$fn(self.rs1.x, self.rs2.x, self.rd.x, self.rl, self.aq)
                 .map(|_| Next(self.width))
         }
@@ -903,7 +911,7 @@ macro_rules! impl_ci_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart.xregisters.$fn(self.imm, self.rd.x);
             Ok(ProgramCounterUpdate::Next(self.width))
         }
@@ -915,7 +923,7 @@ macro_rules! impl_ci_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart.xregisters.$fn(self.imm, self.rd.nzx);
             Ok(ProgramCounterUpdate::Next(self.width))
         }
@@ -924,9 +932,10 @@ macro_rules! impl_ci_type {
     ($impl: path, $fn: ident, non_zero) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
             $impl(icb, self.imm, self.rd.nzx);
-            icb.ok(ProgramCounterUpdate::Next(self.width))
+            let pcu = ProgramCounterUpdate::Next(self.width);
+            icb.ok(pcu)
         }
     };
 }
@@ -938,7 +947,7 @@ macro_rules! impl_cr_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart.xregisters.$fn(self.rd.x, self.rs2.x);
             Ok(ProgramCounterUpdate::Next(self.width))
         }
@@ -950,7 +959,7 @@ macro_rules! impl_cr_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart.xregisters.$fn(self.rd.nzx, self.rs2.nzx);
             Ok(ProgramCounterUpdate::Next(self.width))
         }
@@ -961,9 +970,10 @@ macro_rules! impl_cr_nz_type {
     ($impl: path, $fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
             $impl(icb, self.rd.nzx, self.rs2.nzx);
-            icb.ok(Next(self.width))
+            let pcu = ProgramCounterUpdate::Next(self.width);
+            icb.ok(pcu)
         }
     };
 }
@@ -975,7 +985,7 @@ macro_rules! impl_cb_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             Ok(core.hart.$fn(self.imm, self.rs1.nzx, self.width))
         }
     };
@@ -988,7 +998,7 @@ macro_rules! impl_fcss_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.$fn(self.imm, self.rs2.f).map(|_| Next(self.width))
         }
     };
@@ -1001,7 +1011,7 @@ macro_rules! impl_csr_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
                 .$fn(self.csr, self.rs1.x, self.rd.x)
                 .map(|_| Next(self.width))
@@ -1016,7 +1026,7 @@ macro_rules! impl_csr_imm_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
                 .$fn(self.csr, self.imm as u64, self.rd.x)
                 .map(|_| Next(self.width))
@@ -1031,7 +1041,7 @@ macro_rules! impl_f_x_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
                 .$fn(self.rs1.x, self.rd.f)
                 .map(|_| Next(self.width))
@@ -1044,7 +1054,7 @@ macro_rules! impl_f_x_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
                 .$fn(self.rs1.x, self.rm, self.rd.f)
                 .map(|_| Next(self.width))
@@ -1059,7 +1069,7 @@ macro_rules! impl_x_f_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rd.x)
                 .map(|_| Next(self.width))
@@ -1072,7 +1082,7 @@ macro_rules! impl_x_f_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rm, self.rd.x)
                 .map(|_| Next(self.width))
@@ -1087,7 +1097,7 @@ macro_rules! impl_f_r_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rs2.f, self.rd.f)
                 .map(|_| Next(self.width))
@@ -1100,7 +1110,7 @@ macro_rules! impl_f_r_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rs2.f, self.rd.x)
                 .map(|_| Next(self.width))
@@ -1113,7 +1123,7 @@ macro_rules! impl_f_r_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rm, self.rd.f)
                 .map(|_| Next(self.width))
@@ -1126,7 +1136,7 @@ macro_rules! impl_f_r_type {
         unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
             &self,
             core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
+        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart
                 .$fn(self.rs1.f, self.rs2.f, $(self.$field,)* self.rd.f)
                 .map(|_| Next(self.width))
@@ -1202,7 +1212,7 @@ impl Args {
     unsafe fn run_auipc<MC: MemoryConfig, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<MC, M>,
-    ) -> Result<ProgramCounterUpdate, Exception> {
+    ) -> Result<ProgramCounterUpdate<Address>, Exception> {
         core.hart.run_auipc(self.imm, self.rd.nzx);
         Ok(Next(self.width))
     }
@@ -1214,7 +1224,7 @@ impl Args {
     unsafe fn run_jal<MC: MemoryConfig, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<MC, M>,
-    ) -> Result<ProgramCounterUpdate, Exception> {
+    ) -> Result<ProgramCounterUpdate<Address>, Exception> {
         Ok(Set(core.hart.run_jal(self.imm, self.rd.nzx, self.width)))
     }
 
@@ -1223,7 +1233,7 @@ impl Args {
     unsafe fn run_jalr_imm<MC: MemoryConfig, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<MC, M>,
-    ) -> Result<ProgramCounterUpdate, Exception> {
+    ) -> Result<ProgramCounterUpdate<Address>, Exception> {
         Ok(Set(core.hart.run_jalr_imm(
             self.imm,
             self.rs1.nzx,
@@ -1237,7 +1247,7 @@ impl Args {
     unsafe fn run_jr_imm<MC: MemoryConfig, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<MC, M>,
-    ) -> Result<ProgramCounterUpdate, Exception> {
+    ) -> Result<ProgramCounterUpdate<Address>, Exception> {
         Ok(Set(core.hart.run_jr_imm(self.imm, self.rs1.nzx)))
     }
 
@@ -1365,24 +1375,23 @@ impl Args {
     impl_ci_type!(load_store::run_li, run_li, non_zero);
     impl_cr_type!(run_neg, non_zero);
 
-    fn run_j<MC: MemoryConfig, M: ManagerReadWrite>(
-        &self,
-        core: &mut MachineCoreState<MC, M>,
-    ) -> Result<ProgramCounterUpdate, Exception> {
-        Ok(Set(core.hart.run_j(self.imm)))
+    fn run_j<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+        let addr = branching::run_j(icb, self.imm);
+        let pcu = ProgramCounterUpdate::Set(addr);
+        icb.ok(pcu)
     }
 
     fn run_j_absolute<MC: MemoryConfig, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<MC, M>,
-    ) -> Result<ProgramCounterUpdate, Exception> {
+    ) -> Result<ProgramCounterUpdate<Address>, Exception> {
         Ok(Set(core.hart.run_j_absolute(self.imm)))
     }
 
     unsafe fn run_jalr_absolute<MC: MemoryConfig, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<MC, M>,
-    ) -> Result<ProgramCounterUpdate, Exception> {
+    ) -> Result<ProgramCounterUpdate<Address>, Exception> {
         Ok(Set(core.hart.run_jalr_absolute(
             self.imm,
             self.rd.nzx,
@@ -1395,7 +1404,7 @@ impl Args {
     unsafe fn run_jr<MC: MemoryConfig, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<MC, M>,
-    ) -> Result<ProgramCounterUpdate, Exception> {
+    ) -> Result<ProgramCounterUpdate<Address>, Exception> {
         Ok(Set(core.hart.run_jr(self.rs1.nzx)))
     }
 
@@ -1404,7 +1413,7 @@ impl Args {
     unsafe fn run_jalr<MC: MemoryConfig, M: ManagerReadWrite>(
         &self,
         core: &mut MachineCoreState<MC, M>,
-    ) -> Result<ProgramCounterUpdate, Exception> {
+    ) -> Result<ProgramCounterUpdate<Address>, Exception> {
         Ok(Set(core.hart.run_jalr(
             self.rd.nzx,
             self.rs1.nzx,
@@ -1412,9 +1421,10 @@ impl Args {
         )))
     }
 
-    fn run_nop<I: ICB>(&self, icb: &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate> {
+    fn run_nop<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
         c::run_nop(icb);
-        icb.ok(Next(self.width))
+        let pcu = ProgramCounterUpdate::Next(self.width);
+        icb.ok(pcu)
     }
 
     // RV64C compressed instructions
@@ -1432,7 +1442,7 @@ impl Args {
     fn run_illegal<MC: MemoryConfig, M: ManagerBase>(
         &self,
         _core: &mut MachineCoreState<MC, M>,
-    ) -> Result<ProgramCounterUpdate, Exception> {
+    ) -> Result<ProgramCounterUpdate<Address>, Exception> {
         Err(Exception::IllegalInstruction)
     }
 }

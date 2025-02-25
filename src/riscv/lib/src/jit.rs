@@ -161,12 +161,17 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
                 (lower)(i.args(), &mut builder)
             };
 
-            let ProgramCounterUpdate::Next(width) = pc_update else {
-                todo!("RV-428: support jumps/branching instructions");
-            };
-
-            builder.pc_offset += width as u64;
             builder.steps += 1;
+            match pc_update {
+                ProgramCounterUpdate::Next(width) => {
+                    builder.pc_offset += width as u64;
+                }
+                ProgramCounterUpdate::Set(pc_val) => {
+                    builder.pc_offset = 0;
+                    builder.pc_val = pc_val;
+                    break;
+                }
+            }
         }
 
         builder.end();
@@ -271,7 +276,7 @@ mod tests {
         block_cache::bcall::{BCall, Block, BlockLayout, Interpreted, InterpretedBlockBuilder},
         memory::MemoryConfig,
     };
-    use crate::parser::instruction::InstrWidth::*;
+    use crate::parser::instruction::InstrWidth::{self, *};
     use crate::state_backend::test_helpers::assert_eq_struct;
     use crate::state_backend::{FnManagerIdent, ManagerRead};
     use crate::{backend_test, create_state};
@@ -681,6 +686,142 @@ mod tests {
                 jitted.hart.xregisters.read_nz(x1),
                 jitted.hart.xregisters.read_nz(x2)
             );
+
+            assert_eq_struct(
+                &interpreted.struct_ref::<FnManagerIdent>(),
+                &jitted.struct_ref::<FnManagerIdent>(),
+            );
+        }
+    });
+
+    struct Scenario {
+        initial_pc: u64,
+        expected_pc: u64,
+        instructions: Vec<Instruction>,
+    }
+
+    backend_test!(test_j, F, {
+        use Instruction as I;
+
+        use crate::machine_state::registers::NonZeroXRegister::*;
+
+        // recreate scenarios array but as a vec of scenario structs
+        let scenarios: Vec<Scenario> = vec![
+            // Jumping to the next instruction should exit the block
+            Scenario {
+                initial_pc: 0,
+                expected_pc: 6,
+                instructions: vec![
+                    I::new_nop(InstrWidth::Compressed),
+                    I::new_nop(InstrWidth::Compressed),
+                    I::new_j(2, InstrWidth::Compressed),
+                ],
+            },
+            // Jump past 0 - in both worlds we should wrap around.
+            Scenario {
+                initial_pc: 0,
+                expected_pc: u64::MAX - 3,
+                instructions: vec![
+                    I::new_nop(InstrWidth::Compressed),
+                    I::new_nop(InstrWidth::Compressed),
+                    I::new_j(-8, InstrWidth::Compressed),
+                ],
+            },
+            // Jump past u64::MAX - in both worlds we should wrap around.
+            Scenario {
+                initial_pc: (i64::MAX - 5) as u64,
+                expected_pc: 1,
+                instructions: vec![
+                    I::new_nop(InstrWidth::Uncompressed),
+                    I::new_nop(InstrWidth::Uncompressed),
+                    I::new_j(i64::MAX, InstrWidth::Uncompressed),
+                ],
+            },
+            // jump by nothing
+            Scenario {
+                initial_pc: 0,
+                expected_pc: 4,
+                instructions: vec![
+                    I::new_nop(InstrWidth::Compressed),
+                    I::new_nop(InstrWidth::Compressed),
+                    I::new_j(0, InstrWidth::Compressed),
+                ],
+            },
+            // jumping to start of the block should exit the block in both interpreted and jitted world
+            Scenario {
+                initial_pc: 0,
+                expected_pc: 0,
+                instructions: vec![
+                    I::new_nop(InstrWidth::Compressed),
+                    I::new_nop(InstrWidth::Compressed),
+                    I::new_j(-4, InstrWidth::Compressed),
+                ],
+            },
+        ];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            let mut interpreted =
+                create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut block = create_state!(Interpreted, BlockLayout, F, M4K);
+            let hash = super::Hash::blake2b_hash(&scenario.instructions).unwrap();
+
+            block.start_block();
+            for instr in scenario.instructions.iter() {
+                block.push_instr(*instr);
+            }
+
+            let mut interpreted_steps = 0;
+            let mut jitted_steps = 0;
+
+            interpreted.hart.pc.write(scenario.initial_pc);
+            jitted.hart.pc.write(scenario.initial_pc);
+
+            // Act
+            let fun = jit
+                .compile(&hash, instructions(&block).as_slice())
+                .expect("Compilation should succeed");
+
+            let interpreted_res = unsafe {
+                // SAFETY: interpreted blocks are always callable
+                block.callable(&mut interpreted_bb)
+            }
+            .unwrap()
+            .run_block(
+                &mut interpreted,
+                scenario.initial_pc,
+                &mut interpreted_steps,
+            );
+            let jitted_res = unsafe {
+                // # Safety - the jit is not dropped until after we
+                //            exit the for loop
+                fun.call(&mut jitted, scenario.initial_pc, &mut jitted_steps)
+            };
+
+            // Assert
+            assert_eq!(jitted_res, interpreted_res);
+            assert_eq!(
+                interpreted_steps, jitted_steps,
+                "Interpreted mode ran for {interpreted_steps}, compared to jit-mode of {jitted_steps}"
+            );
+
+            assert_eq!(interpreted_steps, scenario.instructions.len());
+
+            // every scenario expects x1 and x2 to be equal.
+            assert_eq!(
+                interpreted.hart.xregisters.read_nz(x1),
+                interpreted.hart.xregisters.read_nz(x2)
+            );
+            assert_eq!(
+                jitted.hart.xregisters.read_nz(x1),
+                jitted.hart.xregisters.read_nz(x2)
+            );
+
+            assert_eq!(interpreted.hart.pc.read(), scenario.expected_pc);
+            assert_eq!(jitted.hart.pc.read(), scenario.expected_pc);
 
             assert_eq_struct(
                 &interpreted.struct_ref::<FnManagerIdent>(),

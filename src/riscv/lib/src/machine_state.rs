@@ -110,9 +110,9 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M> + Clone, M: bac
 
 /// How to modify the program counter
 #[derive(Debug, PartialEq)]
-pub enum ProgramCounterUpdate {
+pub enum ProgramCounterUpdate<AddressRepr> {
     /// Jump to a fixed address
-    Set(Address),
+    Set(AddressRepr),
     /// Offset to the next instruction by current instruction width
     Next(InstrWidth),
 }
@@ -171,7 +171,7 @@ impl<MC: memory::MemoryConfig, M: backend::ManagerBase> MachineCoreState<MC, M> 
     fn handle_step_result(
         &mut self,
         instr_pc: Address,
-        result: Result<ProgramCounterUpdate, Exception>,
+        result: Result<ProgramCounterUpdate<Address>, Exception>,
     ) -> Result<Address, EnvironException>
     where
         M: backend::ManagerReadWrite,
@@ -227,7 +227,7 @@ impl<MC: memory::MemoryConfig, M: backend::ManagerBase> MachineCoreState<MC, M> 
     fn run_instr_cacheable(
         &mut self,
         instr: &InstrCacheable,
-    ) -> Result<ProgramCounterUpdate, Exception>
+    ) -> Result<ProgramCounterUpdate<Address>, Exception>
     where
         M: backend::ManagerReadWrite,
     {
@@ -392,7 +392,7 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::Ma
     fn run_instr_uncacheable(
         &mut self,
         instr: &InstrUncacheable,
-    ) -> Result<ProgramCounterUpdate, Exception>
+    ) -> Result<ProgramCounterUpdate<Address>, Exception>
     where
         M: backend::ManagerReadWrite,
     {
@@ -432,7 +432,7 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::Ma
     }
 
     /// Advance [`MachineState`] by executing an [`Instr`]
-    fn run_instr(&mut self, instr: &Instr) -> Result<ProgramCounterUpdate, Exception>
+    fn run_instr(&mut self, instr: &Instr) -> Result<ProgramCounterUpdate<Address>, Exception>
     where
         M: backend::ManagerReadWrite,
     {
@@ -449,7 +449,7 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::Ma
         satp: CSRRepr,
         instr_pc: Address,
         phys_addr: Address,
-    ) -> Result<ProgramCounterUpdate, Exception>
+    ) -> Result<ProgramCounterUpdate<Address>, Exception>
     where
         M: backend::ManagerReadWrite,
     {
@@ -716,11 +716,11 @@ mod tests {
 
     backend_test!(test_step, F, {
         let state = create_state!(
-            MachineState, 
-            MachineStateLayout<M4K, DefaultCacheLayouts>, 
-            F, 
-            M4K, 
-            DefaultCacheLayouts, 
+            MachineState,
+            MachineStateLayout<M4K, DefaultCacheLayouts>,
+            F,
+            M4K,
+            DefaultCacheLayouts,
             Interpreted<M4K, F::Manager>, || InterpretedBlockBuilder);
 
         let state_cell = std::cell::RefCell::new(state);
@@ -770,11 +770,11 @@ mod tests {
 
     backend_test!(test_step_env_exc, F, {
         let state = create_state!(
-            MachineState, 
-            MachineStateLayout<M4K, DefaultCacheLayouts>, 
-            F, 
-            M4K, 
-            DefaultCacheLayouts, 
+            MachineState,
+            MachineStateLayout<M4K, DefaultCacheLayouts>,
+            F,
+            M4K,
+            DefaultCacheLayouts,
             Interpreted<M4K, F::Manager>, || InterpretedBlockBuilder);
 
         let state_cell = std::cell::RefCell::new(state);
@@ -813,10 +813,10 @@ mod tests {
 
     backend_test!(test_step_exc_mm, F, {
         let state = create_state!(
-            MachineState, 
-            MachineStateLayout<M4K, DefaultCacheLayouts>, 
-            F, 
-            M4K, 
+            MachineState,
+            MachineStateLayout<M4K, DefaultCacheLayouts>,
+            F,
+            M4K,
             DefaultCacheLayouts, 
             Interpreted<M4K, F::Manager>, || InterpretedBlockBuilder);
 
@@ -1289,11 +1289,11 @@ mod tests {
     // Ensure that cloning the machine state does not result in a stack overflow
     backend_test!(test_machine_state_cloneable, F, {
         let state = create_state!(
-            MachineState, 
-            MachineStateLayout<M1M, DefaultCacheLayouts>, 
-            F, 
-            M1M, 
-            DefaultCacheLayouts, 
+            MachineState,
+            MachineStateLayout<M1M, DefaultCacheLayouts>,
+            F,
+            M1M,
+            DefaultCacheLayouts,
             Interpreted<M1M, F::Manager>, || InterpretedBlockBuilder);
 
         let second = state.clone();
@@ -1306,11 +1306,11 @@ mod tests {
 
     backend_test!(test_block_cache_crossing_pages_creates_new_block, F, {
         let mut state = create_state!(
-            MachineState, 
-            MachineStateLayout<M8K, DefaultCacheLayouts>, 
-            F, 
-            M8K, 
-            DefaultCacheLayouts, 
+            MachineState,
+            MachineStateLayout<M8K, DefaultCacheLayouts>,
+            F,
+            M8K,
+            DefaultCacheLayouts,
             Interpreted<M8K, F::Manager>, || InterpretedBlockBuilder);
 
         let uncompressed_bytes = 0x5307b3;
@@ -1468,11 +1468,11 @@ mod tests {
         let block_b_addr = phys_addr + 128;
 
         let mut state = create_state!(
-            MachineState, 
-            MachineStateLayout<M8K, DefaultCacheLayouts>, 
-            F, 
-            M8K, 
-            DefaultCacheLayouts, 
+            MachineState,
+            MachineStateLayout<M8K, DefaultCacheLayouts>,
+            F,
+            M8K,
+            DefaultCacheLayouts,
             Interpreted<M8K, F::Manager>, || InterpretedBlockBuilder);
 
         // Write the instructions to the beginning of the main memory and point the program
