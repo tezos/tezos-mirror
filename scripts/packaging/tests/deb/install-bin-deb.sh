@@ -6,6 +6,7 @@ set -x
 REPO="https://storage.googleapis.com/$GCP_LINUX_PACKAGES_BUCKET/$CI_COMMIT_REF_NAME"
 DISTRO=$1
 RELEASE=$2
+DATADIR=${3:-}
 
 # For the upgrade script in the CI, we do not want debconf to ask questions
 export DEBIAN_FRONTEND=noninteractive
@@ -43,6 +44,15 @@ EOF
 fi
 
 sudo apt-get install -y octez-baker
+
+if [ -n "$DATADIR" ]; then
+  echo "Setup Custom data dir"
+  usermod -m -d /custom tezos
+  if [ -e /var/tezos/.tezos-node ]; then
+    cp -a /var/tezos/.tezos-node /custom/
+  fi
+  echo "DATADIR=/custom/.tezos-node" >> /etc/default/octez-node
+fi
 
 sudo systemctl enable octez-node
 sudo systemctl start octez-node.service
