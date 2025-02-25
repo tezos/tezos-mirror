@@ -108,7 +108,7 @@ pub trait Block<MC: MemoryConfig, M: ManagerBase> {
         M: ManagerReadWrite;
 
     /// Returns the underlying slice of instructions stored in the block.
-    fn instr(&self) -> &[EnrichedCell<ICallPlaced<MC>, M>]
+    fn instr(&self) -> &[EnrichedCell<ICallPlaced<MC, M>, M>]
     where
         M: ManagerRead;
 
@@ -142,11 +142,11 @@ pub struct InterpretedBlockBuilder;
 ///
 /// [`ICall`]: super::ICall
 pub struct Interpreted<MC: MemoryConfig, M: ManagerBase> {
-    instr: [EnrichedCell<ICallPlaced<MC>, M>; CACHE_INSTR],
+    instr: [EnrichedCell<ICallPlaced<MC, M>, M>; CACHE_INSTR],
     len_instr: Cell<u8, M>,
 }
 
-impl<MC: MemoryConfig, M: ManagerBase> BCall<MC, M> for [EnrichedCell<ICallPlaced<MC>, M>] {
+impl<MC: MemoryConfig, M: ManagerBase> BCall<MC, M> for [EnrichedCell<ICallPlaced<MC, M>, M>] {
     #[inline]
     fn num_instr(&self) -> usize
     where
@@ -193,7 +193,7 @@ impl<MC: MemoryConfig, M: ManagerBase> Block<MC, M> for Interpreted<MC, M> {
     }
 
     #[inline]
-    fn instr(&self) -> &[EnrichedCell<ICallPlaced<MC>, M>]
+    fn instr(&self) -> &[EnrichedCell<ICallPlaced<MC, M>, M>]
     where
         M: ManagerRead,
     {
@@ -325,7 +325,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
         self.fallback.push_instr(instr)
     }
 
-    fn instr(&self) -> &[EnrichedCell<ICallPlaced<MC>, M>]
+    fn instr(&self) -> &[EnrichedCell<ICallPlaced<MC, M>, M>]
     where
         M: ManagerRead,
     {
@@ -420,7 +420,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> BCall<MC, M> for InlineJit<MC, M> {
 }
 
 fn run_block_inner<MC: MemoryConfig, M: ManagerReadWrite>(
-    instr: &[EnrichedCell<ICallPlaced<MC>, M>],
+    instr: &[EnrichedCell<ICallPlaced<MC, M>, M>],
     core: &mut MachineCoreState<MC, M>,
     instr_pc: &mut Address,
     steps: &mut usize,

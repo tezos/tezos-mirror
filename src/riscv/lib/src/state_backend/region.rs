@@ -25,7 +25,7 @@ impl<V: EnrichedValue, M: ManagerBase> EnrichedCell<V, M> {
     /// Bind this state to the enriched cell.
     pub fn bind(cell: Cell<V::E, M>) -> Self
     where
-        V: EnrichedValueLinked<M::ManagerRoot>,
+        V: EnrichedValueLinked,
     {
         let region = cell.into_region();
         let cell = M::enrich_cell(region);
@@ -52,7 +52,7 @@ impl<V: EnrichedValue, M: ManagerBase> EnrichedCell<V, M> {
     pub fn write(&mut self, value: V::E)
     where
         M: ManagerWrite,
-        V: EnrichedValueLinked<M>,
+        V: EnrichedValueLinked,
     {
         M::enriched_cell_write(&mut self.cell, value)
     }
@@ -67,11 +67,11 @@ impl<V: EnrichedValue, M: ManagerBase> EnrichedCell<V, M> {
     }
 
     /// Read the derived value from the enriched cell.
-    pub fn read_derived(&self) -> V::D<M::ManagerRoot>
+    pub fn read_derived(&self) -> V::D
     where
         M: ManagerRead,
-        V: EnrichedValueLinked<M::ManagerRoot>,
-        V::D<M::ManagerRoot>: Copy,
+        V: EnrichedValueLinked,
+        V::D: Copy,
     {
         M::enriched_cell_read_derived(&self.cell)
     }
@@ -88,7 +88,7 @@ impl<V: EnrichedValue, M: ManagerBase> EnrichedCell<V, M> {
 impl<V: EnrichedValue, M: ManagerClone> Clone for EnrichedCell<V, M>
 where
     V::E: Copy,
-    V::D<M>: Copy,
+    V::D: Copy,
 {
     fn clone(&self) -> Self {
         Self {
@@ -99,7 +99,7 @@ where
 
 impl<V, M: ManagerRead> PartialEq for EnrichedCell<V, M>
 where
-    V: EnrichedValueLinked<M::ManagerRoot>,
+    V: EnrichedValueLinked,
     V::E: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -435,7 +435,7 @@ impl<'de, E: serde::Deserialize<'de>, const LEN: usize, M: ManagerDeserialise>
 
 impl<'de, V, M: ManagerDeserialise> serde::Deserialize<'de> for EnrichedCell<V, M>
 where
-    V: EnrichedValueLinked<M::ManagerRoot>,
+    V: EnrichedValueLinked,
     V::E: serde::Deserialize<'de>,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>

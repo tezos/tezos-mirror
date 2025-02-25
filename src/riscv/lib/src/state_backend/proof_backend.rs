@@ -46,7 +46,7 @@ impl<M: ManagerBase> ManagerBase for ProofGen<M> {
 
     type ManagerRoot = Self;
 
-    fn enrich_cell<V: EnrichedValueLinked<Self>>(
+    fn enrich_cell<V: EnrichedValueLinked>(
         underlying: Self::Region<V::E, 1>,
     ) -> Self::EnrichedCell<V> {
         ProofEnrichedCell { underlying }
@@ -110,10 +110,10 @@ impl<M: ManagerRead> ManagerRead for ProofGen<M> {
         Self::region_read(&cell.underlying, 0)
     }
 
-    fn enriched_cell_read_derived<V>(cell: &Self::EnrichedCell<V>) -> V::D<Self::ManagerRoot>
+    fn enriched_cell_read_derived<V>(cell: &Self::EnrichedCell<V>) -> V::D
     where
-        V: EnrichedValueLinked<Self::ManagerRoot>,
-        V::D<Self::ManagerRoot>: Copy,
+        V: EnrichedValueLinked,
+        V::D: Copy,
     {
         V::derive(Self::enriched_cell_ref_stored(cell))
     }
@@ -182,7 +182,7 @@ impl<M: ManagerBase> ManagerWrite for ProofGen<M> {
 
     fn enriched_cell_write<V>(cell: &mut Self::EnrichedCell<V>, value: V::E)
     where
-        V: EnrichedValueLinked<Self>,
+        V: EnrichedValueLinked,
     {
         Self::region_write(&mut cell.underlying, 0, value);
     }
@@ -679,7 +679,7 @@ mod tests {
 
         impl EnrichedValue for Enriching {
             type E = u64;
-            type D<M: ManagerBase + ?Sized> = T;
+            type D = T;
         }
 
         #[derive(Clone, Copy, Debug, PartialEq)]

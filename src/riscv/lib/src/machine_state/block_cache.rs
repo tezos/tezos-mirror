@@ -111,14 +111,15 @@ const PAGE_OFFSET_MASK: usize = (1 << PAGE_OFFSET_WIDTH) - 1;
 pub const CACHE_INSTR: usize = 20;
 
 /// Bindings for deriving an [`ICall`] from an [`Instruction`] via the [`EnrichedCell`] mechanism.
-pub struct ICallPlaced<MC: MemoryConfig> {
-    _pd: PhantomData<MC>,
+pub struct ICallPlaced<MC: MemoryConfig, M: ManagerBase> {
+    _pd0: PhantomData<MC>,
+    _pd1: PhantomData<M>,
 }
 
-impl<MC: MemoryConfig> EnrichedValue for ICallPlaced<MC> {
+impl<MC: MemoryConfig, M: ManagerBase> EnrichedValue for ICallPlaced<MC, M> {
     type E = Instruction;
 
-    type D<M: ManagerBase> = ICall<MC, M>;
+    type D = ICall<MC, M::ManagerRoot>;
 }
 
 /// A function derived from an [OpCode] that can be directly run over the [MachineCoreState].
@@ -837,7 +838,7 @@ impl<BCL: BlockCacheLayout, B: Block<MC, M> + Clone, MC: MemoryConfig, M: Manage
 
 #[inline(always)]
 fn run_instr<MC: MemoryConfig, M: ManagerReadWrite>(
-    instr: &EnrichedCell<ICallPlaced<MC>, M>,
+    instr: &EnrichedCell<ICallPlaced<MC, M>, M>,
     core: &mut MachineCoreState<MC, M>,
 ) -> Result<ProgramCounterUpdate, Exception> {
     let args = instr.read_ref_stored().args();
