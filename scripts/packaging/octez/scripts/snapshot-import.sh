@@ -13,7 +13,11 @@ fi
 NETWORK=mainnet
 HISTORY_MODE=rolling
 SNAPSHOT_NO_CHECK=""
-DATADIR=/var/tezos/.tezos-node
+
+if [ -e /etc/default/octez-node ]; then
+  #shellcheck disable=SC1091
+  . /etc/default/octez-node
+fi
 
 # Function to display help message
 display_help() {
@@ -62,7 +66,7 @@ trap 'rm -f /tmp/$HISTORY_MODE' EXIT
 # We simply check if the config file exist. But we don't
 # try to update the octez node configuration. Trying to
 # do anything automatically might lead to data loss.
-if [ ! -e $DATADIR/config.json ]; then
+if [ ! -e "$DATADIR/config.json" ]; then
   echo "Init node in $DATADIR"
   /usr/bin/octez-node config init --data-dir="$DATADIR" \
     --network="$NETWORK" \

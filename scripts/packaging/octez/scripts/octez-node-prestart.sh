@@ -12,7 +12,10 @@ if [ "$(whoami)" != "tezos" ]; then
   exit 1
 fi
 
-DATADIR=/var/tezos/.tezos-node
+if [ -e /etc/default/octez-node ]; then
+  #shellcheck disable=SC1091
+  . /etc/default/octez-node
+fi
 
 # Function to get a Debconf value
 get_value() {
