@@ -132,6 +132,7 @@ _evm_unstripped_installer_preimages/
 /etherlink/kernels-*
 etherlink-governance-observer
 floodgate
+etherlink-outbox-monitor
 
 # Terraform
 
