@@ -117,10 +117,12 @@ let get_all_plugins ctxt = Proto_plugins.to_list ctxt.proto_plugins
 
 let set_proto_plugins ctxt proto_plugins = ctxt.proto_plugins <- proto_plugins
 
-let get_proto_parameters ?level ctxt =
+let get_proto_parameters ~level ctxt =
   let open Result_syntax in
   let level =
-    match level with None -> ctxt.last_finalized_level | Some level -> level
+    match level with
+    | `Last_proto -> ctxt.last_finalized_level
+    | `Level level -> level
   in
   let* _plugin, parameters = get_plugin_and_parameters_for_level ctxt ~level in
   return parameters

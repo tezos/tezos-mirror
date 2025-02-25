@@ -401,7 +401,9 @@ let get_slot_shard (store : Store.t) (slot_id : Types.slot_id) shard_index =
 let get_slot_pages ~reconstruct_if_missing node_context slot_id =
   let open Lwt_result_syntax in
   let* proto_parameters =
-    Node_context.get_proto_parameters node_context
+    Node_context.get_proto_parameters
+      node_context
+      ~level:(`Level slot_id.Types.Slot_id.slot_level)
     |> Lwt.return
     |> lwt_map_error (fun e -> `Other e)
   in
