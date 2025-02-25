@@ -1,4 +1,4 @@
-Version 21.3
+Version 21.4
 ============
 
 Version 21 contains a new version (V13) of the protocol environment.
@@ -145,14 +145,14 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout octez-v21.3
+  git checkout octez-v21.4
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v21.3`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v21.`` Docker images of Octez.
 
 You can also install Octez using Opam by running ``opam install octez``.
 
@@ -168,6 +168,7 @@ Check :ref:`the documentation <new_packages>` for more details.
 Changelog
 ---------
 
+- `Version 21.4 <../CHANGES.html#version-21-4>`_
 - `Version 21.3 <../CHANGES.html#version-21-3>`_
 - `Version 21.2 <../CHANGES.html#version-21-2>`_
 - `Version 21.1 <../CHANGES.html#version-21-1>`_

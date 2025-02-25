@@ -3,59 +3,33 @@
   "info": {
     "title": "Octez DAL Node RPC",
     "description": "The RPC API for the Octez DAL node.",
-    "version": "Octez 21.3 (73082775)"
+    "version": "Octez 21.4 (b8278e10)"
   },
   "paths": {
-    "/health": {
-      "get": {
-        "description": "Performs health checks on the DAL node, evaluating key components of the DAL node. Returns a health status indicating whether the DAL node is 'Up', 'Down', or 'Degraded' based on the results of these checks.",
+    "/commitments": {
+      "post": {
+        "description": "Add a slot in the node's context if not already present. The corresponding commitment is returned.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string",
+                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "degraded",
-                        "up",
-                        "ko",
-                        "ok",
-                        "down"
-                      ]
-                    },
-                    "checks": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "name": {
-                            "$ref": "#/components/schemas/unistring"
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "degraded",
-                              "up",
-                              "ko",
-                              "ok",
-                              "down"
-                            ]
-                          }
-                        },
-                        "required": [
-                          "name",
-                          "status"
-                        ]
-                      }
+                  "title": "Commitment representation for the DAL (Base58Check-encoded)",
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/unistring"
                     }
-                  },
-                  "required": [
-                    "status",
-                    "checks"
                   ]
                 }
               }
@@ -66,7 +40,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -116,7 +90,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -126,7 +100,7 @@
     },
     "/levels/{int32}/slots/{int}/content": {
       "get": {
-        "description": "Retrieve the content of the slot associated with the given commitment.",
+        "description": "Retrieve the content of the slot whose id is given.",
         "parameters": [
           {
             "name": "int32",
@@ -162,7 +136,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -211,7 +185,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -261,7 +235,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -322,7 +296,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -389,7 +363,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -439,7 +413,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -483,7 +457,19 @@
                           "type": "object",
                           "properties": {
                             "peer": {
-                              "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                              "type": "object",
+                              "properties": {
+                                "peer_id": {
+                                  "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                                },
+                                "maybe_reachable_point": {
+                                  "$ref": "#/components/schemas/p2p_point.id"
+                                }
+                              },
+                              "required": [
+                                "peer_id",
+                                "maybe_reachable_point"
+                              ]
                             },
                             "backoff": {
                               "$ref": "#/components/schemas/timestamp.system"
@@ -510,7 +496,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -532,7 +518,19 @@
                     "type": "object",
                     "properties": {
                       "peer": {
-                        "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        "type": "object",
+                        "properties": {
+                          "peer_id": {
+                            "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                          },
+                          "maybe_reachable_point": {
+                            "$ref": "#/components/schemas/p2p_point.id"
+                          }
+                        },
+                        "required": [
+                          "peer_id",
+                          "maybe_reachable_point"
+                        ]
                       },
                       "connection": {
                         "type": "object",
@@ -589,7 +587,153 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/gossipsub/fanout": {
+      "get": {
+        "description": "Returns the fanout peers per topic alongside the last publication time on the topic.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "topic": {
+                        "type": "object",
+                        "properties": {
+                          "slot_index": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                          },
+                          "pkh": {
+                            "$ref": "#/components/schemas/Signature.Public_key_hash"
+                          }
+                        },
+                        "required": [
+                          "slot_index",
+                          "pkh"
+                        ]
+                      },
+                      "peers": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "peer_id": {
+                              "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                            },
+                            "maybe_reachable_point": {
+                              "$ref": "#/components/schemas/p2p_point.id"
+                            }
+                          },
+                          "required": [
+                            "peer_id",
+                            "maybe_reachable_point"
+                          ]
+                        }
+                      },
+                      "last_publication_time": {
+                        "$ref": "#/components/schemas/timestamp.system"
+                      }
+                    },
+                    "required": [
+                      "topic",
+                      "peers",
+                      "last_publication_time"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/gossipsub/mesh": {
+      "get": {
+        "description": "Get the mesh of the peer. Concretely, the RPC returns a list of topics, where each topic is associated to the remote peers with which the current node shares a full connection (on that topic).",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "topic": {
+                        "type": "object",
+                        "properties": {
+                          "slot_index": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                          },
+                          "pkh": {
+                            "$ref": "#/components/schemas/Signature.Public_key_hash"
+                          }
+                        },
+                        "required": [
+                          "slot_index",
+                          "pkh"
+                        ]
+                      },
+                      "peers": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "peer_id": {
+                              "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                            },
+                            "maybe_reachable_point": {
+                              "$ref": "#/components/schemas/p2p_point.id"
+                            }
+                          },
+                          "required": [
+                            "peer_id",
+                            "maybe_reachable_point"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "topic",
+                      "peers"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -662,7 +806,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -699,7 +843,19 @@
                       "peers": {
                         "type": "array",
                         "items": {
-                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                          "type": "object",
+                          "properties": {
+                            "peer_id": {
+                              "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                            },
+                            "maybe_reachable_point": {
+                              "$ref": "#/components/schemas/p2p_point.id"
+                            }
+                          },
+                          "required": [
+                            "peer_id",
+                            "maybe_reachable_point"
+                          ]
                         }
                       }
                     },
@@ -717,7 +873,49 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/gossipsub/reconnection_delays": {
+      "get": {
+        "description": "For each unreachable point, retrieve the time remaining until the next reconnection attempt.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "point": {
+                        "$ref": "#/components/schemas/p2p_point.id"
+                      },
+                      "delay": {
+                        "$ref": "#/components/schemas/unistring"
+                      }
+                    },
+                    "required": [
+                      "point",
+                      "delay"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -739,7 +937,19 @@
                     "type": "object",
                     "properties": {
                       "peer": {
-                        "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        "type": "object",
+                        "properties": {
+                          "peer_id": {
+                            "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                          },
+                          "maybe_reachable_point": {
+                            "$ref": "#/components/schemas/p2p_point.id"
+                          }
+                        },
+                        "required": [
+                          "peer_id",
+                          "maybe_reachable_point"
+                        ]
                       },
                       "score": {
                         "type": "number"
@@ -759,7 +969,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -798,7 +1008,19 @@
                       "peers": {
                         "type": "array",
                         "items": {
-                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                          "type": "object",
+                          "properties": {
+                            "peer_id": {
+                              "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                            },
+                            "maybe_reachable_point": {
+                              "$ref": "#/components/schemas/p2p_point.id"
+                            }
+                          },
+                          "required": [
+                            "peer_id",
+                            "maybe_reachable_point"
+                          ]
                         }
                       }
                     },
@@ -816,7 +1038,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -860,7 +1082,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -911,7 +1133,19 @@
                       "peers": {
                         "type": "array",
                         "items": {
-                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                          "type": "object",
+                          "properties": {
+                            "peer_id": {
+                              "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                            },
+                            "maybe_reachable_point": {
+                              "$ref": "#/components/schemas/p2p_point.id"
+                            }
+                          },
+                          "required": [
+                            "peer_id",
+                            "maybe_reachable_point"
+                          ]
                         }
                       }
                     },
@@ -929,7 +1163,55 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/peers": {
+      "get": {
+        "description": "By default, get the list of known peers. When the 'connected' flag is given, then only get the connected peers.",
+        "parameters": [
+          {
+            "name": "connected",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "peer": {
+                        "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                      }
+                    },
+                    "required": [
+                      "peer"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1097,7 +1379,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1282,7 +1564,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1326,7 +1608,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1357,7 +1639,7 @@
                   "items": {
                     "type": "object",
                     "properties": {
-                      "point": {
+                      "peer": {
                         "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
                       },
                       "info": {
@@ -1487,7 +1769,7 @@
                       }
                     },
                     "required": [
-                      "point",
+                      "peer",
                       "info"
                     ]
                   }
@@ -1500,55 +1782,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/p2p/peers/list": {
-      "get": {
-        "description": "By default, get the list of known peers. When the 'connected' flag is given, then only get the connected peers.",
-        "parameters": [
-          {
-            "name": "connected",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "peer": {
-                        "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                      }
-                    },
-                    "required": [
-                      "peer"
-                    ]
-                  }
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1596,7 +1830,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1642,7 +1876,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1686,7 +1920,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1738,7 +1972,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1918,7 +2152,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2053,7 +2287,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2104,7 +2338,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2194,7 +2428,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2204,10 +2438,18 @@
     },
     "/slots": {
       "post": {
-        "description": "Post a slot to the DAL node, computes its commitment and commitment proof, then computes the correspoding shards with their proof. The result of this RPC can be directly used to publish a slot header.",
+        "description": "Post a slot to the DAL node, computes its commitment and commitment proof, then computes the correspoding shards with their proof. The result of this RPC can be directly used to publish a slot header. If the sent data is smaller than the size of a DAL slot, it is padded with the character provided as padding query parameter (defaults to \\000). If the slot_index query parameter is provided, the DAL node checks that its profile allows to publish data on the given slot index.",
         "parameters": [
           {
             "name": "padding",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slot_index",
             "in": "query",
             "required": true,
             "schema": {
@@ -2275,7 +2517,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2326,7 +2568,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
