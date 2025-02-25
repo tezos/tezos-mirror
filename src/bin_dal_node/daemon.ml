@@ -427,7 +427,7 @@ module Handler = struct
             (Lwt.return
             @@ Node_context.get_proto_parameters
                  ctxt
-                 ~level:pred_published_level))
+                 ~level:(`Level pred_published_level)))
     in
     let cells_of_level =
       List.map
@@ -772,7 +772,7 @@ module Handler = struct
               ~block_level:level
           in
           let*? proto_parameters =
-            Node_context.get_proto_parameters ctxt ~level
+            Node_context.get_proto_parameters ctxt ~level:(`Level level)
           in
           (* At each potential published_level [level], we prefetch the
              committee for its corresponding attestation_level (that is:
@@ -1159,7 +1159,9 @@ let update_and_register_profiles ctxt =
   let open Lwt_result_syntax in
   let profile_ctxt = Node_context.get_profile_ctxt ctxt in
   let gs_worker = Node_context.get_gs_worker ctxt in
-  let*? proto_parameters = Node_context.get_proto_parameters ctxt in
+  let*? proto_parameters =
+    Node_context.get_proto_parameters ctxt ~level:`Last_proto
+  in
   let profile_ctxt =
     Profile_manager.register_profile
       profile_ctxt
@@ -1226,7 +1228,9 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
     let* block_info =
       Plugin.block_info cctxt ~block:(`Level level) ~metadata:`Always
     in
-    let*? dal_constants = Node_context.get_proto_parameters ctxt ~level in
+    let*? dal_constants =
+      Node_context.get_proto_parameters ctxt ~level:(`Level level)
+    in
     Handler.store_skip_list_cells
       ctxt
       cctxt

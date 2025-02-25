@@ -188,7 +188,7 @@ module Slots_handlers = struct
                 | None | Some _ -> return_unit
               in
               let* proto_parameters =
-                Node_context.get_proto_parameters ctxt
+                Node_context.get_proto_parameters ctxt ~level:`Last_proto
                 |> Lwt.return
                 |> lwt_map_error (fun e -> `Other e)
               in
@@ -275,7 +275,8 @@ module Node = struct
     |> Store.last_processed_level |> Store.Last_processed_level.load
 
   let get_protocol_parameters ctxt level () =
-    Node_context.get_proto_parameters ?level ctxt |> Lwt.return
+    let level = match level with None -> `Last_proto | Some l -> `Level l in
+    Node_context.get_proto_parameters ~level ctxt |> Lwt.return
 end
 
 module Profile_handlers = struct
@@ -288,7 +289,7 @@ module Profile_handlers = struct
           |> lwt_map_error (fun e -> `Other e)
         in
         let* proto_parameters =
-          Node_context.get_proto_parameters ctxt
+          Node_context.get_proto_parameters ctxt ~level:`Last_proto
           |> Lwt.return
           |> lwt_map_error (fun e -> `Other e)
         in
@@ -471,7 +472,9 @@ module Profile_handlers = struct
              level may be in the future and we may not have the plugin for
              it. *)
           let* proto_parameters =
-            Node_context.get_proto_parameters ctxt ~level:published_level
+            Node_context.get_proto_parameters
+              ctxt
+              ~level:(`Level published_level)
             |> Lwt.return
             |> lwt_map_error (fun e -> `Other e)
           in
@@ -497,7 +500,9 @@ module Profile_handlers = struct
             List.map_es number_of_shards_stored all_slot_indexes
           in
           let* published_level_parameters =
-            Node_context.get_proto_parameters ctxt ~level:published_level
+            Node_context.get_proto_parameters
+              ctxt
+              ~level:(`Level published_level)
             |> Lwt.return
             |> lwt_map_error (fun e -> `Other e)
           in
@@ -544,7 +549,7 @@ module Profile_handlers = struct
           |> Errors.other_lwt_result
         in
         let* proto_parameters =
-          Node_context.get_proto_parameters ctxt
+          Node_context.get_proto_parameters ctxt ~level:`Last_proto
           |> Lwt.return
           |> lwt_map_error (fun e -> `Other e)
         in

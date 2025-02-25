@@ -80,12 +80,13 @@ val may_add_plugin :
 (** Set the protocol plugins to the given value. *)
 val set_proto_plugins : t -> Proto_plugins.t -> unit
 
-(** [get_proto_parameters ?level ctxt] returns the DAL node's protocol
-    parameters. When [level] is not provided, it returns the last known
-    parameters. If [level] is provided, then the protocol parameters for that
-    level are returned. The parameters returned are obtained via
+(** [get_proto_parameters ~level ctxt] returns the DAL node's protocol
+    parameters. When [level] is [`Last_proto], it returns the last known
+    parameters. If [level] is [`Level level], then the protocol parameters for
+    that level are returned. The parameters returned are obtained via
     {!get_plugin_and_parameters_for_level}. *)
-val get_proto_parameters : ?level:int32 -> t -> Types.proto_parameters tzresult
+val get_proto_parameters :
+  level:[`Last_proto | `Level of int32] -> t -> Types.proto_parameters tzresult
 
 (** Reconstruct the given slot id by calling the [reconstruct]
     function unless a reconstruction for the given slot id is alredy
