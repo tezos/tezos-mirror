@@ -194,9 +194,7 @@ let fetch_committee ctxt ~level =
   match Committee_cache.find cache ~level with
   | Some committee -> return committee
   | None ->
-      let*? (module Plugin) =
-        Proto_plugins.get_plugin_for_level ctxt.proto_plugins ~level
-      in
+      let*? (module Plugin) = get_plugin_for_level ctxt ~level in
       let+ committee = Plugin.get_committee cctxt ~level in
       Committee_cache.add cache ~level ~committee ;
       committee
