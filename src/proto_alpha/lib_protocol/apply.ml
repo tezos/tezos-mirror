@@ -3019,13 +3019,6 @@ let begin_application ctxt chain_id ~migration_balance_updates
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~per_block_vote
   in
-  let* ctxt, _adaptive_issuance_launch_cycle, _adaptive_issuance_vote_ema =
-    let adaptive_issuance_vote =
-      block_header.Block_header.protocol_data.contents.per_block_votes
-        .adaptive_issuance_vote
-    in
-    Adaptive_issuance.update_ema ctxt ~vote:adaptive_issuance_vote
-  in
   let* ctxt =
     Sc_rollup.Inbox.add_level_info
       ~predecessor:block_header.shell.predecessor
@@ -3087,12 +3080,6 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~per_block_vote
   in
-  let* ctxt, _adaptive_issuance_launch_cycle, _adaptive_issuance_vote_ema =
-    let adaptive_issuance_vote =
-      block_data_contents.per_block_votes.adaptive_issuance_vote
-    in
-    Adaptive_issuance.update_ema ctxt ~vote:adaptive_issuance_vote
-  in
   let* ctxt =
     Sc_rollup.Inbox.add_level_info ~predecessor:predecessor_hash ctxt
   in
@@ -3129,10 +3116,6 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
   let per_block_vote = Per_block_votes.Per_block_vote_pass in
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~per_block_vote
-  in
-  let* ctxt, _adaptive_issuance_launch_cycle, _adaptive_issuance_vote_ema =
-    let adaptive_issuance_vote = Per_block_votes.Per_block_vote_pass in
-    Adaptive_issuance.update_ema ctxt ~vote:adaptive_issuance_vote
   in
   let* ctxt =
     (* The mode [Partial_construction] is used in simulation. We try to

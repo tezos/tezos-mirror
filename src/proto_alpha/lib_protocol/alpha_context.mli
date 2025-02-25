@@ -5519,13 +5519,6 @@ end
 
 (** This module re-exports definitions from {!Adaptive_issuance_storage}. *)
 module Adaptive_issuance : sig
-  val update_ema :
-    context ->
-    vote:Per_block_votes.per_block_vote ->
-    (context * Cycle.t option * Per_block_votes.Adaptive_issuance_launch_EMA.t)
-    tzresult
-    Lwt.t
-
   val launch_cycle : context -> Cycle.t option tzresult Lwt.t
 end
 

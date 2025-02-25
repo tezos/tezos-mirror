@@ -50,16 +50,6 @@ val update_stored_rewards_at_cycle_end :
     launch cycle are already set in the context. *)
 val init_from_genesis : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
-(** [update_ema ctxt ~vote] returns the new context with the new EMA *)
-val update_ema :
-  Raw_context.t ->
-  vote:Per_block_votes_repr.per_block_vote ->
-  (Raw_context.t
-  * Cycle_repr.t option
-  * Per_block_votes_repr.Adaptive_issuance_launch_EMA.t)
-  tzresult
-  Lwt.t
-
 (** [launch_cycle ctxt] reads from the context the cycle at which
     the adaptive issuance feature is set to activate.
 

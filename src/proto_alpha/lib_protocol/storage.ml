@@ -1826,13 +1826,6 @@ module Liquidity_baking = struct
 end
 
 module Adaptive_issuance = struct
-  module Launch_ema =
-    Make_single_data_storage (Registered) (Raw_context)
-      (struct
-        let name = ["adaptive_issuance_ema"]
-      end)
-      (Encoding.Int32)
-
   module Activation =
     Make_single_data_storage (Registered) (Raw_context)
       (struct

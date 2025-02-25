@@ -808,12 +808,6 @@ module Liquidity_baking : sig
 end
 
 module Adaptive_issuance : sig
-  (** Exponential moving average (ema) of votes set in the block header
-      protocol_data.contents. Once the feature is activated, it can no
-      longer be deactivated without a protocol amendment. **)
-  module Launch_ema :
-    Single_data_storage with type t := Raw_context.t and type value = Int32.t
-
   (** Cycle [Some c] from which adaptive issuance is (or will be)
      active, or [None] if the feature is not yet planned to activate. **)
   module Activation :

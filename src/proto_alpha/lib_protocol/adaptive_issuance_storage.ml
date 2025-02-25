@@ -373,7 +373,6 @@ let load_reward_coeff ctxt =
 
 let init_from_genesis ctxt =
   let open Lwt_result_syntax in
-  let* ctxt = Storage.Adaptive_issuance.Launch_ema.init ctxt 0l in
   let current_cycle = (Level_storage.current ctxt).cycle in
   assert (Int32.equal (Cycle_repr.to_int32 current_cycle) 0l) ;
   let* ctxt =
@@ -394,25 +393,6 @@ let init_from_genesis ctxt =
       Misc.(0 --> Constants_storage.issuance_modification_delay ctxt)
   in
   return ctxt
-
-let update_ema ctxt ~vote =
-  let open Lwt_result_syntax in
-  let* old_ema = Storage.Adaptive_issuance.Launch_ema.get ctxt in
-  let* old_ema =
-    Per_block_votes_repr.Adaptive_issuance_launch_EMA.of_int32 old_ema
-  in
-  let new_ema =
-    Per_block_votes_repr.compute_new_adaptive_issuance_ema
-      ~per_block_vote:vote
-      old_ema
-  in
-  let* ctxt =
-    Storage.Adaptive_issuance.Launch_ema.update
-      ctxt
-      (Per_block_votes_repr.Adaptive_issuance_launch_EMA.to_int32 new_ema)
-  in
-  let* launch_cycle = launch_cycle ctxt in
-  return (ctxt, launch_cycle, new_ema)
 
 module For_RPC = struct
   let get_reward_coeff = get_reward_coeff
