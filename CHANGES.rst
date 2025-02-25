@@ -342,6 +342,9 @@ DAL node
 - Added a new RPC ``GET /p2p/gossipsub/fanout/`` that returns the GossipSub
   fanout of a peer. (MR :gl:`!16764`)
 
+- Increased the retention period of shards for bakers from 16 levels to 150 levels. (MR
+  :gl:`!16869`)
+
 Protocol
 ~~~~~~~~
 
