@@ -11,7 +11,7 @@ use crate::{
     machine_state::{
         MachineCoreState, ProgramCounterUpdate,
         hart_state::HartState,
-        main_memory::{Address, MainMemoryLayout},
+        memory::{self, Address},
         registers::{NonZeroXRegister, XRegister, sp},
     },
     parser::instruction::InstrWidth,
@@ -115,9 +115,9 @@ where
     }
 }
 
-impl<ML, M> MachineCoreState<ML, M>
+impl<MC, M> MachineCoreState<MC, M>
 where
-    ML: MainMemoryLayout,
+    MC: memory::MemoryConfig,
     M: backend::ManagerReadWrite,
 {
     /// `C.LW` CL-type compressed instruction
@@ -179,7 +179,7 @@ mod tests {
         machine_state::{
             MachineCoreState, MachineCoreStateLayout, ProgramCounterUpdate,
             hart_state::{HartState, HartStateLayout},
-            main_memory::tests::T1K,
+            memory::M1K,
             registers::{
                 nz::{self, a0},
                 t1,
@@ -197,7 +197,7 @@ mod tests {
             (u64::MAX - 1, 100, 98_i64 as u64),
         ];
         for (init_pc, imm, res_pc) in test_case {
-            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
 
             state.hart.pc.write(init_pc);
             let new_pc = state.hart.run_j(imm);

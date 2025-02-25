@@ -14,11 +14,7 @@ use super::linux;
 use super::reveals::{RevealRequest, RevealRequestLayout};
 use crate::{
     default::ConstDefault,
-    machine_state::{
-        self,
-        block_cache::bcall,
-        main_memory::{self},
-    },
+    machine_state::{self, block_cache::bcall, memory},
     pvm::sbi,
     state_backend::{
         self, Atom, Cell,
@@ -64,9 +60,9 @@ impl<'a> Default for PvmHooks<'a> {
 
 /// PVM state layout
 #[cfg(feature = "supervisor")]
-pub type PvmLayout<ML, CL> = (
+pub type PvmLayout<MC, CL> = (
     state_backend::Atom<u64>,
-    machine_state::MachineStateLayout<ML, CL>,
+    machine_state::MachineStateLayout<MC, CL>,
     Atom<PvmStatus>,
     RevealRequestLayout,
     linux::SupervisorStateLayout,
@@ -74,9 +70,9 @@ pub type PvmLayout<ML, CL> = (
 
 /// PVM state layout
 #[cfg(not(feature = "supervisor"))]
-pub type PvmLayout<ML, CL> = (
+pub type PvmLayout<MC, CL> = (
     state_backend::Atom<u64>,
-    machine_state::MachineStateLayout<ML, CL>,
+    machine_state::MachineStateLayout<MC, CL>,
     Atom<PvmStatus>,
     RevealRequestLayout,
 );
@@ -124,21 +120,21 @@ const INITIAL_VERSION: u64 = 0;
 /// Proof generator for the PVM.
 ///
 /// Uses the interpreted block backend by default.
-type PvmProofGen<'a, ML, CL, M> = Pvm<
-    ML,
+type PvmProofGen<'a, MC, CL, M> = Pvm<
+    MC,
     CL,
-    bcall::Interpreted<ML, ProofGen<state_backend::Ref<'a, M>>>,
+    bcall::Interpreted<MC, ProofGen<state_backend::Ref<'a, M>>>,
     ProofGen<state_backend::Ref<'a, M>>,
 >;
 
 /// Proof-generating virtual machine
 pub struct Pvm<
-    ML: main_memory::MainMemoryLayout,
+    MC: memory::MemoryConfig,
     CL: machine_state::CacheLayouts,
-    B: bcall::Block<ML, M>,
+    B: bcall::Block<MC, M>,
     M: state_backend::ManagerBase,
 > {
-    pub(crate) machine_state: machine_state::MachineState<ML, CL, B, M>,
+    pub(crate) machine_state: machine_state::MachineState<MC, CL, B, M>,
     reveal_request: RevealRequest<M>,
     #[cfg(feature = "supervisor")]
     pub(super) system_state: linux::SupervisorState<M>,
@@ -147,17 +143,17 @@ pub struct Pvm<
 }
 
 impl<
-    ML: main_memory::MainMemoryLayout,
+    MC: memory::MemoryConfig,
     CL: machine_state::CacheLayouts,
-    B: bcall::Block<ML, M>,
+    B: bcall::Block<MC, M>,
     M: state_backend::ManagerBase,
-> Pvm<ML, CL, B, M>
+> Pvm<MC, CL, B, M>
 {
     /// Bind the block cache to the given allocated state and the given [block builder].
     ///
     /// [block builder]: bcall::Block::BlockBuilder
     pub fn bind(
-        space: state_backend::AllocatedOf<PvmLayout<ML, CL>, M>,
+        space: state_backend::AllocatedOf<PvmLayout<MC, CL>, M>,
         block_builder: B::BlockBuilder,
     ) -> Self {
         Self {
@@ -174,7 +170,7 @@ impl<
     /// the constituents of `N` that were produced from the constituents of `&M`.
     pub fn struct_ref<'a, F: state_backend::FnManager<state_backend::Ref<'a, M>>>(
         &'a self,
-    ) -> state_backend::AllocatedOf<PvmLayout<ML, CL>, F::Output> {
+    ) -> state_backend::AllocatedOf<PvmLayout<MC, CL>, F::Output> {
         (
             self.version.struct_ref::<F>(),
             self.machine_state.struct_ref::<F>(),
@@ -186,7 +182,7 @@ impl<
     }
 
     /// Generate a proof-generating version of this PVM.
-    pub fn start_proof(&self) -> PvmProofGen<'_, ML, CL, M> {
+    pub fn start_proof(&self) -> PvmProofGen<'_, MC, CL, M> {
         enum ProofWrapper {}
 
         impl<M: state_backend::ManagerBase> state_backend::FnManager<M> for ProofWrapper {
@@ -365,11 +361,11 @@ impl<
 }
 
 impl<
-    ML: main_memory::MainMemoryLayout,
+    MC: memory::MemoryConfig,
     CL: machine_state::CacheLayouts,
-    B: bcall::Block<ML, M> + Clone,
+    B: bcall::Block<MC, M> + Clone,
     M: state_backend::ManagerClone,
-> Clone for Pvm<ML, CL, B, M>
+> Clone for Pvm<MC, CL, B, M>
 {
     fn clone(&self) -> Self {
         Self {
@@ -394,30 +390,30 @@ mod tests {
     };
 
     use super::*;
-    use crate::state_backend::test_helpers::TestBackendFactory;
     use crate::{
         backend_test, create_state,
         machine_state::{
             TestCacheLayouts,
             block_cache::bcall::InterpretedBlockBuilder,
-            main_memory::M1M,
+            memory::Memory,
             registers::{a0, a1, a2, a3, a6, a7},
         },
         state_backend::owned_backend::Owned,
     };
+    use crate::{machine_state::memory::M1M, state_backend::test_helpers::TestBackendFactory};
 
     #[test]
     fn test_read_input() {
-        type ML = M1M;
-        type L = PvmLayout<ML, TestCacheLayouts>;
-        type B = bcall::Interpreted<ML, Owned>;
+        type MC = M1M;
+        type L = PvmLayout<MC, TestCacheLayouts>;
+        type B = bcall::Interpreted<MC, Owned>;
 
         // Setup PVM
         let space = Owned::allocate::<L>();
-        let mut pvm = Pvm::<ML, TestCacheLayouts, B, _>::bind(space, InterpretedBlockBuilder);
+        let mut pvm = Pvm::<MC, TestCacheLayouts, B, _>::bind(space, InterpretedBlockBuilder);
         pvm.reset();
 
-        let level_addr = main_memory::FIRST_ADDRESS;
+        let level_addr = memory::FIRST_ADDRESS;
         let counter_addr = level_addr + 4;
         let buffer_addr = counter_addr + 4;
 
@@ -509,16 +505,16 @@ mod tests {
 
     #[test]
     fn test_write_debug() {
-        type ML = M1M;
-        type L = PvmLayout<ML, TestCacheLayouts>;
-        type B = bcall::Interpreted<ML, Owned>;
+        type MC = M1M;
+        type L = PvmLayout<MC, TestCacheLayouts>;
+        type B = bcall::Interpreted<MC, Owned>;
 
         let mut buffer = Vec::new();
         let mut hooks = PvmHooks::new(|c| buffer.push(c));
 
         // Setup PVM
         let space = Owned::allocate::<L>();
-        let mut pvm = Pvm::<ML, TestCacheLayouts, B, _>::bind(space, InterpretedBlockBuilder);
+        let mut pvm = Pvm::<MC, TestCacheLayouts, B, _>::bind(space, InterpretedBlockBuilder);
         pvm.reset();
 
         // Prepare subsequent ECALLs to use the SBI_CONSOLE_PUTCHAR extension
@@ -552,17 +548,17 @@ mod tests {
     }
 
     backend_test!(test_reveal, F, {
-        type ML = M1M;
-        type L = PvmLayout<ML, TestCacheLayouts>;
-        type B<F> = bcall::Interpreted<ML, <F as TestBackendFactory>::Manager>;
+        type MC = M1M;
+        type L = PvmLayout<MC, TestCacheLayouts>;
+        type B<F> = bcall::Interpreted<MC, <F as TestBackendFactory>::Manager>;
 
         // Setup PVM
-        let mut pvm = create_state!(Pvm, L, F, ML, TestCacheLayouts, B<F>, || {
+        let mut pvm = create_state!(Pvm, L, F, MC, TestCacheLayouts, B<F>, || {
             InterpretedBlockBuilder
         });
         pvm.reset();
 
-        let input_address = main_memory::FIRST_ADDRESS;
+        let input_address = memory::FIRST_ADDRESS;
         let buffer = [1u8, 2, 3, 4];
         let output_address = input_address + buffer.len() as u64;
         let xregisters = &mut pvm.machine_state.core.hart.xregisters;
@@ -625,18 +621,18 @@ mod tests {
     });
 
     backend_test!(test_reveal_insufficient_buffer_size, F, {
-        type ML = M1M;
-        type L = PvmLayout<ML, TestCacheLayouts>;
-        type B<F> = bcall::Interpreted<ML, <F as TestBackendFactory>::Manager>;
+        type MC = M1M;
+        type L = PvmLayout<MC, TestCacheLayouts>;
+        type B<F> = bcall::Interpreted<MC, <F as TestBackendFactory>::Manager>;
 
         // Setup PVM
-        let mut pvm = create_state!(Pvm, L, F, ML, TestCacheLayouts, B<F>, || {
+        let mut pvm = create_state!(Pvm, L, F, MC, TestCacheLayouts, B<F>, || {
             InterpretedBlockBuilder
         });
         pvm.reset();
 
         const OUTPUT_BUFFER_SIZE: usize = 10;
-        let input_address = main_memory::FIRST_ADDRESS;
+        let input_address = memory::FIRST_ADDRESS;
         let buffer = [1u8, 2, 3, 4];
         let output_address = input_address + buffer.len() as u64;
 

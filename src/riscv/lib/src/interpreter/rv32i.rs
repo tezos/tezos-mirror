@@ -10,7 +10,7 @@ use crate::{
     machine_state::{
         MachineCoreState, ProgramCounterUpdate,
         hart_state::HartState,
-        main_memory::{Address, MainMemoryLayout},
+        memory::{self, Address},
         mode::Mode,
         registers::{NonZeroXRegister, XRegister, XRegisters},
     },
@@ -349,9 +349,9 @@ where
     }
 }
 
-impl<ML, M> MachineCoreState<ML, M>
+impl<MC, M> MachineCoreState<MC, M>
 where
-    ML: MainMemoryLayout,
+    MC: memory::MemoryConfig,
     M: backend::ManagerBase,
 {
     /// `FENCE` I-Type instruction
@@ -381,7 +381,7 @@ mod tests {
                 xstatus::{MPPValue, MStatus, SPPValue},
             },
             hart_state::{HartState, HartStateLayout},
-            main_memory::{Address, tests::T1K},
+            memory::{Address, M1K},
             mode::Mode,
             registers::{XRegisters, XRegistersLayout, a0, a1, a2, fa0, nz, t0, t1, t2, t3},
         },
@@ -410,7 +410,7 @@ mod tests {
         ];
 
         for (imm, rs1, rd, res) in imm_rs1_rd_res {
-            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
 
             state.hart.xregisters.write(a0, rs1);
             state.hart.xregisters.write(t0, imm as u64);
@@ -693,14 +693,14 @@ mod tests {
     });
 
     backend_test!(test_ebreak, F, {
-        let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
 
         let ret_val = state.hart.run_ebreak();
         assert_eq!(ret_val, Exception::Breakpoint);
     });
 
     backend_test!(test_fence, F, {
-        let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(

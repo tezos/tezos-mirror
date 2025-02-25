@@ -8,7 +8,7 @@
 
 use vm_fdt::FdtWriter;
 
-use crate::machine_state::main_memory;
+use crate::machine_state::memory;
 
 /// Information about the initial ramdisk.
 pub struct InitialRamDisk {
@@ -110,8 +110,8 @@ pub fn generate_custom(
 }
 
 /// Generate a Flattened Device Tree for the given hardware configuration.
-pub fn generate<ML: main_memory::MainMemoryLayout>(
+pub fn generate<MC: memory::MemoryConfig>(
     initrd: Option<InitialRamDisk>,
 ) -> Result<Vec<u8>, vm_fdt::Error> {
-    generate_custom(main_memory::FIRST_ADDRESS, ML::BYTES as u64, initrd)
+    generate_custom(memory::FIRST_ADDRESS, MC::TOTAL_BYTES as u64, initrd)
 }

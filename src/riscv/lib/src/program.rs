@@ -4,14 +4,14 @@
 
 use std::{borrow::Cow, collections::BTreeMap, marker::PhantomData};
 
-use crate::{kernel_loader, machine_state::main_memory, parser::parse_block};
+use crate::{kernel_loader, machine_state::memory, parser::parse_block};
 
 /// RISC-V program
-pub struct Program<'a, ML> {
-    _pd: PhantomData<ML>,
+pub struct Program<'a, MC> {
+    _pd: PhantomData<MC>,
 
     /// Address of the program's entrypoint
-    pub entrypoint: main_memory::Address,
+    pub entrypoint: memory::Address,
 
     /// Segments to be written to the main memory
     // Note: `[u8]` owned is `Vec<u8>`. The segment is either re-using an
@@ -20,13 +20,13 @@ pub struct Program<'a, ML> {
     // Invariant: `segments[index]` corresponds to an array
     // representing bytes at `index..index+length` and
     // all the arrays are non-overlapping
-    pub segments: BTreeMap<main_memory::Address, Cow<'a, [u8]>>,
+    pub segments: BTreeMap<memory::Address, Cow<'a, [u8]>>,
 
     /// Raw program headers
     pub program_headers: Option<kernel_loader::ProgramHeaders<'a>>,
 }
 
-impl<'a, ML> kernel_loader::Memory for Program<'a, ML> {
+impl<'a, MC> kernel_loader::Memory for Program<'a, MC> {
     fn write_bytes(
         &mut self,
         mut paddr: u64,
@@ -94,12 +94,12 @@ impl<'a, ML> kernel_loader::Memory for Program<'a, ML> {
     }
 }
 
-impl<'a, ML: main_memory::MainMemoryLayout> Program<'a, ML> {
+impl<'a, MC: memory::MemoryConfig> Program<'a, MC> {
     /// Parse the given ELF executable and convert it into our program
-    /// representation. The main memory layout `ML` is used to compute the
+    /// representation. The main memory configuration `MC` is used to compute the
     /// correct addresses
     pub fn from_elf(elf: &'a [u8]) -> Result<Self, kernel_loader::Error> {
-        let start_if_reloc = main_memory::FIRST_ADDRESS;
+        let start_if_reloc = memory::FIRST_ADDRESS;
 
         let mut myself = Self {
             _pd: PhantomData,
@@ -135,7 +135,7 @@ mod tests {
 
     use crate::{
         kernel_loader::{self, Memory},
-        machine_state::main_memory::{self, M1M},
+        machine_state::memory::{self, M1M},
         program::Program,
     };
 
@@ -174,7 +174,7 @@ mod tests {
             fs::read(PATH).expect("Failed read dummy RISC-V kernel (try: make -C src/riscv build)");
 
         let mut buffer = Cursor::new(Vec::new());
-        kernel_loader::load_elf(&mut buffer, main_memory::FIRST_ADDRESS, &contents).unwrap();
+        kernel_loader::load_elf(&mut buffer, memory::FIRST_ADDRESS, &contents).unwrap();
         let buffer = buffer.into_inner();
 
         let program = Program::<M1M>::from_elf(&contents).unwrap();

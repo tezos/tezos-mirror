@@ -10,14 +10,14 @@
 use std::ops::{BitAnd, BitOr, BitXor};
 
 use crate::{
-    machine_state::{MachineCoreState, main_memory::MainMemoryLayout, registers::XRegister},
+    machine_state::{MachineCoreState, memory, registers::XRegister},
     state_backend as backend,
     traps::Exception,
 };
 
-impl<ML, M> MachineCoreState<ML, M>
+impl<MC, M> MachineCoreState<MC, M>
 where
-    ML: MainMemoryLayout,
+    MC: memory::MemoryConfig,
     M: backend::ManagerReadWrite,
 {
     /// `LR.D` R-type instruction
@@ -228,7 +228,6 @@ mod test {
         interpreter::atomics::{SC_FAILURE, SC_SUCCESS},
         machine_state::{
             MachineCoreState, MachineCoreStateLayout,
-            main_memory::tests::T1K,
             registers::{a0, a1, a2},
         },
         test_amo, test_lrsc,

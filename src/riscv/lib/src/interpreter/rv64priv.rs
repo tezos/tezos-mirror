@@ -13,7 +13,7 @@ use crate::{
             xstatus::{MPPValue, SPPValue},
         },
         hart_state::HartState,
-        main_memory::{Address, MainMemoryLayout},
+        memory::{self, Address},
         mode::Mode,
         registers::XRegister,
     },
@@ -102,9 +102,9 @@ where
     }
 }
 
-impl<ML, M> MachineCoreState<ML, M>
+impl<MC, M> MachineCoreState<MC, M>
 where
-    ML: MainMemoryLayout,
+    MC: memory::MemoryConfig,
     M: backend::ManagerReadWrite,
 {
     /// `WFI` instruction
@@ -142,7 +142,7 @@ mod tests {
         machine_state::{
             MachineCoreState, MachineCoreStateLayout,
             csregisters::{CSRRepr, CSRegister, xstatus},
-            main_memory::tests::T1K,
+            memory::M1K,
             mode::Mode,
             registers::{a0, t0},
         },
@@ -150,8 +150,8 @@ mod tests {
     };
 
     backend_test!(test_sfence, F, {
-        type L = MachineCoreStateLayout<T1K>;
-        let mut state = create_state!(MachineCoreState, L, F, T1K);
+        type L = MachineCoreStateLayout<M1K>;
+        let mut state = create_state!(MachineCoreState, L, F, M1K);
 
         let run_test = |state: &mut MachineCoreState<_, _>,
                         mode: Mode,

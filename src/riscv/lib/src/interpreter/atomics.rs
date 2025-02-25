@@ -7,7 +7,7 @@
 use std::mem;
 
 use crate::{
-    machine_state::{MachineCoreState, main_memory::MainMemoryLayout, registers::XRegister},
+    machine_state::{MachineCoreState, memory, registers::XRegister},
     state_backend as backend,
     traps::Exception,
 };
@@ -15,9 +15,9 @@ use crate::{
 pub const SC_SUCCESS: u64 = 0;
 pub const SC_FAILURE: u64 = 1;
 
-impl<ML, M> MachineCoreState<ML, M>
+impl<MC, M> MachineCoreState<MC, M>
 where
-    ML: MainMemoryLayout,
+    MC: memory::MemoryConfig,
     M: backend::ManagerReadWrite,
 {
     /// Loads a word or a double from the address in `rs1`, places the

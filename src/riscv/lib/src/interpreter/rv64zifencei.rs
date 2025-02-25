@@ -6,17 +6,16 @@
 
 use crate::{
     machine_state::{
-        AccessType, CacheLayouts, MachineState, block_cache::bcall::Block,
-        main_memory::MainMemoryLayout,
+        AccessType, CacheLayouts, MachineState, block_cache::bcall::Block, memory::MemoryConfig,
     },
     state_backend,
 };
 
-impl<ML, CL, B, M> MachineState<ML, CL, B, M>
+impl<MC, CL, B, M> MachineState<MC, CL, B, M>
 where
-    ML: MainMemoryLayout,
+    MC: MemoryConfig,
     CL: CacheLayouts,
-    B: Block<ML, M>,
+    B: Block<MC, M>,
     M: state_backend::ManagerReadWrite,
 {
     /// Execute a `fence.i` instruction.

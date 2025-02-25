@@ -6,7 +6,7 @@
 
 use super::{SupervisorState, error::Error};
 use crate::{
-    machine_state::{MachineCoreState, main_memory::MainMemoryLayout},
+    machine_state::{MachineCoreState, memory::MemoryConfig},
     state_backend::{ManagerBase, ManagerReadWrite},
 };
 
@@ -16,7 +16,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// See: <https://www.man7.org/linux/man-pages/man3/openat.3p.html>
     pub(super) fn handle_openat(
         &mut self,
-        core: &mut MachineCoreState<impl MainMemoryLayout, M>,
+        core: &mut MachineCoreState<impl MemoryConfig, M>,
     ) -> bool
     where
         M: ManagerReadWrite,
@@ -30,7 +30,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// See: <https://man7.org/linux/man-pages/man2/readlink.2.html>
     pub(super) fn handle_readlinkat(
         &mut self,
-        core: &mut MachineCoreState<impl MainMemoryLayout, M>,
+        core: &mut MachineCoreState<impl MemoryConfig, M>,
     ) -> bool
     where
         M: ManagerReadWrite,

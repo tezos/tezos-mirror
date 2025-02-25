@@ -11,7 +11,7 @@ use crate::{
     machine_state::{
         TestCacheLayouts,
         block_cache::bcall::{Interpreted, InterpretedBlockBuilder},
-        main_memory::M64M,
+        memory::M64M,
         mode::Mode,
     },
     program::Program,

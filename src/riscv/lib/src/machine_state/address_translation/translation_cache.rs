@@ -39,7 +39,7 @@ use super::{AccessType, PAGE_OFFSET_WIDTH};
 use crate::{
     bits::ones,
     cache_utils::FenceCounter,
-    machine_state::{csregisters::CSRRepr, main_memory::Address, mode::Mode},
+    machine_state::{csregisters::CSRRepr, memory::Address, mode::Mode},
     state_backend::{
         AllocatedOf, Atom, Cell, FnManager, ManagerBase, ManagerClone, ManagerRead,
         ManagerReadWrite, ManagerWrite, Many, Ref,

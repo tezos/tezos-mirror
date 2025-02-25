@@ -16,7 +16,7 @@ use crate::{
         CacheLayouts, MachineCoreState, MachineError, MachineState, MachineStateLayout,
         StepManyResult, TestCacheLayouts,
         block_cache::bcall::{Block, Interpreted},
-        main_memory::{M1G, MainMemoryLayout},
+        memory::{M1G, MemoryConfig},
         mode,
     },
     program::Program,
@@ -75,19 +75,19 @@ pub enum TestStepperError {
     MachineError(MachineError),
 }
 
-pub type TestStepperLayout<ML = M1G, CL = TestCacheLayouts> =
-    (PosixStateLayout, MachineStateLayout<ML, CL>);
+pub type TestStepperLayout<MC = M1G, CL = TestCacheLayouts> =
+    (PosixStateLayout, MachineStateLayout<MC, CL>);
 
 pub struct TestStepper<
-    ML: MainMemoryLayout = M1G,
+    MC: MemoryConfig = M1G,
     CL: CacheLayouts = TestCacheLayouts,
-    B: Block<ML, Owned> = Interpreted<ML, Owned>,
+    B: Block<MC, Owned> = Interpreted<MC, Owned>,
 > {
-    machine_state: MachineState<ML, CL, B, Owned>,
+    machine_state: MachineState<MC, CL, B, Owned>,
     posix_state: PosixState<Owned>,
 }
 
-impl<ML: MainMemoryLayout, B: Block<ML, Owned>> TestStepper<ML, TestCacheLayouts, B> {
+impl<MC: MemoryConfig, B: Block<MC, Owned>> TestStepper<MC, TestCacheLayouts, B> {
     /// Initialise an interpreter with a given `program`, starting execution in [mode].
     /// An initial ramdisk can also optionally be passed.
     #[inline]
@@ -110,7 +110,7 @@ impl<ML: MainMemoryLayout, B: Block<ML, Owned>> TestStepper<ML, TestCacheLayouts
         mode: mode::Mode,
         block_builder: B::BlockBuilder,
     ) -> Result<(Self, BTreeMap<u64, String>), TestStepperError> {
-        let (posix_space, machine_state_space) = Owned::allocate::<TestStepperLayout<ML>>();
+        let (posix_space, machine_state_space) = Owned::allocate::<TestStepperLayout<MC>>();
         let posix_state = PosixState::bind(posix_space);
         let machine_state = MachineState::bind(machine_state_space, block_builder);
         let mut stepper = Self {
@@ -122,7 +122,7 @@ impl<ML: MainMemoryLayout, B: Block<ML, Owned>> TestStepper<ML, TestCacheLayouts
         stepper.posix_state.set_exit_mode(mode);
 
         // The interpreter needs a program to run.
-        let elf_program = Program::<ML>::from_elf(program)?;
+        let elf_program = Program::<MC>::from_elf(program)?;
         stepper
             .machine_state
             .setup_boot(&elf_program, initrd, mode::Mode::Machine)?;
@@ -160,15 +160,15 @@ impl<ML: MainMemoryLayout, B: Block<ML, Owned>> TestStepper<ML, TestCacheLayouts
     }
 }
 
-impl<ML: MainMemoryLayout, B: Block<ML, Owned>> Stepper for TestStepper<ML, TestCacheLayouts, B> {
-    type MainMemoryLayout = ML;
+impl<MC: MemoryConfig, B: Block<MC, Owned>> Stepper for TestStepper<MC, TestCacheLayouts, B> {
+    type MemoryConfig = MC;
 
     type CacheLayouts = TestCacheLayouts;
 
     type Manager = Owned;
 
     #[inline(always)]
-    fn machine_state(&self) -> &MachineCoreState<Self::MainMemoryLayout, Self::Manager> {
+    fn machine_state(&self) -> &MachineCoreState<Self::MemoryConfig, Self::Manager> {
         &self.machine_state.core
     }
 

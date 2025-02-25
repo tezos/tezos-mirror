@@ -24,23 +24,18 @@ use crate::{
     machine_state::{
         AccessType, CacheLayouts, MachineState,
         block_cache::bcall::Block,
-        main_memory::MainMemoryLayout,
+        memory::{Memory, MemoryConfig},
         registers::{XValue, a0, a1, a2, a3, a6, a7},
     },
     parser::instruction::InstrUncacheable,
-    state_backend::{CellRead, CellReadWrite, CellWrite, ManagerReadWrite},
+    state_backend::{Cell, CellRead, CellReadWrite, CellWrite, ManagerReadWrite},
     traps::EnvironException,
 };
 
 /// Write the SBI error code as the return value.
 #[inline(always)]
-fn sbi_return_error<
-    ML: MainMemoryLayout,
-    CL: CacheLayouts,
-    B: Block<ML, M>,
-    M: ManagerReadWrite,
->(
-    machine: &mut MachineState<ML, CL, B, M>,
+fn sbi_return_error<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerReadWrite>(
+    machine: &mut MachineState<MC, CL, B, M>,
     code: SbiError,
 ) {
     machine.core.hart.xregisters.write(a0, code as i64 as u64);
@@ -48,8 +43,8 @@ fn sbi_return_error<
 
 /// Write an arbitrary value as single return value.
 #[inline(always)]
-fn sbi_return1<ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: ManagerReadWrite>(
-    machine: &mut MachineState<ML, CL, B, M>,
+fn sbi_return1<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerReadWrite>(
+    machine: &mut MachineState<MC, CL, B, M>,
     value: XValue,
 ) {
     // The SBI caller interprets the return value as a [i64]. We don't want the value to be
@@ -63,13 +58,8 @@ fn sbi_return1<ML: MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: Manag
 
 /// Write an `sbiret` return struct.
 #[inline(always)]
-fn sbi_return_sbiret<
-    ML: MainMemoryLayout,
-    CL: CacheLayouts,
-    B: Block<ML, M>,
-    M: ManagerReadWrite,
->(
-    machine: &mut MachineState<ML, CL, B, M>,
+fn sbi_return_sbiret<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerReadWrite>(
+    machine: &mut MachineState<MC, CL, B, M>,
     error: Option<SbiError>,
     value: XValue,
 ) {
@@ -83,13 +73,13 @@ fn sbi_return_sbiret<
 
 /// Run the given closure `inner` and write the corresponding SBI results to `machine`.
 #[inline(always)]
-fn sbi_wrap<ML, CL, B, M, F>(machine: &mut MachineState<ML, CL, B, M>, inner: F)
+fn sbi_wrap<MC, CL, B, M, F>(machine: &mut MachineState<MC, CL, B, M>, inner: F)
 where
-    ML: MainMemoryLayout,
+    MC: MemoryConfig,
     CL: CacheLayouts,
-    B: Block<ML, M>,
+    B: Block<MC, M>,
     M: ManagerReadWrite,
-    F: FnOnce(&mut MachineState<ML, CL, B, M>) -> Result<XValue, SbiError>,
+    F: FnOnce(&mut MachineState<MC, CL, B, M>) -> Result<XValue, SbiError>,
 {
     match inner(machine) {
         Ok(value) => sbi_return1(machine, value),
@@ -99,15 +89,15 @@ where
 
 /// Respond to a request for input with no input. Returns `false` in case the
 /// machine wasn't expecting any input, otherwise returns `true`.
-pub fn provide_no_input<S, ML, CL, B, M>(
+pub fn provide_no_input<S, MC, CL, B, M>(
     status: &mut S,
-    machine: &mut MachineState<ML, CL, B, M>,
+    machine: &mut MachineState<MC, CL, B, M>,
 ) -> bool
 where
     S: CellReadWrite<Value = PvmStatus>,
     CL: CacheLayouts,
-    ML: MainMemoryLayout,
-    B: Block<ML, M>,
+    MC: MemoryConfig,
+    B: Block<MC, M>,
     M: ManagerReadWrite,
 {
     // This method should only do something when we're waiting for input.
@@ -126,9 +116,9 @@ where
 
 /// Provide input information to the machine. Returns `false` in case the
 /// machine wasn't expecting any input, otherwise returns `true`.
-pub fn provide_input<S, ML, CL, B, M>(
+pub fn provide_input<S, MC, CL, B, M>(
     status: &mut S,
-    machine: &mut MachineState<ML, CL, B, M>,
+    machine: &mut MachineState<MC, CL, B, M>,
     level: u32,
     counter: u32,
     payload: &[u8],
@@ -136,8 +126,8 @@ pub fn provide_input<S, ML, CL, B, M>(
 where
     S: CellReadWrite<Value = PvmStatus>,
     CL: CacheLayouts,
-    ML: MainMemoryLayout,
-    B: Block<ML, M>,
+    MC: MemoryConfig,
+    B: Block<MC, M>,
     M: ManagerReadWrite,
 {
     // This method should only do something when we're waiting for input.
@@ -189,17 +179,17 @@ where
 
 /// Provide metadata in response to a metadata request. Returns `false`
 /// if the machine is not expecting metadata.
-pub fn provide_metadata<S, ML, CL, B, M>(
+pub fn provide_metadata<S, MC, CL, B, M>(
     status: &mut S,
-    machine: &mut MachineState<ML, CL, B, M>,
+    machine: &mut MachineState<MC, CL, B, M>,
     rollup_address: &[u8; 20],
     origination_level: u32,
 ) -> bool
 where
     S: CellReadWrite<Value = PvmStatus>,
     CL: CacheLayouts,
-    ML: MainMemoryLayout,
-    B: Block<ML, M>,
+    MC: MemoryConfig,
+    B: Block<MC, M>,
     M: ManagerReadWrite,
 {
     // This method should only do something when we're waiting for metadata.
@@ -233,16 +223,16 @@ where
 
 /// Provide reveal data in response to a reveal request. Returns `false`
 /// if the machine is not expecting reveal.
-pub fn provide_reveal_response<S, ML, CL, B, M>(
+pub fn provide_reveal_response<S, MC, CL, B, M>(
     status: &mut S,
-    machine: &mut MachineState<ML, CL, B, M>,
+    machine: &mut MachineState<MC, CL, B, M>,
     reveal_data: &[u8],
 ) -> bool
 where
     S: CellReadWrite<Value = PvmStatus>,
     CL: CacheLayouts,
-    ML: MainMemoryLayout,
-    B: Block<ML, M>,
+    MC: MemoryConfig,
+    B: Block<MC, M>,
     M: ManagerReadWrite,
 {
     // This method should only do something when we're waiting for reveal.
@@ -301,13 +291,13 @@ where
 
 /// Produce a Ed25519 signature.
 #[inline]
-fn handle_tezos_ed25519_sign<ML, CL, B, M>(
-    machine: &mut MachineState<ML, CL, B, M>,
+fn handle_tezos_ed25519_sign<MC, CL, B, M>(
+    machine: &mut MachineState<MC, CL, B, M>,
 ) -> Result<u64, SbiError>
 where
-    ML: MainMemoryLayout,
+    MC: MemoryConfig,
     CL: CacheLayouts,
-    B: Block<ML, M>,
+    B: Block<MC, M>,
     M: ManagerReadWrite,
 {
     let arg_sk_addr = machine.core.hart.xregisters.read(a0);
@@ -339,13 +329,13 @@ where
 
 /// Verify a Ed25519 signature.
 #[inline]
-fn handle_tezos_ed25519_verify<ML, CL, B, M>(
-    machine: &mut MachineState<ML, CL, B, M>,
+fn handle_tezos_ed25519_verify<MC, CL, B, M>(
+    machine: &mut MachineState<MC, CL, B, M>,
 ) -> Result<u64, SbiError>
 where
-    ML: MainMemoryLayout,
+    MC: MemoryConfig,
     CL: CacheLayouts,
-    B: Block<ML, M>,
+    B: Block<MC, M>,
     M: ManagerReadWrite,
 {
     let arg_pk_addr = machine.core.hart.xregisters.read(a0);
@@ -381,13 +371,13 @@ where
 
 /// Compute a BLAKE2B 256-bit digest.
 #[inline]
-fn handle_tezos_blake2b_hash256<ML, CL, B, M>(
-    machine: &mut MachineState<ML, CL, B, M>,
+fn handle_tezos_blake2b_hash256<MC, CL, B, M>(
+    machine: &mut MachineState<MC, CL, B, M>,
 ) -> Result<u64, SbiError>
 where
-    ML: MainMemoryLayout,
+    MC: MemoryConfig,
     CL: CacheLayouts,
-    B: Block<ML, M>,
+    B: Block<MC, M>,
     M: ManagerReadWrite,
 {
     let arg_out_addr = machine.core.hart.xregisters.read(a0);
@@ -414,15 +404,15 @@ where
 
 /// Handle a [SBI_TEZOS_REVEAL] call.
 #[inline]
-fn handle_tezos_reveal<S, ML, CL, B, M>(
-    machine: &mut MachineState<ML, CL, B, M>,
+fn handle_tezos_reveal<S, MC, CL, B, M>(
+    machine: &mut MachineState<MC, CL, B, M>,
     reveal_request: &mut RevealRequest<M>,
     status: &mut S,
 ) where
     S: CellReadWrite<Value = PvmStatus>,
-    ML: MainMemoryLayout,
+    MC: MemoryConfig,
     CL: CacheLayouts,
-    B: Block<ML, M>,
+    B: Block<MC, M>,
     M: ManagerReadWrite,
 {
     let request_address = machine.core.hart.xregisters.read(a0);
@@ -450,11 +440,11 @@ fn handle_tezos_reveal<S, ML, CL, B, M>(
 
 /// Handle a [SBI_SHUTDOWN] call.
 #[inline(always)]
-fn handle_legacy_shutdown<ML, CL, B, M>(machine: &mut MachineState<ML, CL, B, M>)
+fn handle_legacy_shutdown<MC, CL, B, M>(machine: &mut MachineState<MC, CL, B, M>)
 where
-    ML: MainMemoryLayout,
+    MC: MemoryConfig,
     CL: CacheLayouts,
-    B: Block<ML, M>,
+    B: Block<MC, M>,
     M: ManagerReadWrite,
 {
     // This call always fails.
@@ -463,13 +453,13 @@ where
 
 /// Handle a [SBI_CONSOLE_PUTCHAR] call.
 #[inline(always)]
-fn handle_legacy_console_putchar<ML, CL, B, M>(
-    machine: &mut MachineState<ML, CL, B, M>,
+fn handle_legacy_console_putchar<MC, CL, B, M>(
+    machine: &mut MachineState<MC, CL, B, M>,
     hooks: &mut PvmHooks,
 ) where
-    ML: MainMemoryLayout,
+    MC: MemoryConfig,
     CL: CacheLayouts,
-    B: Block<ML, M>,
+    B: Block<MC, M>,
     M: ManagerReadWrite,
 {
     let char = machine.core.hart.xregisters.read(a0) as u8;
@@ -481,13 +471,13 @@ fn handle_legacy_console_putchar<ML, CL, B, M>(
 
 /// Handle a [SBI_DBCN_CONSOLE_WRITE_BYTE] call.
 #[inline(always)]
-fn handle_debug_console_write_byte<ML, CL, B, M>(
-    machine: &mut MachineState<ML, CL, B, M>,
+fn handle_debug_console_write_byte<MC, CL, B, M>(
+    machine: &mut MachineState<MC, CL, B, M>,
     hooks: &mut PvmHooks,
 ) where
-    ML: MainMemoryLayout,
+    MC: MemoryConfig,
     CL: CacheLayouts,
-    B: Block<ML, M>,
+    B: Block<MC, M>,
     M: ManagerReadWrite,
 {
     let char = machine.core.hart.xregisters.read(a0) as u8;
@@ -499,11 +489,11 @@ fn handle_debug_console_write_byte<ML, CL, B, M>(
 
 /// Handle a [SBI_SRST_SYSTEM_RESET] call.
 #[inline(always)]
-fn handle_system_reset<ML, CL, B, M>(machine: &mut MachineState<ML, CL, B, M>)
+fn handle_system_reset<MC, CL, B, M>(machine: &mut MachineState<MC, CL, B, M>)
 where
-    ML: MainMemoryLayout,
+    MC: MemoryConfig,
     CL: CacheLayouts,
-    B: Block<ML, M>,
+    B: Block<MC, M>,
     M: ManagerReadWrite,
 {
     sbi_return_sbiret(machine, Some(SbiError::NotSupported), 0);
@@ -511,11 +501,11 @@ where
 
 /// Handle unsupported SBI calls.
 #[inline(always)]
-fn handle_not_supported<ML, CL, B, M>(machine: &mut MachineState<ML, CL, B, M>)
+fn handle_not_supported<MC, CL, B, M>(machine: &mut MachineState<MC, CL, B, M>)
 where
-    ML: MainMemoryLayout,
+    MC: MemoryConfig,
     CL: CacheLayouts,
-    B: Block<ML, M>,
+    B: Block<MC, M>,
     M: ManagerReadWrite,
 {
     // SBI requires us to indicate that we don't support this function by returning
@@ -525,18 +515,17 @@ where
 
 /// Handle a PVM SBI call. Returns `true` if it makes sense to continue evaluation.
 #[inline]
-pub fn handle_call<S, ML, CL, B, M>(
-    status: &mut S,
+pub fn handle_call<MC, CL, B, M>(
+    status: &mut Cell<PvmStatus, M>,
     reveal_request: &mut RevealRequest<M>,
-    machine: &mut MachineState<ML, CL, B, M>,
+    machine: &mut MachineState<MC, CL, B, M>,
     hooks: &mut PvmHooks,
     env_exception: EnvironException,
 ) -> bool
 where
-    S: CellReadWrite<Value = PvmStatus>,
-    ML: MainMemoryLayout,
+    MC: MemoryConfig,
     CL: CacheLayouts,
-    B: Block<ML, M>,
+    B: Block<MC, M>,
     M: ManagerReadWrite,
 {
     if let EnvironException::EnvCallFromMMode = env_exception {

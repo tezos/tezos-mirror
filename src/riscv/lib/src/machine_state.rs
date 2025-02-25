@@ -9,7 +9,7 @@ mod cache_layouts;
 pub mod csregisters;
 pub mod hart_state;
 pub mod instruction;
-pub mod main_memory;
+pub mod memory;
 pub mod mode;
 pub mod registers;
 pub mod reservation_set;
@@ -33,7 +33,7 @@ use csregisters::CSRegister;
 use csregisters::{CSRRepr, values::CSRValue};
 use hart_state::{HartState, HartStateLayout};
 use instruction::Instruction;
-use main_memory::{Address, MainMemory, OutOfBounds};
+use memory::{Address, Memory, MemoryConfig, OutOfBounds};
 use mode::Mode;
 
 use crate::{
@@ -51,7 +51,11 @@ use crate::{
 
 /// Layout for the machine 'run state' - which contains everything required for the running of
 /// instructions.
-pub type MachineCoreStateLayout<ML> = (HartStateLayout, ML, TranslationCacheLayout);
+pub type MachineCoreStateLayout<MC> = (
+    HartStateLayout,
+    <MC as MemoryConfig>::Layout,
+    TranslationCacheLayout,
+);
 
 /// The part of the machine state required to run (almost all) instructions.
 ///
@@ -60,15 +64,13 @@ pub type MachineCoreStateLayout<ML> = (HartStateLayout, ML, TranslationCacheLayo
 ///
 /// Certain instructions (e.g. `FENCE.I` may invalidate other parts of the state, but this are
 /// small in number).
-pub struct MachineCoreState<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> {
+pub struct MachineCoreState<MC: memory::MemoryConfig, M: backend::ManagerBase> {
     pub hart: HartState<M>,
-    pub main_memory: MainMemory<ML, M>,
+    pub main_memory: MC::State<M>,
     pub translation_cache: TranslationCache<M>,
 }
 
-impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerClone> Clone
-    for MachineCoreState<ML, M>
-{
+impl<MC: memory::MemoryConfig, M: backend::ManagerClone> Clone for MachineCoreState<MC, M> {
     fn clone(&self) -> Self {
         Self {
             hart: self.hart.clone(),
@@ -79,28 +81,24 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerClone> Clone
 }
 
 /// Layout for the machine state - everything required to fetch & run instructions.
-pub type MachineStateLayout<ML, CL> = (
-    MachineCoreStateLayout<ML>,
-    <CL as CacheLayouts>::BlockCacheLayout<ML>,
+pub type MachineStateLayout<MC, CL> = (
+    MachineCoreStateLayout<MC>,
+    <CL as CacheLayouts>::BlockCacheLayout<MC>,
 );
 
 /// The machine state contains everything required to fetch & run instructions.
 pub struct MachineState<
-    ML: main_memory::MainMemoryLayout,
+    MC: memory::MemoryConfig,
     CL: CacheLayouts,
-    B: Block<ML, M>,
+    B: Block<MC, M>,
     M: backend::ManagerBase,
 > {
-    pub core: MachineCoreState<ML, M>,
-    pub block_cache: BlockCache<CL::BlockCacheLayout<ML>, B, ML, M>,
+    pub core: MachineCoreState<MC, M>,
+    pub block_cache: BlockCache<CL::BlockCacheLayout<MC>, B, MC, M>,
 }
 
-impl<
-    ML: main_memory::MainMemoryLayout,
-    CL: CacheLayouts,
-    B: Block<ML, M> + Clone,
-    M: backend::ManagerClone,
-> Clone for MachineState<ML, CL, B, M>
+impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M> + Clone, M: backend::ManagerClone>
+    Clone for MachineState<MC, CL, B, M>
 {
     fn clone(&self) -> Self {
         Self {
@@ -144,7 +142,7 @@ macro_rules! run_no_args_instr {
     }};
 }
 
-impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreState<ML, M> {
+impl<MC: memory::MemoryConfig, M: backend::ManagerBase> MachineCoreState<MC, M> {
     /// Handle an [`Exception`] if one was risen during execution
     /// of an instruction (also known as synchronous exception) by taking a trap.
     ///
@@ -195,10 +193,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreStat
     }
 
     /// Bind the machine state to the given allocated space.
-    pub fn bind(space: backend::AllocatedOf<MachineCoreStateLayout<ML>, M>) -> Self {
+    pub fn bind(space: backend::AllocatedOf<MachineCoreStateLayout<MC>, M>) -> Self {
         Self {
             hart: HartState::bind(space.0),
-            main_memory: MainMemory::bind(space.1),
+            main_memory: MC::bind(space.1),
             translation_cache: TranslationCache::bind(space.2),
         }
     }
@@ -207,10 +205,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreStat
     /// the constituents of `N` that were produced from the constituents of `&M`.
     pub fn struct_ref<'a, F: backend::FnManager<backend::Ref<'a, M>>>(
         &'a self,
-    ) -> backend::AllocatedOf<MachineCoreStateLayout<ML>, F::Output> {
+    ) -> backend::AllocatedOf<MachineCoreStateLayout<MC>, F::Output> {
         (
             self.hart.struct_ref::<F>(),
-            self.main_memory.struct_ref::<F>(),
+            MC::struct_ref::<_, F>(&self.main_memory),
             self.translation_cache.struct_ref::<F>(),
         )
     }
@@ -220,7 +218,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreStat
     where
         M: backend::ManagerReadWrite,
     {
-        self.hart.reset(main_memory::FIRST_ADDRESS);
+        self.hart.reset(memory::FIRST_ADDRESS);
         self.main_memory.reset();
         self.translation_cache.reset();
     }
@@ -237,14 +235,14 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::ManagerBase> MachineCoreStat
     }
 }
 
-impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: backend::ManagerBase>
-    MachineState<ML, CL, B, M>
+impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::ManagerBase>
+    MachineState<MC, CL, B, M>
 {
     /// Bind the block cache to the given allocated state and the given [block builder].
     ///
     /// [block builder]: Block::BlockBuilder
     pub fn bind(
-        space: backend::AllocatedOf<MachineStateLayout<ML, CL>, M>,
+        space: backend::AllocatedOf<MachineStateLayout<MC, CL>, M>,
         block_builder: B::BlockBuilder,
     ) -> Self {
         Self {
@@ -257,7 +255,7 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: ba
     /// the constituents of `N` that were produced from the constituents of `&M`.
     pub fn struct_ref<'a, F: backend::FnManager<backend::Ref<'a, M>>>(
         &'a self,
-    ) -> backend::AllocatedOf<MachineStateLayout<ML, CL>, F::Output> {
+    ) -> backend::AllocatedOf<MachineStateLayout<MC, CL>, F::Output> {
         (
             self.core.struct_ref::<F>(),
             self.block_cache.struct_ref::<F>(),
@@ -591,7 +589,7 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: ba
     /// Install a program and set the program counter to its start.
     pub fn setup_boot(
         &mut self,
-        program: &Program<ML>,
+        program: &Program<MC>,
         initrd: Option<&[u8]>,
         mode: mode::Mode,
     ) -> Result<(), MachineError>
@@ -614,7 +612,7 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: ba
             .iter()
             .map(|(base, data)| base + data.len() as Address)
             .max()
-            .unwrap_or(main_memory::FIRST_ADDRESS);
+            .unwrap_or(memory::FIRST_ADDRESS);
 
         // Write initial ramdisk, if any
         let (dtb_addr, initrd) = if let Some(initrd) = initrd {
@@ -631,7 +629,7 @@ impl<ML: main_memory::MainMemoryLayout, CL: CacheLayouts, B: Block<ML, M>, M: ba
         };
 
         // Write device tree to memory
-        let fdt = devicetree::generate::<ML>(initrd)?;
+        let fdt = devicetree::generate::<MC>(initrd)?;
         self.core.main_memory.write_all(dtb_addr, fdt.as_slice())?;
 
         // Point DTB boot argument (a1) at the written device tree
@@ -677,7 +675,6 @@ mod tests {
             Instruction, OpCode,
             tagged_instruction::{TaggedArgs, TaggedInstruction, TaggedRegister},
         },
-        main_memory::tests::T1K,
         registers::XRegister,
     };
     use crate::{
@@ -696,7 +693,7 @@ mod tests {
                 satp::{Satp, TranslationAlgorithm},
                 xstatus::{self, MStatus},
             },
-            main_memory::{self, M1M, M8K},
+            memory::{self, M1K, M1M, M8K, Memory},
             mode::Mode,
             registers::{a0, a1, a2, nz, t0, t1, t2, zero},
         },
@@ -713,16 +710,15 @@ mod tests {
         },
         traps::{EnvironException, Exception, TrapContext},
     };
-    use crate::{bits::u64, machine_state::main_memory::M1K};
 
     backend_test!(test_step, F, {
         let state = create_state!(
             MachineState, 
-            MachineStateLayout<T1K, DefaultCacheLayouts>, 
+            MachineStateLayout<M1K, DefaultCacheLayouts>, 
             F, 
-            T1K, 
+            M1K, 
             DefaultCacheLayouts, 
-            Interpreted<T1K, F::Manager>, || InterpretedBlockBuilder);
+            Interpreted<M1K, F::Manager>, || InterpretedBlockBuilder);
 
         let state_cell = std::cell::RefCell::new(state);
 
@@ -733,8 +729,8 @@ mod tests {
             let mut state = state_cell.borrow_mut();
             state.reset();
 
-            let init_pc_addr = main_memory::FIRST_ADDRESS + pc_addr_offset * 4;
-            let jump_addr = main_memory::FIRST_ADDRESS + jump_addr * 4;
+            let init_pc_addr = memory::FIRST_ADDRESS + pc_addr_offset * 4;
+            let jump_addr = memory::FIRST_ADDRESS + jump_addr * 4;
 
             // Instruction which performs a unit op (AUIPC with t0)
             const T2_ENC: u64 = 0b0_0111; // x7
@@ -772,11 +768,11 @@ mod tests {
     backend_test!(test_step_env_exc, F, {
         let state = create_state!(
             MachineState, 
-            MachineStateLayout<T1K, DefaultCacheLayouts>, 
+            MachineStateLayout<M1K, DefaultCacheLayouts>, 
             F, 
-            T1K, 
+            M1K, 
             DefaultCacheLayouts, 
-            Interpreted<T1K, F::Manager>, || InterpretedBlockBuilder);
+            Interpreted<M1K, F::Manager>, || InterpretedBlockBuilder);
 
         let state_cell = std::cell::RefCell::new(state);
 
@@ -788,7 +784,7 @@ mod tests {
             let mut state = state_cell.borrow_mut();
             state.reset();
 
-            let init_pc_addr = main_memory::FIRST_ADDRESS + pc_addr_offset * 4;
+            let init_pc_addr = memory::FIRST_ADDRESS + pc_addr_offset * 4;
             let stvec_addr = init_pc_addr + 4 * stvec_offset;
             let mtvec_addr = init_pc_addr + 4 * mtvec_offset;
 
@@ -815,11 +811,11 @@ mod tests {
     backend_test!(test_step_exc_mm, F, {
         let state = create_state!(
             MachineState, 
-            MachineStateLayout<T1K, DefaultCacheLayouts>, 
+            MachineStateLayout<M1K, DefaultCacheLayouts>, 
             F, 
-            T1K, 
+            M1K, 
             DefaultCacheLayouts, 
-            Interpreted<T1K, F::Manager>, || InterpretedBlockBuilder);
+            Interpreted<M1K, F::Manager>, || InterpretedBlockBuilder);
 
         let state_cell = std::cell::RefCell::new(state);
 
@@ -830,7 +826,7 @@ mod tests {
             let mut state = state_cell.borrow_mut();
             state.reset();
 
-            let init_pc_addr = main_memory::FIRST_ADDRESS + pc_addr_offset * 4;
+            let init_pc_addr = memory::FIRST_ADDRESS + pc_addr_offset * 4;
             let mtvec_addr = init_pc_addr + 4 * mtvec_offset;
             const EBREAK: u64 = 1 << 20 | 0b111_0011;
 
@@ -865,11 +861,11 @@ mod tests {
     backend_test!(test_step_exc_us, F, {
         let state = create_state!(
             MachineState, 
-            MachineStateLayout<T1K, DefaultCacheLayouts>, 
+            MachineStateLayout<M1K, DefaultCacheLayouts>, 
             F, 
-            T1K, 
+            M1K, 
             DefaultCacheLayouts, 
-            Interpreted<T1K, F::Manager>, || InterpretedBlockBuilder);
+            Interpreted<M1K, F::Manager>, || InterpretedBlockBuilder);
 
         let state_cell = std::cell::RefCell::new(state);
 
@@ -881,13 +877,13 @@ mod tests {
             let mut state = state_cell.borrow_mut();
             state.reset();
 
-            let init_pc_addr = main_memory::FIRST_ADDRESS + pc_addr_offset * 4;
+            let init_pc_addr = memory::FIRST_ADDRESS + pc_addr_offset * 4;
             let stvec_addr = init_pc_addr + 4 * stvec_offset;
 
             // stvec is in VECTORED mode
             state.core.hart.csregisters.write(CSRegister::stvec, stvec_addr | 1);
 
-            let bad_address = main_memory::FIRST_ADDRESS.wrapping_sub((pc_addr_offset + 10) * 4);
+            let bad_address = memory::FIRST_ADDRESS.wrapping_sub((pc_addr_offset + 10) * 4);
             let medeleg_val = 1 << Exception::IllegalInstruction.exception_code() |
                 1 << Exception::EnvCallFromSMode.exception_code() |
                 1 << Exception::EnvCallFromMMode.exception_code() |
@@ -961,7 +957,7 @@ mod tests {
             );
             state.reset();
 
-            let start_ram = main_memory::FIRST_ADDRESS;
+            let start_ram = memory::FIRST_ADDRESS;
 
             // Write the instructions to the beginning of the main memory and point the program
             // counter at the first instruction.
@@ -1040,8 +1036,8 @@ mod tests {
     // Test that the machine state does not behave differently when potential ephermeral state is
     // reset that may impact instruction address translation caching.
     backend_test!(test_instruction_address_cache, F, {
-        // Specify the physcal memory layout.
-        let main_mem_addr = main_memory::FIRST_ADDRESS;
+        // Specify the layout in physcal memory.
+        let main_mem_addr = memory::FIRST_ADDRESS;
         let code0_addr = main_mem_addr;
         let code1_addr = code0_addr + 4096;
         let root_page_table_addr = main_mem_addr + 16384;
@@ -1327,7 +1323,7 @@ mod tests {
         })
         .unwrap();
 
-        let start_ram = main_memory::FIRST_ADDRESS;
+        let start_ram = memory::FIRST_ADDRESS;
 
         // Write the instructions to the beginning of the main memory and point the program
         // counter at the first instruction.
@@ -1466,7 +1462,7 @@ mod tests {
             .unwrap(),
         ];
 
-        let phys_addr = main_memory::FIRST_ADDRESS;
+        let phys_addr = memory::FIRST_ADDRESS;
 
         let block_b_addr = phys_addr + 128;
 

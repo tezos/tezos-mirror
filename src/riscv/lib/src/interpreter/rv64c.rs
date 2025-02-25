@@ -9,8 +9,7 @@
 
 use crate::{
     machine_state::{
-        MachineCoreState,
-        main_memory::MainMemoryLayout,
+        MachineCoreState, memory,
         registers::{NonZeroXRegister, XRegister, XRegisters, sp},
     },
     state_backend as backend,
@@ -66,9 +65,9 @@ where
     }
 }
 
-impl<ML, M> MachineCoreState<ML, M>
+impl<MC, M> MachineCoreState<MC, M>
 where
-    ML: MainMemoryLayout,
+    MC: memory::MemoryConfig,
     M: backend::ManagerReadWrite,
 {
     /// `C.LD` CL-type compressed instruction
@@ -131,7 +130,7 @@ mod tests {
         machine_state::{
             MachineCoreState, MachineCoreStateLayout,
             hart_state::{HartState, HartStateLayout},
-            main_memory::tests::T1K,
+            memory::M1K,
             registers::{a3, a4, nz, t0},
         },
         traps::Exception,
@@ -157,7 +156,7 @@ mod tests {
     });
 
     backend_test!(test_run_cldsp_clwsp, F, {
-        let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(

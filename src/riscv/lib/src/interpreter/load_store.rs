@@ -34,7 +34,7 @@ mod test {
         backend_test, create_state,
         machine_state::{
             MachineCoreState, MachineCoreStateLayout,
-            main_memory::tests::T1K,
+            memory::M1K,
             registers::{a2, a3, a4, nz},
         },
     };
@@ -47,7 +47,7 @@ mod test {
         ];
 
         for (imm, rd_rs1, res) in imm_rdrs1_res {
-            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
             super::run_li(&mut state, imm, rd_rs1);
             assert_eq!(state.hart.xregisters.read_nz(rd_rs1), res);
         }
@@ -55,7 +55,7 @@ mod test {
 
     backend_test!(test_lui, F, {
         proptest!(|(imm in any::<i64>())| {
-            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
             state.hart.xregisters.write(a2, 0);
             state.hart.xregisters.write(a4, 0);
 

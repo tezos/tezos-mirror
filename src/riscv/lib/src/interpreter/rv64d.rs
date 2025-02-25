@@ -16,7 +16,7 @@ use crate::{
     machine_state::{
         MachineCoreState,
         hart_state::HartState,
-        main_memory::MainMemoryLayout,
+        memory,
         registers::{FRegister, FValue, XRegister},
     },
     parser::instruction::InstrRoundingMode,
@@ -515,9 +515,9 @@ where
     }
 }
 
-impl<ML, M> MachineCoreState<ML, M>
+impl<MC, M> MachineCoreState<MC, M>
 where
-    ML: MainMemoryLayout,
+    MC: memory::MemoryConfig,
     M: backend::ManagerReadWrite,
 {
     /// `FLD` I-type instruction.
@@ -561,7 +561,7 @@ mod tests {
                 xstatus::{ExtensionValue, MStatus},
             },
             hart_state::{HartState, HartStateLayout},
-            main_memory::tests::T1K,
+            memory::M1K,
             registers::{fa2, fa3, parse_fregister, parse_xregister, t0},
         },
         traps::Exception,
@@ -596,7 +596,7 @@ mod tests {
     });
 
     backend_test!(test_load_store, F, {
-        let state = create_state!(MachineCoreState, MachineCoreStateLayout<T1K>, F, T1K);
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(

@@ -12,7 +12,10 @@ use std::{
 
 use enum_tag::EnumTag;
 use octez_riscv::{
-    machine_state::{AccessType, main_memory::Address},
+    machine_state::{
+        AccessType,
+        memory::{Address, Memory},
+    },
     parser::{instruction::Instr, parse},
     state_backend::ManagerRead,
     stepper::{StepResult, Stepper, StepperStatus},

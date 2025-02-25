@@ -10,7 +10,7 @@ use octez_riscv::{
     machine_state::{
         AccessType,
         csregisters::{CSRegister, satp::Satp},
-        main_memory::Address,
+        memory::{Address, Memory},
     },
     parser::{instruction::Instr, parse},
     state_backend::{ManagerRead, ManagerReadWrite},

@@ -10,7 +10,7 @@
 
 use super::{
     block_cache::{self, BlockCacheLayout},
-    main_memory::MainMemoryLayout,
+    memory::MemoryConfig,
 };
 
 /// Configuration bucket for the size of caches.
@@ -19,14 +19,14 @@ pub enum Sizes<const BLOCK_CACHE_BITS: usize, const BLOCK_CACHE_SIZE: usize> {}
 /// Wrapping trait for a bucket containing layouts for various caches used by the machine state.
 pub trait CacheLayouts {
     /// Layout for the block cache - controlling the number of entries.
-    type BlockCacheLayout<ML: MainMemoryLayout>: BlockCacheLayout<MainMemoryLayout = ML>;
+    type BlockCacheLayout<MC: MemoryConfig>: BlockCacheLayout<MemoryConfig = MC>;
 }
 
 impl<const BLOCK_CACHE_BITS: usize, const BLOCK_CACHE_SIZE: usize> CacheLayouts
     for Sizes<BLOCK_CACHE_BITS, BLOCK_CACHE_SIZE>
 {
-    type BlockCacheLayout<ML: MainMemoryLayout> =
-        block_cache::Layout<ML, BLOCK_CACHE_BITS, BLOCK_CACHE_SIZE>;
+    type BlockCacheLayout<MC: MemoryConfig> =
+        block_cache::Layout<MC, BLOCK_CACHE_BITS, BLOCK_CACHE_SIZE>;
 }
 
 /// The default configuration of cache layouts.

@@ -25,7 +25,7 @@ use std::fmt::Formatter;
 
 use tezos_smart_rollup_constants::riscv::SbiError;
 
-use crate::machine_state::{csregisters::CSRRepr, main_memory::Address};
+use crate::machine_state::{csregisters::CSRRepr, memory::Address};
 
 /// RISC-V Exceptions (also known as synchronous exceptions)
 #[derive(PartialEq, Eq, thiserror::Error, strum::Display, Debug, Clone, Copy)]

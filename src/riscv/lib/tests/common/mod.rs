@@ -6,7 +6,7 @@ use std::fs;
 
 use octez_riscv::{
     machine_state::{
-        DefaultCacheLayouts, block_cache::bcall::InterpretedBlockBuilder, main_memory::M64M,
+        DefaultCacheLayouts, block_cache::bcall::InterpretedBlockBuilder, memory::M64M,
     },
     pvm::PvmHooks,
     stepper::pvm::PvmStepper,
