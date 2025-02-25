@@ -56,7 +56,7 @@ let jobs =
     job_build_static_binaries
       ~__POS__
       ~arch:Amd64
-      ~high_cpu:false
+      ~cpu:Very_high
       ~rules:rules_always
       ()
   in
