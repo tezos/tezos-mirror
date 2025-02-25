@@ -1146,7 +1146,7 @@ let get_proto_plugins cctxt profile_ctxt ~last_processed_level ~first_seen_level
    the period for which the DAL node stores data related to attested slots and
    [target_level] is the level at which we connect the P2P and switch to
    processing blocks in sync with the L1. [target_level] is set to [head_level -
-   2]. It also inserts skip list cells if needed in the period [head_level -
+   3]. It also inserts skip list cells if needed in the period [head_level -
    storage_level].
 
    FIXME: https://gitlab.com/tezos/tezos/-/issues/7429
@@ -1179,11 +1179,12 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
   let store = Node_context.get_store ctxt in
   let last_processed_level_store = Store.last_processed_level store in
   (* [target_level] identifies the level wrt to head level at which we want to
-     start the P2P and process blocks as usual. *)
-  let target_level head_level = Int32.(sub head_level 2l) in
+     start the P2P and process blocks as usual. It's set to [head_level - 3]
+     because the first level the DAL node should process should be a final
+     one. *)
+  let target_level head_level = Int32.(sub head_level 3l) in
   let first_level_for_skip_list_storage period level =
-    (* Note that behind this first level we do not have
-       the plugin. *)
+    (* Note that behind this first level we do not have the plugin. *)
     Int32.(sub level (of_int period))
   in
   let should_store_skip_list_cells ~head_level =
