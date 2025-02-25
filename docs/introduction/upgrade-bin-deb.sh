@@ -61,7 +61,7 @@ set -x
 
 # [install prerequisites]
 apt-get update
-apt-get install -y sudo gpg curl apt-utils debconf-utils
+apt-get install -y sudo gpg curl apt-utils debconf-utils jq
 
 # [preseed debconf]
 echo "debconf debconf/frontend select Noninteractive" | sudo debconf-set-selections
