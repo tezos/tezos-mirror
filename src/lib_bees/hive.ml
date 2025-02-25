@@ -14,9 +14,17 @@ type worker =
     }
       -> worker
 
-type t = {workers : worker String.Hashtbl.t}
+module WorkerTbl = struct
+  type t = worker String.Hashtbl.t
 
-let hive = {workers = String.Hashtbl.create 64}
+  let create ~initial_size = String.Hashtbl.create initial_size
+
+  let find_opt tbl ~name = String.Hashtbl.find_opt tbl name
+end
+
+type t = {workers : WorkerTbl.t}
+
+let hive = {workers = WorkerTbl.create ~initial_size:64}
 
 exception Unknown_worker of string
 
@@ -37,7 +45,7 @@ let launch_worker (type worker) (worker : worker) ~bee_name ~domains worker_loop
 
 let get_error bee_name =
   let {workers} = hive in
-  match String.Hashtbl.find_opt workers bee_name with
+  match WorkerTbl.find_opt workers ~name:bee_name with
   (* Note that this branch shouldn't be reachable, as this function is supposed
      to be called from within an existing worker loop. *)
   | None -> raise (Unknown_worker bee_name)
