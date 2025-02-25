@@ -8,15 +8,6 @@
 mod builder;
 pub mod state_access;
 
-use self::builder::Builder;
-use self::state_access::JsaCalls;
-use self::state_access::JsaImports;
-use self::state_access::register_jsa_symbols;
-use crate::machine_state::MachineCoreState;
-use crate::machine_state::ProgramCounterUpdate;
-use crate::machine_state::instruction::Instruction;
-use crate::machine_state::main_memory::MainMemoryLayout;
-use crate::traps::EnvironException;
 use cranelift::codegen::CodegenError;
 use cranelift::codegen::ir::types::I64;
 use cranelift::codegen::settings::SetError;
@@ -28,6 +19,16 @@ use cranelift_module::Module;
 use cranelift_module::ModuleError;
 use state_access::JitStateAccess;
 use thiserror::Error;
+
+use self::builder::Builder;
+use self::state_access::JsaCalls;
+use self::state_access::JsaImports;
+use self::state_access::register_jsa_symbols;
+use crate::machine_state::MachineCoreState;
+use crate::machine_state::ProgramCounterUpdate;
+use crate::machine_state::instruction::Instruction;
+use crate::machine_state::main_memory::MainMemoryLayout;
+use crate::traps::EnvironException;
 
 /// Alias for the function signature produced by the JIT compilation.
 type JitFn<ML, JSA> = unsafe extern "C" fn(&mut MachineCoreState<ML, JSA>, u64, &mut usize);
@@ -330,8 +331,9 @@ mod tests {
     });
 
     backend_test!(test_cmv, F, {
-        use crate::machine_state::registers::NonZeroXRegister::*;
         use Instruction as I;
+
+        use crate::machine_state::registers::NonZeroXRegister::*;
 
         // Arrange
         let scenarios: &[&[I]] = &[
@@ -403,8 +405,9 @@ mod tests {
     });
 
     backend_test!(test_add, F, {
-        use crate::machine_state::registers::NonZeroXRegister::*;
         use Instruction as I;
+
+        use crate::machine_state::registers::NonZeroXRegister::*;
 
         // Arrange
 
@@ -473,8 +476,9 @@ mod tests {
     });
 
     backend_test!(test_jit_recovers_from_compilation_failure, F, {
-        use crate::machine_state::registers::NonZeroXRegister::*;
         use Instruction as I;
+
+        use crate::machine_state::registers::NonZeroXRegister::*;
 
         // Arrange
         let failure: &[I] = &[

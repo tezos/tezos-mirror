@@ -2,6 +2,15 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::{
+    convert::Infallible,
+    fmt,
+    io::{Write, stdout},
+    ops::Bound,
+};
+
+#[cfg(feature = "supervisor")]
+use super::linux;
 use super::reveals::{RevealRequest, RevealRequestLayout};
 use crate::{
     default::ConstDefault,
@@ -17,15 +26,6 @@ use crate::{
     },
     traps::EnvironException,
 };
-use std::{
-    convert::Infallible,
-    fmt,
-    io::{Write, stdout},
-    ops::Bound,
-};
-
-#[cfg(feature = "supervisor")]
-use super::linux;
 
 /// PVM configuration
 pub struct PvmHooks<'a> {
@@ -385,6 +385,14 @@ impl<
 
 #[cfg(test)]
 mod tests {
+    use std::mem;
+
+    use rand::{Fill, thread_rng};
+    use tezos_smart_rollup_constants::riscv::{
+        REVEAL_REQUEST_MAX_SIZE, SBI_CONSOLE_PUTCHAR, SBI_FIRMWARE_TEZOS, SBI_TEZOS_INBOX_NEXT,
+        SBI_TEZOS_REVEAL,
+    };
+
     use super::*;
     use crate::state_backend::test_helpers::TestBackendFactory;
     use crate::{
@@ -396,12 +404,6 @@ mod tests {
             registers::{a0, a1, a2, a3, a6, a7},
         },
         state_backend::owned_backend::Owned,
-    };
-    use rand::{Fill, thread_rng};
-    use std::mem;
-    use tezos_smart_rollup_constants::riscv::{
-        REVEAL_REQUEST_MAX_SIZE, SBI_CONSOLE_PUTCHAR, SBI_FIRMWARE_TEZOS, SBI_TEZOS_INBOX_NEXT,
-        SBI_TEZOS_REVEAL,
     };
 
     #[test]

@@ -33,6 +33,8 @@
 //! invalidate the cache entries all at once because that would result in a very large proof for
 //! a single invalidation step. Therefore, we do it gradually.
 
+use strum::EnumCount;
+
 use super::{AccessType, PAGE_OFFSET_WIDTH};
 use crate::{
     bits::ones,
@@ -43,7 +45,6 @@ use crate::{
         ManagerReadWrite, ManagerWrite, Many, Ref,
     },
 };
-use strum::EnumCount;
 
 /// Bit mask to obtain the offset into a page
 const OFFSET_MASK: u64 = ones(PAGE_OFFSET_WIDTH as u64);

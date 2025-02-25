@@ -3,10 +3,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{
-    BLUE, DebuggerApp, GRAY, GREEN, Instruction, NEXT_STYLE_FG, ORANGE, RED, SATPModeState,
-    SELECTED_STYLE_FG, TranslationState, YELLOW,
-};
 use octez_riscv::{
     machine_state::{
         csregisters::{
@@ -24,6 +20,11 @@ use ratatui::{
     style::Stylize,
     symbols::border,
     widgets::{block::*, *},
+};
+
+use super::{
+    BLUE, DebuggerApp, GRAY, GREEN, Instruction, NEXT_STYLE_FG, ORANGE, RED, SATPModeState,
+    SELECTED_STYLE_FG, TranslationState, YELLOW,
 };
 
 macro_rules! xregister_line {

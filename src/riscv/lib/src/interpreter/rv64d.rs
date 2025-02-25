@@ -6,6 +6,11 @@
 //!
 //! Chapter 12 - "D" Standard Extension for Double-Precision Floating-Point
 
+use rustc_apfloat::{
+    Float, Status, StatusAnd,
+    ieee::{Double, Single},
+};
+
 use super::float::FloatExt;
 use crate::{
     machine_state::{
@@ -17,10 +22,6 @@ use crate::{
     parser::instruction::InstrRoundingMode,
     state_backend as backend,
     traps::Exception,
-};
-use rustc_apfloat::{
-    Float, Status, StatusAnd,
-    ieee::{Double, Single},
 };
 
 impl From<Double> for FValue {
@@ -546,6 +547,9 @@ where
 
 #[cfg(test)]
 mod tests {
+    use arbitrary_int::u5;
+    use proptest::prelude::*;
+
     use crate::{
         backend_test,
         bits::Bits64,
@@ -562,8 +566,6 @@ mod tests {
         },
         traps::Exception,
     };
-    use arbitrary_int::u5;
-    use proptest::prelude::*;
 
     backend_test!(test_fmv_d, F, {
         let state = create_state!(HartState, HartStateLayout, F);

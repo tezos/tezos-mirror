@@ -5,6 +5,8 @@
 
 mod common;
 
+use std::ops::Bound;
+
 use common::*;
 use octez_riscv::{
     machine_state::{DefaultCacheLayouts, main_memory::M64M},
@@ -12,7 +14,6 @@ use octez_riscv::{
     stepper::{Stepper, StepperStatus, pvm::PvmStepper},
 };
 use rand::Rng;
-use std::ops::Bound;
 
 #[test]
 #[ignore]

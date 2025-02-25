@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use std::{collections::HashMap, sync::Arc};
+
 use tezos_smart_rollup_constants::core::{METADATA_LENGTH, ROLLUP_ADDRESS_LENGTH};
 
 type ResponseFn = Arc<dyn Fn() -> Result<Box<[u8]>, std::io::Error>>;

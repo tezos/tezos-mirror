@@ -4,6 +4,8 @@
 
 //! Merkle trees used for proof generation by the PVM
 
+use std::{convert::Infallible, num::NonZeroUsize};
+
 use super::{
     DynAccess,
     proof::{MerkleProof, MerkleProofLeaf},
@@ -12,7 +14,6 @@ use crate::state_backend::{
     hash::{Hash, HashError},
     proof_backend::tree::{ModifyResult, impl_modify_map_collect},
 };
-use std::{convert::Infallible, num::NonZeroUsize};
 
 // TODO RV-322: Choose optimal Merkleisation parameters for main memory.
 /// Size of the Merkle leaf used for Merkleising [`DynArrays`].
@@ -443,6 +444,10 @@ impl MerkleTree {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
+
+    use proptest::prelude::*;
+
     use super::{
         AccessInfo, CompressedAccessInfo, CompressedMerkleTree, MERKLE_LEAF_SIZE, MerkleTree,
         chunks_to_writer,
@@ -451,8 +456,6 @@ mod tests {
         hash::{Hash, HashError},
         proof_backend::proof::{MerkleProof, MerkleProofLeaf},
     };
-    use proptest::prelude::*;
-    use std::io::Cursor;
 
     impl CompressedMerkleTree {
         /// Get the root hash of a compressed Merkle tree

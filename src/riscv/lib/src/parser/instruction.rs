@@ -3,6 +3,11 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::fmt;
+
+use enum_tag::EnumTag;
+use serde::{Deserialize, Serialize};
+
 use super::XRegisterParsed;
 use crate::{
     default::ConstDefault,
@@ -12,9 +17,6 @@ use crate::{
         registers::{FRegister, NonZeroXRegister, XRegister},
     },
 };
-use enum_tag::EnumTag;
-use serde::{Deserialize, Serialize};
-use std::fmt;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct RTypeArgs {

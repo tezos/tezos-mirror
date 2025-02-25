@@ -6,6 +6,15 @@
 mod move_semantics;
 mod pointer_apply;
 
+use std::{fs, str};
+
+use arbitrary_int::u31;
+use move_semantics::{ImmutableState, MutableState};
+use num_enum::{IntoPrimitive, TryFromPrimitive};
+use ocaml::{Pointer, ToValue};
+use pointer_apply::{ApplyReadOnly, apply_imm, apply_mut};
+use sha2::{Digest, Sha256};
+
 use crate::{
     pvm::{
         PvmHooks, PvmStatus,
@@ -19,13 +28,6 @@ use crate::{
     state_backend::proof_backend::proof,
     storage::{self, StorageError},
 };
-use arbitrary_int::u31;
-use move_semantics::{ImmutableState, MutableState};
-use num_enum::{IntoPrimitive, TryFromPrimitive};
-use ocaml::{Pointer, ToValue};
-use pointer_apply::{ApplyReadOnly, apply_imm, apply_mut};
-use sha2::{Digest, Sha256};
-use std::{fs, str};
 
 const HERMIT_LOADER: &[u8] = include_bytes!("../../assets/hermit-loader");
 

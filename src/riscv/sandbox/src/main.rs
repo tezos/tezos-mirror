@@ -3,9 +3,10 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::error::Error;
+
 use cli::ExitMode;
 use octez_riscv::{machine_state::mode::Mode, stepper::StepperStatus};
-use std::error::Error;
 
 mod cli;
 mod commands;

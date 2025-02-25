@@ -357,6 +357,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use proptest::{arbitrary::any, prop_assert, prop_assert_eq, proptest};
+
     use crate::{
         backend_test, create_state,
         machine_state::{
@@ -367,7 +369,6 @@ mod tests {
         },
         traps::Exception,
     };
-    use proptest::{arbitrary::any, prop_assert, prop_assert_eq, proptest};
 
     backend_test!(test_add_w, F, {
         proptest!(|(

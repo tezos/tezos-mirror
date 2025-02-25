@@ -3,7 +3,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{DebuggerApp, Instruction, PC_CONTEXT};
+use std::{borrow::Cow, collections::HashMap, ops::Range};
+
 use octez_riscv::{
     bits::Bits64,
     machine_state::{
@@ -15,7 +16,8 @@ use octez_riscv::{
     state_backend::{ManagerRead, ManagerReadWrite},
     stepper::{Stepper, StepperStatus},
 };
-use std::{borrow::Cow, collections::HashMap, ops::Range};
+
+use super::{DebuggerApp, Instruction, PC_CONTEXT};
 
 impl<'a, S> DebuggerApp<'a, S>
 where

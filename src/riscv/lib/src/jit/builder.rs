@@ -6,6 +6,11 @@
 //!
 //! [instructions]: crate::machine_state::instruction::Instruction
 
+use cranelift::{
+    codegen::ir::{InstBuilder, MemFlags, Type, Value},
+    frontend::FunctionBuilder,
+};
+
 use super::state_access::{JitStateAccess, JsaCalls};
 use crate::{
     instruction_context::ICB,
@@ -13,10 +18,6 @@ use crate::{
         main_memory::{Address, MainMemoryLayout},
         registers::NonZeroXRegister as XRegister,
     },
-};
-use cranelift::{
-    codegen::ir::{InstBuilder, MemFlags, Type, Value},
-    frontend::FunctionBuilder,
 };
 
 /// Builder context used when lowering individual instructions within a block.

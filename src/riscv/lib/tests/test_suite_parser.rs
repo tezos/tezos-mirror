@@ -3,9 +3,10 @@
 // SPDX-License-Identifier: MIT
 
 use core::panic;
+use std::{fs::DirEntry, process::Command};
+
 use lazy_static::lazy_static;
 use octez_riscv::parser::{instruction::Instr, parse_block};
-use std::{fs::DirEntry, process::Command};
 
 fn compute_offset(src: &str, dest: &str) -> i64 {
     i64::from_str_radix(dest, 16).unwrap() - i64::from_str_radix(src, 16).unwrap()

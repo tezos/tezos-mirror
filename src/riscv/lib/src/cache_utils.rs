@@ -3,6 +3,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::{convert::Infallible, marker::PhantomData};
+
 use crate::{
     default::ConstDefault,
     machine_state::main_memory::Address,
@@ -12,7 +14,6 @@ use crate::{
     },
     storage::{Hash, HashError},
 };
-use std::{convert::Infallible, marker::PhantomData};
 
 /// Integer to keep track of the fence counter
 #[derive(

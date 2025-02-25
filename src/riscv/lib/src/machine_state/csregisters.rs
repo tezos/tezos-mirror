@@ -11,6 +11,11 @@ pub mod satp;
 pub mod values;
 pub mod xstatus;
 
+use num_enum::TryFromPrimitive;
+use root::RootCSRegister;
+use strum::IntoEnumIterator;
+use values::{CSRValues, CSRValuesLayout, MStatusValue};
+
 use self::{
     bits::NormaliseFields,
     satp::Satp,
@@ -24,10 +29,6 @@ use crate::{
     state_backend::{self as backend, ManagerRead},
     traps::{Exception, Interrupt, TrapContext, TrapKind},
 };
-use num_enum::TryFromPrimitive;
-use root::RootCSRegister;
-use strum::IntoEnumIterator;
-use values::{CSRValues, CSRValuesLayout, MStatusValue};
 
 /// Privilege required to access a CSR
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -1672,6 +1673,8 @@ impl<M: backend::ManagerClone> Clone for CSRegisters<M> {
 #[cfg(test)]
 #[allow(clippy::identity_op)]
 mod tests {
+    use strum::IntoEnumIterator;
+
     use crate::{
         backend_test,
         bits::Bits64,
@@ -1685,7 +1688,6 @@ mod tests {
         },
         traps::{Interrupt, TrapContext},
     };
-    use strum::IntoEnumIterator;
 
     #[test]
     fn test_privilege_access() {

@@ -2,14 +2,15 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::error::Error;
+use std::path::Path;
+
 use base64::{Engine, engine::general_purpose::URL_SAFE};
 use http::{HeaderMap, Method, Uri};
 use jstz_crypto::{keypair_from_passphrase, public_key::PublicKey, secret_key::SecretKey};
 use jstz_proto::context::account::{Address, Nonce, ParsedCode};
 use jstz_proto::operation::{Content, DeployFunction, Operation, RunFunction, SignedOperation};
 use serde::{Serialize, Serializer};
-use std::error::Error;
-use std::path::Path;
 use tezos_data_encoding::enc::BinWriter;
 use tezos_smart_rollup::inbox::ExternalMessageFrame;
 use tezos_smart_rollup::types::SmartRollupAddress;

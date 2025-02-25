@@ -210,6 +210,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use proptest::{prelude::*, prop_assert_eq, proptest};
+
     use crate::{
         backend_test, create_state,
         machine_state::{
@@ -224,7 +226,6 @@ mod tests {
         },
         parser::instruction::InstrWidth,
     };
-    use proptest::{prelude::*, prop_assert_eq, proptest};
 
     backend_test!(run_cj, F, {
         let test_case = [

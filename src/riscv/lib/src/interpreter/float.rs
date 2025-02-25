@@ -4,6 +4,13 @@
 
 //! Core-logic implementation of F/D instructions.
 
+use std::{
+    fmt::{self, Display},
+    ops::Neg,
+};
+
+use rustc_apfloat::{Float, FloatConvert, Round, Status, StatusAnd};
+
 use crate::{
     machine_state::{
         csregisters::{CSRRepr, CSRegister, CSRegisters},
@@ -13,11 +20,6 @@ use crate::{
     parser::instruction::InstrRoundingMode,
     state_backend as backend,
     traps::Exception,
-};
-use rustc_apfloat::{Float, FloatConvert, Round, Status, StatusAnd};
-use std::{
-    fmt::{self, Display},
-    ops::Neg,
 };
 
 pub trait FloatExt: Float + Into<FValue> + Copy + Neg + From<FValue> {

@@ -3,6 +3,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::borrow::Borrow;
+
 use super::{
     Elem, EnrichedValue, EnrichedValueLinked, FnManager, ManagerBase, ManagerClone,
     ManagerDeserialise, ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite, Ref,
@@ -11,7 +13,6 @@ use super::{
         merkle::{AccessInfo, AccessInfoAggregatable},
     },
 };
-use std::borrow::Borrow;
 
 /// Link a stored value directly with a derived value -
 /// that would either be expensive to compute each time, or cannot
@@ -569,6 +570,8 @@ impl<const LEN: usize, M: ManagerClone> Clone for DynCells<LEN, M> {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use serde::ser::SerializeTuple;
+
     use crate::{
         backend_test,
         default::ConstDefault,
@@ -577,7 +580,6 @@ pub(crate) mod tests {
             layout::{Atom, Layout},
         },
     };
-    use serde::ser::SerializeTuple;
 
     /// Dummy type that helps us implement custom normalisation via [Elem]
     #[repr(packed)]

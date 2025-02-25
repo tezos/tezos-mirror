@@ -3,14 +3,15 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::{
+    error::Error,
+    fs::{self, File},
+};
+
 pub(crate) use crate::commands::bench::stats::{BenchStats, NamedStats};
 use crate::{
     cli::{self, BenchOptions, BenchRunOptions},
     table,
-};
-use std::{
-    error::Error,
-    fs::{self, File},
 };
 
 pub mod commands;

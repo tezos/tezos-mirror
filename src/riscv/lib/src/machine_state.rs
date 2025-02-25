@@ -17,18 +17,8 @@ pub mod reservation_set;
 #[cfg(test)]
 extern crate proptest;
 
-use crate::{
-    bits::u64,
-    devicetree,
-    parser::{
-        instruction::{Instr, InstrCacheable, InstrUncacheable, InstrWidth},
-        is_compressed, parse_compressed_instruction, parse_uncompressed_instruction,
-    },
-    program::Program,
-    range_utils::{bound_saturating_sub, less_than_bound, unwrap_bound},
-    state_backend::{self as backend, ManagerReadWrite},
-    traps::{EnvironException, Exception},
-};
+use std::ops::Bound;
+
 pub use address_translation::AccessType;
 use address_translation::{
     PAGE_SIZE,
@@ -45,7 +35,19 @@ use hart_state::{HartState, HartStateLayout};
 use instruction::Instruction;
 use main_memory::{Address, MainMemory, OutOfBounds};
 use mode::Mode;
-use std::ops::Bound;
+
+use crate::{
+    bits::u64,
+    devicetree,
+    parser::{
+        instruction::{Instr, InstrCacheable, InstrUncacheable, InstrWidth},
+        is_compressed, parse_compressed_instruction, parse_uncompressed_instruction,
+    },
+    program::Program,
+    range_utils::{bound_saturating_sub, less_than_bound, unwrap_bound},
+    state_backend::{self as backend, ManagerReadWrite},
+    traps::{EnvironException, Exception},
+};
 
 /// Layout for the machine 'run state' - which contains everything required for the running of
 /// instructions.
@@ -664,6 +666,10 @@ pub enum MachineError {
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Bound;
+
+    use proptest::{prop_assert_eq, proptest};
+
     use super::{
         MachineState, MachineStateLayout,
         block_cache::bcall::{Interpreted, InterpretedBlockBuilder},
@@ -708,8 +714,6 @@ mod tests {
         traps::{EnvironException, Exception, TrapContext},
     };
     use crate::{bits::u64, machine_state::main_memory::M1K};
-    use proptest::{prop_assert_eq, proptest};
-    use std::ops::Bound;
 
     backend_test!(test_step, F, {
         let state = create_state!(

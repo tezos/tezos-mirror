@@ -6,8 +6,9 @@
 //!   - <https://elinux.org/Device_Tree_Usage>
 //!   - <https://github.com/devicetree-org/devicetree-specification/releases/tag/v0.4>
 
-use crate::machine_state::main_memory;
 use vm_fdt::FdtWriter;
+
+use crate::machine_state::main_memory;
 
 /// Information about the initial ramdisk.
 pub struct InitialRamDisk {

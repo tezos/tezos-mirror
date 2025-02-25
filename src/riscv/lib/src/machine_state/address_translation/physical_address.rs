@@ -91,8 +91,9 @@ pub fn set_ppn_idx(
 
 #[cfg(test)]
 mod tests {
-    use crate::machine_state::csregisters::{CSRRepr, satp::SvLength};
     use proptest::proptest;
+
+    use crate::machine_state::csregisters::{CSRRepr, satp::SvLength};
 
     #[test]
     pub fn test_physical_address() {

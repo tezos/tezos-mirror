@@ -53,8 +53,9 @@ pub fn get_vpn_idx(v_addr: Address, sv_length: &SvLength, index: usize) -> Optio
 
 #[cfg(test)]
 mod tests {
-    use crate::machine_state::{address_translation::virtual_address, csregisters::satp::SvLength};
     use proptest::proptest;
+
+    use crate::machine_state::{address_translation::virtual_address, csregisters::satp::SvLength};
 
     #[test]
     pub fn test_virtual_address() {

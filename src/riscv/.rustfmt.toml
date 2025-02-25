@@ -1,2 +1,3 @@
 style_edition = "2024"
 required_version = "1.8.0"
+group_imports = "StdExternalCrate"

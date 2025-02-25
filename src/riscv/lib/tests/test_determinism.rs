@@ -4,6 +4,8 @@
 
 mod common;
 
+use std::ops::Bound;
+
 use common::*;
 use octez_riscv::{
     machine_state::{
@@ -13,7 +15,6 @@ use octez_riscv::{
     state_backend::{RefOwnedAlloc, hash},
     stepper::{Stepper, StepperStatus, pvm::PvmStepper},
 };
-use std::ops::Bound;
 
 #[test]
 #[ignore]

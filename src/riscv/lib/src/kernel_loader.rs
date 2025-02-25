@@ -1,3 +1,5 @@
+use std::io::{Cursor, Seek, SeekFrom, Write};
+
 use derive_more::{Error, From};
 use goblin::{
     elf::Elf,
@@ -7,7 +9,6 @@ use goblin::{
         program_header::{PT_LOAD, ProgramHeader},
     },
 };
-use std::io::{Cursor, Seek, SeekFrom, Write};
 
 #[derive(Debug, From, Error, derive_more::Display)]
 pub enum Error {

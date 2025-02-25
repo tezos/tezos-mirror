@@ -3,6 +3,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::{fs, io::Write, ops::Bound};
+
 use goldenfile::Mint;
 use octez_riscv::{
     machine_state::{
@@ -17,7 +19,6 @@ use octez_riscv::{
         test::{TestStepper, TestStepperResult::*},
     },
 };
-use std::{fs, io::Write, ops::Bound};
 
 const TESTS_DIR: &str = "../../../tezt/tests/riscv-tests/generated";
 const GOLDEN_DIR: &str = "tests/expected";
