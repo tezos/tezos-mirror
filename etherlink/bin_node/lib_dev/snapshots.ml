@@ -233,8 +233,9 @@ let export ?snapshot_file ~compression ~data_dir () =
       match (snapshot_file, compression) with
       | Some f, After -> f ^ ".uncompressed"
       | Some f, (No | On_the_fly) -> f
-      | None, On_the_fly -> default_snapshot_file
-      | None, (No | After) -> default_snapshot_file ^ ".uncompressed"
+      | None, On_the_fly -> default_snapshot_file ^ ".gz"
+      | None, After -> default_snapshot_file ^ ".gz.uncompressed"
+      | None, No -> default_snapshot_file
     in
     let*? dest_file =
       interpolate_snapshot_file
