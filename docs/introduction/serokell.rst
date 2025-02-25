@@ -36,8 +36,10 @@ If you were using RPM packages, use ``dnf`` instead of ``apt``.
 
 .. code:: shell
 
-   export distribution=next/debian
+   export distribution=debian
    export release=bookworm
+
+   sudo apt-get install -y sudo gpg curl
 
 .. literalinclude:: install-bin-deb.sh
    :language: shell

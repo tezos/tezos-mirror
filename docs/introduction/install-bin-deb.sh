@@ -122,6 +122,7 @@ if [ "$RELEASETYPE" = "Master" ]; then
   # [add repository]
   apt-get update
   apt-get install -y sudo gpg curl
+  # [add repository]
 
   curl -s "https://packages.nomadic-labs.com/$distribution/octez.asc" |
     sudo gpg --dearmor -o /etc/apt/keyrings/octez.gpg
