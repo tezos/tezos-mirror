@@ -12,8 +12,6 @@ debsystemctl=$(command -v deb-systemd-invoke || echo systemctl)
 
 if [ -e /etc/default/octez-node ]; then
   . /etc/default/octez-node
-  TEZOS_HOME=$(basedir $DATADIR)
-  DATADIR="$TEZOS_HOME/.tezos-node"
 fi
 
 case "${1}" in
@@ -24,7 +22,6 @@ remove)
   rm -Rf /run/octez-node
   ;;
 purge)
-  DATADIR=/var/tezos
   # display a warning before proceding
   db_get octez-node/purge_warning || true
   case "$RET" in
