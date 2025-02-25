@@ -109,7 +109,11 @@ let may_add_plugin ctxt cctxt ~block_level ~proto_level =
   return_unit
 
 let get_plugin_for_level ctxt ~level =
-  Proto_plugins.get_plugin_for_level ctxt.proto_plugins ~level
+  let open Result_syntax in
+  let* plugin, _proto_parameters =
+    Proto_plugins.get_plugin_and_parameters_for_level ctxt.proto_plugins ~level
+  in
+  return plugin
 
 let get_all_plugins ctxt = Proto_plugins.to_list ctxt.proto_plugins
 
