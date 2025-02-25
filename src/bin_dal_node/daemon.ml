@@ -491,9 +491,18 @@ module Handler = struct
         parameters.cryptobox_parameters.number_of_shards
         / parameters.cryptobox_parameters.redundancy_factor
       in
-      let should_be_attested index =
-        let num_attested_shards = attested_shards_per_slot.(index) in
-        num_attested_shards >= threshold
+      let are_slots_protocol_attested =
+        Array.map
+          (fun num_attested_shards -> num_attested_shards >= threshold)
+          attested_shards_per_slot
+      in
+      let should_be_attested index = are_slots_protocol_attested.(index) in
+      let number_of_attested_slots =
+        Array.fold_left
+          (fun counter is_attested ->
+            if is_attested then counter + 1 else counter)
+          0
+          are_slots_protocol_attested
       in
       let contains_traps =
         let store = Node_context.get_store node_ctxt in
@@ -520,6 +529,7 @@ module Handler = struct
         in
         match attestation_opt with
         | None ->
+            Dal_metrics.attested_slots_for_baker_per_level_ratio ~delegate 0. ;
             Event.emit_warn_no_attestation
               ~attester:delegate
               ~attested_level:block_level
@@ -527,6 +537,9 @@ module Handler = struct
           -> (
             match dal_attestation_opt with
             | None ->
+                Dal_metrics.attested_slots_for_baker_per_level_ratio
+                  ~delegate
+                  0. ;
                 Event.emit_warn_attester_not_dal_attesting
                   ~attester:delegate
                   ~attested_level:block_level
@@ -554,6 +567,18 @@ module Handler = struct
                     ([], [], [])
                     (parameters.number_of_slots - 1 --- 0)
                 in
+                let baker_attested_slot =
+                  List.length attested + List.length not_attested_with_traps
+                in
+                let ratio =
+                  try
+                    float_of_int baker_attested_slot
+                    /. float_of_int number_of_attested_slots
+                  with _ -> 1.
+                in
+                Dal_metrics.attested_slots_for_baker_per_level_ratio
+                  ~delegate
+                  ratio ;
                 let*! () =
                   if attested <> [] then
                     Event.emit_attester_attested

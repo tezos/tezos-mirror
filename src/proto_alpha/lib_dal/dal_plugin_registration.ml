@@ -250,6 +250,9 @@ module Plugin = struct
     | Ok b -> b
     | Error _ -> false
 
+  let number_of_attested_slots attestation =
+    Environment.Bitset.cardinal attestation
+
   let is_delegate ctxt ~pkh =
     let open Lwt_result_syntax in
     let*? pkh = Signature.Of_V_latest.get_public_key_hash pkh in

@@ -209,6 +209,8 @@ module Plugin = struct
   let is_attested attestation slot_index =
     match Bitset.mem attestation slot_index with Ok b -> b | Error _ -> false
 
+  let number_of_attested_slots attestation = Bitset.hamming_weight attestation
+
   let is_delegate ctxt ~pkh =
     let open Lwt_result_syntax in
     let*? pkh = Signature.Of_V_latest.get_public_key_hash pkh in
