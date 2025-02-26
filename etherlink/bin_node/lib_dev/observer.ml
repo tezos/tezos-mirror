@@ -103,7 +103,7 @@ let () =
     (function Invalid_snapshot_provider name -> Some name | _ -> None)
     (fun name -> Invalid_snapshot_provider name)
 
-let interpolate_snapshot_provider rollup_address network provider =
+let interpolate_snapshot_provider rollup_address network history_mode provider =
   let open Result_syntax in
   let percent = ('%', "%") in
   let rollup_address_short =
@@ -117,11 +117,22 @@ let interpolate_snapshot_provider rollup_address network provider =
   let network =
     ('n', Format.asprintf "%a" Configuration.pp_supported_network network)
   in
+  let history_mode =
+    ( 'h',
+      Configuration.string_of_history_mode_info history_mode
+      |> String.lowercase_ascii )
+  in
   try
     return
       (Misc.interpolate
          provider
-         [percent; rollup_address_short; rollup_address_long; network])
+         [
+           percent;
+           rollup_address_short;
+           rollup_address_long;
+           network;
+           history_mode;
+         ])
   with _ -> tzfail (Invalid_snapshot_provider provider)
 
 let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
@@ -151,7 +162,12 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     | None -> Result.return_none
     | Some network ->
         Option.map_e
-          (interpolate_snapshot_provider smart_rollup_address network)
+          (interpolate_snapshot_provider
+             smart_rollup_address
+             network
+             (Option.value
+                ~default:Configuration.default_history_mode
+                config.history_mode))
           init_from_snapshot
   in
   let* _loaded =

@@ -162,21 +162,33 @@ end
 
 open Snapshot_utils.Make (Header)
 
-let interpolate_snapshot_file current_level rollup_address filename =
+let interpolate_snapshot_file current_level rollup_address history_mode filename
+    =
   let percent = ('%', "%") in
   let rollup_address_short = ('r', Address.to_short_b58check rollup_address) in
   let rollup_address_long = ('R', Address.to_b58check rollup_address) in
   let current_level =
     ('l', Format.asprintf "%a" Ethereum_types.pp_quantity current_level)
   in
+  let history_mode =
+    ( 'h',
+      Configuration.string_of_history_mode_info history_mode
+      |> String.lowercase_ascii )
+  in
   try
     Ok
       (Misc.interpolate
          filename
-         [percent; rollup_address_short; rollup_address_long; current_level])
+         [
+           percent;
+           rollup_address_short;
+           rollup_address_long;
+           current_level;
+           history_mode;
+         ])
   with _ -> Result_syntax.tzfail (Invalid_snapshot_file filename)
 
-let default_snapshot_file = "evm-snapshot-%r-%l"
+let default_snapshot_file = "evm-%h-snapshot-%r-%l"
 
 let export ?snapshot_file ~compression ~data_dir () =
   let open Lwt_result_syntax in
@@ -225,7 +237,11 @@ let export ?snapshot_file ~compression ~data_dir () =
       | None, (No | After) -> default_snapshot_file ^ ".uncompressed"
     in
     let*? dest_file =
-      interpolate_snapshot_file current_level rollup_address snapshot_file
+      interpolate_snapshot_file
+        current_level
+        rollup_address
+        history_mode
+        snapshot_file
     in
     let*! () = Lwt_utils_unix.create_dir (Filename.dirname dest_file) in
     create stdlib_reader writer header ~files ~dest:dest_file ;
