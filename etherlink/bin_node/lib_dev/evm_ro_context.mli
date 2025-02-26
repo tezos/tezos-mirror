@@ -36,6 +36,8 @@ val load :
 val read_chain_family :
   t -> Ethereum_types.chain_id -> Ethereum_types.chain_family tzresult Lwt.t
 
+val read_enable_multichain_flag : t -> bool tzresult Lwt.t
+
 (** [preload_known_kernels ctxt] uses [ctxt] to preload every kernel known to
     the node in the Fast Execution kernel cache. *)
 val preload_known_kernels : t -> unit tzresult Lwt.t

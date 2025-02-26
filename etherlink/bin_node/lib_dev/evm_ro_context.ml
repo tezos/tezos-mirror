@@ -36,6 +36,12 @@ let read_chain_family ctxt chain_id =
   let* chain_family = Durable_storage.chain_family (read evm_state) chain_id in
   return chain_family
 
+let read_enable_multichain_flag ctxt =
+  let open Lwt_result_syntax in
+  let* _, hash = Evm_store.(use ctxt.store Context_hashes.get_latest) in
+  let* evm_state = get_evm_state ctxt hash in
+  Durable_storage.is_multichain_enabled (read evm_state)
+
 let network_sanity_check ~network ctxt =
   let open Lwt_result_syntax in
   let expected_smart_rollup_address = Constants.rollup_address network in
