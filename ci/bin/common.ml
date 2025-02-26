@@ -336,7 +336,10 @@ let changeset_octez =
 
 (* Only if Etherlink has changed *)
 let changeset_etherlink =
-  Changeset.(changeset_base @ make ["etherlink/**/*"; "Makefile"])
+  Changeset.(
+    changeset_base
+    @ make
+        ["etherlink/**/*"; "Makefile"; "src/kernel_sdk/**/*"; "sdk/rust/**/*"])
 
 (** Only if octez source code has changed, if the images has changed or
     if kernels.mk changed. *)
@@ -565,19 +568,25 @@ let changeset_test_sdk_rust =
   Changeset.(
     changeset_base
     @ changeset_images (* Run if the [rust-toolchain] image is updated *)
-    @ make ["sdk/rust"])
+    @ make ["sdk/rust/**/*"])
 
 let changeset_test_kernels =
   Changeset.(
     changeset_base
     @ changeset_images (* Run if the [rust-toolchain] image is updated *)
-    @ make ["kernels.mk"; "src/kernel_*/**/*"])
+    @ make ["kernels.mk"; "src/kernel_*/**/*"; "sdk/rust/**/*"])
 
 let changeset_test_etherlink_kernel =
   Changeset.(
     changeset_base
     @ changeset_images (* Run if the [rust-toolchain] image is updated *)
-    @ make ["etherlink.mk"; "etherlink/**/*.rs"; "src/kernel_sdk/**/*"])
+    @ make
+        [
+          "etherlink.mk";
+          "etherlink/**/*.rs";
+          "src/kernel_sdk/**/*";
+          "sdk/rust/**/*";
+        ])
 
 let changeset_test_etherlink_firehose =
   Changeset.(
@@ -592,7 +601,7 @@ let changeset_riscv_kernels =
   Changeset.(
     changeset_base
     @ changeset_images (* Run if the [rust-toolchain] image is updated *)
-    @ make ["src/kernel_sdk/**/*"; "src/riscv/**/*"])
+    @ make ["sdk/rust/**/*"; "src/kernel_sdk/**/*"; "src/riscv/**/*"])
 
 let changeset_test_evm_compatibility =
   Changeset.(
