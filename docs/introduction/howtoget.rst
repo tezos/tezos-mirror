@@ -108,17 +108,58 @@ If migrating from Serokell packages you can check out migration documentation
 Fedora Octez packages
 ~~~~~~~~~~~~~~~~~~~~~
 
-If you're using Fedora, you can install packages with Octez binaries
-from the Octez release page indicated above
-using ``rpm`` or ``dnf``. Currently it supports the latest LTS release for
-Fedora and for RockyLinux.
+If you're using Fedora, you can install packages with Octez binaries from the
+Octez from our DNF repository. Currently we support the latest LTS release for
+Fedora and for RockyLinux :
 
-Upgrading to a new or more recent release requires downloading again all the ``rpm``
-packages and repeat the installation.
+- ``rockylinux/9.3``
+- ``fedora/39``
+- ``fedora/42``
 
-For example using ``yum``::
+both on ``amd64`` and ``arm64`` architectures.
 
-    yum install ./octez-client-19.1-1.x86_64.rpm
+In order to add the Tezos package repository to your machine, do:
+
+::
+
+  export distribution=rockylinux
+  export release=9.3
+
+and run:
+
+.. literalinclude:: install-bin-rpm.sh
+   :language: shell
+   :start-after: [add repository]
+   :end-before: [end add repository]
+
+For ``rockylinux`` user you also need to add the ``devel`` repository
+
+::
+
+  dnf -y config-manager --set-enabled devel
+
+To update the local dnf registry run:
+
+::
+
+  dnf update
+
+We also maintain a separate repository for release candidates. To install
+the last release candidate simply prepend ``RC/`` to the distribution name
+as in ``export distribution=RC/rockylinux``
+
+Then, to install the binaries, run the following commands:
+
+.. literalinclude:: install-bin-rpm.sh
+   :language: shell
+   :start-after: [install octez]
+   :end-before: [end install octez]
+
+To remove the Octez packages you can simply run the following command.
+
+.. literalinclude:: install-bin-rpm.sh
+   :language: shell
+   :start-after: [test autopurge]
 
 .. _getting_static_binaries:
 

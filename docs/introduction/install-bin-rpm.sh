@@ -41,14 +41,15 @@ if [ "$RELEASETYPE" = "Master" ]; then
 
   # Add the repository
   dnf -y config-manager --add-repo "https://packages.nomadic-labs.com/$distribution/dists/$release/"
+  # Install public key
+  rpm --import "https://packages.nomadic-labs.com/$distribution/octez.asc"
+  # [end add repository]
+
   if [ "$distroname" = "rockylinux" ]; then
     dnf -y config-manager --set-enabled devel
   fi
   dnf -y update
 
-  # Install public key
-  rpm --import "https://packages.nomadic-labs.com/$distribution/octez.asc"
-  # [end add repository]
 else
   # Update and install the config-mananger plugin
   dnf -y update
@@ -69,13 +70,14 @@ fi
 
 dnf -y install sudo
 
-# [install tezos]
+# [install octez]
 sudo dnf -y install octez-node
 sudo dnf -y install octez-client
 sudo dnf -y install octez-node
 sudo dnf -y install octez-baker
 sudo dnf -y install octez-dal-node
 sudo dnf -y install octez-smart-rollup-node
+# [end install octez]
 
 # [test executables]
 octez-client --version
@@ -84,4 +86,4 @@ octez-node --version
 "octez-accuser-$protocol" --version
 
 # [test autopurge]
-sudo dnf -y remove octez-node octez-client octez-baker octez-dal-node
+sudo dnf -y remove octez-node octez-client octez-baker octez-dal-node octez-smart-rollup-node
