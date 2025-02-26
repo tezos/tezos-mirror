@@ -14,6 +14,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use ocaml::{Pointer, ToValue};
 use pointer_apply::{ApplyReadOnly, apply_imm, apply_mut};
 use sha2::{Digest, Sha256};
+use tezos_smart_rollup_constants::core::{METADATA_LENGTH, ROLLUP_ADDRESS_LENGTH};
 
 use crate::{
     pvm::{
@@ -49,19 +50,18 @@ ocaml::custom!(Repo);
 ocaml::custom!(Id);
 
 #[derive(ocaml::FromValue, ocaml::ToValue, IntoPrimitive, TryFromPrimitive, strum::EnumCount)]
-#[ocaml::sig("Evaluating | WaitingForInput | WaitingForMetadata | WaitingForReveal")]
+#[ocaml::sig("Evaluating | WaitingForInput | WaitingForReveal")]
 #[repr(u8)]
 pub enum Status {
     Evaluating,
     WaitingForInput,
-    WaitingForMetadata,
     WaitingForReveal,
 }
 
 // Check that [`PvmStatus`] and [`Status`] can be coerced into each other.
 const STATUS_ENUM_COERCIBLE: bool = {
     if <PvmStatus as strum::EnumCount>::COUNT != <Status as strum::EnumCount>::COUNT
-        || <Status as strum::EnumCount>::COUNT != 4
+        || <Status as strum::EnumCount>::COUNT != 3
     {
         panic!("Not coercible!");
     }
@@ -71,10 +71,6 @@ const STATUS_ENUM_COERCIBLE: bool = {
     }
 
     if PvmStatus::WaitingForInput as u8 != Status::WaitingForInput as u8 {
-        panic!("Not coercible!");
-    }
-
-    if PvmStatus::WaitingForMetadata as u8 != Status::WaitingForMetadata as u8 {
         panic!("Not coercible!");
     }
 
@@ -446,8 +442,11 @@ fn apply_set_input<M: ManagerReadWrite>(pvm: &mut NodePvm<M>, input: Input) {
             pvm.set_input_message(level, message_counter, payload.to_vec())
         }
         Input::Reveal(RevealData::Metadata(address, origination_level)) => {
-            let address: &[u8; 20] = address.try_into().expect("Unexpected rollup address size");
-            pvm.set_metadata(address, origination_level)
+            let mut metadata_response_buffer = [0u8; METADATA_LENGTH];
+            metadata_response_buffer[..ROLLUP_ADDRESS_LENGTH].copy_from_slice(address);
+            metadata_response_buffer[ROLLUP_ADDRESS_LENGTH..]
+                .copy_from_slice(&origination_level.to_be_bytes());
+            pvm.set_reveal_response(&metadata_response_buffer)
         }
         _ => {
             // TODO: RV-110. Support all revelations in set_input method
@@ -596,4 +595,18 @@ pub fn octez_riscv_serialise_output_proof(_output_proof: Pointer<OutputProof>) -
 #[ocaml::sig("bytes -> (output_proof, string) result")]
 pub fn octez_riscv_deserialise_output_proof(_bytes: &[u8]) -> Result<Pointer<OutputProof>, String> {
     todo!()
+}
+
+#[ocaml::func]
+#[ocaml::sig("state -> bytes")]
+pub fn octez_riscv_get_reveal_request(state: Pointer<State>) -> BytesWrapper {
+    let serialised_reveal_request: Vec<u8> = state.apply_ro(NodePvm::get_reveal_request);
+    BytesWrapper(serialised_reveal_request.into_boxed_slice())
+}
+
+#[ocaml::func]
+#[ocaml::sig("mut_state -> bytes")]
+pub fn octez_riscv_mut_get_reveal_request(state: Pointer<MutState>) -> BytesWrapper {
+    let serialised_reveal_request: Vec<u8> = state.apply_ro(NodePvm::get_reveal_request);
+    BytesWrapper(serialised_reveal_request.into_boxed_slice())
 }

@@ -94,7 +94,6 @@ pub type PvmLayout<MC, CL> = (
 pub enum PvmStatus {
     Evaluating,
     WaitingForInput,
-    WaitingForMetadata,
     WaitingForReveal,
 }
 
@@ -107,7 +106,6 @@ impl fmt::Display for PvmStatus {
         let status = match self {
             PvmStatus::Evaluating => "Evaluating",
             PvmStatus::WaitingForInput => "Waiting for input message",
-            PvmStatus::WaitingForMetadata => "Waiting for metadata",
             PvmStatus::WaitingForReveal => "Waiting for reveal",
         };
         f.write_str(status)
@@ -317,20 +315,6 @@ impl<
             level,
             counter,
             payload,
-        )
-    }
-
-    /// Provide metadata in response to a metadata request. Returns `false`
-    /// if the machine is not expecting metadata.
-    pub fn provide_metadata(&mut self, rollup_address: &[u8; 20], origination_level: u32) -> bool
-    where
-        M: state_backend::ManagerReadWrite,
-    {
-        sbi::provide_metadata(
-            &mut self.status,
-            &mut self.machine_state,
-            rollup_address,
-            origination_level,
         )
     }
 

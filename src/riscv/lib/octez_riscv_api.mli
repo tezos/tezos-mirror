@@ -8,7 +8,7 @@ type repo
 type state
 type mut_state
 type id
-type status = Evaluating | WaitingForInput | WaitingForMetadata | WaitingForReveal
+type status = Evaluating | WaitingForInput | WaitingForReveal
 type reveal_data = RawData of string | Metadata of bytes * int32
 type input = InboxMessage of int32 * int64 * string | Reveal of reveal_data
 type input_request
@@ -59,3 +59,5 @@ external octez_riscv_state_of_output_proof: output_proof -> bytes = "octez_riscv
 external octez_riscv_verify_output_proof: output_proof -> output option = "octez_riscv_verify_output_proof"
 external octez_riscv_serialise_output_proof: output_proof -> bytes = "octez_riscv_serialise_output_proof"
 external octez_riscv_deserialise_output_proof: bytes -> (output_proof, string) result = "octez_riscv_deserialise_output_proof"
+external octez_riscv_get_reveal_request: state -> bytes = "octez_riscv_get_reveal_request"
+external octez_riscv_mut_get_reveal_request: mut_state -> bytes = "octez_riscv_mut_get_reveal_request"

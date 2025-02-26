@@ -40,7 +40,8 @@ let of_pvm_input_request (_input_request : Backend.input_request) :
 
 let make_is_input_state (get_status : 'a -> Backend.status Lwt.t)
     (get_current_level : 'a -> int32 option Lwt.t)
-    (get_message_counter : 'a -> int64 Lwt.t) ~is_reveal_enabled:_ state =
+    (get_message_counter : 'a -> int64 Lwt.t)
+    (get_reveal_request : 'a -> string Lwt.t) ~is_reveal_enabled:_ state =
   let open Lwt_syntax in
   let* status = get_status state in
   match status with
@@ -54,10 +55,15 @@ let make_is_input_state (get_status : 'a -> Backend.status Lwt.t)
           return
             (Sc_rollup.First_after
                (Raw_level.of_int32_exn level, Z.of_int64 message_counter)))
-  | WaitingForMetadata -> return Sc_rollup.(Needs_reveal Reveal_metadata)
   | WaitingForReveal ->
-      (* TODO: RV-407: Rollup node handles reveal request from riscv pvm *)
-      assert false
+      let* reveal_request_string = get_reveal_request state in
+      let reveal_request =
+        (* TODO: RV-501: Errors during decode reveal request should not be fatal *)
+        Data_encoding.Binary.of_string_exn
+          Alpha_context.Sc_rollup.reveal_encoding
+          reveal_request_string
+      in
+      return Sc_rollup.(Needs_reveal reveal_request)
 
 module Insert_failure_impl = struct
   let insert_failure _state =
@@ -114,6 +120,7 @@ module PVM :
       Backend.get_status
       Backend.get_current_level
       Backend.get_message_counter
+      Backend.get_reveal_request
 
   let set_input input state = Backend.set_input state (to_pvm_input input)
 
@@ -205,6 +212,7 @@ module Mutable_state :
       Backend.Mutable_state.get_status
       Backend.Mutable_state.get_current_level
       Backend.Mutable_state.get_message_counter
+      Backend.Mutable_state.get_reveal_request
 
   let set_input input state =
     Backend.Mutable_state.set_input state @@ to_pvm_input input

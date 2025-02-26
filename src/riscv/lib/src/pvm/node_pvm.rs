@@ -236,6 +236,14 @@ impl<M: state_backend::ManagerBase> NodePvm<M> {
         self.with_backend(|state| state.message_counter.read())
     }
 
+    /// Get the reveal request from the PVM state
+    pub fn get_reveal_request(&self) -> Vec<u8>
+    where
+        M: state_backend::ManagerRead,
+    {
+        self.with_backend(|state| state.pvm.reveal_request())
+    }
+
     pub fn install_boot_sector(&mut self, loader: &[u8], kernel: &[u8])
     where
         M: state_backend::ManagerReadWrite,
@@ -287,22 +295,6 @@ impl<M: state_backend::ManagerBase> NodePvm<M> {
             state.message_counter.write(message_counter);
             state.level_is_set.write(true);
             state.level.write(level);
-        })
-    }
-
-    pub fn set_metadata(&mut self, rollup_address: &[u8; 20], origination_level: u32)
-    where
-        M: state_backend::ManagerReadWrite,
-    {
-        self.with_backend_mut(|state| {
-            assert!(
-                state
-                    .pvm
-                    .provide_metadata(rollup_address, origination_level),
-                "Cannot accept metadata in current state ({})",
-                state.pvm.status()
-            );
-            state.tick.write(state.tick.read() + 1);
         })
     }
 
