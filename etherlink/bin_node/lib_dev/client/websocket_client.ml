@@ -36,6 +36,14 @@ module Event = struct
 
   let pp_exn fmt e = Format.pp_print_string fmt (Printexc.to_string e)
 
+  let connected =
+    declare_0
+      ~section
+      ~name:"websocket_client_connected"
+      ~msg:"websocket client connected"
+      ~level:Info
+      ()
+
   let disconnecting =
     declare_0
       ~section
@@ -242,6 +250,7 @@ let connect ?monitoring media uri =
       [("Accept", accept_header); ("Content-type", content_header)]
   in
   let* conn = Websocket_lwt_unix.connect ~ctx client uri ~extra_headers in
+  let* () = Event.(emit connected) () in
   let message_buffer = Buffer.create 256 in
   let monitor =
     match monitoring with

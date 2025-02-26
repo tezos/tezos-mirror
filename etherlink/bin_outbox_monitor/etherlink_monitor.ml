@@ -150,6 +150,14 @@ module Event = struct
          starting from its earliest available level."
       ~level:Warning
       ("lcc", Data_encoding.int32)
+
+  let ws_reconnection =
+    declare_1
+      ~section
+      ~name:"ws_reconnection"
+      ~msg:"Disconnected from websocket, reconnecting in {delay}s."
+      ~level:Error
+      ("delay", Data_encoding.float)
 end
 
 type error +=
@@ -634,32 +642,47 @@ let init_db_pointers db ws_client rollup_node_rpc =
   in
   return_unit
 
+let reconnection_delay = 10.
+
 let start db ~evm_node_endpoint ~rollup_node_endpoint ~l1_node_endpoint =
   let open Lwt_result_syntax in
-  let*! ws_client =
-    Websocket_client.connect
-      ~monitoring:{ping_timeout = 60.; ping_interval = 10.}
-      Media_type.json
-      evm_node_endpoint
+  let run () =
+    let*! ws_client =
+      Websocket_client.connect
+        ~monitoring:{ping_timeout = 60.; ping_interval = 10.}
+        Media_type.json
+        evm_node_endpoint
+    in
+    let rollup_node_rpc = Rollup_node_rpc.make_ctxt ~rollup_node_endpoint in
+    let* () = init_db_pointers db ws_client rollup_node_rpc in
+    let* last_l2_head = Db.Pointers.L2_head.get db in
+    let* last_levels = Db.Levels.last db in
+    let* rollup_address = Rollup_node_rpc.get_rollup_address rollup_node_rpc in
+    let monitor_withdrawals = monitor_withdrawals db ws_client in
+    let monitor_l2_l1_levels =
+      monitor_l2_l1_levels
+        db
+        ws_client
+        ~rollup_node_rpc
+        rollup_address
+        ~l1_node_endpoint
+        ~last_levels
+    in
+    let* () = catch_up_withdrawals db ws_client ~last_l2_head in
+    let* () =
+      Lwt.pick
+        [monitor_withdrawals; monitor_heads db ws_client; monitor_l2_l1_levels]
+    in
+    return_unit
   in
-  let rollup_node_rpc = Rollup_node_rpc.make_ctxt ~rollup_node_endpoint in
-  let* () = init_db_pointers db ws_client rollup_node_rpc in
-  let* last_l2_head = Db.Pointers.L2_head.get db in
-  let* last_levels = Db.Levels.last db in
-  let* rollup_address = Rollup_node_rpc.get_rollup_address rollup_node_rpc in
-  let monitor_withdrawals = monitor_withdrawals db ws_client in
-  let monitor_l2_l1_levels =
-    monitor_l2_l1_levels
-      db
-      ws_client
-      ~rollup_node_rpc
-      rollup_address
-      ~l1_node_endpoint
-      ~last_levels
+  let rec loop ?(first = false) () =
+    let* () =
+      Lwt.catch run (function
+          | Unix.(Unix_error (ECONNREFUSED, _, _)) when not first -> return_unit
+          | e -> Lwt.reraise e)
+    in
+    let*! () = Event.(emit ws_reconnection) reconnection_delay in
+    let*! () = Lwt_unix.sleep reconnection_delay in
+    loop ()
   in
-  let* () = catch_up_withdrawals db ws_client ~last_l2_head in
-  let* () =
-    Lwt.pick
-      [monitor_withdrawals; monitor_heads db ws_client; monitor_l2_l1_levels]
-  in
-  return_unit
+  loop ~first:true ()
