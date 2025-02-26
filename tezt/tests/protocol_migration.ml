@@ -457,11 +457,11 @@ let start_protocol ?consensus_threshold ?round_duration
     ~parameter_file
     client
 
-(** Test that migration occuring through baker daemons
+(** Test that migration occuring through (agnostic) baker daemons
 
    - does not halt the chain;
    - and that the migration block is not attested by the newer
-     protocol's baker.
+     protocol's baker (if not using agnostic baker).
 
    This has become an issue of sort after updating the consensus protocol to
    Tenderbake.  For one, attestations have become mandatory, and not only a sign
@@ -472,27 +472,34 @@ let start_protocol ?consensus_threshold ?round_duration
    Revisit this test, as it may start to fail, whenever a new (family of)
    consensus protocol is put into place in Tezos. **)
 let test_migration_with_bakers ?(migration_level = 4)
-    ?(num_blocks_post_migration = 5) ~migrate_from ~migrate_to () =
+    ?(num_blocks_post_migration = 5) ~migrate_from ~migrate_to
+    ~use_agnostic_baker () =
+  let baker_string, uses =
+    if use_agnostic_baker then
+      ("agnostic_baker", [Constant.octez_experimental_agnostic_baker])
+    else ("baker", [Protocol.baker migrate_from; Protocol.baker migrate_to])
+  in
   Test.register
     ~__FILE__
     ~title:
       (Printf.sprintf
-         "chain progress/attestation of migration block from %s to %s with \
-          baker daemons"
+         "chain progress/attestation of migration block from %s to %s with %s \
+          daemon(s)"
          (Protocol.tag migrate_from)
-         (Protocol.tag migrate_to))
+         (Protocol.tag migrate_to)
+         baker_string)
     ~tags:
       [
         team;
         "protocol";
         "migration";
-        "baker";
+        baker_string;
         "attesting";
         "metadata";
         "from_" ^ Protocol.tag migrate_from;
         "to_" ^ Protocol.tag migrate_to;
       ]
-    ~uses:[Protocol.baker migrate_from; Protocol.baker migrate_to]
+    ~uses
   @@ fun () ->
   let* client, node =
     user_migratable_node_init ~migration_level ~migrate_to ()
@@ -506,23 +513,33 @@ let test_migration_with_bakers ?(migration_level = 4)
   let* () =
     check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client
   in
-
-  Log.info
-    "Launching 2 bakers, one for %s (pre-migration protocol), one for \
-     %s(post-migration protocol)"
-    (Protocol.name migrate_from)
-    (Protocol.name migrate_to) ;
-  let baker_for_proto protocol =
-    let name = Printf.sprintf "baker-proto-%s" (Protocol.name protocol) in
-    let delegates =
-      List.map
-        (fun account -> account.Account.alias)
-        (Array.to_list Account.Bootstrap.keys)
-    in
-    Baker.init ~protocol ~name node client ~delegates
+  let delegates =
+    List.map
+      (fun account -> account.Account.alias)
+      (Array.to_list Account.Bootstrap.keys)
   in
-  let* _baker_from_proto = baker_for_proto migrate_from in
-  let* _baker_to_proto = baker_for_proto migrate_to in
+
+  let* () =
+    if use_agnostic_baker then (
+      Log.info "Launching agnostic baker" ;
+      let* _agnostic_baker =
+        Agnostic_baker.init ~name:"agnostic_baker" node client ~delegates
+      in
+      unit)
+    else (
+      Log.info
+        "Launching 2 bakers, one for %s (pre-migration protocol), one for \
+         %s(post-migration protocol)"
+        (Protocol.name migrate_from)
+        (Protocol.name migrate_to) ;
+      let baker_for_proto protocol =
+        let name = Printf.sprintf "baker-proto-%s" (Protocol.name protocol) in
+        Baker.init ~protocol ~name node client ~delegates
+      in
+      let* _baker_from_proto = baker_for_proto migrate_from in
+      let* _baker_to_proto = baker_for_proto migrate_to in
+      unit)
+  in
   let* _ret = Node.wait_for_level node migration_level in
   let* () =
     check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client
@@ -594,14 +611,14 @@ let test_forked_migration_manual ?(migration_level = 4)
         team;
         "protocol";
         "migration";
-        "baker";
+        "agnostic_baker";
         "attesting";
         "fork";
         "manual";
         "from_" ^ Protocol.tag migrate_from;
         "to_" ^ Protocol.tag migrate_to;
       ]
-    ~uses:[Protocol.baker migrate_to]
+    ~uses:[Constant.octez_experimental_agnostic_baker]
     ~title:
       (Printf.sprintf
          "manually forked migration blocks from %s to %s"
@@ -724,36 +741,14 @@ let test_forked_migration_manual ?(migration_level = 4)
         "proposer %L is the same as proposer %R: only one migration block has \
          been proposed") ;
 
-  let baker_for_proto ~delegates ~node ~client ~protocol =
-    let name =
-      Printf.sprintf
-        "baker-proto-%s-on-%s"
-        (Protocol.name protocol)
-        (Node.name node)
-    in
-    Baker.init ~protocol ~name node client ~delegates
-  in
-
   Log.info
     "Reconnecting nodes and launching bakers for %s"
     (Protocol.name migrate_to) ;
   let* () = connect cn1 cn2 in
 
-  let* baker_1 =
-    baker_for_proto
-      ~delegates:delegates_1
-      ~node:node_1
-      ~client:client_1
-      ~protocol:migrate_to
-  in
+  let* baker_1 = Agnostic_baker.init ~delegates:delegates_1 node_1 client_1 in
 
-  let* baker_2 =
-    baker_for_proto
-      ~delegates:delegates_2
-      ~node:node_2
-      ~client:client_2
-      ~protocol:migrate_to
-  in
+  let* baker_2 = Agnostic_baker.init ~delegates:delegates_2 node_2 client_2 in
 
   let until_level = migration_level + num_blocks_post_migration in
   Log.info "Waiting to reach level %d" until_level ;
@@ -762,8 +757,8 @@ let test_forked_migration_manual ?(migration_level = 4)
     check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client_1
   in
 
-  let* () = Baker.terminate baker_1 in
-  let* () = Baker.terminate baker_2 in
+  let* () = Agnostic_baker.terminate baker_1 in
+  let* () = Agnostic_baker.terminate baker_2 in
   unit
 
 (** Wait for a quorum event on a proposal at the given [level].
@@ -773,7 +768,7 @@ let test_forked_migration_manual ?(migration_level = 4)
     "qc_reached". This is because there is little time between both
     events, so there would be a risk that "qc_reached" happens before
     the second waiter has been registered. *)
-let wait_for_qc_at_level level baker =
+let wait_for_qc_at_level_for_baker level baker =
   let where = sf "level = %d" level in
   let level_seen = ref false in
   let proposal_waiter =
@@ -913,7 +908,7 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
      so everyone will be able to progress to the next level even if the \
      network gets split."
     pre_migration_level ;
-  let* () = wait_for_qc_at_level pre_migration_level baker1_from in
+  let* () = wait_for_qc_at_level_for_baker pre_migration_level baker1_from in
 
   Log.info
     "Disconnect node3. There are now two independent clusters that don't \
@@ -952,6 +947,472 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
   in
   let* () = wait_for_post_migration_proposal baker1_to
   and* () = wait_for_post_migration_proposal baker3_to in
+  Log.info "Post-migration proposal seen in both clusters." ;
+  let* () =
+    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client1
+  in
+
+  Log.info "Check that node1 and node3 have different migration blocks." ;
+  let* migr_block1 = get_block_at_level migration_level client1
+  and* migr_block3 = get_block_at_level migration_level client3 in
+  let get_block_hash block_json = JSON.(block_json |-> "hash" |> as_string) in
+  if String.equal (get_block_hash migr_block1) (get_block_hash migr_block3) then
+    Test.fail "Node1 and node3 have the same migration block." ;
+
+  Log.info "Reconnect node3." ;
+  let* () = connect cn3 cn1 and* () = connect cn3 cn2 in
+
+  let end_level = migration_level + num_blocks_post_migration in
+  Log.info "Wait for all nodes to reach level %d." end_level ;
+  let* (_ : int) = Node.wait_for_level node1 end_level
+  and* (_ : int) = Node.wait_for_level node2 end_level
+  and* (_ : int) = Node.wait_for_level node3 end_level in
+  let* () =
+    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client1
+  in
+
+  let level_from = migration_level and level_to = end_level - 2 in
+  Log.info
+    "Check that node1 and node3 have selected the same final blocks from level \
+     %d to %d (both included). (We don't check more recent levels because \
+     Tenderbake only guarantees finality up to two levels below the current \
+     level.)"
+    level_from
+    level_to ;
+  let n_delegates = Array.length Account.Bootstrap.keys in
+  let rec check_blocks ~level_from ~level_to =
+    if level_from > level_to then Lwt.return_unit
+    else (
+      Log.info "Check block at level %d." level_from ;
+      let* block1 = get_block_at_level level_from client1
+      and* block3 = get_block_at_level level_from client3 in
+      if not (JSON.equal block1 block3) then
+        Test.fail
+          "Level %d block is different on node1 and node3:\n%s\nand\n%s"
+          level_from
+          (JSON.encode block1)
+          (JSON.encode block3) ;
+      let consensus_ops = JSON.(block1 |-> "operations" |=> 0) in
+      let expected_count =
+        if level_from = post_migration_level then 0 else n_delegates
+      in
+      let protocol =
+        if level_from > migration_level then migrate_to else migrate_from
+      in
+      check_attestations ~protocol ~expected_count consensus_ops ;
+      check_blocks ~level_from:(level_from + 1) ~level_to)
+  in
+  check_blocks ~level_from ~level_to
+
+(** Similar to [wait_for_qc_at_level_for_baker], but for agnostic bakers. *)
+let wait_for_qc_at_level_for_agnostic_baker level baker =
+  let where = sf "level = %d" level in
+  let level_seen = ref false in
+  let proposal_waiter =
+    Agnostic_baker.wait_for baker "new_valid_proposal.v0" ~where (fun json ->
+        let proposal_level = JSON.(json |-> "level" |> as_int) in
+        if proposal_level = level then (
+          level_seen := true ;
+          Some ())
+        else if proposal_level > level then
+          Test.fail
+            "Proposal at level %d seen while waiting for proposal at level %d"
+            proposal_level
+            level
+        else None)
+  in
+  Background.register proposal_waiter ;
+  Agnostic_baker.wait_for baker "qc_reached.v0" ~where (fun (_ : JSON.t) ->
+      if !level_seen then Some () else None)
+
+(** Similar to [test_forked_migration_bakers], but for agnostic bakers. *)
+let test_forked_migration_agnostic_bakers ~migrate_from ~migrate_to =
+  Test.register
+    ~__FILE__
+    ~tags:
+      [
+        team;
+        "protocol";
+        "migration";
+        "agnostic_baker";
+        "attesting";
+        "fork";
+        "from_" ^ Protocol.tag migrate_from;
+        "to_" ^ Protocol.tag migrate_to;
+      ]
+    ~uses:[Constant.octez_experimental_agnostic_baker]
+    ~title:
+      (Printf.sprintf
+         "agnostic baker forked migration blocks from %s to %s"
+         (Protocol.tag migrate_from)
+         (Protocol.tag migrate_to))
+  @@ fun () ->
+  Log.info
+    "This test checks that agnostic baker daemons behave correctly (i.e., the \
+     chain is not stuck, nor does it split) in a scenario where 3 nodes get \
+     different migration and post-migration blocks after being split into two \
+     disconnected clusters (of 2 and 1 node respectively) then reconnected." ;
+  let migration_level = 4 in
+  Log.info "The migration will occur at level %d." migration_level ;
+  (* How many blocks to bake after the migration block to check that
+     everything is fine. Should be at least 3, so that there is at
+     least one post-migration block that is guaranteed final by
+     Tenderbake (two levels below the final level of the test). *)
+  let num_blocks_post_migration = 4 in
+
+  Log.info "Start and connect three nodes." ;
+  let more_node_args = [Node.Connections 2] in
+  let* ((client1, node1) as cn1) =
+    user_migratable_node_init ~more_node_args ~migrate_to ~migration_level ()
+  in
+  let* ((client2, node2) as cn2) =
+    user_migratable_node_init ~more_node_args ~migrate_to ~migration_level ()
+  in
+  let* ((client3, node3) as cn3) =
+    user_migratable_node_init ~more_node_args ~migrate_to ~migration_level ()
+  in
+  let* () = connect cn1 cn2
+  and* () = connect cn1 cn3
+  and* () = connect cn2 cn3 in
+
+  Log.info
+    "Partition bootstrap delegates into 3 groups. Start agnostic bakers on a \
+     separate node for each group of delegates." ;
+  (* The groups are chosen considering baker rights at levels 4 and 5,
+     see comment further below. *)
+  let group1 =
+    (node1, client1, Constant.[bootstrap1.alias; bootstrap2.alias])
+  in
+  let group2 = (node2, client2, Constant.[bootstrap5.alias]) in
+  let group3 =
+    (node3, client3, Constant.[bootstrap3.alias; bootstrap4.alias])
+  in
+  let pp_delegates =
+    let pp_sep fmt () = Format.fprintf fmt " and " in
+    Format.pp_print_list ~pp_sep Format.pp_print_string
+  in
+  let agnostic_baker (node, client, delegates) =
+    let name = sf "agnostic_baker_%s" (Node.name node) in
+    Log.info "Start %s for %a." name pp_delegates delegates ;
+    let* baker = Agnostic_baker.init ~name ~delegates node client in
+    Agnostic_baker.log_block_injection ~color:Log.Color.FG.yellow baker ;
+    return baker
+  in
+  let* agnostic_baker1 = agnostic_baker group1
+  and* _agnostic_baker2 = agnostic_baker group2
+  and* agnostic_baker3 = agnostic_baker group3 in
+
+  Log.info
+    "Activate a protocol where everyone needs to sign off a block proposal for \
+     it to be included, ie. set consensus_threshold to 100%% of \
+     consensus_committee_size." ;
+  let* () =
+    start_protocol
+      ~consensus_threshold:(fun ~consensus_committee_size ->
+        consensus_committee_size)
+      ~round_duration:2
+        (* We bump the round duration to 2s (default in tests is 1s) to
+           ensure that there will be enough time to kick node3 after the
+           quorum at the pre-migration level but before the proposal of
+           the migration-level block (see below). *)
+      ~expected_bake_for_blocks:0 (* We will not use "bake for". *)
+      ~protocol:migrate_from
+      client1
+  in
+  let* () =
+    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client1
+  in
+
+  let pre_migration_level = migration_level - 1 in
+  Log.info
+    "Wait for a quorum event on a proposal at pre-migration level %d. At this \
+     point, we know that attestations on this proposal have been propagated, \
+     so everyone will be able to progress to the next level even if the \
+     network gets split."
+    pre_migration_level ;
+  let* () =
+    wait_for_qc_at_level_for_agnostic_baker pre_migration_level agnostic_baker1
+  in
+
+  Log.info
+    "Disconnect node3. There are now two independent clusters that don't \
+     communicate: [node1; node2] and [node3]." ;
+  let* () = disconnect cn1 cn3 and* () = disconnect cn2 cn3 in
+
+  let post_migration_level = migration_level + 1 in
+  Log.info
+    "Migration blocks are not attested, so each cluster should be able to \
+     propose blocks for the post-migration level %d. However, since none of \
+     the clusters has enough voting power to reach the consensus_threshold, \
+     they should not be able to propose blocks for higher levels.\n\
+     We wait for each cluster to propose a block at the post-migration level. \
+     (If this takes more than 10 seconds, check the comment on baking rights \
+     in the code.)"
+    post_migration_level ;
+  (* For this step to be reasonably fast, we need both clusters to
+     have delegates with baking rights for early rounds at the
+     migration and post-migration levels. As of March 2023, this step
+     takes less than 4 seconds with the following baking rights (with
+     minimal_block_delay set to the default ie 1 second):
+     - level 4 (migration level), round 0: bootstrap3 (node3)
+     - level 4, round 1: bootstrap1 (node1)
+     - level 5, round 0: bootstrap1 (node1)
+     - level 5, round 1: bootstrap4 (node3)
+     If this step takes significantly longer to complete, check
+     whether the baking rights have changed and reorganize the split
+     of delegates into bakers as needed. *)
+  let wait_for_post_migration_proposal baker =
+    Agnostic_baker.wait_for baker "new_valid_proposal.v0" (fun json ->
+        let level = JSON.(json |-> "level" |> as_int) in
+        if level = post_migration_level then Some ()
+        else if level > post_migration_level then
+          Test.fail "Reached level %d with a split network." level
+        else None)
+  in
+  let* () = wait_for_post_migration_proposal agnostic_baker1
+  and* () = wait_for_post_migration_proposal agnostic_baker3 in
+  Log.info "Post-migration proposal seen in both clusters." ;
+  let* () =
+    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client1
+  in
+
+  Log.info "Check that node1 and node3 have different migration blocks." ;
+  let* migr_block1 = get_block_at_level migration_level client1
+  and* migr_block3 = get_block_at_level migration_level client3 in
+  let get_block_hash block_json = JSON.(block_json |-> "hash" |> as_string) in
+  if String.equal (get_block_hash migr_block1) (get_block_hash migr_block3) then
+    Test.fail "Node1 and node3 have the same migration block." ;
+
+  Log.info "Reconnect node3." ;
+  let* () = connect cn3 cn1 and* () = connect cn3 cn2 in
+
+  let end_level = migration_level + num_blocks_post_migration in
+  Log.info "Wait for all nodes to reach level %d." end_level ;
+  let* (_ : int) = Node.wait_for_level node1 end_level
+  and* (_ : int) = Node.wait_for_level node2 end_level
+  and* (_ : int) = Node.wait_for_level node3 end_level in
+  let* () =
+    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client1
+  in
+
+  let level_from = migration_level and level_to = end_level - 2 in
+  Log.info
+    "Check that node1 and node3 have selected the same final blocks from level \
+     %d to %d (both included). (We don't check more recent levels because \
+     Tenderbake only guarantees finality up to two levels below the current \
+     level.)"
+    level_from
+    level_to ;
+  let n_delegates = Array.length Account.Bootstrap.keys in
+  let rec check_blocks ~level_from ~level_to =
+    if level_from > level_to then Lwt.return_unit
+    else (
+      Log.info "Check block at level %d." level_from ;
+      let* block1 = get_block_at_level level_from client1
+      and* block3 = get_block_at_level level_from client3 in
+      if not (JSON.equal block1 block3) then
+        Test.fail
+          "Level %d block is different on node1 and node3:\n%s\nand\n%s"
+          level_from
+          (JSON.encode block1)
+          (JSON.encode block3) ;
+      let consensus_ops = JSON.(block1 |-> "operations" |=> 0) in
+      let expected_count =
+        if level_from = post_migration_level then 0 else n_delegates
+      in
+      let protocol =
+        if level_from > migration_level then migrate_to else migrate_from
+      in
+      check_attestations ~protocol ~expected_count consensus_ops ;
+      check_blocks ~level_from:(level_from + 1) ~level_to)
+  in
+  check_blocks ~level_from ~level_to
+
+(** Similar to [test_forked_migration_bakers] and [test_forked_migration_agnostic_bakers],
+    but combining both protocol-dependent and agnostic bakers. *)
+let test_forked_migration_all_bakers ~migrate_from ~migrate_to =
+  Test.register
+    ~__FILE__
+    ~tags:
+      [
+        team;
+        "protocol";
+        "migration";
+        "baker";
+        "agnostic_baker";
+        "attesting";
+        "fork";
+        "from_" ^ Protocol.tag migrate_from;
+        "to_" ^ Protocol.tag migrate_to;
+      ]
+    ~uses:
+      [
+        Constant.octez_experimental_agnostic_baker;
+        Protocol.baker migrate_from;
+        Protocol.baker migrate_to;
+      ]
+    ~title:
+      (Printf.sprintf
+         "different types of bakers forked migration blocks from %s to %s"
+         (Protocol.tag migrate_from)
+         (Protocol.tag migrate_to))
+  @@ fun () ->
+  Log.info
+    "This test checks that agnostic baker and baker daemons behave correctly \
+     (i.e., the chain is not stuck, nor does it split) in a scenario where 3 \
+     nodes get different migration and post-migration blocks after being split \
+     into two disconnected clusters (of 2 and 1 node respectively) then \
+     reconnected. Some of bakers\n\
+    \     use protocol-specific binaries, while the rest use the agnostic \
+     baker binary." ;
+  let migration_level = 4 in
+  Log.info "The migration will occur at level %d." migration_level ;
+  (* How many blocks to bake after the migration block to check that
+     everything is fine. Should be at least 3, so that there is at
+     least one post-migration block that is guaranteed final by
+     Tenderbake (two levels below the final level of the test). *)
+  let num_blocks_post_migration = 4 in
+
+  Log.info "Start and connect three nodes." ;
+  let more_node_args = [Node.Connections 2] in
+  let* ((client1, node1) as cn1) =
+    user_migratable_node_init ~more_node_args ~migrate_to ~migration_level ()
+  in
+  let* ((client2, node2) as cn2) =
+    user_migratable_node_init ~more_node_args ~migrate_to ~migration_level ()
+  in
+  let* ((client3, node3) as cn3) =
+    user_migratable_node_init ~more_node_args ~migrate_to ~migration_level ()
+  in
+  let* () = connect cn1 cn2
+  and* () = connect cn1 cn3
+  and* () = connect cn2 cn3 in
+
+  Log.info
+    "Partition bootstrap delegates into 3 groups. Start bakers on a separate \
+     node for each group of delegates." ;
+  (* The groups are chosen considering baker rights at levels 4 and 5,
+     see comment further below. *)
+  let group1 =
+    (node1, client1, Constant.[bootstrap1.alias; bootstrap2.alias])
+  in
+  let group2 = (node2, client2, Constant.[bootstrap5.alias]) in
+  let group3 =
+    (node3, client3, Constant.[bootstrap3.alias; bootstrap4.alias])
+  in
+  let pp_delegates =
+    let pp_sep fmt () = Format.fprintf fmt " and " in
+    Format.pp_print_list ~pp_sep Format.pp_print_string
+  in
+
+  (* Protocol-specific bakers *)
+  let baker_for_proto protocol (node, client, delegates) =
+    let name = sf "baker_%s_%s" (Protocol.tag protocol) (Node.name node) in
+    Log.info "Start %s for %a." name pp_delegates delegates ;
+    let event_sections_levels =
+      [(String.concat "." [Protocol.encoding_prefix protocol; "baker"], `Debug)]
+    in
+    (* We copy the code in {!Baker.init}, except that we don't wait
+       for the baker to be ready. Indeed, bakers aren't ready until
+       their protocol has been activated. *)
+    let* () = Node.wait_for_ready node in
+    let baker = Baker.create ~protocol ~name ~delegates node client in
+    let* () = Baker.run ~event_sections_levels baker in
+    Baker.log_block_injection ~color:Log.Color.FG.yellow baker ;
+    return baker
+  in
+
+  (* Agnostic bakers *)
+  let agnostic_baker (node, client, delegates) =
+    let name = sf "agnostic_baker_%s" (Node.name node) in
+    Log.info "Start %s for %a." name pp_delegates delegates ;
+    let* baker = Agnostic_baker.init ~name ~delegates node client in
+    Agnostic_baker.log_block_injection ~color:Log.Color.FG.yellow baker ;
+    return baker
+  in
+
+  let* baker1_from = baker_for_proto migrate_from group1
+  and* baker1_to = baker_for_proto migrate_to group1
+  and* _agnostic_baker2 = agnostic_baker group2
+  and* agnostic_baker3 = agnostic_baker group3 in
+
+  Log.info
+    "Activate a protocol where everyone needs to sign off a block proposal for \
+     it to be included, ie. set consensus_threshold to 100%% of \
+     consensus_committee_size." ;
+  let* () =
+    start_protocol
+      ~consensus_threshold:(fun ~consensus_committee_size ->
+        consensus_committee_size)
+      ~round_duration:2
+        (* We bump the round duration to 2s (default in tests is 1s) to
+           ensure that there will be enough time to kick node3 after the
+           quorum at the pre-migration level but before the proposal of
+           the migration-level block (see below). *)
+      ~expected_bake_for_blocks:0 (* We will not use "bake for". *)
+      ~protocol:migrate_from
+      client1
+  in
+  let* () =
+    check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client1
+  in
+
+  let pre_migration_level = migration_level - 1 in
+  Log.info
+    "Wait for a quorum event on a proposal at pre-migration level %d. At this \
+     point, we know that attestations on this proposal have been propagated, \
+     so everyone will be able to progress to the next level even if the \
+     network gets split."
+    pre_migration_level ;
+  let* () = wait_for_qc_at_level_for_baker pre_migration_level baker1_from in
+
+  Log.info
+    "Disconnect node3. There are now two independent clusters that don't \
+     communicate: [node1; node2] and [node3]." ;
+  let* () = disconnect cn1 cn3 and* () = disconnect cn2 cn3 in
+
+  let post_migration_level = migration_level + 1 in
+  Log.info
+    "Migration blocks are not attested, so each cluster should be able to \
+     propose blocks for the post-migration level %d. However, since none of \
+     the clusters has enough voting power to reach the consensus_threshold, \
+     they should not be able to propose blocks for higher levels.\n\
+     We wait for each cluster to propose a block at the post-migration level. \
+     (If this takes more than 10 seconds, check the comment on baking rights \
+     in the code.)"
+    post_migration_level ;
+
+  (* For this step to be reasonably fast, we need both clusters to
+     have delegates with baking rights for early rounds at the
+     migration and post-migration levels. As of March 2023, this step
+     takes less than 4 seconds with the following baking rights (with
+     minimal_block_delay set to the default ie 1 second):
+     - level 4 (migration level), round 0: bootstrap3 (node3)
+     - level 4, round 1: bootstrap1 (node1)
+     - level 5, round 0: bootstrap1 (node1)
+     - level 5, round 1: bootstrap4 (node3)
+     If this step takes significantly longer to complete, check
+     whether the baking rights have changed and reorganize the split
+     of delegates into bakers as needed. *)
+  let wait_for_post_migration_proposal_baker baker =
+    Baker.wait_for baker "new_valid_proposal.v0" (fun json ->
+        let level = JSON.(json |-> "level" |> as_int) in
+        if level = post_migration_level then Some ()
+        else if level > post_migration_level then
+          Test.fail "Reached level %d with a split network." level
+        else None)
+  in
+
+  let wait_for_post_migration_proposal_agnostic_baker baker =
+    Agnostic_baker.wait_for baker "new_valid_proposal.v0" (fun json ->
+        let level = JSON.(json |-> "level" |> as_int) in
+        if level = post_migration_level then Some ()
+        else if level > post_migration_level then
+          Test.fail "Reached level %d with a split network." level
+        else None)
+  in
+  let* () = wait_for_post_migration_proposal_baker baker1_to
+  and* () = wait_for_post_migration_proposal_agnostic_baker agnostic_baker3 in
   Log.info "Post-migration proposal seen in both clusters." ;
   let* () =
     check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client1
@@ -1766,8 +2227,19 @@ let test_unstaked_requests_and_min_delegated () =
 
 let register ~migrate_from ~migrate_to =
   test_migration_for_whole_cycle ~migrate_from ~migrate_to ;
-  test_migration_with_bakers ~migrate_from ~migrate_to () ;
+  test_migration_with_bakers
+    ~migrate_from
+    ~migrate_to
+    ~use_agnostic_baker:false
+    () ;
+  test_migration_with_bakers
+    ~migrate_from
+    ~migrate_to
+    ~use_agnostic_baker:true
+    () ;
   test_forked_migration_bakers ~migrate_from ~migrate_to ;
+  test_forked_migration_agnostic_bakers ~migrate_from ~migrate_to ;
+  test_forked_migration_all_bakers ~migrate_from ~migrate_to ;
   test_forked_migration_manual ~migrate_from ~migrate_to () ;
   test_migration_with_snapshots ~migrate_from ~migrate_to ;
   test_tolerated_inactivity_period () ;
