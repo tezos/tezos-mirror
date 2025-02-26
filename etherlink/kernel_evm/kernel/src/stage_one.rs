@@ -226,7 +226,9 @@ mod tests {
 
     use crate::{
         block_storage::internal_for_tests::store_current_number,
-        blueprint_storage::read_next_blueprint, dal::tests::*, parsing::RollupType,
+        blueprint_storage::{read_blueprint, read_next_blueprint},
+        dal::tests::*,
+        parsing::RollupType,
     };
 
     use super::*;
@@ -495,11 +497,16 @@ mod tests {
         fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         // The dummy chunk in the inbox is registered at block 10
-        store_current_number(&mut host, U256::from(9)).unwrap();
-        if read_next_blueprint(&mut host, &mut conf)
-            .expect("Blueprint reading shouldn't fail")
-            .0
-            .is_none()
+        if read_blueprint(
+            &mut host,
+            &mut conf,
+            U256::from(10),
+            crate::block::GENESIS_PARENT_HASH,
+            Timestamp::from(0),
+        )
+        .expect("Blueprint reading shouldn't fail")
+        .0
+        .is_none()
         {
             panic!("There should be a blueprint")
         }

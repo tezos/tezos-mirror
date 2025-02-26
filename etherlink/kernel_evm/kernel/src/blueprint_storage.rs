@@ -267,6 +267,7 @@ fn fetch_delayed_txs<Host: Runtime>(
 // wish to refuse such blueprints.
 pub const DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS: i64 = 300i64;
 
+#[allow(clippy::too_many_arguments)]
 fn parse_and_validate_blueprint<Host: Runtime>(
     host: &mut Host,
     bytes: &[u8],
@@ -275,17 +276,12 @@ fn parse_and_validate_blueprint<Host: Runtime>(
     evm_node_flag: bool,
     max_blueprint_lookahead_in_seconds: i64,
     parent_hash: H256,
+    head_timestamp: Timestamp,
 ) -> anyhow::Result<(BlueprintValidity, usize)> {
     // Decode
     match rlp::decode::<BlueprintWithDelayedHashes>(bytes) {
         Err(e) => Ok((BlueprintValidity::DecoderError(e), bytes.len())),
         Ok(blueprint_with_hashes) => {
-            let head = block_storage::read_current(host);
-            let head_timestamp = match head {
-                Ok(block) => block.timestamp,
-                Err(_) => Timestamp::from(0),
-            };
-
             // Validate parent hash
             #[cfg(not(feature = "benchmark"))]
             if parent_hash != blueprint_with_hashes.parent_hash {
@@ -365,6 +361,7 @@ fn read_all_chunks_and_validate<Host: Runtime>(
     nb_chunks: u16,
     config: &mut Configuration,
     parent_hash: H256,
+    previous_timestamp: Timestamp,
 ) -> anyhow::Result<(Option<Blueprint>, usize)> {
     let mut chunks = vec![];
     let mut size = 0;
@@ -406,6 +403,7 @@ fn read_all_chunks_and_validate<Host: Runtime>(
                 *evm_node_flag,
                 *max_blueprint_lookahead_in_seconds,
                 parent_hash,
+                previous_timestamp,
             )?;
             if let (BlueprintValidity::Valid(blueprint), size_with_delayed_transactions) =
                 validity
@@ -430,6 +428,7 @@ pub fn read_blueprint<Host: Runtime>(
     config: &mut Configuration,
     number: U256,
     parent_hash: H256,
+    previous_timestamp: Timestamp,
 ) -> anyhow::Result<(Option<Blueprint>, usize)> {
     let blueprint_path = blueprint_path(number)?;
     let exists = host.store_has(&blueprint_path)?.is_some();
@@ -451,6 +450,7 @@ pub fn read_blueprint<Host: Runtime>(
                 nb_chunks,
                 config,
                 parent_hash,
+                previous_timestamp,
             )?;
             Ok((blueprint, size))
         } else {
@@ -481,10 +481,16 @@ pub fn read_next_blueprint<Host: Runtime>(
     host: &mut Host,
     config: &mut Configuration,
 ) -> anyhow::Result<(Option<Blueprint>, usize)> {
-    let number = read_next_blueprint_number(host)?;
-    let parent_hash = block_storage::read_current_hash(host)
-        .unwrap_or(crate::block::GENESIS_PARENT_HASH);
-    read_blueprint(host, config, number, parent_hash)
+    let (number, parent_hash, previous_timestamp) =
+        match block_storage::read_current(host) {
+            Ok(block) => (block.number + 1, block.hash, block.timestamp),
+            Err(_) => (
+                U256::zero(),
+                crate::block::GENESIS_PARENT_HASH,
+                Timestamp::from(0),
+            ),
+        };
+    read_blueprint(host, config, number, parent_hash, previous_timestamp)
 }
 
 pub fn drop_blueprint<Host: Runtime>(host: &mut Host, number: U256) -> Result<(), Error> {
@@ -587,6 +593,7 @@ mod tests {
             false,
             500,
             GENESIS_PARENT_HASH,
+            Timestamp::from(0),
         )
         .expect("Should be able to parse blueprint");
         assert_eq!(
@@ -648,6 +655,7 @@ mod tests {
             false,
             500,
             GENESIS_PARENT_HASH,
+            Timestamp::from(0),
         )
         .expect("Should be able to parse blueprint");
         assert_eq!(validity.0, BlueprintValidity::InvalidParentHash);

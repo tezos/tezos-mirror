@@ -34,6 +34,7 @@ use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;
+use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::Path;
 use tick_model::estimate_remaining_ticks_for_transaction_execution;
 
@@ -245,10 +246,12 @@ enum BlueprintParsing {
 }
 
 #[cfg_attr(feature = "benchmark", inline(never))]
+#[allow(clippy::too_many_arguments)]
 fn next_bip_from_blueprints<Host: Runtime>(
     host: &mut Host,
     current_block_number: U256,
     current_block_parent_hash: H256,
+    previous_timestamp: Timestamp,
     tick_counter: &TickCounter,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
@@ -259,6 +262,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
         config,
         current_block_number,
         current_block_parent_hash,
+        previous_timestamp,
     )?;
     log!(host, Benchmarking, "Size of blueprint: {}", size);
     match blueprint {
@@ -460,16 +464,24 @@ pub fn produce<Host: Runtime>(
     let (
         current_block_number,
         current_block_parent_hash,
+        previous_timestamp,
         previous_receipts_root,
         previous_transactions_root,
     ) = match block_storage::read_current(host) {
         Ok(block) => (
             block.number + 1,
             block.hash,
+            block.timestamp,
             block.receipts_root,
             block.transactions_root,
         ),
-        Err(_) => (U256::zero(), GENESIS_PARENT_HASH, vec![0; 32], vec![0; 32]),
+        Err(_) => (
+            U256::zero(),
+            GENESIS_PARENT_HASH,
+            Timestamp::from(0),
+            vec![0; 32],
+            vec![0; 32],
+        ),
     };
     let mut evm_account_storage =
         init_account_storage().context("Failed to initialize EVM account storage")?;
@@ -498,6 +510,7 @@ pub fn produce<Host: Runtime>(
                     safe_host.host,
                     current_block_number,
                     current_block_parent_hash,
+                    previous_timestamp,
                     &tick_counter,
                     config,
                     &kernel_upgrade,
