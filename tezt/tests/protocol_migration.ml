@@ -768,11 +768,22 @@ let test_forked_migration_manual ?(migration_level = 4)
     "qc_reached". This is because there is little time between both
     events, so there would be a risk that "qc_reached" happens before
     the second waiter has been registered. *)
-let wait_for_qc_at_level_for_baker level baker =
+let wait_for_qc_at_level :
+    type baker.
+    wait_for:
+      (?where:string ->
+      baker ->
+      string ->
+      (JSON.t -> unit option) ->
+      unit Lwt.t) ->
+    int ->
+    baker ->
+    unit Lwt.t =
+ fun ~wait_for level baker ->
   let where = sf "level = %d" level in
   let level_seen = ref false in
   let proposal_waiter =
-    Baker.wait_for baker "new_valid_proposal.v0" ~where (fun json ->
+    wait_for baker "new_valid_proposal.v0" ~where (fun json ->
         let proposal_level = JSON.(json |-> "level" |> as_int) in
         if proposal_level = level then (
           level_seen := true ;
@@ -785,7 +796,7 @@ let wait_for_qc_at_level_for_baker level baker =
         else None)
   in
   Background.register proposal_waiter ;
-  Baker.wait_for baker "qc_reached.v0" ~where (fun (_ : JSON.t) ->
+  wait_for baker "qc_reached.v0" ~where (fun (_ : JSON.t) ->
       if !level_seen then Some () else None)
 
 let get_block_at_level level client =
@@ -908,7 +919,12 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
      so everyone will be able to progress to the next level even if the \
      network gets split."
     pre_migration_level ;
-  let* () = wait_for_qc_at_level_for_baker pre_migration_level baker1_from in
+  let* () =
+    wait_for_qc_at_level
+      pre_migration_level
+      ~wait_for:Baker.wait_for
+      baker1_from
+  in
 
   Log.info
     "Disconnect node3. There are now two independent clusters that don't \
@@ -1003,27 +1019,6 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
       check_blocks ~level_from:(level_from + 1) ~level_to)
   in
   check_blocks ~level_from ~level_to
-
-(** Similar to [wait_for_qc_at_level_for_baker], but for agnostic bakers. *)
-let wait_for_qc_at_level_for_agnostic_baker level baker =
-  let where = sf "level = %d" level in
-  let level_seen = ref false in
-  let proposal_waiter =
-    Agnostic_baker.wait_for baker "new_valid_proposal.v0" ~where (fun json ->
-        let proposal_level = JSON.(json |-> "level" |> as_int) in
-        if proposal_level = level then (
-          level_seen := true ;
-          Some ())
-        else if proposal_level > level then
-          Test.fail
-            "Proposal at level %d seen while waiting for proposal at level %d"
-            proposal_level
-            level
-        else None)
-  in
-  Background.register proposal_waiter ;
-  Agnostic_baker.wait_for baker "qc_reached.v0" ~where (fun (_ : JSON.t) ->
-      if !level_seen then Some () else None)
 
 (** Similar to [test_forked_migration_bakers], but for agnostic bakers. *)
 let test_forked_migration_agnostic_bakers ~migrate_from ~migrate_to =
@@ -1131,7 +1126,10 @@ let test_forked_migration_agnostic_bakers ~migrate_from ~migrate_to =
      network gets split."
     pre_migration_level ;
   let* () =
-    wait_for_qc_at_level_for_agnostic_baker pre_migration_level agnostic_baker1
+    wait_for_qc_at_level
+      pre_migration_level
+      ~wait_for:Agnostic_baker.wait_for
+      agnostic_baker1
   in
 
   Log.info
@@ -1364,8 +1362,12 @@ let test_forked_migration_all_bakers ~migrate_from ~migrate_to =
      so everyone will be able to progress to the next level even if the \
      network gets split."
     pre_migration_level ;
-  let* () = wait_for_qc_at_level_for_baker pre_migration_level baker1_from in
-
+  let* () =
+    wait_for_qc_at_level
+      pre_migration_level
+      ~wait_for:Baker.wait_for
+      baker1_from
+  in
   Log.info
     "Disconnect node3. There are now two independent clusters that don't \
      communicate: [node1; node2] and [node3]." ;
