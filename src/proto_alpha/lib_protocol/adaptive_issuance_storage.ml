@@ -23,12 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Default reward coefficient when AI is not in effect, chosen so that
-   rewards * coeff = rewards *)
-let default_reward = Q.one
+(* Initial reward coefficient when activating the protocol from Genesis. *)
+let initial_genesis_coeff = Q.one
 
-(* Default bonus value *)
-let default_bonus = Issuance_bonus_repr.zero
+(* Initial bonus value when activating the protocol from Genesis. *)
+let initial_genesis_bonus = Issuance_bonus_repr.zero
 
 (* Note: the reward and the bonus values are computed as rationals ([Q.t]) but
    are stored as fixed-point values (see {!Issuance_bonus_repr}) so that the
@@ -79,18 +78,21 @@ let check_determined_cycle ctxt cycle =
 let get_reward_coeff ctxt ~cycle =
   let open Lwt_result_syntax in
   let* () = check_determined_cycle ctxt cycle in
-  (* Even if AI is enabled, the storage can be empty: this is the case for
-     the first 5 cycles after AI is enabled *)
   let* k_opt = Storage.Issuance_coeff.find ctxt cycle in
-  return (Option.value ~default:default_reward k_opt)
+  (* The coeff should always be present in the storage on mainnet and
+     ghostnet and tests that activate alpha from Genesis. However,
+     some tests activate R022 from Genesis then migrate to alpha
+     before cycle 3; in such tests, [k_opt] may still be [None] for
+     cycles 0 to 2. *)
+  return (Option.value ~default:initial_genesis_coeff k_opt)
 
 let get_reward_bonus ctxt ~cycle =
   let open Lwt_result_syntax in
   match cycle with
-  | None -> return default_bonus
+  | None -> return initial_genesis_bonus
   | Some cycle ->
       let* k_opt = Storage.Issuance_bonus.find ctxt cycle in
-      return (Option.value ~default:default_bonus k_opt)
+      return (Option.value ~default:initial_genesis_bonus k_opt)
 
 let load_reward_coeff ctxt ~cycle =
   let open Lwt_result_syntax in
@@ -363,7 +365,25 @@ let init_from_genesis ctxt =
   let open Lwt_result_syntax in
   let* ctxt = Storage.Adaptive_issuance.Launch_ema.init ctxt 0l in
   let current_cycle = (Level_storage.current ctxt).cycle in
-  Storage.Adaptive_issuance.Activation.init ctxt (Some current_cycle)
+  assert (Int32.equal (Cycle_repr.to_int32 current_cycle) 0l) ;
+  let* ctxt =
+    Storage.Adaptive_issuance.Activation.init ctxt (Some current_cycle)
+  in
+  (* When cycle n starts, the storage should already contain the coeff
+     and bonus for cycles n to (n + issuance_modification_delay). *)
+  let*! ctxt =
+    let open Lwt_syntax in
+    List.fold_left_s
+      (fun ctxt i ->
+        let for_cycle = Cycle_repr.of_int32_exn (Int32.of_int i) in
+        let* ctxt =
+          Storage.Issuance_coeff.add ctxt for_cycle initial_genesis_coeff
+        in
+        Storage.Issuance_bonus.add ctxt for_cycle initial_genesis_bonus)
+      ctxt
+      Misc.(0 --> Constants_storage.issuance_modification_delay ctxt)
+  in
+  return ctxt
 
 let update_ema ctxt ~vote =
   let open Lwt_result_syntax in
