@@ -53,7 +53,7 @@ let parse_args () =
       ]
   in
   let usage_msg =
-    Format.sprintf "tezos-validator [--version] [--socket-dir <dir>]"
+    Format.sprintf "octez-validator [--version] [--socket-dir <dir>]"
   in
   Arg.parse
     args
