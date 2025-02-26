@@ -120,6 +120,7 @@ apt-get install -y debconf-utils apt-utils procps
 
 if [ "$RELEASETYPE" = "Master" ]; then
   # [add repository]
+  apg-get update
   apt-get install -y sudo gpg curl
 
   curl -s "https://packages.nomadic-labs.com/$distribution/octez.asc" |

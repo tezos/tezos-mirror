@@ -163,7 +163,7 @@ The packages, as introduced since Octez version 20, are now **available via APT 
 We recommend users to install them from the APT repository corresponding to their Linux distribution, rather than from the links available in the GitLab release page.
 
 In addition, a **new set of Debian packages is now available for testing**. These packages will replace the current available packages in the future.
-Check :ref:`the documentation <new_packages>` for more details.
+Check :ref:`the documentation <installing_packages>` for more details.
 
 Changelog
 ---------
