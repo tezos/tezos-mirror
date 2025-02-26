@@ -96,6 +96,7 @@ val register_test :
   ?websockets:bool ->
   ?history_mode:Evm_node.history_mode ->
   ?enable_tx_queue:bool ->
+  ?spawn_rpc:int ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
   title:string ->
   tags:string list ->
@@ -143,6 +144,7 @@ val register_test_for_kernels :
   ?enable_fast_withdrawal:bool ->
   ?history_mode:Evm_node.history_mode ->
   ?enable_tx_queue:bool ->
+  ?spawn_rpc:int ->
   title:string ->
   tags:string list ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
@@ -189,5 +191,6 @@ val setup_sequencer :
   ?websockets:bool ->
   ?history_mode:Evm_node.history_mode ->
   ?enable_tx_queue:bool ->
+  ?spawn_rpc:int ->
   Protocol.t ->
   sequencer_setup Lwt.t

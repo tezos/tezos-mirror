@@ -16,3 +16,14 @@ val main :
   config:Configuration.t ->
   unit ->
   unit tzresult Lwt.t
+
+(** [spawn_main ~exposed_port ~redirection_endpoint ~data_dir] spawn an RPC process that listens
+    to [exposed_port], connects to [protected_endpoint] and [private_endpoint] when specified,
+    and reads the config in [data_dir]. *)
+val spawn_main :
+  exposed_port:int ->
+  protected_endpoint:Uri.t ->
+  ?private_endpoint:Uri.t ->
+  data_dir:string ->
+  unit ->
+  Rpc_server.finalizer

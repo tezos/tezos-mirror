@@ -252,8 +252,8 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
     ?websockets ?enable_fast_withdrawal ?history_mode
     ?(use_threshold_encryption = default_threshold_encryption_registration)
     ?(use_dal = default_dal_registration)
-    ?(use_multichain = default_multichain_registration) ?enable_tx_queue ~title
-    ~tags body protocols =
+    ?(use_multichain = default_multichain_registration) ?enable_tx_queue
+    ?spawn_rpc ~title ~tags body protocols =
   let dal_cases =
     match use_dal with
     | Register_both {extra_tags_with; extra_tags_without} ->
@@ -320,6 +320,7 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
                 ~enable_dal
                 ~enable_multichain
                 ?enable_tx_queue
+                ?spawn_rpc
                 ~title
                 ~tags:(te_tags @ dal_tags @ multichain_tags @ tags)
                 body
@@ -10281,6 +10282,38 @@ let test_tx_queue =
       ~error_msg:"Expected %r transaction injected found %l.") ;
   unit
 
+let test_spawn_rpc =
+  let fresh_port = Port.fresh () in
+  register_all
+    ~spawn_rpc:fresh_port
+    ~tags:["sequencer"; "spawn"; "rpc"]
+    ~title:
+      "The spawned RPC successfully functions as an intermediate node for \
+       public requests"
+  @@ fun {sequencer; observer; _} _protocol ->
+  Log.info "experimental_features.spawn_rpc = %d" fresh_port ;
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:300_000
+      ~value:Wei.zero
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  let*@ transaction_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+  let*@ size = Rpc.produce_block sequencer in
+  Check.((size = 1) int) ~error_msg:"block size sould be 1" ;
+  let* () = Evm_node.wait_for_blueprint_applied sequencer 1 in
+  let* () = Evm_node.wait_for_blueprint_applied observer 1 in
+  let*@ _seq_block = Rpc.get_block_by_number ~block:"1" sequencer in
+  let*@ _obs_block = Rpc.get_block_by_number ~block:"1" observer in
+  let*@ tx_obj = Rpc.get_transaction_by_hash ~transaction_hash sequencer in
+  Check.is_true (Option.is_some tx_obj) ~error_msg:"tx is missing" ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -10425,4 +10458,5 @@ let () =
   test_eip2930_transaction_object [Alpha] ;
   test_eip1559_transaction_object [Alpha] ;
   test_apply_from_full_history_mode protocols ;
-  test_tx_queue [Alpha]
+  test_tx_queue [Alpha] ;
+  test_spawn_rpc protocols

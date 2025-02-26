@@ -98,6 +98,7 @@ type experimental_features = {
   enable_websocket : bool;
   max_websocket_message_length : int;
   monitor_websocket_heartbeat : monitor_websocket_heartbeat option;
+  spawn_rpc : int option;
   l2_chains : l2_chain list option;
   enable_tx_queue : bool;
 }

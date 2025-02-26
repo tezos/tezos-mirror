@@ -233,6 +233,8 @@ val wait_for_pending_upgrade : ?timeout:float -> t -> (string * string) Lwt.t
 
 val wait_for_successful_upgrade : ?timeout:float -> t -> (string * int) Lwt.t
 
+val wait_for_spawn_rpc_ready : ?timeout:float -> t -> unit Lwt.t
+
 val wait_for_block_producer_locked : ?timeout:float -> t -> unit Lwt.t
 
 val wait_for_block_producer_tx_injected : ?timeout:float -> t -> string Lwt.t
@@ -310,6 +312,7 @@ val patch_config_with_experimental_feature :
   ?enable_websocket:bool ->
   ?max_websocket_message_length:int ->
   ?enable_tx_queue:bool ->
+  ?spawn_rpc:int ->
   unit ->
   JSON.t ->
   JSON.t

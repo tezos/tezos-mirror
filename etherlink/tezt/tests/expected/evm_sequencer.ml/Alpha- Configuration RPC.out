@@ -22,6 +22,7 @@
       "ping_interval": 5,
       "ping_timeout": 30
     },
+    "spawn_rpc": null,
     "l2_chains": null,
     "enable_tx_queue": false
   },
@@ -81,6 +82,7 @@
       "ping_interval": 5,
       "ping_timeout": 30
     },
+    "spawn_rpc": null,
     "l2_chains": null,
     "enable_tx_queue": false
   },
@@ -133,6 +135,7 @@
       "ping_interval": 5,
       "ping_timeout": 30
     },
+    "spawn_rpc": null,
     "l2_chains": null,
     "enable_tx_queue": false
   },

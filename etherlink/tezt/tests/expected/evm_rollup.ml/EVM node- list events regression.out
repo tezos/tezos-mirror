@@ -1819,6 +1819,14 @@ private_server_is_ready:
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
 
+spawn_rpc_is_ready:
+  description: the rpc process is ready
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* spawn_rpc_is_ready version 0 */
+      "spawn_rpc_is_ready.v0": any }
+
 legacy_mode:
   description: node is using the (deprecated) legacy block storage, import a recent snapshot to start using the new block storage
   level: warning

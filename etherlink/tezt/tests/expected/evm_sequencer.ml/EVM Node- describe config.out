@@ -162,6 +162,12 @@
                number
                /* Timeout in seconds after which the connection will be
                   considered dead and closed. */ },
+      "spawn_rpc"?:
+        /* Spawn a RPC node listening on the given port */
+        { /* Some */
+          "protected_port": integer ∈ [1, 2^16-1] }
+        || null
+        /* None */,
       "l2_chains"?:
         /* Configuration of l2_chains for multisequencing.
                             If not set, the node will adopt a single chain
