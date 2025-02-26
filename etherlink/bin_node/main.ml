@@ -835,7 +835,10 @@ let make_event_config ~verbosity ?daily_logs_path () =
   let open Tezos_event_logging.Internal_event in
   let open Tezos_base_unix.Internal_event_unix in
   let open Tezos_base.Internal_event_config in
-  let config = make_with_defaults ~verbosity () in
+  let log_cfg =
+    Tezos_base_unix.Logs_simple_config.create_cfg ~advertise_levels:true ()
+  in
+  let config = make_with_defaults ~log_cfg ~verbosity () in
   match daily_logs_path with
   | Some daily_logs_path ->
       (* Show only above Info rpc_server events, they are not
@@ -858,6 +861,7 @@ let make_event_config ~verbosity ?daily_logs_path () =
           ~format:"pp-rfc5424"
           ~chmod:0o640
           ~section_prefixes:daily_logs_section_prefixes
+          ~advertise_levels:true
           (`Path Filename.Infix.(daily_logs_path // "daily.log"))
       in
       add_uri_to_config uri config

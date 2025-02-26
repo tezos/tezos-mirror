@@ -12,6 +12,10 @@
   uncompressed snapshots. Previously, the node was not adding any extension to
   compressed snapshots, and was appending `.uncompressed` to uncompressed
   snapshots. (!16957)
+- The node now advertises the level of each log by default. It can be disabled through
+  the use of [environment variables][docs]. (!16976)
+
+[docs]: https://octez.tezos.com/docs/user/logging.html#environment-variables
 
 ### Configuration changes
 
