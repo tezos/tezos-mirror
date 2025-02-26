@@ -491,13 +491,11 @@ pub fn produce<Host: Runtime>(
         precompiles::precompile_set::<SafeStorage<&mut Host>>(config.enable_fa_bridge);
 
     // Check if there's a BIP in storage to resume its execution
-    let (processed_blueprint, block_in_progress_provenance, block_in_progress) =
+    let (block_in_progress_provenance, block_in_progress) =
         match storage::read_block_in_progress(&safe_host)? {
-            Some(block_in_progress) => (
-                block_in_progress.number,
-                BlockInProgressProvenance::Storage,
-                block_in_progress,
-            ),
+            Some(block_in_progress) => {
+                (BlockInProgressProvenance::Storage, block_in_progress)
+            }
             None => {
                 // Using `safe_host.host` allows to escape from the failsafe storage, which is necessary
                 // because the sequencer pool address is located outside of `/evm/world_state`.
@@ -530,14 +528,11 @@ pub fn produce<Host: Runtime>(
                 // We are going to execute a new block, we copy the storage to allow
                 // to revert if the block fails.
                 safe_host.start()?;
-                (
-                    block_in_progress.number,
-                    BlockInProgressProvenance::Blueprint,
-                    *block_in_progress,
-                )
+                (BlockInProgressProvenance::Blueprint, *block_in_progress)
             }
         };
 
+    let processed_blueprint = block_in_progress.number;
     match compute_bip(
         &mut safe_host,
         &outbox_queue,
