@@ -31,9 +31,13 @@ type (_, _) call =
       * 'input
       -> ('input, 'output) call
 
-(** [connect media uri] connects to an EVM node websocket server on [uri],
-      communication is either JSON or binary depending on [media]. *)
-val connect : Media_type.t -> Uri.t -> t Lwt.t
+type monitoring = {ping_timeout : float; ping_interval : float}
+
+(** [connect ?monitoring media uri] connects to an EVM node websocket server on
+    [uri], communication is either JSON or binary depending on [media]. If
+    [monitoring] is provided, the connection is monitored with the given
+    parameters. *)
+val connect : ?monitoring:monitoring -> Media_type.t -> Uri.t -> t Lwt.t
 
 (** Disconnect the websocket client by sending a close frame and closing the
     connection. *)

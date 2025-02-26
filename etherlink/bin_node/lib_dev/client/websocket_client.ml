@@ -175,12 +175,17 @@ let handle_message (media : Media_type.t) message =
           let* () = Event.(emit decoding_error) (e1, e2) in
           return_none)
 
-let disconnect ?(code = 1000) conn =
+let disconnect ?(status = Websocket_encodings.Normal_closure) conn =
   let open Lwt_syntax in
   Lwt.catch
     (fun () ->
       let* () = Event.(emit disconnecting) () in
-      let* () = Websocket_lwt_unix.write conn (Websocket.Frame.close code) in
+      let* () =
+        Websocket_lwt_unix.write
+          conn
+          (Websocket.Frame.close
+             (Websocket_encodings.code_of_close_status status))
+      in
       let* () = Websocket_lwt_unix.close_transport conn in
       let* () = Event.(emit disconnected) () in
       return_unit)
@@ -188,15 +193,21 @@ let disconnect ?(code = 1000) conn =
       let* () = Event.(emit disconnection_error) e in
       return_unit)
 
-let monitor_connection ?(ping_timeout = 10.) conn monitor_mbox =
+exception Timeout of float
+
+let monitor_connection ~ping_timeout ~ping_interval conn monitor_mbox =
+  let open Lwt_syntax in
   let rec loop ~push ping_counter =
-    if push then
-      Websocket_lwt_unix.write
-        conn
-        (Websocket.Frame.create
-           ~opcode:Ping
-           ~content:(string_of_int ping_counter)
-           ()) ;
+    let* () =
+      if push then
+        Websocket_lwt_unix.write
+          conn
+          (Websocket.Frame.create
+             ~opcode:Ping
+             ~content:(string_of_int ping_counter)
+             ())
+      else return_unit
+    in
     let* res =
       Lwt.pick
         [
@@ -213,11 +224,13 @@ let monitor_connection ?(ping_timeout = 10.) conn monitor_mbox =
           loop ~push:true (ping_counter + 1)
         else (* ignore *)
           loop ~push:false ping_counter
-    | `Timeout -> disconnect ~code:1001 conn
+    | `Timeout -> raise (Timeout ping_timeout)
   in
   loop ~push:true 0
 
-let connect media uri =
+type monitoring = {ping_timeout : float; ping_interval : float}
+
+let connect ?monitoring media uri =
   let open Lwt_syntax in
   let* endp = Resolver_lwt.resolve_uri ~uri Resolver_lwt_unix.system in
   let ctx = Lazy.force Conduit_lwt_unix.default_ctx in
@@ -230,12 +243,26 @@ let connect media uri =
   in
   let* conn = Websocket_lwt_unix.connect ~ctx client uri ~extra_headers in
   let message_buffer = Buffer.create 256 in
-  let monitor_mbox = Lwt_mvar.create_empty () in
+  let monitor =
+    match monitoring with
+    | None -> None
+    | Some {ping_timeout; ping_interval} ->
+        let monitor_mbox = Lwt_mvar.create_empty () in
+        let monitor =
+          monitor_connection ~ping_timeout ~ping_interval conn monitor_mbox
+        in
+        Some (monitor_mbox, monitor)
+  in
   let frame_stream =
     Lwt_stream.from (fun () ->
         Lwt.catch
           (fun () ->
-            let* frame = Websocket_lwt_unix.read conn in
+            let read = Websocket_lwt_unix.read conn in
+            let* frame =
+              match monitor with
+              | None -> read
+              | Some (_, timeout) -> Lwt.choose [read; timeout]
+            in
             match frame.opcode with
             | Close ->
                 let* () = disconnect conn in
@@ -243,7 +270,7 @@ let connect media uri =
             | _ -> return_some frame)
           (fun e ->
             let* () = Event.(emit connection_closed) e in
-            let* () = disconnect conn in
+            let* () = disconnect ~status:Going_away conn in
             return_none))
   in
   let response_stream =
@@ -258,7 +285,16 @@ let connect media uri =
                 (Websocket.Frame.create ~opcode:Pong ~content ())
             in
             return_none
-        | {opcode = Pong; _} -> return_none
+        | {opcode = Pong; content; _} ->
+            let* () =
+              match monitor with
+              | None -> return_unit
+              | Some (mbox, _) -> (
+                  match int_of_string_opt content with
+                  | None -> return_unit
+                  | Some i -> Lwt_mvar.put mbox i)
+            in
+            return_none
         | {opcode = Close; _} ->
             (* Cannot happen because frame_stream is closed when we receive this
                opcode. *)

@@ -637,7 +637,10 @@ let init_db_pointers db ws_client rollup_node_rpc =
 let start db ~evm_node_endpoint ~rollup_node_endpoint ~l1_node_endpoint =
   let open Lwt_result_syntax in
   let*! ws_client =
-    Websocket_client.connect Media_type.json evm_node_endpoint
+    Websocket_client.connect
+      ~monitoring:{ping_timeout = 60.; ping_interval = 10.}
+      Media_type.json
+      evm_node_endpoint
   in
   let rollup_node_rpc = Rollup_node_rpc.make_ctxt ~rollup_node_endpoint in
   let* () = init_db_pointers db ws_client rollup_node_rpc in
