@@ -1417,6 +1417,8 @@ etherlink.build:static-x86_64:
     - .gitlab/**/*
     - Makefile
     - etherlink/**/*
+    - sdk/rust/**/*
+    - src/kernel_sdk/**/*
     when: manual
     allow_failure: true
   dependencies:
@@ -1469,6 +1471,8 @@ etherlink.build:static-arm64:
     - .gitlab/**/*
     - Makefile
     - etherlink/**/*
+    - sdk/rust/**/*
+    - src/kernel_sdk/**/*
     when: manual
     allow_failure: true
   dependencies:
@@ -3299,7 +3303,7 @@ test_sdk_rust:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - images/**/*
-    - sdk/rust
+    - sdk/rust/**/*
     when: on_success
   needs:
   - job: oc.docker:rust-toolchain:amd64
@@ -3359,6 +3363,7 @@ test_kernels:
     - .gitlab/**/*
     - images/**/*
     - kernels.mk
+    - sdk/rust/**/*
     - src/kernel_*/**/*
     when: on_success
   needs:
@@ -3402,6 +3407,7 @@ test_etherlink_kernel:
     - etherlink.mk
     - etherlink/**/*.rs
     - images/**/*
+    - sdk/rust/**/*
     - src/kernel_sdk/**/*
     when: on_success
   needs:
@@ -3484,6 +3490,7 @@ audit_riscv_deps:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - images/**/*
+    - sdk/rust/**/*
     - src/kernel_sdk/**/*
     - src/riscv/**/*
     when: on_success
@@ -3522,6 +3529,7 @@ check_riscv_kernels:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - images/**/*
+    - sdk/rust/**/*
     - src/kernel_sdk/**/*
     - src/riscv/**/*
     when: on_success
@@ -3563,6 +3571,7 @@ test_riscv_kernels:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - images/**/*
+    - sdk/rust/**/*
     - src/kernel_sdk/**/*
     - src/riscv/**/*
     when: on_success
@@ -3604,6 +3613,7 @@ test_long_riscv_kernels:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - images/**/*
+    - sdk/rust/**/*
     - src/kernel_sdk/**/*
     - src/riscv/**/*
     when: on_success
@@ -3645,6 +3655,7 @@ test_miri_riscv_kernels:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - images/**/*
+    - sdk/rust/**/*
     - src/kernel_sdk/**/*
     - src/riscv/**/*
     when: on_success
@@ -3818,6 +3829,8 @@ oc.unit:etherlink-x86_64:
     - .gitlab/**/*
     - Makefile
     - etherlink/**/*
+    - sdk/rust/**/*
+    - src/kernel_sdk/**/*
     when: on_success
   needs:
   - oc.docker:ci:amd64
