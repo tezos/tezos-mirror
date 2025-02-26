@@ -6,7 +6,7 @@ After=network.target
 [Service]
 EnvironmentFile=-/etc/default/octez-baker-active
 EnvironmentFile=-/etc/default/octez-accuser-active
-WorkingDirectory=/var/tezos
+WorkingDirectory=~
 Restart=on-failure
 User=tezos
 ExecStart=/bin/sh -c "/usr/bin/octez-accuser-$PROTOCOL run $RUNTIME_OPTS"

@@ -5,7 +5,7 @@ After=network.target octez-node.service
 
 [Service]
 EnvironmentFile=-/etc/default/octez-smart-rollup-node
-WorkingDirectory=/var/tezos
+WorkingDirectory=~
 Restart=on-failure
 User=tezos
 ExecStart=/usr/bin/octez-smart-rollup-node run $RUNTIME_OPTS

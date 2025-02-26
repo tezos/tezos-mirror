@@ -6,7 +6,7 @@ After=network.target
 [Service]
 TimeoutSec=600s
 EnvironmentFile=-/etc/default/octez-node
-WorkingDirectory=/var/tezos
+WorkingDirectory=~
 Restart=on-failure
 TimeoutSec=1500
 User=tezos
