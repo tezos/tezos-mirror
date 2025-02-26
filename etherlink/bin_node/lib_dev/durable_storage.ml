@@ -334,6 +334,11 @@ let kernel_root_hash read =
     Durable_storage_path.kernel_root_hash
     Bytes.to_string
 
+let is_multichain_enabled read =
+  let open Lwt_result_syntax in
+  let* bytes_opt = read Durable_storage_path.Feature_flags.multichain in
+  return (Option.is_some bytes_opt)
+
 let storage_at read address (Qty pos) =
   let open Lwt_result_syntax in
   let pad32left0 s =
@@ -419,6 +424,11 @@ module Make (Reader : READER) = struct
     let open Lwt_result_syntax in
     let* read = read_with_state () in
     chain_id read
+
+  let is_multichain_enabled () =
+    let open Lwt_result_syntax in
+    let* read = read_with_state () in
+    is_multichain_enabled read
 
   let l2_minimum_base_fee_per_gas chain_id =
     let open Lwt_result_syntax in
