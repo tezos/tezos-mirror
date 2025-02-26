@@ -254,7 +254,12 @@ fn next_bip_from_blueprints<Host: Runtime>(
     kernel_upgrade: &Option<KernelUpgrade>,
     minimum_base_fee_per_gas: U256,
 ) -> Result<BlueprintParsing, anyhow::Error> {
-    let (blueprint, size) = read_blueprint(host, config, current_block_number)?;
+    let (blueprint, size) = read_blueprint(
+        host,
+        config,
+        current_block_number,
+        current_block_parent_hash,
+    )?;
     log!(host, Benchmarking, "Size of blueprint: {}", size);
     match blueprint {
         Some(blueprint) => {
