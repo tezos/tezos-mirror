@@ -6,7 +6,23 @@
 (*****************************************************************************)
 
 module type BAKER_COMMANDS_HELPERS = sig
-  val map_commands :
+  (** [run_baker ~configuration ~baking_mode ~sources ~cctxt] is the main running
+      function signature that all protocol plugins will need to implement. It
+      requires the [~configuration] which contains all the possible CLI arguments
+      for the agnostic baker, together with a [~baking_mode] argument and delegates
+      list given by [~sources] in the client context [~cctxt].
+      
+      Depending on the protocol, the arguments can be transformed in the corresponding
+      plugin, but the structure of the list of arguments will not grow or shrink, to
+      prevent incompatibilities at migrations. *)
+  val run_baker :
+    configuration:Configuration.t ->
+    baking_mode:string option ->
+    sources:Tezos_crypto.Signature.V1.public_key_hash list ->
+    cctxt:Tezos_client_base.Client_context.full ->
+    unit Error_monad.tzresult Lwt.t
+
+  val baker_commands :
     unit -> Tezos_client_base.Client_context.full Tezos_clic.command list
 end
 

@@ -26,11 +26,11 @@ let run_thread (module Plugin : Protocol_plugin_sig.S) ~baker_args
     ~cancel_promise ~logs_path =
   let () =
     Client_commands.register Plugin.protocol_hash @@ fun _network ->
-    Plugin.Baker_commands_helpers.map_commands ()
+    Plugin.Baker_commands_helpers.baker_commands ()
   in
 
   let select_commands _ _ =
-    Lwt_result_syntax.return @@ Plugin.Baker_commands_helpers.map_commands ()
+    Lwt_result_syntax.return @@ Plugin.Baker_commands_helpers.baker_commands ()
   in
 
   (* This call is not strictly necessary as the parameters are initialized
