@@ -531,7 +531,7 @@ pub fn produce<Host: Runtime>(
                 // to revert if the block fails.
                 safe_host.start()?;
                 (
-                    current_block_number,
+                    block_in_progress.number,
                     BlockInProgressProvenance::Blueprint,
                     *block_in_progress,
                 )
