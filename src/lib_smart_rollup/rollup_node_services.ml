@@ -254,6 +254,10 @@ module Encodings = struct
                (req "message_index" int31)
                (opt "message" Outbox_message.summary_encoding))))
 
+  let outbox_msg_status : [`Executable | `Lost | `Pending] t =
+    string_enum
+      [("executable", `Executable); ("pending", `Pending); ("lost", `Lost)]
+
   let queued_message = L2_message.encoding
 
   let batcher_queue = list queued_message
@@ -914,6 +918,12 @@ module Query = struct
            q#drop_duplicate)
     |> seal
 
+  let outbox_level_query =
+    let open Tezos_rpc.Query in
+    query (fun l -> l)
+    |+ opt_field "outbox_level" Tezos_rpc.Arg.int32 (fun k -> k)
+    |> seal
+
   let outbox_query : bool Tezos_rpc.Query.t =
     let open Tezos_rpc.Query in
     query (fun b -> b)
@@ -1128,17 +1138,31 @@ module Local = struct
         (Data_encoding.option Encodings.commitment_with_hash_and_level_infos)
       (path / "commitments" /: Arg.commitment_hash)
 
+  let outbox_pending =
+    Tezos_rpc.Service.get_service
+      ~description:
+        "Pending outbox messages with their status (executable, pending, or \
+         lost)"
+      ~query:Query.outbox_level_query
+      ~output:
+        Data_encoding.(
+          list
+            (merge_objs
+               Encodings.outbox
+               (obj1 (req "status" Encodings.outbox_msg_status))))
+      (path / "outbox" / "pending")
+
   let outbox_pending_executable =
     Tezos_rpc.Service.get_service
       ~description:"Pending outbox messages which can be executed"
-      ~query:Tezos_rpc.Query.empty
+      ~query:Query.outbox_level_query
       ~output:(Data_encoding.list Encodings.outbox)
       (path / "outbox" / "pending" / "executable")
 
   let outbox_pending_unexecutable =
     Tezos_rpc.Service.get_service
       ~description:"Pending outbox messages which cannot yet be executed"
-      ~query:Tezos_rpc.Query.empty
+      ~query:Query.outbox_level_query
       ~output:(Data_encoding.list Encodings.outbox)
       (path / "outbox" / "pending" / "unexecutable")
 
