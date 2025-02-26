@@ -205,8 +205,8 @@ impl BlockInProgress {
         estimated_ticks_in_run: u64,
         timestamp: Timestamp,
         base_fee_per_gas: U256,
-        previous_receipts_root: &OwnedHash,
-        previous_transactions_root: &OwnedHash,
+        previous_receipts_root: OwnedHash,
+        previous_transactions_root: OwnedHash,
     ) -> Self {
         Self {
             number,
@@ -222,8 +222,8 @@ impl BlockInProgress {
             logs_offset: 0,
             timestamp,
             base_fee_per_gas,
-            previous_receipts_root: previous_receipts_root.to_vec(),
-            previous_transactions_root: previous_transactions_root.to_vec(),
+            previous_receipts_root,
+            previous_transactions_root,
         }
     }
 
@@ -233,8 +233,8 @@ impl BlockInProgress {
         number: U256,
         transactions: VecDeque<Transaction>,
         base_fee_per_gas: U256,
-        receipts_root: &OwnedHash,
-        transactions_root: &OwnedHash,
+        receipts_root: OwnedHash,
+        transactions_root: OwnedHash,
     ) -> BlockInProgress {
         Self::new_with_ticks(
             number,
@@ -281,8 +281,8 @@ impl BlockInProgress {
         parent_hash: H256,
         tick_counter: u64,
         base_fee_per_gas: U256,
-        receipts_root: &OwnedHash,
-        transactions_root: &OwnedHash,
+        receipts_root: OwnedHash,
+        transactions_root: OwnedHash,
     ) -> BlockInProgress {
         // blueprint is turn into a ring to allow popping from the front
         let ring = blueprint.transactions.into();
