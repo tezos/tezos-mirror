@@ -3,6 +3,164 @@
 Changelog
 '''''''''
 
+Version 22.0~rc1
+================
+
+General
+-------
+
+- Changed the compiler version to 5.2.1 and added a manual job to compile with
+  ocaml 4.14.2. (MR :gl:`!15404`)
+
+- Logging output on TTYs now adapt to the terminal width. (MR :gl:`!12348`)
+
+- Logging output can now advertise the level associated to each events, by
+  enabling the ``advertise-levels`` option in the file-descriptor sink URI. (MR :gl:`!16190`)
+
+- Removed binaries for ParisC. (MR :gl:`!16427`)
+
+Node
+----
+
+- Changed the default ``history-mode`` from ``Full`` to ``Rolling``. (MR :gl:`!15942`)
+
+- Introduced a specific exit code for the ``octez-node upgrade storage
+  --status`` command. It now returns the exit code 1 when an upgrade
+  is available. 0 is returned when the storage is up to date. (MR :gl:`!15152`)
+
+- New RPCs ``/chain/{chain_id}/protocols`` (and
+  ``/chain/{chain_id}/protocols/{protocol_hash}``) to retrieve protocol
+  activation levels of the chain. (MR :gl:`!15447`)
+
+Client
+------
+
+- Registered ``operation.bls_mode_unsigned`` encoding. (MR :gl:`!16655`)
+
+- Allow tz4 (BLS) addresses to be registered as delegate and or as consensus
+  keys. (MR :gl:`!15302`)
+
+ - **Breaking change** Removed read-write commands specific to ParisC. (MR :gl:`!16431`)
+
+Baker
+-----
+
+- The baker emits a warning when it is started with ``--dal-node``, but the DAL
+  node has no registered attester, that is, it was not started with
+  ``--attester-profiles <manager_key>``. (MR :gl:`!16333`)
+
+- **Breaking change** For ``proto_alpha``, providing the endpoint of a running
+  DAL node is required for the baker to be launched, unless opted out with the
+  newly introduced ``--without-dal`` option. (MR :gl:`!16049`)
+
+- **Breaking change** The baker daemon ``--dal-node-timeout-percentage``
+  argument has been removed. (MR :gl:`!15554`)
+
+Agnostic Baker
+--------------
+
+- Released agnostic baker binary as experimental. (MR :gl:`!16318`)
+
+- Use of a generic watchdog. (MR :gl:`!15508`)
+
+- Changed the binary name to ``octez-experimental-agnostic-baker``. (MR :gl:`!16434`)
+
+- Added a mechanism for the agnostic baker to switch on new protocol. (MR :gl:`!15305`)
+
+- Introduced a dummy agnostic baker. (MR :gl:`!15029`)
+
+Overview: The Agnostic Baker is a protocol-independent binary that dynamically determines
+and executes the appropriate baking binary based on the active protocol. It continuously
+monitors the blockchain state and automatically transitions to the correct binary whenever
+a new protocol is detected, such as during migrations or at startup.
+
+Please note that this feature is in an EXPERIMENTAL phase, as clearly suggested by its name.
+Therefore, it should NOT be used on ``mainnet``. For further clarifications, you can consult
+the README from ``src/bin_agnostic_baker``.
+
+Protocol Compiler And Environment
+---------------------------------
+
+- Added a new version of the protocol environment (V14). (MR :gl:`!15345`)
+
+- Added a new version of the protocol environment (V15). (MR :gl:`!16599`)
+
+Docker Images
+-------------
+
+- Fixed the Docker ``octez-snapshot-import`` command to properly pass
+  arguments to the snapshot import process. (MR :gl:`!11259`)
+
+Data Availability Committee (DAC)
+---------------------------------
+
+- **Breaking_change** DAC node and client have been removed to
+  simplify the codebase. (MR :gl:`!14862`)
+
+Data Availability Layer (DAL)
+-----------------------------
+
+DAL node
+~~~~~~~~
+
+- **Breaking_change** The configuration value ``metrics-addr`` is now an option.
+  It should not break unless the value differs from the default value
+  (``0.0.0.0:11733``). The new default value is ``None``, so no metrics are
+  exported by default.
+
+- **Breaking change** For the RPCs ``/p2p/gossipsub/topics/peers``,
+  ``/p2p/gossipsub/pkhs/peers``, and ``/p2p/gossipsub/slot_indexes/peers``, the
+  flag ``subscribed`` is removed and a new flag ``all`` is introduced. The
+  default behavior is now to list peers only for topics the current peer is
+  subscribed to, while the ``all`` flag can be used to recover the previous
+  behavior. (MR :gl:`!14518`)
+
+- **Bugfix** When shutting down the DAL node using SIGINT, it does a
+  best effort to shutdown properly its running P2P connections
+
+- **Feature** The DAL node stores now a peers.json file in its
+  directory when it is shutdown with SIGINT. This file is read if it
+  exists when starting the DAL node to restore previous known
+  connections quickly.
+
+- **Change** The DAL node store version has been upgraded from 1 to 2.
+  The DAL node store will automatically upgrade without requiring any
+  user action. For users running the DAL node with the
+  ``--operator-profile`` flag enabled, the node now uses SQLite
+  specifically for managing skip list cells (MR :gl:`!15780`),
+  preventing inode exhaustion. All other stores remain unchanged.
+
+- **Feature** The DAL node downloads trusted setup files when launched in observer
+   or operator mode. (MR :gl:`!16102`)
+
+- The DAL node supports a ``config update`` command to update an
+  existing configuration. It takes the same arguments as for the other
+  commands. (MR :gl:`!15759`)
+
+- Fixed file descriptor leak in resto affecting connections to the L1 node.
+  (MR :gl:`!15322`)
+
+- Added a new RPC ``/last_processed_level`` to retrieve the last (finalized) L1
+  level processed by a DAL node. (MR :gl:`!16420`)
+
+- A warning is emitted when registering a public key hash (as an attester
+  profile) that does not correspond to that of a delegate. (MR :gl:`!16336`)
+
+- Set the message validation function at node startup, fixing
+  https://gitlab.com/tezos/tezos/-/issues/7629. (MR :gl:`!15830`)
+
+- A warning has been introduced in case it is observed that the DAL node lags
+  behind the L1 node. (MR :gl:`!15756`)
+
+- Added a new RPC ``GET /protocol_parameters/`` that retrieve the protocol
+  parameters that the DAL node uses for a given level, which by default is the
+  last finalized level the node is aware of. (MR :gl:`!16704`)
+
+Miscellaneous
+-------------
+
+- Renamed ``Bls`` file from the crypto library in ``Bls_aug.ml``. (MR :gl:`!16683`).
+
 Version 21.4
 ============
 
@@ -24,6 +182,25 @@ DAL node
 - **Feature** A new RPC ``/p2p/gossipsub/reconnection_delays`` which
   provides for each unreachable point, the time remaining until the
   next reconnection attempt. (MR :gl:`!16767`)
+
+- **Feature** Added a new RPC ``GET /p2p/gossipsub/mesh/`` that returns the GossipSub mesh
+  (i.e. full data connections per topic) of a peer. (MR :gl:`!16754`)
+
+- **Feature** Added a new RPC ``GET /p2p/gossipsub/fanout/`` that returns the GossipSub
+  fanout of a peer. (MR :gl:`!16764`)
+
+- **Bugfix** Fixed the timing of the reconnection to peers attempts. (MR :gl:`!16466`)
+
+- **Bugfix** From v21.2, the ``SO_KEEP_ALIVE`` socket option was used
+  for incoming connections only. It is now used with both incoming
+  connections and outgoing connections. (MR :gl:`!16820`)
+
+Baker
+-----
+
+- Fixed a long time running baker memory leak. (MR :gl:`!16719`)
+
+- Fixed the storage maintenance default value in the config file (MR :gl:`!16744`)
 
 Version 21.3
 ============

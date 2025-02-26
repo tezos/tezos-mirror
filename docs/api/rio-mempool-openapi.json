@@ -205,7 +205,7 @@
                       "protocol": {
                         "type": "string",
                         "enum": [
-                          "PsQuebecnLByd3JwTiGadoG4nGWi3HYiLXUjkibeFV8dCFeVMUg"
+                          "PsRiotumaAMotcRoDWW1bysEhQy2n1M5fy8JgRp8jjRfHGmfeA7"
                         ]
                       },
                       "branch": {
@@ -214,7 +214,7 @@
                       "contents": {
                         "type": "array",
                         "items": {
-                          "$ref": "#/components/schemas/021-PsQuebec.operation.alpha.contents"
+                          "$ref": "#/components/schemas/022-PsRiotum.operation.alpha.contents"
                         }
                       },
                       "signature": {
@@ -357,7 +357,7 @@
                           "contents": {
                             "type": "array",
                             "items": {
-                              "$ref": "#/components/schemas/021-PsQuebec.operation.alpha.contents"
+                              "$ref": "#/components/schemas/022-PsRiotum.operation.alpha.contents"
                             }
                           },
                           "signature": {
@@ -383,7 +383,7 @@
                           "protocol": {
                             "type": "string",
                             "enum": [
-                              "PsQuebecnLByd3JwTiGadoG4nGWi3HYiLXUjkibeFV8dCFeVMUg"
+                              "PsRiotumaAMotcRoDWW1bysEhQy2n1M5fy8JgRp8jjRfHGmfeA7"
                             ]
                           },
                           "branch": {
@@ -392,7 +392,7 @@
                           "contents": {
                             "type": "array",
                             "items": {
-                              "$ref": "#/components/schemas/021-PsQuebec.operation.alpha.contents"
+                              "$ref": "#/components/schemas/022-PsRiotum.operation.alpha.contents"
                             }
                           },
                           "signature": {
@@ -423,7 +423,7 @@
                           "protocol": {
                             "type": "string",
                             "enum": [
-                              "PsQuebecnLByd3JwTiGadoG4nGWi3HYiLXUjkibeFV8dCFeVMUg"
+                              "PsRiotumaAMotcRoDWW1bysEhQy2n1M5fy8JgRp8jjRfHGmfeA7"
                             ]
                           },
                           "branch": {
@@ -432,7 +432,7 @@
                           "contents": {
                             "type": "array",
                             "items": {
-                              "$ref": "#/components/schemas/021-PsQuebec.operation.alpha.contents"
+                              "$ref": "#/components/schemas/022-PsRiotum.operation.alpha.contents"
                             }
                           },
                           "signature": {
@@ -463,7 +463,7 @@
                           "protocol": {
                             "type": "string",
                             "enum": [
-                              "PsQuebecnLByd3JwTiGadoG4nGWi3HYiLXUjkibeFV8dCFeVMUg"
+                              "PsRiotumaAMotcRoDWW1bysEhQy2n1M5fy8JgRp8jjRfHGmfeA7"
                             ]
                           },
                           "branch": {
@@ -472,7 +472,7 @@
                           "contents": {
                             "type": "array",
                             "items": {
-                              "$ref": "#/components/schemas/021-PsQuebec.operation.alpha.contents"
+                              "$ref": "#/components/schemas/022-PsRiotum.operation.alpha.contents"
                             }
                           },
                           "signature": {
@@ -503,7 +503,7 @@
                           "protocol": {
                             "type": "string",
                             "enum": [
-                              "PsQuebecnLByd3JwTiGadoG4nGWi3HYiLXUjkibeFV8dCFeVMUg"
+                              "PsRiotumaAMotcRoDWW1bysEhQy2n1M5fy8JgRp8jjRfHGmfeA7"
                             ]
                           },
                           "branch": {
@@ -512,7 +512,7 @@
                           "contents": {
                             "type": "array",
                             "items": {
-                              "$ref": "#/components/schemas/021-PsQuebec.operation.alpha.contents"
+                              "$ref": "#/components/schemas/022-PsRiotum.operation.alpha.contents"
                             }
                           },
                           "signature": {
@@ -543,7 +543,7 @@
                           "protocol": {
                             "type": "string",
                             "enum": [
-                              "PsQuebecnLByd3JwTiGadoG4nGWi3HYiLXUjkibeFV8dCFeVMUg"
+                              "PsRiotumaAMotcRoDWW1bysEhQy2n1M5fy8JgRp8jjRfHGmfeA7"
                             ]
                           },
                           "branch": {
@@ -552,7 +552,7 @@
                           "contents": {
                             "type": "array",
                             "items": {
-                              "$ref": "#/components/schemas/021-PsQuebec.operation.alpha.contents"
+                              "$ref": "#/components/schemas/022-PsRiotum.operation.alpha.contents"
                             }
                           },
                           "signature": {
@@ -719,7 +719,7 @@
   },
   "components": {
     "schemas": {
-      "021-PsQuebec.adaptive_issuance_vote": {
+      "022-PsRiotum.adaptive_issuance_vote": {
         "oneOf": [
           {
             "title": "per_block_vote_on",
@@ -744,7 +744,7 @@
           }
         ]
       },
-      "021-PsQuebec.block_header.alpha.full_header": {
+      "022-PsRiotum.block_header.alpha.full_header": {
         "title": "Shell header",
         "description": "Block header's shell-related content. It contains information such as the block level, its predecessor and timestamp.",
         "type": "object",
@@ -795,10 +795,10 @@
             "$ref": "#/components/schemas/cycle_nonce"
           },
           "liquidity_baking_toggle_vote": {
-            "$ref": "#/components/schemas/021-PsQuebec.liquidity_baking_vote"
+            "$ref": "#/components/schemas/022-PsRiotum.liquidity_baking_vote"
           },
           "adaptive_issuance_vote": {
-            "$ref": "#/components/schemas/021-PsQuebec.adaptive_issuance_vote"
+            "$ref": "#/components/schemas/022-PsRiotum.adaptive_issuance_vote"
           },
           "signature": {
             "$ref": "#/components/schemas/Signature.V1"
@@ -821,7 +821,7 @@
           "signature"
         ]
       },
-      "021-PsQuebec.contract_id": {
+      "022-PsRiotum.contract_id": {
         "title": "A contract handle",
         "description": "A contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash or a base58 originated contract hash.",
         "oneOf": [
@@ -830,7 +830,7 @@
           }
         ]
       },
-      "021-PsQuebec.contract_id.originated": {
+      "022-PsRiotum.contract_id.originated": {
         "title": "A contract handle -- originated account",
         "description": "A contract notation as given to an RPC or inside scripts. Can be a base58 originated contract hash.",
         "oneOf": [
@@ -839,7 +839,7 @@
           }
         ]
       },
-      "021-PsQuebec.entrypoint": {
+      "022-PsRiotum.entrypoint": {
         "title": "entrypoint",
         "description": "Named entrypoint to a Michelson smart contract",
         "oneOf": [
@@ -923,7 +923,7 @@
           }
         ]
       },
-      "021-PsQuebec.inlined.attestation": {
+      "022-PsRiotum.inlined.attestation": {
         "description": "An operation's shell header.",
         "type": "object",
         "properties": {
@@ -931,7 +931,7 @@
             "$ref": "#/components/schemas/block_hash"
           },
           "operations": {
-            "$ref": "#/components/schemas/021-PsQuebec.inlined.attestation_mempool.contents"
+            "$ref": "#/components/schemas/022-PsRiotum.inlined.attestation_mempool.contents"
           },
           "signature": {
             "$ref": "#/components/schemas/Signature.V1"
@@ -942,7 +942,7 @@
           "operations"
         ]
       },
-      "021-PsQuebec.inlined.attestation_mempool.contents": {
+      "022-PsRiotum.inlined.attestation_mempool.contents": {
         "oneOf": [
           {
             "title": "Attestation",
@@ -1024,7 +1024,7 @@
           }
         ]
       },
-      "021-PsQuebec.inlined.preattestation": {
+      "022-PsRiotum.inlined.preattestation": {
         "description": "An operation's shell header.",
         "type": "object",
         "properties": {
@@ -1032,7 +1032,7 @@
             "$ref": "#/components/schemas/block_hash"
           },
           "operations": {
-            "$ref": "#/components/schemas/021-PsQuebec.inlined.preattestation.contents"
+            "$ref": "#/components/schemas/022-PsRiotum.inlined.preattestation.contents"
           },
           "signature": {
             "$ref": "#/components/schemas/Signature.V1"
@@ -1043,7 +1043,7 @@
           "operations"
         ]
       },
-      "021-PsQuebec.inlined.preattestation.contents": {
+      "022-PsRiotum.inlined.preattestation.contents": {
         "type": "object",
         "properties": {
           "kind": {
@@ -1079,7 +1079,7 @@
           "block_payload_hash"
         ]
       },
-      "021-PsQuebec.liquidity_baking_vote": {
+      "022-PsRiotum.liquidity_baking_vote": {
         "oneOf": [
           {
             "title": "per_block_vote_on",
@@ -1104,7 +1104,7 @@
           }
         ]
       },
-      "021-PsQuebec.michelson.v1.primitives": {
+      "022-PsRiotum.michelson.v1.primitives": {
         "type": "string",
         "enum": [
           "SHA256",
@@ -1267,10 +1267,10 @@
           "code"
         ]
       },
-      "021-PsQuebec.mutez": {
+      "022-PsRiotum.mutez": {
         "$ref": "#/components/schemas/positive_bignum"
       },
-      "021-PsQuebec.operation.alpha.contents": {
+      "022-PsRiotum.operation.alpha.contents": {
         "oneOf": [
           {
             "title": "Preattestation",
@@ -1347,6 +1347,54 @@
             ]
           },
           {
+            "title": "Attestations_aggregate",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "attestations_aggregate"
+                ]
+              },
+              "consensus_content": {
+                "type": "object",
+                "properties": {
+                  "level": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "round": {
+                    "type": "integer",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                  },
+                  "block_payload_hash": {
+                    "$ref": "#/components/schemas/value_hash"
+                  }
+                },
+                "required": [
+                  "level",
+                  "round",
+                  "block_payload_hash"
+                ]
+              },
+              "committee": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "consensus_content",
+              "committee"
+            ]
+          },
+          {
             "title": "Attestation_with_dal",
             "type": "object",
             "properties": {
@@ -1398,10 +1446,10 @@
                 ]
               },
               "op1": {
-                "$ref": "#/components/schemas/021-PsQuebec.inlined.preattestation"
+                "$ref": "#/components/schemas/022-PsRiotum.inlined.preattestation"
               },
               "op2": {
-                "$ref": "#/components/schemas/021-PsQuebec.inlined.preattestation"
+                "$ref": "#/components/schemas/022-PsRiotum.inlined.preattestation"
               }
             },
             "required": [
@@ -1421,10 +1469,10 @@
                 ]
               },
               "op1": {
-                "$ref": "#/components/schemas/021-PsQuebec.inlined.attestation"
+                "$ref": "#/components/schemas/022-PsRiotum.inlined.attestation"
               },
               "op2": {
-                "$ref": "#/components/schemas/021-PsQuebec.inlined.attestation"
+                "$ref": "#/components/schemas/022-PsRiotum.inlined.attestation"
               }
             },
             "required": [
@@ -1501,16 +1549,73 @@
                 ]
               },
               "bh1": {
-                "$ref": "#/components/schemas/021-PsQuebec.block_header.alpha.full_header"
+                "$ref": "#/components/schemas/022-PsRiotum.block_header.alpha.full_header"
               },
               "bh2": {
-                "$ref": "#/components/schemas/021-PsQuebec.block_header.alpha.full_header"
+                "$ref": "#/components/schemas/022-PsRiotum.block_header.alpha.full_header"
               }
             },
             "required": [
               "kind",
               "bh1",
               "bh2"
+            ]
+          },
+          {
+            "title": "Dal_entrapment_evidence",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "dal_entrapment_evidence"
+                ]
+              },
+              "attestation": {
+                "$ref": "#/components/schemas/022-PsRiotum.inlined.attestation"
+              },
+              "slot_index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "shard_with_proof": {
+                "type": "object",
+                "properties": {
+                  "shard": {
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -1073741824,
+                          "maximum": 1073741823
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "proof": {
+                    "$ref": "#/components/schemas/DAL_commitment"
+                  }
+                },
+                "required": [
+                  "shard",
+                  "proof"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "attestation",
+              "slot_index",
+              "shard_with_proof"
             ]
           },
           {
@@ -1621,7 +1726,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -1660,7 +1765,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -1672,16 +1777,16 @@
                 "$ref": "#/components/schemas/positive_bignum"
               },
               "amount": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "destination": {
-                "$ref": "#/components/schemas/021-PsQuebec.contract_id"
+                "$ref": "#/components/schemas/022-PsRiotum.contract_id"
               },
               "parameters": {
                 "type": "object",
                 "properties": {
                   "entrypoint": {
-                    "$ref": "#/components/schemas/021-PsQuebec.entrypoint"
+                    "$ref": "#/components/schemas/022-PsRiotum.entrypoint"
                   },
                   "value": {}
                 },
@@ -1716,7 +1821,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -1728,13 +1833,13 @@
                 "$ref": "#/components/schemas/positive_bignum"
               },
               "balance": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "delegate": {
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "script": {
-                "$ref": "#/components/schemas/021-PsQuebec.scripted.contracts"
+                "$ref": "#/components/schemas/022-PsRiotum.scripted.contracts"
               }
             },
             "required": [
@@ -1762,7 +1867,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -1800,7 +1905,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -1812,7 +1917,7 @@
                 "$ref": "#/components/schemas/positive_bignum"
               },
               "limit": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               }
             },
             "required": [
@@ -1838,7 +1943,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -1853,7 +1958,7 @@
                 "$ref": "#/components/schemas/bignum"
               },
               "destination": {
-                "$ref": "#/components/schemas/021-PsQuebec.contract_id.originated"
+                "$ref": "#/components/schemas/022-PsRiotum.contract_id.originated"
               }
             },
             "required": [
@@ -1881,7 +1986,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -1894,6 +1999,9 @@
               },
               "pk": {
                 "$ref": "#/components/schemas/Signature.Public_key"
+              },
+              "proof": {
+                "$ref": "#/components/schemas/Signature.V1"
               }
             },
             "required": [
@@ -1967,7 +2075,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2004,7 +2112,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2018,13 +2126,13 @@
               "ticket_contents": {},
               "ticket_ty": {},
               "ticket_ticketer": {
-                "$ref": "#/components/schemas/021-PsQuebec.contract_id"
+                "$ref": "#/components/schemas/022-PsRiotum.contract_id"
               },
               "ticket_amount": {
                 "$ref": "#/components/schemas/positive_bignum"
               },
               "destination": {
-                "$ref": "#/components/schemas/021-PsQuebec.contract_id"
+                "$ref": "#/components/schemas/022-PsRiotum.contract_id"
               },
               "entrypoint": {
                 "$ref": "#/components/schemas/unistring"
@@ -2059,7 +2167,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2117,7 +2225,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2174,7 +2282,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2217,7 +2325,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2256,7 +2364,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2321,7 +2429,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2612,7 +2720,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2667,7 +2775,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2715,7 +2823,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2758,7 +2866,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2860,7 +2968,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2933,13 +3041,13 @@
                             "type": "object",
                             "properties": {
                               "contents": {
-                                "$ref": "#/components/schemas/micheline.021-PsQuebec.michelson_v1.expression"
+                                "$ref": "#/components/schemas/micheline.022-PsRiotum.michelson_v1.expression"
                               },
                               "ty": {
-                                "$ref": "#/components/schemas/micheline.021-PsQuebec.michelson_v1.expression"
+                                "$ref": "#/components/schemas/micheline.022-PsRiotum.michelson_v1.expression"
                               },
                               "ticketer": {
-                                "$ref": "#/components/schemas/021-PsQuebec.contract_id"
+                                "$ref": "#/components/schemas/022-PsRiotum.contract_id"
                               }
                             },
                             "required": [
@@ -2980,7 +3088,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/021-PsQuebec.mutez"
+                "$ref": "#/components/schemas/022-PsRiotum.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -3108,7 +3216,7 @@
           }
         ]
       },
-      "021-PsQuebec.scripted.contracts": {
+      "022-PsRiotum.scripted.contracts": {
         "type": "object",
         "properties": {
           "code": {},
@@ -3240,7 +3348,7 @@
         "description": "Decimal representation of 64 bit integers",
         "type": "string"
       },
-      "micheline.021-PsQuebec.michelson_v1.expression": {
+      "micheline.022-PsRiotum.michelson_v1.expression": {
         "oneOf": [
           {
             "title": "Int",
@@ -3283,7 +3391,7 @@
             "title": "Sequence",
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/micheline.021-PsQuebec.michelson_v1.expression"
+              "$ref": "#/components/schemas/micheline.022-PsRiotum.michelson_v1.expression"
             }
           },
           {
@@ -3292,12 +3400,12 @@
             "type": "object",
             "properties": {
               "prim": {
-                "$ref": "#/components/schemas/021-PsQuebec.michelson.v1.primitives"
+                "$ref": "#/components/schemas/022-PsRiotum.michelson.v1.primitives"
               },
               "args": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/micheline.021-PsQuebec.michelson_v1.expression"
+                  "$ref": "#/components/schemas/micheline.022-PsRiotum.michelson_v1.expression"
                 }
               },
               "annots": {
