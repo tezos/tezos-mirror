@@ -7,6 +7,7 @@ mod error;
 mod fds;
 mod fs;
 mod memory;
+mod parameters;
 mod rng;
 
 use std::ffi::CStr;
@@ -420,7 +421,15 @@ impl<M: ManagerBase> SupervisorState<M> {
             READLINKAT => return self.handle_readlinkat(core),
             EXIT | EXITGROUP => return self.handle_exit(core),
             SET_TID_ADDRESS => return self.handle_set_tid_address(core),
-            TKILL => return self.handle_tkill(core),
+            TKILL => {
+                return match self.handle_tkill(core) {
+                    Ok(b) => b,
+                    Err(e) => {
+                        core.hart.xregisters.write_system_call_error(e);
+                        true
+                    }
+                };
+            }
             SIGALTSTACK => return self.handle_sigaltstack(core),
             RT_SIGACTION => return self.handle_rt_sigaction(core),
             RT_SIGPROCMASK => return self.handle_rt_sigprocmask(core),
@@ -582,35 +591,30 @@ impl<M: ManagerBase> SupervisorState<M> {
 
     /// Handle `tkill` system call. As there is only one thread at the moment, this system call
     /// will return an error if the thread ID is not the main thread ID.
-    fn handle_tkill(&mut self, core: &mut MachineCoreState<impl MemoryConfig, M>) -> bool
+    fn handle_tkill(
+        &mut self,
+        core: &mut MachineCoreState<impl MemoryConfig, M>,
+    ) -> Result<bool, Error>
     where
         M: ManagerReadWrite,
     {
-        let thread_id = core.hart.xregisters.read(registers::a0);
-        let signal = core.hart.xregisters.read(registers::a1);
-
-        if thread_id != MAIN_THREAD_ID {
-            // We only support exiting the main thread
-            core.hart.xregisters.write_system_call_error(Error::Search);
-            return true;
-        }
+        core.hart
+            .xregisters
+            .try_read::<parameters::MainThreadId>(registers::a0)?;
+        let signal = core
+            .hart
+            .xregisters
+            .try_read::<parameters::Signal>(registers::a1)?;
 
         // Indicate that we have exited
         self.exited.write(true);
 
-        /// Setting bit 2^7 of the exit code indicates that the process was killed by a signal
-        const EXIT_BY_SIGNAL: u64 = 1 << 7;
-
-        /// Only 7 bits may be used to indicate the signal that terminated the process
-        const EXIT_SIGNAL_MASK: u64 = EXIT_BY_SIGNAL - 1;
-
-        self.exit_code
-            .write(EXIT_BY_SIGNAL | signal & EXIT_SIGNAL_MASK);
+        self.exit_code.write(signal.exit_code());
 
         // Return 0 as an indicator of success, even if this might not actually be used
         core.hart.xregisters.write(registers::a0, 0);
 
-        false
+        Ok(false)
     }
 }
 

@@ -2,6 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::num::TryFromIntError;
+
+use arbitrary_int::TryNewError;
+
 use crate::machine_state::registers::XRegisters;
 use crate::machine_state::registers::XValue;
 use crate::machine_state::registers::a0;
@@ -54,6 +58,18 @@ impl Error {
         // The discriminant matches the error code
         let error_code = -(self as i32);
         error_code as u64
+    }
+}
+
+impl From<TryFromIntError> for Error {
+    fn from(_: TryFromIntError) -> Self {
+        Error::InvalidArgument
+    }
+}
+
+impl From<TryNewError> for Error {
+    fn from(_: TryNewError) -> Self {
+        Error::InvalidArgument
     }
 }
 
