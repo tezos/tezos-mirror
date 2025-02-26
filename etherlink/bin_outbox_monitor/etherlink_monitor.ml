@@ -49,15 +49,6 @@ module Event = struct
       ~level:Debug
       ("log", Ethereum_types.transaction_log_encoding)
 
-  let pp_withdrawal_kind fmt (k : Db.withdrawal_kind) =
-    match k with
-    | Xtz -> Format.pp_print_string fmt "XTZ"
-    | FA ticket_owner ->
-        Format.fprintf
-          fmt
-          "FA(%s)"
-          (Ethereum_types.Address.to_string ticket_owner)
-
   let withdrawal_log =
     declare_8
       ~section
@@ -67,16 +58,15 @@ module Event = struct
          transaction {transactionHash}({transactionIndex}/{logIndex}) of block \
          {blockNumber}"
       ~level:Notice
-      ("amount", Db.quantity_hum_encoding)
-      ("token", Db.withdrawal_kind_encoding)
+      ("amount", Data_encoding.float)
+      ("token", Data_encoding.string)
       ("sender", Ethereum_types.address_encoding)
       ("receiver", Contract.encoding)
       ("transactionHash", Ethereum_types.hash_encoding)
       ("transactionIndex", Db.quantity_hum_encoding)
       ("logIndex", Db.quantity_hum_encoding)
       ("blockNumber", Db.quantity_hum_encoding)
-      ~pp1:Ethereum_types.pp_quantity
-      ~pp2:pp_withdrawal_kind
+      ~pp2:Format.pp_print_string
       ~pp3:(fun fmt a ->
         Format.pp_print_string fmt (Ethereum_types.Address.to_string a))
       ~pp4:Contract.pp
@@ -85,17 +75,22 @@ module Event = struct
       ~pp7:Ethereum_types.pp_quantity
       ~pp8:Ethereum_types.pp_quantity
 
-  let emit_withdrawal_log (w : Db.withdrawal_log) =
-    emit
-      withdrawal_log
-      ( w.withdrawal.amount,
-        w.withdrawal.kind,
-        w.withdrawal.sender,
-        w.withdrawal.receiver,
-        w.transactionHash,
-        w.transactionIndex,
-        w.logIndex,
-        w.blockNumber )
+  let emit_withdrawal_log ws_client (w : Db.withdrawal_log) =
+    let open Lwt_result_syntax in
+    let* amount, symbol =
+      Token_info.get_for_display ws_client w.withdrawal.kind w.withdrawal.amount
+    in
+    Lwt_result.ok
+    @@ emit
+         withdrawal_log
+         ( amount,
+           symbol,
+           w.withdrawal.sender,
+           w.withdrawal.receiver,
+           w.transactionHash,
+           w.transactionIndex,
+           w.logIndex,
+           w.blockNumber )
 
   let parsing_error =
     declare_1
@@ -353,7 +348,7 @@ let parse_log (log : Ethereum_types.transaction_log) =
           return (parsed_log_to_db log (FA_withdrawal withdraw_data))
       | None -> return_none)
 
-let handle_one_log db (log : Ethereum_types.transaction_log) =
+let handle_one_log ws_client db (log : Ethereum_types.transaction_log) =
   let open Lwt_result_syntax in
   let*! () = Event.(emit transaction_log) log in
   let withdrawal = parse_log log in
@@ -369,7 +364,7 @@ let handle_one_log db (log : Ethereum_types.transaction_log) =
       in
       return_unit
   | Ok (Some withdrawal) ->
-      let*! () = Event.emit_withdrawal_log withdrawal in
+      let* () = Event.emit_withdrawal_log ws_client withdrawal in
       Db.Withdrawals.store db withdrawal
 
 let lwt_stream_iter_es f stream =
@@ -404,7 +399,9 @@ let monitor_withdrawals db ws_client =
       ~address:filter_address
       ~topics:filter_topics
   in
-  let* () = lwt_stream_iter_es (handle_one_log db) logs_subscription.stream in
+  let* () =
+    lwt_stream_iter_es (handle_one_log ws_client db) logs_subscription.stream
+  in
   return_unit
 
 (** Retrieve log events that happened between [from_block] and [to_block] and
@@ -446,7 +443,7 @@ let rec get_logs db ws_client ~from_block ~to_block =
           (function
             | Filter.Block_filter _ | Pending_transaction_filter _ ->
                 return_unit
-            | Log log -> handle_one_log db log)
+            | Log log -> handle_one_log ws_client db log)
           logs
     | Error (Filter_helpers.Too_many_logs {limit} :: _ as e)
       when Z.equal from_z to_z ->

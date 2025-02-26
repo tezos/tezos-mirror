@@ -175,18 +175,47 @@ let handle_message (media : Media_type.t) message =
           let* () = Event.(emit decoding_error) (e1, e2) in
           return_none)
 
-let disconnect conn =
+let disconnect ?(code = 1000) conn =
   let open Lwt_syntax in
   Lwt.catch
     (fun () ->
       let* () = Event.(emit disconnecting) () in
-      let* () = Websocket_lwt_unix.write conn (Websocket.Frame.close 1000) in
+      let* () = Websocket_lwt_unix.write conn (Websocket.Frame.close code) in
       let* () = Websocket_lwt_unix.close_transport conn in
       let* () = Event.(emit disconnected) () in
       return_unit)
     (fun e ->
       let* () = Event.(emit disconnection_error) e in
       return_unit)
+
+let monitor_connection ?(ping_timeout = 10.) conn monitor_mbox =
+  let rec loop ~push ping_counter =
+    if push then
+      Websocket_lwt_unix.write
+        conn
+        (Websocket.Frame.create
+           ~opcode:Ping
+           ~content:(string_of_int ping_counter)
+           ()) ;
+    let* res =
+      Lwt.pick
+        [
+          (let+ c = Lwt_mvar.take monitor_mbox in
+           `Pong c);
+          (let+ () = Lwt_unix.sleep ping_timeout in
+           `Timeout);
+        ]
+    in
+    match res with
+    | `Pong c ->
+        if c = ping_counter then
+          let* () = Lwt_unix.sleep ping_interval in
+          loop ~push:true (ping_counter + 1)
+        else (* ignore *)
+          loop ~push:false ping_counter
+    | `Timeout -> disconnect ~code:1001 conn
+  in
+  loop ~push:true 0
 
 let connect media uri =
   let open Lwt_syntax in
@@ -201,6 +230,7 @@ let connect media uri =
   in
   let* conn = Websocket_lwt_unix.connect ~ctx client uri ~extra_headers in
   let message_buffer = Buffer.create 256 in
+  let monitor_mbox = Lwt_mvar.create_empty () in
   let frame_stream =
     Lwt_stream.from (fun () ->
         Lwt.catch
