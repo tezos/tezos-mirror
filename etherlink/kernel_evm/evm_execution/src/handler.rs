@@ -487,6 +487,20 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .unwrap_or_default()
     }
 
+    /// Get the amount of gas refunded for the current transaction.
+    pub fn gas_refunded(&self) -> i64 {
+        self.transaction_data
+            .last()
+            .map(|layer| {
+                layer
+                    .gasometer
+                    .as_ref()
+                    .map(|g| g.refunded_gas())
+                    .unwrap_or_default()
+            })
+            .unwrap_or_default()
+    }
+
     /// Record the cost of a static-cost opcode
     pub fn record_cost(&mut self, cost: u64) -> Result<(), ExitError> {
         let Some(layer) = self.transaction_data.last_mut() else {
@@ -536,7 +550,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .unwrap_or(Ok(()))
     }
 
-    /// Record the refund of a contract call. This differs from a storage
+    /// Record the stipend of a contract call. This differs from a storage
     /// operation refund in that the refunded gas can be used again by the
     /// same transaction. Function name reflects the SputnikVM name used to
     /// implement this functionality.
@@ -557,6 +571,28 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .map_err(|_| {
                 EthereumError::InconsistentState(Cow::from(
                     "Recording a stipend returned an error",
+                ))
+            })
+    }
+
+    /// Record the refund of a contract call.
+    fn record_refund(&mut self, refund: i64) -> Result<(), EthereumError> {
+        let Some(layer) = self.transaction_data.last_mut() else {
+            return Err(EthereumError::InconsistentTransactionStack(
+                self.transaction_data.len(),
+                false,
+                false,
+            ));
+        };
+
+        layer
+            .gasometer
+            .as_mut()
+            .map(|gasometer| gasometer.record_refund(refund))
+            .unwrap_or(Ok(()))
+            .map_err(|_| {
+                EthereumError::InconsistentState(Cow::from(
+                    "Recording a refund returned an error",
                 ))
             })
     }
@@ -1900,6 +1936,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         );
 
         let gas_remaining = self.gas_remaining();
+        let gas_refunded = self.gas_refunded();
 
         commit_storage_cache(self, number_of_tx_layer);
 
@@ -1927,6 +1964,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 top_layer.accessed_storage_keys = committed_data.accessed_storage_keys;
 
                 self.record_stipend(gas_remaining)?;
+                self.record_refund(gas_refunded)?;
 
                 Ok(())
             } else {
