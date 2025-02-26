@@ -2391,7 +2391,6 @@ let import_snapshot_command =
       in
       let*! () = init_logs ~daily_logs:false ~data_dir configuration in
       Evm_node_lib_dev.Snapshots.import_from
-        ~cancellable:true
         ~force
         ~keep_alive:false
         ~data_dir

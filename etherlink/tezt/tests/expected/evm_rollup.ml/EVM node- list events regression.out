@@ -1680,6 +1680,70 @@ extract_snapshot_archive_in_progress:
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
 
+still_compressing_snapshot:
+  description: still compressing snapshot {filename} after {elapsed_time} ({progress}% done)
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* still_compressing_snapshot version 0 */
+      "still_compressing_snapshot.v0":
+        { "filename": $unistring,
+          "elapsed_time": $timespan.system,
+          "progress": number } }
+    $timespan.system:
+      /* A span of time, as seen by the local computer. */
+      number
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+
+compressing_snapshot:
+  description: compressing snapshot {filename}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* compressing_snapshot version 0 */
+      "compressing_snapshot.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+
+still_exporting_snapshot:
+  description: still exporting snapshot {filename} after {elapsed_time} ({progress}% done)
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* still_exporting_snapshot version 0 */
+      "still_exporting_snapshot.v0":
+        { "filename": $unistring,
+          "elapsed_time": $timespan.system,
+          "progress": number } }
+    $timespan.system:
+      /* A span of time, as seen by the local computer. */
+      number
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+
+exporting_snapshot:
+  description: exporting snapshot {filename}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* exporting_snapshot version 0 */
+      "exporting_snapshot.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+
 importing_snapshot:
   description: importing snapshot
   level: notice

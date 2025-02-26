@@ -1231,7 +1231,6 @@ module State = struct
       match snapshot_url with
       | Some snapshot_url when not store_already_exists ->
           Snapshots.import_from
-            ~cancellable:true
             ~force:true
             ~keep_alive:configuration.Configuration.keep_alive
             ~data_dir

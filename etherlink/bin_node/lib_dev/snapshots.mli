@@ -48,23 +48,16 @@ val export :
   unit ->
   string tzresult Lwt.t
 
-(** [import ~cancellable ~force ~data_dir ~snapshot_file] imports the
-    snapshot at path [snapshot_file] into the data directory [data_dir]. Import
-    will fail if [data_dir] is already populated unless [force] is set to
-    [true]. Set [cancellable] if you want to be able to cancel the resulting
-    promise cleanly. *)
+(** [import ~force ~data_dir ~snapshot_file] imports the snapshot at path
+    [snapshot_file] into the data directory [data_dir]. Import will fail if
+    [data_dir] is already populated unless [force] is set to [true]. *)
 val import :
-  cancellable:bool ->
-  force:bool ->
-  data_dir:string ->
-  snapshot_file:string ->
-  unit tzresult Lwt.t
+  force:bool -> data_dir:string -> snapshot_file:string -> unit tzresult Lwt.t
 
-(** [import_from ~cancellable ~force ~keep_alive ~data_dir ~download_path ~snapshot_file]
-    similar to [import] but also takes care of downloading the file if the provided string
-    is an url. *)
+(** [import_from ~force ~keep_alive ~data_dir ~download_path ~snapshot_file]
+    similar to [import] but also takes care of downloading the file if the
+    provided string is an url. *)
 val import_from :
-  cancellable:bool ->
   force:bool ->
   keep_alive:bool ->
   data_dir:string ->

@@ -259,6 +259,60 @@ let importing_snapshot =
     ~msg:"importing snapshot"
     ()
 
+let exporting_snapshot =
+  Internal_event.Simple.declare_1
+    ~level:Notice
+    ~section
+    ~pp1:(fun fmt filename ->
+      Format.pp_print_string fmt (Filename.basename filename))
+    ~name:"exporting_snapshot"
+    ~msg:"exporting snapshot {filename}"
+    ("filename", Data_encoding.string)
+
+let still_exporting_snapshot =
+  Internal_event.Simple.declare_3
+    ~level:Notice
+    ~section
+    ~pp1:(fun fmt filename ->
+      Format.pp_print_string fmt (Filename.basename filename))
+    ~pp2:(fun fmt elapsed_time ->
+      Format.fprintf fmt "%a" Ptime.Span.pp elapsed_time)
+    ~pp3:(fun fmt p -> Format.fprintf fmt "%.1f" p)
+    ~name:"still_exporting_snapshot"
+    ~msg:
+      "still exporting snapshot {filename} after {elapsed_time} ({progress}% \
+       done)"
+    ("filename", Data_encoding.string)
+    ("elapsed_time", Time.System.Span.encoding)
+    ("progress", Data_encoding.float)
+
+let compressing_snapshot =
+  Internal_event.Simple.declare_1
+    ~level:Notice
+    ~section
+    ~pp1:(fun fmt filename ->
+      Format.pp_print_string fmt (Filename.basename filename))
+    ~name:"compressing_snapshot"
+    ~msg:"compressing snapshot {filename}"
+    ("filename", Data_encoding.string)
+
+let still_compressing_snapshot =
+  Internal_event.Simple.declare_3
+    ~level:Notice
+    ~section
+    ~pp1:(fun fmt filename ->
+      Format.pp_print_string fmt (Filename.basename filename))
+    ~pp2:(fun fmt elapsed_time ->
+      Format.fprintf fmt "%a" Ptime.Span.pp elapsed_time)
+    ~pp3:(fun fmt p -> Format.fprintf fmt "%.1f" p)
+    ~name:"still_compressing_snapshot"
+    ~msg:
+      "still compressing snapshot {filename} after {elapsed_time} ({progress}% \
+       done)"
+    ("filename", Data_encoding.string)
+    ("elapsed_time", Time.System.Span.encoding)
+    ("progress", Data_encoding.float)
+
 let extract_snapshot_archive_in_progress =
   Internal_event.Simple.declare_2
     ~level:Notice
@@ -500,6 +554,20 @@ let download_in_progress ~size ~remaining_size ~elapsed_time url =
 let download_failed url reason = emit download_failed (url, reason)
 
 let importing_snapshot () = emit importing_snapshot ()
+
+let exporting_snapshot snapshot = emit exporting_snapshot snapshot
+
+let still_exporting_snapshot ~total ~progress snapshot elapsed_time =
+  emit
+    still_exporting_snapshot
+    (snapshot, elapsed_time, 100. *. float_of_int progress /. float_of_int total)
+
+let compressing_snapshot snapshot = emit compressing_snapshot snapshot
+
+let still_compressing_snapshot ~total ~progress snapshot elapsed_time =
+  emit
+    still_compressing_snapshot
+    (snapshot, elapsed_time, 100. *. float_of_int progress /. float_of_int total)
 
 let extract_snapshot_archive_in_progress ~archive_name ~elapsed_time =
   emit extract_snapshot_archive_in_progress (archive_name, elapsed_time)

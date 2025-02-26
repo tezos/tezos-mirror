@@ -38,6 +38,8 @@
 - Adds support for the `%h` variable in the `snapshot export` and `run observer
   --init-from-snapshot` commands, to generalize over the current history mode
   of the node. (!16946)
+- Ensures `snapshot export` does not leave temporary files behind when
+  interrupted. (!16985)
 
 ## Version 0.18 (2025-02-24)
 
