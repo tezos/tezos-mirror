@@ -301,11 +301,16 @@ val spawn_init_config_minimal :
 
 type rpc_server = Resto | Dream
 
-(** [patch_config_with_experimental_feature ?drop_duplicate_when_injection
-    ?next_wasm_runtime ?rpc_server ?enable_websocket
-    ?max_websocket_message_length json_config] patches a config to add
-    experimental feature. Each optional argument add the correspondent
-    experimental feature. *)
+type tx_queue_config = {max_size : int; max_lifespan : int}
+
+(** [patch_config_with_experimental_feature
+    ?drop_duplicate_when_injection ?next_wasm_runtime ?rpc_server
+    ?enable_websocket ?max_websocket_message_length json_config]
+    patches a config to add experimental feature. Each optional
+    argument add the correspondent experimental feature.
+
+    if [enable_tx_queue] is true then set the config to [true] or to
+    [tx_queue_config] if it's defined. *)
 val patch_config_with_experimental_feature :
   ?drop_duplicate_when_injection:bool ->
   ?blueprints_publisher_order_enabled:bool ->
@@ -314,6 +319,7 @@ val patch_config_with_experimental_feature :
   ?enable_websocket:bool ->
   ?max_websocket_message_length:int ->
   ?enable_tx_queue:bool ->
+  ?tx_queue_config:tx_queue_config ->
   ?spawn_rpc:int ->
   unit ->
   JSON.t ->
@@ -404,6 +410,12 @@ val wait_for_tx_pool_add_transaction : ?timeout:float -> t -> string Lwt.t
     [tx_queue_add_transaction.v0] using {!wait_for} and returns the transaction
     hash. *)
 val wait_for_tx_queue_add_transaction : ?timeout:float -> t -> string Lwt.t
+
+(** [wait_for_tx_queue_transaction_confirmed ?timeout evm_node] waits
+    for the event [tx_queue_transaction_confirmed.v0] using {!wait_for}
+    and returns the transaction hash. *)
+val wait_for_tx_queue_transaction_confirmed :
+  ?timeout:float -> t -> string Lwt.t
 
 (** [wait_for_tx_queue_injecting_transaction ?timeout evm_node] waits
     for the event [tx_queue_injecting_transaction.v0] using

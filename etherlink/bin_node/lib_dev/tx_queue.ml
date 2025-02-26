@@ -272,6 +272,11 @@ module Handlers = struct
     match request with
     | Inject {payload; tx_object; callback} ->
         let pending_callback (reason : pending_variant) =
+          let*! () =
+            match reason with
+            | `Dropped -> Tx_queue_events.transaction_dropped tx_object.hash
+            | `Confirmed -> Tx_queue_events.transaction_confirmed tx_object.hash
+          in
           Tx_object.remove state.tx_object tx_object.hash ;
           callback (reason :> all_variant)
         in

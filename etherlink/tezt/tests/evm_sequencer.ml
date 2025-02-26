@@ -10612,10 +10612,24 @@ let test_tx_queue =
     ~kernels:[Latest] (* node only test *)
     ~use_threshold_encryption:Register_without_feature
     ~use_dal:Register_without_feature
-    ~enable_tx_queue:true
     ~websockets:false
     ~title:"Submits a transaction to an observer with a tx queue."
   @@ fun {sequencer; observer; _} _protocol ->
+  let* () = Evm_node.terminate observer in
+
+  let* () =
+    Evm_node.Config_file.update observer
+    @@ Evm_node.patch_config_with_experimental_feature
+         ~enable_tx_queue:true
+         ~tx_queue_config:
+           {
+             max_size = 1000;
+             max_lifespan = 100000 (* absurd value so no TX are dropped *);
+           }
+         ()
+  in
+  let* () = Evm_node.run observer in
+
   let* () =
     let*@ _ = produce_block sequencer in
     unit
@@ -10706,6 +10720,42 @@ let test_tx_queue =
   and* _ = observer_wait_tx_added
   and* _ = observer_wait_tx_injected
   and* _ = sequencer_wait_tx_added in
+
+  Log.info
+    "Produce enough block to include all txs and make sure they are confirmed \
+     by the observer" ;
+  (* Checks that all txs were confirmed in the observer *)
+  let observer_wait_tx_confirmed =
+    let waiter () =
+      let* _ = Evm_node.wait_for_tx_queue_transaction_confirmed observer in
+      return 1
+    in
+    wait_for_all_tx_process ~name:"tx confirmed in observer" ~waiter
+  in
+  (* Checks that all txs were included in a block by the sequencer *)
+  let* () =
+    let res = ref None in
+    let _p =
+      let* () =
+        let waiter () =
+          let* _hash = Evm_node.wait_for_block_producer_tx_injected sequencer in
+          return 1
+        in
+        wait_for_all_tx_process ~name:"tx included by sequencer" ~waiter
+      in
+      res := Some () ;
+      unit
+    in
+    let result_f () = return !res in
+    bake_until
+      ~__LOC__
+      ~bake:(fun () ->
+        let*@ _ = produce_block sequencer in
+        unit)
+      ~result_f
+      ()
+  and* _ = observer_wait_tx_confirmed in
+
   Log.info
     "Verifying that all transactions can be retrieved both in the observer and \
      in the sequencer" ;

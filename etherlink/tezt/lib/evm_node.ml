@@ -574,6 +574,10 @@ let wait_for_tx_queue_add_transaction ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"tx_queue_add_transaction.v0"
   @@ fun json -> JSON.(json |> as_string |> Option.some)
 
+let wait_for_tx_queue_transaction_confirmed ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"tx_queue_transaction_confirmed.v0"
+  @@ fun json -> JSON.(json |> as_string |> Option.some)
+
 let wait_for_tx_queue_injecting_transaction ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"tx_queue_injecting_transaction.v0"
   @@ fun json -> JSON.(json |> as_int |> Option.some)
@@ -1269,11 +1273,13 @@ let optional_json_put ~name v f json =
         (name, JSON.annotate ~origin:"evm_node.config_patch" @@ value_json)
         json
 
+type tx_queue_config = {max_size : int; max_lifespan : int}
+
 let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false)
     ?(blueprints_publisher_order_enabled = false) ?(next_wasm_runtime = true)
     ?rpc_server ?(enable_websocket = false) ?max_websocket_message_length
-    ?(enable_tx_queue = false) ?spawn_rpc () =
+    ?(enable_tx_queue = false) ?tx_queue_config ?spawn_rpc () =
   JSON.update "experimental_features" @@ fun json ->
   conditional_json_put
     drop_duplicate_when_injection
@@ -1295,7 +1301,14 @@ let patch_config_with_experimental_feature
   |> conditional_json_put
        enable_tx_queue
        ~name:"enable_tx_queue"
-       (`O [("max_size", `Float 1000.)])
+       (match tx_queue_config with
+       | Some {max_size; max_lifespan} ->
+           `O
+             [
+               ("max_size", `Float (Float.of_int max_size));
+               ("max_lifespan", `Float (Float.of_int max_lifespan));
+             ]
+       | None -> `Bool true)
   |> optional_json_put
        max_websocket_message_length
        ~name:"max_websocket_message_length"
