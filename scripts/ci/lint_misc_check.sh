@@ -23,3 +23,6 @@ make lint-tests-pkg
 #- ODOC_WARN_ERROR=true dune build @src/proto_alpha/lib_protocol/doc
 # check that the hack-module patch applies cleanly
 git apply devtools/protocol-print/add-hack-module.patch
+
+# Check that the protocol profiling patches can still be applied
+scripts/patch-profiler-proto.sh --dry-run
