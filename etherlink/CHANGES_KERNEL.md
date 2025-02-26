@@ -11,6 +11,8 @@
 - The EVM now complies to EIP-3651. (!16888)
 - The EVM now properly record init code cost for `CREATE`/`CREATE2`
   opcodes, now fully complying with EIP63860. (!16890)
+- The EVM is now refunding accounts as expected during inter (layer)
+  transactions. (!16973)
  
 ### Internal
 
