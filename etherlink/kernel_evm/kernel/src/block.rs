@@ -255,7 +255,6 @@ fn next_bip_from_blueprints<Host: Runtime>(
     tick_counter: &TickCounter,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
-    minimum_base_fee_per_gas: U256,
 ) -> Result<BlueprintParsing, anyhow::Error> {
     let (
         current_block_number,
@@ -308,7 +307,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
             let gas_price = crate::gas_price::base_fee_per_gas(
                 host,
                 blueprint.timestamp,
-                minimum_base_fee_per_gas,
+                config.limits.minimum_base_fee_per_gas,
             );
 
             let bip = block_in_progress::BlockInProgress::from_blueprint(
@@ -343,7 +342,6 @@ fn compute_bip<Host: Runtime>(
     limits: &Limits,
     tracer_input: Option<TracerInput>,
     chain_id: U256,
-    minimum_base_fee_per_gas: U256,
     da_fee_per_byte: U256,
     coinbase: H160,
     evm_configuration: &Config,
@@ -352,7 +350,7 @@ fn compute_bip<Host: Runtime>(
         init_account_storage().context("Failed to initialize EVM account storage")?;
     let constants: BlockConstants = block_in_progress.constants(
         chain_id,
-        minimum_base_fee_per_gas,
+        limits.minimum_base_fee_per_gas,
         da_fee_per_byte,
         GAS_LIMIT,
         coinbase,
@@ -482,7 +480,6 @@ pub fn produce<Host: Runtime>(
     tracer_input: Option<TracerInput>,
 ) -> Result<ComputationResult, anyhow::Error> {
     let chain_id = config.chain_config.chain_id;
-    let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host)?;
     let da_fee_per_byte = crate::retrieve_da_fee(host)?;
 
     let kernel_upgrade = upgrade::read_kernel_upgrade(host)?;
@@ -515,7 +512,6 @@ pub fn produce<Host: Runtime>(
                     &tick_counter,
                     config,
                     &kernel_upgrade,
-                    minimum_base_fee_per_gas,
                 )? {
                     BlueprintParsing::Next(bip) => bip,
                     BlueprintParsing::None => {
@@ -546,7 +542,6 @@ pub fn produce<Host: Runtime>(
         &config.limits,
         tracer_input,
         chain_id,
-        minimum_base_fee_per_gas,
         da_fee_per_byte,
         coinbase,
         &config.chain_config.evm_configuration,

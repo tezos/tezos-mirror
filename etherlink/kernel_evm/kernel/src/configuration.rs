@@ -7,6 +7,8 @@ use crate::{
     blueprint_storage::DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS,
     chains::ChainFamily,
     delayed_inbox::DelayedInbox,
+    fees::MINIMUM_BASE_FEE_PER_GAS,
+    retrieve_minimum_base_fee_per_gas,
     storage::{
         dal_slots, enable_dal, evm_node_flag, is_enable_fa_bridge,
         max_blueprint_lookahead_in_seconds, read_admin, read_delayed_transaction_bridge,
@@ -107,6 +109,7 @@ impl ChainConfig {
 pub struct Limits {
     pub maximum_allowed_ticks: u64,
     pub maximum_gas_limit: u64,
+    pub minimum_base_fee_per_gas: U256,
 }
 
 impl Default for Limits {
@@ -114,6 +117,7 @@ impl Default for Limits {
         Self {
             maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             maximum_gas_limit: MAXIMUM_GAS_LIMIT,
+            minimum_base_fee_per_gas: MINIMUM_BASE_FEE_PER_GAS.into(),
         }
     }
 }
@@ -231,9 +235,13 @@ pub fn fetch_limits(host: &mut impl Runtime) -> Limits {
     let maximum_gas_limit =
         read_or_set_maximum_gas_per_transaction(host).unwrap_or(MAXIMUM_GAS_LIMIT);
 
+    let minimum_base_fee_per_gas = retrieve_minimum_base_fee_per_gas(host)
+        .unwrap_or(MINIMUM_BASE_FEE_PER_GAS.into());
+
     Limits {
         maximum_allowed_ticks,
         maximum_gas_limit,
+        minimum_base_fee_per_gas,
     }
 }
 
