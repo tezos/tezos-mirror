@@ -19,6 +19,8 @@
   snapshot. (!16963)
 - **experimental feature** Adds a configuration for the `tx_queue`.
   (!16903)
+- Commands emitting logs now systematically comply with the `verbosity`
+  configuration option. (!16975)
 
 ### RPCs changes
 
