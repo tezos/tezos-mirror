@@ -7,6 +7,11 @@
 - The default snapshot filename has been changed from
   `evm-snapshot-<rollup_address>-<head>` to
   `evm-<history_mode>-snapshot-<rollup_address>-<head>`. (!16946)
+- When an explicit snapshot filename is omitted, `snapshot export` will append
+  `.gz` to compressed snapshots and will not add any file extension to
+  uncompressed snapshots. Previously, the node was not adding any extension to
+  compressed snapshots, and was appending `.uncompressed` to uncompressed
+  snapshots. (!16957)
 
 ### Configuration changes
 
