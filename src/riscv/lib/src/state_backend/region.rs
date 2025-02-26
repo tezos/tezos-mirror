@@ -6,10 +6,7 @@
 use super::{
     Elem, EnrichedValue, EnrichedValueLinked, FnManager, ManagerBase, ManagerClone,
     ManagerDeserialise, ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite, Ref,
-    proof_backend::{
-        ProofGen,
-        merkle::{AccessInfo, AccessInfoAggregatable},
-    },
+    proof_backend::{ProofGen, merkle::AccessInfoAggregatable},
 };
 
 /// Link a stored value directly with a derived value -
@@ -202,7 +199,7 @@ impl<A: PartialEq<B> + Copy, B: Copy, M: ManagerRead, N: ManagerRead> PartialEq<
 impl<E: serde::Serialize, M: ManagerSerialise> AccessInfoAggregatable
     for Cell<E, Ref<'_, ProofGen<M>>>
 {
-    fn aggregate_access_info(&self) -> AccessInfo {
+    fn aggregate_access_info(&self) -> bool {
         self.region.region.get_access_info()
     }
 }
@@ -416,7 +413,7 @@ impl<V: EnrichedValue, M: ManagerSerialise> AccessInfoAggregatable
 where
     V::E: serde::Serialize,
 {
-    fn aggregate_access_info(&self) -> AccessInfo {
+    fn aggregate_access_info(&self) -> bool {
         self.cell.get_access_info()
     }
 }
@@ -459,7 +456,7 @@ impl<A: PartialEq<B> + Copy, B: Copy, const LEN: usize, M: ManagerRead, N: Manag
 impl<E: serde::Serialize, const LEN: usize, M: ManagerSerialise> AccessInfoAggregatable
     for Cells<E, LEN, Ref<'_, ProofGen<M>>>
 {
-    fn aggregate_access_info(&self) -> AccessInfo {
+    fn aggregate_access_info(&self) -> bool {
         self.region.get_access_info()
     }
 }
