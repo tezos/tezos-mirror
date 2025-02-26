@@ -181,7 +181,8 @@
         /* tx queue configuration */
         { /* Some */
           "max_size": integer ∈ [-2^30, 2^30],
-          "max_transaction_batch_length"?: integer ∈ [-2^30, 2^30] }
+          "max_transaction_batch_length"?: integer ∈ [-2^30, 2^30],
+          "max_lifespan"?: integer ∈ [-2^30, 2^30] }
         || null
         /* None */
         || boolean

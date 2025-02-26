@@ -8,8 +8,6 @@
 
 open Tezos_workers
 
-let two_seconds = Ptime.Span.of_int_s 2
-
 type parameters = {evm_node_endpoint : Uri.t; config : Configuration.tx_queue}
 
 type queue_variant = [`Accepted | `Refused]
@@ -84,13 +82,13 @@ module Pending_transactions = struct
         Some pending
     | None -> None
 
-  let drop htbl =
+  let drop ~max_lifespan htbl =
     let now = Time.System.now () in
     let dropped = ref [] in
     S.filter_map_inplace
       (fun _hash pending ->
         let lifespan = Ptime.diff now pending.since in
-        if Ptime.Span.compare lifespan two_seconds > 0 then (
+        if Ptime.Span.compare lifespan max_lifespan > 0 then (
           dropped := pending :: !dropped ;
           None)
         else Some pending)
@@ -329,7 +327,11 @@ module Handlers = struct
             transactions_to_inject
         in
 
-        let txns = Pending_transactions.drop state.pending in
+        let txns =
+          Pending_transactions.drop
+            ~max_lifespan:(Ptime.Span.of_int_s state.config.max_lifespan_s)
+            state.pending
+        in
         List.iter
           (fun {pending_callback; _} ->
             Lwt.async (fun () -> pending_callback `Dropped))
