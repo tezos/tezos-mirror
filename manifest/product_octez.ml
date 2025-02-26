@@ -7200,6 +7200,7 @@ let hash = Protocol.hash
             embedded |> open_;
             main |> open_;
             octez_validation |> open_;
+            baking |> if_some |> open_;
             baking_commands |> if_some |> open_;
             octez_client_commands |> open_;
             octez_client_base_unix |> open_;

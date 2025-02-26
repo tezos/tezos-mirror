@@ -11,6 +11,7 @@
   tezos-protocol-alpha.embedded-protocol
   tezos-protocol-alpha.protocol
   octez-shell-libs.validation
+  octez-protocol-alpha-libs.baking
   octez-protocol-alpha-libs.baking-commands
   octez-shell-libs.client-commands
   octez-shell-libs.client-base-unix
@@ -23,6 +24,7 @@
   -open Tezos_embedded_protocol_alpha
   -open Tezos_protocol_alpha
   -open Tezos_validation
+  -open Tezos_baking_alpha
   -open Tezos_baking_alpha_commands
   -open Tezos_client_commands
   -open Tezos_client_base_unix

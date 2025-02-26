@@ -11,6 +11,7 @@
   tezos-protocol-022-PsRiotum.embedded-protocol
   tezos-protocol-022-PsRiotum.protocol
   octez-shell-libs.validation
+  octez-protocol-022-PsRiotum-libs.baking
   octez-protocol-022-PsRiotum-libs.baking-commands
   octez-shell-libs.client-commands
   octez-shell-libs.client-base-unix
@@ -23,6 +24,7 @@
   -open Tezos_embedded_protocol_022_PsRiotum
   -open Tezos_protocol_022_PsRiotum
   -open Tezos_validation
+  -open Tezos_baking_022_PsRiotum
   -open Tezos_baking_022_PsRiotum_commands
   -open Tezos_client_commands
   -open Tezos_client_base_unix
