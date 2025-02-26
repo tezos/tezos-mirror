@@ -40,10 +40,12 @@ pub trait BCall<MC: MemoryConfig, M: ManagerBase> {
     /// Run a block against the machine state.
     ///
     /// When calling this function, there must be no partial block in progress. To ensure
-    /// this, you must always run [`Block::complete_block`] prior to fetching
+    /// this, you must always run [`BlockCache::complete_current_block`] prior to fetching
     /// and running a new block.
     ///
     /// There _must_ also be sufficient steps remaining, to execute the block in full.
+    ///
+    /// [`BlockCache::complete_current_block`]: super::BlockCache::complete_current_block
     fn run_block(
         &self,
         core: &mut MachineCoreState<MC, M>,
@@ -63,7 +65,7 @@ pub type BlockLayout = (Atom<u8>, [Atom<Instruction>; CACHE_INSTR]);
 /// Blocks will never contain more than [`CACHE_INSTR`] instructions.
 pub trait Block<MC: MemoryConfig, M: ManagerBase> {
     /// Block construction may require additional state not kept in storage,
-    /// this is then passed as a parameter to [`Block::complete_block`].
+    /// this is then passed as a parameter to [`Block::callable`].
     type BlockBuilder: Default;
 
     /// Bind the block to the given allocated state.
@@ -174,19 +176,21 @@ pub struct Interpreted<MC: MemoryConfig, M: ManagerBase> {
 impl<MC: MemoryConfig, M: ManagerBase> Interpreted<MC, M> {
     /// Calculate the [`BlockHash`] from the instructions in the block.
     ///
-    /// If the block is already runnable, it will not re-caculate the block hash.
+    /// If the block is already runnable, it will not re-calculate the block hash.
     fn update_block_hash(&mut self)
     where
         M: ManagerRead,
     {
-        let mut instr = [&Instruction::DEFAULT; CACHE_INSTR];
         let len = self.len_instr.read() as usize;
 
-        for i in 0..len {
-            instr[i] = self.instr[i].read_ref_stored();
-        }
+        let instr = self
+            .instr
+            .iter()
+            .take(len)
+            .map(|i| i.read_ref_stored())
+            .collect::<Vec<_>>();
 
-        self.hash.make_runnable(&instr[0..len])
+        self.hash.make_runnable(&instr)
     }
 }
 
@@ -334,10 +338,15 @@ impl<MC: MemoryConfig, M: ManagerClone> Clone for Interpreted<MC, M> {
 /// Not all instructions are currently supported, when a block contains
 /// unsupported instructions, a fallback to [`Interpreted`] mode occurs.
 ///
-/// Blocks are compiled upon calling [`Block::complete_block`], in a *stop the world* fashion.
+/// Blocks are compiled upon calling [`Block::callable`], in a *stop the world* fashion.
 pub struct InlineJit<MC: MemoryConfig, M: JitStateAccess> {
     fallback: Interpreted<MC, M>,
     jit_fn: Option<JCall<MC, M>>,
+    /// Whether or not compilation has been attempted.
+    ///
+    /// **N.B.** compilation may fail, in which case `compiled` will still be true, and fallback
+    /// should occur to the interpreted block.
+    compiled: bool,
 }
 
 impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
@@ -347,6 +356,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     where
         M: ManagerWrite,
     {
+        self.compiled = false;
         self.jit_fn = None;
         self.fallback.start_block()
     }
@@ -355,6 +365,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     where
         M: ManagerWrite,
     {
+        self.compiled = false;
         self.jit_fn = None;
         self.fallback.invalidate()
     }
@@ -363,6 +374,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     where
         M: ManagerReadWrite,
     {
+        self.compiled = false;
         self.jit_fn = None;
         self.fallback.reset()
     }
@@ -371,6 +383,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     where
         M: ManagerReadWrite,
     {
+        self.compiled = false;
         self.jit_fn = None;
         self.fallback.push_instr(instr)
     }
@@ -386,6 +399,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
         Self {
             fallback: Interpreted::bind(allocated),
             jit_fn: None,
+            compiled: false,
         }
     }
 
@@ -407,17 +421,19 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     where
         M: ManagerRead + 'a,
     {
-        if !self.fallback.hash.is_dirty() {
-            // We've already compiled this block
+        if self.compiled {
             return Some(self);
         }
 
-        if self.fallback.callable(&mut block_builder.1).is_none() {
+        // Trigger hashing of the block, if callable
+        self.fallback.callable(&mut block_builder.1);
+
+        let BlockHash::Runnable(hash) = &self.fallback.hash else {
             // Block is not callable
             return None;
-        }
+        };
 
-        // trigger compilation
+        // trigger JIT compilation
         let instr = self
             .fallback
             .instr
@@ -425,9 +441,11 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
             .take(<Self as Block<MC, M>>::num_instr(self))
             .map(|i| i.read_ref_stored());
 
-        let jitfn = block_builder.0.compile(instr);
+        let jitfn = block_builder.0.compile(hash, instr);
 
         self.jit_fn = jitfn;
+        self.compiled = true;
+
         Some(self)
     }
 
@@ -478,6 +496,7 @@ impl<MC: MemoryConfig, M: JitStateAccess + ManagerClone> Clone for InlineJit<MC,
         Self {
             fallback: self.fallback.clone(),
             jit_fn: None,
+            compiled: false,
         }
     }
 }
@@ -537,12 +556,12 @@ mod test {
                 $expr
             }
 
-            let mut block = create_state!(Interpreted, BlockLayout<M1K>, $F, M1K);
+            let mut block = create_state!(Interpreted, BlockLayout, $F, M1K);
             let mut bb = <Interpreted<M1K, M<$F>> as Block<M1K, M<$F>>>::BlockBuilder::default();
 
             inner::<_, $F>(&mut block, &mut bb);
 
-            let mut block = create_state!(InlineJit, BlockLayout<M1K>, $F, M1K);
+            let mut block = create_state!(InlineJit, BlockLayout, $F, M1K);
             let mut bb = <InlineJit<M1K, M<$F>> as Block<M1K, M<$F>>>::BlockBuilder::default();
 
             inner::<_, $F>(&mut block, &mut bb);
@@ -606,7 +625,7 @@ mod test {
             let BlockHash::Runnable(hash_1) = block.block_hash() else {
                 unreachable!()
             };
-            let hash_1 = hash_1.clone();
+            let hash_1 = *hash_1;
 
             block.reset();
             assert!(matches!(block.block_hash(), BlockHash::Dirty));
@@ -620,8 +639,7 @@ mod test {
             };
 
             assert_ne!(
-                hash_1,
-                hash_2.clone(),
+                hash_1, *hash_2,
                 "Hashes for unique sets of instructions must not match"
             );
 
@@ -634,8 +652,7 @@ mod test {
             };
 
             assert_eq!(
-                hash_1,
-                hash_3.clone(),
+                hash_1, *hash_3,
                 "Hashes for identical instructions must match"
             );
         });
