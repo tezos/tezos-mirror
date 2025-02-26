@@ -29,7 +29,6 @@ use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::trace::TracerInput;
 use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::L2Block;
-use tezos_ethereum::eth_gen::OwnedHash;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::runtime::Runtime;
@@ -247,19 +246,35 @@ enum BlueprintParsing {
 }
 
 #[cfg_attr(feature = "benchmark", inline(never))]
-#[allow(clippy::too_many_arguments)]
 fn next_bip_from_blueprints<Host: Runtime>(
     host: &mut Host,
-    current_block_number: U256,
-    current_block_parent_hash: H256,
-    previous_timestamp: Timestamp,
     tick_counter: &TickCounter,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
     minimum_base_fee_per_gas: U256,
-    receipts_root: OwnedHash,
-    transactions_root: OwnedHash,
 ) -> Result<BlueprintParsing, anyhow::Error> {
+    let (
+        current_block_number,
+        current_block_parent_hash,
+        previous_timestamp,
+        receipts_root,
+        transactions_root,
+    ) = match block_storage::read_current(host) {
+        Ok(block) => (
+            block.number + 1,
+            block.hash,
+            block.timestamp,
+            block.receipts_root,
+            block.transactions_root,
+        ),
+        Err(_) => (
+            U256::zero(),
+            GENESIS_PARENT_HASH,
+            Timestamp::from(0),
+            vec![0; 32],
+            vec![0; 32],
+        ),
+    };
     let (blueprint, size) = read_blueprint(
         host,
         config,
@@ -459,28 +474,6 @@ pub fn produce<Host: Runtime>(
     // in blocks is set to the pool address.
     let coinbase = sequencer_pool_address.unwrap_or_default();
 
-    let (
-        current_block_number,
-        current_block_parent_hash,
-        previous_timestamp,
-        previous_receipts_root,
-        previous_transactions_root,
-    ) = match block_storage::read_current(host) {
-        Ok(block) => (
-            block.number + 1,
-            block.hash,
-            block.timestamp,
-            block.receipts_root,
-            block.transactions_root,
-        ),
-        Err(_) => (
-            U256::zero(),
-            GENESIS_PARENT_HASH,
-            Timestamp::from(0),
-            vec![0; 32],
-            vec![0; 32],
-        ),
-    };
     let mut evm_account_storage =
         init_account_storage().context("Failed to initialize EVM account storage")?;
     let mut tick_counter = TickCounter::new(0u64);
@@ -504,15 +497,10 @@ pub fn produce<Host: Runtime>(
                 // Execute at most one of the stored blueprints
                 let block_in_progress = match next_bip_from_blueprints(
                     safe_host.host,
-                    current_block_number,
-                    current_block_parent_hash,
-                    previous_timestamp,
                     &tick_counter,
                     config,
                     &kernel_upgrade,
                     minimum_base_fee_per_gas,
-                    previous_receipts_root,
-                    previous_transactions_root,
                 )? {
                     BlueprintParsing::Next(bip) => bip,
                     BlueprintParsing::None => {
