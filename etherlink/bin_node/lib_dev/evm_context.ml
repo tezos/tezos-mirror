@@ -1230,22 +1230,14 @@ module State = struct
     let* () =
       match snapshot_url with
       | Some snapshot_url when not store_already_exists ->
-          Lwt_utils_unix.with_tempdir
-            ".download_snapshot_"
-            ~temp_dir:data_dir
-            (fun tmp_dir ->
-              let* snapshot_file =
-                Misc.download_file
-                  ~keep_alive:configuration.Configuration.keep_alive
-                  ~working_dir:tmp_dir
-                  snapshot_url
-              in
-              let*! () = Events.importing_snapshot () in
-              Snapshots.import
-                ~cancellable:true
-                ~force:true
-                ~data_dir
-                ~snapshot_file)
+          Snapshots.import_from
+            ~cancellable:true
+            ~force:true
+            ~keep_alive:configuration.Configuration.keep_alive
+            ~data_dir
+            ~download_path:".download_snapshot_"
+            ~snapshot_file:snapshot_url
+            ()
       | _ -> return_unit
     in
     Irmin_context.load

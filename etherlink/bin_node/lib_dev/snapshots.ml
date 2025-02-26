@@ -386,6 +386,27 @@ let import ~cancellable ~force ~data_dir ~snapshot_file =
   if display_progress then extract_snapshot_archive
   else Lwt.pick [extract_snapshot_archive; periodic_emit ()]
 
+let import_from ~cancellable ~force ~keep_alive ~data_dir ~download_path
+    ~snapshot_file () =
+  let open Lwt_result_syntax in
+  let with_snapshot k =
+    if
+      String.starts_with ~prefix:"http://" snapshot_file
+      || String.starts_with ~prefix:"https://" snapshot_file
+    then
+      Lwt_utils_unix.with_tempdir ~temp_dir:data_dir download_path
+      @@ fun working_dir ->
+      let* snapshot_file =
+        Misc.download_file ~keep_alive ~working_dir snapshot_file
+      in
+      k snapshot_file
+    else k snapshot_file
+  in
+  Data_dir.use ~data_dir @@ fun () ->
+  with_snapshot @@ fun snapshot_file ->
+  let*! () = Events.importing_snapshot () in
+  import ~cancellable ~force ~data_dir ~snapshot_file
+
 let info ~snapshot_file =
   let compressed = is_compressed_snapshot snapshot_file in
   let reader = if compressed then gzip_reader else stdlib_reader in

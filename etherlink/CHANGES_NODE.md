@@ -4,6 +4,9 @@
 
 ### Configuration changes
 
+- Observer `--init-from-snapshot` now also accepts a path to an existing
+  snapshot. (!16963)
+
 ### RPCs changes
 
 ### Metrics changes
