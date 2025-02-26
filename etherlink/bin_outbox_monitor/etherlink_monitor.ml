@@ -542,7 +542,7 @@ let monitor_heads db ws_client =
   in
   return_unit
 
-let monitor_l2_l1_levels db ws_client ~rollup_node_rpc ~l1_node_endpoint
+let monitor_l2_l1_levels db ws_client ~rollup_node_rpc ~l1_node_rpc
     rollup_address ~last_levels =
   let open Lwt_result_syntax in
   let* start_l1_level =
@@ -587,12 +587,12 @@ let monitor_l2_l1_levels db ws_client ~rollup_node_rpc ~l1_node_endpoint
         let* () =
           L1_execution.mark_executed_outbox_messages
             db
-            ~l1_node_endpoint
+            ~l1_node_rpc
             ~rollup_address
             ~block:l1_level
         in
         let* () = Db.Levels.store db ~l1_level ~start_l2_level ~end_l2_level in
-        let* () = L1_execution.check_overdue db ~l1_node_endpoint in
+        let* () = L1_execution.check_overdue db ~l1_node_rpc in
         let* () = Matcher.run db in
         return_unit)
       levels_subscription.stream
@@ -646,6 +646,8 @@ let reconnection_delay = 10.
 
 let start db ~evm_node_endpoint ~rollup_node_endpoint ~l1_node_endpoint =
   let open Lwt_result_syntax in
+  let rollup_node_rpc = Rollup_node_rpc.make_ctxt ~rollup_node_endpoint in
+  let l1_node_rpc = L1_execution.make_ctxt l1_node_endpoint in
   let run () =
     let*! ws_client =
       Websocket_client.connect
@@ -653,7 +655,6 @@ let start db ~evm_node_endpoint ~rollup_node_endpoint ~l1_node_endpoint =
         Media_type.json
         evm_node_endpoint
     in
-    let rollup_node_rpc = Rollup_node_rpc.make_ctxt ~rollup_node_endpoint in
     let* () = init_db_pointers db ws_client rollup_node_rpc in
     let* last_l2_head = Db.Pointers.L2_head.get db in
     let* last_levels = Db.Levels.last db in
@@ -665,7 +666,7 @@ let start db ~evm_node_endpoint ~rollup_node_endpoint ~l1_node_endpoint =
         ws_client
         ~rollup_node_rpc
         rollup_address
-        ~l1_node_endpoint
+        ~l1_node_rpc
         ~last_levels
     in
     let* () = catch_up_withdrawals db ws_client ~last_l2_head in

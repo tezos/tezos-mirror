@@ -62,19 +62,17 @@ module Event = struct
       ~pp5:Ethereum_types.pp_quantity
 end
 
-let call_rpc_json l1_node_endpoint ?(query = []) path =
+let make_ctxt endpoint =
+  new Retrier_context.ctxt ~timeout:30. endpoint [Media_type.json]
+
+let call_rpc_json (l1_node_rpc : Retrier_context.t) ?(query = []) path =
   let open Lwt_result_syntax in
   let uri =
-    Uri.with_path l1_node_endpoint
-    @@ String.concat "/" [Uri.path l1_node_endpoint; path]
+    Uri.with_path l1_node_rpc#endpoint
+    @@ String.concat "/" [Uri.path l1_node_rpc#endpoint; path]
   in
   let uri = Uri.with_query uri query in
-  let* response =
-    Tezos_rpc_http_client_unix.RPC_client_unix.generic_media_type_call
-      ~accept:[Media_type.json]
-      `GET
-      uri
-  in
+  let* response = l1_node_rpc#generic_media_type_call `GET uri in
   match response with
   | `Json (`Ok resp) -> return resp
   | `Binary _ ->
@@ -107,29 +105,29 @@ let call_rpc_json l1_node_endpoint ?(query = []) path =
         (Format.pp_print_option Data_encoding.Json.pp)
         resp
 
-let fetch_l1_block_ops l1_node_endpoint block =
+let fetch_l1_block_ops l1_node_rpc block =
   call_rpc_json
-    l1_node_endpoint
+    l1_node_rpc
     (Format.sprintf "chains/main/blocks/%ld/operations/3" block)
     ~query:[("metdata", ["always"])]
 
-let fetch_constants l1_node_endpoint =
-  call_rpc_json l1_node_endpoint "chains/main/blocks/head/context/constants"
+let fetch_constants l1_node_rpc =
+  call_rpc_json l1_node_rpc "chains/main/blocks/head/context/constants"
 
-let get_challenge_window l1_node_endpoint =
+let get_challenge_window l1_node_rpc =
   let open Lwt_result_syntax in
-  let+ constants = fetch_constants l1_node_endpoint in
+  let+ constants = fetch_constants l1_node_rpc in
   Ezjsonm.find constants ["smart_rollup_challenge_window_in_blocks"]
   |> Ezjsonm.get_int
 
 let get_challenge_window =
   let challenge_window = ref None in
-  fun l1_node_endpoint ->
+  fun l1_node_rpc ->
     let open Lwt_result_syntax in
     match !challenge_window with
     | Some w -> return w
     | None ->
-        let+ w = get_challenge_window l1_node_endpoint in
+        let+ w = get_challenge_window l1_node_rpc in
         challenge_window := Some w ;
         w
 
@@ -248,9 +246,9 @@ let op_decoder =
 
 let ops_decoder = Json_encoding.list op_decoder
 
-let get_executed_outbox_messages l1_node_endpoint rollup_address block =
+let get_executed_outbox_messages l1_node_rpc rollup_address block =
   let open Lwt_result_syntax in
-  let+ operations_json = fetch_l1_block_ops l1_node_endpoint block in
+  let+ operations_json = fetch_l1_block_ops l1_node_rpc block in
   let operations =
     Json_encoding.destruct ~ignore_extra_fields:true ops_decoder operations_json
   in
@@ -272,19 +270,16 @@ let get_executed_outbox_messages l1_node_endpoint rollup_address block =
     operations
   |> List.rev
 
-let make_ctxt endpoint =
-  let open Tezos_rpc_http_client_unix.RPC_client_unix in
-  new http_ctxt {default_config with endpoint} [Media_type.json]
-
-let mark_executed_outbox_messages db ~l1_node_endpoint ~rollup_address ~block =
+let mark_executed_outbox_messages db ~(l1_node_rpc : Retrier_context.t)
+    ~rollup_address ~block =
   let open Lwt_result_syntax in
   let* executed =
-    get_executed_outbox_messages l1_node_endpoint rollup_address block
+    get_executed_outbox_messages l1_node_rpc rollup_address block
   in
   when_ (executed <> []) @@ fun () ->
   let* header =
     Tezos_shell_services.Shell_services.Blocks.Header.shell_header
-      (make_ctxt l1_node_endpoint)
+      l1_node_rpc
       ~block:(`Level block)
       ()
   in
@@ -319,9 +314,9 @@ let mark_executed_outbox_messages db ~l1_node_endpoint ~rollup_address ~block =
   in
   return_unit
 
-let check_overdue db ~l1_node_endpoint =
+let check_overdue db ~l1_node_rpc =
   let open Lwt_result_syntax in
-  let* challenge_window = get_challenge_window l1_node_endpoint in
+  let* challenge_window = get_challenge_window l1_node_rpc in
   let* lcc = Db.Pointers.LCC.get db in
   let executable_level = Int32.sub lcc (Int32.of_int challenge_window) in
   let* overdues = Db.Withdrawals.get_overdue db ~challenge_window in
