@@ -547,9 +547,6 @@ impl<BCL: BlockCacheLayout, B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase>
         // If the instruction is at the start of the page, we _must_ start a new block,
         // as we cannot allow blocks to cross page boundaries.
         if phys_addr & PAGE_OFFSET_MASK as u64 == 0 || phys_addr != next_addr {
-            let previous = BCL::entry_mut(&mut self.entries, self.current_block_addr.read());
-            previous.block.complete_block(&mut self.block_builder);
-
             self.reset_to(phys_addr);
         }
 
@@ -578,9 +575,6 @@ impl<BCL: BlockCacheLayout, B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase>
         // If the instruction is at the start of the page, we _must_ start a new block,
         // as we cannot allow blocks to cross page boundaries.
         if phys_addr & PAGE_OFFSET_MASK as u64 == 0 || phys_addr != next_addr {
-            let previous = BCL::entry_mut(&mut self.entries, self.current_block_addr.read());
-            previous.block.complete_block(&mut self.block_builder);
-
             self.reset_to(phys_addr);
         }
 
@@ -620,9 +614,6 @@ impl<BCL: BlockCacheLayout, B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase>
             entry.start_block(block_addr, fence_counter);
             len_instr = 0;
         } else if len_instr == CACHE_INSTR {
-            // complete previous block
-            entry.block.complete_block(&mut self.block_builder);
-
             // The current block is full, start a new one
             self.reset_to(phys_addr);
             block_addr = phys_addr;
@@ -659,9 +650,6 @@ impl<BCL: BlockCacheLayout, B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase>
             }
             self.next_instr_addr.write(!0);
             self.current_block_addr.write(!0);
-
-            let current_entry = BCL::entry_mut(&mut self.entries, block_addr);
-            current_entry.block.complete_block(&mut self.block_builder);
         }
     }
 
@@ -691,7 +679,7 @@ impl<BCL: BlockCacheLayout, B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase>
             unsafe {
                 // SAFETY: the block builder given to this function is the same as was given to the
                 //         'compile' function of this block.
-                entry.block.callable(&self.block_builder)
+                entry.block.callable(&mut self.block_builder)
             }
         } else {
             None

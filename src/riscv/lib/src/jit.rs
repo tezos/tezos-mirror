@@ -289,7 +289,7 @@ mod tests {
         ];
 
         let mut jit = JIT::<M1K, F::Manager>::new().unwrap();
-        let interpreted_bb = InterpretedBlockBuilder;
+        let mut interpreted_bb = InterpretedBlockBuilder;
 
         for scenario in scenarios {
             let mut interpreted =
@@ -316,7 +316,7 @@ mod tests {
 
             let interpreted_res = unsafe {
                 // SAFETY: interpreted blocks are always callable
-                block.callable(&interpreted_bb)
+                block.callable(&mut interpreted_bb)
             }
             .unwrap()
             .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
@@ -362,7 +362,7 @@ mod tests {
         ];
 
         let mut jit = JIT::<M1K, F::Manager>::new().unwrap();
-        let interpreted_bb = InterpretedBlockBuilder;
+        let mut interpreted_bb = InterpretedBlockBuilder;
 
         for scenario in scenarios {
             let mut interpreted =
@@ -389,7 +389,7 @@ mod tests {
 
             let interpreted_res = unsafe {
                 // SAFETY: interpreted blocks are always callable
-                block.callable(&interpreted_bb)
+                block.callable(&mut interpreted_bb)
             }
             .unwrap()
             .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
@@ -436,7 +436,7 @@ mod tests {
         ];
 
         let mut jit = JIT::<M1K, F::Manager>::new().unwrap();
-        let interpreted_bb = InterpretedBlockBuilder;
+        let mut interpreted_bb = InterpretedBlockBuilder;
 
         let mut interpreted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
         let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
@@ -461,7 +461,7 @@ mod tests {
 
         let interpreted_res = unsafe {
             // SAFETY: interpreted blocks are always callable
-            block.callable(&interpreted_bb)
+            block.callable(&mut interpreted_bb)
         }
         .unwrap()
         .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);

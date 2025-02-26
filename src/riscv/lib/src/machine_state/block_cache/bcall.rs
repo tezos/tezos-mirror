@@ -91,13 +91,6 @@ pub trait Block<MC: MemoryConfig, M: ManagerBase> {
     where
         M: ManagerRead;
 
-    /// Mark a block as complete.
-    ///
-    /// This may trigger effects such as JIT-compilation.
-    fn complete_block(&mut self, builder: &mut Self::BlockBuilder)
-    where
-        M: ManagerReadWrite;
-
     /// Invalidate a block, it will no longer be callable.
     fn invalidate(&mut self)
     where
@@ -125,7 +118,7 @@ pub trait Block<MC: MemoryConfig, M: ManagerBase> {
     /// as this block may be run via `BCall::run_block`.
     unsafe fn callable<'a>(
         &mut self,
-        block_builder: &'a Self::BlockBuilder,
+        block_builder: &'a mut Self::BlockBuilder,
     ) -> Option<&mut (impl BCall<MC, M> + ?Sized + 'a)>
     where
         M: ManagerRead + 'a;
@@ -235,14 +228,6 @@ impl<MC: MemoryConfig, M: ManagerBase> Block<MC, M> for Interpreted<MC, M> {
         self.len_instr.read() as usize
     }
 
-    fn complete_block(&mut self, _builder: &mut Self::BlockBuilder)
-    where
-        M: ManagerReadWrite,
-    {
-        // This does nothing in the interpreted world, but will e.g. under JIT
-        // (compilation gets triggered)
-    }
-
     #[inline]
     fn instr(&self) -> &[EnrichedCell<ICallPlaced<MC, M>, M>]
     where
@@ -312,7 +297,7 @@ impl<MC: MemoryConfig, M: ManagerBase> Block<MC, M> for Interpreted<MC, M> {
     #[inline]
     unsafe fn callable<'a>(
         &mut self,
-        _bb: &'a Self::BlockBuilder,
+        _bb: &'a mut Self::BlockBuilder,
     ) -> Option<&mut (impl BCall<MC, M> + ?Sized + 'a)>
     where
         M: ManagerRead + 'a,
@@ -408,23 +393,6 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
         self.fallback.struct_ref::<F>()
     }
 
-    fn complete_block(&mut self, jit: &mut Self::BlockBuilder) {
-        self.fallback.complete_block(&mut jit.1);
-
-        if <Self as Block<MC, M>>::num_instr(self) > 0 {
-            let instr = self
-                .fallback
-                .instr
-                .iter()
-                .take(<Self as Block<MC, M>>::num_instr(self))
-                .map(|i| i.read_ref_stored());
-
-            let jitfn = jit.0.compile(instr);
-
-            self.jit_fn = jitfn;
-        }
-    }
-
     /// # SAFETY
     ///
     /// The `block_builder` must be the same as the block builder given to the `compile` call that
@@ -434,16 +402,33 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     /// as this block may be run via [`BCall::run_block`].
     unsafe fn callable<'a>(
         &mut self,
-        block_builder: &'a Self::BlockBuilder,
+        block_builder: &'a mut Self::BlockBuilder,
     ) -> Option<&mut (impl BCall<MC, M> + ?Sized + 'a)>
     where
         M: ManagerRead + 'a,
     {
-        if self.fallback.callable(&block_builder.1).is_some() {
-            Some(self)
-        } else {
-            None
+        if !self.fallback.hash.is_dirty() {
+            // We've already compiled this block
+            return Some(self);
         }
+
+        if self.fallback.callable(&mut block_builder.1).is_none() {
+            // Block is not callable
+            return None;
+        }
+
+        // trigger compilation
+        let instr = self
+            .fallback
+            .instr
+            .iter()
+            .take(<Self as Block<MC, M>>::num_instr(self))
+            .map(|i| i.read_ref_stored());
+
+        let jitfn = block_builder.0.compile(instr);
+
+        self.jit_fn = jitfn;
+        Some(self)
     }
 
     fn num_instr(&self) -> usize
