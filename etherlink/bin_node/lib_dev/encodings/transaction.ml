@@ -438,12 +438,12 @@ let to_transaction_object :
       gas = Qty gas_limit;
       gasPrice = Qty max_fee_per_gas;
       hash;
-      input = decode_hash data;
+      input = decode_hex data;
       nonce = Qty nonce;
       to_;
       transactionIndex = None;
       value = Qty value;
       v = Qty v;
-      r = decode_hash r;
-      s = decode_hash s;
+      r = decode_hex r;
+      s = decode_hex s;
     }

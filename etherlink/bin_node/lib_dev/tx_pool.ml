@@ -452,7 +452,7 @@ let insert_valid_transaction state tx_raw
     state
   in
   let tx_data =
-    transaction_object.input |> Ethereum_types.hash_to_bytes |> Bytes.of_string
+    transaction_object.input |> Ethereum_types.hex_to_bytes |> Bytes.of_string
   in
   if tx_data_size_limit_reached ~max_number_of_chunks ~tx_data then
     let*! () = Tx_pool_events.tx_data_size_limit_reached () in

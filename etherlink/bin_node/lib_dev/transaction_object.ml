@@ -246,8 +246,6 @@ type t =
   | EIP_2930 of EIP_2930.t
   | EIP_1559 of EIP_1559.t
 
-let unhash (Hash h) = h
-
 let from_store_transaction_object (obj : legacy_transaction_object) = Kernel obj
 
 let block_from_legacy block =
@@ -309,10 +307,10 @@ let reconstruct_from_eip_2930_transaction (obj : legacy_transaction_object)
           gas = obj.gas;
           gas_price = obj.gasPrice;
           access_list;
-          input = unhash obj.input;
+          input = obj.input;
           v = obj.v;
-          r = unhash obj.r;
-          s = unhash obj.s;
+          r = obj.r;
+          s = obj.s;
         }
   | _ -> error_with "failed to decode EIP-2930 transaction"
 
@@ -358,10 +356,10 @@ let reconstruct_from_eip_1559_transaction (obj : legacy_transaction_object)
           max_fee_per_gas;
           max_priority_fee_per_gas;
           access_list;
-          input = unhash obj.input;
+          input = obj.input;
           v = obj.v;
-          r = unhash obj.r;
-          s = unhash obj.s;
+          r = obj.r;
+          s = obj.s;
         }
   | _ ->
       (* This should not happen, but we cannot decode the transaction *)

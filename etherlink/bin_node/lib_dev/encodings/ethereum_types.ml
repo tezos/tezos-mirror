@@ -401,15 +401,15 @@ type legacy_transaction_object = {
   gas : quantity;
   gasPrice : quantity;
   hash : hash;
-  input : hash;
+  input : hex;
   nonce : quantity;
   to_ : address option;
   transactionIndex : quantity option;
       (* It can be null if it's in a pending block. *)
   value : quantity;
   v : quantity;
-  r : hash;
-  s : hash;
+  r : hex;
+  s : hex;
 }
 
 let legacy_transaction_object_from_rlp_item block_hash rlp_item =
@@ -442,7 +442,7 @@ let legacy_transaction_object_from_rlp_item block_hash rlp_item =
       let gas = decode_number_le gas_used in
       let gas_price = decode_number_le gas_price in
       let hash = decode_hash hash in
-      let input = decode_hash input in
+      let input = decode_hex input in
       let nonce = decode_number_le nonce in
       let to_ = if to_ = Bytes.empty then None else Some (decode_address to_) in
       let index = decode_optional_number_be index in
@@ -450,8 +450,8 @@ let legacy_transaction_object_from_rlp_item block_hash rlp_item =
       (* The signature is taken from the raw transaction, that is encoded in big
          endian. *)
       let v = decode_number_be v in
-      let r = decode_hash r in
-      let s = decode_hash s in
+      let r = decode_hex r in
+      let s = decode_hex s in
       {
         blockHash = block_hash;
         blockNumber = block_number;
@@ -540,15 +540,15 @@ let legacy_transaction_object_encoding =
           (req "gas" quantity_encoding)
           (req "gasPrice" quantity_encoding)
           (req "hash" hash_encoding)
-          (req "input" hash_encoding)
+          (req "input" hex_encoding)
           (req "nonce" quantity_encoding)
           (req "to" (option address_encoding))
           (req "transactionIndex" (option quantity_encoding)))
        (obj4
           (req "value" quantity_encoding)
           (req "v" quantity_encoding)
-          (req "r" hash_encoding)
-          (req "s" hash_encoding)))
+          (req "r" hex_encoding)
+          (req "s" hex_encoding)))
 
 type 'transaction_object block_transactions =
   | TxHash of hash list

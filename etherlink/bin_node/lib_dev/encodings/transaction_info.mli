@@ -21,12 +21,12 @@ type receipt_fields = {
 type object_fields = {
   gas : quantity;
   gas_price : quantity;
-  input : hash;
+  input : hex;
   nonce : quantity;
   value : quantity;
   v : quantity;
-  r : hash;
-  s : hash;
+  r : hex;
+  s : hex;
 }
 
 (** This is the merge of a {!Transaction_receipt.t} and

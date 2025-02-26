@@ -21,12 +21,12 @@ type receipt_fields = {
 type object_fields = {
   gas : quantity;
   gas_price : quantity;
-  input : hash;
+  input : hex;
   nonce : quantity;
   value : quantity;
   v : quantity;
-  r : hash;
-  s : hash;
+  r : hex;
+  s : hex;
 }
 
 type t = {
@@ -158,9 +158,9 @@ let object_fields_encoding =
     (obj8
        (req "gas" quantity_encoding)
        (req "gas_price" quantity_encoding)
-       (req "input" hash_encoding)
+       (req "input" hex_encoding)
        (req "nonce" quantity_encoding)
        (req "value" quantity_encoding)
        (req "v" quantity_encoding)
-       (req "r" hash_encoding)
-       (req "s" hash_encoding))
+       (req "r" hex_encoding)
+       (req "s" hex_encoding))
