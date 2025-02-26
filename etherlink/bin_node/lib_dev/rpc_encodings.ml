@@ -235,6 +235,20 @@ module Chain_id = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Chain_family = struct
+  type input = Ethereum_types.chain_id
+
+  type output = Ethereum_types.chain_family
+
+  let input_encoding = Data_encoding.tup1 Ethereum_types.Chain_id.encoding
+
+  let output_encoding = Ethereum_types.Chain_family.encoding
+
+  let method_ = "tez_chainFamily"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Accounts = struct
   type input = unit
 
@@ -971,6 +985,7 @@ let supported_methods : (module METHOD) list =
     (module Kernel_root_hash);
     (module Network_id);
     (module Chain_id);
+    (module Chain_family);
     (module Accounts);
     (module Get_balance);
     (module Get_storage_at);

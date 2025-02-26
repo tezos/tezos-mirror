@@ -120,6 +120,8 @@ val quantity_encoding : quantity Data_encoding.t
 
 val pp_quantity : Format.formatter -> quantity -> unit
 
+val decode_z_le : bytes -> Z.t
+
 val quantity_of_z : Z.t -> quantity
 
 val decode_number_le : bytes -> quantity

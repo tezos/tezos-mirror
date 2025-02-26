@@ -276,6 +276,37 @@ let chain_id read =
     Durable_storage_path.chain_id
     Chain_id.decode_le
 
+let l2_minimum_base_fee_per_gas read chain_id =
+  inspect_durable_and_decode
+    read
+    (Durable_storage_path.Chain_configuration.minimum_base_fee_per_gas chain_id)
+    Ethereum_types.decode_z_le
+
+let l2_da_fee_per_byte read chain_id =
+  inspect_durable_and_decode
+    read
+    (Durable_storage_path.Chain_configuration.da_fee_per_byte chain_id)
+    Ethereum_types.decode_z_le
+
+let l2_maximum_gas_per_transaction read chain_id =
+  inspect_durable_and_decode
+    read
+    (Durable_storage_path.Chain_configuration.maximum_gas_per_transaction
+       chain_id)
+    Ethereum_types.decode_z_le
+
+let chain_family read chain_id =
+  inspect_durable_and_decode
+    read
+    (Durable_storage_path.Chain_configuration.chain_family chain_id)
+    (fun x -> Ethereum_types.Chain_family.of_string_exn (Bytes.to_string x))
+
+let world_state read chain_id =
+  inspect_durable_and_decode
+    read
+    (Durable_storage_path.Chain_configuration.world_state chain_id)
+    Bytes.to_string
+
 let base_fee_per_gas read =
   let open Lwt_result_syntax in
   let* block =
@@ -388,6 +419,31 @@ module Make (Reader : READER) = struct
     let open Lwt_result_syntax in
     let* read = read_with_state () in
     chain_id read
+
+  let l2_minimum_base_fee_per_gas chain_id =
+    let open Lwt_result_syntax in
+    let* read = read_with_state () in
+    l2_minimum_base_fee_per_gas read chain_id
+
+  let l2_da_fee_per_byte chain_id =
+    let open Lwt_result_syntax in
+    let* read = read_with_state () in
+    l2_da_fee_per_byte read chain_id
+
+  let l2_maximum_gas_per_transaction chain_id =
+    let open Lwt_result_syntax in
+    let* read = read_with_state () in
+    l2_maximum_gas_per_transaction read chain_id
+
+  let chain_family chain_id =
+    let open Lwt_result_syntax in
+    let* read = read_with_state () in
+    chain_family read chain_id
+
+  let world_state chain_id =
+    let open Lwt_result_syntax in
+    let* read = read_with_state () in
+    world_state read chain_id
 
   let base_fee_per_gas () =
     let open Lwt_result_syntax in

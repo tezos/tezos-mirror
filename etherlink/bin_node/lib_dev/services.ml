@@ -451,6 +451,12 @@ let dispatch_request (rpc : Configuration.rpc)
               rpc_ok chain_id
             in
             build ~f module_ parameters
+        | Rpc_encodings.Chain_family.Method ->
+            let f chain_id =
+              let* chain_family = Backend_rpc.chain_family chain_id in
+              rpc_ok chain_family
+            in
+            build_with_input ~f module_ parameters
         | Get_balance.Method ->
             let f (address, block_param) =
               let* balance = Backend_rpc.balance address block_param in

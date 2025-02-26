@@ -453,23 +453,9 @@ let test_make_l2_kernel_installer_config chain_family =
     Evm_node.init ~mode:sequencer (Sc_rollup_node.endpoint sc_rollup_node)
   in
 
-  (* Verify the chain_family is set to EVM *)
-  let family_path =
-    "/evm/chain_configurations/" ^ string_of_int chain_id ^ "/chain_family"
-  in
-  let*@ rpc = Rpc.state_value sequencer family_path in
-  let family_value =
-    match rpc with
-    | None ->
-        Test.fail
-          ~__LOC__
-          "There should be a value at %s setup by the \
-           make_l2_kernel_installer_config"
-          family_path
-    | Some family_value -> family_value
-  in
-  let (`Hex expected) = Hex.of_string chain_family in
-  Check.((family_value = expected) string)
+  (* Verify the chain_family is properly set *)
+  let*@ family_value = Rpc.get_chain_family sequencer chain_id in
+  Check.((family_value = chain_family) string)
     ~error_msg:"Expected chain_family to be %R, got %L" ;
 
   (* Verify that the balance of the bootstrap account is set by the command
