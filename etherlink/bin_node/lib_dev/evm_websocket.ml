@@ -75,78 +75,12 @@ module Request = struct
 
   let view (req : _ t) = View req
 
-  let opcode_encoding : Websocket.Frame.Opcode.t Data_encoding.t =
-    let open Data_encoding in
-    let open Websocket.Frame.Opcode in
-    union
-      [
-        case
-          (Tag 0)
-          ~title:"continuation"
-          (constant "continuation")
-          (function Continuation -> Some () | _ -> None)
-          (fun () -> Continuation);
-        case
-          (Tag 1)
-          ~title:"text"
-          (constant "text")
-          (function Text -> Some () | _ -> None)
-          (fun () -> Text);
-        case
-          (Tag 2)
-          ~title:"binary"
-          (constant "binary")
-          (function Binary -> Some () | _ -> None)
-          (fun () -> Binary);
-        case
-          (Tag 8)
-          ~title:"close"
-          (constant "close")
-          (function Close -> Some () | _ -> None)
-          (fun () -> Close);
-        case
-          (Tag 9)
-          ~title:"ping"
-          (constant "ping")
-          (function Ping -> Some () | _ -> None)
-          (fun () -> Ping);
-        case
-          (Tag 10)
-          ~title:"pong"
-          (constant "pong")
-          (function Pong -> Some () | _ -> None)
-          (fun () -> Pong);
-        case
-          (Tag 15)
-          ~title:"ctrl"
-          (obj1 (req "ctrl" int31))
-          (function Ctrl i -> Some i | _ -> None)
-          (fun i -> Ctrl i);
-        case
-          (Tag 255)
-          ~title:"nonctrl"
-          (obj1 (req "nonctrl" int31))
-          (function Nonctrl i -> Some i | _ -> None)
-          (fun i -> Nonctrl i);
-      ]
-
-  let frame_encoding : Websocket.Frame.t Data_encoding.t =
-    let open Data_encoding in
-    let open Websocket.Frame in
-    conv
-      (fun {opcode; extension; final; content} ->
-        (opcode, extension, final, content))
-      (fun (opcode, extension, final, content) ->
-        {opcode; extension; final; content})
-    @@ obj4
-         (req "opcode" opcode_encoding)
-         (req "extension" int31)
-         (req "final" bool)
-         (req "content" string)
-
   let encoding =
     let open Data_encoding in
-    conv (fun (View (Frame r)) -> r) (fun r -> View (Frame r)) frame_encoding
+    conv
+      (fun (View (Frame r)) -> r)
+      (fun r -> View (Frame r))
+      Websocket_encodings.frame_encoding
 
   let pp ppf (View (Frame r)) = Websocket.Frame.pp ppf r
 end

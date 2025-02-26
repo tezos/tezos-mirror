@@ -171,6 +171,8 @@ let lwt_canceler =
 
 let lwt_exit = external_lib "lwt-exit" V.True
 
+let lwt_log = external_lib "lwt_log" V.True
+
 let lwt_ppx = external_lib "lwt_ppx" V.True
 
 let lwt_unix = external_sublib lwt "lwt.unix"
