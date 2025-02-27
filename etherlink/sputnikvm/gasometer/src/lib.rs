@@ -584,6 +584,10 @@ pub fn dynamic_opcode_cost<H: Handler>(
 				target_is_cold: handler.is_cold(address, Some(index))?,
 			}
 		}
+		Opcode::TLOAD if config.has_transient_storage => GasCost::TLoad,
+		Opcode::TLOAD => GasCost::Invalid(opcode),
+		Opcode::TSTORE if config.has_transient_storage => GasCost::TStore,
+		Opcode::TSTORE => GasCost::Invalid(opcode),
 		Opcode::LOG0 if !is_static => GasCost::Log {
 			n: 0,
 			len: U256::from_big_endian(&stack.peek(1)?[..]),
@@ -845,6 +849,8 @@ impl<'config> Inner<'config> {
 				self.config.gas_ext_code_hash,
 				self.config,
 			),
+			GasCost::TLoad => consts::G_TLOAD,
+			GasCost::TStore => consts::G_TSTORE,
 			GasCost::BlobHash => consts::G_BLOBHASH,
 			GasCost::BlobBaseFee => consts::G_BLOBBASEFEE,
 		})
@@ -1003,6 +1009,10 @@ pub enum GasCost {
 		/// True if target has not been previously accessed in this transaction
 		target_is_cold: bool,
 	},
+	/// Gas cost for `TLOAD`.
+	TLoad,
+	/// Gas cost for `TSTORE`.
+	TStore,
 	/// Gas cost for `BLOBHASH`.
 	BlobHash,
 	/// Gas cost for `BLOBBASEFEE`.

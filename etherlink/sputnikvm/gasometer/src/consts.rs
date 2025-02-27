@@ -19,5 +19,7 @@ pub const G_SHA3WORD: u64 = 6;
 pub const G_COPY: u64 = 3;
 pub const G_BLOCKHASH: u64 = 20;
 pub const G_CODEDEPOSIT: u64 = 200;
+pub const G_TLOAD: u64 = 100;
+pub const G_TSTORE: u64 = 100;
 pub const G_BLOBHASH: u64 = 3;
 pub const G_BLOBBASEFEE: u64 = 2;
