@@ -844,6 +844,11 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
   (* The tezos/tezos CI uses singleton tags for its runners. *)
   let tag =
     match (arch, tag, cpu) with
+    | Some Arm64, _, (High | Very_high) ->
+        failwith
+          "[job] cannot specify both [arch=Arm64] and [cpu=High] or \
+           [cpu=Very_high] in job '%s'."
+          name
     | Some _, Some _, High
     | None, Some _, High
     | Some _, None, High
