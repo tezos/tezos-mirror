@@ -2061,6 +2061,25 @@ let stat_metadata_cycles block_store =
 
 (***************** Upgrade to V3.1 *****************)
 
+type error += Unexpected_status_encoding of string
+
+let () =
+  let open Data_encoding in
+  register_error_kind
+    `Permanent
+    ~id:"block_store.unexpected_status_encoding"
+    ~title:"Unexpected status encoding"
+    ~description:"The status file encoding found is not the expected one."
+    ~pp:(fun ppf path ->
+      Format.fprintf
+        ppf
+        "The status format found at %s is invalid. Please delete the file for \
+         a proper upgrade."
+        path)
+    (obj1 (req "path " string))
+    (function Unexpected_status_encoding path -> Some path | _ -> None)
+    (fun path -> Unexpected_status_encoding path)
+
 let v_3_1_upgrade chain_dir =
   let open Lwt_result_syntax in
   let legacy_block_store_status_file =
@@ -2070,10 +2089,17 @@ let v_3_1_upgrade chain_dir =
   if exists then
     (* Load using the legacy block_store_status encoding *)
     let*! () = Store_events.(emit load_block_store_status ()) in
-    let* legacy_status_data =
+    let*! legacy_status_data =
       Stored_data.init
         legacy_block_store_status_file
         ~initial_data:Block_store_status.Legacy.create_idle_status
+    in
+    let* legacy_status_data =
+      match legacy_status_data with
+      | Ok legacy_status_data -> return legacy_status_data
+      | Error _exn ->
+          tzfail
+            (Unexpected_status_encoding legacy_block_store_status_file.path)
     in
     (* Convert to the new encoding *)
     let* status = Block_store_status.of_legacy legacy_status_data in
