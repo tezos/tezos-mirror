@@ -126,7 +126,7 @@ let versions network =
 
 let delegates ?(accounts = []) network =
   match network with
-  | (`Mainnet | `Ghostnet) as network -> (
+  | (`Mainnet | `Ghostnet | `Rionet) as network -> (
       let decoder json =
         json |> JSON.as_list
         |> List.map (fun json_account ->
@@ -161,7 +161,7 @@ let delegates ?(accounts = []) network =
           response.code
           (Printexc.to_string exn) ;
         Lwt.return_none)
-  | `Weeklynet _ | `Nextnet _ | `Rionet ->
+  | `Weeklynet _ | `Nextnet _ ->
       (* There are no aliases for these networks. *)
       Lwt.return_none
   | `Sandbox ->
