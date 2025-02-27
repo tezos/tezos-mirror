@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let parse_args () =
+let parse_args name =
   let socket_dir = ref None in
   let args =
     Arg.
@@ -51,20 +51,19 @@ let parse_args () =
           " Display version information" );
       ]
   in
-  let usage_msg =
-    Format.sprintf "octez-validator [--version] [--socket-dir <dir>]"
-  in
+  let usage_msg = Format.sprintf "%s [--version] [--socket-dir <dir>]" name in
   Arg.parse
     args
     (fun s -> raise (Arg.Bad (Format.sprintf "Unexpected argument: %s" s)))
     usage_msg ;
   match !socket_dir with
   | Some s -> s
-  | None -> raise (Arg.Bad (Format.sprintf "please provide --socket-dir"))
+  | None ->
+      raise (Arg.Bad (Format.sprintf "%s: please provide --socket-dir" name))
 
-let run () =
-  let socket_dir = parse_args () in
-  let main_promise = External_validator.main ~socket_dir in
+let run name main =
+  let socket_dir = parse_args name in
+  let main_promise = main ~socket_dir in
   Stdlib.exit
     (let open Lwt_syntax in
      Lwt.Exception_filter.(set handle_all_except_runtime) ;
@@ -75,3 +74,12 @@ let run () =
          | Error err ->
              Format.eprintf "%a\n%!" pp_print_trace err ;
              Lwt_exit.exit_and_wait 1))
+
+module Validator = struct
+  let run () = run "octez-validator" External_validator.main
+end
+
+module Hypervisor = struct
+  let run () =
+    run "octez-validator-hypervisor" External_validator.Hypervisor.main
+end

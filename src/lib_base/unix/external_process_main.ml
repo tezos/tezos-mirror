@@ -71,11 +71,12 @@ struct
         ~pp1
 
     let initialized =
-      declare_0
+      declare_1
         ~level:Info
         ~name:"initialized"
-        ~msg:(Params.name ^ " initialized and listening")
-        ()
+        ~msg:(Params.name ^ " initialized and listening with pid {pid}")
+        ~pp1:Format.pp_print_int
+        ("pid", Data_encoding.int31)
 
     let terminated =
       declare_0
@@ -134,7 +135,7 @@ struct
     let*! () =
       Internal_event_unix.init ~config:(Params.internal_events parameters) ()
     in
-    let*! () = Events.(emit initialized ()) in
+    let*! () = Events.(emit initialized (Unix.getpid ())) in
     let rec loop state =
       let*! (Params.Erequest recved) =
         Lwt_unix_socket.recv input Params.request_encoding

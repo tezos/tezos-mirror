@@ -259,14 +259,19 @@ let apply_block worker ?canceler bv peer chain_store ~predecessor block_header
            will shutdown gracefully. *)
         if retry && errors_contains_context_error errs then
           match Block_validator_process.kind bv.validation_process with
-          | Block_validator_process.External_process ->
+          | Block_validator_process.External_process -> (
               let*! () =
                 Events.(emit context_error_at_block_application)
                   (block_hash, errs)
               in
-              let*! () = Block_validator_process.close bv.validation_process in
-              let*! () = Events.(emit retry_block_application) block_hash in
-              apply_block ~retry:false
+              let*! r = Block_validator_process.restart bv.validation_process in
+              match r with
+              | Ok () ->
+                  let*! () = Events.(emit retry_block_application) block_hash in
+                  apply_block ~retry:false
+              | Error errs ->
+                  (* If the validator cannot be restarted we are doomed. *)
+                  Lwt.return (Application_error errs))
           | Single_process ->
               (* If the node is configured in single process mode we cannot
                  mitigate. The application error is directly raised and the node

@@ -107,7 +107,11 @@ let () =
 
 let () =
   if Filename.basename Sys.argv.(0) = "octez-validator" then
-    Tezos_validation.Command_line.run ()
+    Tezos_validation.Command_line.Validator.run ()
+
+let () =
+  if Filename.basename Sys.argv.(0) = "octez-validator-hypervisor" then
+    Tezos_validation.Command_line.Hypervisor.run ()
 
 let () =
   if Filename.basename Sys.argv.(0) = "octez-rpc-process" then

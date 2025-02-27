@@ -71,4 +71,6 @@ module type S = sig
       arguments that should be given to the external process executable to
       start. *)
   val command_line_args : socket_dir:string -> string * string list
+
+  val hypervisor_name : string
 end

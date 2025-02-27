@@ -130,3 +130,5 @@ val socket_path_prefix : string
 val socket_path : socket_dir:string -> pid:int -> string
 
 val command_line_args : socket_dir:string -> string * string list
+
+val hypervisor_name : string
