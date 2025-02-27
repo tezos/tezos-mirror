@@ -691,8 +691,11 @@ let init ~data_dir ~perm () =
     let* () =
       List.iter_es
         (fun (i, ((module M : Evm_node_migrations.S) as mig)) ->
+          let start_t = Time.System.now () in
           let* () = Migrations.apply_migration conn i mig in
-          let*! () = Evm_store_events.applied_migration M.name in
+          let end_t = Time.System.now () in
+          let migration_time = Ptime.diff end_t start_t in
+          let*! () = Evm_store_events.applied_migration M.name migration_time in
           return_unit)
         migrations
     in
