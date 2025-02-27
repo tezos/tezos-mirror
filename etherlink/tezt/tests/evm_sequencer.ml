@@ -8268,7 +8268,88 @@ let fast_withdrawal ?(expect_failure = false) ~sender ~endpoint ~amount_wei
       ~value:amount_wei
       ~gas:16_000_000
   in
+
   wait_for_application ~produce_block call_fast_withdrawal
+
+let test_fast_withdraw_feature_flag_deactivated =
+  let commitment_period = 5 and challenge_window = 5 in
+  register_all
+    ~tags:["evm"; "feature_flag"; "fast_withdrawal"]
+    ~title:"Check fast withdraw tez is deactivated with feature flag"
+    ~commitment_period
+    ~challenge_window
+    ~enable_fast_withdrawal:false
+    ~kernels:[Kernel.Latest]
+  @@ fun {client; sc_rollup_address; l1_contracts; sc_rollup_node; sequencer; _}
+             _protocol ->
+  let admin = Constant.bootstrap5 in
+
+  let produce_block () = Rpc.produce_block sequencer in
+  let {exchanger; _} = l1_contracts in
+  let* fast_withdrawal_contract_address =
+    Client.originate_contract
+      ~alias:"fast_withdrawal_contract_address"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap5.public_key_hash
+      ~init:(sf "Pair %S {}" exchanger)
+      ~prg:(fast_withdrawal_path ())
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
+
+  let withdraw_amount = Tez.of_int 50 in
+  (* Define the amount to deposit in tez (100 tez), and specify the Ethereum-based receiver for the rollup. *)
+  let deposit_amount = Tez.of_int 100 in
+  let receiver =
+    Eth_account.
+      {
+        address = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB";
+        private_key =
+          "0xb7c548b5442f5b28236f0dcd619f65aaaafd952240908adcf9642d8e616587ee";
+      }
+  in
+
+  (* Define the Tezos address that will receive the fast withdrawal on L1. *)
+  let withdraw_receiver = "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX" in
+
+  (* Execute the deposit of 100 tez to the rollup. The depositor is the admin account, and the receiver is the Ethereum address. *)
+  let* () =
+    send_deposit_to_delayed_inbox
+      ~l1_contracts
+      ~amount:deposit_amount
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~depositor:admin
+      ~receiver:receiver.address
+      client
+  in
+
+  (* We bake enough blocks for the sequencer to realize there's a deposit. *)
+  let* () =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  (* We create a L2 block to include the deposit *)
+  let* _ = produce_block () in
+  (* Define the amount for fast withdrawal as 50 tez (half of the deposited amount). *)
+  let withdraw_amount_wei = Wei.of_tez withdraw_amount in
+
+  (* Perform the fast withdrawal from the rollup, transferring 50 tez to the L1 withdrawal contract. *)
+  let* err =
+    fast_withdrawal
+      ~expect_failure:true
+      ~amount_wei:withdraw_amount_wei
+      ~sender:receiver
+      ~receiver:withdraw_receiver
+      ~fast_withdrawal_contract_address
+      ~produce_block
+      ~endpoint:(Evm_node.endpoint sequencer)
+      ()
+  in
+  if not (err =~ rex "Error") then Test.fail "Test should fail with error" ;
+  unit
 
 let execute_payout ~service_provider_pkh ~exchanger
     ~fast_withdrawal_contract_address ~service_provider_proxy client receipt =
@@ -10756,6 +10837,7 @@ let () =
   test_make_l2_kernel_installer_config "Michelson" protocols ;
   test_fast_withdrawal_feature_flag protocols ;
   test_deposit_and_fast_withdraw protocols ;
+  test_fast_withdraw_feature_flag_deactivated protocols ;
   test_trace_call protocols ;
   test_trace_empty_block protocols ;
   test_trace_block protocols ;
