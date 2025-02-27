@@ -22,8 +22,10 @@ module type BAKER_COMMANDS_HELPERS = sig
     cctxt:Tezos_client_base.Client_context.full ->
     unit Error_monad.tzresult Lwt.t
 
-  val baker_commands :
-    unit -> Tezos_client_base.Client_context.full Tezos_clic.command list
+  val run_vdf_daemon :
+    cctxt:Tezos_client_base.Client_context.full ->
+    keep_alive:bool ->
+    unit tzresult Lwt.t
 end
 
 module type S = sig
