@@ -991,6 +991,16 @@ let trusted_ring () =
   in
   unit
 
+let check_connected_points expected node =
+  let* points = Node.RPC.(call node @@ get_network_points) in
+  let connected_points = List.filter point_is_running points in
+  Check.(
+    (List.length connected_points = expected)
+      int
+      ~__LOC__
+      ~error_msg:"Expected %R connected points, got %L") ;
+  unit
+
 (* This test sets up a clique between a set of [M] nodes [N_1;
    ...; N_M].
 
@@ -1020,6 +1030,7 @@ let expected_peer_id () =
   let nodes = Cluster.create num_nodes [] in
   Cluster.clique nodes ;
   let* () = Cluster.start ~wait_connections:true nodes in
+  let* () = Lwt_list.iter_s (check_connected_points (num_nodes - 1)) nodes in
   let point_id_of_node node =
     let addr, port = Node.point node in
     sf "%s:%d" addr port
@@ -1071,15 +1082,9 @@ let expected_peer_id () =
         ~error_msg:
           ("Expected the expected_peer_id of neighbor of " ^ Node.name node
          ^ " to be %R, got %L")) ;
-    let* points = Node.RPC.(call node @@ get_network_points) in
-    let connected_points = List.filter point_is_running points in
-    Check.(
-      (List.length connected_points = num_nodes - 1)
-        int
-        ~__LOC__
-        ~error_msg:"Expected %R connected points, got %L") ;
-    unit
+    check_connected_points (num_nodes - 1) node
   in
+
   Log.info "Set wrong [expected_peer_id]" ;
   (* For all nodes [node], we set [expected_peer_id] on its
      connection to its neighbor [next(node)] to the peer id of
@@ -1126,15 +1131,8 @@ let expected_peer_id () =
   (* Each node should now have two connected peers less *)
   let* () =
     iter_p nodes @@ fun node ->
-    let* points = Node.RPC.(call node @@ get_network_points) in
-    let connected_points = List.filter point_is_running points in
     (* We lost two connections *)
-    Check.(
-      (List.length connected_points = num_nodes - 3)
-        int
-        ~__LOC__
-        ~error_msg:"Expected %R connected points, got %L") ;
-    unit
+    check_connected_points (num_nodes - 3) node
   in
   unit
 
