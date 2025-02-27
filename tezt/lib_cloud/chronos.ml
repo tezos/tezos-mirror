@@ -23,7 +23,7 @@ type task = {
 }
 
 type t = {
-  mutable tasks : task list;
+  tasks : task list;
   shutdown : unit Lwt.t;
   trigger_shutdown : unit Lwt.u;
 }
