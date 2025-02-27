@@ -72,6 +72,18 @@ let gzip_reader : reader = (module Gzip_reader)
 
 let gzip_writer : writer = (module Gzip_writer)
 
+let run ~cancellable k =
+  if cancellable then
+    (* [Lwt_preemptive] does not yet provide a way to cancel a detached
+       computation.
+
+       As a temporary fix, we use [Lwt.wrap_in_cancelable]. The promise
+       created by [detach] is cancelled. The detached computation keeps
+       running, which is less than ideal, but it is reasonable because
+       our use case for cancellation leads to the program exiting. *)
+    Lwt.wrap_in_cancelable (Lwt_preemptive.detach k ())
+  else Lwt.return (k ())
+
 (* Magic bytes for gzip files is 1f8b. *)
 let is_compressed_snapshot snapshot_file =
   let ic = open_in snapshot_file in
@@ -86,6 +98,17 @@ let is_compressed_snapshot snapshot_file =
   | e ->
       close_in ic ;
       raise e
+
+let periodic_report event =
+  let open Lwt_syntax in
+  let start_time = Ptime_clock.now () in
+  let rec aux () =
+    let* () = Lwt_unix.sleep 60. in
+    let elapsed_time = Ptime.diff (Ptime_clock.now ()) start_time in
+    let* () = event elapsed_time in
+    aux ()
+  in
+  aux ()
 
 module Make (Header : sig
   type t
@@ -116,8 +139,20 @@ struct
     in
     loop (Data_encoding.Binary.read_stream Header.encoding)
 
-  let create (module Reader : READER) (module Writer : WRITER) header ~files
-      ~dest =
+  let run_progress ~display_progress k =
+    match display_progress with
+    | `Bar progress_bar -> Progress_bar.with_reporter progress_bar k
+    | `Periodic_event mk_event ->
+        let progress = ref 0 in
+        Lwt.pick
+          [
+            k (fun i -> progress := !progress + i);
+            periodic_report (fun elapsed_time ->
+                mk_event ~progress:!progress elapsed_time);
+          ]
+
+  let create (module Reader : READER) (module Writer : WRITER) header
+      ~cancellable ~display_progress ~files ~dest () =
     let module Archive_writer = Tar.Make (struct
       include Reader
       include Writer
@@ -130,14 +165,18 @@ struct
         0
         files
     in
-    let progress_bar =
-      Progress_bar.progress_bar
-        ~counter:`Bytes
-        ~message:"Exporting snapshot  "
-        ~color:(Terminal.Color.rgb 3 132 252)
-        total
+    let display_progress =
+      match display_progress with
+      | `Bar ->
+          `Bar
+            (Progress_bar.progress_bar
+               ~counter:`Bytes
+               ~message:"Exporting snapshot  "
+               ~color:(Terminal.Color.rgb 3 132 252)
+               total)
+      | `Periodic_event mk_event -> `Periodic_event (mk_event ~total)
     in
-    Progress_bar.with_reporter progress_bar @@ fun count_progress ->
+    run_progress ~display_progress @@ fun count_progress ->
     let write_file file (out_chan : Writer.out_channel) =
       let in_chan = Reader.open_in file in
       try
@@ -173,6 +212,7 @@ struct
       |> Stream.of_list
     in
     let out_chan = Writer.open_out dest in
+    run ~cancellable @@ fun () ->
     try
       write_snapshot_header
         (module struct
@@ -216,33 +256,20 @@ struct
         let in_chan = in_chan
       end)
     in
-    let maybe_progress k =
-      if display_progress then (
-        let spinner = Progress_bar.spinner ~message:"Extracting snapshot" in
-        Progress_bar.with_reporter spinner @@ fun count_progress ->
-        Writer.count_progress := count_progress ;
-        k ())
-      else k ()
-    in
-    let run k =
-      if cancellable then
-        (* [Lwt_preemptive] does not yet provide a way to cancel a detached
-           computation.
-
-           As a temporary fix, we use [Lwt.wrap_in_cancelable]. The promise
-           created by [detach] is cancelled. The detached computation keeps
-           running, which is less than ideal, but it is reasonable because
-           our use case for cancellation leads to the program exiting. *)
-        Lwt.wrap_in_cancelable (Lwt_preemptive.detach k ())
-      else Lwt.return (k ())
+    let display_progress =
+      match display_progress with
+      | `Bar -> `Bar (Progress_bar.spinner ~message:"Extracting snapshot")
+      | `Periodic_event mk_event ->
+          `Periodic_event (fun ~progress:_ -> mk_event)
     in
     Lwt.finalize
       (fun () ->
         let header = read_snapshot_header reader_input in
         let* check_result = header_check header in
-        maybe_progress @@ fun () ->
+        run_progress ~display_progress @@ fun count_progress ->
+        Writer.count_progress := count_progress ;
         let*! () =
-          run (fun () ->
+          run ~cancellable (fun () ->
               Archive_reader.Archive.extract_gen out_channel_of_header in_chan)
         in
         return (header, check_result))
@@ -250,19 +277,24 @@ struct
         Reader.close_in in_chan ;
         Lwt.return_unit)
 
-  let compress ~snapshot_file =
+  let compress ~cancellable ~display_progress ~snapshot_file () =
     let Unix.{st_size = total; _} = Unix.stat snapshot_file in
-    let progress_bar =
-      Progress_bar.progress_bar
-        ~counter:`Bytes
-        ~message:"Compressing snapshot"
-        ~color:(Terminal.Color.rgb 3 198 252)
-        total
+    let display_progress =
+      match display_progress with
+      | `Bar ->
+          `Bar
+            (Progress_bar.progress_bar
+               ~counter:`Bytes
+               ~message:"Compressing snapshot"
+               ~color:(Terminal.Color.rgb 3 198 252)
+               total)
+      | `Periodic_event mk_event -> `Periodic_event (mk_event ~total)
     in
-    Progress_bar.with_reporter progress_bar @@ fun count_progress ->
+    run_progress ~display_progress @@ fun count_progress ->
     let snapshot_file_gz = Filename.chop_suffix snapshot_file ".uncompressed" in
     let in_chan = open_in snapshot_file in
     let out_chan = Gzip.open_out snapshot_file_gz in
+    run ~cancellable @@ fun () ->
     try
       let buffer_size = 64 * 1024 in
       let buf = Bytes.create buffer_size in

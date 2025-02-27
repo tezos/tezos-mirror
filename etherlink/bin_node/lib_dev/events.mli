@@ -156,6 +156,16 @@ val download_failed : string -> download_error -> unit Lwt.t
 
 val importing_snapshot : unit -> unit Lwt.t
 
+val exporting_snapshot : string -> unit Lwt.t
+
+val still_exporting_snapshot :
+  total:int -> progress:int -> string -> Ptime.Span.t -> unit Lwt.t
+
+val compressing_snapshot : string -> unit Lwt.t
+
+val still_compressing_snapshot :
+  total:int -> progress:int -> string -> Ptime.Span.t -> unit Lwt.t
+
 (** [extract_snapshot_archive_in_progress ~archive_name ~elapsed_time] advertises that the node is
     extracting the snapshot archive named [archive_name], and explicitly mentions the time elapsed
     since the extraction started. *)

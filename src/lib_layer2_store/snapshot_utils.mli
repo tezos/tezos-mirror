@@ -34,42 +34,70 @@ module Make (Header : sig
 
   val encoding : t Data_encoding.t
 end) : sig
-  (** [create reader writer header ~files ~dest] creates a snapshot archive with
-      the header [header] with the contents of [files]. Each element of [files]
-      is a pair whose first component is the path of the file to include and the
-      second component is the "relative" path it should be registered to in the
-      snapshot archive The archive is produced in file [dest]. *)
+  (** [create reader writer header ~cancellable ~display_progress ~files ~dest]
+      creates a snapshot archive with the header [header] with the contents of
+      [files]. Each element of [files] is a pair whose first component is the
+      path of the file to include and the second component is the "relative"
+      path it should be registered to in the snapshot archive The archive is
+      produced in file [dest]. 
+
+      Setting [cancellable] to [true] ensures the promise returned by [create]
+      can be canceled. How progress is advertized is controlled by the
+      [display_progress] variable. Note that [`Bar] is not compatible with
+      [Lwt_exit]. *)
   val create :
     reader ->
     writer ->
     Header.t ->
+    cancellable:bool ->
+    display_progress:
+      [ `Bar
+      | `Periodic_event of total:int -> progress:int -> Ptime.span -> unit Lwt.t
+      ] ->
     files:(string * string) list ->
     dest:string ->
-    unit
+    unit ->
+    unit Lwt.t
 
-  (** [extract reader writer check_header ~snapshot_file ~dest] extracts the
-      snapshot archive [snapshot_file] in the directory [dest]. Existing files
-      in [dest] with the same names are overwritten. The header header read
-      from the snapshot is checked with [check_header] before beginning
-      extraction, and returned. If [display_progress] is set to [true], a
-      spinner is exposed to the user to amuse them while they wait. Set
-      [cancellable] to [true] if you want to be able to use [Lwt.cancel]
-      on the promise. *)
+  (** [extract reader writer check_header ~cancellable ~display_progress
+      ~snapshot_file ~dest] extracts the snapshot archive [snapshot_file] in the
+      directory [dest]. Existing files in [dest] with the same names are
+      overwritten. The header read from the snapshot is checked with
+      [check_header] before beginning extraction, and returned. 
+
+      Setting [cancellable] to [true] ensures the promise returned by [extract]
+      can be canceled. How progress is advertized is controlled by the
+      [display_progress] variable. Note that [`Bar] is not compatible with
+      [Lwt_exit]. *)
   val extract :
     reader ->
     writer ->
     (Header.t -> 'a tzresult Lwt.t) ->
     cancellable:bool ->
-    display_progress:bool ->
+    display_progress:[`Bar | `Periodic_event of Ptime.span -> unit Lwt.t] ->
     snapshot_file:string ->
     dest:string ->
     (Header.t * 'a) tzresult Lwt.t
 
-  (** [compress ~snapshot_file] compresses the snapshot archive [snapshot_file]
-      of the form ["path/to/snapshot.uncompressed"] to a new file
-      ["path/to/snapshot"] whose path is returned. [snapshot_file] is removed
-      upon successful compression. *)
-  val compress : snapshot_file:string -> string
+  (** [compress ~cancellable ~display_progress ~snapshot_file] compresses the
+      snapshot archive [snapshot_file] of the form
+      ["path/to/snapshot.uncompressed"] to a new file ["path/to/snapshot"]
+      whose path is returned. [snapshot_file] is removed upon successful
+      compression.
+
+      Setting [cancellable] to [true] ensures the promise returned by
+      [compress] can be canceled. How progress is advertized is controlled by
+      the [display_progress] variable. Note that [`Bar] is not compatible with
+      [Lwt_exit]. *)
+  val compress :
+    cancellable:bool ->
+    display_progress:
+      [ `Bar
+      | `Periodic_event of total:int -> progress:int -> Ptime.span -> unit Lwt.t
+      ] ->
+    snapshot_file:string ->
+    unit ->
+    string Lwt.t
 
   (** [read_header reader ~snapshot_file] reads the header from the snapshot
       file without extracting it. *)

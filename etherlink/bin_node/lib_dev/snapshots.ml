@@ -194,66 +194,90 @@ let export ?snapshot_file ~compression ~data_dir () =
   let open Lwt_result_syntax in
   let* () = Data_dir.lock ~data_dir in
   let evm_state_path = Data_dir.store_path ~data_dir in
-  let* dest_file =
-    let evm_context_files =
-      Tezos_stdlib_unix.Utils.fold_files
-        evm_state_path
-        (fun relative_path acc ->
-          let full_path = Filename.concat evm_state_path relative_path in
-          (full_path, Filename.concat "store" relative_path) :: acc)
-        []
-    in
-    let files = evm_context_files in
-    (* Export SQLite database *)
-    Lwt_utils_unix.with_tempdir ~temp_dir:data_dir ".evm_node_sqlite_export_"
-    @@ fun tmp_dir ->
-    let output_db_file = Filename.concat tmp_dir Evm_store.sqlite_file_name in
-    let* {
-           rollup_address;
-           current_number = current_level;
-           legacy_block_storage;
-           history_mode;
-           first_number = first_level;
-         } =
-      Data_dir.export_store ~data_dir ~output_db_file
-    in
-    let header =
-      if legacy_block_storage then
-        Header.(V0_legacy {rollup_address; current_level})
-      else
-        Header.(V1 {rollup_address; current_level; history_mode; first_level})
-    in
-    let files = (output_db_file, Evm_store.sqlite_file_name) :: files in
-    let writer =
-      match compression with
-      | On_the_fly -> gzip_writer
-      | No | After -> stdlib_writer
-    in
-    let snapshot_file =
-      match (snapshot_file, compression) with
-      | Some f, After -> f ^ ".uncompressed"
-      | Some f, (No | On_the_fly) -> f
-      | None, On_the_fly -> default_snapshot_file ^ ".gz"
-      | None, After -> default_snapshot_file ^ ".gz.uncompressed"
-      | None, No -> default_snapshot_file
-    in
-    let*? dest_file =
-      interpolate_snapshot_file
-        current_level
-        rollup_address
-        history_mode
-        snapshot_file
-    in
-    let*! () = Lwt_utils_unix.create_dir (Filename.dirname dest_file) in
-    create stdlib_reader writer header ~files ~dest:dest_file ;
-    return dest_file
+
+  let evm_context_files =
+    Tezos_stdlib_unix.Utils.fold_files
+      evm_state_path
+      (fun relative_path acc ->
+        let full_path = Filename.concat evm_state_path relative_path in
+        (full_path, Filename.concat "store" relative_path) :: acc)
+      []
+  in
+  let files = evm_context_files in
+  (* Export SQLite database *)
+  Lwt_utils_unix.with_tempdir ~temp_dir:data_dir ".evm_node_sqlite_export_"
+  @@ fun tmp_dir ->
+  let output_db_file = Filename.concat tmp_dir Evm_store.sqlite_file_name in
+  let* {
+         rollup_address;
+         current_number = current_level;
+         legacy_block_storage;
+         history_mode;
+         first_number = first_level;
+       } =
+    Data_dir.export_store ~data_dir ~output_db_file
+  in
+  let header =
+    if legacy_block_storage then
+      Header.(V0_legacy {rollup_address; current_level})
+    else Header.(V1 {rollup_address; current_level; history_mode; first_level})
+  in
+  let files = (output_db_file, Evm_store.sqlite_file_name) :: files in
+  let writer =
+    match compression with
+    | On_the_fly -> gzip_writer
+    | No | After -> stdlib_writer
   in
   let snapshot_file =
-    match compression with
-    | No | On_the_fly -> dest_file
-    | After -> compress ~snapshot_file:dest_file
+    match (snapshot_file, compression) with
+    | Some f, After -> f ^ ".uncompressed"
+    | Some f, (No | On_the_fly) -> f
+    | None, On_the_fly -> default_snapshot_file ^ ".gz"
+    | None, After -> default_snapshot_file ^ ".gz.uncompressed"
+    | None, No -> default_snapshot_file
   in
-  return snapshot_file
+  let*? extract_dest_file =
+    interpolate_snapshot_file
+      current_level
+      rollup_address
+      history_mode
+      snapshot_file
+  in
+  let dest_file =
+    Option.value
+      ~default:extract_dest_file
+      (Filename.chop_suffix_opt ~suffix:".uncompressed" extract_dest_file)
+  in
+  let*! () = Events.exporting_snapshot dest_file in
+  let tmp_dest = Filename.(Infix.(tmp_dir // basename extract_dest_file)) in
+  let*! () =
+    create
+      ~cancellable:true
+      ~display_progress:
+        (`Periodic_event (Events.still_exporting_snapshot dest_file))
+      stdlib_reader
+      writer
+      header
+      ~files
+      ~dest:tmp_dest
+      ()
+  in
+  let*! tmp_dest =
+    match compression with
+    | No | On_the_fly -> Lwt.return tmp_dest
+    | After ->
+        let*! () = Events.compressing_snapshot dest_file in
+        compress
+          ~cancellable:true
+          ~display_progress:
+            (`Periodic_event (Events.still_compressing_snapshot dest_file))
+          ~snapshot_file:tmp_dest
+          ()
+  in
+
+  let*! () = Lwt_utils_unix.create_dir (Filename.dirname dest_file) in
+  let*! () = Lwt_unix.rename tmp_dest dest_file in
+  return dest_file
 
 let check_snapshot_exists snapshot_file =
   let open Lwt_result_syntax in
@@ -322,7 +346,7 @@ let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
   in
   return_unit
 
-let import ~cancellable ~force ~data_dir ~snapshot_file =
+let import ~force ~data_dir ~snapshot_file =
   let open Lwt_result_syntax in
   let open Filename.Infix in
   let*! populated = Data_dir.populated ~data_dir in
@@ -345,53 +369,40 @@ let import ~cancellable ~force ~data_dir ~snapshot_file =
     else stdlib_reader
   in
 
-  let display_progress = not cancellable in
-
-  let start_time = Ptime_clock.now () in
-  let rec periodic_emit () =
-    let*! () = Lwt_unix.sleep 60.0 in
-    let elapsed_time = Ptime.diff (Ptime_clock.now ()) start_time in
-    let*! () =
-      Events.extract_snapshot_archive_in_progress
-        ~archive_name:snapshot_file
-        ~elapsed_time
-    in
-    periodic_emit ()
+  Lwt_utils_unix.with_tempdir ~temp_dir:data_dir ".octez_evm_node_import_"
+  @@ fun dest ->
+  let* _snapshot_header, () =
+    extract
+      reader
+      stdlib_writer
+      (check_header ~populated ~data_dir)
+      ~cancellable:true
+      ~display_progress:
+        (`Periodic_event
+          (fun elapsed_time ->
+            Events.extract_snapshot_archive_in_progress
+              ~archive_name:snapshot_file
+              ~elapsed_time))
+        (* [progress] modifies the signal handlers, which are necessary for
+           [Lwt_exit] to work. As a consequence, if we want to be
+           cancellable, we cannot have display bar. *)
+      ~snapshot_file
+      ~dest
   in
-  let extract_snapshot_archive =
-    Lwt_utils_unix.with_tempdir ~temp_dir:data_dir ".octez_evm_node_import_"
-    @@ fun dest ->
-    let* _snapshot_header, () =
-      extract
-        reader
-        stdlib_writer
-        (check_header ~populated ~data_dir)
-        ~cancellable
-        ~display_progress
-          (* [progress] modifies the signal handlers, which are necessary for
-             [Lwt_exit] to work. As a consequence, if we want to be
-             cancellable, we cannot have display bar. *)
-        ~snapshot_file
-        ~dest
-    in
-    Unix.rename
-      (Data_dir.store_path ~data_dir:dest)
-      (Data_dir.store_path ~data_dir) ;
-    let rm f =
-      try Unix.unlink f with Unix.Unix_error (Unix.ENOENT, _, _) -> ()
-    in
-    rm @@ (data_dir // Evm_store.sqlite_file_name) ^ "-shm" ;
-    rm @@ (data_dir // Evm_store.sqlite_file_name) ^ "-wal" ;
-    Unix.rename
-      (dest // Evm_store.sqlite_file_name)
-      (data_dir // Evm_store.sqlite_file_name) ;
-    return_unit
+  Unix.rename
+    (Data_dir.store_path ~data_dir:dest)
+    (Data_dir.store_path ~data_dir) ;
+  let rm f =
+    try Unix.unlink f with Unix.Unix_error (Unix.ENOENT, _, _) -> ()
   in
-  if display_progress then extract_snapshot_archive
-  else Lwt.pick [extract_snapshot_archive; periodic_emit ()]
+  rm @@ (data_dir // Evm_store.sqlite_file_name) ^ "-shm" ;
+  rm @@ (data_dir // Evm_store.sqlite_file_name) ^ "-wal" ;
+  Unix.rename
+    (dest // Evm_store.sqlite_file_name)
+    (data_dir // Evm_store.sqlite_file_name) ;
+  return_unit
 
-let import_from ~cancellable ~force ~keep_alive ~data_dir ~download_path
-    ~snapshot_file () =
+let import_from ~force ~keep_alive ~data_dir ~download_path ~snapshot_file () =
   let open Lwt_result_syntax in
   let with_snapshot k =
     if
@@ -409,7 +420,7 @@ let import_from ~cancellable ~force ~keep_alive ~data_dir ~download_path
   Data_dir.use ~data_dir @@ fun () ->
   with_snapshot @@ fun snapshot_file ->
   let*! () = Events.importing_snapshot () in
-  import ~cancellable ~force ~data_dir ~snapshot_file
+  import ~force ~data_dir ~snapshot_file
 
 let info ~snapshot_file =
   let compressed = is_compressed_snapshot snapshot_file in

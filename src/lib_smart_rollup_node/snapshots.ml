@@ -650,7 +650,7 @@ let post_export_checks ~snapshot_file =
       reader
       stdlib_writer
       (fun _ -> return_unit)
-      ~display_progress:true
+      ~display_progress:`Bar
       ~cancellable:false
       ~snapshot_file
       ~dest
@@ -779,16 +779,27 @@ let export_dir (header : Header.t) ~unlock ~compression ~data_dir ~dest
         | On_the_fly -> gzip_writer
         | No | After -> stdlib_writer
       in
-      create stdlib_reader writer header ~files ~dest:dest_file ;
+      let*! () =
+        create
+          stdlib_reader
+          writer
+          header
+          ~files
+          ~display_progress:`Bar
+          ~cancellable:false
+          ~dest:dest_file
+          ()
+      in
       return_unit
     in
     return dest_file
   in
   let*! () = unlock () in
-  let snapshot_file =
+  let*! snapshot_file =
     match compression with
-    | No | On_the_fly -> snapshot_file
-    | After -> compress ~snapshot_file
+    | No | On_the_fly -> Lwt.return snapshot_file
+    | After ->
+        compress ~cancellable:false ~display_progress:`Bar ~snapshot_file ()
   in
   return snapshot_file
 
@@ -988,7 +999,7 @@ let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
       reader
       stdlib_writer
       (pre_import_checks cctxt ~no_checks ~data_dir)
-      ~display_progress:true
+      ~display_progress:`Bar
       ~cancellable:false
       ~snapshot_file
       ~dest:data_dir
