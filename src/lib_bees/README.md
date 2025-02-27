@@ -1,7 +1,7 @@
 # Workers
 <!-- Summary line: One sentence about this component. -->
 
-The workers library: an event-driven task management abstraction somewhat akin
+The bees library: an event-driven task management abstraction somewhat akin
 to actors.
 
 ## API Documentation
@@ -10,7 +10,7 @@ to actors.
 -->
 
 The API documentation is available online:
-<https://tezos.gitlab.io/api/odoc/_html/octez-libs/tezos_workers.html>
+<https://tezos.gitlab.io/api/odoc/_html/octez-libs/Tezos_bees/index.html>
 
 
 ## Overview
