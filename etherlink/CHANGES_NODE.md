@@ -22,6 +22,11 @@
 
 ### RPCs changes
 
+- **experimental feature** With the `tx_queue` feature enable in an
+  observer node, the RPC `eth_getTransactionByhash` returns the
+  transaction found in the `tx_queue`, it also works for transaction
+  that have been already forwarded to the upstream node. (!!16829)
+
 ### Metrics changes
 
 ### Execution changes

@@ -570,7 +570,11 @@ let dispatch_request (rpc : Configuration.rpc)
         | Get_transaction_by_hash.Method ->
             let f tx_hash =
               let* transaction_object =
-                let* transaction_object = Tx_pool.find tx_hash in
+                if Configuration.is_tx_queue_enabled config then
+                  Tx_queue.find tx_hash
+                else Tx_pool.find tx_hash
+              in
+              let* transaction_object =
                 match transaction_object with
                 | Some transaction_object ->
                     (* TODO: https://gitlab.com/tezos/tezos/-/issues/7747
