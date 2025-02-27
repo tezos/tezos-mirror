@@ -2067,7 +2067,7 @@ let octez_crypto_dal =
 
 let _octez_crypto_dal_tests =
   tezt
-    ["test_dal_cryptobox"]
+    ["test_dal_cryptobox"; "test_trap"]
     ~path:"src/lib_crypto_dal/test"
     ~opam:"octez-libs"
     ~dep_files:["srs_zcash_g1_5"; "srs_zcash_g2_5"]
@@ -2081,7 +2081,8 @@ let _octez_crypto_dal_tests =
         alcotezt;
         qcheck_alcotest;
         octez_bls12_381_polynomial;
-        octez_test_helpers;
+        octez_base_test_helpers |> open_;
+        octez_base |> open_ ~m:"TzPervasives";
       ]
 
 let ppx_brassaia =
