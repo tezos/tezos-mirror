@@ -9,7 +9,7 @@ Summary
 
 Version 22 introduces the following changes or new features:
   (1) Support of the **Rio Protocol proposal** (See :ref:`the protocol support section <protocol_support_v22>`)
-  (2) Source code is compiled with **OCaml 5 compiler** (See :ref:`the compiler version section <compiler_version_v22>`)
+  (2) Source code is compiled with the **OCaml 5 compiler** (See :ref:`the compiler version section <compiler_version_v22>`)
   (3) The baker requires an endpoint of a running DAL node or the ``--without-dal`` option to start. (See :ref:`the DAL node section <dal_node_v22>`)
   (4) The default :doc:`history mode <../user/history_modes>` is now ``Rolling`` instead of ``Full``.
   (5) **New experimental agnostic baker executable**. (See :ref:`the experimental agnostic baker section <agnostic_baker_v22>`)
@@ -32,8 +32,8 @@ Starting from Octez version 22, the source code can be compiled with version 5 o
 
 .. _dal_node_v22:
 
-DAL Node
-~~~~~~~~
+DAL operations and Bakers
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The baker option ``--without-dal``, introduced in :doc:`Octez-v21.3 <version-21>`, is now **mandatory** if not providing an endpoint of a DAL node.
 
@@ -51,7 +51,7 @@ The Agnostic Baker is a protocol-independent binary that dynamically determines 
 It continuously monitors the blockchain state and automatically transitions to the correct binary whenever
 a new protocol is detected by the node, such as during migrations or at startup.
 
-The v22 agnostic is **EXPERIMENTAL ONLY** and should **NOT** be used on ``mainnet``.
+The v22 agnostic baker is **EXPERIMENTAL ONLY** and should **NOT** be used on ``mainnet``.
 You can use the agnostic baker on test networks and give feedback.
 
 You can find more information on the agnostic baker in the corresponding :src:`README <src/bin_agnostic_baker/README.md>` file.
@@ -97,7 +97,7 @@ Packages
 In Octez v22, the new set of packages, that was introduced in the previous version of Octez, **replaces** the old one in the APT repository. Check :ref:`the documentation <installing_packages>` for more details.
 
 Therefore, upgrading to the new packages is done as usual with ``apt``.
-Note however that the handling of Zcash parameters is done automatically in the new packages, hence the need to overwrite the old settings::
+Note however that the Zcash parameters are in a different package now, which needs to overwrite files from the old package::
 
     $ sudo apt update
     $ sudo apt upgrade octez-baker -o DPkg::options::="--force-overwrite"
