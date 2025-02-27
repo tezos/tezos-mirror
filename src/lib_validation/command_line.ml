@@ -37,10 +37,9 @@ let parse_args () =
                      (Format.sprintf "File '%s' is not a valid directory" s))
               else socket_dir := Some s),
           {|<dir>
-      When provided, the validator will communicate through a socket located
+      The validator will communicate through a socket located
       at '<dir>/tezos-validation-socket-<pid>' where <pid> is the
-      tezos-validator's process identifier. By default, the validator will
-      communicate through its standard input and output.|}
+      tezos-validator's process identifier.|}
         );
         ( "--version",
           Unit
@@ -59,11 +58,13 @@ let parse_args () =
     args
     (fun s -> raise (Arg.Bad (Format.sprintf "Unexpected argument: %s" s)))
     usage_msg ;
-  !socket_dir
+  match !socket_dir with
+  | Some s -> s
+  | None -> raise (Arg.Bad (Format.sprintf "please provide --socket-dir"))
 
 let run () =
   let socket_dir = parse_args () in
-  let main_promise = External_validator.main ?socket_dir () in
+  let main_promise = External_validator.main ~socket_dir in
   Stdlib.exit
     (let open Lwt_syntax in
      Lwt.Exception_filter.(set handle_all_except_runtime) ;
