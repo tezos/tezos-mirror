@@ -28,10 +28,6 @@ type t = {
   trigger_shutdown : unit Lwt.u;
 }
 
-let zero () =
-  let shutdown, trigger_shutdown = Lwt.task () in
-  {tasks = []; shutdown; trigger_shutdown}
-
 let validate_time s =
   let in_range ~v (min, max) =
     Option.fold ~none:true ~some:(fun v -> v >= min && v <= max) v

@@ -10,9 +10,6 @@
 (** The scheduler *)
 type t
 
-(** Create an empty chronos scheduler *)
-val zero : unit -> t
-
 (** [register t ~time ~action] adds a new task to the scheduler.
 
     The time format follows the standard cron syntax with five
