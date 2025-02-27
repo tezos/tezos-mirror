@@ -9,7 +9,7 @@ use crate::{
     parser::{
         XRegisterParsed,
         instruction::{
-            CIBTypeArgs, CRTypeArgs, InstrWidth, NonZeroRdITypeArgs, NonZeroRdRTypeArgs,
+            CIBTypeArgs, CRTypeArgs, ITypeArgs, InstrWidth, NonZeroRdITypeArgs, NonZeroRdRTypeArgs,
             SBTypeArgs, SplitITypeArgs, UJTypeArgs,
         },
         split_x0,
@@ -440,6 +440,88 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::JAbsolute`].
+    pub(crate) fn new_j_absolute(imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::JAbsolute,
+            args: Args {
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::JalrImm`].
+    pub(crate) fn new_jalr_imm(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::JalrImm,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::JalrAbsolute`].
+    pub(crate) fn new_jalr_absolute(rd: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::JalrAbsolute,
+            args: Args {
+                rd: rd.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::JrImm`].
+    pub(crate) fn new_jr_imm(rs1: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::JrImm,
+            args: Args {
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Jr`].
+    pub(crate) fn new_jr(rs1: NonZeroXRegister, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Jr,
+            args: Args {
+                rs1: rs1.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Jalr`].
+    pub(crate) fn new_jalr(rd: NonZeroXRegister, rs1: NonZeroXRegister, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Jalr,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {
@@ -858,6 +940,38 @@ impl Instruction {
             // If `rd_rs1 == x0`, this will never branch.
             X::X0 => Instruction::new_nop(InstrWidth::Compressed),
             X::NonZero(rd_rs1) => Instruction::new_bnez(rd_rs1, args.imm, InstrWidth::Compressed),
+        }
+    }
+
+    /// Convert [`InstrCacheable::Jalr`] according to whether registers and imm are non-zero.
+    ///
+    /// [`InstrCacheable::Jalr`]: crate::parser::instruction::InstrCacheable::Jalr
+    pub(super) fn from_ic_jalr(args: &ITypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rd), split_x0(args.rs1), args.imm) {
+            // if rd and rs1 are x0, the only effect is an unconditional jump to the absolute address `imm`.
+            (X::X0, X::X0, imm) => Instruction::new_j_absolute(imm, InstrWidth::Uncompressed),
+            // if rd is x0 and imm is 0, the only effect is an unconditional jump to the address stored in rs1.
+            (X::X0, X::NonZero(rs1), 0) => Instruction::new_jr(rs1, InstrWidth::Uncompressed),
+            // if rd is x0 and imm is non-zero, the only effect is an unconditional jump to the address stored in rs1 + imm.
+            (X::X0, X::NonZero(rs1), imm) => {
+                Instruction::new_jr_imm(rs1, imm, InstrWidth::Uncompressed)
+            }
+            // if rd is non-x0 and imm is 0, the effect is a jump to the absolute address `imm`
+            // and storing `pc + 4` in the register `rd`.
+            (X::NonZero(rd), X::X0, imm) => {
+                Instruction::new_jalr_absolute(rd, imm, InstrWidth::Uncompressed)
+            }
+            // if rd and rs1 are non-x0 and imm is 0, the effect is a jump to the address stored in rs1
+            // and storing `pc + 4` in the register `rd`.
+            (X::NonZero(rd), X::NonZero(rs1), 0) => {
+                Instruction::new_jalr(rd, rs1, InstrWidth::Uncompressed)
+            }
+            // if all non-zero, the effect is a jump to the address stored in rs1 + imm
+            // and storing `pc + 4` in the register `rd`.
+            (X::NonZero(rd), X::NonZero(rs1), imm) => {
+                Instruction::new_jalr_imm(rd, rs1, imm, InstrWidth::Uncompressed)
+            }
         }
     }
 }

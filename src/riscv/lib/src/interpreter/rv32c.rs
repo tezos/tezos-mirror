@@ -36,29 +36,39 @@ where
         current_pc.wrapping_add(imm as u64)
     }
 
-    /// `C.JR` CR-type compressed instruction
-    ///
     /// Performs an unconditional control transfer to the address in register `rs1`.
-    pub fn run_cjr(&mut self, rs1: NonZeroXRegister) -> Address {
+    ///
+    /// Relevant RISC-V opcodes:
+    /// - JALR
+    /// - C.JR
+    pub fn run_jr(&mut self, rs1: NonZeroXRegister) -> Address {
         // The target address is obtained by setting the
         // least-significant bit of the address in rs1 to zero
         self.xregisters.read_nz(rs1) & !1
     }
 
-    /// `C.JALR` CR-type compressed instruction
+    /// Writes the address of the instruction following the jump (pc+2) to `rd`.
+    /// Jumps to the target address `val(rs1)`.
     ///
-    /// Performs the same operation as `C.JR`, but additionally writes the
-    /// address of the instruction following the jump (pc+2) to the
-    /// link register (`x1`).
-    pub fn run_cjalr(&mut self, rs1: NonZeroXRegister) -> Address {
+    /// Relevant RISC-V opcodes:
+    /// - JALR
+    /// - C.JALR
+    pub fn run_jalr(
+        &mut self,
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        width: InstrWidth,
+    ) -> Address {
         // The return address to be saved in rd is the next instruction after this one.
-        let return_address = self.pc.read().wrapping_add(InstrWidth::Compressed as u64);
-        self.xregisters
-            .write_nz(NonZeroXRegister::x1, return_address);
+        let return_address = self.pc.read().wrapping_add(width as u64);
 
         // The target address is obtained by setting the
         // least-significant bit of the address in rs1 to zero
-        self.xregisters.read_nz(rs1) & !1
+        let target_address = self.xregisters.read_nz(rs1) & !1;
+
+        self.xregisters.write_nz(rd, return_address);
+
+        target_address
     }
 
     /// Performs a conditional ( val(`rs1`) == 0 ) control transfer.
@@ -226,7 +236,7 @@ mod tests {
             // save program counter and value for rs1.
             state.pc.write(init_pc);
             state.xregisters.write_nz(rs1, init_rs1);
-            let new_pc = state.run_cjalr(rs1);
+            let new_pc = state.run_jalr(nz::ra, rs1, InstrWidth::Compressed);
 
             // check the program counter hasn't changed, the returned
             // value for the program counter is correct, and that the link
@@ -239,7 +249,7 @@ mod tests {
             // save program counter and value for rs1.
             state.pc.write(init_pc);
             state.xregisters.write_nz(rs1, init_rs1);
-            let new_pc = state.run_cjr(rs1);
+            let new_pc = state.run_jr(rs1);
 
             // check the program counter hasn't changed and the returned
             // value for the program counter is correct.

@@ -333,13 +333,12 @@ pub enum ArgsShape {
 pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
     use OpCode::*;
     match opcode {
-        Lb | Lh | Lw | Lbu | Lhu | Lwu | Ld | Sb | Sh | Sw | Sd | Blt | Bge | Bltu | Bgeu
-        | Jalr | Lrw | Scw | Amoswapw | Amoaddw | Amoxorw | Amoandw | Amoorw | Amominw
-        | Amomaxw | Amominuw | Amomaxuw | Lrd | Scd | Amoswapd | Amoaddd | Amoxord | Amoandd
-        | Amoord | Amomind | Amomaxd | Amominud | Amomaxud | Rem | Remu | Remw | Remuw | Div
-        | Divu | Divw | Divuw | Mul | Mulh | Mulhsu | Mulhu | Mulw | Csrrw | Csrrs | Csrrc
-        | Csrrwi | Csrrsi | Csrrci | CLw | CSw | CSwsp | CAddw | CSubw | CLd | CSd | CSdsp
-        | Unknown => ArgsShape::XSrcXDest,
+        Lb | Lh | Lw | Lbu | Lhu | Lwu | Ld | Sb | Sh | Sw | Sd | Blt | Bge | Bltu | Bgeu | Lrw
+        | Scw | Amoswapw | Amoaddw | Amoxorw | Amoandw | Amoorw | Amominw | Amomaxw | Amominuw
+        | Amomaxuw | Lrd | Scd | Amoswapd | Amoaddd | Amoxord | Amoandd | Amoord | Amomind
+        | Amomaxd | Amominud | Amomaxud | Rem | Remu | Remw | Remuw | Div | Divu | Divw | Divuw
+        | Mul | Mulh | Mulhsu | Mulhu | Mulw | Csrrw | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci
+        | CLw | CSw | CSwsp | CAddw | CSubw | CLd | CSd | CSdsp | Unknown => ArgsShape::XSrcXDest,
 
         Fadds | Fsubs | Fmuls | Fdivs | Fsqrts | Fmins | Fmaxs | Fsgnjs | Fsgnjns | Fsgnjxs
         | Fmadds | Fmsubs | Fnmsubs | Fnmadds | Faddd | Fsubd | Fmuld | Fdivd | Fsqrtd | Fmind
@@ -355,8 +354,8 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         Fsw | Fsd | CFsd | CFsdsp => ArgsShape::XSrcFSrc,
 
         Addi | Andi | Ori | Xori | Slli | Srli | Srai | Add | Sub | Mv | Neg | And | Or | Xor
-        | Sll | Srl | Sra | Jal | J | CJr | CJalr | CAddiw | Li | CLdsp | CLwsp | Nop | Beq
-        | Beqz | Bne | Bnez => ArgsShape::NZXSrcNZXDest,
+        | Sll | Srl | Sra | Jal | J | JrImm | JAbsolute | JalrAbsolute | Jr | Jalr | CAddiw
+        | Li | CLdsp | CLwsp | Nop | Beq | Beqz | Bne | Bnez | JalrImm => ArgsShape::NZXSrcNZXDest,
 
         Addiw | Addw | Subw | Sllw | Srlw | Sraw | Slti | Sltiu | Slliw | Srliw | Sraiw | Slt
         | Sltu | Auipc => ArgsShape::XSrcNZXDest,
@@ -450,7 +449,7 @@ mod tests {
         assert_eq!(instr_xsrc_fsrc, instr_xsrc_fsrc_de);
 
         let instr_nzxsrc_nzxdest = Instruction {
-            opcode: OpCode::CJr,
+            opcode: OpCode::Jr,
             args: Args {
                 rs1: NonZeroXRegister::x2.into(),
                 ..Args::DEFAULT

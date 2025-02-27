@@ -695,7 +695,7 @@ mod tests {
             },
             memory::{self, M1K, M1M, M8K, Memory},
             mode::Mode,
-            registers::{a0, a1, a2, nz, t0, t1, t2, zero},
+            registers::{a0, a1, a2, nz, t0, t1, t2},
         },
         parser::{
             XRegisterParsed::*,
@@ -1450,12 +1450,10 @@ mod tests {
             })
             .unwrap(),
             Instruction::try_from(TaggedInstruction {
-                opcode: OpCode::Jalr,
+                opcode: OpCode::Jr,
                 args: TaggedArgs {
-                    rd: zero.into(),
-                    rs1: a0.into(),
-                    imm: 0,
-                    rs2: TaggedRegister::X(XRegister::x1),
+                    rd: nz::ra.into(),
+                    rs1: nz::a0.into(),
                     ..TaggedArgs::DEFAULT
                 },
             })
