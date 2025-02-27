@@ -634,25 +634,6 @@ module Helpers = struct
     assert (String.length slot = slot_size) ;
     slot
 
-  let pp_cryptobox_error fmt = function
-    | `Fail message -> Format.fprintf fmt "Fail: %s" message
-    | `Not_enough_shards message ->
-        Format.fprintf fmt "Not enough shards: %s" message
-    | `Shard_index_out_of_range message ->
-        Format.fprintf fmt "Shard index out of range: %s" message
-    | `Invalid_shard_length message ->
-        Format.fprintf fmt "Invalid shard length: %s" message
-    | `Invalid_page -> Format.fprintf fmt "Invalid page"
-    | `Page_index_out_of_range -> Format.fprintf fmt "Page index out of range"
-    | `Invalid_degree_strictly_less_than_expected _ ->
-        Format.fprintf fmt "Invalid degree strictly less than expected"
-    | `Page_length_mismatch -> Format.fprintf fmt "Page length mismatch"
-    | `Slot_wrong_size message ->
-        Format.fprintf fmt "Slot wrong size: %s" message
-    | `Prover_SRS_not_loaded -> Format.fprintf fmt "Prover SRS not loaded"
-    | `Shard_length_mismatch -> Format.fprintf fmt "Shard length mismatch"
-    | `Invalid_shard -> Format.fprintf fmt "Invalid shard"
-
   let make_cryptobox
       ?(on_error =
         fun msg -> Test.fail "Dal_common.make: Unexpected error: %s" msg)
@@ -686,34 +667,20 @@ module Helpers = struct
           e
     | Ok () -> unit
 
-  let generate_slot ~slot_size =
-    Bytes.init slot_size (fun _ ->
-        let x = Random.int 26 in
-        Char.chr (x + Char.code 'a'))
-
   let get_commitment_and_shards_with_proofs cryptobox ~slot =
-    let open Cryptobox in
-    let ( let*? ) x f =
-      match x with
-      | Error err -> Test.fail "Unexpected error:@.%a@." pp_cryptobox_error err
-      | Ok x -> f x
+    let res =
+      Tezos_crypto_dal.Cryptobox.Internal_for_tests
+      .get_commitment_and_shards_with_proofs
+        cryptobox
+        ~slot
     in
-    let*? precomputation = precompute_shards_proofs cryptobox in
-    let*? polynomial = polynomial_from_slot cryptobox slot in
-    let shards = shards_from_polynomial cryptobox polynomial in
-    let shard_proofs =
-      prove_shards cryptobox ~precomputation ~polynomial |> Array.to_seq
-    in
-    let*? commitment = commit cryptobox polynomial in
-    let*? commitment_proof = prove_commitment cryptobox polynomial in
-    let shards =
-      Seq.fold_left2
-        (fun seq shard proof -> Seq.cons (shard, proof) seq)
-        Seq.empty
-        shards
-        shard_proofs
-    in
-    (commitment, commitment_proof, shards)
+    match res with
+    | Error err ->
+        Test.fail
+          "Unexpected error:@.%a@."
+          Tezos_crypto_dal.Cryptobox.pp_error
+          err
+    | Ok v -> v
 
   let publish_commitment ?dont_wait ?counter ?force ?source ?fee ?error ~index
       ~commitment ~proof client =

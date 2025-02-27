@@ -1100,6 +1100,24 @@ end
 include Inner
 module Verifier = Inner
 
+let pp_error fmt = function
+  | `Fail message -> Format.fprintf fmt "Fail: %s" message
+  | `Not_enough_shards message ->
+      Format.fprintf fmt "Not enough shards: %s" message
+  | `Shard_index_out_of_range message ->
+      Format.fprintf fmt "Shard index out of range: %s" message
+  | `Invalid_shard_length message ->
+      Format.fprintf fmt "Invalid shard length: %s" message
+  | `Invalid_page -> Format.fprintf fmt "Invalid page"
+  | `Page_index_out_of_range -> Format.fprintf fmt "Page index out of range"
+  | `Invalid_degree_strictly_less_than_expected _ ->
+      Format.fprintf fmt "Invalid degree strictly less than expected"
+  | `Page_length_mismatch -> Format.fprintf fmt "Page length mismatch"
+  | `Slot_wrong_size message -> Format.fprintf fmt "Slot wrong size: %s" message
+  | `Prover_SRS_not_loaded -> Format.fprintf fmt "Prover SRS not loaded"
+  | `Shard_length_mismatch -> Format.fprintf fmt "Shard length mismatch"
+  | `Invalid_shard -> Format.fprintf fmt "Invalid shard"
+
 module Internal_for_tests = struct
   let parameters_initialisation () =
     Prover
@@ -1201,6 +1219,30 @@ module Internal_for_tests = struct
     | _ -> false
 
   let slot_as_polynomial_length = Parameters_check.slot_as_polynomial_length
+
+  let generate_slot ~slot_size =
+    Bytes.init slot_size (fun _ ->
+        let x = Random.int 26 in
+        Char.chr (x + Char.code 'a'))
+
+  let get_commitment_and_shards_with_proofs cryptobox ~slot =
+    let open Result_syntax in
+    let* precomputation = precompute_shards_proofs cryptobox in
+    let* polynomial = polynomial_from_slot cryptobox slot in
+    let shards = shards_from_polynomial cryptobox polynomial in
+    let shard_proofs =
+      prove_shards cryptobox ~precomputation ~polynomial |> Array.to_seq
+    in
+    let* commitment = commit cryptobox polynomial in
+    let* commitment_proof = prove_commitment cryptobox polynomial in
+    let shards =
+      Seq.fold_left2
+        (fun seq shard proof -> Seq.cons (shard, proof) seq)
+        Seq.empty
+        shards
+        shard_proofs
+    in
+    return (commitment, commitment_proof, shards)
 end
 
 let init_prover_dal ~find_srs_files ?(srs_size_log2 = 21) ~fetch_trusted_setup

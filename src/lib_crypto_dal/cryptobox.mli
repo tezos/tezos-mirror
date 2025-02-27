@@ -574,6 +574,22 @@ module Internal_for_tests : sig
     parameters -> (unit, [> `Fail of string]) result
 
   val slot_as_polynomial_length : slot_size:int -> page_size:int -> int
+
+  (** Generates a random string (with chars from 'a' to 'z') of size
+      [slot_size]. *)
+  val generate_slot : slot_size:int -> bytes
+
+  (** Given a slot, it returns the slot's commitment, its proof, and the shards
+      and their proof. *)
+  val get_commitment_and_shards_with_proofs :
+    t ->
+    slot:bytes ->
+    ( commitment * commitment_proof * (shard * shard_proof) Seq.t,
+      [> `Invalid_degree_strictly_less_than_expected of
+         (int, int) error_container
+      | `Prover_SRS_not_loaded
+      | `Slot_wrong_size of string ] )
+    result
 end
 
 (** [init_prover_dal ~find_srs_files ?(srs_size_log2=21) ~fetch_trusted_setup ()]
@@ -588,6 +604,22 @@ val init_prover_dal :
   fetch_trusted_setup:bool ->
   unit ->
   unit Error_monad.tzresult Lwt.t
+
+val pp_error :
+  Format.formatter ->
+  [ `Fail of string
+  | `Invalid_degree_strictly_less_than_expected of 'a
+  | `Invalid_page
+  | `Invalid_shard_length of string
+  | `Not_enough_shards of string
+  | `Page_index_out_of_range
+  | `Page_length_mismatch
+  | `Shard_index_out_of_range of string
+  | `Slot_wrong_size of string
+  | `Shard_length_mismatch
+  | `Prover_SRS_not_loaded
+  | `Invalid_shard ] ->
+  unit
 
 (** node parameters for the DAL. *)
 module Config : sig

@@ -101,10 +101,6 @@ module Helpers : sig
      mode. *)
   val init_prover : ?__LOC__:string -> unit -> unit Lwt.t
 
-  (** Generates a random string (with chars from 'a' to 'z') of size
-      [slot_size]. *)
-  val generate_slot : slot_size:int -> bytes
-
   val get_commitment_and_shards_with_proofs :
     Cryptobox.t ->
     slot:bytes ->
@@ -147,22 +143,6 @@ module Helpers : sig
     index:int ->
     slot ->
     string Lwt.t
-
-  val pp_cryptobox_error :
-    Format.formatter ->
-    [ `Fail of string
-    | `Invalid_degree_strictly_less_than_expected of 'a
-    | `Invalid_page
-    | `Invalid_shard_length of string
-    | `Not_enough_shards of string
-    | `Page_index_out_of_range
-    | `Page_length_mismatch
-    | `Shard_index_out_of_range of string
-    | `Slot_wrong_size of string
-    | `Shard_length_mismatch
-    | `Prover_SRS_not_loaded
-    | `Invalid_shard ] ->
-    unit
 
   (** Wait for a connection event between [main_node] and
     [other_node]. The optional argument [other_peer_id] can be used to
