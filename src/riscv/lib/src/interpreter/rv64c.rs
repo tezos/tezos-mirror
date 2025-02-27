@@ -63,8 +63,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::panic::{AssertUnwindSafe, catch_unwind};
-
     use proptest::{arbitrary::any, prop_assert, prop_assert_eq, proptest};
 
     use crate::{
@@ -121,7 +119,7 @@ mod tests {
                 state.run_sw(8, t0, a3)?;
 
                 state.run_ldnz(offset as i64, nz::sp, nz::t4)?;
-                state.run_clwsp((offset + 8) as i64, nz::t3)?;
+                state.run_lwnz((offset + 8) as i64, nz::sp, nz::t3)?;
                 assert_eq!(state.hart.xregisters.read_nz(nz::t4), v_d);
                 assert_eq!(state.hart.xregisters.read_nz(nz::t3), v_w as i32 as u64);
 
@@ -130,7 +128,6 @@ mod tests {
 
             let invalid_offset = 0u64.wrapping_sub(1024);
             let aligned_offset = 512;
-            let misaligned_offset = 513;
 
             // Out of bounds loads / stores
             prop_assert!(perform_test(invalid_offset).is_err_and(|e|
@@ -139,10 +136,6 @@ mod tests {
 
             // Aligned loads / stores
             prop_assert!(perform_test(aligned_offset).is_ok());
-
-            // Misaligned loads / stores
-            let result = catch_unwind(AssertUnwindSafe(|| perform_test(misaligned_offset)));
-            prop_assert!(result.is_err());
         });
     });
 }

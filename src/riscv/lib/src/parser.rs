@@ -1223,9 +1223,9 @@ const fn parse_compressed_instruction_inner(instr: u16) -> Instr {
                     imm,
                 }),
             },
-            C_F3_2 => CLw(ITypeArgs {
-                rd: c_rdp_rs2p(instr),
-                rs1: c_rs1p(instr),
+            C_F3_2 => CLw(NonZeroITypeArgs {
+                rd: c_rdp_rs2p_nz(instr),
+                rs1: c_rs1p_nz(instr),
                 imm: clw_imm(instr),
             }),
             C_F3_3 => CLd(NonZeroITypeArgs {

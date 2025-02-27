@@ -351,6 +351,8 @@ pub enum InstrCacheable {
     Sltiu(NonZeroRdITypeArgs),
     Lb(ITypeArgs),
     Lh(ITypeArgs),
+    /// `LW` - Loads a word (4 bytes) starting from address given by: val(rs1) + imm
+    /// NOTE: For RV64I the value is sign-extended to 64 bits.
     Lw(ITypeArgs),
     Lbu(ITypeArgs),
     Lhu(ITypeArgs),
@@ -515,7 +517,18 @@ pub enum InstrCacheable {
     Csrrci(CsriArgs),
 
     // RV32C compressed instructions
-    CLw(ITypeArgs),
+    /// `C.LW` - Loads a 32-bit value from memory into register `rd`. It computes
+    /// an effective address by adding the immediate to the base address
+    /// in register `rs1`.
+    ///
+    /// The immediate is obtained by zero-extending and scaling by 4 the
+    /// offset encoded in the instruction (see U:C-16.3).
+    CLw(NonZeroITypeArgs),
+    /// `C.LWSP` - Loads a 32-bit value from memory into register `rd`. It computes
+    /// an effective address by adding the immediate to the stack pointer.
+    ///
+    /// The immediate is obtained by zero-extending and scaling by 4 the
+    /// offset encoded in the instruction (see U:C-16.3).
     CLwsp(CIBNZTypeArgs),
     CSw(SBTypeArgs),
     CSwsp(CSSTypeArgs),
