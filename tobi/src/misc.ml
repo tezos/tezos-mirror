@@ -49,6 +49,10 @@ let unit = Ok ()
 
 let ( let* ) r f = match r with Ok x -> f x | Error _ as e -> e
 
+let wrap_errors context = function
+  | Ok _ as x -> x
+  | Error {code; message} -> Error {code; message = context :: message}
+
 let iter_r (type e) iter container f =
   let exception E of e error in
   try
@@ -69,3 +73,53 @@ let list_map_r list f =
         list_map_r ~acc:(new_head :: acc) tail f
   in
   list_map_r list f
+
+module PP = struct
+  type t =
+    | Bool of bool
+    | Char of char
+    | Int of int
+    | Float of float
+    | String of string
+    | List of t list
+    | Variant of string * t list
+    | Tuple of t list
+    | Record of (string * t) list
+
+  let rec pp context_requires_parentheses fmt value =
+    let pp_par = pp true in
+    let pp = pp false in
+    let fp x = Format.fprintf fmt x in
+    match value with
+    | Bool b -> fp "%b" b
+    | Char c -> fp "%C" c
+    | Int i -> fp "%d" i
+    | Float f -> fp "%g" f
+    | String s -> fp "%S" s
+    | List [] -> fp "[]"
+    | List [item] -> fp "[ %a ]" pp item
+    | List (head :: tail) ->
+        fp "@[@[<hv 2>[@ %a" pp head ;
+        List.iter (fp ";@ %a" pp) tail ;
+        fp "@]@ ]@]"
+    | Variant (name, []) -> fp "%s" name
+    | Variant (name, items) ->
+        if context_requires_parentheses then
+          fp "@[<hov 2>(%s@ %a)@]" name pp (Tuple items)
+        else fp "@[<hov 2>%s@ %a@]" name pp (Tuple items)
+    | Tuple [] -> fp "()"
+    | Tuple [item] -> pp_par fmt item
+    | Tuple (head :: tail) ->
+        fp "@[<hov 2>(%a" pp head ;
+        List.iter (fp ",@ %a" pp) tail ;
+        fp ")@]"
+    | Record [] -> fp "{}"
+    | Record [(k, v)] -> fp "@[<hov 2>{ %s =@ %a }@]" k pp v
+    | Record (head :: tail) ->
+        let pp_item _fmt (k, v) = fp "@[<hov 2>%s =@ %a@]" k pp v in
+        fp "@[@[<hv 2>{@ %a" pp_item head ;
+        List.iter (fp ";@ %a" pp_item) tail ;
+        fp "@]@ }@]"
+
+  let pp = pp false
+end

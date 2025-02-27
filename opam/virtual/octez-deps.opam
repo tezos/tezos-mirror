@@ -81,6 +81,7 @@ depends: [
   "ocamlgraph"
   "ocp-ocamlres" { >= "0.4" }
   "ocplib-endian"
+  "opam-file-format" { >= "2.1.6" }
   "opentelemetry"
   "optint"
   "ppx_deriving"

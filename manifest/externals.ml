@@ -204,6 +204,8 @@ let ocplib_endian_bigstring =
 let ocplib_ocamlres =
   external_lib ~opam:"ocp-ocamlres" "ocplib-ocamlres" V.(at_least "0.4")
 
+let opam_file_format = external_lib "opam-file-format" V.(at_least "2.1.6")
+
 let opentelemetry = external_lib "opentelemetry" V.True
 
 let opentelemetry_lwt = external_lib "opentelemetry-lwt" V.True
