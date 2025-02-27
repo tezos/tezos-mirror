@@ -12,8 +12,8 @@ use crate::blueprint_storage::{
     drop_blueprint, read_blueprint, read_current_block_header,
     store_current_block_header, BlockHeader, BlueprintHeader, EVMBlockHeader,
 };
+use crate::chains::EvmLimits;
 use crate::configuration::ConfigurationMode;
-use crate::configuration::EvmLimits;
 use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
 use crate::event::Event;

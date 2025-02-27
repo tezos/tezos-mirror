@@ -200,7 +200,8 @@ pub fn fetch_blueprints<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use crate::{
-        configuration::{ChainConfig, EvmLimits},
+        chains::EvmLimits,
+        configuration::ChainConfig,
         dal_slot_import_signal::{
             DalSlotImportSignals, DalSlotIndicesList, DalSlotIndicesOfLevel,
             UnsignedDalSlotSignals,

@@ -5,7 +5,7 @@
 
 use crate::{
     blueprint_storage::DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS,
-    chains::ChainFamily,
+    chains::{ChainFamily, EvmLimits},
     delayed_inbox::DelayedInbox,
     fees::MINIMUM_BASE_FEE_PER_GAS,
     retrieve_minimum_base_fee_per_gas,
@@ -102,20 +102,6 @@ impl ChainConfig {
             chain_id,
             chain_family: ChainFamily::Evm,
             evm_configuration,
-        }
-    }
-}
-
-pub struct EvmLimits {
-    pub maximum_gas_limit: u64,
-    pub minimum_base_fee_per_gas: U256,
-}
-
-impl Default for EvmLimits {
-    fn default() -> Self {
-        Self {
-            maximum_gas_limit: MAXIMUM_GAS_LIMIT,
-            minimum_base_fee_per_gas: MINIMUM_BASE_FEE_PER_GAS.into(),
         }
     }
 }

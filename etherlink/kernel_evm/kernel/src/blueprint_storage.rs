@@ -640,9 +640,8 @@ mod tests {
 
     use super::*;
     use crate::block::GENESIS_PARENT_HASH;
-    use crate::configuration::{
-        ChainConfig, DalConfiguration, EvmLimits, TezosContracts,
-    };
+    use crate::chains::EvmLimits;
+    use crate::configuration::{ChainConfig, DalConfiguration, TezosContracts};
     use crate::delayed_inbox::Hash;
     use crate::sequencer_blueprint::rlp_roundtrip;
     use crate::storage::store_last_info_per_level_timestamp;
