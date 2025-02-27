@@ -53,7 +53,8 @@ let on_new_blueprint evm_node_endpoint next_blueprint_number
         match reorg with
         | Some level -> return (`Check_for_reorg level)
         | None -> return `Continue)
-    | Ok () | Error (Node_error.Diverged {must_exit = false; _} :: _) ->
+    | Ok _ (* tx_hashes *)
+    | Error (Node_error.Diverged {must_exit = false; _} :: _) ->
         return `Continue
     | Error err -> fail err
   else if Z.(lt level number) then

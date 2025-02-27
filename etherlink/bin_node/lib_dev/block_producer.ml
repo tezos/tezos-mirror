@@ -168,7 +168,7 @@ let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
         Evm_state.get_delayed_inbox_item head_info.evm_state delayed_hash)
       delayed_hashes
   in
-  let* () =
+  let* _hashes =
     Evm_context.apply_blueprint timestamp blueprint_payload delayed_transactions
   in
   let (Qty number) = head_info.next_blueprint_number in

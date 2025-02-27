@@ -131,7 +131,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
           ~smart_rollup_address:smart_rollup_address_b58
           ~chunks:genesis_chunks
       in
-      let* () =
+      let* _tx_hashes =
         Evm_context.apply_blueprint genesis_timestamp genesis_payload []
       in
       Blueprints_publisher.publish
