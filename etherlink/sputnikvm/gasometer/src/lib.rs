@@ -477,6 +477,8 @@ pub fn dynamic_opcode_cost<H: Handler>(
 
 		Opcode::BASEFEE if config.has_base_fee => GasCost::Base,
 		Opcode::BASEFEE => GasCost::Invalid(opcode),
+		Opcode::BLOBHASH if config.has_blob_instructions => GasCost::BlobHash,
+		Opcode::BLOBHASH => GasCost::Invalid(opcode),
 		Opcode::BLOBBASEFEE if config.has_blob_instructions => GasCost::BlobBaseFee,
 		Opcode::BLOBBASEFEE => GasCost::Invalid(opcode),
 
@@ -843,6 +845,7 @@ impl<'config> Inner<'config> {
 				self.config.gas_ext_code_hash,
 				self.config,
 			),
+			GasCost::BlobHash => consts::G_BLOBHASH,
 			GasCost::BlobBaseFee => consts::G_BLOBBASEFEE,
 		})
 	}
@@ -1000,6 +1003,8 @@ pub enum GasCost {
 		/// True if target has not been previously accessed in this transaction
 		target_is_cold: bool,
 	},
+	/// Gas cost for `BLOBHASH`.
+	BlobHash,
 	/// Gas cost for `BLOBBASEFEE`.
 	BlobBaseFee,
 }
