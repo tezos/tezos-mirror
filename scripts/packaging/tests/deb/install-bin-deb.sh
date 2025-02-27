@@ -54,7 +54,6 @@ if [ -n "$DATADIR" ]; then
   echo "DATADIR=/custom/.tezos-node" >> /etc/default/octez-node
 fi
 
-sudo systemctl enable octez-node
 sudo systemctl start octez-node.service
 sudo systemctl status octez-node.service
 
@@ -67,8 +66,12 @@ key=$(sudo su tezos -c "octez-client show address alice" | grep Hash: | awk '{ p
 echo "BAKER_KEY=$key" >> /etc/default/octez-baker-active
 
 sudo systemctl enable octez-baker-active
-sudo systemctl start octez-baker-active.service
+sudo systemctl start octez-baker.service
+
+sudo systemctl status octez-baker.service
+
 sudo systemctl status octez-baker-active.service
+sudo systemctl status octez-baker-next.service
 
 sudo su tezos -c "octez-node config show"
 
