@@ -536,6 +536,10 @@ pub fn dynamic_opcode_cost<H: Handler>(
 		Opcode::CALLDATACOPY | Opcode::CODECOPY => GasCost::VeryLowCopy {
 			len: U256::from_big_endian(&stack.peek(2)?[..]),
 		},
+		Opcode::MCOPY if config.has_mcopy => GasCost::VeryLowCopy {
+			len: U256::from_big_endian(&stack.peek(2)?[..]),
+		},
+		Opcode::MCOPY => GasCost::Invalid(opcode),
 		Opcode::EXP => GasCost::Exp {
 			power: U256::from_big_endian(&stack.peek(1)?[..]),
 		},
@@ -642,10 +646,12 @@ pub fn dynamic_opcode_cost<H: Handler>(
 			len: U256::from_big_endian(&stack.peek(1)?[..]),
 		}),
 
-		Opcode::CODECOPY | Opcode::CALLDATACOPY | Opcode::RETURNDATACOPY => Some(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(0)?[..]),
-			len: U256::from_big_endian(&stack.peek(2)?[..]),
-		}),
+		Opcode::CODECOPY | Opcode::CALLDATACOPY | Opcode::RETURNDATACOPY | Opcode::MCOPY => {
+			Some(MemoryCost {
+				offset: U256::from_big_endian(&stack.peek(0)?[..]),
+				len: U256::from_big_endian(&stack.peek(2)?[..]),
+			})
+		}
 
 		Opcode::EXTCODECOPY => Some(MemoryCost {
 			offset: U256::from_big_endian(&stack.peek(1)?[..]),
