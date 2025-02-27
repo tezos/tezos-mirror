@@ -92,7 +92,9 @@ let should_run task tm =
 let run ~now_tm t =
   Lwt_list.iter_p
     (fun task ->
-      if should_run task now_tm then task.action () else Lwt.return_unit)
+      if should_run task now_tm then
+        Lwt.catch (fun () -> task.action ()) (fun _exn -> Lwt.return_unit)
+      else Lwt.return_unit)
     t.tasks
 
 let start t =
