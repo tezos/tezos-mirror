@@ -35,6 +35,10 @@ module CommonStubs = struct
     scalar -> scalar array -> int -> Bls12_381.Fr.t -> int
     = "caml_bls12_381_signature_blst_polynomial_evaluation"
 
+  external lagrange_coeff_zero :
+    Bls12_381.Fr.t array -> Bls12_381.Fr.t array -> int -> int
+    = "caml_bls12_381_signature_blst_lagrange_coeff_zero"
+
   external pairing_init : bool -> Bytes.t -> Unsigned.Size_t.t -> ctxt
     = "caml_bls12_381_signature_blst_pairing_init_stubs"
 
@@ -273,6 +277,21 @@ module MinPk = struct
       ~subgroup_check
       (Array.of_list signatures)
       scalars
+
+  let threshold_signature_opt ids_signatures : signature option =
+    let len = List.length ids_signatures in
+    if len <= 1 then None
+    else
+      let ids, signatures = List.split ids_signatures in
+      let scalars = List.map Bls12_381.Fr.of_int ids |> Array.of_list in
+      let scalars_res = Array.init len (fun _i -> Bls12_381.Fr.(copy zero)) in
+      let b = CommonStubs.lagrange_coeff_zero scalars_res scalars len in
+      if b = 0 then
+        Bls12_381.G2.pippenger_with_compressed_bytes_array_opt
+          ~subgroup_check:true
+          (Array.of_list signatures)
+          scalars_res
+      else None
 
   let aggregate_public_key_opt ?(subgroup_check = true) pks =
     Bls12_381.G1.add_bulk_with_compressed_bytes_array_opt
@@ -588,6 +607,21 @@ module MinSig = struct
       ~subgroup_check
       (Array.of_list signatures)
       scalars
+
+  let threshold_signature_opt ids_signatures : signature option =
+    let len = List.length ids_signatures in
+    if len <= 1 then None
+    else
+      let ids, signatures = List.split ids_signatures in
+      let scalars = List.map Bls12_381.Fr.of_int ids |> Array.of_list in
+      let scalars_res = Array.init len (fun _i -> Bls12_381.Fr.(copy zero)) in
+      let b = CommonStubs.lagrange_coeff_zero scalars_res scalars len in
+      if b = 0 then
+        Bls12_381.G1.pippenger_with_compressed_bytes_array_opt
+          ~subgroup_check:true
+          (Array.of_list signatures)
+          scalars_res
+      else None
 
   let aggregate_public_key_opt ?(subgroup_check = true) pks =
     Bls12_381.G2.add_bulk_with_compressed_bytes_array_opt

@@ -137,6 +137,11 @@ module MinPk : sig
   val aggregate_signature_weighted_opt :
     ?subgroup_check:bool -> (Z.t * signature) list -> signature option
 
+  (** [threshold_signature_opt [(id_x, s_x);(id_y, s_y);...] ]
+      reconstructs a signature if at least [m] valid signatures [s_i]
+      produced by a participant [id_i] are provided. *)
+  val threshold_signature_opt : (int * signature) list -> signature option
+
   (** [aggregate_public_key_opt ?subgroup_check pks] aggregates the public keys
       [pks]. If [subgroup_check] is set, the function also checks if the
       points are in G1. *)
@@ -339,6 +344,11 @@ module MinSig : sig
       function also checks if the points are in G1. *)
   val aggregate_signature_weighted_opt :
     ?subgroup_check:bool -> (Z.t * signature) list -> signature option
+
+  (** [threshold_signature_opt [(id_x, s_x);(id_y, s_y);...] ]
+      reconstructs a signature if at least [m] valid signatures [s_i]
+      produced by a participant [id_i] are provided. *)
+  val threshold_signature_opt : (int * signature) list -> signature option
 
   (** [aggregate_public_key_opt ?subgroup_check pks] aggregates the public keys
       [pks]. If [subgroup_check] is set, the function also checks if the
