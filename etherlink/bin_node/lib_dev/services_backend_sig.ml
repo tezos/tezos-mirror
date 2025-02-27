@@ -99,6 +99,11 @@ module type S = sig
       or the zero address. *)
   val coinbase : unit -> Ethereum_types.address tzresult Lwt.t
 
+  (** [is_multichain_enabled ()] returns the value of the multichain feature flag
+      this method targets proxy nodes that do not have direct access
+      to the durable storage. *)
+  val is_multichain_enabled : unit -> bool tzresult Lwt.t
+
   include Tracer_sig.S
 end
 
