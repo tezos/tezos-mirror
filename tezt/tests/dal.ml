@@ -7283,10 +7283,14 @@ let dal_crypto_benchmark () =
           err
     | Ok x -> f x
   in
+  (* the defaults are the Rio parameters *)
   let number_of_shards = Cli.get_int ~default:512 "nb_shards" in
   let slot_size = Cli.get_int ~default:126_944 "slot_size" in
   let redundancy_factor = Cli.get_int ~default:8 "redundancy" in
   let page_size = Cli.get_int ~default:3967 "page_size" in
+  let traps_fraction =
+    Cli.get_float ~default:0.0005 "traps_fraction" |> Q.of_float
+  in
   let* () =
     let parameters =
       {number_of_shards; redundancy_factor; page_size; slot_size}
@@ -7309,7 +7313,7 @@ let dal_crypto_benchmark () =
           ()
       in
       Log.info "SRS loaded." ;
-      let*? config =
+      let*? () =
         Result.map_error
           (fun x ->
             `Fail
@@ -7319,7 +7323,7 @@ let dal_crypto_benchmark () =
                  x))
           result
       in
-      Lwt.return config
+      unit
     in
     Profiler.record_f Profiler.main Debug (message, []) @@ fun () ->
     match make parameters with
@@ -7362,7 +7366,7 @@ let dal_crypto_benchmark () =
           prove_shards dal ~precomputation ~polynomial |> Array.to_seq
         in
         let _polynomial =
-          Profiler.record_f Profiler.main Debug ("Reconstruct polynomial", [])
+          Profiler.record_f Profiler.main Debug ("reconstruct polynomial", [])
           @@ fun () -> polynomial_from_shards dal shards
         in
         let nb_pages = slot_size / page_size in
@@ -7434,7 +7438,27 @@ let dal_crypto_benchmark () =
                  in
                  ())
         in
-        () ;
+        let () =
+          let message =
+            sf "share_is_trap (number_of_shards:%d)" (Seq.length shards)
+          in
+          Profiler.record_f Profiler.main Debug (message, []) @@ fun () ->
+          shards
+          |> Seq.iter (fun {share; index = _} ->
+                 let res =
+                   Tezos_crypto_dal.Trap.share_is_trap
+                     Tezos_crypto.Signature.Public_key_hash.zero
+                     share
+                     ~traps_fraction
+                 in
+                 match res with
+                 | Ok _is_trap -> ()
+                 | Error err ->
+                     Test.fail
+                       "Unexpected error:@.%a@."
+                       Data_encoding.Binary.pp_write_error
+                       err)
+        in
         Lwt.return_unit
   in
   Profiler.close_and_unplug Profiler.main instance ;
