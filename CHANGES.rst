@@ -28,14 +28,6 @@ General
 Node
 ----
 
-- The node will detect stalled connections more quickly (on
-  Linux-based distributions). This behavior can be controlled via the
-  environment variable ``OCTEZ_P2P_TCP_USER_TIMEOUT``. Its default
-  value is ``15000``, meaning that it will now take ``15s`` to detect
-  a stalled connection (compared to up to ``15`` minutes by default on
-  Linux). Users can opt out by setting the value to ``0``. (MR
-  :gl:`!16907`)
-
 Client
 ------
 
