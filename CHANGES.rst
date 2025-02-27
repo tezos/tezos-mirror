@@ -115,87 +115,11 @@ Smart Rollup node
 
   (MR :gl:`!15929`)
 
-- Updated RPC ``/local/batcher/injection`` with a new query argument
-  possibility. When the rpc contains ``"drop_duplicate": true`` then
-  the batcher will drop the messages that were already injected with a
-  previous RPC call.  If ``"drop_duplicate": false`` then the rollup
-  node defaults to its the previous behavior, where messages are
-  injected again, even if the exact same one was previously
-  injected. By default ``"drop_duplicate": false``. (MR :gl:`!13165`)
-
-- RPC ``/health`` now returns meaningful health related data to asses if the
-  rollup node operates correctly. Old ``/health`` RPC is renamed to ``/ping``.
-  (MR :gl:`!12940`)
-
-- Use a local cache per game for intermediate states of dissections. (MR
-  :gl:`!12899`)
-
-- Introduce the 5th version of the WASM PVM, which defaults to a higher tick
-  limits to delegate refutability to the kernels. (MR :gl:`!12999`)
-
-- Trigger GC every 1000 blocks (instead of 100) by default to reduce CPU
-  consumption. (MR :gl:`!13177`)
-
-- Default history mode is now "full". (MR :gl:`!13178`)
-
-- Allow to import archive snapshots in "full" rollup node. (MR :gl:`!13186`)
-
-- Fix a bug in how commitments are computed after a protocol migration
-  where the the commitment period changes. (MR :gl:`!13588`)
-
-- Ensure penultimate commitment is published on snapshot export as a
-  failsafe. (MR :gl:`!13544`)
-
-- Include commitment publication information in snapshots. (MR :gl:`!13724`)
-
-- Under-approximate publication level for cementation when it is missing. (MR
-  :gl:`!13725`)
-
-- New metrics for the rollup node, including performance ones which can be
-  enabled with the flag ``--enable-performance-metrics`` (requires
-  ``lsof``). (MR :gl:`!12290`)
-
-- Addition of ``elapsed_time`` to performance metrics,
-  which exposes in seconds the time since the node started. (MR :gl:`!16551`)
-
-- Rotate multiple batcher keys in injector so that they are used evenly. (MR
-  :gl:`!14194`)
-
-- RPC ``/global/block/<block_id>?outbox=true`` now returns the outbox messages
-  produced by the PVM for ``block_id`` if the query parameter ``outbox`` is
-  present. (MR :gl:`!14140`)
-
-- Introduce the 6th version of the WASM PVM. (MR :gl:`!14493`)
-
-- New RPC ``GET /admin/cancel_gc`` to cancel any on-going garbage collection in
-  the rollup node. (MR :gl:`!14693`)
-
-- Refined GC for rollup node is now triggered every ~3 days to make it less
-  wasteful on resources. Gc is not run anymore after importing an archive
-  snapshot in a full node. (MR :gl:`!14717`)
-
-- The command ``snapshot export`` tries to cancel ongoing GC, if any. Add
-  ``--rollup-node-endpoint`` to specify the RPC server endpoint, if the address
-  and port of the running node have been changed via command-line arguments. (MR
-  :gl:`!14694`)
-
-- Fixed an issue which could introduce a discrepancy between the snapshot header
-  and its content. (MR :gl:`!14777`)
-
-- RPC ``/global/block/<block_id>/outbox/<outbox_level>/messages`` now fails if
-  ``outbox_level`` is above the level of ``block_id``. (MR :gl:`!14911`)
-
 - Improved error messages for RPC
   ``/global/block/<block_id>/helpers/proofs/outbox/<outbox_level>/messages?index=<message_index>``. (MR :gl:`!15507`)
 
-- Paginate RPC for durable storage subkeys
-  ``/global/block/<block_id>/durable/wasm_2_0_0/subkeys?key=<key>&offset=<offset>&length=<length>``,
-  with new query parameters ``offset`` and ``length``. (MR :gl:`!15625`)
-
-- Fixed file descriptor leak in resto for connections with the L1 node.
-  (MR :gl:`!15322`)
-
 - Fixed potential issue with store with SQLite < 3.35. (MR :gl:`!15631`)
+
 - Improved error messages for RPC
   ``/global/block/<block_id>/helpers/proofs/outbox/<outbox_level>/messages?index=<message_index>``. (MR :gl:`!15507`)
 
