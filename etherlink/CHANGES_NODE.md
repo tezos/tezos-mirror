@@ -17,6 +17,8 @@
 
 - Observer `--init-from-snapshot` now also accepts a path to an existing
   snapshot. (!16963)
+- **experimental feature** Adds a configuration for the `tx_queue`.
+  (!16903)
 
 ### RPCs changes
 

@@ -87,6 +87,8 @@ val chain_id : supported_network -> Ethereum_types.chain_id
 
 type l2_chain = {chain_id : Ethereum_types.chain_id}
 
+type tx_queue = {max_size : int; max_transaction_batch_length : int option}
+
 (** Configuration settings for experimental features, with no backward
     compatibility guarantees. *)
 type experimental_features = {
@@ -100,7 +102,7 @@ type experimental_features = {
   monitor_websocket_heartbeat : monitor_websocket_heartbeat option;
   spawn_rpc : int option;
   l2_chains : l2_chain list option;
-  enable_tx_queue : bool;
+  enable_tx_queue : tx_queue option;
 }
 
 type sequencer = {
@@ -184,6 +186,8 @@ type t = {
   finalized_view : bool;
   history_mode : history_mode option;
 }
+
+val is_tx_queue_enabled : t -> bool
 
 val history_mode_encoding : history_mode Data_encoding.t
 

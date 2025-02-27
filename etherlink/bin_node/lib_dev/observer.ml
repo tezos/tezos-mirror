@@ -196,41 +196,36 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
   in
 
   let* () =
-    if config.experimental_features.enable_tx_queue then
-      let* () =
-        Tx_queue.start
-          ~relay_endpoint:evm_node_endpoint
-          ~max_transaction_batch_length:None
-          ()
-      in
-      return_unit
-    else
-      let mode =
-        if config.finalized_view then
-          Tx_pool.Forward
-            {
-              injector =
-                (fun _ raw_tx ->
-                  Injector.send_raw_transaction
-                    ~keep_alive:config.keep_alive
-                    ~base:evm_node_endpoint
-                    ~raw_tx);
-            }
-        else Tx_pool.Relay
-      in
-      Tx_pool.start
-        {
-          backend = observer_backend;
-          smart_rollup_address =
-            Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
-              smart_rollup_address;
-          mode;
-          tx_timeout_limit = config.tx_pool_timeout_limit;
-          tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
-          tx_pool_tx_per_addr_limit =
-            Int64.to_int config.tx_pool_tx_per_addr_limit;
-          max_number_of_chunks = None;
-        }
+    match config.experimental_features.enable_tx_queue with
+    | Some tx_queue_config ->
+        Tx_queue.start ~evm_node_endpoint ~config:tx_queue_config ()
+    | None ->
+        let mode =
+          if config.finalized_view then
+            Tx_pool.Forward
+              {
+                injector =
+                  (fun _ raw_tx ->
+                    Injector.send_raw_transaction
+                      ~keep_alive:config.keep_alive
+                      ~base:evm_node_endpoint
+                      ~raw_tx);
+              }
+          else Tx_pool.Relay
+        in
+        Tx_pool.start
+          {
+            backend = observer_backend;
+            smart_rollup_address =
+              Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
+                smart_rollup_address;
+            mode;
+            tx_timeout_limit = config.tx_pool_timeout_limit;
+            tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
+            tx_pool_tx_per_addr_limit =
+              Int64.to_int config.tx_pool_tx_per_addr_limit;
+            max_number_of_chunks = None;
+          }
   in
   Metrics.init
     ~mode:"observer"
@@ -314,7 +309,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     let*! () = task in
     return_unit
   else
-    let ping_tx_pool = not config.experimental_features.enable_tx_queue in
+    let ping_tx_pool = not @@ Configuration.is_tx_queue_enabled config in
     let* () =
       Blueprints_follower.start
         ~ping_tx_pool
@@ -323,7 +318,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
         ~next_blueprint_number
         (on_new_blueprint evm_node_endpoint)
     and* () =
-      if config.experimental_features.enable_tx_queue then
+      if Configuration.is_tx_queue_enabled config then
         Tx_queue.beacon ~tick_interval:0.05
       else return_unit
     in

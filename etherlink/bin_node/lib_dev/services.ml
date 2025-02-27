@@ -650,7 +650,7 @@ let dispatch_request (rpc : Configuration.rpc)
                     rpc_error (Rpc_errors.transaction_rejected err None)
                 | Ok transaction_object -> (
                     let* tx_hash =
-                      if config.experimental_features.enable_tx_queue then
+                      if Configuration.is_tx_queue_enabled config then
                         let* () = Tx_queue.inject transaction_object tx_raw in
                         return (Ok transaction_object.hash)
                       else Tx_pool.add transaction_object txn
@@ -875,7 +875,7 @@ let dispatch_private_request (rpc : Configuration.rpc)
               rpc_error (Rpc_errors.transaction_rejected err None)
           | Ok transaction_object -> (
               let* tx_hash =
-                if config.experimental_features.enable_tx_queue then
+                if Configuration.is_tx_queue_enabled config then
                   let transaction = Ethereum_types.hex_encode_string raw_txn in
                   let* () = Tx_queue.inject transaction_object transaction in
                   return @@ Ok transaction_object.hash
