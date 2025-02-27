@@ -97,7 +97,7 @@ Packages
 In Octez v22, the new set of packages, that was introduced in the previous version of Octez, **replaces** the old one in the APT repository. Check :ref:`the documentation <installing_packages>` for more details.
 
 Therefore, upgrading to the new packages is done as usual with ``apt``.
-Note just that the handling of Zcash parameters is done automatically in the new packages, hence the need to overwrite the old settings::
+Note however that the handling of Zcash parameters is done automatically in the new packages, hence the need to overwrite the old settings::
 
     $ sudo apt update
     $ sudo apt upgrade octez-baker -o DPkg::options::="--force-overwrite"
