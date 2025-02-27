@@ -421,6 +421,13 @@ let slot_filler () =
     ~contract:"SlotFiller"
     ~evm_version:"shanghai"
 
+let call_fast_withdrawal () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/call_fast_withdrawal.sol")
+    ~label:"call_fast_withdrawal"
+    ~contract:"CallPrecompile"
+    ~evm_version:"shanghai"
+
 let delegatecall_delegator () =
   compile_contract
     ~source:(solidity_contracts_path ^ "/delegatecall.sol")
