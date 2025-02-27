@@ -568,7 +568,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
         Agent.make
           ~configuration
           ~next_available_port
-          ~name:configuration.name
+          ~vm_name:"default"
           ~process_monitor
           ()
       in
@@ -676,7 +676,7 @@ let agents t =
             Agent.make
               ~configuration
               ~next_available_port
-              ~name:configuration.name
+              ~vm_name:(Format.asprintf "%s-0" Env.tezt_cloud)
               ~process_monitor
               ()
           in

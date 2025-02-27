@@ -109,6 +109,7 @@ let monitoring_jingo_template agents agent =
   Tobj
     [
       ("name", Tstr (Agent.name agent));
+      ("vm_name", Tstr (Agent.vm_name agent));
       ("uri", Tstr (sf "http://%s:19999" host));
     ]
 
