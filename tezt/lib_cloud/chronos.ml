@@ -19,7 +19,7 @@ type time = {
 type task = {
   time : time;
   action : unit -> unit Lwt.t;
-  mutable last_run : float option;
+  mutable last_run : Unix.tm option;
 }
 
 type t = {
@@ -77,8 +77,7 @@ let time_to_string spec =
    standard use different numbering conventions for months:
    - Unix.tm_mon ranges from 0 to 11 (January = 0, December = 11)
    - Cron standard uses 1 to 12 (January = 1, December = 12) *)
-let should_run task now =
-  let tm = Unix.gmtime now in
+let should_run task tm =
   let matches value = Option.fold ~none:true ~some:(Int.equal value) in
   matches tm.Unix.tm_min task.time.minute
   && matches tm.Unix.tm_hour task.time.hour
@@ -95,33 +94,38 @@ let register t ~tm ~action =
     failwith
       (Format.asprintf "Invalid time specification: %s" (time_to_string time))
 
-let run t =
-  let now = Sys.time () in
+let run ~now_tm t =
   Lwt_list.iter_p
     (fun task ->
-      if should_run task now then
+      if should_run task now_tm then
         match task.last_run with
         | None ->
-            task.last_run <- Some now ;
+            task.last_run <- Some now_tm ;
             task.action ()
-        | Some last ->
-            let last_tm = Unix.gmtime last in
-            let now_tm = Unix.gmtime now in
-            if last_tm.Unix.tm_min <> now_tm.Unix.tm_min then (
-              task.last_run <- Some now ;
+        | Some last_tm ->
+            if last_tm.tm_min <> now_tm.tm_min then (
+              task.last_run <- Some now_tm ;
               task.action ())
             else Lwt.return_unit
       else Lwt.return_unit)
     t.tasks
 
 let start t =
-  let rec loop () =
-    let* () = run t in
-    let* () = Lwt_unix.sleep 60. in
-    loop ()
+  let rec loop last_tm =
+    let now_tm = Unix.(gmtime (gettimeofday ())) in
+    let* () =
+      if last_tm.Unix.tm_min <> now_tm.Unix.tm_min then run ~now_tm t
+      else Lwt_unix.sleep 1.
+    in
+    loop now_tm
   in
-  (* Runs the loop then wait for the shutdown promise. *)
-  let* () = Lwt.pick [loop (); t.shutdown] in
-  Lwt.return_unit
+  (* Runs the loop until the shutdown is triggered. *)
+  Background.register
+    (Lwt.pick
+       [
+         (let now_tm = Unix.(gmtime (gettimeofday ())) in
+          loop now_tm);
+         t.shutdown;
+       ])
 
 let shutdown t = Lwt.wakeup t.trigger_shutdown ()

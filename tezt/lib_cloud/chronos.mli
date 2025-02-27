@@ -35,7 +35,7 @@ val zero : unit -> t
 val register : t -> tm:string -> action:(unit -> unit Lwt.t) -> unit
 
 (** [start t] starts the scheduler. *)
-val start : t -> unit Lwt.t
+val start : t -> unit
 
 (** [shutdown t] triggers a shutdown of the scheduler. *)
 val shutdown : t -> unit
