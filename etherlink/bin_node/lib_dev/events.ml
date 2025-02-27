@@ -313,6 +313,14 @@ let still_compressing_snapshot =
     ("elapsed_time", Time.System.Span.encoding)
     ("progress", Data_encoding.float)
 
+let import_finished =
+  Internal_event.Simple.declare_0
+    ~level:Notice
+    ~section
+    ~name:"import_finished"
+    ~msg:"snapshot import is finished"
+    ()
+
 let extract_snapshot_archive_in_progress =
   Internal_event.Simple.declare_2
     ~level:Notice
@@ -568,6 +576,8 @@ let still_compressing_snapshot ~total ~progress snapshot elapsed_time =
   emit
     still_compressing_snapshot
     (snapshot, elapsed_time, 100. *. float_of_int progress /. float_of_int total)
+
+let import_finished () = emit import_finished ()
 
 let extract_snapshot_archive_in_progress ~archive_name ~elapsed_time =
   emit extract_snapshot_archive_in_progress (archive_name, elapsed_time)

@@ -10751,6 +10751,55 @@ let test_spawn_rpc =
   Check.is_true (Option.is_some tx_obj) ~error_msg:"tx is missing" ;
   unit
 
+let test_observer_init_from_snapshot =
+  register_all
+    ~tags:["observer"; "init"; "from"; "snapshot"]
+    ~title:"Observer successfully inits from a rolling snapshot"
+  @@ fun {sequencer; sc_rollup_node; _} _protocol ->
+  (* Restart the sequencer in rolling:3 *)
+  let* () = Evm_node.terminate sequencer in
+  let*! () = Evm_node.switch_history_mode sequencer (Rolling 2) in
+  let* () = Evm_node.run sequencer
+  and* _ =
+    Evm_node.wait_for_start_history_mode ~history_mode:"rolling:2" sequencer
+  in
+
+  (* Produce 1 block, stop, export the snapshot, start *)
+  let*@ _size = Rpc.produce_block sequencer in
+  let* () = Evm_node.wait_for_blueprint_applied sequencer 1 in
+  let* () = Evm_node.terminate sequencer in
+  let*! snapshot_file = Evm_node.export_snapshot sequencer in
+  let* () = Evm_node.run sequencer in
+
+  (* Init observer from snapshot but with history mode set to rolling:5 *)
+  let name = "observer_init_from_snapshot" in
+  let observer =
+    Evm_node.create
+      ~name
+      ~mode:
+        (Observer
+           {
+             initial_kernel = "evm_kernel.wasm";
+             preimages_dir = Some "/tmp";
+             private_rpc_port = None;
+             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+           })
+      ~data_dir:(Temp.dir name)
+      (Evm_node.endpoint sequencer)
+  in
+  let* () = Process.check @@ Evm_node.spawn_init_config observer in
+  let extra_arguments =
+    ["--init-from-snapshot"; snapshot_file; "--history"; "rolling:5"]
+  in
+  let* () = Evm_node.run observer ~extra_arguments
+  and* _ =
+    Evm_node.wait_for_start_history_mode ~history_mode:"rolling:5" observer
+  and* _ = Evm_node.wait_for_import_finished observer in
+
+  (* Retrieve first block *)
+  let*@ _block = Rpc.get_block_by_number ~block:"1" observer in
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -10898,4 +10947,5 @@ let () =
   test_eip1559_transaction_object [Alpha] ;
   test_apply_from_full_history_mode protocols ;
   test_tx_queue [Alpha] ;
-  test_spawn_rpc protocols
+  test_spawn_rpc protocols ;
+  test_observer_init_from_snapshot protocols

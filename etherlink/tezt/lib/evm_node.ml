@@ -427,6 +427,10 @@ let wait_for_spawn_rpc_ready ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"spawn_rpc_is_ready.v0"
   @@ Fun.const (Some ())
 
+let wait_for_import_finished ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"import_finished.v0"
+  @@ Fun.const (Some ())
+
 let wait_for_block_producer_locked ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"block_producer_locked.v0"
   @@ Fun.const (Some ())
