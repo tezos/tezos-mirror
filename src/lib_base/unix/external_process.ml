@@ -319,17 +319,12 @@ module Make (P : External_process_parameters.S) = struct
      TODO: Add critical section for external process launch, see
      https://gitlab.com/tezos/tezos/-/issues/5175
   *)
-  let start_process ~process_path parameters =
+  let start_process ~process_path =
     let open Lwt_result_syntax in
     let canceler = Lwt_canceler.create () in
     (* We assume that there is only one external process per socket *)
     let socket_dir = get_temporary_socket_dir () in
-    let proc_name, args = P.command_line_args parameters ~socket_dir in
-    let arg0 =
-      match proc_name with
-      | Some p -> p
-      | None -> Filename.basename process_path
-    in
+    let arg0, args = P.command_line_args ~socket_dir in
     let args = arg0 :: args in
     let env = Unix.environment () in
     (* FIXME https://gitlab.com/tezos/tezos/-/issues/4837

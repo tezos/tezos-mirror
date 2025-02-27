@@ -67,9 +67,8 @@ module type S = sig
   val socket_path : socket_dir:string -> pid:int -> string
 
   (** [command_line_args params ~socket_dir] is [(name, args)] where [name] is
-      the new name for the external process (zeroth argument) (or [None] if it
-      should reuse the same name as the caller) and [args] are the arguments
-      that should be given to the external process executable to start. *)
-  val command_line_args :
-    parameters -> socket_dir:string -> string option * string list
+      the new name for the external process (zeroth argument) and [args] are the
+      arguments that should be given to the external process executable to
+      start. *)
+  val command_line_args : socket_dir:string -> string * string list
 end

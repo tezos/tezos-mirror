@@ -129,5 +129,4 @@ val socket_path_prefix : string
     [pid] is the process ID of the validator process. *)
 val socket_path : socket_dir:string -> pid:int -> string
 
-val command_line_args :
-  parameters -> socket_dir:string -> string option * string list
+val command_line_args : socket_dir:string -> string * string list
