@@ -1,0 +1,25 @@
+[Unit]
+Description=Octez baker service
+After=network.target
+Requires=octez-baker-active.service octez-baker-next.service octez-accuser-active.service octez-accuser-next.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/true
+RemainAfterExit=yes
+Restart=on-failure
+TimeoutStartSec=300
+TimeoutStopSec=300
+
+ExecStartPre=systemctl start octez-baker-active.service
+ExecStartPre=systemctl start octez-baker-next.service
+ExecStartPre=systemctl start octez-accuser-active.service
+ExecStartPre=systemctl start octez-accuser-next.service
+
+ExecStopPost=systemctl stop octez-baker-active.service
+ExecStopPost=systemctl stop octez-baker-next.service
+ExecStopPost=systemctl stop octez-accuser-active.service
+ExecStopPost=systemctl stop octez-accuser-next.service
+
+[Install]
+WantedBy=multi-user.target
