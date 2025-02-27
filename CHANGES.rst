@@ -40,6 +40,10 @@ Baker
 Agnostic Baker
 --------------
 
+- The agnostic baker has a unified CLI such that incompatibilities between baking arguments
+  for consecutive protocols can occur much harder, and will probably generate compilation
+  errors. (MR :gl:`!16968`)
+
 - The agnostic baker no longer requires the protocol specific baking binaries, instead
   it directly spawns baking processes using a protocol plugin to retrieve the necessary
   functionalities. (MR :gl:`!16583`)
