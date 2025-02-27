@@ -393,42 +393,10 @@ module V2_0_0 = struct
                  s)
           in
           set s
-      | PS.Reveal (PS.Raw_data data) ->
+      | PS.Reveal reveal_data ->
+          let reveal_data_bytes = PS.reveal_response_to_bytes reveal_data in
           let* s = get in
-          let* s = lift (WASM_machine.reveal_step (Bytes.of_string data) s) in
-          set s
-      | PS.Reveal (PS.Metadata metadata) ->
-          let metadata_bytes =
-            Data_encoding.Binary.to_bytes_exn
-              Sc_rollup_metadata_repr.encoding
-              metadata
-          in
-          let* s = get in
-          let* s = lift (WASM_machine.reveal_step metadata_bytes s) in
-          set s
-      | PS.Reveal (PS.Dal_page content_bytes) ->
-          let content_bytes =
-            Option.value ~default:Bytes.empty content_bytes
-            (* [content_opt] is [None] when the slot was not confirmed in the L1.
-               In this case, we return empty bytes.
-
-               Note that the kernel can identify this unconfirmed slot scenario because
-               all confirmed pages have a size of 4KiB. Thus, a page can only be considered
-               empty (0KiB) if it is unconfirmed. *)
-          in
-          let* s = get in
-          let* s = lift (WASM_machine.reveal_step content_bytes s) in
-          set s
-      | PS.Reveal (PS.Dal_parameters dal_parameters) ->
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6544
-             reveal_dal_parameters result for slow execution PVM. *)
-          let dal_parameters_bytes =
-            Data_encoding.Binary.to_bytes_exn
-              Sc_rollup_dal_parameters_repr.encoding
-              dal_parameters
-          in
-          let* s = get in
-          let* s = lift (WASM_machine.reveal_step dal_parameters_bytes s) in
+          let* s = lift (WASM_machine.reveal_step reveal_data_bytes s) in
           set s
 
     let set_input input = state_of @@ set_input_state input
