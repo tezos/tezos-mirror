@@ -16,11 +16,7 @@ type time = {
   day_of_week : int option; (* 0-6, Sunday = 0 *)
 }
 
-type task = {
-  time : time;
-  action : unit -> unit Lwt.t;
-  mutable last_run : Unix.tm option;
-}
+type task = {time : time; action : unit -> unit Lwt.t}
 
 type t = {
   tasks : task list;
@@ -73,7 +69,7 @@ let task ~tm ~action =
   if not is_valid then
     failwith
       (Format.asprintf "Invalid time specification: %s" (time_to_string time)) ;
-  {time; action; last_run = None}
+  {time; action}
 
 let init ~tasks =
   let shutdown, trigger_shutdown = Lwt.task () in
@@ -96,17 +92,7 @@ let should_run task tm =
 let run ~now_tm t =
   Lwt_list.iter_p
     (fun task ->
-      if should_run task now_tm then
-        match task.last_run with
-        | None ->
-            task.last_run <- Some now_tm ;
-            task.action ()
-        | Some last_tm ->
-            if last_tm.tm_min <> now_tm.tm_min then (
-              task.last_run <- Some now_tm ;
-              task.action ())
-            else Lwt.return_unit
-      else Lwt.return_unit)
+      if should_run task now_tm then task.action () else Lwt.return_unit)
     t.tasks
 
 let start t =
