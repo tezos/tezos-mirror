@@ -640,7 +640,9 @@ mod tests {
 
     use super::*;
     use crate::block::GENESIS_PARENT_HASH;
-    use crate::configuration::{ChainConfig, DalConfiguration, Limits, TezosContracts};
+    use crate::configuration::{
+        ChainConfig, DalConfiguration, EvmLimits, TezosContracts,
+    };
     use crate::delayed_inbox::Hash;
     use crate::sequencer_blueprint::rlp_roundtrip;
     use crate::storage::store_last_info_per_level_timestamp;
@@ -681,7 +683,7 @@ mod tests {
                 max_blueprint_lookahead_in_seconds: 100_000i64,
             },
             maximum_allowed_ticks: MAX_ALLOWED_TICKS,
-            limits: Limits::default(),
+            limits: EvmLimits::default(),
             enable_fa_bridge: false,
             chain_config: ChainConfig::default(),
             garbage_collect_blocks: false,

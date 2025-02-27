@@ -106,12 +106,12 @@ impl ChainConfig {
     }
 }
 
-pub struct Limits {
+pub struct EvmLimits {
     pub maximum_gas_limit: u64,
     pub minimum_base_fee_per_gas: U256,
 }
 
-impl Default for Limits {
+impl Default for EvmLimits {
     fn default() -> Self {
         Self {
             maximum_gas_limit: MAXIMUM_GAS_LIMIT,
@@ -123,7 +123,7 @@ impl Default for Limits {
 pub struct Configuration {
     pub tezos_contracts: TezosContracts,
     pub mode: ConfigurationMode,
-    pub limits: Limits,
+    pub limits: EvmLimits,
     pub maximum_allowed_ticks: u64,
     pub enable_fa_bridge: bool,
     pub chain_config: ChainConfig,
@@ -135,7 +135,7 @@ impl Default for Configuration {
         Self {
             tezos_contracts: TezosContracts::default(),
             mode: ConfigurationMode::Proxy,
-            limits: Limits::default(),
+            limits: EvmLimits::default(),
             maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
             chain_config: ChainConfig::default(),
@@ -228,14 +228,14 @@ fn fetch_tezos_contracts(host: &mut impl Runtime) -> TezosContracts {
     }
 }
 
-pub fn fetch_limits(host: &mut impl Runtime) -> Limits {
+pub fn fetch_limits(host: &mut impl Runtime) -> EvmLimits {
     let maximum_gas_limit =
         read_or_set_maximum_gas_per_transaction(host).unwrap_or(MAXIMUM_GAS_LIMIT);
 
     let minimum_base_fee_per_gas = retrieve_minimum_base_fee_per_gas(host)
         .unwrap_or(MINIMUM_BASE_FEE_PER_GAS.into());
 
-    Limits {
+    EvmLimits {
         maximum_gas_limit,
         minimum_base_fee_per_gas,
     }

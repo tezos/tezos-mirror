@@ -200,7 +200,7 @@ pub fn fetch_blueprints<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use crate::{
-        configuration::{ChainConfig, Limits},
+        configuration::{ChainConfig, EvmLimits},
         dal_slot_import_signal::{
             DalSlotImportSignals, DalSlotIndicesList, DalSlotIndicesOfLevel,
             UnsignedDalSlotSignals,
@@ -278,7 +278,7 @@ mod tests {
                 evm_node_flag: false,
                 max_blueprint_lookahead_in_seconds: 100_000i64,
             },
-            limits: Limits::default(),
+            limits: EvmLimits::default(),
             maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
             chain_config: ChainConfig::default(),
@@ -294,7 +294,7 @@ mod tests {
                 ..contracts
             },
             mode: ConfigurationMode::Proxy,
-            limits: Limits::default(),
+            limits: EvmLimits::default(),
             maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
             chain_config: ChainConfig::default(),

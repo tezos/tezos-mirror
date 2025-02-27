@@ -13,7 +13,7 @@ use crate::blueprint_storage::{
     store_current_block_header, BlockHeader, BlueprintHeader, EVMBlockHeader,
 };
 use crate::configuration::ConfigurationMode;
-use crate::configuration::Limits;
+use crate::configuration::EvmLimits;
 use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
 use crate::event::Event;
@@ -121,7 +121,7 @@ fn compute<Host: Runtime>(
     evm_account_storage: &mut EthereumAccountStorage,
     sequencer_pool_address: Option<H160>,
     maximum_allowed_ticks: u64,
-    limits: &Limits,
+    limits: &EvmLimits,
     tracer_input: Option<TracerInput>,
     evm_configuration: &Config,
 ) -> Result<BlockInProgressComputationResult, anyhow::Error> {
@@ -340,7 +340,7 @@ fn compute_bip<Host: Runtime>(
     precompiles: &PrecompileBTreeMap<Host>,
     tick_counter: &mut TickCounter,
     sequencer_pool_address: Option<H160>,
-    limits: &Limits,
+    limits: &EvmLimits,
     maximum_allowed_ticks: u64,
     tracer_input: Option<TracerInput>,
     chain_id: U256,
@@ -1334,7 +1334,7 @@ mod tests {
             &mut evm_account_storage,
             None,
             MAX_ALLOWED_TICKS,
-            &Limits::default(),
+            &EvmLimits::default(),
             None,
             &EVMVersion::current_test_config(),
         )
