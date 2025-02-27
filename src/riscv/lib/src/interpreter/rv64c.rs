@@ -70,32 +70,6 @@ where
     MC: memory::MemoryConfig,
     M: backend::ManagerReadWrite,
 {
-    /// `C.LD` CL-type compressed instruction
-    ///
-    /// Loads a 64-bit value from memory into register `rd`. It computes
-    /// an effective address by adding the immediate to the base address
-    /// in register `rs1`.
-    /// The immediate is obtained by zero-extending and scaling by 8 the
-    /// offset encoded in the instruction (see U:C-16.3).
-    pub fn run_cld(&mut self, imm: i64, rs1: XRegister, rd: XRegister) -> Result<(), Exception> {
-        debug_assert!(imm >= 0 && imm % 8 == 0);
-        self.run_ld(imm, rs1, rd)
-    }
-
-    /// `C.LDSP` CI-type compressed instruction
-    ///
-    /// Loads a 64-bit value from memory into register `rd`. It computes
-    /// an effective address by adding the immediate to the stack pointer.
-    /// The immediate is obtained by zero-extending and scaling by 8 the
-    /// offset encoded in the instruction (see U:C-16.3).
-    pub fn run_cldsp(&mut self, imm: i64, rd_rs1: NonZeroXRegister) -> Result<(), Exception> {
-        debug_assert!(imm >= 0 && imm % 8 == 0);
-        let value: i64 = self.read_from_bus(imm, sp)?;
-        // i64 as u64 is a no-op
-        self.hart.xregisters.write_nz(rd_rs1, value as u64);
-        Ok(())
-    }
-
     /// `C.SD` CS-type compressed instruction
     ///
     /// Stores a 64-bit value in register `rs2` to memory. It computes
@@ -178,7 +152,7 @@ mod tests {
                 state.run_sd(0, t0, a4)?;
                 state.run_sw(8, t0, a3)?;
 
-                state.run_cldsp(offset as i64, nz::t4)?;
+                state.run_ldnz(offset as i64, nz::sp, nz::t4)?;
                 state.run_clwsp((offset + 8) as i64, nz::t3)?;
                 assert_eq!(state.hart.xregisters.read_nz(nz::t4), v_d);
                 assert_eq!(state.hart.xregisters.read_nz(nz::t3), v_w as i32 as u64);

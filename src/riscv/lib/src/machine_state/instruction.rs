@@ -342,8 +342,6 @@ pub enum OpCode {
     CSubw,
 
     // RV64C compressed instructions
-    CLd,
-    CLdsp,
     CSd,
     CSdsp,
     CAddiw,
@@ -370,6 +368,8 @@ pub enum OpCode {
     JalrAbsolute,
     /// Same as `Jr` but jumps to `val(rs1) + imm`.
     JrImm,
+    /// Same as Ld but only using NonZeroXRegisters.
+    Ldnz,
 }
 
 impl OpCode {
@@ -420,6 +420,7 @@ impl OpCode {
             Self::Lhu => Args::run_lhu,
             Self::Lwu => Args::run_lwu,
             Self::Ld => Args::run_ld,
+            Self::Ldnz => Args::run_ldnz,
             Self::Sb => Args::run_sb,
             Self::Sh => Args::run_sh,
             Self::Sw => Args::run_sw,
@@ -553,8 +554,6 @@ impl OpCode {
             Self::CAddw => Args::run_caddw,
             Self::CSubw => Args::run_csubw,
             Self::Nop => Args::run_nop,
-            Self::CLd => Args::run_cld,
-            Self::CLdsp => Args::run_cldsp,
             Self::CSd => Args::run_csd,
             Self::CSdsp => Args::run_csdsp,
             Self::CAddiw => Args::run_caddiw,
@@ -776,6 +775,18 @@ macro_rules! impl_load_type {
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.imm, self.rs1.x, self.rd.x)
+                .map(|_| Next(self.width))
+        }
+    };
+
+    ($fn: ident, non_zero) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
+            &self,
+            core: &mut MachineCoreState<MC, M>,
+        ) -> Result<ProgramCounterUpdate, Exception> {
+            core.$fn(self.imm, self.rs1.nzx, self.rd.nzx)
                 .map(|_| Next(self.width))
         }
     };
@@ -1162,6 +1173,7 @@ impl Args {
     impl_load_type!(run_lhu);
     impl_load_type!(run_lwu);
     impl_load_type!(run_ld);
+    impl_load_type!(run_ldnz, non_zero);
 
     // RV64I S-type instructions
     impl_store_type!(run_sb);
@@ -1401,8 +1413,6 @@ impl Args {
     // RV64C compressed instructions
     impl_store_type!(run_csd);
     impl_css_type!(run_csdsp);
-    impl_load_type!(run_cld);
-    impl_cload_sp_type!(run_cldsp);
     impl_ci_type!(run_caddiw, non_zero);
     impl_cr_type!(run_caddw);
     impl_cr_type!(run_csubw);
@@ -1519,10 +1529,7 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Lwu,
                 args: args.to_args(InstrWidth::Uncompressed),
             },
-            InstrCacheable::Ld(args) => Instruction {
-                opcode: OpCode::Ld,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
+            InstrCacheable::Ld(args) => Instruction::from_ic_ld(args),
             // RV64I S-type instructions
             InstrCacheable::Sb(args) => Instruction {
                 opcode: OpCode::Sb,
@@ -2055,14 +2062,14 @@ impl From<&InstrCacheable> for Instruction {
             InstrCacheable::CNop => Instruction::new_nop(InstrWidth::Compressed),
 
             // RV64C compressed instructions
-            InstrCacheable::CLd(args) => Instruction {
-                opcode: OpCode::CLd,
-                args: args.to_args(InstrWidth::Compressed),
-            },
-            InstrCacheable::CLdsp(args) => Instruction {
-                opcode: OpCode::CLdsp,
-                args: args.into(),
-            },
+            InstrCacheable::CLd(args) => {
+                debug_assert!(args.imm >= 0 && args.imm % 8 == 0);
+                Instruction::new_ldnz(args.rd, args.rs1, args.imm, InstrWidth::Compressed)
+            }
+            InstrCacheable::CLdsp(args) => {
+                debug_assert!(args.imm >= 0 && args.imm % 8 == 0);
+                Instruction::new_ldnz(args.rd_rs1, nz::sp, args.imm, InstrWidth::Compressed)
+            }
             InstrCacheable::CSd(args) => Instruction {
                 opcode: OpCode::CSd,
                 args: args.to_args(InstrWidth::Compressed),

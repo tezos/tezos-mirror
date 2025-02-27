@@ -242,9 +242,29 @@ where
     MC: memory::MemoryConfig,
     M: backend::ManagerReadWrite,
 {
-    /// `LD` I-type instruction
+    /// Loads a double-word (8 bytes) starting from address given by: `val(rs1) + imm`
+    /// where `rs1` and `rd` are NonZeroXRegisters.
     ///
-    /// Loads a double-word (8 bytes) starting from address given by: val(rs1) + imm
+    /// Relevant opcodes:
+    /// - `LD`
+    /// - `C.LD`
+    /// - `C.LDSP`
+    pub fn run_ldnz(
+        &mut self,
+        imm: i64,
+        rs1: NonZeroXRegister,
+        rd: NonZeroXRegister,
+    ) -> Result<(), Exception> {
+        let value: i64 = self.read_from_bus_nz(imm, rs1)?;
+        // i64 as u64 is a no-op
+        self.hart.xregisters.write_nz(rd, value as u64);
+        Ok(())
+    }
+
+    /// Loads a double-word (8 bytes) starting from address given by: `imm`.
+    ///
+    /// Relevant opcodes:
+    /// - `LD`
     pub fn run_ld(&mut self, imm: i64, rs1: XRegister, rd: XRegister) -> Result<(), Exception> {
         let value: i64 = self.read_from_bus(imm, rs1)?;
         // i64 as u64 is a no-op

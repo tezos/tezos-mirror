@@ -338,7 +338,7 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | Amomaxuw | Lrd | Scd | Amoswapd | Amoaddd | Amoxord | Amoandd | Amoord | Amomind
         | Amomaxd | Amominud | Amomaxud | Rem | Remu | Remw | Remuw | Div | Divu | Divw | Divuw
         | Mul | Mulh | Mulhsu | Mulhu | Mulw | Csrrw | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci
-        | CLw | CSw | CSwsp | CAddw | CSubw | CLd | CSd | CSdsp | Unknown => ArgsShape::XSrcXDest,
+        | CLw | CSw | CSwsp | CAddw | CSubw | CSd | CSdsp | Unknown => ArgsShape::XSrcXDest,
 
         Fadds | Fsubs | Fmuls | Fdivs | Fsqrts | Fmins | Fmaxs | Fsgnjs | Fsgnjns | Fsgnjxs
         | Fmadds | Fmsubs | Fnmsubs | Fnmadds | Faddd | Fsubd | Fmuld | Fdivd | Fsqrtd | Fmind
@@ -355,7 +355,7 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
 
         Addi | Andi | Ori | Xori | Slli | Srli | Srai | Add | Sub | Mv | Neg | And | Or | Xor
         | Sll | Srl | Sra | Jal | J | JrImm | JAbsolute | JalrAbsolute | Jr | Jalr | CAddiw
-        | Li | CLdsp | CLwsp | Nop | Beq | Beqz | Bne | Bnez | JalrImm => ArgsShape::NZXSrcNZXDest,
+        | Li | CLwsp | Nop | Beq | Beqz | Bne | Bnez | JalrImm | Ldnz => ArgsShape::NZXSrcNZXDest,
 
         Addiw | Addw | Subw | Sllw | Srlw | Sraw | Slti | Sltiu | Slliw | Srliw | Sraiw | Slt
         | Sltu | Auipc => ArgsShape::XSrcNZXDest,

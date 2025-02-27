@@ -40,6 +40,13 @@ pub struct ITypeArgs {
     pub imm: i64,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
+pub struct NonZeroITypeArgs {
+    pub rd: NonZeroXRegister,
+    pub rs1: NonZeroXRegister,
+    pub imm: i64,
+}
+
 /// Intermediate representation of Args for I-type instructions with parsed split of registers.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct SplitITypeArgs {
@@ -341,6 +348,8 @@ pub enum InstrCacheable {
     Lbu(ITypeArgs),
     Lhu(ITypeArgs),
     Lwu(ITypeArgs),
+    /// `LD` - Loads a double-word (8 bytes) starting
+    /// from address given by: `val(rs1) + imm`.
     Ld(ITypeArgs),
 
     // RV64I S-type instructions
@@ -575,7 +584,18 @@ pub enum InstrCacheable {
     CNop,
 
     // RV64C compressed instructions
-    CLd(ITypeArgs),
+    /// `C.LD` - Loads a 64-bit value from memory into register `rd`.
+    /// It computes an effective address by adding the immediate to the base address
+    /// in register `rs1`.
+    ///
+    /// The immediate is obtained by zero-extending and scaling by 8 the
+    /// offset encoded in the instruction (see U:C-16.3).
+    CLd(NonZeroITypeArgs),
+    /// `C.LDSP` - Loads a 64-bit value from memory into register `rd`. It computes
+    /// an effective address by adding the immediate to the stack pointer.
+    ///
+    /// The immediate is obtained by zero-extending and scaling by 8 the
+    /// offset encoded in the instruction (see U:C-16.3).
     CLdsp(CIBNZTypeArgs),
     CSd(SBTypeArgs),
     CSdsp(CSSTypeArgs),
