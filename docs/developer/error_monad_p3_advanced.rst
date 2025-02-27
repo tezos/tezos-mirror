@@ -213,8 +213,7 @@ you are registering:
 
 -  ``Permanent``: is for irremediable failures, i.e., failures that
    happen and will always happen whatever the context. E.g.,
-   `originating a
-   contract <https://tezos.gitlab.io/alpha/glossary.html?highlight=originate#origination>`__
+   :ref:`originating a contract <def_origination_alpha>`
    that does not type-check is a permanent error. This is used by the
    shell to mark the data as invalid.
 

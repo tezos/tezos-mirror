@@ -56,7 +56,7 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
       if t.disable_peer_discovery then worker_loop t callback
       else
         (* Since [request_info] may be modified in another Lwt thread, it is
-           required that getting the [last_sent_swat_request] and invoquing the
+           required that getting the [last_sent_swat_request] and invoking the
            callback be atomic to avoid race conditions.
            e.g. there must not exist a Lwt cooperation point between this
            affectation and the invocation of the callback.

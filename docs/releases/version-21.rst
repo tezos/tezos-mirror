@@ -69,7 +69,7 @@ corresponding modes of an accompanying smart rollup node.
 
    The binary encoding of ``/config/netwok/dal`` changed.
    As a result, the v21 DAL node is not compatible with earlier versions of Octez -- it cannot interact with earlier versioned Octez nodes. If you are operating a Tezos DAL node, make sure to upgrade all Octez infra to v21.1 (or at least v21.0).
-   Also, for attesters, it is recommended that they start their DAL node using the argument ``--attester-profiles=<pkh>`` where <pkh> is the attester's address (not the alias).
+   Also, for attesters, it is recommended that they start their DAL node using the argument ``--attester-profile=<pkh>`` where <pkh> is the attester's address (not the alias).
 
 Octez v21.1 contains several improvements concerning the DAL, mainly concerning network reliability and diagnostics enabling bakers to detect more easily whether their DAL node is working as expected.
 In particular, the DAL node now does the following.

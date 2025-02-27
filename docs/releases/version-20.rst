@@ -54,7 +54,7 @@ Some deprecated RPCs have been removed. Please check `the changelog <../CHANGES.
 
 The RPC ``/health/ready`` has been introduced to get the status of the RPC server.
 
-Starting from Octez v20, we strongly advise nodes and bakers operators to synchronise their clocks using NTP as issued in `the node section of getting started <https://tezos.gitlab.io/introduction/howtouse.html#node>`__.
+Starting from Octez v20, we strongly advise nodes and bakers operators to synchronise their clocks using NTP as issued in :ref:`start_node`.
 
 Smart rollup
 ~~~~~~~~~~~~

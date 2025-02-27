@@ -26,7 +26,7 @@
   if ($0 !~ /<footer>/) {
     gsub("¶"," ");
     gsub("class=\"reference internal\" href=\"#", "class=\"reference local\" href=\"#");
-    gsub("class=\"reference internal\" href=\"", "class=\"reference external\" href=\"https://tezos.gitlab.io/active/");
+    gsub("class=\"reference internal\" href=\"", "class=\"reference external\" href=\"https://octez.tezos.com/docs/active/");
     print;
   }
 }

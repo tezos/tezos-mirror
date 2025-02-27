@@ -29,7 +29,7 @@
     This module defines:
     - primitive functions to implement a session-establishment protocol
       (set up an authentication/encryption symmetric session key,
-       check proof of work target, authenticate hosts, exchange meta data),
+       check proof of work target, authenticate hosts, exchange metadata),
     - a higher-level, authenticated and encrypted, type of connection.
 
     It is parametric in two (abstract data) types. ['msg] is the unit of

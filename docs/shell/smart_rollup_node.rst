@@ -1525,7 +1525,7 @@ Define these functions in the ``lib.rs`` as follows:
 
    mod host;
    use crate::host::read_input;
-   use crate::host:ReadInputMessageInfo;
+   use crate::host::ReadInputMessageInfo;
 
    pub const MAX_MESSAGE_SIZE: u32 = 4096u32;
 

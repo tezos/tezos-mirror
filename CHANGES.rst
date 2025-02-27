@@ -1,7 +1,7 @@
 Development Changelog
 '''''''''''''''''''''
 
-**NB:** The changelog for releases can be found at: https://tezos.gitlab.io/CHANGES.html
+**NB:** The changelog for releases can be found at: https://octez.tezos.com/docs/CHANGES.html
 
 
 This file lists the changes added to each version of octez-node,

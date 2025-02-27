@@ -89,7 +89,7 @@ RPC Changes
 
 - In the following paths, ``../`` is short for
   ``/chains/<chain_id>/blocks/<block_id>/context/delegates/<baker_pkh>/``.
-  See https://tezos.gitlab.io/quebec/baking_power.html for more
+  See :doc:`../active/baking_power` for more
   details on the renamed and new RPCs.
 
   * Renamed RPC ``GET ../current_frozen_deposits`` to ``GET
