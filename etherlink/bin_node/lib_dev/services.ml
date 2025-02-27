@@ -280,6 +280,20 @@ let eth_subscribe ~(kind : Ethereum_types.Subscription.kind) =
     | Syncing ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/7642 *)
         Stdlib.failwith "The websocket event [syncing] is not implemented yet."
+    | Etherlink L1_L2_levels ->
+        let* () =
+          unless (Evm_events_follower.available ()) @@ fun () ->
+          failwith "The EVM node does not follow a rollup node"
+        in
+        let stream, stopper =
+          Lwt_watcher.create_stream Evm_context.l1_l2_levels_watcher
+        in
+        let stream =
+          Lwt_stream.map
+            (fun l -> Ethereum_types.Subscription.Etherlink (L1_l2_levels l))
+            stream
+        in
+        return (stream, stopper)
   in
   let stopper () =
     Stdlib.Hashtbl.remove subscriptions id ;

@@ -387,7 +387,14 @@ module Subscription : sig
     topics : Filter.topic option list option;
   }
 
-  type kind = NewHeads | Logs of logs | NewPendingTransactions | Syncing
+  type etherlink_extension = L1_L2_levels
+
+  type kind =
+    | NewHeads
+    | Logs of logs
+    | NewPendingTransactions
+    | Syncing
+    | Etherlink of etherlink_extension
 
   val kind_encoding : kind Data_encoding.t
 
@@ -407,11 +414,20 @@ module Subscription : sig
 
   type sync_output = {syncing : bool; status : sync_status}
 
+  type l1_l2_levels_output = {
+    l1_level : int32;
+    start_l2_level : quantity;
+    end_l2_level : quantity;
+  }
+
+  type etherlink_extension_output = L1_l2_levels of l1_l2_levels_output
+
   type 'transaction_object output =
     | NewHeads of 'transaction_object block
     | Logs of transaction_log
     | NewPendingTransactions of hash
     | Syncing of sync_output
+    | Etherlink of etherlink_extension_output
 
   val output_encoding :
     'transaction_object Data_encoding.t ->

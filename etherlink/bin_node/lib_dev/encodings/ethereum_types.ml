@@ -1290,7 +1290,14 @@ module Subscription = struct
          (opt "address" Filter.filter_address_encoding)
          (opt "topics" (list @@ option Filter.topic_encoding)))
 
-  type kind = NewHeads | Logs of logs | NewPendingTransactions | Syncing
+  type etherlink_extension = L1_L2_levels
+
+  type kind =
+    | NewHeads
+    | Logs of logs
+    | NewPendingTransactions
+    | Syncing
+    | Etherlink of etherlink_extension
 
   let kind_encoding =
     let open Data_encoding in
@@ -1311,12 +1318,14 @@ module Subscription = struct
             | NewHeads -> Some "newHeads"
             | NewPendingTransactions -> Some "newPendingTransactions"
             | Syncing -> Some "syncing"
-            | Logs _ -> Some "logs")
+            | Logs _ -> Some "logs"
+            | Etherlink L1_L2_levels -> Some "tez_l1L2Levels")
           (function
             | "newHeads" -> NewHeads
             | "newPendingTransactions" -> NewPendingTransactions
             | "syncing" -> Syncing
             | "logs" -> Logs {address = None; topics = None}
+            | "tez_l1L2Levels" -> Etherlink L1_L2_levels
             | _ -> raise Unknown_subscription);
       ]
 
@@ -1368,11 +1377,32 @@ module Subscription = struct
       (fun (syncing, status) -> {syncing; status})
       (obj2 (req "syncing" bool) (req "status" sync_status_encoding))
 
+  type l1_l2_levels_output = {
+    l1_level : int32;
+    start_l2_level : quantity;
+    end_l2_level : quantity;
+  }
+
+  let l1_l2_levels_output_encoding =
+    let open Data_encoding in
+    conv
+      (fun {l1_level; start_l2_level; end_l2_level} ->
+        (l1_level, start_l2_level, end_l2_level))
+      (fun (l1_level, start_l2_level, end_l2_level) ->
+        {l1_level; start_l2_level; end_l2_level})
+      (obj3
+         (req "l1Level" int32)
+         (req "startBlockNumber" quantity_encoding)
+         (req "endBlockNumber" quantity_encoding))
+
+  type etherlink_extension_output = L1_l2_levels of l1_l2_levels_output
+
   type 'transaction_object output =
     | NewHeads of 'transaction_object block
     | Logs of transaction_log
     | NewPendingTransactions of hash
     | Syncing of sync_output
+    | Etherlink of etherlink_extension_output
 
   let output_encoding transaction_object_encoding =
     let open Data_encoding in
@@ -1402,5 +1432,11 @@ module Subscription = struct
           sync_output_encoding
           (function Syncing l -> Some l | _ -> None)
           (fun l -> Syncing l);
+        case
+          ~title:"tez_l1l2Levels"
+          (Tag 4)
+          l1_l2_levels_output_encoding
+          (function Etherlink (L1_l2_levels l) -> Some l | _ -> None)
+          (fun l -> Etherlink (L1_l2_levels l));
       ]
 end

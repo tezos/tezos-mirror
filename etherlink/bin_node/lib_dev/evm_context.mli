@@ -155,6 +155,10 @@ val head_watcher :
 (** Watcher that gets notified each time a new receipt is produced. *)
 val receipt_watcher : Transaction_receipt.t Lwt_watcher.input
 
+(** Watcher that gets notified of new L1 levels its associated L2 levels. *)
+val l1_l2_levels_watcher :
+  Ethereum_types.Subscription.l1_l2_levels_output Lwt_watcher.input
+
 (** [check_history_mode ?switch ~store_history_mode ~history_mode ()] checks
     that the history mode are compatible, and returns the history mode the node
     should run in, depending on its stored mode [store_history_mode], the one
