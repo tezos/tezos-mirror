@@ -709,7 +709,7 @@ let push_metrics t
       Cloud.push_metric
         t.cloud
         ~help:"Total published commitments per slot"
-        ~typ:`Gauge
+        ~typ:`Counter
         ~labels
         ~name:"tezt_total_published_commitments_per_slot"
         (float value))
@@ -720,7 +720,7 @@ let push_metrics t
       Cloud.push_metric
         t.cloud
         ~help:"Total attested commitments per slot"
-        ~typ:`Gauge
+        ~typ:`Counter
         ~labels
         ~name:"tezt_total_attested_commitments_per_slot"
         (float value))
