@@ -73,6 +73,9 @@ pub struct DebugOptions {
         action(clap::ArgAction::SetFalse)
     )]
     pub demangle: bool,
+
+    #[command(flatten)]
+    pub preimage: PreimageOptions,
 }
 
 #[derive(Debug, Clone, Parser)]
@@ -88,6 +91,9 @@ pub struct GdbServerOptions {
     /// Port to listen on for gdb client (on `localhost:<PORT>`).
     #[arg(long, short)]
     pub port: u16,
+
+    #[command(flatten)]
+    pub preimage: PreimageOptions,
 }
 
 #[derive(Clone, ValueEnum, Debug)]
@@ -235,6 +241,13 @@ pub struct TableSortArgs {
 }
 
 #[derive(Debug, Clone, Parser)]
+pub struct PreimageOptions {
+    /// Directory containing preimage files for reveal requests
+    #[arg(long)]
+    pub preimages_dir: Option<Box<Path>>,
+}
+
+#[derive(Debug, Clone, Parser)]
 pub struct CommonOptions {
     #[arg(short = 'm', long, value_enum, default_value_t = ExitMode::User)]
     pub posix_exit_mode: ExitMode,
@@ -251,6 +264,9 @@ pub struct CommonOptions {
     /// Run as PVM.
     #[arg(long)]
     pub pvm: bool,
+
+    #[command(flatten)]
+    pub preimage: PreimageOptions,
 }
 
 #[derive(Debug, Clone, Parser)]

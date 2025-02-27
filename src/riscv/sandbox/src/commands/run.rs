@@ -136,6 +136,7 @@ fn run_pvm<R, B: Block<M1G, Owned>>(
         hooks,
         rollup_address.into_hash().as_ref().try_into().unwrap(),
         common.inbox.origination_level,
+        common.preimage.preimages_dir.clone(),
         block_builder,
     )?;
 

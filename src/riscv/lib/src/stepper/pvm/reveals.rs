@@ -3,68 +3,96 @@
 // SPDX-License-Identifier: MIT
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::fs;
+use std::path::Path;
 
+use tezos_crypto_rs::blake2b::digest_256;
 use tezos_smart_rollup_constants::core::METADATA_LENGTH;
+use tezos_smart_rollup_constants::core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_constants::core::ROLLUP_ADDRESS_LENGTH;
 
-type ResponseFn = Arc<dyn Fn() -> Result<Box<[u8]>, std::io::Error>>;
-
 /// Data structure that maps reveal request to reveal response
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct RevealRequestResponseMap {
-    map: HashMap<Box<[u8]>, ResponseFn>,
+    map: HashMap<Box<[u8]>, Box<[u8]>>,
+    preimages_dir: Option<Box<Path>>,
 }
 
 impl RevealRequestResponseMap {
-    // TODO RV-458: Sandbox can load pre-images and provide them when it receives reveal request
-    // Currently, one sample record with dummy data is added to the map for testing purpose
     /// Construct the mapping from reveal request to reveal response
-    pub fn new(rollup_address: [u8; 20], origination_level: u32) -> Self {
-        let mut reveal_request_response_map = RevealRequestResponseMap::default();
-
-        // Entry for returning dummy data to generic reveal request
-        reveal_request_response_map.add_static(
-            [
-                0, 1, 10, 20, 30, 40, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 100, 120, 140, 160,
-            ],
-            [
-                150, 160, 170, 180, 190, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-                2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-                2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-                2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 50, 60, 70, 80, 90,
-            ],
-        );
+    pub fn new(
+        rollup_address: [u8; 20],
+        origination_level: u32,
+        preimages_dir: Option<Box<Path>>,
+    ) -> Self {
+        let mut reveal_request_response_map = Self {
+            map: HashMap::new(),
+            preimages_dir,
+        };
 
         // Entry for responding to reveal_metadata request
-        let mut metadata_response_buffer = [0u8; METADATA_LENGTH];
-        metadata_response_buffer[..ROLLUP_ADDRESS_LENGTH].copy_from_slice(&rollup_address);
-        metadata_response_buffer[ROLLUP_ADDRESS_LENGTH..]
-            .copy_from_slice(&origination_level.to_be_bytes());
-        reveal_request_response_map.add_static([1u8], metadata_response_buffer);
+        reveal_request_response_map.add_metadata(rollup_address, origination_level);
 
         reveal_request_response_map
-    }
-
-    /// Construct an entry of RevealRequestResponseMap with response that requires loading
-    #[allow(dead_code)]
-    pub fn add_handler(
-        &mut self,
-        request: impl Into<Box<[u8]>>,
-        response: impl Fn() -> Result<Box<[u8]>, std::io::Error> + 'static,
-    ) {
-        self.map.insert(request.into(), Arc::new(response));
     }
 
     /// Construct an entry of RevealRequestResponseMap with static response
     pub fn add_static(&mut self, request: impl Into<Box<[u8]>>, response: impl Into<Box<[u8]>>) {
         let response_value: Box<[u8]> = response.into();
-        self.add_handler(request, move || Ok(response_value.clone()));
+        self.map.insert(request.into(), response_value);
     }
 
     /// Get response function for the given request
-    pub fn get_response(&self, request: &[u8]) -> Option<ResponseFn> {
-        self.map.get(request).cloned()
+    pub fn get_response(&self, request: &[u8]) -> Option<Box<[u8]>> {
+        self.map
+            .get(request)
+            .cloned()
+            .or_else(|| self.load_response_from_disk(request))
     }
+
+    fn load_response_from_disk(&self, request: &[u8]) -> Option<Box<[u8]>> {
+        let preimages_dir = self.preimages_dir.as_ref()?;
+
+        // Expecting the first byte to be the tag for preimage hash
+        if request.first() != Some(&0) {
+            return None;
+        }
+
+        let preimage_hash = &request[1..];
+        let hex_name = hex::encode(preimage_hash);
+        let file_path = preimages_dir.join(hex_name);
+
+        if !file_path.is_file() {
+            return None;
+        }
+
+        let content = fs::read(file_path).ok()?;
+        if check_preimage_hash(&content, preimage_hash) {
+            Some(content.into_boxed_slice())
+        } else {
+            None
+        }
+    }
+
+    fn add_metadata(
+        &mut self,
+        rollup_address: [u8; ROLLUP_ADDRESS_LENGTH],
+        origination_level: u32,
+    ) {
+        let mut metadata_response_buffer = [0u8; METADATA_LENGTH];
+        metadata_response_buffer[..ROLLUP_ADDRESS_LENGTH].copy_from_slice(&rollup_address);
+        metadata_response_buffer[ROLLUP_ADDRESS_LENGTH..]
+            .copy_from_slice(&origination_level.to_be_bytes());
+        self.add_static([1u8], metadata_response_buffer);
+    }
+}
+
+fn check_preimage_hash(preimage: &[u8], preimage_hash: &[u8]) -> bool {
+    // Only blake2b (`preimage_hash[0] == 0`) is supported for now
+    if preimage_hash.len() != PREIMAGE_HASH_SIZE || preimage_hash[0] != 0 {
+        return false;
+    }
+
+    let computed_hash = digest_256(preimage);
+    preimage_hash[1..] == computed_hash
 }

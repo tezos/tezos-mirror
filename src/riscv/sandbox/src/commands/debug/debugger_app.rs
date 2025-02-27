@@ -253,6 +253,7 @@ impl<'hooks, MC: memory::MemoryConfig, CL: CacheLayouts>
             hooks,
             rollup_address,
             opts.common.inbox.origination_level,
+            opts.preimage.preimages_dir.clone(),
             block_builder,
         )?;
 

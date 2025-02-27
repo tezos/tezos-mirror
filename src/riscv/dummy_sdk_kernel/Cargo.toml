@@ -3,6 +3,11 @@ name = "riscv-dummy-sdk"
 version = "0.0.0"
 edition = "2021"
 
+[dependencies.tezos_crypto_rs]
+version = "0.6.0"
+path = "../../../sdk/rust/crypto"
+default-features = false
+
 [dependencies.tezos-smart-rollup]
 path = "../../kernel_sdk/sdk"
 version = "0.2.2"
@@ -18,3 +23,6 @@ features = [
 
 [dependencies.tezos-smart-rollup-constants]
 path = "../../kernel_sdk/constants"
+
+[dependencies]
+hex = "0.4.3"
