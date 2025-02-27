@@ -621,6 +621,39 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sw`].
+    pub(crate) fn new_sw(rs1: XRegister, rs2: XRegister, imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Sw,
+            args: Args {
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Swnz`].
+    pub(crate) fn new_swnz(
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Swnz,
+            args: Args {
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {
@@ -1122,6 +1155,31 @@ impl Instruction {
                 Instruction::new_lwnz(rd, rs1, args.imm, InstrWidth::Uncompressed)
             }
             _ => Instruction::new_lw(args.rd, args.rs1, args.imm, InstrWidth::Uncompressed),
+        }
+    }
+
+    /// Convert [`InstrCacheable::Sw`] according to whether registers are non-zero.
+    ///
+    /// [`InstrCacheable::Sw`]: crate::parser::instruction::InstrCacheable::Sw
+    pub(super) fn from_ic_sw(args: &SBTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rs1), split_x0(args.rs2)) {
+            (X::NonZero(rs1), X::NonZero(rs2)) => {
+                Instruction::new_swnz(rs1, rs2, args.imm, InstrWidth::Uncompressed)
+            }
+            _ => Instruction::new_sw(args.rs1, args.rs2, args.imm, InstrWidth::Uncompressed),
+        }
+    }
+
+    /// Convert [`InstrCacheable::CSwsp`] according to whether register is non-zero.
+    ///
+    /// [`InstrCacheable::CSwsp`]: crate::parser::instruction::InstrCacheable::CSwsp
+    pub(super) fn from_ic_cswsp(args: &CSSTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        debug_assert!(args.imm >= 0 && args.imm % 4 == 0);
+        match split_x0(args.rs2) {
+            X::NonZero(rs2) => Instruction::new_swnz(nz::sp, rs2, args.imm, InstrWidth::Compressed),
+            X::X0 => Instruction::new_sw(sp, x0, args.imm, InstrWidth::Compressed),
         }
     }
 }

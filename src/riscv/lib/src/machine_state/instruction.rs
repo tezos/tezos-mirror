@@ -330,8 +330,6 @@ pub enum OpCode {
     Csrrci,
 
     // RV32C compressed instructions
-    CSw,
-    CSwsp,
     /// Jumps to val(rs1)
     Jr,
     /// Effects are to store the next instruction address in rd and jump to val(rs1).
@@ -370,6 +368,8 @@ pub enum OpCode {
     Sdnz,
     /// Same as Lw but only using NonZeroXRegisters.
     Lwnz,
+    /// Same as Sw but only using NonZeroXRegisters.
+    Swnz,
 }
 
 impl OpCode {
@@ -425,6 +425,7 @@ impl OpCode {
             Self::Sb => Args::run_sb,
             Self::Sh => Args::run_sh,
             Self::Sw => Args::run_sw,
+            Self::Swnz => Args::run_swnz,
             Self::Sd => Args::run_sd,
             Self::Sdnz => Args::run_sdnz,
             Self::Beq => Args::run_beq,
@@ -541,8 +542,6 @@ impl OpCode {
             Self::Csrrwi => Args::run_csrrwi,
             Self::Csrrsi => Args::run_csrrsi,
             Self::Csrrci => Args::run_csrrci,
-            Self::CSw => Args::run_csw,
-            Self::CSwsp => Args::run_cswsp,
             Self::J => Args::run_j,
             Self::JAbsolute => Args::run_j_absolute,
             Self::Jr => Args::run_jr,
@@ -967,19 +966,6 @@ macro_rules! impl_cb_type {
     };
 }
 
-macro_rules! impl_css_type {
-    ($fn: ident) => {
-        /// SAFETY: This function must only be called on an `Args` belonging
-        /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
-            &self,
-            core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate, Exception> {
-            core.$fn(self.imm, self.rs2.x).map(|_| Next(self.width))
-        }
-    };
-}
-
 macro_rules! impl_fcss_type {
     ($fn: ident) => {
         /// SAFETY: This function must only be called on an `Args` belonging
@@ -1181,6 +1167,7 @@ impl Args {
     impl_store_type!(run_sw);
     impl_store_type!(run_sd);
     impl_store_type!(run_sdnz, non_zero);
+    impl_store_type!(run_swnz, non_zero);
 
     // RV64I B-type instructions
     impl_b_type!(run_beq, non_zero);
@@ -1350,12 +1337,10 @@ impl Args {
 
     // RV32C compressed instructions
     impl_cr_nz_type!(c::run_mv, run_mv);
-    impl_store_type!(run_csw);
     impl_cb_type!(run_beqz);
     impl_cb_type!(run_bnez);
     impl_ci_type!(load_store::run_li, run_li, non_zero);
     impl_cr_type!(run_neg, non_zero);
-    impl_css_type!(run_cswsp);
 
     fn run_j<MC: MemoryConfig, M: ManagerReadWrite>(
         &self,
@@ -1533,10 +1518,7 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Sh,
                 args: args.to_args(InstrWidth::Uncompressed),
             },
-            InstrCacheable::Sw(args) => Instruction {
-                opcode: OpCode::Sw,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
+            InstrCacheable::Sw(args) => Instruction::from_ic_sw(args),
             InstrCacheable::Sd(args) => Instruction::from_ic_sd(args),
 
             // RV64I B-type instructions
@@ -2003,14 +1985,11 @@ impl From<&InstrCacheable> for Instruction {
                 debug_assert!(args.imm >= 0 && args.imm % 4 == 0);
                 Instruction::new_lwnz(args.rd_rs1, nz::sp, args.imm, InstrWidth::Compressed)
             }
-            InstrCacheable::CSw(args) => Instruction {
-                opcode: OpCode::CSw,
-                args: args.to_args(InstrWidth::Compressed),
-            },
-            InstrCacheable::CSwsp(args) => Instruction {
-                opcode: OpCode::CSwsp,
-                args: args.into(),
-            },
+            InstrCacheable::CSw(args) => {
+                debug_assert!(args.imm >= 0 && args.imm % 4 == 0);
+                Instruction::new_swnz(args.rs1, args.rs2, args.imm, InstrWidth::Compressed)
+            }
+            InstrCacheable::CSwsp(args) => Instruction::from_ic_cswsp(args),
             InstrCacheable::CJ(args) => Instruction::new_j(args.imm, InstrWidth::Compressed),
             InstrCacheable::CJr(args) => Instruction::new_jr(args.rs1, InstrWidth::Compressed),
             InstrCacheable::CJalr(args) => {

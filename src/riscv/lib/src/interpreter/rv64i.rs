@@ -384,13 +384,33 @@ where
         self.write_to_bus_nz(imm, rs1, value)
     }
 
-    /// `SW` S-type instruction
+    /// Stores a word (lowest 4 bytes from rs2) to the address starting at: `val(rs1) + imm`
     ///
-    /// Stores a word (lowest 4 bytes from rs2) to the address starting at: val(rs1) + imm
+    /// Relevant opcodes:
+    /// - `SW`
+    /// - `C.SWSP`
     pub fn run_sw(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Result<(), Exception> {
         let value: u64 = self.hart.xregisters.read(rs2);
         // u64 as u32 is truncated, getting the lowest 32 bits
         self.write_to_bus(imm, rs1, value as u32)
+    }
+
+    /// Stores a word (lowest 4 bytes from rs2) to the address starting at: `val(rs1) + imm`
+    /// where `rs1` and `rs2` are NonZeroXRegisters.
+    ///
+    /// Relevant opcodes:
+    /// - `SW`
+    /// - `C.SW`
+    /// - `C.SWSP`
+    pub fn run_swnz(
+        &mut self,
+        imm: i64,
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+    ) -> Result<(), Exception> {
+        let value: u64 = self.hart.xregisters.read_nz(rs2);
+        // u64 as u32 is truncated, getting the lowest 32 bits
+        self.write_to_bus_nz(imm, rs1, value as u32)
     }
 
     /// `SH` S-type instruction

@@ -698,7 +698,7 @@ mod tests {
             },
             memory::{self, M1K, M1M, M8K, Memory},
             mode::Mode,
-            registers::{a0, a1, a2, nz, t0, t1, t2},
+            registers::{NonZeroXRegister, a0, a1, a2, nz, t0, t1, t2},
         },
         parser::{
             XRegisterParsed::*,
@@ -1441,13 +1441,13 @@ mod tests {
             })
             .unwrap(),
             Instruction::try_from(TaggedInstruction {
-                opcode: OpCode::CSw,
+                opcode: OpCode::Swnz,
                 args: TaggedArgs {
-                    rs1: a0.into(),
-                    rs2: a1.into(),
+                    rs1: nz::a0.into(),
+                    rs2: nz::a1.into(),
                     imm: 0,
                     width: InstrWidth::Compressed,
-                    rd: TaggedRegister::X(XRegister::x1),
+                    rd: TaggedRegister::NZX(NonZeroXRegister::x1),
                     ..TaggedArgs::DEFAULT
                 },
             })

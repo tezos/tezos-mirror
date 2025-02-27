@@ -12,7 +12,7 @@ use crate::{
         MachineCoreState, ProgramCounterUpdate,
         hart_state::HartState,
         memory::{self, Address},
-        registers::{NonZeroXRegister, XRegister, sp},
+        registers::{NonZeroXRegister, XRegister},
     },
     parser::instruction::InstrWidth,
     state_backend as backend,
@@ -140,17 +140,6 @@ where
     pub fn run_csw(&mut self, imm: i64, rs1: XRegister, rs2: XRegister) -> Result<(), Exception> {
         debug_assert!(imm >= 0 && imm % 4 == 0);
         self.run_sw(imm, rs1, rs2)
-    }
-
-    /// `C.SWSP` CSS-type compressed instruction
-    ///
-    /// Stores a 32-bit value in register `rs2` to memory. It computes
-    /// an effective address by adding the immediate to the stack pointer.
-    /// The immediate is obtained by zero-extending and scaling by 4 the
-    /// offset encoded in the instruction (see U:C-16.3).
-    pub fn run_cswsp(&mut self, imm: i64, rs2: XRegister) -> Result<(), Exception> {
-        debug_assert!(imm >= 0 && imm % 4 == 0);
-        self.run_sw(imm, sp, rs2)
     }
 }
 
