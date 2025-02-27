@@ -114,4 +114,6 @@ if [ -f /var/lib/octez-node/daemon_was_running ] &&
   rm /var/lib/octez-node/daemon_was_running
 fi
 
+systemctl daemon-reload || true
+
 #DEBHELPER#
