@@ -7,6 +7,7 @@
 
 module Agent = Agent
 module Types = Types
+module Chronos = Chronos
 
 module Alert = struct
   include Alert_manager
