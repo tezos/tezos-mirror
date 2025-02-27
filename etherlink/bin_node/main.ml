@@ -831,6 +831,48 @@ let websocket_checks config =
       Internal_event.Simple.emit Event.buggy_dream_websocket () |> Lwt_result.ok
   | _ -> Lwt_result_syntax.return_unit
 
+let make_event_config ~verbosity ?daily_logs_path () =
+  let open Tezos_event_logging.Internal_event in
+  let open Tezos_base_unix.Internal_event_unix in
+  let open Tezos_base.Internal_event_config in
+  let config = make_with_defaults ~verbosity () in
+  match daily_logs_path with
+  | Some daily_logs_path ->
+      (* Show only above Info rpc_server events, they are not
+         relevant as we do not have a REST-API server. If not
+         set, the daily logs are polluted with these
+         uninformative logs. *)
+      let daily_logs_section_prefixes =
+        [
+          ("rpc_server", Some Notice);
+          ("rpc_server", Some Warning);
+          ("rpc_server", Some Error);
+          ("rpc_server", Some Fatal);
+        ]
+      in
+      let uri =
+        make_config_uri
+          ~create_dirs:true
+          ~daily_logs:7
+          ~level:Info
+          ~format:"pp-rfc5424"
+          ~chmod:0o640
+          ~section_prefixes:daily_logs_section_prefixes
+          (`Path Filename.Infix.(daily_logs_path // "daily.log"))
+      in
+      add_uri_to_config uri config
+  | None -> config
+
+let init_logs ~daily_logs ~data_dir configuration =
+  let open Tezos_base_unix.Internal_event_unix in
+  let daily_logs_path =
+    if daily_logs then Some Filename.Infix.(data_dir // "daily_logs") else None
+  in
+  let config =
+    make_event_config ~verbosity:configuration.verbose ?daily_logs_path ()
+  in
+  init ~config ()
+
 let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
     ?cors_origins ?cors_headers ?log_filter_max_nb_blocks
     ?log_filter_max_nb_logs ?log_filter_chunk_size ?rollup_node_endpoint
@@ -875,10 +917,7 @@ let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
         };
     }
   in
-  let*! () =
-    let open Tezos_base_unix.Internal_event_unix in
-    init ~config:(make_with_defaults ~verbosity:config.verbose ()) ()
-  in
+  let*! () = init_logs ~daily_logs:true ~data_dir config in
   let*! () = Internal_event.Simple.emit Event.event_starting "proxy" in
   let* () = Evm_node_lib_dev.Proxy.main config in
   let wait, _resolve = Lwt.wait () in
@@ -910,24 +949,6 @@ let sequencer_disable_native_execution configuration =
           {configuration.kernel_execution with native_execution_policy = Never};
       }
   | Never -> return configuration
-
-let make_event_config ~verbosity ~daily_logs_path
-    ?(daily_logs_section_prefixes = []) () =
-  let open Tezos_event_logging.Internal_event in
-  let open Tezos_base_unix.Internal_event_unix in
-  let open Tezos_base.Internal_event_config in
-  let config = make_with_defaults ~verbosity () in
-  let uri =
-    make_config_uri
-      ~create_dirs:true
-      ~daily_logs:7
-      ~level:Info
-      ~format:"pp-rfc5424"
-      ~chmod:0o640
-      ~section_prefixes:daily_logs_section_prefixes
-      (`Path Filename.Infix.(daily_logs_path // "daily.log"))
-  in
-  add_uri_to_config uri config
 
 let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
     ?rpc_batch_limit ?cors_origins ?cors_headers ?tx_pool_timeout_limit
@@ -983,27 +1004,7 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
       ~finalized_view
       ()
   in
-  let*! () =
-    let open Tezos_base_unix.Internal_event_unix in
-    let config =
-      make_event_config
-        ~verbosity:configuration.verbose
-        ~daily_logs_path:Filename.Infix.(data_dir // "daily_logs")
-          (* Show only above Info rpc_server events, they are not
-             relevant as we do not have a REST-API server. If not
-             set, the daily logs are polluted with these
-             uninformative logs. *)
-        ~daily_logs_section_prefixes:
-          [
-            ("rpc_server", Some Notice);
-            ("rpc_server", Some Warning);
-            ("rpc_server", Some Error);
-            ("rpc_server", Some Fatal);
-          ]
-        ()
-    in
-    init ~config ()
-  in
+  let*! () = init_logs ~daily_logs:true ~data_dir configuration in
   let*! configuration =
     match sandbox_key with
     | None ->
@@ -1134,27 +1135,7 @@ let rpc_command =
           read_write_config
           ~finalized_view
       in
-      let*! () =
-        let open Tezos_base_unix.Internal_event_unix in
-        let config =
-          make_event_config
-            ~verbosity:config.verbose
-            ~daily_logs_path:Filename.Infix.(data_dir // "daily_logs")
-              (* Show only above Info rpc_server events, they are not
-                 relevant as we do not have a REST-API server. If not
-                 set, the daily logs are polluted with these
-                 uninformative logs. *)
-            ~daily_logs_section_prefixes:
-              [
-                ("rpc_server", Some Notice);
-                ("rpc_server", Some Warning);
-                ("rpc_server", Some Error);
-                ("rpc_server", Some Fatal);
-              ]
-            ()
-        in
-        init ~config ()
-      in
+      let*! () = init_logs ~daily_logs:true ~data_dir config in
       let* () = websocket_checks config in
       let*! () = Internal_event.Simple.emit Event.event_starting "rpc" in
       Evm_node_lib_dev.Rpc.main
@@ -1207,27 +1188,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?network
       ()
   in
-  let*! () =
-    let open Tezos_base_unix.Internal_event_unix in
-    let config =
-      make_event_config
-        ~verbosity:config.verbose
-        ~daily_logs_path:Filename.Infix.(data_dir // "daily_logs")
-          (* Show only above Info rpc_server events, they are not
-             relevant as we do not have a REST-API server. If not
-             set, the daily logs are polluted with these
-             uninformative logs. *)
-        ~daily_logs_section_prefixes:
-          [
-            ("rpc_server", Some Notice);
-            ("rpc_server", Some Warning);
-            ("rpc_server", Some Error);
-            ("rpc_server", Some Fatal);
-          ]
-        ()
-    in
-    init ~config ()
-  in
+  let*! () = init_logs ~daily_logs:true ~data_dir config in
   let* () = websocket_checks config in
   let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
   Evm_node_lib_dev.Observer.main
@@ -1442,6 +1403,7 @@ let init_from_rollup_node_command =
     (fun (data_dir, omit_delayed_tx_events) rollup_node_data_dir () ->
       let open Lwt_result_syntax in
       let* configuration = Cli.create_or_read_config ~data_dir () in
+      let*! () = init_logs ~daily_logs:false ~data_dir configuration in
       Evm_node_lib_dev.Evm_context.init_from_rollup_node
         ~configuration
         ~omit_delayed_tx_events
@@ -1550,15 +1512,6 @@ let replay_command =
          l2_level
          () ->
       let open Lwt_result_syntax in
-      let*! () =
-        let open Tezos_base_unix.Internal_event_unix in
-        let config =
-          if kernel_verbosity = Some Evm_node_lib_dev.Events.Debug then
-            Some (make_with_defaults ~verbosity:Debug ())
-          else None
-        in
-        init ?config ()
-      in
       let* configuration =
         Cli.create_or_read_config
           ~data_dir
@@ -1567,6 +1520,7 @@ let replay_command =
           ?native_execution_policy
           ()
       in
+      let*! () = init_logs ~daily_logs:false ~data_dir configuration in
       Evm_node_lib_dev.Replay.main
         ~profile
         ?kernel_path
@@ -1598,12 +1552,8 @@ let patch_kernel_command =
     (fun (data_dir, block_number, force) kernel_path () ->
       let open Lwt_result_syntax in
       let open Evm_node_lib_dev in
-      let*! () =
-        let open Tezos_base_unix.Internal_event_unix in
-        let config = make_with_defaults ~verbosity:Warning () in
-        init ~config ()
-      in
       let* configuration = Cli.create_or_read_config ~data_dir () in
+      let*! () = init_logs ~daily_logs:false ~data_dir configuration in
       (* We remove the [observer] configuration. This [patch] should not need
          to interact with an upstream EVM node. *)
       let configuration = {configuration with observer = None} in
@@ -1770,11 +1720,7 @@ mode.|}
           ?history_mode
           ()
       in
-      let*! () =
-        let open Tezos_base_unix.Internal_event_unix in
-        let config = make_with_defaults ~verbosity:Warning () in
-        init ~config ()
-      in
+      let*! () = init_logs ~daily_logs:false ~data_dir config in
       let* () = websocket_checks config in
       Configuration.save ~force ~data_dir config)
 
@@ -1806,11 +1752,7 @@ let check_config_command =
               config_path
         | None -> load ?network ~data_dir ()
       in
-      let*! () =
-        let open Tezos_base_unix.Internal_event_unix in
-        let config = make_with_defaults ~verbosity:Warning () in
-        init ~config ()
-      in
+      let*! () = init_logs ~daily_logs:false ~data_dir config in
       let* () = websocket_checks config in
       if print_config then
         Format.printf "%a\n" (Configuration.pp_print_json ~data_dir) config
@@ -2401,6 +2343,9 @@ let export_snapshot (data_dir, snapshot_file, compress_on_the_fly, uncompressed)
     =
   let open Lwt_result_syntax in
   let open Evm_node_lib_dev.Snapshots in
+  let* configuration = Configuration.Cli.create_or_read_config ~data_dir () in
+  let*! () = init_logs ~daily_logs:false ~data_dir configuration in
+
   let compression =
     match (compress_on_the_fly, uncompressed) with
     | true, true ->
@@ -2441,11 +2386,10 @@ let import_snapshot_command =
     (prefixes ["snapshot"; "import"] @@ Params.snapshot_file_or_url @@ stop)
     (fun (data_dir, force) snapshot_file () ->
       let open Lwt_result_syntax in
-      let*! () =
-        let open Tezos_base_unix.Internal_event_unix in
-        let config = make_with_defaults ~verbosity:Notice () in
-        init ~config ()
+      let* configuration =
+        Configuration.Cli.create_or_read_config ~data_dir ()
       in
+      let*! () = init_logs ~daily_logs:false ~data_dir configuration in
       Evm_node_lib_dev.Snapshots.import_from
         ~cancellable:true
         ~force
@@ -2552,11 +2496,7 @@ let switch_history_mode_command =
       let* () =
         Evm_store.use store @@ fun conn ->
         let* config = Cli.create_or_read_config ~data_dir ~history_mode () in
-        let*! () =
-          let open Tezos_base_unix.Internal_event_unix in
-          let config = make_with_defaults ~verbosity:Warning () in
-          init ~config ()
-        in
+        let*! () = init_logs ~daily_logs:false ~data_dir config in
         let* store_history_mode = Evm_store.Metadata.find_history_mode conn in
 
         let* history_mode =
@@ -2599,12 +2539,8 @@ let patch_state_command =
     @@ stop)
     (fun (data_dir, block_number, force) key value () ->
       let open Evm_node_lib_dev in
-      let*! () =
-        let open Tezos_base_unix.Internal_event_unix in
-        let config = make_with_defaults ~verbosity:Warning () in
-        init ~config ()
-      in
       let* configuration = Cli.create_or_read_config ~data_dir () in
+      let*! () = init_logs ~daily_logs:false ~data_dir configuration in
       if force then
         (* We remove the [observer] configuration. This [patch] should not need
            to interact with an upstream EVM node. *)
@@ -2642,6 +2578,7 @@ let preemptive_kernel_download_command =
       let* configuration =
         Cli.create_or_read_config ~data_dir ?preimages ?preimages_endpoint ()
       in
+      let*! () = init_logs ~daily_logs:false ~data_dir configuration in
       let kernel_execution_config = configuration.kernel_execution in
       let*? preimages_endpoint =
         Option.either
