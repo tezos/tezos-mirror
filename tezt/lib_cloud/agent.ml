@@ -8,6 +8,13 @@
 module Configuration = struct
   include Types.Agent_configuration
 
+  let pp fmt x =
+    Format.fprintf
+      fmt
+      "%a"
+      Data_encoding.Json.pp
+      (Data_encoding.Json.construct encoding x)
+
   let uri_of_docker_image docker_image =
     match (docker_image, Env.mode) with
     | Types.Agent_configuration.Gcp {alias}, (`Cloud | `Host | `Orchestrator) ->
