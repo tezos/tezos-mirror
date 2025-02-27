@@ -67,6 +67,18 @@ let time_to_string spec =
       to_string spec.day_of_week;
     ]
 
+let task ~tm ~action =
+  let time = time_of_string tm in
+  let is_valid = validate_time time in
+  if not is_valid then
+    failwith
+      (Format.asprintf "Invalid time specification: %s" (time_to_string time)) ;
+  {time; action; last_run = None}
+
+let init ~tasks =
+  let shutdown, trigger_shutdown = Lwt.task () in
+  {tasks; shutdown; trigger_shutdown}
+
 (* Check if a task should run at the given time.
 
    The `+ 1` is needed because OCaml's Unix module and the cron
@@ -80,15 +92,6 @@ let should_run task tm =
   && matches tm.Unix.tm_mday task.time.day
   && matches (succ tm.Unix.tm_mon) task.time.month
   && matches tm.Unix.tm_wday task.time.day_of_week
-
-(* Schedule a task using cron string. *)
-let register t ~tm ~action =
-  let time = time_of_string tm in
-  let task = {time; action; last_run = None} in
-  if validate_time time then t.tasks <- task :: t.tasks
-  else
-    failwith
-      (Format.asprintf "Invalid time specification: %s" (time_to_string time))
 
 let run ~now_tm t =
   Lwt_list.iter_p

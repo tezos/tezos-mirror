@@ -10,9 +10,13 @@
 (** The scheduler *)
 type t
 
-(** [register t ~time ~action] adds a new task to the scheduler.
+(** A scheduler task. *)
+type task
 
-    The time format follows the standard cron syntax with five
+(** [task ~tm ~action] return a new task performing [action] according
+    to the time [tm].
+
+    The [tm] time format follows the standard cron syntax with five
     space-separated fields: minute, hour, day of month, month, and day
     of week. Each field can be either a specific number within its
     valid range (minute: 0-59, hour: 0-23, day: 1-31, month: 1-12, day
@@ -29,7 +33,11 @@ type t
 
     @raise Failure if the time specification is invalid.
     @raise Failure if the time string format is invalid. *)
-val register : t -> tm:string -> action:(unit -> unit Lwt.t) -> unit
+val task : tm:string -> action:(unit -> unit Lwt.t) -> task
+
+(** [init ~tasks] creates an chronos scheduler performing the given
+    [tasks]. *)
+val init : tasks:task list -> t
 
 (** [start t] starts the scheduler. *)
 val start : t -> unit
