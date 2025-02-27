@@ -104,6 +104,23 @@ CAMLprim value caml_bls12_381_signature_blst_signature_keygen_stubs(
   CAMLreturn(CAML_BLS12_381_OUTPUT_SUCCESS);
 }
 
+CAMLprim value caml_bls12_381_signature_blst_polynomial_evaluation(
+    value scalar_res, value scalars, value nscalars, value fr_x) {
+  CAMLparam4(scalar_res, scalars, nscalars, fr_x);
+  int len_c = Int_val(nscalars);
+  blst_fr scalar_i, res;
+
+  // a(X) = ((..(a_{n-1} * X + a_{n-2}) * X + ...) * X + a_1) * X + a_0
+  blst_fr_from_scalar(&res, Blst_scalar_val(Field(scalars, len_c - 1)));
+  for (int i = len_c - 2; i >= 0; i--) {
+    blst_fr_mul(&res, &res, Blst_fr_val(fr_x));
+    blst_fr_from_scalar(&scalar_i, Blst_scalar_val(Field(scalars, i)));
+    blst_fr_add(&res, &res, &scalar_i);
+  }
+  blst_scalar_from_fr(Blst_scalar_val(scalar_res), &res);
+  CAMLreturn(CAML_BLS12_381_OUTPUT_SUCCESS);
+}
+
 // Pk in G1, Signature in G2
 CAMLprim value
 caml_bls12_381_signature_blst_sk_to_pk_in_g1_stubs(value buffer, value scalar) {

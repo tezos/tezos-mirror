@@ -31,6 +31,10 @@ module CommonStubs = struct
     Unsigned.Size_t.t ->
     unit = "caml_bls12_381_signature_blst_signature_keygen_stubs"
 
+  external polynomial_evaluation :
+    scalar -> scalar array -> int -> Bls12_381.Fr.t -> int
+    = "caml_bls12_381_signature_blst_polynomial_evaluation"
+
   external pairing_init : bool -> Bytes.t -> Unsigned.Size_t.t -> ctxt
     = "caml_bls12_381_signature_blst_pairing_init_stubs"
 
@@ -113,6 +117,21 @@ let generate_sk ?(key_info = Bytes.empty) ikm =
       key_info
       (Unsigned.Size_t.of_int key_info_length) ;
   buffer_scalar
+
+let share_secret_key secret_polynomial ~n =
+  let poly_s = Array.of_list secret_polynomial in
+  let len = Array.length poly_s in
+  assert (len > 1) ;
+  let polynomial_evaluation x =
+    let res_scalar = CommonStubs.allocate_scalar () in
+    ignore @@ CommonStubs.polynomial_evaluation res_scalar poly_s len x ;
+    res_scalar
+  in
+  (* Secret polynomial s(x) is evaluated at n distinct points called
+     ids. Note: they cannot be equal to 0 because s(0) = s_0 is the secret. *)
+  List.init n (fun i ->
+      let id = i + 1 in
+      (id, polynomial_evaluation (Bls12_381.Fr.of_int id)))
 
 module MinPk = struct
   module Stubs = struct

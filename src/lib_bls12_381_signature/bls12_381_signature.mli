@@ -29,6 +29,16 @@ val sk_to_bytes : sk -> Bytes.t
     default value of [key_info] is the empty bytes sequence. *)
 val generate_sk : ?key_info:Bytes.t -> Bytes.t -> sk
 
+(** [share_secret_key [s_0;...;s_{m-1}] n] shares a secret key [s_0]
+    between [n] participants so that any [m] participants can
+    collaboratively sign messages, while fewer than [m] participants
+    cannot produce a valid signature. Other coefficients [s_i] are
+    random secrets. Each participant is assigned a unique identifier
+    [id_i] in range [1; n].
+
+    Precondition: 1 < m and m <= n. *)
+val share_secret_key : sk list -> n:int -> (int * sk) list
+
 (** BLS signatures instantiation minimizing the size of the public keys (48
     bytes) but use longer signatures (96 bytes). *)
 module MinPk : sig
