@@ -39,7 +39,7 @@ let make_is_input_state (get_status : 'a -> Backend.status Lwt.t)
   let* status = get_status state in
   match status with
   | Evaluating -> return Sc_rollup.No_input_required
-  | WaitingForInput -> (
+  | Waiting_for_input -> (
       let* level = get_current_level state in
       match level with
       | None -> return Sc_rollup.Initial
@@ -48,7 +48,7 @@ let make_is_input_state (get_status : 'a -> Backend.status Lwt.t)
           return
             (Sc_rollup.First_after
                (Raw_level.of_int32_exn level, Z.of_int64 message_counter)))
-  | WaitingForReveal ->
+  | Waiting_for_reveal ->
       (* TODO: RV-407: Rollup node handles reveal request from riscv pvm *)
       assert false
 

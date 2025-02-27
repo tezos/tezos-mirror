@@ -64,7 +64,7 @@ module PVM :
     let* status = Backend.get_status state in
     match status with
     | Evaluating -> return Sc_rollup.No_input_required
-    | WaitingForInput -> (
+    | Waiting_for_input -> (
         let* level = Backend.get_current_level state in
         match level with
         | None -> return Sc_rollup.Initial
@@ -73,7 +73,7 @@ module PVM :
             return
               (Sc_rollup.First_after
                  (Raw_level.of_int32_exn level, Z.of_int64 message_counter)))
-    | WaitingForReveal ->
+    | Waiting_for_reveal ->
         (* TODO: RV-407: Rollup node handles reveal request from riscv pvm *)
         assert false
 

@@ -49,7 +49,7 @@ ocaml::custom!(Repo);
 ocaml::custom!(Id);
 
 #[derive(ocaml::FromValue, ocaml::ToValue, IntoPrimitive, TryFromPrimitive, strum::EnumCount)]
-#[ocaml::sig("Evaluating | WaitingForInput | WaitingForReveal")]
+#[ocaml::sig("Evaluating | Waiting_for_input | Waiting_for_reveal")]
 #[repr(u8)]
 pub enum Status {
     Evaluating,
@@ -108,17 +108,18 @@ unsafe impl ocaml::ToValue for BytesWrapper {
         unsafe { ocaml::Value::bytes(&self.0) }
     }
 }
+
 /// Input values are passed into the PVM after an input request has been made.
 #[derive(ocaml::FromValue)]
-#[ocaml::sig("InboxMessage of int32 * int64 * bytes | Reveal of bytes")]
+#[ocaml::sig("Inbox_message of int32 * int64 * bytes | Reveal of bytes")]
 pub enum Input<'a> {
     InboxMessage(u32, u64, &'a [u8]),
     Reveal(&'a [u8]),
 }
 
-/// A value of this type could only be returned as part of successfully verifying a proof.
+/// Describes possible input requests the PVM may ask for during execution.
 #[derive(ocaml::ToValue)]
-#[ocaml::sig("NoInputRequired | Initial | FirstAfter of int32 * int64 | NeedsReveal of bytes")]
+#[ocaml::sig("No_input_required | Initial | First_after of int32 * int64 | Needs_reveal of bytes")]
 pub enum InputRequest {
     NoInputRequired,
     Initial,
@@ -152,7 +153,7 @@ pub struct OutputInfo {
 
 ocaml::custom!(OutputInfo);
 
-/// A value of this type could only be returned as part of successfully verifying an output proof.
+/// A value of this type is generated as part of successfully verifying an output proof.
 #[derive(ocaml::ToValue)]
 #[ocaml::sig("{info : output_info; encoded_message : bytes}")]
 pub struct Output {

@@ -18,8 +18,10 @@ type state = Api.state
 
 type status = Api.status
 
+(* Mirrors Api.input but requires manual conversion *)
 type input = Inbox_message of int32 * int64 * string | Reveal of string
 
+(* Mirrors Api.input_request but requires manual conversion *)
 type input_request =
   | No_input_required
   | Initial
