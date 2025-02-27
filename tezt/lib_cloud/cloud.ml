@@ -36,6 +36,7 @@ type t = {
   prometheus : Prometheus.t option;
   grafana : Grafana.t option;
   alert_manager : Alert_manager.t option;
+  chronos : Chronos.t option;
   otel : Otel.t option;
   jaeger : Jaeger.t option;
   deployement : Deployement.t option;
@@ -125,6 +126,7 @@ let shutdown ?exn t =
       ~some:(Deployement.terminate ?exn)
       t.deployement
   in
+  let () = Option.iter Chronos.shutdown t.chronos in
   (* This is not necessary because [Process.clean_up] already killed it.
   *)
   let* () = Option.fold ~none:Lwt.return_unit ~some:Web.shutdown t.website in
@@ -151,7 +153,7 @@ let wait_ssh_server_running agent =
         let* _ = Env.wait_process ~is_ready ~run () in
         Lwt.return_unit
 
-let orchestrator ?(alerts = []) deployement f =
+let orchestrator ?(alerts = []) ?(tasks = []) deployement f =
   let agents = Deployement.agents deployement in
   let* website =
     if Env.website then
@@ -166,6 +168,13 @@ let orchestrator ?(alerts = []) deployement f =
       let* prometheus = Prometheus.start ~alerts agents in
       Lwt.return_some prometheus
     else Lwt.return_none
+  in
+  let chronos =
+    if List.is_empty tasks then None
+    else
+      let chronos = Chronos.init ~tasks in
+      let () = Chronos.start chronos in
+      Some chronos
   in
   let* alert_manager =
     match alerts with
@@ -194,6 +203,7 @@ let orchestrator ?(alerts = []) deployement f =
       prometheus;
       grafana;
       alert_manager;
+      chronos;
       otel;
       jaeger;
       deployement = Some deployement;
@@ -467,7 +477,7 @@ let set_faketime faketime agent =
       Process.run cmd args
 
 let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
-    f =
+    ?tasks f =
   Test.register ~__FILE__ ~title ~tags ?seed @@ fun () ->
   let* () = Env.init () in
   let vms =
@@ -530,6 +540,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
           jaeger = None;
           prometheus = None;
           alert_manager = None;
+          chronos = None;
           deployement = None;
         }
   | Some configurations -> (
@@ -573,20 +584,20 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
               |> Deployement.of_agents
             in
             let* () = ensure_ready deployement in
-            orchestrator ?alerts deployement f
+            orchestrator ?alerts ?tasks deployement f
         | `Localhost ->
             (* The scenario is executed locally and the VM are on the host machine. *)
             let* () = Jobs.docker_build ~push:false () in
             let* deployement = Deployement.deploy ~configurations in
             let* () = ensure_ready deployement in
-            orchestrator ?alerts deployement f
+            orchestrator ?alerts ?tasks deployement f
         | `Cloud ->
             (* The scenario is executed locally and the VMs are on the cloud. *)
             let* () = Jobs.deploy_docker_registry () in
             let* () = Jobs.docker_build ~push:Env.push_docker () in
             let* deployement = Deployement.deploy ~configurations in
             let* () = ensure_ready deployement in
-            orchestrator ?alerts deployement f
+            orchestrator ?alerts ?tasks deployement f
         | `Host ->
             (* The scenario is executed remotely. *)
             let* proxy_running = try_reattach () in

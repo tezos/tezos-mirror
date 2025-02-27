@@ -19,6 +19,7 @@ val register :
   tags:string list ->
   ?seed:Test.seed ->
   ?alerts:Alert_manager.alert list ->
+  ?tasks:Chronos.task list ->
   (t -> unit Lwt.t) ->
   unit
 

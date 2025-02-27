@@ -114,7 +114,10 @@ module Cloud : sig
       proxy mode. This can be used for example when an argument is
       provided via an environment variable instead of a command-line
       argument.
- *)
+
+      [tasks] represent Chronos tasks that will be registered in a
+      Chronos.t process. If [tasks] is empty, no Chronos process will
+      be started. *)
   val register :
     ?proxy_files:string list ->
     ?proxy_args:string list ->
@@ -124,6 +127,7 @@ module Cloud : sig
     tags:string list ->
     ?seed:Test.seed ->
     ?alerts:Alert.t list ->
+    ?tasks:Chronos.task list ->
     (t -> unit Lwt.t) ->
     unit
 
