@@ -70,6 +70,8 @@ pub trait Backend {
 	fn block_randomness(&self) -> Option<H256>;
 	/// Environmental block gas limit.
 	fn block_gas_limit(&self) -> U256;
+	/// Environmental blob hash at index.
+	fn blob_hash(&self, index: H256) -> H256;
 	/// Environmental block base fee.
 	fn block_base_fee_per_gas(&self) -> U256;
 	/// Returns the value of the blob base-fee of the current block it is executing in.

@@ -2417,6 +2417,10 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
         self.block.base_fee_per_gas()
     }
 
+    fn blob_hash(&self, _index: H256) -> H256 {
+        todo!()
+    }
+
     fn block_blob_base_fee(&self) -> U256 {
         self.block.blob_base_fee()
     }

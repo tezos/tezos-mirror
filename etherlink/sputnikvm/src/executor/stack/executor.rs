@@ -1120,6 +1120,9 @@ impl<'config, 'precompiles, S: StackState<'config>, P: PrecompileSet> Handler
 	fn block_gas_limit(&self) -> U256 {
 		self.state.block_gas_limit()
 	}
+	fn blob_hash(&self, index: H256) -> H256 {
+		self.state.blob_hash(index)
+	}
 	fn block_base_fee_per_gas(&self) -> U256 {
 		self.state.block_base_fee_per_gas()
 	}
