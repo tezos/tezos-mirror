@@ -175,16 +175,6 @@ module Make (P : External_process_parameters.S) = struct
              P.name)
         ()
 
-    let cannot_start_process =
-      declare_0
-        ~level:Info
-        ~name:"cannot_start_process"
-        ~msg:
-          (Format.sprintf
-             "cannot start %s process: the node is shutting down"
-             P.name)
-        ()
-
     let request_for =
       declare_1
         ~level:Debug
@@ -215,12 +205,10 @@ module Make (P : External_process_parameters.S) = struct
     clean_up_callback_id : Lwt_exit.clean_up_callback_id;
   }
 
-  type process_status = Uninitialized | Running of external_process | Exiting
-
   type t = {
     parameters : P.parameters;
     process_path : string;
-    mutable process : process_status;
+    external_process : external_process;
     lock : Lwt_mutex.t;
   }
 
@@ -275,14 +263,17 @@ module Make (P : External_process_parameters.S) = struct
      - the node receives the ack and continues,
      - initialization is finished.
   *)
-  let process_init p process_input process_output =
+  let process_init external_process parameters =
     let open Lwt_result_syntax in
     let*! () =
-      Lwt_unix_socket.send process_input P.parameters_encoding p.parameters
+      Lwt_unix_socket.send
+        external_process.input
+        P.parameters_encoding
+        parameters
     in
     let* () =
       Lwt_unix_socket.recv
-        process_output
+        external_process.output
         (Error_monad.result_encoding Data_encoding.empty)
     in
     return_unit
@@ -294,16 +285,16 @@ module Make (P : External_process_parameters.S) = struct
      TODO: Add critical section for external process launch, see
      https://gitlab.com/tezos/tezos/-/issues/5175
   *)
-  let start_process p =
+  let start_process ~process_path parameters =
     let open Lwt_result_syntax in
     let canceler = Lwt_canceler.create () in
     (* We assume that there is only one external process per socket *)
     let socket_dir = get_temporary_socket_dir () in
-    let proc_name, args = P.command_line_args p.parameters ~socket_dir in
+    let proc_name, args = P.command_line_args parameters ~socket_dir in
     let arg0 =
       match proc_name with
       | Some p -> p
-      | None -> Filename.basename p.process_path
+      | None -> Filename.basename process_path
     in
     let args = arg0 :: args in
     let env = Unix.environment () in
@@ -325,7 +316,7 @@ module Make (P : External_process_parameters.S) = struct
       |> Array.of_seq
     in
     let process =
-      Lwt_process.open_process_none ~env (p.process_path, Array.of_list args)
+      Lwt_process.open_process_none ~env (process_path, Array.of_list args)
     in
     let socket_path = P.socket_path ~socket_dir ~pid:process#pid in
     (* Make sure that the mimicked anonymous file descriptor is
@@ -392,54 +383,49 @@ module Make (P : External_process_parameters.S) = struct
     let process_input = Lwt_io.of_fd ~mode:Output process_socket in
     let process_output = Lwt_io.of_fd ~mode:Input process_socket in
     let*! () = Events.(emit process_started process#pid) in
-    p.process <-
-      Running
-        {
-          process;
-          process_socket;
-          input = process_input;
-          output = process_output;
-          canceler;
-          clean_up_callback_id;
-        } ;
+    let external_process =
+      {
+        process;
+        process_socket;
+        input = process_input;
+        output = process_output;
+        canceler;
+        clean_up_callback_id;
+      }
+    in
     let* () = process_handshake process_input process_output in
-    let* () = process_init p process_input process_output in
-    return (process, process_input, process_output)
+    let* () = process_init external_process parameters in
+    return external_process
 
   (* Inspects the process's state and return it. If the process is
      in an inconsistent state, it will be restarted automatically --
      by running [start_process]. *)
   let process_state p =
     let open Lwt_result_syntax in
-    match p.process with
-    | Running
-        {
-          process;
-          process_socket;
-          input = process_input;
-          output = process_output;
-          canceler;
-          clean_up_callback_id;
-        } -> (
-        match process#state with
-        | Running -> return (process, process_input, process_output)
-        | Exited status ->
-            (* When the process is in an inconsistent state, we restart
-               it automatically. *)
-            let*! () = Error_monad.cancel_with_exceptions canceler in
-            Lwt_exit.unregister_clean_up_callback clean_up_callback_id ;
-            let*! () =
-              Lwt.catch
-                (fun () -> Lwt_unix.close process_socket)
-                (fun _ -> Lwt.return_unit)
-            in
-            p.process <- Uninitialized ;
-            let*! () = Events.(emit process_exited_abnormally status) in
-            start_process p)
-    | Uninitialized -> start_process p
-    | Exiting ->
-        let*! () = Events.(emit cannot_start_process ()) in
-        tzfail Cannot_process_while_shutting_down
+    let {
+      process;
+      process_socket;
+      input = process_input;
+      output = process_output;
+      canceler;
+      clean_up_callback_id;
+    } =
+      p.external_process
+    in
+    match process#state with
+    | Running -> return (process, process_input, process_output)
+    | Exited status ->
+        (* When the process is in an inconsistent state, we restart
+           it automatically. *)
+        let*! () = Error_monad.cancel_with_exceptions canceler in
+        Lwt_exit.unregister_clean_up_callback clean_up_callback_id ;
+        let*! () =
+          Lwt.catch
+            (fun () -> Lwt_unix.close process_socket)
+            (fun _ -> Lwt.return_unit)
+        in
+        let*! () = Events.(emit process_exited_abnormally status) in
+        Lwt_exit.exit_and_raise 1
 
   (* Sends the given request to the external process. If the request
      failed to be fulfilled, the status of the external process is
@@ -484,44 +470,27 @@ module Make (P : External_process_parameters.S) = struct
         match process#state with
         | Running -> return res
         | Exited status ->
-            p.process <- Uninitialized ;
             let*! () = Events.(emit process_exited_abnormally status) in
-            return res)
+            Lwt_exit.exit_and_raise 1)
       (fun exn ->
         let*! () =
           match process#state with
           | Running -> Lwt.return_unit
           | Exited status ->
               let*! () = Events.(emit process_exited_abnormally status) in
-              p.process <- Uninitialized ;
-              Lwt.return_unit
+              Lwt_exit.exit_and_raise 1
         in
         fail_with_exn exn)
 
   (* The initialization phase aims to configure the external process
-     and start it's associated process. This will result in the call
-     of [process_handshake] and [process_init].
-     Note that it is important to have [init] as a blocking promise as
-     the external process must initialize the context (in RW) before
-     the node tries to open it (in RO).*)
+     and start its associated process. This will result in the call
+     of [process_handshake] and [process_init]. *)
   let init parameters ~process_path =
     let open Lwt_result_syntax in
-    let process =
-      {
-        parameters;
-        process_path;
-        process = Uninitialized;
-        lock = Lwt_mutex.create ();
-      }
-    in
-    let* (_ :
-           Lwt_process.process_none
-           * Lwt_io.output Lwt_io.channel
-           * Lwt_io.input Lwt_io.channel) =
-      start_process process
-    in
+    let lock = Lwt_mutex.create () in
+    let* external_process = start_process ~process_path parameters in
     let*! () = Events.(emit init ()) in
-    return process
+    return {parameters; process_path; external_process; lock}
 
   let reconfigure_event_logging process config =
     let open Lwt_result_syntax in
@@ -533,48 +502,40 @@ module Make (P : External_process_parameters.S) = struct
   let close p =
     let open Lwt_syntax in
     let* () = Events.(emit close ()) in
-    match p.process with
-    | Running {process; input = process_input; canceler; _} ->
-        let request = P.terminate_request in
-        let* () = Events.(emit request_for request) in
-        let* () =
-          Lwt.catch
-            (fun () ->
-              p.process <- Exiting ;
-              (* Try to trigger the clean shutdown of the external process. *)
-              Lwt_unix_socket.send process_input P.request_encoding request)
-            (function
-              | Unix.Unix_error (ECONNREFUSED, _, _)
-              | Unix.Unix_error (EPIPE, _, _)
-              | Unix.Unix_error (ENOTCONN, _, _) ->
-                  (* It may fail if the external process is not
-                     responding (connection already closed) and is
-                     killed afterwards. No need to propagate the error. *)
-                  let* () = Events.(emit cannot_close ()) in
-                  Lwt.return_unit
-              | e -> Lwt.reraise e)
-        in
-        let* () =
-          Lwt.catch
-            (fun () ->
-              Lwt_unix.with_timeout shutdown_timeout (fun () ->
-                  let* s = process#status in
-                  match s with
-                  | Unix.WEXITED 0 -> Events.(emit process_exited_normally ())
-                  | status ->
-                      let* () =
-                        Events.(emit process_exited_abnormally status)
-                      in
-                      process#terminate ;
-                      Lwt.return_unit))
-            (function
-              | Lwt_unix.Timeout -> Events.(emit unresponsive_process) ()
-              | err -> Lwt.reraise err)
-        in
-        let* () = Error_monad.cancel_with_exceptions canceler in
-        (* Set the process status as uninitialized so that the process can be
-           restarted and avoid raising [Cannot_process_while_shutting_down]. *)
-        p.process <- Uninitialized ;
-        Lwt.return_unit
-    | Uninitialized | Exiting -> Lwt.return_unit
+    let {process; input = process_input; canceler; _} = p.external_process in
+    let request = P.terminate_request in
+    let* () = Events.(emit request_for request) in
+    let* () =
+      Lwt.catch
+        (fun () ->
+          (* Try to trigger the clean shutdown of the external process. *)
+          Lwt_unix_socket.send process_input P.request_encoding request)
+        (function
+          | Unix.Unix_error (ECONNREFUSED, _, _)
+          | Unix.Unix_error (EPIPE, _, _)
+          | Unix.Unix_error (ENOTCONN, _, _) ->
+              (* It may fail if the external process is not
+                 responding (connection already closed) and is
+                 killed afterwards. No need to propagate the error. *)
+              let* () = Events.(emit cannot_close ()) in
+              Lwt.return_unit
+          | e -> Lwt.reraise e)
+    in
+    let* () =
+      Lwt.catch
+        (fun () ->
+          Lwt_unix.with_timeout shutdown_timeout (fun () ->
+              let* s = process#status in
+              match s with
+              | Unix.WEXITED 0 -> Events.(emit process_exited_normally ())
+              | status ->
+                  let* () = Events.(emit process_exited_abnormally status) in
+                  process#terminate ;
+                  Lwt.return_unit))
+        (function
+          | Lwt_unix.Timeout -> Events.(emit unresponsive_process) ()
+          | err -> Lwt.reraise err)
+    in
+    let* () = Error_monad.cancel_with_exceptions canceler in
+    Lwt.return_unit
 end
