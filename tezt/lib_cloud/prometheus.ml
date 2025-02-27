@@ -67,6 +67,18 @@ let get_name (t : t) = t.name
 
 let get_port (t : t) = t.port
 
+let get_query_endpoint ~query =
+  if Env.prometheus then
+    Some
+      (Uri.make
+         ~scheme:"http"
+         ~host:"localhost"
+         ~port:Env.prometheus_port
+         ~path:"/api/v1/query"
+         ~query:[("query", [query])]
+         ())
+  else None
+
 let netdata_source_of_agents agents =
   let name = "netdata" in
   let metrics_path = "/api/v1/allmetrics?format=prometheus&help=yes" in
