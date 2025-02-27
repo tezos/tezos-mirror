@@ -5,12 +5,12 @@
 use super::{Args, Instruction, OpCode};
 use crate::{
     default::ConstDefault,
-    machine_state::registers::{NonZeroXRegister, XRegister, nz},
+    machine_state::registers::{NonZeroXRegister, XRegister, nz, sp, x0},
     parser::{
         XRegisterParsed,
         instruction::{
-            CIBTypeArgs, CRTypeArgs, ITypeArgs, InstrWidth, NonZeroRdITypeArgs, NonZeroRdRTypeArgs,
-            SBTypeArgs, SplitITypeArgs, UJTypeArgs,
+            CIBTypeArgs, CRTypeArgs, CSSTypeArgs, ITypeArgs, InstrWidth, NonZeroRdITypeArgs,
+            NonZeroRdRTypeArgs, SBTypeArgs, SplitITypeArgs, UJTypeArgs,
         },
         split_x0,
     },
@@ -555,6 +555,39 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sd`].
+    pub(crate) fn new_sd(rs1: XRegister, rs2: XRegister, imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Sd,
+            args: Args {
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sdnz`].
+    pub(crate) fn new_sdnz(
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Sdnz,
+            args: Args {
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {
@@ -1018,6 +1051,31 @@ impl Instruction {
                 Instruction::new_ldnz(rd, rs1, args.imm, InstrWidth::Uncompressed)
             }
             _ => Instruction::new_ld(args.rd, args.rs1, args.imm, InstrWidth::Uncompressed),
+        }
+    }
+
+    /// Convert [`InstrCacheable::Sd`] according to whether registers are non-zero.
+    ///
+    /// [`InstrCacheable::Sd`]: crate::parser::instruction::InstrCacheable::Sd
+    pub(super) fn from_ic_sd(args: &SBTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rs1), split_x0(args.rs2)) {
+            (X::NonZero(rs1), X::NonZero(rs2)) => {
+                Instruction::new_sdnz(rs1, rs2, args.imm, InstrWidth::Uncompressed)
+            }
+            _ => Instruction::new_sd(args.rs1, args.rs2, args.imm, InstrWidth::Uncompressed),
+        }
+    }
+
+    /// Convert [`InstrCacheable::CSdsp`] according to whether register is non-zero.
+    ///
+    /// [`InstrCacheable::CSdsp`]: crate::parser::instruction::InstrCacheable::CSdsp
+    pub(super) fn from_ic_csdsp(args: &CSSTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        debug_assert!(args.imm >= 0 && args.imm % 8 == 0);
+        match split_x0(args.rs2) {
+            X::NonZero(rs2) => Instruction::new_sdnz(nz::sp, rs2, args.imm, InstrWidth::Compressed),
+            X::X0 => Instruction::new_sd(sp, x0, args.imm, InstrWidth::Compressed),
         }
     }
 }

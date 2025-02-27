@@ -342,8 +342,6 @@ pub enum OpCode {
     CSubw,
 
     // RV64C compressed instructions
-    CSd,
-    CSdsp,
     CAddiw,
 
     // RV64DC compressed instructions
@@ -370,6 +368,8 @@ pub enum OpCode {
     JrImm,
     /// Same as Ld but only using NonZeroXRegisters.
     Ldnz,
+    /// Same as Sd but only using NonZeroXRegisters.
+    Sdnz,
 }
 
 impl OpCode {
@@ -425,6 +425,7 @@ impl OpCode {
             Self::Sh => Args::run_sh,
             Self::Sw => Args::run_sw,
             Self::Sd => Args::run_sd,
+            Self::Sdnz => Args::run_sdnz,
             Self::Beq => Args::run_beq,
             Self::Bne => Args::run_bne,
             Self::Blt => Args::run_blt,
@@ -554,8 +555,6 @@ impl OpCode {
             Self::CAddw => Args::run_caddw,
             Self::CSubw => Args::run_csubw,
             Self::Nop => Args::run_nop,
-            Self::CSd => Args::run_csd,
-            Self::CSdsp => Args::run_csdsp,
             Self::CAddiw => Args::run_caddiw,
             Self::CFld => Args::run_cfld,
             Self::CFldsp => Args::run_cfldsp,
@@ -825,6 +824,18 @@ macro_rules! impl_store_type {
             core: &mut MachineCoreState<MC, M>,
         ) -> Result<ProgramCounterUpdate, Exception> {
             core.$fn(self.imm, self.rs1.x, self.rs2.x)
+                .map(|_| Next(self.width))
+        }
+    };
+
+    ($fn: ident, non_zero) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
+            &self,
+            core: &mut MachineCoreState<MC, M>,
+        ) -> Result<ProgramCounterUpdate, Exception> {
+            core.$fn(self.imm, self.rs1.nzx, self.rs2.nzx)
                 .map(|_| Next(self.width))
         }
     };
@@ -1180,6 +1191,7 @@ impl Args {
     impl_store_type!(run_sh);
     impl_store_type!(run_sw);
     impl_store_type!(run_sd);
+    impl_store_type!(run_sdnz, non_zero);
 
     // RV64I B-type instructions
     impl_b_type!(run_beq, non_zero);
@@ -1411,8 +1423,6 @@ impl Args {
     }
 
     // RV64C compressed instructions
-    impl_store_type!(run_csd);
-    impl_css_type!(run_csdsp);
     impl_ci_type!(run_caddiw, non_zero);
     impl_cr_type!(run_caddw);
     impl_cr_type!(run_csubw);
@@ -1543,10 +1553,7 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Sw,
                 args: args.to_args(InstrWidth::Uncompressed),
             },
-            InstrCacheable::Sd(args) => Instruction {
-                opcode: OpCode::Sd,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
+            InstrCacheable::Sd(args) => Instruction::from_ic_sd(args),
 
             // RV64I B-type instructions
             InstrCacheable::Beq(args) => Instruction::from_ic_beq(args),
@@ -2070,14 +2077,11 @@ impl From<&InstrCacheable> for Instruction {
                 debug_assert!(args.imm >= 0 && args.imm % 8 == 0);
                 Instruction::new_ldnz(args.rd_rs1, nz::sp, args.imm, InstrWidth::Compressed)
             }
-            InstrCacheable::CSd(args) => Instruction {
-                opcode: OpCode::CSd,
-                args: args.to_args(InstrWidth::Compressed),
-            },
-            InstrCacheable::CSdsp(args) => Instruction {
-                opcode: OpCode::CSdsp,
-                args: args.into(),
-            },
+            InstrCacheable::CSd(args) => {
+                debug_assert!(args.imm >= 0 && args.imm % 8 == 0);
+                Instruction::new_sdnz(args.rs1, args.rs2, args.imm, InstrWidth::Compressed)
+            }
+            InstrCacheable::CSdsp(args) => Instruction::from_ic_csdsp(args),
             InstrCacheable::CAddiw(args) => Instruction {
                 opcode: OpCode::CAddiw,
                 args: args.into(),
