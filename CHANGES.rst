@@ -28,16 +28,6 @@ General
 Node
 ----
 
-- Changed the default ``history-mode`` from ``Full`` to ``Rolling``. (MR :gl:`!15942`)
-
-- Introduced a specific exit code for the ``octez-node upgrade storage
-  --status`` command. It now returns the exit code 1 when an upgrade
-  is available. 0 is returned when the storage is up to date. (MR :gl:`!15152`)
-
-- New RPCs ``/chain/{chain_id}/protocols`` (and
-  ``/chain/{chain_id}/protocols/{protocol_hash}``) to retrieve protocol
-  activation levels of the chain. (MR :gl:`!15447`)
-
 - The node will detect stalled connections more quickly (on
   Linux-based distributions). This behavior can be controlled via the
   environment variable ``OCTEZ_P2P_TCP_USER_TIMEOUT``. Its default
