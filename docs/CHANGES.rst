@@ -56,6 +56,54 @@ Baker
 - **Breaking change** The baker daemon ``--dal-node-timeout-percentage``
   argument has been removed. (MR :gl:`!15554`)
 
+Smart Rollup node
+-----------------
+
+- In the bailout mode there was a bug where the wrong key was used
+  when recovering the bond. The node uses the ``cementing`` key and not
+  the ``operating`` key. (MR :gl:`!16016`).
+
+- Extended the ``DELETE /admin/injector/queues`` RPC endpoint with new query to
+  clear injector queues based on priority order. The RPC can takes two
+  optional arguments:
+
+  + ``order_below``: an integer that filters out all operations with
+    order strictly inferior to it.
+
+  + ``drop_no_order``: a boolean that if true remove all operations
+    that has no order specified. ``false`` by default.
+
+  When ``tag`` is specified only operation of that type will be
+  considered, else all operations are considered.(MR :gl:`!15929`)
+
+- Added an RPC ``DELETE /admin/batcher/queue`` endpoint, which can take two optional
+  arguments:
+
+  + ``order_below``: an integer that filters all messages with order
+    inferior to it.
+
+  + ``drop_no_order``: a boolean that if true remove all messages that
+    has no order specified. ``false` by default. If no ``order_below``
+    is specified it completely clear the queue.
+
+  (MR :gl:`!15929`)
+
+- Improved error messages for RPC
+  ``/global/block/<block_id>/helpers/proofs/outbox/<outbox_level>/messages?index=<message_index>``. (MR :gl:`!15507`)
+
+- Fixed potential issue with store with SQLite < 3.35. (MR :gl:`!15631`)
+
+- Improved error messages for RPC
+  ``/global/block/<block_id>/helpers/proofs/outbox/<outbox_level>/messages?index=<message_index>``. (MR :gl:`!15507`)
+
+- Fix potential issue with store with SQLite < 3.35. (MR :gl:`!15631`)
+
+- Addeed a new CLI switch ``--unsafe-disable-wasm-kernel-checks`` which allows to bypass
+  invalid kernel checks in the WASM VM, for use by jstz. (MR :gl:`!15910`)
+
+- Support ``remote`` signer scheme and check remote signer available on
+  startup. (MR :gl:`!16651`)
+
 Agnostic Baker
 --------------
 
@@ -168,16 +216,6 @@ DAL node
 --------
 
 - **Bugfix** Fixed the timing of the reconnection to peers attempts. (MR :gl:`!16466`)
-
-- Added a new RPC ``GET /p2p/gossipsub/mesh/`` that returns the GossipSub mesh
-  (i.e. full data connections per topic) of a peer. (MR :gl:`!16754`)
-
-- Added a new RPC ``GET /p2p/gossipsub/fanout/`` that returns the GossipSub
-  fanout of a peer. (MR :gl:`!16764`)
-
-- **Bugfix** From v21.2, the ``SO_KEEP_ALIVE`` socket option was used
-  for incoming connections only. It is now used with both incoming
-  connections and outgoing connections. (MR :gl:`!16820`)
 
 - **Feature** A new RPC ``/p2p/gossipsub/reconnection_delays`` which
   provides for each unreachable point, the time remaining until the
