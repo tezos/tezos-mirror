@@ -2418,7 +2418,11 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
     }
 
     fn blob_hash(&self, _index: H256) -> H256 {
-        todo!()
+        // Etherlink doesn't support blob as defined by
+        // EIP-4844 (Proto-Danksharding).
+        // As such, the following value will always return
+        // zero.
+        H256::zero()
     }
 
     fn block_blob_base_fee(&self) -> U256 {
