@@ -124,6 +124,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     delayed_inbox: &mut DelayedInbox,
     sequencer: PublicKey,
     dal: Option<DalConfiguration>,
+    maximum_allowed_ticks: u64,
     enable_fa_bridge: bool,
     garbage_collect_blocks: bool,
     evm_configuration: &Config,
@@ -136,6 +137,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
         sequencer,
         delayed_inbox,
         enable_fa_bridge,
+        maximum_allowed_ticks,
         dal,
         garbage_collect_blocks,
         evm_configuration,
@@ -179,6 +181,7 @@ pub fn fetch_blueprints<Host: Runtime>(
             delayed_inbox,
             sequencer.clone(),
             dal.clone(),
+            config.maximum_allowed_ticks,
             config.enable_fa_bridge,
             config.garbage_collect_blocks,
             &config.chain_config.evm_configuration,
@@ -203,6 +206,7 @@ mod tests {
             UnsignedDalSlotSignals,
         },
         parsing::DAL_SLOT_IMPORT_SIGNAL_TAG,
+        tick_model::constants::MAX_ALLOWED_TICKS,
     };
     use evm_execution::configuration::EVMVersion;
     use primitive_types::U256;
@@ -275,6 +279,7 @@ mod tests {
                 max_blueprint_lookahead_in_seconds: 100_000i64,
             },
             limits: Limits::default(),
+            maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
             chain_config: ChainConfig::default(),
             garbage_collect_blocks: false,
@@ -290,6 +295,7 @@ mod tests {
             },
             mode: ConfigurationMode::Proxy,
             limits: Limits::default(),
+            maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
             chain_config: ChainConfig::default(),
             garbage_collect_blocks: false,

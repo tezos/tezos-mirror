@@ -120,6 +120,7 @@ fn compute<Host: Runtime>(
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
     sequencer_pool_address: Option<H160>,
+    maximum_allowed_ticks: u64,
     limits: &Limits,
     tracer_input: Option<TracerInput>,
     evm_configuration: &Config,
@@ -139,7 +140,7 @@ fn compute<Host: Runtime>(
         log!(host, Benchmarking, "Transaction data size: {}", data_size);
         // The current number of ticks remaining for the current `kernel_run` is allocated for the transaction.
         let allocated_ticks = estimate_remaining_ticks_for_transaction_execution(
-            limits.maximum_allowed_ticks,
+            maximum_allowed_ticks,
             block_in_progress.estimated_ticks_in_run,
             data_size,
         );
@@ -340,6 +341,7 @@ fn compute_bip<Host: Runtime>(
     tick_counter: &mut TickCounter,
     sequencer_pool_address: Option<H160>,
     limits: &Limits,
+    maximum_allowed_ticks: u64,
     tracer_input: Option<TracerInput>,
     chain_id: U256,
     da_fee_per_byte: U256,
@@ -363,6 +365,7 @@ fn compute_bip<Host: Runtime>(
         precompiles,
         &mut evm_account_storage,
         sequencer_pool_address,
+        maximum_allowed_ticks,
         limits,
         tracer_input,
         evm_configuration,
@@ -540,6 +543,7 @@ pub fn produce<Host: Runtime>(
         &mut tick_counter,
         sequencer_pool_address,
         &config.limits,
+        config.maximum_allowed_ticks,
         tracer_input,
         chain_id,
         da_fee_per_byte,
@@ -615,6 +619,7 @@ mod tests {
     use crate::storage::read_block_in_progress;
     use crate::storage::read_last_info_per_level_timestamp;
     use crate::storage::{read_transaction_receipt, read_transaction_receipt_status};
+    use crate::tick_model::constants::MAX_ALLOWED_TICKS;
     use crate::{retrieve_block_fees, retrieve_chain_id};
     use evm_execution::account_storage::{
         account_path, init_account_storage, EthereumAccountStorage,
@@ -1317,8 +1322,7 @@ mod tests {
             vec![0; 32],
         );
         // run is almost full wrt ticks
-        let limits = Limits::default();
-        block_in_progress.estimated_ticks_in_run = limits.maximum_allowed_ticks - 1000;
+        block_in_progress.estimated_ticks_in_run = MAX_ALLOWED_TICKS - 1000;
 
         // act
         let result = compute(
@@ -1329,7 +1333,8 @@ mod tests {
             &precompiles,
             &mut evm_account_storage,
             None,
-            &limits,
+            MAX_ALLOWED_TICKS,
+            &Limits::default(),
             None,
             &EVMVersion::current_test_config(),
         )
@@ -1602,13 +1607,8 @@ mod tests {
         host.reboot_left().expect("should be some reboot left");
 
         // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
-        let limits = Limits {
-            maximum_allowed_ticks: 9_000_000_000,
-            ..Limits::default()
-        };
-
         let mut configuration = Configuration {
-            limits,
+            maximum_allowed_ticks: 9_000_000_000,
             ..dummy_configuration(EVMVersion::current_test_config())
         };
 
@@ -1682,13 +1682,8 @@ mod tests {
         store_blueprints(&mut host, proposals);
 
         // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
-        let limits = Limits {
-            maximum_allowed_ticks: 9_000_000_000,
-            ..Limits::default()
-        };
-
         let mut configuration = Configuration {
-            limits,
+            maximum_allowed_ticks: 9_000_000_000,
             ..dummy_configuration(EVMVersion::current_test_config())
         };
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
@@ -1839,13 +1834,8 @@ mod tests {
         store_inbox_blueprint(&mut host, blueprint(proposals_first_reboot)).unwrap();
 
         // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
-        let limits = Limits {
-            maximum_allowed_ticks: 9_000_000_000,
-            ..Limits::default()
-        };
-
         let mut configuration = Configuration {
-            limits,
+            maximum_allowed_ticks: 9_000_000_000,
             ..dummy_configuration(EVMVersion::current_test_config())
         };
         // sanity check: no current block

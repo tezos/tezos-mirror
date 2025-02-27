@@ -107,7 +107,6 @@ impl ChainConfig {
 }
 
 pub struct Limits {
-    pub maximum_allowed_ticks: u64,
     pub maximum_gas_limit: u64,
     pub minimum_base_fee_per_gas: U256,
 }
@@ -115,7 +114,6 @@ pub struct Limits {
 impl Default for Limits {
     fn default() -> Self {
         Self {
-            maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             maximum_gas_limit: MAXIMUM_GAS_LIMIT,
             minimum_base_fee_per_gas: MINIMUM_BASE_FEE_PER_GAS.into(),
         }
@@ -126,6 +124,7 @@ pub struct Configuration {
     pub tezos_contracts: TezosContracts,
     pub mode: ConfigurationMode,
     pub limits: Limits,
+    pub maximum_allowed_ticks: u64,
     pub enable_fa_bridge: bool,
     pub chain_config: ChainConfig,
     pub garbage_collect_blocks: bool,
@@ -137,6 +136,7 @@ impl Default for Configuration {
             tezos_contracts: TezosContracts::default(),
             mode: ConfigurationMode::Proxy,
             limits: Limits::default(),
+            maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
             chain_config: ChainConfig::default(),
             garbage_collect_blocks: false,
@@ -229,9 +229,6 @@ fn fetch_tezos_contracts(host: &mut impl Runtime) -> TezosContracts {
 }
 
 pub fn fetch_limits(host: &mut impl Runtime) -> Limits {
-    let maximum_allowed_ticks =
-        read_maximum_allowed_ticks(host).unwrap_or(MAX_ALLOWED_TICKS);
-
     let maximum_gas_limit =
         read_or_set_maximum_gas_per_transaction(host).unwrap_or(MAXIMUM_GAS_LIMIT);
 
@@ -239,7 +236,6 @@ pub fn fetch_limits(host: &mut impl Runtime) -> Limits {
         .unwrap_or(MINIMUM_BASE_FEE_PER_GAS.into());
 
     Limits {
-        maximum_allowed_ticks,
         maximum_gas_limit,
         minimum_base_fee_per_gas,
     }
@@ -260,6 +256,8 @@ pub fn fetch_configuration<Host: Runtime>(
     chain_id: U256,
 ) -> Configuration {
     let tezos_contracts = fetch_tezos_contracts(host);
+    let maximum_allowed_ticks =
+        read_maximum_allowed_ticks(host).unwrap_or(MAX_ALLOWED_TICKS);
     let limits = fetch_limits(host);
     let sequencer = sequencer(host).unwrap_or_default();
     let enable_fa_bridge = is_enable_fa_bridge(host).unwrap_or_default();
@@ -293,6 +291,7 @@ pub fn fetch_configuration<Host: Runtime>(
                         evm_node_flag,
                         max_blueprint_lookahead_in_seconds,
                     },
+                    maximum_allowed_ticks,
                     limits,
                     enable_fa_bridge,
                     chain_config,
@@ -310,6 +309,7 @@ pub fn fetch_configuration<Host: Runtime>(
         None => Configuration {
             tezos_contracts,
             mode: ConfigurationMode::Proxy,
+            maximum_allowed_ticks,
             limits,
             enable_fa_bridge,
             chain_config,

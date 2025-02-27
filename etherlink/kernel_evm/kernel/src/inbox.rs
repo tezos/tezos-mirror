@@ -7,7 +7,7 @@
 
 use crate::blueprint_storage::store_sequencer_blueprint;
 use crate::bridge::Deposit;
-use crate::configuration::{fetch_limits, DalConfiguration, TezosContracts};
+use crate::configuration::{DalConfiguration, TezosContracts};
 use crate::dal::fetch_and_parse_sequencer_blueprint_from_dal;
 use crate::dal_slot_import_signal::DalSlotImportSignals;
 use crate::delayed_inbox::DelayedInbox;
@@ -687,6 +687,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
     sequencer: PublicKey,
     delayed_inbox: &mut DelayedInbox,
     enable_fa_bridge: bool,
+    maximum_allowed_ticks: u64,
     dal: Option<DalConfiguration>,
     garbage_collect_blocks: bool,
     evm_configuration: &Config,
@@ -696,14 +697,12 @@ pub fn read_sequencer_inbox<Host: Runtime>(
     // variable remains true, that means that the inbox was already consumed
     // during this kernel run.
     let mut inbox_is_empty = true;
-    let limits = fetch_limits(host);
     let next_blueprint_number: U256 =
         crate::blueprint_storage::read_next_blueprint_number(host)?;
     let mut parsing_context = SequencerParsingContext {
         sequencer,
         delayed_bridge,
-        allocated_ticks: limits
-            .maximum_allowed_ticks
+        allocated_ticks: maximum_allowed_ticks
             .saturating_sub(TICKS_FOR_BLUEPRINT_INTERCEPT),
         dal_configuration: dal,
         buffer_transaction_chunks: None,
@@ -717,9 +716,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
                 host,
                 Benchmarking,
                 "Estimated ticks: {}",
-                limits
-                    .maximum_allowed_ticks
-                    .saturating_sub(parsing_context.allocated_ticks)
+                maximum_allowed_ticks.saturating_sub(parsing_context.allocated_ticks)
             );
             return Ok(StageOneStatus::Reboot);
         };
@@ -753,9 +750,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
                     host,
                     Benchmarking,
                     "Estimated ticks: {}",
-                    limits
-                        .maximum_allowed_ticks
-                        .saturating_sub(parsing_context.allocated_ticks)
+                    maximum_allowed_ticks.saturating_sub(parsing_context.allocated_ticks)
                 );
                 return Ok(StageOneStatus::Done);
             }
@@ -778,6 +773,7 @@ mod tests {
     use crate::inbox::TransactionContent::Ethereum;
     use crate::parsing::RollupType;
     use crate::storage::*;
+    use crate::tick_model::constants::MAX_ALLOWED_TICKS;
     use evm_execution::configuration::EVMVersion;
     use primitive_types::U256;
     use std::fmt::Write;
@@ -1435,6 +1431,7 @@ mod tests {
             pk.clone(),
             &mut delayed_inbox,
             false,
+            MAX_ALLOWED_TICKS,
             None,
             false,
             &EVMVersion::current_test_config(),

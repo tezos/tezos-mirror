@@ -644,6 +644,7 @@ mod tests {
     use crate::delayed_inbox::Hash;
     use crate::sequencer_blueprint::rlp_roundtrip;
     use crate::storage::store_last_info_per_level_timestamp;
+    use crate::tick_model::constants::MAX_ALLOWED_TICKS;
     use primitive_types::H256;
     use tezos_crypto_rs::hash::ContractKt1Hash;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
@@ -679,6 +680,7 @@ mod tests {
                 evm_node_flag: false,
                 max_blueprint_lookahead_in_seconds: 100_000i64,
             },
+            maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             limits: Limits::default(),
             enable_fa_bridge: false,
             chain_config: ChainConfig::default(),

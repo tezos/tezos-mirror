@@ -362,7 +362,7 @@ mod tests {
 
     use crate::block_storage;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
-    use crate::configuration::{ChainConfig, Configuration, Limits};
+    use crate::configuration::{ChainConfig, Configuration};
     use crate::fees;
     use crate::main;
     use crate::parsing::RollupType;
@@ -588,13 +588,8 @@ mod tests {
         let block_fees = dummy_block_fees();
 
         // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
-        let limits = Limits {
-            maximum_allowed_ticks: 9_000_000_000,
-            ..Limits::default()
-        };
-
         let mut configuration = Configuration {
-            limits,
+            maximum_allowed_ticks: 9_000_000_000,
             ..dummy_configuration(EVMVersion::current_test_config())
         };
 
