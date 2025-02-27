@@ -72,3 +72,9 @@ let parse_baking_mode baking_mode =
   match baking_mode with
   | Some local_data_dir_path -> Baking_commands.Local {local_data_dir_path}
   | None -> Remote
+
+let parse_sources =
+  List.map_es (fun source ->
+      match Tezos_crypto.Signature.V1.Of_V_latest.public_key_hash source with
+      | Some source -> Lwt_result_syntax.return source
+      | None -> failwith "Cannot convert from V_latest signature to V1.")

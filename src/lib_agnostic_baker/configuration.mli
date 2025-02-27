@@ -44,6 +44,13 @@ val baker_args :
 val directory_parameter :
   (string, Tezos_client_base.Client_context.full) Tezos_clic.parameter
 
+val sources_param :
+  ( Tezos_crypto.Signature.Public_key_hash.t list ->
+    Tezos_client_base.Client_context.full ->
+    unit Error_monad.tzresult Lwt.t,
+    Tezos_client_base.Client_context.full )
+  Tezos_clic.params
+
 type t = {
   pidfile : string option;
   node_version_check_bypass : bool;

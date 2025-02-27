@@ -28,3 +28,8 @@ val parse_configuration :
   * Q.t option
 
 val parse_baking_mode : string option -> Baking_commands.baking_mode
+
+val parse_sources :
+  Tezos_base.TzPervasives.Signature.public_key_hash list ->
+  (Tezos_base.TzPervasives.Signature.V1.public_key_hash list, tztrace) result
+  Lwt.t

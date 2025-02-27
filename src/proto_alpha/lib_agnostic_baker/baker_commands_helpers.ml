@@ -11,14 +11,6 @@ let run_baker ~configuration ~baking_mode ~sources ~cctxt =
   let cctxt = new Protocol_client_context.wrap_full cctxt in
   Baking_commands.run_baker args baking_mode sources cctxt
 
-let sources_param =
-  Tezos_clic.seq_of_param
-    (Client_keys.Public_key_hash.source_param
-       ~name:"baker"
-       ~desc:
-         "name of the delegate owning the attestation/baking right or name of \
-          the consensus key signing on the delegate's behalf")
-
 let baker_commands () :
     Tezos_client_base.Client_context.full Tezos_clic.command list =
   let open Configuration in

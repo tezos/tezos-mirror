@@ -18,7 +18,7 @@ module type BAKER_COMMANDS_HELPERS = sig
   val run_baker :
     configuration:Configuration.t ->
     baking_mode:string option ->
-    sources:Tezos_crypto.Signature.V1.public_key_hash list ->
+    sources:Tezos_crypto.Signature.public_key_hash list ->
     cctxt:Tezos_client_base.Client_context.full ->
     unit Error_monad.tzresult Lwt.t
 

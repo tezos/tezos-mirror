@@ -357,6 +357,14 @@ let directory_parameter =
       if not exists then failwith "Directory doesn't exist: '%s'" p
       else return p)
 
+let sources_param =
+  Tezos_clic.seq_of_param
+    (Tezos_client_base.Client_keys.Public_key_hash.source_param
+       ~name:"baker"
+       ~desc:
+         "name of the delegate owning the attestation/baking right or name of \
+          the consensus key signing on the delegate's behalf")
+
 type t = {
   pidfile : string option;
   node_version_check_bypass : bool;
