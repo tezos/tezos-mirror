@@ -21,7 +21,7 @@ use std::{
 };
 
 use merkle::AccessInfo;
-use serde::{Serialize, ser::SerializeTuple};
+use serde::ser::SerializeTuple;
 
 use super::{
     EnrichedValue, EnrichedValueLinked, ManagerBase, ManagerRead, ManagerReadWrite,
@@ -45,6 +45,16 @@ impl<M: ManagerBase> ManagerBase for ProofGen<M> {
     type EnrichedCell<V: EnrichedValue> = ProofEnrichedCell<V, M>;
 
     type ManagerRoot = Self;
+
+    fn enrich_cell<V: EnrichedValueLinked<Self>>(
+        underlying: Self::Region<V::E, 1>,
+    ) -> Self::EnrichedCell<V> {
+        ProofEnrichedCell { underlying }
+    }
+
+    fn as_devalued_cell<V: EnrichedValue>(cell: &Self::EnrichedCell<V>) -> &Self::Region<V::E, 1> {
+        &cell.underlying
+    }
 }
 
 /// Implementation of [`ManagerRead`] which wraps another manager and
@@ -97,11 +107,7 @@ impl<M: ManagerRead> ManagerRead for ProofGen<M> {
         V: EnrichedValue,
         V::E: Copy,
     {
-        cell.set_read();
-        match &cell.written {
-            None => M::enriched_cell_read_stored(&cell.source),
-            Some(value) => *value,
-        }
+        Self::region_read(&cell.underlying, 0)
     }
 
     fn enriched_cell_read_derived<V>(cell: &Self::EnrichedCell<V>) -> V::D<Self::ManagerRoot>
@@ -116,8 +122,7 @@ impl<M: ManagerRead> ManagerRead for ProofGen<M> {
     where
         V: EnrichedValue,
     {
-        cell.set_read();
-        cell.unrecorded_ref_stored()
+        Self::region_ref(&cell.underlying, 0)
     }
 }
 
@@ -179,8 +184,7 @@ impl<M: ManagerBase> ManagerWrite for ProofGen<M> {
     where
         V: EnrichedValueLinked<Self>,
     {
-        cell.set_write();
-        cell.written = Some(value);
+        Self::region_write(&mut cell.underlying, 0, value);
     }
 }
 
@@ -228,19 +232,6 @@ impl<M: ManagerSerialise> ManagerSerialise for ProofGen<M> {
         let mut values = vec![0u8; LEN];
         region.unrecorded_read_all(0, &mut values);
         serializer.serialize_bytes(values.as_slice())
-    }
-
-    fn serialise_enriched_cell<V, S>(
-        cell: &Self::EnrichedCell<V>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
-    where
-        V: EnrichedValue,
-        V::E: serde::Serialize,
-        S: serde::Serializer,
-    {
-        let elem = cell.unrecorded_ref_stored();
-        elem.serialize(serializer)
     }
 }
 
@@ -388,53 +379,35 @@ impl<M: ManagerRead, const LEN: usize> ProofDynRegion<LEN, M> {
 /// The underlying cell is never mutated, but written values are recorded
 /// in order to preserve the integrity of subsequent reads.
 pub struct ProofEnrichedCell<V: EnrichedValue, M: ManagerBase> {
-    source: M::EnrichedCell<V>,
-    written: Option<V::E>,
-    access: Cell<AccessInfo>,
+    underlying: ProofRegion<V::E, 1, M>,
 }
 
 impl<V: EnrichedValue, M: ManagerBase> ProofEnrichedCell<V, M> {
     /// Bind a pre-existing enriched cell.
-    pub fn bind(source: M::EnrichedCell<V>) -> Self {
+    pub fn bind(source: M::Region<V::E, 1>) -> Self {
         Self {
-            source,
-            written: None,
-            access: Cell::new(AccessInfo::NoAccess),
+            underlying: ProofRegion::bind(source),
         }
     }
 
     /// Get a copy of the access log.
     pub fn get_access_info(&self) -> AccessInfo {
-        self.access.get()
+        self.underlying.access.get()
     }
 
     /// Set the access log to `Read` or, if previously `Write`, to `ReadWrite`.
     pub fn set_read(&self) {
-        self.access.set(AccessInfo::and_read(self.access.get()))
+        self.underlying.set_read()
     }
 
     /// Set the access log to `Write` or, if previously `Read`, to `ReadWrite`.
     pub fn set_write(&mut self) {
-        self.access.set(AccessInfo::and_write(self.access.get()))
+        self.underlying.set_write()
     }
 
     /// Set the access log to `ReadWrite`.
     pub fn set_read_write(&self) {
-        self.access.set(AccessInfo::ReadWrite)
-    }
-}
-
-impl<V: EnrichedValue, M: ManagerRead> ProofEnrichedCell<V, M> {
-    /// Version of [`ManagerRead::enriched_cell_ref_stored`] which does not
-    /// record the access as a read.
-    fn unrecorded_ref_stored(&self) -> &V::E
-    where
-        V: EnrichedValue,
-    {
-        match &self.written {
-            None => M::enriched_cell_ref_stored(&self.source),
-            Some(value) => value,
-        }
+        self.underlying.set_read_write()
     }
 }
 
@@ -720,9 +693,8 @@ mod tests {
 
         proptest!(|(value_before: u64, value_after: u64)| {
             // A read followed by a write
-            let cell = (value_before, T::from(&value_before));
-            let mut proof_cell: ProofEnrichedCell<Enriching, Ref<'_, Owned>> =
-                ProofEnrichedCell::bind(&cell);
+            let value = [value_before];
+            let mut proof_cell: ProofEnrichedCell<Enriching, Ref<'_, Owned>> = ProofEnrichedCell::bind(&value);
             prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::NoAccess);
             let value = ProofGen::<Ref<'_, Owned>>::enriched_cell_read_stored(&proof_cell);
             prop_assert_eq!(value, value_before);
@@ -733,9 +705,8 @@ mod tests {
             prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::ReadWrite);
 
             // A write followed by a read
-            let cell = (value_before, T::from(&value_before));
-            let mut proof_cell: ProofEnrichedCell<Enriching, Ref<'_, Owned>> =
-                ProofEnrichedCell::bind(&cell);
+            let value = [value_before];
+            let mut proof_cell: ProofEnrichedCell<Enriching, Ref<'_, Owned>> = ProofEnrichedCell::bind(&value);
             prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::NoAccess);
             ProofGen::<Ref<'_, Owned>>::enriched_cell_write(&mut proof_cell, value_after);
             prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::Write);

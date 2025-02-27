@@ -3,8 +3,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::borrow::Borrow;
-
 use super::{
     Elem, EnrichedValue, EnrichedValueLinked, FnManager, ManagerBase, ManagerClone,
     ManagerDeserialise, ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite, Ref,
@@ -25,7 +23,12 @@ pub struct EnrichedCell<V: EnrichedValue, M: ManagerBase> {
 
 impl<V: EnrichedValue, M: ManagerBase> EnrichedCell<V, M> {
     /// Bind this state to the enriched cell.
-    pub fn bind(cell: M::EnrichedCell<V>) -> Self {
+    pub fn bind(cell: Cell<V::E, M>) -> Self
+    where
+        V: EnrichedValueLinked<M::ManagerRoot>,
+    {
+        let region = cell.into_region();
+        let cell = M::enrich_cell(region);
         Self { cell }
     }
 
@@ -36,10 +39,11 @@ impl<V: EnrichedValue, M: ManagerBase> EnrichedCell<V, M> {
 
     /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
     /// the constituents of `N` that were produced from the constituents of `&M`.
-    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(&'a self) -> EnrichedCell<V, F::Output> {
-        EnrichedCell {
-            cell: F::map_enriched_cell(self.cell.borrow()),
-        }
+    pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(&'a self) -> Cell<V::E, F::Output> {
+        let cell = self.cell_ref();
+        let region = M::as_devalued_cell(cell);
+        let region = F::map_region(region);
+        Cell::bind(region)
     }
 
     /// Write the value back to the enriched cell.
@@ -401,7 +405,9 @@ where
     where
         S: serde::Serializer,
     {
-        M::serialise_enriched_cell(&self.cell, serializer)
+        let cell = self.cell_ref();
+        let region = M::as_devalued_cell(cell);
+        M::serialise_region(region, serializer)
     }
 }
 
@@ -429,14 +435,15 @@ impl<'de, E: serde::Deserialize<'de>, const LEN: usize, M: ManagerDeserialise>
 
 impl<'de, V, M: ManagerDeserialise> serde::Deserialize<'de> for EnrichedCell<V, M>
 where
-    V: EnrichedValueLinked<M>,
+    V: EnrichedValueLinked<M::ManagerRoot>,
     V::E: serde::Deserialize<'de>,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        let cell = M::deserialise_enriched_cell(deserializer)?;
+        let region = M::deserialise_region(deserializer)?;
+        let cell = M::enrich_cell(region);
         Ok(Self { cell })
     }
 }

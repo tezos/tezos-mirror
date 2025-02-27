@@ -244,7 +244,10 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::Ma
     pub fn bind(
         space: backend::AllocatedOf<MachineStateLayout<MC, CL>, M>,
         block_builder: B::BlockBuilder,
-    ) -> Self {
+    ) -> Self
+    where
+        M::ManagerRoot: ManagerReadWrite,
+    {
         Self {
             core: MachineCoreState::bind(space.0),
             block_cache: BlockCache::bind(space.1, block_builder),

@@ -90,7 +90,9 @@ use super::address_translation::PAGE_OFFSET_WIDTH;
 use super::instruction::Instruction;
 use super::{MachineCoreState, memory::MemoryConfig};
 use super::{ProgramCounterUpdate, memory::Address};
+use crate::default::ConstDefault;
 use crate::machine_state::address_translation::PAGE_SIZE;
+use crate::machine_state::instruction::Args;
 use crate::parser::instruction::InstrWidth;
 use crate::state_backend::{
     self, AllocatedOf, Atom, Cell, EnrichedCell, EnrichedValue, ManagerBase, ManagerClone,
@@ -102,8 +104,6 @@ use crate::{
     cache_utils::Sizes,
     storage::{Hash, HashError},
 };
-use crate::{default::ConstDefault, state_backend::verify_backend};
-use crate::{machine_state::instruction::Args, storage::binary};
 
 /// Mask for getting the offset within a page
 const PAGE_OFFSET_MASK: usize = (1 << PAGE_OFFSET_WIDTH) - 1;
@@ -117,11 +117,11 @@ pub struct ICallLayout<MC> {
 }
 
 impl<MC: MemoryConfig> state_backend::Layout for ICallLayout<MC> {
-    type Allocated<M: state_backend::ManagerBase> = EnrichedCell<ICallPlaced<MC>, M>;
+    type Allocated<M: state_backend::ManagerBase> = Cell<Instruction, M>;
 
     fn allocate<M: state_backend::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-        let value = backend.allocate_enriched_cell(Instruction::DEFAULT);
-        EnrichedCell::bind(value)
+        let value = backend.allocate_region([Instruction::DEFAULT]);
+        Cell::bind(value)
     }
 }
 
@@ -135,25 +135,11 @@ impl<MC: MemoryConfig> state_backend::ProofLayout for ICallLayout<MC> {
     fn to_merkle_tree(
         state: state_backend::RefProofGenOwnedAlloc<Self>,
     ) -> Result<proof_backend::merkle::MerkleTree, HashError> {
-        let serialised = binary::serialise(&state)?;
-        proof_backend::merkle::MerkleTree::make_merkle_leaf(
-            serialised,
-            state.cell_ref().get_access_info(),
-        )
+        Atom::to_merkle_tree(state)
     }
 
     fn from_proof(proof: state_backend::ProofTree) -> state_backend::FromProofResult<Self> {
-        let leaf = proof.into_leaf()?;
-
-        let cell = match leaf {
-            state_backend::ProofPart::Present(data) => {
-                let value = binary::deserialise(data)?;
-                verify_backend::EnrichedCell::Present(value)
-            }
-            state_backend::ProofPart::Absent => verify_backend::EnrichedCell::Absent,
-        };
-
-        Ok(EnrichedCell::bind(cell))
+        Atom::from_proof(proof)
     }
 }
 
@@ -258,7 +244,10 @@ pub struct Cached<MC: MemoryConfig, B: Block<MC, M>, M: ManagerBase> {
 }
 
 impl<MC: MemoryConfig, B: Block<MC, M>, M: ManagerBase> Cached<MC, B, M> {
-    fn bind(space: AllocatedOf<CachedLayout<MC>, M>) -> Self {
+    fn bind(space: AllocatedOf<CachedLayout<MC>, M>) -> Self
+    where
+        M::ManagerRoot: ManagerReadWrite,
+    {
         Self {
             address: space.0,
             fence_counter: space.1,
@@ -394,12 +383,15 @@ pub trait BlockCacheLayout: state_backend::CommitmentLayout + state_backend::Pro
 
     type Sizes;
 
-    fn bind<B: Block<Self::MemoryConfig, M>, M: state_backend::ManagerBase>(
+    fn bind<B, M>(
         space: state_backend::AllocatedOf<Self, M>,
         block_builder: B::BlockBuilder,
     ) -> BlockCache<Self, B, Self::MemoryConfig, M>
     where
-        Self: Sized;
+        Self: Sized,
+        M: state_backend::ManagerBase,
+        M::ManagerRoot: ManagerReadWrite,
+        B: Block<Self::MemoryConfig, M>;
 
     fn entry<B: Block<Self::MemoryConfig, M>, M: ManagerBase>(
         entries: &Self::Entries<B, M>,
@@ -447,7 +439,10 @@ impl<MC: MemoryConfig, const BITS: usize, const SIZE: usize> BlockCacheLayout
     fn bind<B: Block<Self::MemoryConfig, M>, M: ManagerBase>(
         space: AllocatedOf<Self, M>,
         block_builder: B::BlockBuilder,
-    ) -> BlockCache<Self, B, Self::MemoryConfig, M> {
+    ) -> BlockCache<Self, B, Self::MemoryConfig, M>
+    where
+        M::ManagerRoot: ManagerReadWrite,
+    {
         BlockCache {
             current_block_addr: space.0,
             next_instr_addr: space.1,
@@ -535,7 +530,10 @@ impl<BCL: BlockCacheLayout<MemoryConfig = MC>, B: Block<MC, M>, MC: MemoryConfig
     /// Bind the block cache to the given allocated state and the given [block builder].
     ///
     /// [block builder]: Block::BlockBuilder
-    pub fn bind(space: AllocatedOf<BCL, M>, block_builder: B::BlockBuilder) -> Self {
+    pub fn bind(space: AllocatedOf<BCL, M>, block_builder: B::BlockBuilder) -> Self
+    where
+        M::ManagerRoot: ManagerReadWrite,
+    {
         BCL::bind(space, block_builder)
     }
 
@@ -908,7 +906,7 @@ mod tests {
             mode::Mode,
             registers::{XRegister, a1, nz, t0, t1},
         },
-        state_backend::{CommitmentLayout, owned_backend::Owned},
+        state_backend::owned_backend::Owned,
     };
 
     pub type TestLayout<MC> = Layout<MC, TEST_CACHE_BITS, TEST_CACHE_SIZE>;
@@ -1209,22 +1207,6 @@ mod tests {
             second_block.unwrap().num_instr()
         );
     });
-
-    /// Tests that a layout which contains an [`EnrichedCell`] is hashed identically as
-    /// a layout which contains a [`Cell`] of the same value.
-    #[test]
-    fn test_enriched_cell_hashing() {
-        let instr = Instruction::DEFAULT;
-
-        let ec_value = (instr, ICall::<M1K, Owned>::from(&instr));
-        let ec: EnrichedCell<ICallPlaced<M1K>, Ref<'_, Owned>> = EnrichedCell::bind(&ec_value);
-        let ec_hash = <ICallLayout<M1K> as CommitmentLayout>::state_hash(ec).unwrap();
-
-        let c_value = [instr; 1];
-        let c: Cell<Instruction, Ref<'_, Owned>> = Cell::bind(&c_value);
-        let c_hash = <Atom<Instruction> as CommitmentLayout>::state_hash(c).unwrap();
-        assert_eq!(ec_hash, c_hash);
-    }
 
     /// The initialised block cache must not return any blocks. This is especially important for
     /// blocks at address 0 which at one point were accidentally valid but empty which caused loops.
