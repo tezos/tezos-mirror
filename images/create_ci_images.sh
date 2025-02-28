@@ -204,6 +204,9 @@ build() {
       --build-arg BUILD_IMAGE="alpine:${alpine_version}" \
       --build-arg OCAML_VERSION="${ocaml_version}" \
       --build-arg TARGETARCH="${targetarch}" \
+      --build-arg NPM_REGISTRY_DOMAIN="${NPM_REGISTRY_DOMAIN:-}" \
+      --build-arg NPM_REGISTRY_PATH="${NPM_REGISTRY_PATH:-}" \
+      $(if [ -f /tmp/npm_token.txt ]; then echo "--secret id=npm_token,src=/tmp/npm_token.txt"; fi) \
       -t "$f_image_name" \
       $(if [ -n "$tag_extra" ]; then echo "-t $f_image_name_extra"; fi) \
       "$@" \

@@ -365,7 +365,7 @@ RUN apk del sqlite-dev sqlite-libs \
  # Version number should be kept in sync with the one of the
  # datadog/ci image used for the [datadog_ci] image
  # (cf. ci/bin/common.ml)
- && npm --verbose install -g "@datadog/datadog-ci@2.44.0" \
+ RUN npm --verbose install -g "@datadog/datadog-ci@2.44.0" \
  # We need eth since e2e tests. This requires git as well.
  && npm --verbose install -g eth-cli@2.0.2 \
  # We need solc to compile solidity smart-contracts

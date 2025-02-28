@@ -84,6 +84,9 @@ if [ "$exists" = "true" ]; then
   exit 0
 fi
 
+# Export npm registry token to build context
+echo -n "$(gcloud auth print-access-token)" > /tmp/npm_token.txt
+
 echo "Build CI images with image_tag_suffix $image_tag_suffix"
 
 ./images/create_ci_images.sh \
