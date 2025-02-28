@@ -62,7 +62,7 @@ let signer_test protocol ~keys =
   in
   let level_2_promise = Node.wait_for_level node 2 in
   let level_3_promise = Node.wait_for_level node 3 in
-  let* _baker = Baker.init ~protocol node client in
+  let* _baker = Agnostic_baker.init node client in
   let* _ = level_2_promise in
   Log.info "New head arrive level 2" ;
   let* _ = level_3_promise in
@@ -74,7 +74,8 @@ let signer_simple_test =
     ~__FILE__
     ~title:"signer test"
     ~tags:[team; "node"; "baker"; "tz1"]
-    ~uses:(fun protocol -> [Constant.octez_signer; Protocol.baker protocol])
+    ~uses:(fun _protocol ->
+      [Constant.octez_signer; Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   let* _ =
     signer_test protocol ~keys:(Account.Bootstrap.keys |> Array.to_list)

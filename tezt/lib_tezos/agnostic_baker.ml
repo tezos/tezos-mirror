@@ -23,10 +23,15 @@ module Parameters = struct
     base_dir : string;
     node_data_dir : string;
     node_rpc_endpoint : Endpoint.t;
+    dal_node_rpc_endpoint : Endpoint.t option;
     mutable pending_ready : unit option Lwt.u list;
-    remote_mode : bool;
     liquidity_baking_toggle_vote : liquidity_baking_vote option;
-    use_dal_node : string option;
+    force_apply_from_round : int option;
+    remote_mode : bool;
+    operations_pool : string option;
+    state_recorder : bool;
+    node_version_check_bypass : bool;
+    node_version_allowed : string option;
   }
 
   type session_state = {mutable ready : bool}
@@ -52,8 +57,10 @@ let set_ready agnostic_baker =
 
 let create_from_uris ?runner
     ?(path = Uses.path Constant.octez_experimental_agnostic_baker) ?name ?color
-    ?event_pipe ?(delegates = []) ?(remote_mode = false)
-    ?(liquidity_baking_toggle_vote = Some Pass) ?use_dal_node ~base_dir
+    ?event_pipe ?(delegates = []) ?(liquidity_baking_toggle_vote = Some Pass)
+    ?force_apply_from_round ?(remote_mode = false) ?operations_pool
+    ?dal_node_rpc_endpoint ?(state_recorder = false)
+    ?(node_version_check_bypass = false) ?node_version_allowed ~base_dir
     ~node_data_dir ~node_rpc_endpoint () =
   let agnostic_baker =
     create
@@ -69,9 +76,14 @@ let create_from_uris ?runner
         node_data_dir;
         node_rpc_endpoint;
         pending_ready = [];
-        remote_mode;
         liquidity_baking_toggle_vote;
-        use_dal_node;
+        force_apply_from_round;
+        remote_mode;
+        operations_pool;
+        dal_node_rpc_endpoint;
+        state_recorder;
+        node_version_check_bypass;
+        node_version_allowed;
       }
   in
   agnostic_baker
@@ -80,8 +92,10 @@ let handle_event node ({name; _} : event) =
   match name with "starting_daemon.v0" -> set_ready node | _ -> ()
 
 let create ?runner ?path ?name ?color ?event_pipe ?(delegates = [])
-    ?(remote_mode = false) ?(liquidity_baking_toggle_vote = Some Pass)
-    ?use_dal_node node client =
+    ?(liquidity_baking_toggle_vote = Some Pass) ?force_apply_from_round
+    ?(remote_mode = false) ?operations_pool ?dal_node ?(state_recorder = false)
+    ?(node_version_check_bypass = false) ?node_version_allowed node client =
+  let dal_node_rpc_endpoint = Option.map Dal_node.as_rpc_endpoint dal_node in
   let agnostic_baker =
     create_from_uris
       ?runner
@@ -89,10 +103,15 @@ let create ?runner ?path ?name ?color ?event_pipe ?(delegates = [])
       ?name
       ?color
       ?event_pipe
-      ?use_dal_node
       ~delegates
-      ~remote_mode
       ~liquidity_baking_toggle_vote
+      ?force_apply_from_round
+      ~remote_mode
+      ?operations_pool
+      ?dal_node_rpc_endpoint
+      ~state_recorder
+      ~node_version_check_bypass
+      ?node_version_allowed
       ~base_dir:(Client.base_dir client)
       ~node_data_dir:(Node.data_dir node)
       ~node_rpc_endpoint:(Node.as_rpc_endpoint node)
@@ -113,24 +132,63 @@ let run ?event_level ?event_sections_levels (agnostic_baker : t) =
   let node_addr =
     Endpoint.as_string agnostic_baker.persistent_state.node_rpc_endpoint
   in
-  let run_args =
-    if agnostic_baker.persistent_state.remote_mode then ["remotely"]
-    else ["with"; "local"; "node"; node_data_dir]
-  in
   let liquidity_baking_toggle_vote =
     Cli_arg.optional_arg
       "liquidity-baking-toggle-vote"
       liquidity_baking_vote_to_string
       agnostic_baker.persistent_state.liquidity_baking_toggle_vote
   in
-  let use_dal_node =
-    match agnostic_baker.persistent_state.use_dal_node with
-    | None -> ["--without-dal"]
-    | Some endpoint -> ["--dal-node"; endpoint]
+  let force_apply_from_round =
+    (* From Protocol Q, the flag --force-apply has been replaced by
+       --force-apply-from-round, the following maintains back-compatibility with
+       ParisC tests. *)
+    Cli_arg.optional_arg
+      "force-apply-from-round"
+      string_of_int
+      agnostic_baker.persistent_state.force_apply_from_round
+  in
+  let operations_pool =
+    Cli_arg.optional_arg
+      "operations-pool"
+      Fun.id
+      agnostic_baker.persistent_state.operations_pool
+  in
+  let dal_node_endpoint =
+    Cli_arg.optional_arg
+      "dal-node"
+      Endpoint.as_string
+      agnostic_baker.persistent_state.dal_node_rpc_endpoint
+  in
+  let without_dal =
+    Cli_arg.optional_switch
+      "without-dal"
+      (Option.is_none agnostic_baker.persistent_state.dal_node_rpc_endpoint)
+  in
+  let state_recorder =
+    Cli_arg.optional_switch
+      "record-state"
+      agnostic_baker.persistent_state.state_recorder
+  in
+  let node_version_check_bypass =
+    Cli_arg.optional_switch
+      "node-version-check-bypass"
+      agnostic_baker.persistent_state.node_version_check_bypass
+  in
+  let node_version_allowed =
+    Cli_arg.optional_arg
+      "node-version-allowed"
+      Fun.id
+      agnostic_baker.persistent_state.node_version_allowed
+  in
+  let run_args =
+    if agnostic_baker.persistent_state.remote_mode then ["remotely"]
+    else ["with"; "local"; "node"; node_data_dir]
   in
   let arguments =
     ["--"; "--endpoint"; node_addr; "--base-dir"; base_dir; "run"]
-    @ run_args @ delegates @ liquidity_baking_toggle_vote @ use_dal_node
+    @ run_args @ delegates @ liquidity_baking_toggle_vote
+    @ force_apply_from_round @ operations_pool @ dal_node_endpoint @ without_dal
+    @ state_recorder @ node_version_check_bypass @ node_version_allowed
   in
 
   let on_terminate _ =
@@ -167,8 +225,9 @@ let wait_for_ready agnostic_baker =
 
 let init ?runner ?(path = Uses.path Constant.octez_experimental_agnostic_baker)
     ?name ?color ?event_level ?event_pipe ?event_sections_levels
-    ?(delegates = []) ?remote_mode ?liquidity_baking_toggle_vote ?use_dal_node
-    node client =
+    ?(delegates = []) ?liquidity_baking_toggle_vote ?force_apply_from_round
+    ?remote_mode ?operations_pool ?dal_node ?state_recorder
+    ?node_version_check_bypass ?node_version_allowed node client =
   let* () = Node.wait_for_ready node in
   let agnostic_baker =
     create
@@ -177,9 +236,14 @@ let init ?runner ?(path = Uses.path Constant.octez_experimental_agnostic_baker)
       ?name
       ?color
       ?event_pipe
-      ?remote_mode
       ?liquidity_baking_toggle_vote
-      ?use_dal_node
+      ?force_apply_from_round
+      ?remote_mode
+      ?operations_pool
+      ?dal_node
+      ?state_recorder
+      ?node_version_check_bypass
+      ?node_version_allowed
       ~delegates
       node
       client

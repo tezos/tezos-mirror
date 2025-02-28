@@ -232,7 +232,7 @@ let test_threshold_zero =
     ~title:"bootstrap: test threshold zero"
     ~tags:
       [team; Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   Log.info "Setup network" ;
   let* node, client =
@@ -244,7 +244,7 @@ let test_threshold_zero =
       ~timestamp:Now
       ()
   in
-  let* _ = Baker.init ~protocol node client in
+  let* _ = Agnostic_baker.init node client in
 
   Log.info "Check that the node is bootstrapped" ;
   let* () = check_sync_state client Synced in
@@ -269,7 +269,7 @@ let test_threshold_one =
     ~__FILE__
     ~title:"bootstrap: test threshold one"
     ~tags:[team; "bootstrap"; "threshold"]
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   Log.info "Add a first peer with threshold zero" ;
   let* node, client =
@@ -281,7 +281,7 @@ let test_threshold_one =
       ~timestamp:Now
       ()
   in
-  let* baker = Baker.init ~protocol node client in
+  let* baker = Agnostic_baker.init node client in
 
   Log.info "Check synchronisation state of first peer" ;
   let* () = check_sync_state client Synced in
@@ -295,7 +295,7 @@ let test_threshold_one =
   in
   let* () = Client.Admin.connect_address client ~peer:node1 in
   let* _ = Node.wait_for_level node 2 in
-  let* () = Baker.kill baker in
+  let* () = Agnostic_baker.terminate baker in
 
   Log.info "Check bootstrapped state of second peer" ;
   let* () = Client.bootstrapped client1 in
@@ -309,7 +309,7 @@ let test_threshold_two =
     ~title:"bootstrap: test threshold two"
     ~tags:
       [team; Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   Log.info "Add a first peer with threshold zero" ;
   let* node, client =
@@ -321,7 +321,7 @@ let test_threshold_two =
       ~timestamp:Now
       ()
   in
-  let* baker = Baker.init ~protocol node client in
+  let* baker = Agnostic_baker.init node client in
 
   Log.info "Add nodes and connect in clique" ;
 
@@ -363,7 +363,7 @@ let test_threshold_two =
         unit)
       [node; node1; node2; node3]
   in
-  let* () = Baker.kill baker in
+  let* () = Agnostic_baker.terminate baker in
 
   let* () = Client.bootstrapped client in
   let* () = Client.bootstrapped client1 in
@@ -378,7 +378,7 @@ let test_threshold_stuck =
     ~title:"bootstrap: test threshold stuck"
     ~tags:
       [team; Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   let sync_latency = 3 in
 
@@ -395,12 +395,12 @@ let test_threshold_stuck =
       ~timestamp:Now
       ()
   in
-  let* baker = Baker.init ~protocol node client in
+  let* baker = Agnostic_baker.init node client in
 
   Log.info "Bake a few blocks and kill baker" ;
   let* current_level = Node.get_level node in
   let* (level : int) = Node.wait_for_level node (current_level + 3) in
-  let* () = Baker.terminate baker in
+  let* () = Agnostic_baker.terminate baker in
 
   Log.info "Add two additional peers" ;
   let* node1, client1 =
@@ -442,7 +442,7 @@ let test_threshold_split_view =
     ~title:"bootstrap: test threshold split view"
     ~tags:
       [team; Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   Log.info
     "Add two peers with threshold zero, and one with threshold 2 and a high \
@@ -474,7 +474,7 @@ let test_threshold_split_view =
       ~timestamp:Now
       ()
   in
-  let* _ = Baker.init ~protocol node client in
+  let* _ = Agnostic_baker.init node client in
   let* () = connect_clique client [node; node1; node2] in
 
   Log.info "Test that all nodes bootstrap" ;
@@ -517,7 +517,7 @@ let test_many_nodes_bootstrap =
         "threshold";
         Tag.memory_4k;
       ]
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   let num_nodes = 8 in
   let running_time = 10.0 in
@@ -538,7 +538,7 @@ let test_many_nodes_bootstrap =
       ~timestamp:Now
       ()
   in
-  let* _ = Baker.init ~protocol node client in
+  let* _ = Agnostic_baker.init node client in
   let* node1, client1 =
     Client.init_with_protocol
       ~nodes_args:

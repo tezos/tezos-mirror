@@ -38,6 +38,12 @@ val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
  *)
 val wait_for_ready : t -> unit Lwt.t
 
+(** Raw events. *)
+type event = {name : string; value : JSON.t; timestamp : float}
+
+(** See [Daemon.Make.on_event]. *)
+val on_event : t -> (event -> unit) -> unit
+
 (** Spawn [octez-experimental-agnostic-baker run].
 
     The resulting promise is fulfilled as soon as the agnostic baker has been
@@ -88,19 +94,19 @@ val protocol_status : Protocol.t -> protocol_status
     agnostic baker. This defaults to the empty list, which is a shortcut for "every known
     account".
 
-    [liquidity_baking_toggle_vote] is passed to the agnostic baker
-    daemon through the flags [--liquidity-baking-toggle-vote]. If
-    [--liquidity-baking-toggle-vote] is [None], then
-    [--liquidity-baking-toggle-vote] is not passed. If it is [Some x]
-    then [--liquidity-baking-toggle-vote x] is passed. The default
-    value is [Some Pass].
-
-    [use_dal_node] is passed to the agnostic baker daemon through the
-    [--without-dal] or [--dal-node <uri>] flags. If the flag is [None], the
-    former option is passed, otherwise if the flag is [Some <uri>], then the
-    latter option is passed. The default value is [None].
+    [force_apply_from_round], [operations_pool], [state_recorder], [node_version_check_bypass],
+    [node_version_allowed] and [liquidity_baking_toggle_vote] are passed to the
+    baker daemon through the flags [--force-apply-from-round],
+    [--operations-pool], [--record-state], [--node-version-check-bypass], [--node-version-allowed]
+    and [--liquidity-baking-toggle-vote]. If [--liquidity-baking-toggle-vote]
+    is [None], then [--liquidity-baking-toggle-vote] is not passed. If it is [Some x] then
+    [--liquidity-baking-toggle-vote x] is passed. The default value is [Some Pass].
 
     If [remote_mode] is specified, the agnostic baker will run in RPC-only mode.
+
+    If [dal_node] is specified, then it is the DAL node that the baker queries
+    in order to determine the attestations it sends to the L1 node. A
+    [--dal_node] argument is passed to specify the DAL node's endpoint.
  *)
 val create :
   ?runner:Runner.t ->
@@ -109,9 +115,14 @@ val create :
   ?color:Log.Color.t ->
   ?event_pipe:string ->
   ?delegates:string list ->
-  ?remote_mode:bool ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
-  ?use_dal_node:string ->
+  ?force_apply_from_round:int ->
+  ?remote_mode:bool ->
+  ?operations_pool:string ->
+  ?dal_node:Dal_node.t ->
+  ?state_recorder:bool ->
+  ?node_version_check_bypass:bool ->
+  ?node_version_allowed:string ->
   Node.t ->
   Client.t ->
   t
@@ -129,6 +140,10 @@ val create :
     The [base_dir] parameter contains needed information about the wallets used
     by the agnostic baker.
 
+    If [dal_node_rpc_endpoint] is specified, then it provides the DAL node RPC
+    server's endpoint that the baker queries in order to determine the
+    attestations it sends to the L1 node. A [--dal-node] argument is passed
+    to specify the DAL node's endpoint.
  *)
 val create_from_uris :
   ?runner:Runner.t ->
@@ -137,9 +152,14 @@ val create_from_uris :
   ?color:Log.Color.t ->
   ?event_pipe:string ->
   ?delegates:string list ->
-  ?remote_mode:bool ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
-  ?use_dal_node:string ->
+  ?force_apply_from_round:int ->
+  ?remote_mode:bool ->
+  ?operations_pool:string ->
+  ?dal_node_rpc_endpoint:Endpoint.t ->
+  ?state_recorder:bool ->
+  ?node_version_check_bypass:bool ->
+  ?node_version_allowed:string ->
   base_dir:string ->
   node_data_dir:string ->
   node_rpc_endpoint:Endpoint.t ->
@@ -191,9 +211,14 @@ val init :
   ?event_pipe:string ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?delegates:string list ->
-  ?remote_mode:bool ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
-  ?use_dal_node:string ->
+  ?force_apply_from_round:int ->
+  ?remote_mode:bool ->
+  ?operations_pool:string ->
+  ?dal_node:Dal_node.t ->
+  ?state_recorder:bool ->
+  ?node_version_check_bypass:bool ->
+  ?node_version_allowed:string ->
   Node.t ->
   Client.t ->
   t Lwt.t

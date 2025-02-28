@@ -57,7 +57,7 @@ let test_nonce_seed_revelation =
     ~__FILE__
     ~title:"Nonce seed revelation"
     ~tags:[team; "nonce"; "seed"; "revelation"; Tag.memory_3k]
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   (* Run a node and a baker.
      The node runs in archive mode to obtain metadata with [RPC.get_chain_block]. *)
@@ -98,7 +98,7 @@ let test_nonce_seed_revelation =
       (fun i node ->
         let* client = Client.init ~endpoint:(Node node) () in
         let delegates = [Account.Bootstrap.keys.(i).alias] in
-        Baker.init ~protocol ~delegates node client)
+        Agnostic_baker.init ~delegates node client)
       nodes
   in
   let* () =
@@ -114,7 +114,7 @@ let test_nonce_seed_revelation =
   (* Wait until target level is reached *)
   let* () = cycle_two_promise in
   (* No need to bake further *)
-  let* () = Lwt_list.iter_p Baker.terminate bakers in
+  let* () = Lwt_list.iter_p Agnostic_baker.terminate bakers in
   Log.info "Get all blocks" ;
   (* Retrieve all blocks for two full cycles. *)
   let* blocks =
@@ -235,7 +235,7 @@ let test_baking_nonce_migration =
     ~__FILE__
     ~title:"Baking nonce format migration"
     ~tags:[team; "nonce"; "migration"]
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   Log.info "Initialize node and client" ;
   let* node, client =
@@ -248,7 +248,7 @@ let test_baking_nonce_migration =
     Array.to_list
     @@ Array.map (fun key -> Account.(key.alias)) Account.Bootstrap.keys
   in
-  let baker = Baker.create ~protocol ~delegates node client in
+  let baker = Agnostic_baker.create ~delegates node client in
 
   (* Reduce the block per cycle to gain some time *)
   let blocks_per_cycle = 4 in
@@ -276,9 +276,9 @@ let test_baking_nonce_migration =
 
   Log.info "Start the baker and wait for success migration nonces baker event" ;
   let successful_migration_event =
-    Baker.wait_for baker "success_migrate_nonces.v0" Option.some
+    Agnostic_baker.wait_for baker "success_migrate_nonces.v0" Option.some
   in
-  let* () = Baker.run baker in
+  let* () = Agnostic_baker.run baker in
 
   let* _ = successful_migration_event in
 
@@ -286,7 +286,7 @@ let test_baking_nonce_migration =
     "Bake until the level: %d (end of the second cycle) then kill the baker"
     target_level ;
   let* _ = target_level_promise in
-  let* () = Baker.kill baker in
+  let* () = Agnostic_baker.terminate baker in
 
   Log.info "Retrieve the nonce file contents" ;
   let* chain_id = Client.RPC.call client @@ RPC.get_chain_chain_id () in
@@ -307,9 +307,9 @@ let test_baking_nonce_migration =
     "Restart the baker until level: %d (end of the fifth cycle) then kill the \
      baker"
     target_level ;
-  let* () = Baker.run baker in
+  let* () = Agnostic_baker.run baker in
   let* _ = target_level_promise in
-  let* () = Baker.kill baker in
+  let* () = Agnostic_baker.terminate baker in
 
   Log.info "Concat old nonces contents with the new one" ;
   let new_nonces_contents = Base.read_file nonces_file in
@@ -323,20 +323,20 @@ let test_baking_nonce_migration =
     "Restart the baker and wait for ignore failed nonce migration event then \
      kill the baker" ;
   let failed_migration_event =
-    Baker.wait_for baker "ignore_failed_nonce_migration.v0" Option.some
+    Agnostic_baker.wait_for baker "ignore_failed_nonce_migration.v0" Option.some
   in
-  let* () = Baker.run baker in
+  let* () = Agnostic_baker.run baker in
   let* _ = failed_migration_event in
-  let* () = Baker.kill baker in
+  let* () = Agnostic_baker.terminate baker in
 
   Log.info "Remove old nonces contents from nonces file" ;
   let () = Base.write_file nonces_file ~contents:new_nonces_contents in
 
   Log.info "Restart the baker and wait for success migrate nonces event" ;
   let successful_migration_event =
-    Baker.wait_for baker "success_migrate_nonces.v0" Option.some
+    Agnostic_baker.wait_for baker "success_migrate_nonces.v0" Option.some
   in
-  let* () = Baker.run baker in
+  let* () = Agnostic_baker.run baker in
   let* _ = successful_migration_event in
   unit
 

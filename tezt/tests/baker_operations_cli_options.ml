@@ -338,7 +338,7 @@ let test_baker_external_operations =
     ~__FILE__
     ~title:"Baker external operations"
     ~tags:[Tag.layer1; "baker"; "external"; "operations"]
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   Log.info "Init" ;
   let node_args = Node.[Synchronisation_threshold 0] in
@@ -418,7 +418,7 @@ let test_baker_external_operations =
     Lwt_unix.sleep
       (float_of_int (minimal_block_delay + delay_increment_per_round))
   in
-  let* _baker = Baker.init ~protocol ~operations_pool node client in
+  let* _baker = Agnostic_baker.init ~operations_pool node client in
   (* Wait until we have seen enough blocks. This should not take much time. *)
   Log.info "Wait until high enough level" ;
   let* (_ : int) = Node.wait_for_level node (level + 1) in
@@ -473,8 +473,8 @@ let test_baker_state_recorder protocol state_recorder =
   let* level = Node.get_level node in
   (* Initialise a baker *)
   let* _baker =
-    if state_recorder then Baker.init ~protocol ~state_recorder node client
-    else Baker.init ~protocol node client
+    if state_recorder then Agnostic_baker.init ~state_recorder node client
+    else Agnostic_baker.init node client
   in
   (* Wait for chain to process the empty block *)
   let* (_ : int) = Node.wait_for_level node (level + 1) in
@@ -501,7 +501,7 @@ let test_baker_state_recorder_memory =
     ~__FILE__
     ~title:"Baker state recorder - memory case"
     ~tags:[Tag.layer1; "baker"; "state"; "recorder"; "memory"]
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol -> test_baker_state_recorder protocol false
 
 let test_baker_state_recorder_filesystem =
@@ -509,7 +509,7 @@ let test_baker_state_recorder_filesystem =
     ~__FILE__
     ~title:"Baker state recorder - filesystem case"
     ~tags:[Tag.layer1; "baker"; "state"; "recorder"; "filesystem"]
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol -> test_baker_state_recorder protocol true
 
 let register ~protocols =
