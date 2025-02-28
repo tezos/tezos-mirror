@@ -267,7 +267,7 @@ module Tx_object = struct
   let add htbl
       (({hash = Hash (Hex hash); _} : Ethereum_types.legacy_transaction_object)
        as tx_object) =
-    S.add htbl hash tx_object
+    S.replace htbl hash tx_object
 
   let find htbl (Hash (Hex hash)) = S.find htbl hash
 
@@ -283,7 +283,7 @@ module Pending_transactions = struct
   let empty ~start_size = S.create start_size
 
   let add htbl (Hash (Hex hash)) pending_callback =
-    S.add
+    S.replace
       htbl
       hash
       ({pending_callback; since = Time.System.now ()} : pending_request)
