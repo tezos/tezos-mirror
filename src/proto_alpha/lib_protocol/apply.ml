@@ -468,18 +468,12 @@ let apply_unstake ~ctxt ~sender ~amount ~destination ~before_operation =
       in
       return (ctxt, result, [])
 
-let apply_finalize_unstake ~ctxt ~sender ~amount ~destination ~before_operation
-    =
+let apply_finalize_unstake ~ctxt ~amount ~destination ~before_operation =
   let open Lwt_result_syntax in
   let*? () =
     error_when Tez.(amount <> zero) (Invalid_nonzero_transaction_amount amount)
   in
-  let*? () =
-    error_unless
-      Signature.Public_key_hash.(sender = destination)
-      Invalid_self_transaction_destination
-  in
-  let contract = Contract.Implicit sender in
+  let contract = Contract.Implicit destination in
   let*? ctxt = Gas.consume ctxt Adaptive_issuance_costs.find_delegate_cost in
   let*! already_allocated = Contract.allocated ctxt contract in
   let* ctxt, balance_updates = Staking.finalize_unstake ctxt contract in
@@ -1102,7 +1096,6 @@ let apply_manager_operation :
               in
               apply_finalize_unstake
                 ~ctxt
-                ~sender:source
                 ~amount
                 ~destination:pkh
                 ~before_operation:ctxt_before_op
