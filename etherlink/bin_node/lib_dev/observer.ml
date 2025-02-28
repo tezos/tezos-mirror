@@ -8,6 +8,12 @@
 
 open Ethereum_types
 
+let confirm_txs config tx_hashes =
+  let open Lwt_result_syntax in
+  if Configuration.is_tx_queue_enabled config then
+    Seq.iter_ep (fun hash -> Tx_queue.confirm hash) tx_hashes
+  else return_unit
+
 (** [on_new_blueprint evm_node_endpoint next_blueprint_number
     blueprint] applies evm events found in the blueprint, then applies
     the blueprint itself.
@@ -21,7 +27,7 @@ open Ethereum_types
     into a forced blueprint. The sequencer has performed a reorganization and
     starts submitting blocks from the new branch.
 *)
-let on_new_blueprint evm_node_endpoint next_blueprint_number
+let on_new_blueprint config evm_node_endpoint next_blueprint_number
     (({delayed_transactions; blueprint; _} : Blueprint_types.with_events) as
      blueprint_with_events) =
   let open Lwt_result_syntax in
@@ -53,7 +59,10 @@ let on_new_blueprint evm_node_endpoint next_blueprint_number
         match reorg with
         | Some level -> return (`Check_for_reorg level)
         | None -> return `Continue)
-    | Ok () | Error (Node_error.Diverged {must_exit = false; _} :: _) ->
+    | Ok tx_hashes ->
+        let* () = confirm_txs config tx_hashes in
+        return `Continue
+    | Error (Node_error.Diverged {must_exit = false; _} :: _) ->
         return `Continue
     | Error err -> fail err
   else if Z.(lt level number) then
@@ -318,7 +327,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
         ~time_between_blocks
         ~evm_node_endpoint
         ~next_blueprint_number
-        (on_new_blueprint evm_node_endpoint)
+        (on_new_blueprint config evm_node_endpoint)
     and* () =
       if Configuration.is_tx_queue_enabled config then
         Tx_queue.beacon ~tick_interval:0.05

@@ -830,48 +830,44 @@ module State = struct
   let rec apply_blueprint ?(events = []) ctxt conn timestamp payload
       delayed_transactions =
     let open Lwt_result_syntax in
-    let* _current_block =
-      Misc.with_timing_f_e Blueprint_events.blueprint_applied @@ fun () ->
-      let* evm_state, context, current_block, applied_kernel_upgrade, split_info
-          =
-        let* () = apply_evm_events conn ctxt events in
-        apply_blueprint_store_unsafe
-          ctxt
-          conn
-          timestamp
-          payload
-          delayed_transactions
-      in
-      let kernel_upgrade =
-        match ctxt.session.pending_upgrade with
-        | Some {injected_before; kernel_upgrade}
-          when injected_before = ctxt.session.next_blueprint_number ->
-            Some kernel_upgrade
-        | _ -> None
-      in
-
-      let*? current_block =
-        Transaction_object.reconstruct_block payload current_block
-      in
-
-      let*! () =
-        on_new_head
-          ?split_info
-          ctxt
-          ~applied_upgrade:applied_kernel_upgrade
-          evm_state
-          context
-          current_block
-          {
-            delayed_transactions;
-            kernel_upgrade;
-            blueprint =
-              {number = ctxt.session.next_blueprint_number; timestamp; payload};
-          }
-      in
-      return current_block
+    Misc.with_timing_f_e Blueprint_events.blueprint_applied @@ fun () ->
+    let* evm_state, context, current_block, applied_kernel_upgrade, split_info =
+      let* () = apply_evm_events conn ctxt events in
+      apply_blueprint_store_unsafe
+        ctxt
+        conn
+        timestamp
+        payload
+        delayed_transactions
     in
-    return_unit
+    let kernel_upgrade =
+      match ctxt.session.pending_upgrade with
+      | Some {injected_before; kernel_upgrade}
+        when injected_before = ctxt.session.next_blueprint_number ->
+          Some kernel_upgrade
+      | _ -> None
+    in
+
+    let*? current_block =
+      Transaction_object.reconstruct_block payload current_block
+    in
+
+    let*! () =
+      on_new_head
+        ?split_info
+        ctxt
+        ~applied_upgrade:applied_kernel_upgrade
+        evm_state
+        context
+        current_block
+        {
+          delayed_transactions;
+          kernel_upgrade;
+          blueprint =
+            {number = ctxt.session.next_blueprint_number; timestamp; payload};
+        }
+    in
+    return current_block
 
   and apply_evm_event_unsafe ctxt conn evm_state event latest_finalized_level =
     let open Lwt_result_syntax in
@@ -1061,7 +1057,7 @@ module State = struct
       prepare_local_flushed_blueprint ctxt parent_hash flushed_blueprint
     in
     (* Apply the blueprint. *)
-    let* () =
+    let* _block =
       apply_blueprint ~events ctxt conn timestamp payload delayed_transactions
     in
     return ctxt.session.evm_state
@@ -1493,7 +1489,7 @@ module State = struct
         let events =
           Blueprint_types.events_of_blueprint_with_events blueprint_with_events
         in
-        let* () =
+        let* _block =
           apply_blueprint
             ~events
             ctxt
@@ -1674,13 +1670,22 @@ module Handlers = struct
         protect @@ fun () ->
         let ctxt = Worker.state self in
         State.Transaction.run ctxt @@ fun ctxt conn ->
-        State.apply_blueprint
-          ?events
-          ctxt
-          conn
-          timestamp
-          payload
-          delayed_transactions
+        let* block =
+          State.apply_blueprint
+            ?events
+            ctxt
+            conn
+            timestamp
+            payload
+            delayed_transactions
+        in
+        let tx_hashes =
+          match block.transactions with
+          | TxHash tx_hashes -> List.to_seq tx_hashes
+          | TxFull tx_objects ->
+              List.to_seq tx_objects |> Seq.map Transaction_object.hash
+        in
+        return tx_hashes
     | Last_known_L1_level -> (
         protect @@ fun () ->
         let ctxt = Worker.state self in

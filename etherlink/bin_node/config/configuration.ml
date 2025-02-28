@@ -71,18 +71,26 @@ let chain_id_encoding : Ethereum_types.chain_id Data_encoding.t =
 
 type l2_chain = {chain_id : Ethereum_types.chain_id}
 
-type tx_queue = {max_size : int; max_transaction_batch_length : int option}
+type tx_queue = {
+  max_size : int;
+  max_transaction_batch_length : int option;
+  max_lifespan_s : int;
+}
+
+let default_tx_queue =
+  {max_size = 1000; max_transaction_batch_length = None; max_lifespan_s = 2}
 
 let tx_queue_encoding =
   let open Data_encoding in
   conv
-    (fun {max_size; max_transaction_batch_length} ->
-      (max_size, max_transaction_batch_length))
-    (fun (max_size, max_transaction_batch_length) ->
-      {max_size; max_transaction_batch_length})
-    (obj2 (req "max_size" int31) (opt "max_transaction_batch_length" int31))
-
-let default_tx_queue = {max_size = 1000; max_transaction_batch_length = None}
+    (fun {max_size; max_transaction_batch_length; max_lifespan_s} ->
+      (max_size, max_transaction_batch_length, max_lifespan_s))
+    (fun (max_size, max_transaction_batch_length, max_lifespan_s) ->
+      {max_size; max_transaction_batch_length; max_lifespan_s})
+    (obj3
+       (req "max_size" int31)
+       (opt "max_transaction_batch_length" int31)
+       (dft "max_lifespan" int31 default_tx_queue.max_lifespan_s))
 
 let tx_queue_opt_encoding =
   let open Data_encoding in

@@ -49,6 +49,22 @@ let add_transaction =
     ~pp1:(fun fmt Ethereum_types.(Hash (Hex h)) -> Format.fprintf fmt "%10s" h)
     ("tx_hash", Ethereum_types.hash_encoding)
 
+let transaction_dropped =
+  declare_1
+    ~name:"tx_queue_transaction_dropped"
+    ~msg:"transaction {tx_hash} dropped"
+    ~level:Debug
+    ~pp1:(fun fmt Ethereum_types.(Hash (Hex h)) -> Format.fprintf fmt "%10s" h)
+    ("tx_hash", Ethereum_types.hash_encoding)
+
+let transaction_confirmed =
+  declare_1
+    ~name:"tx_queue_transaction_confirmed"
+    ~msg:"transaction {tx_hash} confirmed"
+    ~level:Debug
+    ~pp1:(fun fmt Ethereum_types.(Hash (Hex h)) -> Format.fprintf fmt "%10s" h)
+    ("tx_hash", Ethereum_types.hash_encoding)
+
 let is_ready () = emit is_ready ()
 
 let shutdown () = emit shutdown ()
@@ -56,6 +72,10 @@ let shutdown () = emit shutdown ()
 let injecting_transactions n = emit injecting_transactions n
 
 let add_transaction tx = emit add_transaction tx
+
+let transaction_dropped tx = emit transaction_dropped tx
+
+let transaction_confirmed tx = emit transaction_confirmed tx
 
 let rpc_error (error : Rpc_encodings.JSONRPC.error) =
   emit rpc_error (Int32.of_int error.code, error.message)

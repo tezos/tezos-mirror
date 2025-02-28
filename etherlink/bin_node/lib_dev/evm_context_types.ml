@@ -20,7 +20,7 @@ module Request = struct
         payload : Blueprint_types.payload;
         delayed_transactions : Evm_events.Delayed_transaction.t list;
       }
-        -> (unit, tztrace) t
+        -> (Ethereum_types.hash Seq.t, tztrace) t
     | Last_known_L1_level : (int32 option, tztrace) t
     | Delayed_inbox_hashes : (Ethereum_types.hash list, tztrace) t
     | Patch_state : {

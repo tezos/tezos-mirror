@@ -82,14 +82,15 @@ val apply_evm_events :
 (** [apply_blueprint ?events timestamp payload delayed_transactions]
     applies [payload] in the freshest EVM state stored under [ctxt] at
     timestamp [timestamp], forwards the
-    {!Blueprint_types.with_events}.  It commits the result if the
-    blueprint produces the expected block. *)
+    {!Blueprint_types.with_events}, and returns the transaction hashes
+    of the created block. It commits the result if the blueprint
+    produces the expected block. *)
 val apply_blueprint :
   ?events:Evm_events.t list ->
   Time.Protocol.t ->
   Blueprint_types.payload ->
   Evm_events.Delayed_transaction.t list ->
-  unit tzresult Lwt.t
+  Ethereum_types.hash Seq.t tzresult Lwt.t
 
 val head_info : unit -> head Lwt.t
 

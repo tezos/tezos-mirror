@@ -90,7 +90,11 @@ val chain_id : supported_network -> Ethereum_types.chain_id
 
 type l2_chain = {chain_id : Ethereum_types.chain_id}
 
-type tx_queue = {max_size : int; max_transaction_batch_length : int option}
+type tx_queue = {
+  max_size : int;
+  max_transaction_batch_length : int option;
+  max_lifespan_s : int;
+}
 
 (** Configuration settings for experimental features, with no backward
     compatibility guarantees. *)
