@@ -6,15 +6,21 @@ use std::error::Error;
 use std::path::Path;
 
 use base64::{Engine, engine::general_purpose::URL_SAFE};
+use bincode::config::{Configuration, Fixint, LittleEndian};
 use http::{HeaderMap, Method, Uri};
-use jstz_crypto::{keypair_from_passphrase, public_key::PublicKey, secret_key::SecretKey};
-use jstz_proto::context::account::{Address, Nonce, ParsedCode};
+use jstz_crypto::{
+    hash::Hash, keypair_from_passphrase, public_key::PublicKey, public_key_hash::PublicKeyHash,
+    secret_key::SecretKey, smart_function_hash::SmartFunctionHash,
+};
+use jstz_proto::context::account::{Address, Addressable, Nonce, ParsedCode};
 use jstz_proto::operation::{Content, DeployFunction, Operation, RunFunction, SignedOperation};
 use serde::{Serialize, Serializer};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_smart_rollup::inbox::ExternalMessageFrame;
 use tezos_smart_rollup::types::SmartRollupAddress;
 use tezos_smart_rollup::utils::inbox::file::{InboxFile, Message};
+
+const BINCODE_CONFIGURATION: Configuration<LittleEndian, Fixint> = bincode::config::legacy();
 
 const FA2: &str = include_str!("../../fa2.js");
 
@@ -228,9 +234,9 @@ fn deploy_fa2(
 ) -> Result<(Address, Message)> {
     let code: ParsedCode = FA2.to_string().try_into()?;
 
-    let address = Address::digest(
+    let address = Address::SmartFunction(SmartFunctionHash::digest(
         format!("{}{}{}", &account.address, code, account.nonce.next()).as_bytes(),
-    )?;
+    )?);
 
     let content = Content::DeployFunction(DeployFunction {
         function_code: code,
@@ -247,8 +253,9 @@ fn gen_keys(num: usize) -> Result<Vec<Account>> {
 
     for i in 0..num {
         let (sk, pk) = keypair_from_passphrase(&i.to_string())?;
+        let address = Address::User(PublicKeyHash::from(&pk));
         let account = Account {
-            address: Address::try_from(&pk)?,
+            address,
             sk,
             pk,
             nonce: Default::default(),
@@ -272,8 +279,12 @@ impl Account {
         rollup_addr: SmartRollupAddress,
         content: Content,
     ) -> Result<Message> {
+        let Address::User(source) = &self.address else {
+            return Err("Expected a user address".into());
+        };
+
         let op = Operation {
-            source: self.address.clone(),
+            source: source.clone(),
             nonce: self.nonce,
             content,
         };
@@ -281,7 +292,7 @@ impl Account {
         let hash = op.hash();
         let signed_op = SignedOperation::new(self.pk.clone(), self.sk.sign(hash)?, op);
 
-        let bytes = bincode::serialize(&signed_op)?;
+        let bytes = bincode::encode_to_vec(signed_op, BINCODE_CONFIGURATION)?;
         let mut external = Vec::with_capacity(bytes.len() + EXTERNAL_FRAME_SIZE);
 
         let frame = ExternalMessageFrame::Targetted {
