@@ -4625,13 +4625,10 @@ let test_migration_accuser_issue ~migrate_from ~migrate_to =
         client
     in
     Log.info "Start bakers for the current and the next protocols" ;
-    let baker_from =
-      Baker.create ~dal_node ~protocol:migrate_from node client
-    in
-    let baker_to = Baker.create ~dal_node ~protocol:migrate_to node client in
 
-    let* () = Baker.run baker_from in
-    let* () = Baker.run baker_to in
+    let baker = Agnostic_baker.create ~dal_node node client in
+
+    let* () = Agnostic_baker.run baker in
 
     let* _level = Node.wait_for_level node migration_level in
     Log.info "migrated to next protocol, starting a second DAL node accuser" ;
@@ -4646,8 +4643,7 @@ let test_migration_accuser_issue ~migrate_from ~migrate_to =
     let* () = Dal_node.run accuser ~wait_ready:true in
 
     let* _level = Node.wait_for_level node last_level in
-    let* () = Baker.terminate baker_from in
-    let* () = Baker.terminate baker_to in
+    let* () = Agnostic_baker.terminate baker in
 
     Lwt_list.iter_s
       (fun delegate ->
@@ -4671,7 +4667,7 @@ let test_migration_accuser_issue ~migrate_from ~migrate_to =
     ~scenario
     ~tags
     ~description
-    ~uses:[Protocol.baker migrate_from; Protocol.baker migrate_to]
+    ~uses:[Constant.octez_experimental_agnostic_baker]
     ~activation_timestamp:Now
     ~producer_profiles:[slot_index]
     ~minimal_block_delay:
