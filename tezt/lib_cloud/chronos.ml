@@ -16,21 +16,13 @@ type time = {
   day_of_week : int option; (* 0-6, Sunday = 0 *)
 }
 
-type task = {
-  time : time;
-  action : unit -> unit Lwt.t;
-  mutable last_run : float option;
-}
+type task = {time : time; action : unit -> unit Lwt.t}
 
 type t = {
-  mutable tasks : task list;
+  tasks : task list;
   shutdown : unit Lwt.t;
   trigger_shutdown : unit Lwt.u;
 }
-
-let zero () =
-  let shutdown, trigger_shutdown = Lwt.task () in
-  {tasks = []; shutdown; trigger_shutdown}
 
 let validate_time s =
   let in_range ~v (min, max) =
@@ -71,14 +63,25 @@ let time_to_string spec =
       to_string spec.day_of_week;
     ]
 
+let task ~tm ~action =
+  let time = time_of_string tm in
+  let is_valid = validate_time time in
+  if not is_valid then
+    failwith
+      (Format.asprintf "Invalid time specification: %s" (time_to_string time)) ;
+  {time; action}
+
+let init ~tasks =
+  let shutdown, trigger_shutdown = Lwt.task () in
+  {tasks; shutdown; trigger_shutdown}
+
 (* Check if a task should run at the given time.
 
    The `+ 1` is needed because OCaml's Unix module and the cron
    standard use different numbering conventions for months:
    - Unix.tm_mon ranges from 0 to 11 (January = 0, December = 11)
    - Cron standard uses 1 to 12 (January = 1, December = 12) *)
-let should_run task now =
-  let tm = Unix.gmtime now in
+let should_run task tm =
   let matches value = Option.fold ~none:true ~some:(Int.equal value) in
   matches tm.Unix.tm_min task.time.minute
   && matches tm.Unix.tm_hour task.time.hour
@@ -86,42 +89,30 @@ let should_run task now =
   && matches (succ tm.Unix.tm_mon) task.time.month
   && matches tm.Unix.tm_wday task.time.day_of_week
 
-(* Schedule a task using cron string. *)
-let register t ~tm ~action =
-  let time = time_of_string tm in
-  let task = {time; action; last_run = None} in
-  if validate_time time then t.tasks <- task :: t.tasks
-  else
-    failwith
-      (Format.asprintf "Invalid time specification: %s" (time_to_string time))
-
-let run t =
-  let now = Sys.time () in
+let run ~now_tm t =
   Lwt_list.iter_p
     (fun task ->
-      if should_run task now then
-        match task.last_run with
-        | None ->
-            task.last_run <- Some now ;
-            task.action ()
-        | Some last ->
-            let last_tm = Unix.gmtime last in
-            let now_tm = Unix.gmtime now in
-            if last_tm.Unix.tm_min <> now_tm.Unix.tm_min then (
-              task.last_run <- Some now ;
-              task.action ())
-            else Lwt.return_unit
+      if should_run task now_tm then
+        Lwt.catch (fun () -> task.action ()) (fun _exn -> Lwt.return_unit)
       else Lwt.return_unit)
     t.tasks
 
 let start t =
-  let rec loop () =
-    let* () = run t in
-    let* () = Lwt_unix.sleep 60. in
-    loop ()
+  let rec loop last_tm =
+    let now_tm = Unix.(gmtime (gettimeofday ())) in
+    let* () =
+      if last_tm.Unix.tm_min <> now_tm.Unix.tm_min then run ~now_tm t
+      else Lwt_unix.sleep 1.
+    in
+    loop now_tm
   in
-  (* Runs the loop then wait for the shutdown promise. *)
-  let* () = Lwt.pick [loop (); t.shutdown] in
-  Lwt.return_unit
+  (* Runs the loop until the shutdown is triggered. *)
+  Background.register
+    (Lwt.pick
+       [
+         (let now_tm = Unix.(gmtime (gettimeofday ())) in
+          loop now_tm);
+         t.shutdown;
+       ])
 
 let shutdown t = Lwt.wakeup t.trigger_shutdown ()
