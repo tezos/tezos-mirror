@@ -84,13 +84,6 @@ struct
         ~msg:(Params.name ^ " terminated")
         ()
 
-    let initialization_request =
-      declare_0
-        ~level:Info
-        ~name:"initialization_request"
-        ~msg:(Format.sprintf "initializing %s's environment" Params.name)
-        ()
-
     let request =
       declare_1
         ~level:Info
@@ -121,7 +114,6 @@ struct
      the init scenario. *)
   let init input output =
     let open Lwt_result_syntax in
-    let*! () = Events.(emit initialization_request ()) in
     let*! parameters = Lwt_unix_socket.recv input Params.parameters_encoding in
     let* state = Processing.initial_state parameters in
     (* It is necessary to send the ok result, as a blocking promise for
@@ -147,6 +139,7 @@ struct
       else
         Internal_event_unix.init ~config:(Params.internal_events parameters) ()
     in
+    let*! () = Events.(emit initialized ()) in
     let rec loop state =
       let*! (Params.Erequest recved) =
         Lwt_unix_socket.recv input Params.request_encoding
@@ -189,7 +182,6 @@ struct
           return (socket_in, socket_out, false)
       | None -> return (Lwt_io.stdin, Lwt_io.stdout, true)
     in
-    let*! () = Events.(emit initialized ()) in
     let*! r =
       Error_monad.catch_es (fun () ->
           let* () = run ~using_std_channel in_channel out_channel in
