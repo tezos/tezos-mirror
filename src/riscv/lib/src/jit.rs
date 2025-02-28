@@ -266,7 +266,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Default for JIT<MC, M> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::machine_state::{MachineCoreState, MachineCoreStateLayout, memory::M1K};
+    use crate::machine_state::{MachineCoreState, MachineCoreStateLayout, memory::M4K};
     use crate::machine_state::{
         block_cache::bcall::{BCall, Block, BlockLayout, Interpreted, InterpretedBlockBuilder},
         memory::MemoryConfig,
@@ -299,14 +299,14 @@ mod tests {
             ],
         ];
 
-        let mut jit = JIT::<M1K, F::Manager>::new().unwrap();
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
         let mut interpreted_bb = InterpretedBlockBuilder;
 
         for scenario in scenarios {
             let mut interpreted =
-                create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
-            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
-            let mut block = create_state!(Interpreted, BlockLayout, F, M1K);
+                create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut block = create_state!(Interpreted, BlockLayout, F, M4K);
 
             let hash = super::Hash::blake2b_hash(scenario).unwrap();
 
@@ -374,14 +374,14 @@ mod tests {
             ],
         ];
 
-        let mut jit = JIT::<M1K, F::Manager>::new().unwrap();
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
         let mut interpreted_bb = InterpretedBlockBuilder;
 
         for scenario in scenarios {
             let mut interpreted =
-                create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
-            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
-            let mut block = create_state!(Interpreted, BlockLayout, F, M1K);
+                create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut block = create_state!(Interpreted, BlockLayout, F, M4K);
 
             let hash = super::Hash::blake2b_hash(scenario).unwrap();
 
@@ -450,12 +450,12 @@ mod tests {
             I::new_add(x1, x1, x2, Compressed),
         ];
 
-        let mut jit = JIT::<M1K, F::Manager>::new().unwrap();
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
         let mut interpreted_bb = InterpretedBlockBuilder;
 
-        let mut interpreted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
-        let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
-        let mut block = create_state!(Interpreted, BlockLayout, F, M1K);
+        let mut interpreted = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+        let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+        let mut block = create_state!(Interpreted, BlockLayout, F, M4K);
 
         let hash = super::Hash::blake2b_hash(scenario).unwrap();
 
@@ -533,14 +533,14 @@ mod tests {
             ],
         ];
 
-        let mut jit = JIT::<M1K, F::Manager>::new().unwrap();
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
         let mut interpreted_bb = InterpretedBlockBuilder;
 
         for scenario in scenarios {
             let mut interpreted =
-                create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
-            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
-            let mut block = create_state!(Interpreted, BlockLayout, F, M1K);
+                create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut block = create_state!(Interpreted, BlockLayout, F, M4K);
             let hash = super::Hash::blake2b_hash(scenario).unwrap();
 
             block.start_block();
@@ -624,14 +624,14 @@ mod tests {
             ],
         ];
 
-        let mut jit = JIT::<M1K, F::Manager>::new().unwrap();
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
         let mut interpreted_bb = InterpretedBlockBuilder;
 
         for scenario in scenarios {
             let mut interpreted =
-                create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
-            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
-            let mut block = create_state!(Interpreted, BlockLayout, F, M1K);
+                create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut block = create_state!(Interpreted, BlockLayout, F, M4K);
             let hash = super::Hash::blake2b_hash(scenario).unwrap();
 
             block.start_block();
@@ -711,10 +711,10 @@ mod tests {
         let success_hash = super::Hash::blake2b_hash(success).unwrap();
 
         for failure in failure_scenarios.iter() {
-            let mut jit = JIT::<M1K, F::Manager>::new().unwrap();
+            let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
 
-            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
-            let mut block = create_state!(Interpreted, BlockLayout, F, M1K);
+            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut block = create_state!(Interpreted, BlockLayout, F, M4K);
             let failure_hash = super::Hash::blake2b_hash(failure).unwrap();
 
             block.start_block();

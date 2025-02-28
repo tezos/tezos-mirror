@@ -103,4 +103,4 @@ pub trait MemoryConfig: 'static {
 }
 
 // Re-export memory configurations
-pub use config::{M1G, M1K, M1M, M4G, M8K, M64M};
+pub use config::{M1G, M1M, M4G, M4K, M8K, M64M};

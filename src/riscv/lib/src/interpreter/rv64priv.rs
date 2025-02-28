@@ -142,7 +142,7 @@ mod tests {
         machine_state::{
             MachineCoreState, MachineCoreStateLayout,
             csregisters::{CSRRepr, CSRegister, xstatus},
-            memory::M1K,
+            memory::M4K,
             mode::Mode,
             registers::{a0, t0},
         },
@@ -150,8 +150,8 @@ mod tests {
     };
 
     backend_test!(test_sfence, F, {
-        type L = MachineCoreStateLayout<M1K>;
-        let mut state = create_state!(MachineCoreState, L, F, M1K);
+        type L = MachineCoreStateLayout<M4K>;
+        let mut state = create_state!(MachineCoreState, L, F, M4K);
 
         let run_test = |state: &mut MachineCoreState<_, _>,
                         mode: Mode,

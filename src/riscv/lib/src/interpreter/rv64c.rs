@@ -70,7 +70,7 @@ mod tests {
         machine_state::{
             MachineCoreState, MachineCoreStateLayout,
             hart_state::{HartState, HartStateLayout},
-            memory::M1K,
+            memory::M4K,
             registers::{a3, a4, nz, t0},
         },
         traps::Exception,
@@ -96,7 +96,7 @@ mod tests {
     });
 
     backend_test!(test_run_cldsp_clwsp, F, {
-        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(

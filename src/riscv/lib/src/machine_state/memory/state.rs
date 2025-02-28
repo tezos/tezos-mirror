@@ -128,7 +128,7 @@ pub mod tests {
     use super::*;
     use crate::{
         backend_test,
-        machine_state::memory::{M1K, Memory, MemoryConfig},
+        machine_state::memory::{M4K, Memory, MemoryConfig},
         state_backend::owned_backend::Owned,
     };
 
@@ -149,8 +149,8 @@ pub mod tests {
     }
 
     backend_test!(test_endianess, F, {
-        let space = F::allocate::<<M1K as MemoryConfig>::Layout>();
-        let mut memory = M1K::bind(space);
+        let space = F::allocate::<<M4K as MemoryConfig>::Layout>();
+        let mut memory = M4K::bind(space);
 
         memory.write(0, 0x1122334455667788u64).unwrap();
 

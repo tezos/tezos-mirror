@@ -568,7 +568,7 @@ mod tests {
                 xstatus::{ExtensionValue, MStatus},
             },
             hart_state::{HartState, HartStateLayout},
-            memory::M1K,
+            memory::M4K,
             registers::{fa1, fa4, parse_fregister, parse_xregister, t0},
         },
         traps::Exception,
@@ -612,7 +612,7 @@ mod tests {
     });
 
     backend_test!(test_load_store, F, {
-        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(

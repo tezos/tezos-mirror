@@ -154,7 +154,7 @@ mod tests {
         machine_state::{
             MachineCoreState, MachineCoreStateLayout, ProgramCounterUpdate,
             hart_state::{HartState, HartStateLayout},
-            memory::M1K,
+            memory::M4K,
             registers::{
                 nz::{self, a0},
                 t1,
@@ -172,7 +172,7 @@ mod tests {
             (u64::MAX - 1, 100, 98_i64 as u64),
         ];
         for (init_pc, imm, res_pc) in test_case {
-            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
 
             state.hart.pc.write(init_pc);
             let new_pc = state.hart.run_j(imm);

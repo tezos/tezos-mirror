@@ -696,7 +696,7 @@ mod tests {
                 satp::{Satp, TranslationAlgorithm},
                 xstatus::{self, MStatus},
             },
-            memory::{self, M1K, M1M, M8K, Memory},
+            memory::{self, M1M, M4K, M8K, Memory},
             mode::Mode,
             registers::{NonZeroXRegister, a0, a1, a2, nz, t0, t1, t2},
         },
@@ -717,11 +717,11 @@ mod tests {
     backend_test!(test_step, F, {
         let state = create_state!(
             MachineState, 
-            MachineStateLayout<M1K, DefaultCacheLayouts>, 
+            MachineStateLayout<M4K, DefaultCacheLayouts>, 
             F, 
-            M1K, 
+            M4K, 
             DefaultCacheLayouts, 
-            Interpreted<M1K, F::Manager>, || InterpretedBlockBuilder);
+            Interpreted<M4K, F::Manager>, || InterpretedBlockBuilder);
 
         let state_cell = std::cell::RefCell::new(state);
 
@@ -771,11 +771,11 @@ mod tests {
     backend_test!(test_step_env_exc, F, {
         let state = create_state!(
             MachineState, 
-            MachineStateLayout<M1K, DefaultCacheLayouts>, 
+            MachineStateLayout<M4K, DefaultCacheLayouts>, 
             F, 
-            M1K, 
+            M4K, 
             DefaultCacheLayouts, 
-            Interpreted<M1K, F::Manager>, || InterpretedBlockBuilder);
+            Interpreted<M4K, F::Manager>, || InterpretedBlockBuilder);
 
         let state_cell = std::cell::RefCell::new(state);
 
@@ -814,11 +814,11 @@ mod tests {
     backend_test!(test_step_exc_mm, F, {
         let state = create_state!(
             MachineState, 
-            MachineStateLayout<M1K, DefaultCacheLayouts>, 
+            MachineStateLayout<M4K, DefaultCacheLayouts>, 
             F, 
-            M1K, 
+            M4K, 
             DefaultCacheLayouts, 
-            Interpreted<M1K, F::Manager>, || InterpretedBlockBuilder);
+            Interpreted<M4K, F::Manager>, || InterpretedBlockBuilder);
 
         let state_cell = std::cell::RefCell::new(state);
 
@@ -864,11 +864,11 @@ mod tests {
     backend_test!(test_step_exc_us, F, {
         let state = create_state!(
             MachineState, 
-            MachineStateLayout<M1K, DefaultCacheLayouts>, 
+            MachineStateLayout<M4K, DefaultCacheLayouts>, 
             F, 
-            M1K, 
+            M4K, 
             DefaultCacheLayouts, 
-            Interpreted<M1K, F::Manager>, || InterpretedBlockBuilder);
+            Interpreted<M4K, F::Manager>, || InterpretedBlockBuilder);
 
         let state_cell = std::cell::RefCell::new(state);
 
@@ -940,12 +940,12 @@ mod tests {
             }))
         ]);
 
-        type LocalLayout = MachineStateLayout<M1K, TestCacheLayouts>;
+        type LocalLayout = MachineStateLayout<M4K, TestCacheLayouts>;
 
-        type BlockRunner<F> = Interpreted<M1K, <F as TestBackendFactory>::Manager>;
+        type BlockRunner<F> = Interpreted<M4K, <F as TestBackendFactory>::Manager>;
 
         type LocalMachineState<F> =
-            MachineState<M1K, TestCacheLayouts, BlockRunner<F>, <F as TestBackendFactory>::Manager>;
+            MachineState<M4K, TestCacheLayouts, BlockRunner<F>, <F as TestBackendFactory>::Manager>;
 
         // Configure the machine state.
         let base_state = {
@@ -953,7 +953,7 @@ mod tests {
                 MachineState,
                 LocalLayout,
                 F,
-                M1K,
+                M4K,
                 TestCacheLayouts,
                 BlockRunner<F>,
                 || InterpretedBlockBuilder
