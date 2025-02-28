@@ -360,11 +360,11 @@ RUN apk update \
  # Version number should be kept in sync with the one of the
  # datadog/ci image used for the [datadog_ci] image
  # (cf. ci/bin/common.ml)
- && npm --ddd install -g "@datadog/datadog-ci@2.44.0" \
+ && npm --verbose install -g "@datadog/datadog-ci@2.44.0" \
  # We need eth since e2e tests. This requires git as well.
- && npm --ddd install -g eth-cli@2.0.2 \
+ && npm --verbose install -g eth-cli@2.0.2 \
  # We need solc to compile solidity smart-contracts
- && npm --ddd install -g solc@0.8.26 \
+ && npm --verbose install -g solc@0.8.26 \
  && PATH="/root/.cargo/bin:${PATH}" \
  && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | ash -s -- -y \
  && RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=lld" cargo install \
