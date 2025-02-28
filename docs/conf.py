@@ -70,7 +70,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Tezos'
-copyright = '2018-2024'
+copyright = '2018-2025'
 author = 'Contributors to the Octez & Tezos protocol documentation'
 
 # The version info for the project you're documenting, acts as replacement for
