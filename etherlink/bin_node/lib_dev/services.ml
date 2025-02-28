@@ -43,14 +43,24 @@ let configuration_service =
     ~output:Data_encoding.Json.encoding
     Path.(root / "configuration")
 
+type health_check_query = {drift_threshold : Z.t}
+
 let health_check_service =
   Service.get_service
     ~description:"Assess the health of the RPC server"
-    ~query:Query.empty
+    ~query:
+      Query.(
+        query (fun drift_threshold ->
+            {drift_threshold = Z.of_int drift_threshold})
+        |+ field "drift_threshold" Arg.int 100 (fun {drift_threshold} ->
+               Z.to_int drift_threshold)
+        |> seal)
     ~output:Data_encoding.empty
     Path.(root / "health_check")
 
 type error += Node_is_bootstrapping
+
+type error += Node_is_lagging
 
 let () =
   register_error_kind
@@ -61,7 +71,17 @@ let () =
       "Node is bootstrapping and result from the RPC servers can be outdated"
     Data_encoding.empty
     (function Node_is_bootstrapping -> Some () | _ -> None)
-    (fun () -> Node_is_bootstrapping)
+    (fun () -> Node_is_bootstrapping) ;
+  register_error_kind
+    `Temporary
+    ~id:"node_is_lagging"
+    ~title:"Node is lagging"
+    ~description:
+      "Node is lagging behind its upstream EVM node and result from the RPC \
+       servers can be outdated"
+    Data_encoding.empty
+    (function Node_is_lagging -> Some () | _ -> None)
+    (fun () -> Node_is_lagging)
 
 let client_version =
   Format.sprintf
@@ -117,11 +137,17 @@ let configuration_handler config =
     (Configuration.encoding hidden)
     config
 
-let health_check_handler ?delegate_to () =
+let health_check_handler ?delegate_to query =
   match delegate_to with
   | None ->
       let open Lwt_result_syntax in
       let* () = fail_when (Metrics.is_bootstrapping ()) Node_is_bootstrapping in
+      let* () =
+        fail_when
+          Z.Compare.(
+            Drift_monitor.last_observed_drift () > query.drift_threshold)
+          Node_is_lagging
+      in
       return_unit
   | Some evm_node_endpoint ->
       Rollup_services.call_service
@@ -130,7 +156,7 @@ let health_check_handler ?delegate_to () =
         ~media_types:[Media_type.json]
         health_check_service
         ()
-        ()
+        query
         ()
 
 let version dir =
@@ -142,8 +168,8 @@ let configuration config dir =
       configuration_handler config |> Lwt.return_ok)
 
 let health_check ?delegate_to dir =
-  Evm_directory.register0 dir health_check_service (fun () () ->
-      health_check_handler ?delegate_to ())
+  Evm_directory.register0 dir health_check_service (fun query () ->
+      health_check_handler ?delegate_to query)
 
 let get_block_by_number ~full_transaction_object block_param
     (module Rollup_node_rpc : Services_backend_sig.S) =
