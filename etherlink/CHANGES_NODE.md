@@ -32,7 +32,14 @@
 - **experimental feature** With the `tx_queue` feature enable in an
   observer node, the RPC `eth_getTransactionByhash` returns the
   transaction found in the `tx_queue`, it also works for transaction
-  that have been already forwarded to the upstream node. (!!16829)
+  that have been already forwarded to the upstream node. (!16829)
+- `GET /health_check` now returns an error if the node does not keep up with
+  its remote EVM node. More precisely, the node will fetch the current head of
+  the upstream node every 60 seconds, and compare it with its own. If the
+  difference is larger than a given `drift_threshold` (defaults to 100), then
+  the RPC returns an error. To use a different threshold, it is possible to
+  specify it in the URL, *e.g.*, `GET /health_check?drift_threshold=10` to set
+  the threshold to 10. (!17025)
 
 ### Metrics changes
 
