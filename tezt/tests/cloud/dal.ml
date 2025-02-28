@@ -2664,36 +2664,6 @@ let rec loop t level =
   loop t (level + 1)
 
 let register (module Cli : Scenarios_cli.Dal) =
-  let module Alert = struct
-    open Tezt_cloud
-
-    let receiver =
-      match Cli.Alerts.dal_slack_webhook with
-      | None -> Alert.null_receiver
-      | Some api_url ->
-          Alert.slack_receiver ~name:"slack-notifications" ~api_url ()
-
-    let alert =
-      Alert.make
-        ~route:
-          (Alert.route
-             ~group_wait:"10s"
-             ~group_interval:"10s"
-             ~repeat_interval:"12h"
-               (* In the future, probably we should make this value equals to Cli.metrics_retention *)
-             receiver)
-        ~group_name:"tezt"
-        ~name:"LowDALAttestedCommitmentsRatio"
-        ~for_:"5m"
-        ~severity:Info
-        ~expr:{|vector(1)|}
-        ~summary:"DAL attested commitments ratio over the last 12 hours"
-        ~description:
-          {|'DAL attested commitments ratio over the last 12 hours: {{ with query "avg_over_time(tezt_dal_commitments_ratio{kind=\"attested\"}[12h])" }}{{ . | first | value | printf "%.2f%%" }}{{ end }}'|}
-        ()
-
-    let alerts = [alert]
-  end in
   let configuration, etherlink_configuration =
     let stake = Cli.stake in
     let stake_machine_type = Cli.stake_machine_type in
@@ -2878,7 +2848,6 @@ let register (module Cli : Scenarios_cli.Dal) =
     ~__FILE__
     ~title:"DAL node benchmark"
     ~tags:[]
-    ~alerts:Alert.alerts
     (fun cloud ->
       toplog "Creating the agents" ;
       if
