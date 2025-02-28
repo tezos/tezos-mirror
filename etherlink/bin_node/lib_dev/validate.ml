@@ -28,14 +28,10 @@ let validate_chain_id (module Backend_rpc : Services_backend_sig.S)
       if Z.equal transaction_chain_id chain_id then return (Ok ())
       else return (Error "Invalid chain id")
 
-let validate_nonce (module Backend_rpc : Services_backend_sig.S)
-    (transaction : Transaction.transaction) caller =
+let validate_nonce ~next_nonce:(Qty next_nonce)
+    (transaction : Transaction.transaction) =
   let open Lwt_result_syntax in
-  let* nonce =
-    Backend_rpc.nonce caller Block_parameter.(Block_parameter Latest)
-  in
-  let nonce = match nonce with None -> Z.zero | Some (Qty nonce) -> nonce in
-  if transaction.nonce >= nonce then return (Ok ())
+  if transaction.nonce >= next_nonce then return (Ok ())
   else return (Error "Nonce too low")
 
 let validate_gas_limit (module Backend_rpc : Services_backend_sig.S)
@@ -109,10 +105,10 @@ let validate_total_cost (tx_object : legacy_transaction_object) ~balance =
   if total_cost > balance then return (Error "Not enough funds")
   else return (Ok ())
 
-let validate_stateless backend_rpc transaction ~caller =
+let validate_stateless ~next_nonce backend_rpc transaction ~caller =
   let open Lwt_result_syntax in
   let** () = validate_chain_id backend_rpc transaction in
-  let** () = validate_nonce backend_rpc transaction caller in
+  let** () = validate_nonce ~next_nonce transaction in
   let** () = validate_sender_not_a_contract backend_rpc caller in
   return (Ok ())
 
@@ -136,17 +132,27 @@ let valid_transaction_object ~backend_rpc ~decode ~hash ~mode tx_raw =
   let tx_raw = Bytes.unsafe_of_string tx_raw in
   let**? tx = decode tx_raw in
   let**? tx_object = Transaction.to_transaction_object ~hash tx in
+  let* next_nonce =
+    let (module Backend_rpc : Services_backend_sig.S) = backend_rpc in
+    Backend_rpc.nonce tx_object.from Block_parameter.(Block_parameter Latest)
+  in
+  let next_nonce =
+    match next_nonce with None -> Qty Z.zero | Some next_nonce -> next_nonce
+  in
   let** () =
     match mode with
-    | Stateless -> validate_stateless backend_rpc tx ~caller:tx_object.from
+    | Stateless ->
+        validate_stateless backend_rpc ~next_nonce tx ~caller:tx_object.from
     | With_state -> validate_with_state backend_rpc tx tx_object
     | Full ->
-        let** () = validate_stateless backend_rpc tx ~caller:tx_object.from in
+        let** () =
+          validate_stateless ~next_nonce backend_rpc tx ~caller:tx_object.from
+        in
         let** () = validate_with_state backend_rpc tx tx_object in
         return (Ok ())
   in
 
-  return (Ok tx_object)
+  return (Ok (next_nonce, tx_object))
 
 let is_tx_valid ((module Backend_rpc : Services_backend_sig.S) as backend_rpc)
     ~mode tx_raw =
