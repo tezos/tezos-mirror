@@ -86,6 +86,7 @@ sig
 end
 
 val register_default_signer :
+  ?signing_version:Signature.version ->
   ?other_registrations:((module Client_config.Remote_params) -> unit) ->
   ?logger:RPC_client_unix.logger ->
   Client_context.io_wallet ->
