@@ -36,6 +36,9 @@
 
 ### Metrics changes
 
+- Deduplicates metrics `block_process_time_histogram_bucket{le="0.100000"}`
+  (!17035)
+
 ### Execution changes
 
 ### Storage changes
