@@ -42,6 +42,7 @@ type pending_request = {
 type callback = all_variant variant_callback
 
 type request = {
+  next_nonce : Ethereum_types.quantity;
   payload : Ethereum_types.hex;
   tx_object : Ethereum_types.legacy_transaction_object;
   callback : callback;
@@ -313,6 +314,7 @@ type state = {
   mutable queue : queue_request Queue.t;
   pending : Pending_transactions.t;
   tx_object : Tx_object.t;
+  address_nonce : Address_nonce.t;
   config : Configuration.tx_queue;
   keep_alive : bool;
 }
@@ -343,6 +345,11 @@ module Request = struct
         txn_hash : Ethereum_types.hash;
       }
         -> (Ethereum_types.legacy_transaction_object option, tztrace) t
+    | Nonce : {
+        next_nonce : Ethereum_types.quantity;
+        address : Ethereum_types.address;
+      }
+        -> (Ethereum_types.quantity, tztrace) t
     | Tick : (unit, tztrace) t
     | Clear : (unit, tztrace) t
 
@@ -393,6 +400,18 @@ module Request = struct
           (obj1 (req "request" (constant "clear")))
           (function View Clear -> Some () | _ -> None)
           (fun _ -> assert false);
+        case
+          Json_only
+          ~title:"Nonce"
+          (obj3
+             (req "request" (constant "nonce"))
+             (req "next_nonce" Ethereum_types.quantity_encoding)
+             (req "address" Ethereum_types.address_encoding))
+          (function
+            | View (Nonce {next_nonce; address}) ->
+                Some ((), next_nonce, address)
+            | _ -> None)
+          (fun _ -> assert false);
       ]
 
   let pp fmt (View r) =
@@ -404,6 +423,8 @@ module Request = struct
     | Find {txn_hash = Hash (Hex txn_hash)} -> fprintf fmt "Find %s" txn_hash
     | Tick -> fprintf fmt "Tick"
     | Clear -> fprintf fmt "Clear"
+    | Nonce {next_nonce = _; address = Address (Hex address)} ->
+        fprintf fmt "Nonce %s" address
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -491,27 +512,72 @@ module Handlers = struct
     let open Lwt_result_syntax in
     let state = Worker.state self in
     match request with
-    | Inject {payload; tx_object; callback} ->
+    | Inject {next_nonce; payload; tx_object; callback} ->
+        let (Address (Hex addr)) = tx_object.from in
+        let (Qty tx_nonce) = tx_object.nonce in
         let pending_callback (reason : pending_variant) =
-          let*! () =
+          let open Lwt_syntax in
+          let* res =
             match reason with
-            | `Dropped -> Tx_queue_events.transaction_dropped tx_object.hash
-            | `Confirmed -> Tx_queue_events.transaction_confirmed tx_object.hash
+            | `Dropped ->
+                let* () = Tx_queue_events.transaction_dropped tx_object.hash in
+                return
+                @@ Address_nonce.remove
+                     state.address_nonce
+                     ~addr
+                     ~nonce:tx_nonce
+            | `Confirmed ->
+                let* () =
+                  Tx_queue_events.transaction_confirmed tx_object.hash
+                in
+                return
+                @@ Address_nonce.confirm_nonce
+                     state.address_nonce
+                     ~addr
+                     ~nonce:tx_nonce
+          in
+          let* () =
+            match res with
+            | Ok () -> return_unit
+            | Error errs -> Tx_queue_events.callback_error errs
           in
           Tx_object.remove state.tx_object tx_object.hash ;
           callback (reason :> all_variant)
         in
         let queue_callback reason =
-          (match reason with
-          | `Accepted ->
-              Pending_transactions.add
-                state.pending
-                tx_object.hash
-                pending_callback
-          | `Refused -> Tx_object.remove state.tx_object tx_object.hash) ;
+          let open Lwt_syntax in
+          let* res =
+            match reason with
+            | `Accepted ->
+                Pending_transactions.add
+                  state.pending
+                  tx_object.hash
+                  pending_callback ;
+                return_ok_unit
+            | `Refused ->
+                Tx_object.remove state.tx_object tx_object.hash ;
+                return
+                @@ Address_nonce.remove
+                     state.address_nonce
+                     ~addr
+                     ~nonce:tx_nonce
+          in
+          let* () =
+            match res with
+            | Ok () -> return_unit
+            | Error errs -> Tx_queue_events.callback_error errs
+          in
           callback (reason :> all_variant)
         in
         Tx_object.add state.tx_object tx_object ;
+        let Ethereum_types.(Qty next_nonce) = next_nonce in
+        let*? () =
+          Address_nonce.add
+            state.address_nonce
+            ~addr
+            ~next_nonce
+            ~nonce:tx_nonce
+        in
         Queue.add {payload; queue_callback} state.queue ;
         return_unit
     | Confirm {txn_hash} -> (
@@ -570,6 +636,12 @@ module Handlers = struct
         Queue.clear state.queue ;
         let*! () = Tx_queue_events.cleared () in
         return_unit
+    | Nonce {next_nonce; address = Address (Hex addr)} ->
+        let Ethereum_types.(Qty next_nonce) = next_nonce in
+        let*? next_gap =
+          Address_nonce.next_gap state.address_nonce ~addr ~next_nonce
+        in
+        return @@ Ethereum_types.Qty next_gap
 
   type launch_error = tztrace
 
@@ -584,6 +656,10 @@ module Handlers = struct
         (* start with /4 and let it grow if necessary to not allocate
            too much at start. *)
         tx_object = Tx_object.empty ~start_size:(config.max_size / 4);
+        address_nonce = Address_nonce.empty ~start_size:(config.max_size / 10);
+        (* start with /10 and let it grow if necessary to not allocate
+           too much at start. It's expected to have less different
+           addresses than transactions. *)
         config;
         keep_alive;
       }
@@ -657,12 +733,12 @@ let rec beacon ~tick_interval =
   let*! () = Lwt_unix.sleep tick_interval in
   beacon ~tick_interval
 
-let inject ?(callback = fun _ -> Lwt_syntax.return_unit)
+let inject ?(callback = fun _ -> Lwt_syntax.return_unit) ~next_nonce
     (tx_object : Ethereum_types.legacy_transaction_object) txn =
   let open Lwt_syntax in
   let* () = Tx_queue_events.add_transaction tx_object.hash in
   let* worker = worker_promise in
-  push_request worker (Inject {payload = txn; tx_object; callback})
+  push_request worker (Inject {next_nonce; payload = txn; tx_object; callback})
 
 let confirm txn_hash =
   bind_worker @@ fun w -> push_request w (Confirm {txn_hash})
@@ -689,6 +765,12 @@ let clear () =
   let open Lwt_result_syntax in
   let*? w = Lazy.force worker in
   Worker.Queue.push_request_and_wait w Clear |> handle_request_error
+
+let nonce ~next_nonce address =
+  let open Lwt_result_syntax in
+  let*? w = Lazy.force worker in
+  Worker.Queue.push_request_and_wait w (Nonce {next_nonce; address})
+  |> handle_request_error
 
 let shutdown () =
   let open Lwt_result_syntax in

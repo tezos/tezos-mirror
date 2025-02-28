@@ -21,6 +21,12 @@ features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
 
+- With the `tx_queue` feature enabled in an observer node, for the RPC
+  `eth_getTransactionCount` at the `pending` block, it will return the
+  next available nonce found in the `tx_queue`. It also works for
+  transactions that have been already forwarded to the upstream node
+  but not yet confirmed. (!!16829)
+
 ## Version 0.19 (2025-03-10)
 
 This release contains a number of quality of life improvements, notably related

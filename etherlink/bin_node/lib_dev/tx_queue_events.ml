@@ -49,6 +49,15 @@ let rpc_error =
     ("code", Data_encoding.int32)
     ("message", Data_encoding.string)
 
+let callback_error =
+  declare_1
+    ~section
+    ~name:"tx_queue_callback_error"
+    ~msg:"A callback produced an error: [<v 2>@{error}@]"
+    ~level:Error
+    ~pp1:Error_monad.pp_print_trace
+    ("error", Events.trace_encoding)
+
 let add_transaction =
   declare_1
     ~name:"tx_queue_add_transaction"
@@ -89,3 +98,5 @@ let transaction_confirmed tx = emit transaction_confirmed tx
 
 let rpc_error (error : Rpc_encodings.JSONRPC.error) =
   emit rpc_error (Int32.of_int error.code, error.message)
+
+let callback_error (error : tztrace) = emit callback_error error

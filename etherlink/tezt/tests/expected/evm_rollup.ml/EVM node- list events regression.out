@@ -1382,6 +1382,14 @@ tx_pool_started:
     { /* tx_pool_started version 0 */
       "tx_pool_started.v0": any }
 
+tx_queue_callback_error:
+  description: A callback produced an error: [<v 2>@{error}@]
+  level: error
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_callback_error version 0 */
+      "tx_queue_callback_error.v0": any }
+
 tx_queue_rpc_error:
   description: an RPC produced the error :
 	code:{code},
@@ -2375,6 +2383,14 @@ tx_pool_transaction_injection_failed:
   json format:
     { /* tx_pool_transaction_injection_failed version 0 */
       "tx_pool_transaction_injection_failed.v0": any }
+
+tx_queue_callback_error:
+  description: A callback produced an error: [<v 2>@{error}@]
+  level: error
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_callback_error version 0 */
+      "tx_queue_callback_error.v0": any }
 
 tx_queue_rpc_error:
   description: an RPC produced the error :

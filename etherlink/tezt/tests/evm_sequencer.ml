@@ -10979,6 +10979,241 @@ let test_tx_queue_clear =
   and* () = wait_for_clear in
   unit
 
+let test_tx_queue_nonce =
+  register_all
+    ~tags:["observer"; "tx_queue"; "nonce"]
+    ~time_between_blocks:Nothing
+    ~kernels:[Latest] (* node only test *)
+    ~use_threshold_encryption:Register_without_feature
+    ~use_dal:Register_without_feature
+    ~websockets:false
+    ~title:
+      "Submits transactions to an observer with a tx queue and make sure it \
+       can respond to getTransactionCount."
+  @@ fun {sequencer; observer; _} _protocol ->
+  let* () = Evm_node.terminate observer in
+
+  let* () =
+    Evm_node.Config_file.update observer
+    @@ Evm_node.patch_config_with_experimental_feature
+         ~enable_tx_queue:true
+         ~tx_queue_config:
+           {
+             max_size = 1000;
+             max_lifespan = 100000 (* absurd value so no TX are dropped *);
+           }
+         ()
+  in
+  let* () = Evm_node.run observer in
+
+  let* () =
+    let*@ _ = produce_block sequencer in
+    unit
+  and* () = Evm_node.wait_for_blueprint_applied observer 1 in
+  let check_nonce ~__LOC__ ~evm_node ~block ~expected =
+    let*@ nonce =
+      Rpc.get_transaction_count
+        evm_node
+        ~block
+        ~address:Eth_account.bootstrap_accounts.(0).address
+    in
+    Check.(
+      (Int64.to_int nonce = expected)
+        int
+        ~__LOC__
+        ~error_msg:"Expected nonce %R found %L") ;
+    unit
+  in
+
+  let check_nonce ~__LOC__ ?(check_observer = false) ?(check_sequencer = false)
+      ~block ~expected () =
+    let* () =
+      if check_observer then
+        check_nonce ~__LOC__ ~evm_node:observer ~block ~expected
+      else unit
+    in
+    if check_sequencer then
+      check_nonce ~__LOC__ ~evm_node:sequencer ~block ~expected
+    else unit
+  in
+
+  (* helper to craft a tx with given nonce. *)
+  let send_raw_tx ~nonce =
+    let* raw_tx =
+      Cast.craft_tx
+        ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+        ~chain_id:1337
+        ~nonce
+        ~gas_price:1_000_000_000
+        ~gas:23_300
+        ~value:Wei.one
+        ~address:Eth_account.bootstrap_accounts.(1).address
+        ()
+    in
+    Rpc.send_raw_transaction ~raw_tx observer
+  in
+
+  let send_and_wait_sequencer_receive ~nonce =
+    let wait_sequencer_see_tx =
+      Evm_node.wait_for_tx_pool_add_transaction sequencer
+    in
+    let* _ =
+      let*@ _hash = send_raw_tx ~nonce in
+      unit
+    and* _ = wait_sequencer_see_tx in
+    unit
+  in
+
+  let wait_for_all_tx_process ~nb_txs ~name ~waiter =
+    let rec aux total =
+      if total = nb_txs then (
+        Log.info "All (%d) txs processed: \"%s\"." total name ;
+        unit)
+      else if total > nb_txs then
+        Test.fail
+          "more transaction where processed (%s) than expected, impossible"
+          name
+      else
+        let* nb = waiter () in
+        let total = total + nb in
+        Log.debug "Processed %d of txs. (%s)" total name ;
+        aux total
+    in
+    aux 0
+  in
+
+  (* Test start here *)
+  let* () =
+    check_nonce ~__LOC__ ~check_observer:true ~block:"pending" ~expected:0 ()
+  in
+
+  (* number of transactions that we are going to process (submit,
+      inject, ...) *)
+  let nb_txs = 5 in
+  Log.info
+    "Sending %d transactions to the observer and check after each that the \
+     nonce in pending is correct"
+    nb_txs ;
+  let* _hashes =
+    fold nb_txs () @@ fun i () ->
+    let* () = send_and_wait_sequencer_receive ~nonce:i in
+    check_nonce
+      ~__LOC__
+      ~check_observer:true
+      ~check_sequencer:true
+      ~block:"pending"
+      ~expected:(i + 1)
+      ()
+  in
+
+  let* () =
+    check_nonce
+      ~__LOC__
+      ~check_observer:true
+      ~check_sequencer:true
+      ~block:"pending"
+      ~expected:nb_txs
+      ()
+  in
+
+  Log.info
+    "Send another txs to create a gap and check that the nonce in pending is \
+     still the same" ;
+  let* () = send_and_wait_sequencer_receive ~nonce:(nb_txs + 1) in
+
+  let* () =
+    check_nonce
+      ~__LOC__
+      ~check_observer:true
+      ~check_sequencer:true
+      ~block:"pending"
+      ~expected:nb_txs
+      ()
+  in
+
+  Log.info
+    "Send missing nonce to fill the gap and check that the nonce in pending is \
+     now correct" ;
+  let* () = send_and_wait_sequencer_receive ~nonce:nb_txs in
+
+  Log.info
+    "produce enough block to include all txs and make sure the nonce of latest \
+     and pending is equal." ;
+  (* Checks that all txs were confirmed in the observer *)
+  let observer_wait_tx_confirmed () =
+    let waiter () =
+      let* _ = Evm_node.wait_for_tx_queue_transaction_confirmed observer in
+      return 1
+    in
+    wait_for_all_tx_process
+      ~nb_txs:(nb_txs + 2)
+      ~name:"tx confirmed in observer"
+      ~waiter
+  in
+
+  (* Checks that all txs were included in a block by the sequencer *)
+  let sequencer_wait_tx_included () =
+    let waiter () =
+      let* _hash = Evm_node.wait_for_block_producer_tx_injected sequencer in
+      return 1
+    in
+    wait_for_all_tx_process
+      ~nb_txs:(nb_txs + 2)
+      ~name:"tx included by sequencer"
+      ~waiter
+  in
+
+  (* produce enough blocks to include all txs submited *)
+  let produce_block_until_all_included () =
+    let res = ref None in
+    let _p =
+      let* () = sequencer_wait_tx_included () in
+      res := Some () ;
+      unit
+    in
+    let result_f () = return !res in
+    bake_until
+      ~__LOC__
+      ~bake:(fun () ->
+        let*@ _ = produce_block sequencer in
+        unit)
+      ~result_f
+      ()
+  in
+
+  let* () = produce_block_until_all_included ()
+  and* () = observer_wait_tx_confirmed () in
+
+  let* () =
+    check_nonce
+      ~__LOC__
+      ~check_observer:true
+      ~check_sequencer:true
+      ~block:"pending"
+      ~expected:(nb_txs + 2)
+      ()
+  in
+  let* () =
+    check_nonce
+      ~__LOC__
+      ~check_observer:true
+      ~check_sequencer:true
+      ~block:"latest"
+      ~expected:(nb_txs + 2)
+      ()
+  in
+
+  Log.info "Try to send a transaction with a nonce in the past." ;
+  let*@? _hash = send_raw_tx ~nonce:(nb_txs + 1) in
+
+  (* still true with a valid tx in pending. *)
+  let* () = send_and_wait_sequencer_receive ~nonce:(nb_txs + 3) in
+  let*@? _hash = send_raw_tx ~nonce:(nb_txs + 1) in
+
+  Log.info "Try to send a transaction with an nonce already pending." ;
+  let* () = send_and_wait_sequencer_receive ~nonce:(nb_txs + 3) in
+  unit
+
 let test_spawn_rpc =
   let fresh_port = Port.fresh () in
   register_all
@@ -11210,4 +11445,5 @@ let () =
   test_tx_queue [Alpha] ;
   test_tx_queue_clear [Alpha] ;
   test_spawn_rpc protocols ;
-  test_observer_init_from_snapshot protocols
+  test_observer_init_from_snapshot protocols ;
+  test_tx_queue_nonce [Alpha]
