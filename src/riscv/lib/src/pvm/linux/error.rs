@@ -6,6 +6,7 @@ use std::num::TryFromIntError;
 
 use arbitrary_int::TryNewError;
 
+use crate::machine_state::memory::OutOfBounds;
 use crate::machine_state::registers::XRegisters;
 use crate::machine_state::registers::XValue;
 use crate::machine_state::registers::a0;
@@ -58,6 +59,12 @@ impl Error {
         // The discriminant matches the error code
         let error_code = -(self as i32);
         error_code as u64
+    }
+}
+
+impl From<OutOfBounds> for Error {
+    fn from(_: OutOfBounds) -> Self {
+        Error::InvalidArgument
     }
 }
 

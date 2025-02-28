@@ -412,55 +412,59 @@ impl<M: ManagerBase> SupervisorState<M> {
         // Programs targeting a Linux kernel pass the system call number in register a7
         let system_call_no = core.hart.xregisters.read(registers::a7);
 
-        match system_call_no {
-            GETCWD => return self.handle_getcwd(core),
-            OPENAT => return self.handle_openat(core),
+        let result = match system_call_no {
+            GETCWD => self.handle_getcwd(core),
+            OPENAT => self.handle_openat(),
             WRITE => return self.handle_write(core, hooks),
             WRITEV => return self.handle_writev(core, hooks),
             PPOLL => return self.handle_ppoll(core),
-            READLINKAT => return self.handle_readlinkat(core),
+            READLINKAT => self.handle_readlinkat(),
             EXIT | EXITGROUP => return self.handle_exit(core),
-            SET_TID_ADDRESS => return self.handle_set_tid_address(core),
-            TKILL => {
-                return match self.handle_tkill(core) {
-                    Ok(b) => b,
-                    Err(e) => {
-                        core.hart.xregisters.write_system_call_error(e);
-                        true
-                    }
-                };
-            }
+            SET_TID_ADDRESS => self.handle_set_tid_address(core),
+            TKILL => self.handle_tkill(core),
             SIGALTSTACK => return self.handle_sigaltstack(core),
             RT_SIGACTION => return self.handle_rt_sigaction(core),
             RT_SIGPROCMASK => return self.handle_rt_sigprocmask(core),
-            GETRANDOM => return self.handle_getrandom(core),
+            GETRANDOM => self.handle_getrandom(core),
             SBI_FIRMWARE_TEZOS => return on_tezos(core),
-            _ => {}
+            _ => Err(Error::NoSystemCall),
+        };
+
+        match result {
+            Err(Error::NoSystemCall) => {
+                let xregisters = &core.hart.xregisters;
+
+                // TODO: RV-413: Don't use `eprintln!`
+                eprintln!("> Unimplemented system call: {system_call_no}");
+                eprintln!("\ta0 = {}", xregisters.read(registers::a0));
+                eprintln!("\ta1 = {}", xregisters.read(registers::a1));
+                eprintln!("\ta2 = {}", xregisters.read(registers::a2));
+                eprintln!("\ta3 = {}", xregisters.read(registers::a3));
+                eprintln!("\ta4 = {}", xregisters.read(registers::a4));
+                eprintln!("\ta5 = {}", xregisters.read(registers::a5));
+                eprintln!("\ta6 = {}", xregisters.read(registers::a6));
+
+                core.hart
+                    .xregisters
+                    .write_system_call_error(Error::NoSystemCall);
+
+                false
+            }
+            Err(e) => {
+                core.hart.xregisters.write_system_call_error(e);
+                true
+            }
+            Ok(b) => b,
         }
-
-        let xregisters = &core.hart.xregisters;
-
-        // TODO: RV-413: Don't use `eprintln!`
-        eprintln!("> Unimplemented system call: {system_call_no}");
-        eprintln!("\ta0 = {}", xregisters.read(registers::a0));
-        eprintln!("\ta1 = {}", xregisters.read(registers::a1));
-        eprintln!("\ta2 = {}", xregisters.read(registers::a2));
-        eprintln!("\ta3 = {}", xregisters.read(registers::a3));
-        eprintln!("\ta4 = {}", xregisters.read(registers::a4));
-        eprintln!("\ta5 = {}", xregisters.read(registers::a5));
-        eprintln!("\ta6 = {}", xregisters.read(registers::a6));
-
-        core.hart
-            .xregisters
-            .write_system_call_error(Error::NoSystemCall);
-
-        false
     }
 
     /// Handle `set_tid_address` system call.
     ///
     /// See: <https://www.man7.org/linux/man-pages/man2/set_tid_address.2.html>
-    fn handle_set_tid_address(&mut self, core: &mut MachineCoreState<impl MemoryConfig, M>) -> bool
+    fn handle_set_tid_address(
+        &mut self,
+        core: &mut MachineCoreState<impl MemoryConfig, M>,
+    ) -> Result<bool, Error>
     where
         M: ManagerRead + ManagerWrite,
     {
@@ -476,7 +480,7 @@ impl<M: ManagerBase> SupervisorState<M> {
         // The caller expects the Thread ID to be returned
         core.hart.xregisters.write(registers::a0, MAIN_THREAD_ID);
 
-        true
+        Ok(true)
     }
 
     fn handle_exit(&mut self, core: &mut MachineCoreState<impl MemoryConfig, M>) -> bool
