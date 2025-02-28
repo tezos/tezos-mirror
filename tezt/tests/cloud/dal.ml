@@ -2632,6 +2632,7 @@ module Tasks = struct
     match dal_slack_webhook with
     | None -> []
     | Some webhook ->
+        let webhook = Uri.of_string webhook in
         let action () = action ~webhook ~configuration () in
         List.map (fun (name, tm) -> Chronos.task ~name ~tm ~action) tms
 end
@@ -3209,6 +3210,10 @@ let register (module Cli : Scenarios_cli.Dal) =
       | Some fundraiser_key -> ["--fundraiser"; fundraiser_key])
     ~__FILE__
     ~title:"DAL node benchmark"
+    ~tasks:
+      (Tasks.tasks
+         ~dal_slack_webhook:Cli.Alerts.dal_slack_webhook
+         ~configuration)
     ~tags:[]
     (fun cloud ->
       toplog "Creating the agents" ;
