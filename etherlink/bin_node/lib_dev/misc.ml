@@ -48,16 +48,21 @@ let normalize_addr str =
   | Some str -> str
   | None -> str
 
-let interpolate str vars =
+let interpolate str (vars : (char * [`Available of string | `Disabled]) list) =
+  let vars = ('%', `Available "%") :: vars in
   let buf = Buffer.create (String.length str) in
   let look =
     String.fold_left
       (fun look c ->
         if look then
           match List.assoc_opt ~equal:( = ) c vars with
-          | Some substitute ->
+          | Some (`Available substitute) ->
               Buffer.add_string buf substitute ;
               false
+          | Some `Disabled ->
+              raise
+                (Invalid_argument
+                   Format.(sprintf "interpolate: %%%c is disabled" c))
           | None -> raise (Invalid_argument "interpolate")
         else if c = '%' then true
         else (

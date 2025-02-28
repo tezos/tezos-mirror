@@ -184,27 +184,29 @@ open Snapshot_utils.Make (Header)
 
 let interpolate_snapshot_file current_level rollup_address history_mode filename
     =
-  let percent = ('%', "%") in
-  let rollup_address_short = ('r', Address.to_short_b58check rollup_address) in
-  let rollup_address_long = ('R', Address.to_b58check rollup_address) in
+  let rollup_address_short =
+    ('r', `Available (Address.to_short_b58check rollup_address))
+  in
+  let rollup_address_long =
+    ('R', `Available (Address.to_b58check rollup_address))
+  in
   let current_level =
-    ('l', Format.asprintf "%a" Ethereum_types.pp_quantity current_level)
+    ( 'l',
+      `Available (Format.asprintf "%a" Ethereum_types.pp_quantity current_level)
+    )
   in
   let history_mode =
     ( 'h',
-      Configuration.string_of_history_mode_info history_mode
-      |> String.lowercase_ascii )
+      `Available
+        (Configuration.string_of_history_mode_info history_mode
+        |> String.lowercase_ascii) )
   in
   try
     Ok
       (Misc.interpolate
          filename
          [
-           percent;
-           rollup_address_short;
-           rollup_address_long;
-           current_level;
-           history_mode;
+           rollup_address_short; rollup_address_long; current_level; history_mode;
          ])
   with _ -> Result_syntax.tzfail (Invalid_snapshot_file filename)
 
@@ -456,4 +458,5 @@ let import_from ~force ~keep_alive ?history_mode ~data_dir ~download_path
   in
   let*! () = Events.importing_snapshot () in
   let* () = import ~force ~data_dir ~snapshot_file in
+  let*! () = Events.import_finished () in
   return store_history_mode

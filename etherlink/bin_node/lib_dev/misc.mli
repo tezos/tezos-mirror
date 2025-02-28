@@ -34,7 +34,8 @@ val normalize_addr : string -> string
     We use a format similar to [printf], that is [%<c>] where [<c>] is a
     character. [vars] is therefore a list of pair containing a character (the
     variable) and a string (its value). *)
-val interpolate : string -> (char * string) list -> string
+val interpolate :
+  string -> (char * [`Available of string | `Disabled]) list -> string
 
 val download_file :
   keep_alive:bool -> working_dir:string -> string -> string tzresult Lwt.t
