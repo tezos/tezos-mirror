@@ -166,13 +166,16 @@ teztale.build:static-arm64:
   - eval $(opam env)
   script:
   - make teztale
+  after_script:
+  - mkdir -p ./teztale-binaries/arm64
+  - mv octez-teztale-* ./teztale-binaries/arm64/
   variables:
     PROFILE: static
   artifacts:
     name: teztale-binaries
     expire_in: never
     paths:
-    - octez-teztale-*
+    - teztale-binaries/arm64/octez-teztale-*
     when: on_success
 
 teztale.build:static-x86_64:
@@ -189,11 +192,14 @@ teztale.build:static-x86_64:
   - eval $(opam env)
   script:
   - make teztale
+  after_script:
+  - mkdir -p ./teztale-binaries/x86_64
+  - mv octez-teztale-* ./teztale-binaries/x86_64/
   variables:
     PROFILE: static
   artifacts:
     name: teztale-binaries
     expire_in: never
     paths:
-    - octez-teztale-*
+    - teztale-binaries/x86_64/octez-teztale-*
     when: on_success
