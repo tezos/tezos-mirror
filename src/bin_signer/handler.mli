@@ -37,6 +37,7 @@ val public_key :
 (** [sign cctxt req ?magic_bytes ~check_high_watermark ~require_auth]
     signs [req] and returns a signature. *)
 val sign :
+  ?signing_version:Signature.version ->
   ?magic_bytes:int list ->
   check_high_watermark:bool ->
   require_auth:bool ->

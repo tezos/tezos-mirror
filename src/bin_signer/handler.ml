@@ -264,14 +264,18 @@ let check_authorization cctxt pkh data require_auth signature =
       then return_unit
       else failwith "invalid authentication signature"
 
-let sign ?magic_bytes ~check_high_watermark ~require_auth
+let sign ?signing_version ?magic_bytes ~check_high_watermark ~require_auth
     (cctxt : #Client_context.wallet)
     Signer_messages.Sign.Request.{pkh; data; signature} =
   let open Lwt_result_syntax in
   let pkh, version =
     match pkh with
-    | Pkh pkh -> (pkh, None)
-    | Pkh_with_version (pkh, version) -> (pkh, Some version)
+    | Pkh pkh -> (pkh, signing_version)
+    | Pkh_with_version (pkh, req_version) ->
+        ( pkh,
+          match signing_version with
+          | Some _v -> signing_version
+          | None -> Some req_version )
   in
   let*! () =
     Events.(emit request_for_signing)

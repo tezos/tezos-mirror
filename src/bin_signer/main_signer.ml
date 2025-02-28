@@ -54,6 +54,15 @@ let default_http_port =
   | None -> "6732"
   | Some port -> port
 
+let signing_version_for_test =
+  Option.map
+    (function
+      | "0" -> Signature.Version_0
+      | "1" -> Signature.Version_1
+      | "2" -> Signature.Version_2
+      | _ -> Signature.V_latest.version)
+    (Sys.getenv_opt "TEZOS_SIGNER_SIGNING_VERSION")
+
 let group =
   {
     Tezos_clic.name = "signer";
@@ -158,6 +167,7 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
               cctxt
               (Tcp (host, port, [AI_SOCKTYPE SOCK_STREAM]))
               ?magic_bytes
+              ?signing_version:signing_version_for_test
               ~check_high_watermark
               ~require_auth
               ~timeout
@@ -186,6 +196,7 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
               cctxt
               (Unix path)
               ?magic_bytes
+              ?signing_version:signing_version_for_test
               ~check_high_watermark
               ~require_auth
           in
@@ -222,6 +233,7 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
             ~host
             ~port
             ?magic_bytes
+            ?signing_version:signing_version_for_test
             ~check_high_watermark
             ~require_auth);
       command
@@ -276,6 +288,7 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
             ~cert
             ~key
             ?magic_bytes
+            ?signing_version:signing_version_for_test
             ~check_high_watermark
             ~require_auth);
       command

@@ -26,15 +26,21 @@
 open Signer_messages
 module Events = Signer_events.Socket_daemon
 
-let handle_client_step ?magic_bytes ?timeout ~check_high_watermark ~require_auth
-    cctxt fd =
+let handle_client_step ?signing_version ?magic_bytes ?timeout
+    ~check_high_watermark ~require_auth cctxt fd =
   let open Lwt_result_syntax in
   let* recved = Tezos_base_unix.Socket.recv ?timeout fd Request.encoding in
   match recved with
   | Sign req ->
       let encoding = result_encoding Sign.Response.encoding in
       let*! res =
-        Handler.sign cctxt req ?magic_bytes ~check_high_watermark ~require_auth
+        Handler.sign
+          ?signing_version
+          cctxt
+          req
+          ?magic_bytes
+          ~check_high_watermark
+          ~require_auth
       in
       Tezos_base_unix.Socket.send fd encoding res
   | Deterministic_nonce req ->
@@ -72,12 +78,13 @@ let handle_client_step ?magic_bytes ?timeout ~check_high_watermark ~require_auth
       in
       Tezos_base_unix.Socket.send fd encoding res
 
-let handle_client_loop ?magic_bytes ?timeout ~check_high_watermark ~require_auth
-    cctxt fd =
+let handle_client_loop ?signing_version ?magic_bytes ?timeout
+    ~check_high_watermark ~require_auth cctxt fd =
   let rec loop () =
     let open Lwt_result_syntax in
     let* () =
       handle_client_step
+        ?signing_version
         ?magic_bytes
         ?timeout
         ~check_high_watermark
@@ -89,8 +96,8 @@ let handle_client_loop ?magic_bytes ?timeout ~check_high_watermark ~require_auth
   in
   loop ()
 
-let run ?magic_bytes ?timeout ~check_high_watermark ~require_auth
-    (cctxt : #Client_context.wallet) path =
+let run ?signing_version ?magic_bytes ?timeout ~check_high_watermark
+    ~require_auth (cctxt : #Client_context.wallet) path =
   let open Lwt_result_syntax in
   let open Tezos_base_unix.Socket in
   let*! () =
@@ -120,6 +127,7 @@ let run ?magic_bytes ?timeout ~check_high_watermark ~require_auth
               (fun () ->
                 let* (_ : unit tzresult) =
                   handle_client_loop
+                    ?signing_version
                     ?magic_bytes
                     ?timeout
                     ~check_high_watermark
