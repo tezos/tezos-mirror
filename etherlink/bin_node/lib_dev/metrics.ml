@@ -166,7 +166,7 @@ module Block = struct
   type t = {time_processed : Counter.t; transactions : Counter.t}
 
   module Process_time_histogram = Histogram (struct
-    let spec = Histogram_spec.of_list [0.1; 0.1; 0.5; 1.; 2.; 5.; 10.]
+    let spec = Histogram_spec.of_list [0.1; 0.5; 1.; 2.; 5.; 10.]
   end)
 
   let process_time_histogram =
