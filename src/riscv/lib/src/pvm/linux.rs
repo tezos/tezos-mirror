@@ -11,7 +11,6 @@ mod parameters;
 mod rng;
 
 use std::ffi::CStr;
-use std::num::NonZeroU64;
 
 use tezos_smart_rollup_constants::riscv::SBI_FIRMWARE_TEZOS;
 
@@ -88,11 +87,6 @@ const RT_SIGPROCMASK: u64 = 135;
 
 /// System call number for `getrandom` on RISC-V
 const GETRANDOM: u64 = 278;
-
-/// Size of the `sigset_t` type in bytes
-///
-/// As we're building a 64-bit system, the sigset should be 64-bit wide as well.
-const SIGSET_SIZE: u64 = 8;
 
 /// Key into the auxiliary vector which informs supervised processes of auxiliary information
 #[derive(Clone, Copy)]
@@ -419,12 +413,12 @@ impl<M: ManagerBase> SupervisorState<M> {
             WRITEV => return self.handle_writev(core, hooks),
             PPOLL => return self.handle_ppoll(core),
             READLINKAT => self.handle_readlinkat(),
-            EXIT | EXITGROUP => return self.handle_exit(core),
+            EXIT | EXITGROUP => self.handle_exit(core),
             SET_TID_ADDRESS => self.handle_set_tid_address(core),
             TKILL => self.handle_tkill(core),
-            SIGALTSTACK => return self.handle_sigaltstack(core),
-            RT_SIGACTION => return self.handle_rt_sigaction(core),
-            RT_SIGPROCMASK => return self.handle_rt_sigprocmask(core),
+            SIGALTSTACK => self.handle_sigaltstack(core),
+            RT_SIGACTION => self.handle_rt_sigaction(core),
+            RT_SIGPROCMASK => self.handle_rt_sigprocmask(core),
             GETRANDOM => self.handle_getrandom(core),
             SBI_FIRMWARE_TEZOS => return on_tezos(core),
             _ => Err(Error::NoSystemCall),
@@ -483,114 +477,108 @@ impl<M: ManagerBase> SupervisorState<M> {
         Ok(true)
     }
 
-    fn handle_exit(&mut self, core: &mut MachineCoreState<impl MemoryConfig, M>) -> bool
+    fn handle_exit(
+        &mut self,
+        core: &mut MachineCoreState<impl MemoryConfig, M>,
+    ) -> Result<bool, Error>
     where
         M: ManagerReadWrite,
     {
-        let status = core.hart.xregisters.read(registers::a0);
-        self.exit_code.write(status);
+        let status = core
+            .hart
+            .xregisters
+            .try_read::<parameters::ExitStatus>(registers::a0)?;
+        self.exit_code.write(status.exit_code());
         self.exited.write(true);
 
-        false
+        Ok(false)
     }
 
     /// Handle `sigaltstack` system call. The new signal stack configuration is discarded. If the
     /// old signal stack configuration is requested, it will be zeroed out.
-    fn handle_sigaltstack(&mut self, core: &mut MachineCoreState<impl MemoryConfig, M>) -> bool
+    fn handle_sigaltstack(
+        &mut self,
+        core: &mut MachineCoreState<impl MemoryConfig, M>,
+    ) -> Result<bool, Error>
     where
         M: ManagerReadWrite,
     {
-        let old = core.hart.xregisters.read(registers::a1);
+        let old = core
+            .hart
+            .xregisters
+            .try_read::<parameters::SignalAction>(registers::a1)?;
 
         /// `sizeof(struct sigaltstack)` on the Kernel side
         const SIZE_SIGALTSTACK: usize = 24;
 
-        if let Some(old) = NonZeroU64::new(old) {
-            let Ok(()) = core.main_memory.write(old.get(), [0u8; SIZE_SIGALTSTACK]) else {
-                core.hart.xregisters.write_system_call_error(Error::Fault);
-                return true;
-            };
-        }
+        core.main_memory
+            .write(old.address(), [0u8; SIZE_SIGALTSTACK])?;
 
         // Return 0 as an indicator of success
         core.hart.xregisters.write(registers::a0, 0);
 
-        true
+        Ok(true)
     }
 
     /// Handle `rt_sigaction` system call. This does nothing effectively. It does not support
     /// retrieving the previous handler for a signal - it just zeroes out the memory.
     ///
     /// See: <https://www.man7.org/linux/man-pages/man2/rt_sigaction.2.html>
-    fn handle_rt_sigaction(&mut self, core: &mut MachineCoreState<impl MemoryConfig, M>) -> bool
+    fn handle_rt_sigaction(
+        &mut self,
+        core: &mut MachineCoreState<impl MemoryConfig, M>,
+    ) -> Result<bool, Error>
     where
         M: ManagerReadWrite,
     {
-        let old_action = core.hart.xregisters.read(registers::a2);
-        let sigset_t_size = core.hart.xregisters.read(registers::a3);
+        let old = core
+            .hart
+            .xregisters
+            .try_read::<parameters::SignalAction>(registers::a2)?;
 
-        // As we're implementing a 64-bit system, the size of `sigset_t` must be 8 bytes.
-        // This is an assumption which is used in the remainder of the function body.
-        if sigset_t_size != SIGSET_SIZE {
-            core.hart
-                .xregisters
-                .write_system_call_error(Error::InvalidArgument);
-            return true;
-        }
+        core.hart
+            .xregisters
+            .try_read::<parameters::SigsetTSizeEightBytes>(registers::a3)?;
 
         /// `sizeof(struct sigaction)` on the Kernel side
         const SIZE_SIGACTION: usize = 32;
 
-        if let Some(old_action) = NonZeroU64::new(old_action) {
-            // As we don't store the previous signal handler, we just zero out the memory
-            let Ok(()) = core
-                .main_memory
-                .write(old_action.get(), [0u8; SIZE_SIGACTION])
-            else {
-                core.hart.xregisters.write_system_call_error(Error::Fault);
-                return true;
-            };
-        }
+        // As we don't store the previous signal handler, we just zero out the memory
+        core.main_memory
+            .write(old.address(), [0u8; SIZE_SIGACTION])?;
 
         // Return 0 as an indicator of success
         core.hart.xregisters.write(registers::a0, 0);
 
-        true
+        Ok(true)
     }
 
     /// Handle `rt_sigprocmask` system call. This does nothing effectively. If the previous mask is
     /// requested, it will simply be zeroed out.
-    fn handle_rt_sigprocmask(&mut self, core: &mut MachineCoreState<impl MemoryConfig, M>) -> bool
+    fn handle_rt_sigprocmask(
+        &mut self,
+        core: &mut MachineCoreState<impl MemoryConfig, M>,
+    ) -> Result<bool, Error>
     where
         M: ManagerReadWrite,
     {
-        let old = core.hart.xregisters.read(registers::a2);
-        let sigset_t_size = core.hart.xregisters.read(registers::a3);
+        let old = core
+            .hart
+            .xregisters
+            .try_read::<parameters::SignalAction>(registers::a2)?;
 
-        // As we're implementing a 64-bit system, the size of `sigset_t` must be 8 bytes.
-        // This is an assumption which is used in the remainder of the function body.
-        if sigset_t_size != SIGSET_SIZE {
-            core.hart
-                .xregisters
-                .write_system_call_error(Error::InvalidArgument);
-            return true;
-        }
+        core.hart
+            .xregisters
+            .try_read::<parameters::SigsetTSizeEightBytes>(registers::a3)?;
 
-        if let Some(old_action) = NonZeroU64::new(old) {
-            // As we don't store the previous mask, we just zero out the memory
-            let Ok(()) = core
-                .main_memory
-                .write(old_action.get(), [0u8; SIGSET_SIZE as usize])
-            else {
-                core.hart.xregisters.write_system_call_error(Error::Fault);
-                return true;
-            };
-        }
+        // As we don't store the previous mask, we just zero out the memory
+        core.main_memory
+            .write(old.address(), [0u8; parameters::SIGSET_SIZE as usize])?;
 
         // Return 0 as an indicator of success
         core.hart.xregisters.write(registers::a0, 0);
 
-        true
+        Ok(true)
     }
 
     /// Handle `tkill` system call. As there is only one thread at the moment, this system call
