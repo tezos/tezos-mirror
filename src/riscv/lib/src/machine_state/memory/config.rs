@@ -2,6 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
+#[cfg(feature = "supervisor")]
+use super::protection::PagePermissions;
+#[cfg(feature = "supervisor")]
+use super::protection::PagePermissionsLayout;
 use super::state::MemoryImpl;
 use crate::state_backend::AllocatedOf;
 use crate::state_backend::DynArray;
@@ -17,7 +21,16 @@ impl<const PAGES: usize, const TOTAL_BYTES: usize> super::MemoryConfig
 {
     const TOTAL_BYTES: usize = TOTAL_BYTES;
 
+    #[cfg(not(feature = "supervisor"))]
     type Layout = DynArray<TOTAL_BYTES>;
+
+    #[cfg(feature = "supervisor")]
+    type Layout = (
+        DynArray<TOTAL_BYTES>,
+        PagePermissionsLayout<PAGES>,
+        PagePermissionsLayout<PAGES>,
+        PagePermissionsLayout<PAGES>,
+    );
 
     type State<M: ManagerBase> = MemoryImpl<PAGES, TOTAL_BYTES, M>;
 
@@ -34,7 +47,16 @@ impl<const PAGES: usize, const TOTAL_BYTES: usize> super::MemoryConfig
             );
         }
 
-        MemoryImpl { data: space }
+        #[cfg(not(feature = "supervisor"))]
+        return MemoryImpl { data: space };
+
+        #[cfg(feature = "supervisor")]
+        MemoryImpl {
+            data: space.0,
+            readable_pages: PagePermissions::bind(space.1),
+            writable_pages: PagePermissions::bind(space.2),
+            executable_pages: PagePermissions::bind(space.3),
+        }
     }
 
     fn struct_ref<'a, M, F>(instance: &'a Self::State<M>) -> AllocatedOf<Self::Layout, F::Output>
@@ -42,7 +64,16 @@ impl<const PAGES: usize, const TOTAL_BYTES: usize> super::MemoryConfig
         M: ManagerBase,
         F: FnManager<Ref<'a, M>>,
     {
-        instance.data.struct_ref::<F>()
+        #[cfg(not(feature = "supervisor"))]
+        return instance.data.struct_ref::<F>();
+
+        #[cfg(feature = "supervisor")]
+        (
+            instance.data.struct_ref::<F>(),
+            instance.readable_pages.struct_ref::<F>(),
+            instance.writable_pages.struct_ref::<F>(),
+            instance.executable_pages.struct_ref::<F>(),
+        )
     }
 }
 

@@ -23,6 +23,7 @@ use crate::machine_state::block_cache::bcall::Block;
 use crate::machine_state::memory::Address;
 use crate::machine_state::memory::Memory;
 use crate::machine_state::memory::MemoryConfig;
+use crate::machine_state::memory::PAGE_SIZE;
 use crate::machine_state::mode::Mode;
 use crate::machine_state::registers;
 use crate::program::Program;
@@ -36,9 +37,6 @@ use crate::state_backend::ManagerRead;
 use crate::state_backend::ManagerReadWrite;
 use crate::state_backend::ManagerWrite;
 use crate::state_backend::Ref;
-
-/// Size of a memory page in bytes
-pub const PAGE_SIZE: u64 = 4096;
 
 /// Thread identifier for the main thread
 const MAIN_THREAD_ID: u64 = 1;
@@ -113,7 +111,7 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase>
     /// Add data to the stack, returning the updated stack pointer.
     fn push_stack(&mut self, align: u64, data: impl AsRef<[u8]>) -> Result<Address, MachineError>
     where
-        M: ManagerRead + ManagerWrite,
+        M: ManagerReadWrite,
     {
         let data = data.as_ref();
 
@@ -152,7 +150,7 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase>
         auxv: &[(AuxVectorKey, u64)],
     ) -> Result<(), MachineError>
     where
-        M: ManagerRead + ManagerWrite,
+        M: ManagerReadWrite,
     {
         // First we push all constants so that they are at the top of the stack
         let arg_ptrs = args
@@ -199,7 +197,7 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase>
     /// Load the program into memory and set the PC to its entrypoint.
     fn load_program(&mut self, program: &Program<MC>) -> Result<(), MachineError>
     where
-        M: ManagerWrite,
+        M: ManagerReadWrite,
     {
         // Reset hart state & set pc to entrypoint
         self.core.hart.reset(program.entrypoint);
@@ -223,7 +221,7 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase>
         self.prepare_stack();
 
         // Auxiliary values vector
-        let mut auxv = vec![(AuxVectorKey::PageSize, PAGE_SIZE)];
+        let mut auxv = vec![(AuxVectorKey::PageSize, PAGE_SIZE.get())];
 
         // If program headers are available, then we should inform the supervised process of them
         if let Some(prog_headers) = &program.program_headers {
@@ -385,7 +383,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// old signal stack configuration is requested, it will be zeroed out.
     fn handle_sigaltstack(&mut self, core: &mut MachineCoreState<impl MemoryConfig, M>) -> bool
     where
-        M: ManagerRead + ManagerWrite,
+        M: ManagerReadWrite,
     {
         let old = core.hart.xregisters.read(registers::a1);
 
@@ -411,7 +409,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// See: <https://www.man7.org/linux/man-pages/man2/rt_sigaction.2.html>
     fn handle_rt_sigaction(&mut self, core: &mut MachineCoreState<impl MemoryConfig, M>) -> bool
     where
-        M: ManagerRead + ManagerWrite,
+        M: ManagerReadWrite,
     {
         let old_action = core.hart.xregisters.read(registers::a2);
         let sigset_t_size = core.hart.xregisters.read(registers::a3);
@@ -449,7 +447,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// requested, it will simply be zeroed out.
     fn handle_rt_sigprocmask(&mut self, core: &mut MachineCoreState<impl MemoryConfig, M>) -> bool
     where
-        M: ManagerRead + ManagerWrite,
+        M: ManagerReadWrite,
     {
         let old = core.hart.xregisters.read(registers::a2);
         let sigset_t_size = core.hart.xregisters.read(registers::a3);
