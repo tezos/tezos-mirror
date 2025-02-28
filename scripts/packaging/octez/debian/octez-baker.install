@@ -1,4 +1,4 @@
-binaries/octez-baker-* /usr/bin/
-binaries/octez-accuser-* /usr/bin/
+binaries/octez-baker-P* /usr/bin/
+binaries/octez-accuser-P* /usr/bin/
 scripts/wait-for-node-up.sh /usr/share/octez-baker/
-debian/octez-baker@.service /lib/systemd/system/
+scripts/systemd-octez-bakers.sh /usr/share/octez-baker/
