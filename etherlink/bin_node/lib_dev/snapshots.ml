@@ -13,6 +13,8 @@ type error +=
   | Incorrect_rollup of Address.t * Address.t
   | Outdated_snapshot of Z.t * Z.t
   | Invalid_snapshot_file of string
+  | History_mode_mismatch of
+      Configuration.history_mode * Configuration.history_mode
 
 let () =
   register_error_kind
@@ -88,7 +90,25 @@ let () =
         name)
     Data_encoding.(obj1 (req "snapshot_file" string))
     (function Invalid_snapshot_file name -> Some name | _ -> None)
-    (fun name -> Invalid_snapshot_file name)
+    (fun name -> Invalid_snapshot_file name) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_history_mode_mismatch"
+    ~title:"History mode mismatch"
+    ~description:"Configuration history mode does not match snapshot's."
+    ~pp:(fun ppf (config_mode, snapshot_mode) ->
+      Format.fprintf
+        ppf
+        "History mode values are: Configuration = %s; Snapshot = %s. Consider \
+         running with `--history-mode`."
+        (Configuration.string_of_history_mode_info config_mode)
+        (Configuration.string_of_history_mode_info snapshot_mode))
+    Data_encoding.(
+      obj2
+        (req "config_history_mode" Configuration.history_mode_encoding)
+        (req "snapshot_history_mode" Configuration.history_mode_encoding))
+    (function History_mode_mismatch (a1, a2) -> Some (a1, a2) | _ -> None)
+    (fun (a1, a2) -> History_mode_mismatch (a1, a2))
 
 type compression = No | On_the_fly | After
 
@@ -402,7 +422,14 @@ let import ~force ~data_dir ~snapshot_file =
     (data_dir // Evm_store.sqlite_file_name) ;
   return_unit
 
-let import_from ~force ~keep_alive ~data_dir ~download_path ~snapshot_file () =
+let info ~snapshot_file =
+  let compressed = is_compressed_snapshot snapshot_file in
+  let reader = if compressed then gzip_reader else stdlib_reader in
+  let snapshot_header = read_header reader ~snapshot_file in
+  (snapshot_header, if compressed then `Compressed else `Uncompressed)
+
+let import_from ~force ~keep_alive ?history_mode ~data_dir ~download_path
+    ~snapshot_file () =
   let open Lwt_result_syntax in
   let with_snapshot k =
     if
@@ -419,11 +446,14 @@ let import_from ~force ~keep_alive ~data_dir ~download_path ~snapshot_file () =
   in
   Data_dir.use ~data_dir @@ fun () ->
   with_snapshot @@ fun snapshot_file ->
+  let header, _ = info ~snapshot_file in
+  let* store_history_mode =
+    match (history_mode, header) with
+    | Some h1, V1 {history_mode = h2; _} ->
+        if Configuration.history_mode_partial_eq h1 h2 then return_some h1
+        else tzfail (History_mode_mismatch (h1, h2))
+    | _ -> return_none
+  in
   let*! () = Events.importing_snapshot () in
-  import ~force ~data_dir ~snapshot_file
-
-let info ~snapshot_file =
-  let compressed = is_compressed_snapshot snapshot_file in
-  let reader = if compressed then gzip_reader else stdlib_reader in
-  let snapshot_header = read_header reader ~snapshot_file in
-  (snapshot_header, if compressed then `Compressed else `Uncompressed)
+  let* () = import ~force ~data_dir ~snapshot_file in
+  return store_history_mode

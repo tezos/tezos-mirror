@@ -60,11 +60,12 @@ val import :
 val import_from :
   force:bool ->
   keep_alive:bool ->
+  ?history_mode:Configuration.history_mode ->
   data_dir:string ->
   download_path:string ->
   snapshot_file:string ->
   unit ->
-  unit tzresult Lwt.t
+  Configuration.history_mode option tzresult Lwt.t
 
 (** [info ~snapshot_file] returns information that can be used to inspect the
     snapshot file. *)

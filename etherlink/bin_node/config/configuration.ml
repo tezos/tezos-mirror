@@ -49,6 +49,13 @@ type history_mode =
   | Rolling of garbage_collector_parameters
   | Full of garbage_collector_parameters
 
+let history_mode_partial_eq h1 h2 =
+  match (h1, h2) with
+  | Archive, Archive -> true
+  | Rolling _, Rolling _ -> true
+  | Full _, Full _ -> true
+  | _ -> false
+
 type rpc_server = Resto | Dream
 
 type monitor_websocket_heartbeat = {ping_interval : float; ping_timeout : float}

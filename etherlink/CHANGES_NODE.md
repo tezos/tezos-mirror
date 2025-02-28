@@ -25,6 +25,7 @@
   (!16903)
 - Commands emitting logs now systematically comply with the `verbosity`
   configuration option. (!16975)
+- Supports specifying an expected history mode in `run observer` with the `--history` argument. The node will refuse to start if its context is using a different history mode, but it can be used with `--init-from-snapshot` to download a snapshot of the expected mode. (!16979)
 
 ### RPCs changes
 
