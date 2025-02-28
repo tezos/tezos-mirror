@@ -3,6 +3,13 @@ meta:
   endian: be
 doc: ! 'Encoding id: signer_messages.request'
 types:
+  bls:
+    seq:
+    - id: pkh
+      type: public_key_hash
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+    - id: version
+      type: s1
   bytes_dyn_uint30:
     seq:
     - id: len_bytes_dyn_uint30
@@ -57,8 +64,8 @@ types:
   sign:
     seq:
     - id: pkh
-      type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      type: signer_messages__public_key_hash
+      doc: signer messages public key hash encoding
     - id: data
       type: bytes_dyn_uint30
     - id: signature_tag
@@ -72,6 +79,23 @@ types:
     - id: pkh
       type: public_key_hash
       doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+  signer_messages__public_key_hash:
+    seq:
+    - id: signer_messages__public_key_hash_tag
+      type: u1
+      enum: signer_messages__public_key_hash_tag
+    - id: ed25519
+      size: 20
+      if: (signer_messages__public_key_hash_tag == signer_messages__public_key_hash_tag::ed25519)
+    - id: secp256k1
+      size: 20
+      if: (signer_messages__public_key_hash_tag == signer_messages__public_key_hash_tag::secp256k1)
+    - id: p256
+      size: 20
+      if: (signer_messages__public_key_hash_tag == signer_messages__public_key_hash_tag::p256)
+    - id: bls
+      type: bls
+      if: (signer_messages__public_key_hash_tag == signer_messages__public_key_hash_tag::bls)
   signer_messages__supports_deterministic_nonces__request:
     seq:
     - id: pkh
@@ -82,6 +106,11 @@ enums:
     0: false
     255: true
   public_key_hash_tag:
+    0: ed25519
+    1: secp256k1
+    2: p256
+    3: bls
+  signer_messages__public_key_hash_tag:
     0: ed25519
     1: secp256k1
     2: p256
