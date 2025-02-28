@@ -1348,6 +1348,8 @@ teztale.build:static-x86_64:
   script:
   - make teztale
   after_script:
+  - mkdir -p ./teztale-binaries/x86_64
+  - mv octez-teztale-* ./teztale-binaries/x86_64/
   - ./scripts/ci/sccache-stop.sh
   variables:
     PROFILE: static
@@ -1358,7 +1360,7 @@ teztale.build:static-x86_64:
     name: teztale-binaries
     expire_in: 1 day
     paths:
-    - octez-teztale-*
+    - teztale-binaries/x86_64/octez-teztale-*
     when: on_success
 
 teztale.build:static-arm64:
@@ -1392,6 +1394,8 @@ teztale.build:static-arm64:
   script:
   - make teztale
   after_script:
+  - mkdir -p ./teztale-binaries/arm64
+  - mv octez-teztale-* ./teztale-binaries/arm64/
   - ./scripts/ci/sccache-stop.sh
   variables:
     PROFILE: static
@@ -1402,7 +1406,7 @@ teztale.build:static-arm64:
     name: teztale-binaries
     expire_in: 1 day
     paths:
-    - octez-teztale-*
+    - teztale-binaries/arm64/octez-teztale-*
     when: on_success
 
 etherlink.build:static-x86_64:
