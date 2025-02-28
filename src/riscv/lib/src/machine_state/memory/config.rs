@@ -6,18 +6,28 @@ use super::state::MemoryImpl;
 use crate::state_backend::{AllocatedOf, DynArray, FnManager, ManagerBase, Ref};
 
 /// State layout for the memory component
-pub struct MemoryConfig<const TOTAL_BYTES: usize>(DynArray<TOTAL_BYTES>);
+pub struct MemoryConfig<const PAGES: usize, const TOTAL_BYTES: usize>(DynArray<TOTAL_BYTES>);
 
-impl<const TOTAL_BYTES: usize> super::MemoryConfig for MemoryConfig<TOTAL_BYTES> {
+impl<const PAGES: usize, const TOTAL_BYTES: usize> super::MemoryConfig
+    for MemoryConfig<PAGES, TOTAL_BYTES>
+{
     const TOTAL_BYTES: usize = TOTAL_BYTES;
 
     type Layout = DynArray<TOTAL_BYTES>;
 
-    type State<M: ManagerBase> = MemoryImpl<TOTAL_BYTES, M>;
+    type State<M: ManagerBase> = MemoryImpl<PAGES, TOTAL_BYTES, M>;
 
     fn bind<M: ManagerBase>(space: AllocatedOf<Self::Layout, M>) -> Self::State<M> {
         if TOTAL_BYTES == 0 {
             panic!("Memory size must be positive");
+        }
+
+        if PAGES.checked_mul(super::PAGE_SIZE.get() as usize) != Some(TOTAL_BYTES) {
+            panic!(
+                "Memory size {} must be a non-overflowing multiple of the page size {}",
+                TOTAL_BYTES,
+                super::PAGE_SIZE
+            );
         }
 
         MemoryImpl { data: space }
@@ -35,15 +45,16 @@ impl<const TOTAL_BYTES: usize> super::MemoryConfig for MemoryConfig<TOTAL_BYTES>
 /// Generates a valid memory configuration.
 macro_rules! gen_memory_layout {
     ($name:ident = $size_in_g:literal GiB) => {
-        pub type $name = MemoryConfig<{ $size_in_g * 1024 * 1024 * 1024 }>;
+        pub type $name =
+            MemoryConfig<{ $size_in_g * 1024 * 256 }, { $size_in_g * 1024 * 1024 * 1024 }>;
     };
 
     ($name:ident = $size_in_m:literal MiB) => {
-        pub type $name = MemoryConfig<{ $size_in_m * 1024 * 1024 }>;
+        pub type $name = MemoryConfig<{ $size_in_m * 256 }, { $size_in_m * 1024 * 1024 }>;
     };
 
     ($name:ident = $size_in_k:literal KiB) => {
-        pub type $name = MemoryConfig<{ $size_in_k * 1024 }>;
+        pub type $name = MemoryConfig<{ $size_in_k / 4 }, { $size_in_k * 1024 }>;
     };
 }
 

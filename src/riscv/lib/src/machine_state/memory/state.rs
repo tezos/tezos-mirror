@@ -13,11 +13,13 @@ use crate::state_backend::{
 };
 
 /// Machine's memory
-pub struct MemoryImpl<const TOTAL_BYTES: usize, M: ManagerBase> {
+pub struct MemoryImpl<const PAGES: usize, const TOTAL_BYTES: usize, M: ManagerBase> {
     pub(super) data: DynCells<TOTAL_BYTES, M>,
 }
 
-impl<const TOTAL_BYTES: usize, M: ManagerBase> MemoryImpl<TOTAL_BYTES, M> {
+impl<const PAGES: usize, const TOTAL_BYTES: usize, M: ManagerBase>
+    MemoryImpl<PAGES, TOTAL_BYTES, M>
+{
     /// Ensure the access is within bounds.
     #[inline]
     fn check_bounds(address: Address, length: usize) -> Result<(), OutOfBounds> {
@@ -29,7 +31,8 @@ impl<const TOTAL_BYTES: usize, M: ManagerBase> MemoryImpl<TOTAL_BYTES, M> {
     }
 }
 
-impl<const TOTAL_BYTES: usize, M> Memory<M> for MemoryImpl<TOTAL_BYTES, M>
+impl<const PAGES: usize, const TOTAL_BYTES: usize, M> Memory<M>
+    for MemoryImpl<PAGES, TOTAL_BYTES, M>
 where
     M: ManagerBase,
 {
@@ -134,18 +137,21 @@ pub mod tests {
 
     #[test]
     fn bounds_check() {
+        type OwnedM0 = MemoryImpl<0, 0, Owned>;
+        type OwnedM4K = <M4K as MemoryConfig>::State<Owned>;
+
         // Zero-sized reads or writes are always valid
-        assert!(MemoryImpl::<0, Owned>::check_bounds(0, 0).is_ok());
-        assert!(MemoryImpl::<0, Owned>::check_bounds(1, 0).is_ok());
-        assert!(MemoryImpl::<32, Owned>::check_bounds(0, 0).is_ok());
-        assert!(MemoryImpl::<32, Owned>::check_bounds(32, 0).is_ok());
-        assert!(MemoryImpl::<32, Owned>::check_bounds(64, 0).is_ok());
+        assert!(OwnedM0::check_bounds(0, 0).is_ok());
+        assert!(OwnedM0::check_bounds(1, 0).is_ok());
+        assert!(OwnedM4K::check_bounds(0, 0).is_ok());
+        assert!(OwnedM4K::check_bounds(4096, 0).is_ok());
+        assert!(OwnedM4K::check_bounds(2 * 4096, 0).is_ok());
 
         // Bounds checks
-        assert!(MemoryImpl::<0, Owned>::check_bounds(0, 1).is_err());
-        assert!(MemoryImpl::<0, Owned>::check_bounds(1, 1).is_err());
-        assert!(MemoryImpl::<32, Owned>::check_bounds(32, 1).is_err());
-        assert!(MemoryImpl::<32, Owned>::check_bounds(64, 1).is_err());
+        assert!(OwnedM0::check_bounds(0, 1).is_err());
+        assert!(OwnedM0::check_bounds(1, 1).is_err());
+        assert!(OwnedM4K::check_bounds(4096, 1).is_err());
+        assert!(OwnedM4K::check_bounds(2 * 4096, 1).is_err());
     }
 
     backend_test!(test_endianess, F, {
