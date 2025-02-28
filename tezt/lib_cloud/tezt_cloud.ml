@@ -288,3 +288,7 @@ let register ~tags =
   register_list_dns_domains ~tags ;
   register_dns_add ~tags ;
   register_dns_remove ~tags
+
+module Prometheus = struct
+  let get_query_endpoint ~query = Prometheus.get_query_endpoint ~query
+end
