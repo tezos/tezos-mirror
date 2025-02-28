@@ -1,7 +1,6 @@
 [Unit]
 Description=Octez baker service
 After=network.target
-Requires=octez-baker-active.service octez-baker-next.service octez-accuser-active.service octez-accuser-next.service
 
 [Service]
 Type=oneshot
@@ -11,15 +10,14 @@ Restart=on-failure
 TimeoutStartSec=300
 TimeoutStopSec=300
 
-ExecStartPre=systemctl start octez-baker-active.service
-ExecStartPre=systemctl start octez-baker-next.service
-ExecStartPre=systemctl start octez-accuser-active.service
-ExecStartPre=systemctl start octez-accuser-next.service
+EnvironmentFile=-/etc/default/octez-node
+EnvironmentFile=-/etc/default/octez-baker
 
-ExecStopPost=systemctl stop octez-baker-active.service
-ExecStopPost=systemctl stop octez-baker-next.service
-ExecStopPost=systemctl stop octez-accuser-active.service
-ExecStopPost=systemctl stop octez-accuser-next.service
+# The baker is started only if the node is up and running
+ExecStartPre=/usr/share/octez-baker/wait-for-node-up.sh
+
+ExecStartPre=/usr/share/octez-baker/systemd-octez-bakers.sh start
+ExecStopPost=/usr/share/octez-baker/systemd-octez-bakers.sh stop
 
 [Install]
 WantedBy=multi-user.target
