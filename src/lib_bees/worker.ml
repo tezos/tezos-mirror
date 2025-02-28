@@ -332,7 +332,7 @@ struct
         timestamp : Time.System.t;
       }
         -> message
-    | Shutdown : message
+    | Shutdown : message (* Appears when a worker shutdown is happening *)
 
   type 'a queue
 
@@ -405,6 +405,10 @@ struct
     | Bounded_buffer q -> Eio.Stream.take q
     | Dropbox_buffer q -> Eio.Stream.take q
 
+  (** [take t] returns the next item from the queue of the worker.
+     If no item is available, it waits until there is one. If some timeout
+     has been specified for the worker, returns [None] if no message
+     arrived. *)
   let take t =
     match t.timeout with
     | None -> Some (take t)
@@ -417,6 +421,14 @@ struct
         with
         | Error `Timeout -> None
         | Ok m -> Some m)
+
+  (** [take_nonblocking t] is like [take], but returns [None] instead of
+      waiting if no message is available. *)
+  let take_nonblocking (type a) (t : a t) =
+    match t.buffer with
+    | Queue_buffer q -> Eio.Stream.take_nonblocking q
+    | Bounded_buffer q -> Eio.Stream.take_nonblocking q
+    | Dropbox_buffer q -> Eio.Stream.take_nonblocking q
 
   let add (type a) (t : a t) (m : message) =
     match t.buffer with
@@ -577,23 +589,88 @@ struct
       H.on_completion self request params status
   end
 
+  (** Clear the queue canceling promises until it is empty
+      and add a [Shutdown] message for notifying others if needed. *)
+  let cancel_promises_and_notify_shutdown w =
+    let rec cancel_promises () =
+      match take_nonblocking w with
+      | None -> ()
+      | Some Shutdown -> cancel_promises ()
+      | Some (Message {request = _; metadata = _; resolver; timestamp = _}) ->
+          ignore
+          @@ Option.map
+               (fun resolver ->
+                 Eio.Promise.try_resolve resolver @@ Error (Any Request_exn))
+               resolver ;
+          cancel_promises ()
+    in
+    cancel_promises () ;
+    add w Shutdown
+
+  (** On shutdown:
+      - set the worker in a [Closing] status
+      - cancel all the pending promises and notify shutdown via
+        [cancel_promises_and_notify_shutdown]
+      - set the worker in a [Closed] status
+
+      There are few steps to perform after this shutdown, which will
+      be handheld by the [worker_loop] when it encounter a [Closed]
+      worker status.
+  *)
+  let rec shutdown_eio ?birth ?emit w =
+    match w.status with
+    | Launching _ ->
+        Eio.Fiber.yield () ;
+        shutdown_eio ?birth ?emit w
+    | Closed _ | Closing _ ->
+        add w Shutdown ;
+        Eio.Fiber.yield ()
+    | Running _ ->
+        let now = Time.System.now () in
+        let birth = Option.value ~default:now birth in
+        w.status <- Closing (birth, now) ;
+        w.state <- None ;
+        Option.iter Lwt_eio.run_lwt_in_main emit ;
+        cancel_promises_and_notify_shutdown w ;
+        w.stream_explorer <- [] ;
+        w.status <- Closed (birth, Time.System.now (), None) ;
+        Eio.Fiber.yield ()
+
+  let shutdown ?birth ?emit w =
+    Lwt_eio.run_eio @@ fun () -> shutdown_eio ?birth ?emit w
+
   let worker_loop (type kind) handlers _domain (worker : kind t) : [`Stop_daemon]
       =
     let (module Handlers : EIO_HANDLERS with type self = kind t) = handlers in
     let rec loop () : [`Stop_daemon] =
+      let yield_and_loop () =
+        Eio.Fiber.yield () ;
+        loop ()
+      in
       match worker.status with
       | Launching _ -> assert false
-      | Closing _ | Closed _ ->
-          add worker Shutdown ;
+      | Closing _ -> yield_and_loop ()
+      | Closed _ ->
+          (* The loop that triggered the Closed state should already
+             have handled this, but it cost nothing to add it here as a safety
+             net *)
+          cancel_promises_and_notify_shutdown worker ;
+          (* TODO: only call this one once *)
+          Handlers.on_close worker ;
+          (* TODO: check whether the canceler is used with the legacy
+             workers except when shutdowning the worker, as it
+             introduces a dependency to Lwt's event loop. *)
+          (* [Error_monad.cancel_with_exceptions] relies on
+             [Lwt_canceler.cancel] which means that it can be called multiple
+             times and still be executed only once. *)
+          ( Lwt_eio.run_lwt @@ fun () ->
+            Error_monad.cancel_with_exceptions worker.canceler ) ;
           `Stop_daemon
-      | Running _ -> (
-          let popped = take worker in
-          match popped with
+      | Running birth -> (
+          match take worker with
           | None ->
               Handlers.on_no_request worker ;
-              (* TODO: To check *)
-              Eio.Fiber.yield () ;
-              loop ()
+              yield_and_loop ()
           | Some (Message {request; metadata = _; resolver; timestamp = pushed})
             -> (
               worker.stream_explorer <-
@@ -605,13 +682,16 @@ struct
               Option.iter
                 (fun x -> resolve_error resolver (Any x))
                 (Hive.get_error (Format.asprintf "%a" Name.pp worker.name)) ;
-
               match Handlers.on_request worker request with
               | Ok v ->
                   let completed = Time.System.now () in
-                  resolve resolver (Ok v) ;
                   let status = Worker_types.{pushed; treated; completed} in
+                  (* We call the [on_completion] callbacks before resolving
+                     the promise in order to make sure that the user code can
+                     rely on the fact that these callbacks have been called
+                     once the promise is resolved. *)
                   Handlers.on_completion worker request v status ;
+                  resolve resolver (Ok v) ;
                   ( Lwt_eio.run_lwt_in_main @@ fun () ->
                     Worker_events.(emit request_no_errors)
                       (Request.view request, status) ) ;
@@ -628,33 +708,20 @@ struct
                   match r with
                   | Ok () -> loop ()
                   | Error errs ->
-                      add worker Shutdown ;
-                      ( Lwt_eio.run_lwt_in_main @@ fun () ->
-                        Worker_events.(emit crashed) errs ) ;
-                      `Stop_daemon)
+                      (* On unrecoverable error, launch the shutdown process *)
+                      let emit () = Worker_events.(emit crashed) errs in
+                      Lwt_eio.run_lwt_in_main (fun () ->
+                          shutdown ~birth worker ~emit) ;
+                      loop ())
               | exception e ->
                   resolve resolver (Error (Any e)) ;
                   raise e)
-          | Some Shutdown -> (
-              match worker.status with
-              | Closing _ | Closed _ ->
-                  add worker Shutdown ;
-                  `Stop_daemon
-              | Launching _ -> assert false
-              | Running birth ->
-                  worker.status <- Closing (birth, Time.System.now ()) ;
-                  Handlers.on_close worker ;
-                  (Lwt_eio.run_lwt_in_main @@ Worker_events.(emit terminated)) ;
-                  worker.status <- Closed (birth, Time.System.now (), None) ;
-                  (* Add [Shutdown] again to the worker queue to make sure that
-                     other bees see the shutdown request *)
-                  add worker Shutdown ;
-                  (* TODO: check whether the canceler is used with the legacy
-                     workers except when shutdowning the worker, as it
-                     introduces a dependency to Lwt's event loop. *)
-                  ( Lwt_eio.run_lwt @@ fun () ->
-                    Error_monad.cancel_with_exceptions worker.canceler ) ;
-                  `Stop_daemon))
+          | Some Shutdown ->
+              (* If [Shutdown] is read, shutdown is already happening.
+                 Propagate the info and loop, so that we will fall into the
+                 [Closing _ | Closed _] case and handle the termination there. *)
+              add worker Shutdown ;
+              yield_and_loop ())
     in
     loop ()
 
@@ -808,21 +875,11 @@ struct
     | Launching _ | Closing _ | Closed _ ->
         Eio.Promise.create_resolved (Error (Closed None))
 
-  let shutdown_eio w =
-    match w.status with
-    | Launching _ | Closed _ | Closing _ ->
-        add w Shutdown ;
-        Eio.Fiber.yield ()
-    | Running _ ->
-        w.status <- Closing (Time.System.now (), Time.System.now ()) ;
-        while not @@ is_empty w do
-          ignore @@ take w
-        done ;
-        w.stream_explorer <- [] ;
-        add w Shutdown ;
-        Eio.Fiber.yield ()
+  let shutdown_eio w = shutdown_eio w
 
-  let shutdown w = Lwt_eio.run_eio @@ fun () -> shutdown_eio w
+  let shutdown w =
+    Lwt.bind (shutdown w) @@ fun () ->
+    Lwt.map ignore (Lwt_canceler.when_canceled w.canceler)
 
   module type BOX = sig
     type t
