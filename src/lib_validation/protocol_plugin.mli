@@ -217,11 +217,10 @@ end
 module type AGNOSTIC_BAKER_PLUGIN = sig
   val hash : Protocol_hash.t
 
-  val run_baker_binary :
-    baker_args:string list ->
-    cancel_promise:int Lwt.t ->
-    logs_path:string option ->
-    int Lwt.t
+  val name : string
+
+  val map_commands :
+    unit -> Tezos_client_base.Client_context.full Tezos_clic.command list
 end
 
 (** Register a validation plugin for a specific protocol

@@ -18,6 +18,46 @@ let shutdown baker =
   Lwt.wakeup baker.process.canceller 0 ;
   return_unit
 
+(** [run_thread plugin ~baker_args ~cancel_promise ~logs_path] returns the main
+    running thread for the baker given its corresponding [plugin], with the command
+    line arguments given by [~baker_args] and cancellation Lwt promise
+    [~cancel_promise]. The event logs are stored according to [~logs_path]. *)
+let run_thread
+    (module Agnostic_baker_plugin : Protocol_plugin.AGNOSTIC_BAKER_PLUGIN)
+    ~baker_args ~cancel_promise ~logs_path =
+  let () =
+    Client_commands.register Agnostic_baker_plugin.hash @@ fun _network ->
+    Agnostic_baker_plugin.map_commands ()
+  in
+
+  let select_commands _ _ =
+    Lwt_result_syntax.return @@ Agnostic_baker_plugin.map_commands ()
+  in
+
+  (* This call is not strictly necessary as the parameters are initialized
+     lazily the first time a Sapling operation (validation or forging) is
+     done. This is what the client does.
+     For a long running binary however it is important to make sure that the
+     parameters files are there at the start and avoid failing much later while
+     validating an operation. Plus paying this cost upfront means that the first
+     validation will not be more expensive. *)
+  let () = Tezos_sapling.Core.Validator.init_params () in
+
+  let module Config = struct
+    include Daemon_config
+
+    let default_daily_logs_path = logs_path
+  end in
+  Lwt.pick
+    [
+      Client_main_run.lwt_run
+        (module Config)
+        ~select_commands
+        ~cmd_args:baker_args
+        ();
+      cancel_promise;
+    ]
+
 (** [spawn_baker protocol_hash ~baker_args] spawns a baker for the given [protocol_hash]
     with [~baker_args] as command line arguments. *)
 let spawn_baker protocol_hash ~baker_args =
@@ -39,12 +79,13 @@ let spawn_baker protocol_hash ~baker_args =
   let cancel_promise, canceller = Lwt.wait () in
   let* thread =
     match Protocol_plugin.find_agnostic_baker_plugin protocol_hash with
-    | Some (module Agnostic_baker_plugin) ->
+    | Some plugin ->
         (* The internal event logging needs to be closed, because another one will be
            initialised in the [run_baker_binary]. *)
         let*! () = Tezos_base_unix.Internal_event_unix.close () in
         return
-        @@ Agnostic_baker_plugin.run_baker_binary
+        @@ run_thread
+             plugin
              ~baker_args
              ~cancel_promise
              ~logs_path:Parameters.default_daily_logs_path
