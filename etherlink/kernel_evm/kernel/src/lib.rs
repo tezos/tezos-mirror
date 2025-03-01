@@ -369,7 +369,8 @@ mod tests {
 
     use crate::block_storage;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
-    use crate::configuration::{ChainConfig, Configuration};
+    use crate::chains::{ChainConfig, EvmLimits};
+    use crate::configuration::Configuration;
     use crate::fees;
     use crate::main;
     use crate::parsing::RollupType;
@@ -426,7 +427,11 @@ mod tests {
 
     fn dummy_configuration(evm_configuration: Config) -> Configuration {
         Configuration {
-            chain_config: ChainConfig::new_evm_config(DUMMY_CHAIN_ID, evm_configuration),
+            chain_config: ChainConfig::new_evm_config(
+                DUMMY_CHAIN_ID,
+                EvmLimits::default(),
+                evm_configuration,
+            ),
             ..Configuration::default()
         }
     }

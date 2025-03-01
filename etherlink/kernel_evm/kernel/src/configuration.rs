@@ -5,7 +5,7 @@
 
 use crate::{
     blueprint_storage::DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS,
-    chains::{ChainFamily, EvmLimits},
+    chains::{ChainConfig, EvmLimits},
     delayed_inbox::DelayedInbox,
     retrieve_minimum_base_fee_per_gas,
     storage::{
@@ -17,11 +17,7 @@ use crate::{
     },
     tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS},
 };
-use evm::Config;
-use evm_execution::{
-    configuration::{fetch_evm_configuration, EVMVersion},
-    read_ticketer,
-};
+use evm_execution::{configuration::fetch_evm_configuration, read_ticketer};
 use primitive_types::U256;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
@@ -69,46 +65,9 @@ impl std::fmt::Display for ConfigurationMode {
     }
 }
 
-pub struct ChainConfig {
-    pub chain_id: U256,
-    pub chain_family: ChainFamily,
-    pub evm_configuration: Config,
-}
-
-impl Default for ChainConfig {
-    fn default() -> Self {
-        Self {
-            chain_id: U256::from(CHAIN_ID),
-            chain_family: ChainFamily::Evm,
-            evm_configuration: EVMVersion::to_config(&EVMVersion::default()),
-        }
-    }
-}
-
-impl std::fmt::Display for ChainConfig {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{{Chain id: {}, Chain informations: {}}}",
-            self.chain_id, self.chain_family
-        )
-    }
-}
-
-impl ChainConfig {
-    pub fn new_evm_config(chain_id: U256, evm_configuration: Config) -> Self {
-        ChainConfig {
-            chain_id,
-            chain_family: ChainFamily::Evm,
-            evm_configuration,
-        }
-    }
-}
-
 pub struct Configuration {
     pub tezos_contracts: TezosContracts,
     pub mode: ConfigurationMode,
-    pub limits: EvmLimits,
     pub maximum_allowed_ticks: u64,
     pub enable_fa_bridge: bool,
     pub chain_config: ChainConfig,
@@ -120,7 +79,6 @@ impl Default for Configuration {
         Self {
             tezos_contracts: TezosContracts::default(),
             mode: ConfigurationMode::Proxy,
-            limits: EvmLimits::default(),
             maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
             chain_config: ChainConfig::default(),
@@ -213,7 +171,7 @@ fn fetch_tezos_contracts(host: &mut impl Runtime) -> TezosContracts {
     }
 }
 
-pub fn fetch_limits(host: &mut impl Runtime) -> EvmLimits {
+pub fn fetch_evm_limits(host: &mut impl Runtime) -> EvmLimits {
     let maximum_gas_limit =
         read_or_set_maximum_gas_per_transaction(host).unwrap_or(MAXIMUM_GAS_LIMIT);
 
@@ -242,13 +200,14 @@ pub fn fetch_configuration<Host: Runtime>(
     let tezos_contracts = fetch_tezos_contracts(host);
     let maximum_allowed_ticks =
         read_maximum_allowed_ticks(host).unwrap_or(MAX_ALLOWED_TICKS);
-    let limits = fetch_limits(host);
+    let evm_limits = fetch_evm_limits(host);
     let sequencer = sequencer(host).unwrap_or_default();
     let enable_fa_bridge = is_enable_fa_bridge(host).unwrap_or_default();
     let evm_configuration = fetch_evm_configuration(host);
     let dal: Option<DalConfiguration> = fetch_dal_configuration(host);
     let evm_node_flag = evm_node_flag(host).unwrap_or(false);
-    let chain_config = ChainConfig::new_evm_config(chain_id, evm_configuration);
+    let chain_config =
+        ChainConfig::new_evm_config(chain_id, evm_limits, evm_configuration);
     match sequencer {
         Some(sequencer) => {
             let delayed_bridge = read_delayed_transaction_bridge(host)
@@ -276,7 +235,6 @@ pub fn fetch_configuration<Host: Runtime>(
                         max_blueprint_lookahead_in_seconds,
                     },
                     maximum_allowed_ticks,
-                    limits,
                     enable_fa_bridge,
                     chain_config,
                     garbage_collect_blocks: !evm_node_flag,
@@ -284,7 +242,7 @@ pub fn fetch_configuration<Host: Runtime>(
                 Err(err) => {
                     log!(host, Fatal, "The kernel failed to created the delayed inbox, reverting configuration to proxy ({:?})", err);
                     Configuration {
-                        limits,
+                        chain_config,
                         ..Configuration::default()
                     }
                 }
@@ -294,7 +252,6 @@ pub fn fetch_configuration<Host: Runtime>(
             tezos_contracts,
             mode: ConfigurationMode::Proxy,
             maximum_allowed_ticks,
-            limits,
             enable_fa_bridge,
             chain_config,
             garbage_collect_blocks: false,

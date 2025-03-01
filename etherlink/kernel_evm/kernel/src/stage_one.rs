@@ -8,6 +8,7 @@ use crate::blueprint_storage::{
     clear_all_blueprints, read_current_blueprint_header, store_forced_blueprint,
     store_inbox_blueprint,
 };
+use crate::chains::ChainConfig;
 use crate::configuration::{
     Configuration, ConfigurationMode, DalConfiguration, TezosContracts,
 };
@@ -17,7 +18,6 @@ use crate::inbox::{read_proxy_inbox, read_sequencer_inbox};
 use crate::inbox::{ProxyInboxContent, StageOneStatus};
 use crate::storage::read_last_info_per_level_timestamp;
 use anyhow::Ok;
-use evm::Config;
 use std::ops::Add;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
@@ -32,7 +32,7 @@ pub fn fetch_proxy_blueprints<Host: Runtime>(
     tezos_contracts: &TezosContracts,
     enable_fa_bridge: bool,
     garbage_collect_blocks: bool,
-    evm_configuration: &Config,
+    chain_configuration: &ChainConfig,
 ) -> Result<StageOneStatus, anyhow::Error> {
     if let Some(ProxyInboxContent { transactions }) = read_proxy_inbox(
         host,
@@ -40,7 +40,7 @@ pub fn fetch_proxy_blueprints<Host: Runtime>(
         tezos_contracts,
         enable_fa_bridge,
         garbage_collect_blocks,
-        evm_configuration,
+        chain_configuration,
     )? {
         let timestamp =
             read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));
@@ -127,7 +127,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     maximum_allowed_ticks: u64,
     enable_fa_bridge: bool,
     garbage_collect_blocks: bool,
-    evm_configuration: &Config,
+    chain_configuration: &ChainConfig,
 ) -> Result<StageOneStatus, anyhow::Error> {
     match read_sequencer_inbox(
         host,
@@ -140,7 +140,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
         maximum_allowed_ticks,
         dal,
         garbage_collect_blocks,
-        evm_configuration,
+        chain_configuration,
     )? {
         StageOneStatus::Done => {
             // Check if there are timed-out transactions in the delayed inbox
@@ -184,7 +184,7 @@ pub fn fetch_blueprints<Host: Runtime>(
             config.maximum_allowed_ticks,
             config.enable_fa_bridge,
             config.garbage_collect_blocks,
-            &config.chain_config.evm_configuration,
+            &config.chain_config,
         ),
         ConfigurationMode::Proxy => fetch_proxy_blueprints(
             host,
@@ -192,7 +192,7 @@ pub fn fetch_blueprints<Host: Runtime>(
             &config.tezos_contracts,
             config.enable_fa_bridge,
             config.garbage_collect_blocks,
-            &config.chain_config.evm_configuration,
+            &config.chain_config,
         ),
     }
 }
@@ -200,8 +200,7 @@ pub fn fetch_blueprints<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use crate::{
-        chains::EvmLimits,
-        configuration::ChainConfig,
+        chains::test_chain_config,
         dal_slot_import_signal::{
             DalSlotImportSignals, DalSlotIndicesList, DalSlotIndicesOfLevel,
             UnsignedDalSlotSignals,
@@ -209,7 +208,6 @@ mod tests {
         parsing::DAL_SLOT_IMPORT_SIGNAL_TAG,
         tick_model::constants::MAX_ALLOWED_TICKS,
     };
-    use evm_execution::configuration::EVMVersion;
     use primitive_types::U256;
     use rlp::Encodable;
     use tezos_crypto_rs::hash::{HashTrait, SecretKeyEd25519, UnknownSignature};
@@ -279,10 +277,9 @@ mod tests {
                 evm_node_flag: false,
                 max_blueprint_lookahead_in_seconds: 100_000i64,
             },
-            limits: EvmLimits::default(),
             maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
-            chain_config: ChainConfig::default(),
+            chain_config: test_chain_config(),
             garbage_collect_blocks: false,
         }
     }
@@ -295,10 +292,9 @@ mod tests {
                 ..contracts
             },
             mode: ConfigurationMode::Proxy,
-            limits: EvmLimits::default(),
             maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
-            chain_config: ChainConfig::default(),
+            chain_config: test_chain_config(),
             garbage_collect_blocks: false,
         }
     }
@@ -571,7 +567,7 @@ mod tests {
             &conf.tezos_contracts,
             false,
             false,
-            &EVMVersion::current_test_config(),
+            &conf.chain_config,
         )
         .unwrap()
         {

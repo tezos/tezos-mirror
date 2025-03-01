@@ -12,7 +12,7 @@ use crate::blueprint_storage::{
     drop_blueprint, read_blueprint, read_current_block_header,
     store_current_block_header, BlockHeader, BlueprintHeader, EVMBlockHeader,
 };
-use crate::chains::EvmLimits;
+use crate::chains::{ChainConfig, EvmLimits};
 use crate::configuration::ConfigurationMode;
 use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
@@ -305,28 +305,33 @@ fn next_bip_from_blueprints<Host: Runtime>(
                     return Ok(BlueprintParsing::None);
                 }
             }
-            let gas_price = crate::gas_price::base_fee_per_gas(
-                host,
-                blueprint.timestamp,
-                config.limits.minimum_base_fee_per_gas,
-            );
+            match &config.chain_config {
+                ChainConfig::Evm(chain_config) => {
+                    let gas_price = crate::gas_price::base_fee_per_gas(
+                        host,
+                        blueprint.timestamp,
+                        chain_config.limits.minimum_base_fee_per_gas,
+                    );
 
-            let bip = block_in_progress::BlockInProgress::from_blueprint(
-                blueprint,
-                current_block_number,
-                current_block_parent_hash,
-                tick_counter.c,
-                gas_price,
-                receipts_root,
-                transactions_root,
-            );
+                    let bip = block_in_progress::BlockInProgress::from_blueprint(
+                        blueprint,
+                        current_block_number,
+                        current_block_parent_hash,
+                        tick_counter.c,
+                        gas_price,
+                        receipts_root,
+                        transactions_root,
+                    );
 
-            tezos_evm_logging::log!(
-                host,
-                tezos_evm_logging::Level::Debug,
-                "bip: {bip:?}"
-            );
-            Ok(BlueprintParsing::Next(Box::new(bip)))
+                    tezos_evm_logging::log!(
+                        host,
+                        tezos_evm_logging::Level::Debug,
+                        "bip: {bip:?}"
+                    );
+                    Ok(BlueprintParsing::Next(Box::new(bip)))
+                }
+                ChainConfig::Michelson(_) => panic!("Implement Tezlink"),
+            }
         }
         None => Ok(BlueprintParsing::None),
     }
@@ -482,7 +487,7 @@ pub fn produce<Host: Runtime>(
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
 ) -> Result<ComputationResult, anyhow::Error> {
-    let chain_id = config.chain_config.chain_id;
+    let chain_id = config.chain_config.get_chain_id();
     let da_fee_per_byte = crate::retrieve_da_fee(host)?;
 
     let kernel_upgrade = upgrade::read_kernel_upgrade(host)?;
@@ -535,21 +540,25 @@ pub fn produce<Host: Runtime>(
         };
 
     let processed_blueprint = block_in_progress.number;
-    match compute_bip(
-        &mut safe_host,
-        &outbox_queue,
-        block_in_progress,
-        &precompiles,
-        &mut tick_counter,
-        sequencer_pool_address,
-        &config.limits,
-        config.maximum_allowed_ticks,
-        tracer_input,
-        chain_id,
-        da_fee_per_byte,
-        coinbase,
-        &config.chain_config.evm_configuration,
-    ) {
+    let computation_result = match &config.chain_config {
+        ChainConfig::Evm(chain_config) => compute_bip(
+            &mut safe_host,
+            &outbox_queue,
+            block_in_progress,
+            &precompiles,
+            &mut tick_counter,
+            sequencer_pool_address,
+            &chain_config.limits,
+            config.maximum_allowed_ticks,
+            tracer_input,
+            chain_id,
+            da_fee_per_byte,
+            coinbase,
+            &chain_config.evm_config,
+        ),
+        ChainConfig::Michelson(_) => panic!("Implement Tezlink"),
+    };
+    match computation_result {
         Ok(BlockComputationResult::Finished {
             included_delayed_transactions,
             block,
@@ -609,7 +618,6 @@ mod tests {
     use crate::blueprint_storage::read_next_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
-    use crate::configuration::ChainConfig;
     use crate::fees::DA_FEE_PER_BYTE;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
     use crate::inbox::Transaction;
@@ -687,7 +695,11 @@ mod tests {
 
     fn dummy_configuration(evm_configuration: Config) -> Configuration {
         Configuration {
-            chain_config: ChainConfig::new_evm_config(DUMMY_CHAIN_ID, evm_configuration),
+            chain_config: ChainConfig::new_evm_config(
+                DUMMY_CHAIN_ID,
+                EvmLimits::default(),
+                evm_configuration,
+            ),
             ..Configuration::default()
         }
     }
