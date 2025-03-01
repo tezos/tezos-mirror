@@ -282,7 +282,7 @@ pub fn eth_bip_from_blueprint<Host: Runtime>(
     let gas_price = crate::gas_price::base_fee_per_gas(
         host,
         blueprint.timestamp,
-        chain_config.limits.minimum_base_fee_per_gas,
+        chain_config.get_limits().minimum_base_fee_per_gas,
     );
 
     let bip = EthBlockInProgress::from_blueprint(
@@ -595,13 +595,13 @@ pub fn produce<Host: Runtime>(
                 &precompiles,
                 &mut tick_counter,
                 sequencer_pool_address,
-                &chain_config.limits,
+                chain_config.get_limits(),
                 config.maximum_allowed_ticks,
                 tracer_input,
                 chain_id,
                 da_fee_per_byte,
                 coinbase,
-                &chain_config.evm_config,
+                chain_config.get_evm_config(),
             )
         }
         (

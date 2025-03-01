@@ -457,7 +457,7 @@ fn read_and_dispatch_input<Host: Runtime, Mode: Parsable + InputHandler>(
                 ChainConfig::Evm(evm) => simulation::start_simulation_mode(
                     host,
                     enable_fa_bridge,
-                    &evm.evm_config,
+                    evm.get_evm_config(),
                 ),
                 ChainConfig::Michelson(_) => Ok(()),
             }?;

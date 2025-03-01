@@ -2,13 +2,11 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::{
+    fees::MINIMUM_BASE_FEE_PER_GAS, tick_model::constants::MAXIMUM_GAS_LIMIT, CHAIN_ID,
+};
 use evm_execution::configuration::EVMVersion;
 use primitive_types::U256;
-
-use crate::{
-    configuration::CHAIN_ID, fees::MINIMUM_BASE_FEE_PER_GAS,
-    tick_model::constants::MAXIMUM_GAS_LIMIT,
-};
 
 #[derive(Clone, Copy, Debug)]
 pub enum ChainFamily {
@@ -32,14 +30,43 @@ impl From<String> for ChainFamily {
     }
 }
 
+#[derive(Debug)]
 pub struct EvmChainConfig {
-    pub chain_id: U256,
-    pub limits: EvmLimits,
-    pub evm_config: evm_execution::Config,
+    chain_id: U256,
+    limits: EvmLimits,
+    evm_config: evm_execution::Config,
+}
+
+#[derive(Debug)]
+pub struct MichelsonChainConfig {
+    chain_id: U256,
+}
+
+pub enum ChainConfig {
+    Evm(Box<EvmChainConfig>),
+    Michelson(MichelsonChainConfig),
+}
+
+pub trait ChainConfigTrait: std::fmt::Debug {
+    fn get_chain_id(&self) -> U256;
+
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+        chain_family: ChainFamily,
+    ) -> std::fmt::Result {
+        write!(f, "{{Chain family: {}, {:?}}}", chain_family, self)
+    }
+}
+
+impl ChainConfigTrait for EvmChainConfig {
+    fn get_chain_id(&self) -> U256 {
+        self.chain_id
+    }
 }
 
 impl EvmChainConfig {
-    pub fn create_config(
+    fn create_config(
         chain_id: U256,
         limits: EvmLimits,
         evm_config: evm_execution::Config,
@@ -50,10 +77,20 @@ impl EvmChainConfig {
             evm_config,
         }
     }
+
+    pub fn get_limits(&self) -> &EvmLimits {
+        &self.limits
+    }
+
+    pub fn get_evm_config(&self) -> &evm_execution::Config {
+        &self.evm_config
+    }
 }
 
-pub struct MichelsonChainConfig {
-    pub chain_id: U256,
+impl ChainConfigTrait for MichelsonChainConfig {
+    fn get_chain_id(&self) -> U256 {
+        self.chain_id
+    }
 }
 
 impl MichelsonChainConfig {
@@ -62,19 +99,15 @@ impl MichelsonChainConfig {
     }
 }
 
-#[allow(clippy::large_enum_variant)]
-pub enum ChainConfig {
-    Evm(EvmChainConfig),
-    Michelson(MichelsonChainConfig),
-}
-
 impl ChainConfig {
     pub fn new_evm_config(
         chain_id: U256,
         limits: EvmLimits,
         evm_config: evm_execution::Config,
     ) -> Self {
-        ChainConfig::Evm(EvmChainConfig::create_config(chain_id, limits, evm_config))
+        ChainConfig::Evm(Box::new(EvmChainConfig::create_config(
+            chain_id, limits, evm_config,
+        )))
     }
 
     pub fn new_michelson_config(chain_id: U256) -> Self {
@@ -90,9 +123,9 @@ impl ChainConfig {
 
     pub fn get_chain_id(&self) -> U256 {
         match self {
-            ChainConfig::Evm(evm_chain_config) => evm_chain_config.chain_id,
+            ChainConfig::Evm(evm_chain_config) => evm_chain_config.get_chain_id(),
             ChainConfig::Michelson(michelson_chain_config) => {
-                michelson_chain_config.chain_id
+                michelson_chain_config.get_chain_id()
             }
         }
     }
@@ -122,36 +155,31 @@ impl Default for EvmLimits {
     }
 }
 
+impl Default for ChainConfig {
+    fn default() -> Self {
+        ChainConfig::Evm(Box::default())
+    }
+}
+
 impl std::fmt::Display for ChainConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let chain_family = self.get_chain_family();
         match self {
-            ChainConfig::Evm(chain_config) => write!(
-                f,
-                "{{Chain id: {}, Chain family: {}, Limits: {:?}, VMConfig: {:?}}}",
-                chain_config.chain_id,
-                ChainFamily::Evm,
-                chain_config.limits,
-                chain_config.evm_config
-            ),
-            ChainConfig::Michelson(chain_config) => {
-                write!(
-                    f,
-                    "{{Chain id: {}, Chain family: {}}}",
-                    chain_config.chain_id,
-                    ChainFamily::Michelson
-                )
+            ChainConfig::Evm(evm_chain_config) => evm_chain_config.fmt(f, chain_family),
+            ChainConfig::Michelson(michelson_chain_config) => {
+                michelson_chain_config.fmt(f, chain_family)
             }
         }
     }
 }
 
-impl Default for ChainConfig {
+impl Default for EvmChainConfig {
     fn default() -> Self {
-        Self::Evm(EvmChainConfig::create_config(
+        Self::create_config(
             U256::from(CHAIN_ID),
             EvmLimits::default(),
             EVMVersion::to_config(&EVMVersion::default()),
-        ))
+        )
     }
 }
 
