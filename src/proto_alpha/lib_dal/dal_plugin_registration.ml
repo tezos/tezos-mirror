@@ -203,7 +203,7 @@ module Plugin = struct
                     match operation_metadata.contents with
                     | Single_result (Attestation_result result) ->
                         let delegate =
-                          Tezos_crypto.Signature.Of_V1.public_key_hash
+                          Tezos_crypto.Signature.Of_V2.public_key_hash
                             result.delegate
                         in
                         Some
@@ -230,7 +230,7 @@ module Plugin = struct
     in
     List.fold_left
       (fun acc ({delegate; indexes} : Plugin.RPC.Dal.S.shards_assignment) ->
-        let delegate = Tezos_crypto.Signature.Of_V1.public_key_hash delegate in
+        let delegate = Tezos_crypto.Signature.Of_V2.public_key_hash delegate in
         Tezos_crypto.Signature.Public_key_hash.Map.add delegate indexes acc)
       Tezos_crypto.Signature.Public_key_hash.Map.empty
       pkh_to_shards

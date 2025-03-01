@@ -6483,7 +6483,8 @@ let hash = Protocol.hash
   module Ed25519 = Tezos_crypto.Signature.Ed25519
   module P256 = Tezos_crypto.Signature.P256
   module Secp256k1 = Tezos_crypto.Signature.Secp256k1
-  include Tezos_crypto.Signature.V1|});
+  include Tezos_crypto.Signature.V%d|}
+                 (if N.(number <= 022) then 1 else 2));
           ]
     in
     let dune_client_keys_version_rule =
@@ -6494,7 +6495,10 @@ let hash = Protocol.hash
             [
               S "write-file";
               S "%{targets}";
-              S (sf {|include Tezos_client_base.Client_keys_v1|});
+              S
+                (sf
+                   {|include Tezos_client_base.Client_keys_v%d|}
+                   (if N.(number <= 022) then 1 else 2));
             ])
     in
     let parameters =
@@ -7343,7 +7347,11 @@ let hash = Protocol.hash
                 [
                   S "write-file";
                   S "%{targets}";
-                  S "include module type of Tezos_benchmark.Crypto_samplers.V1";
+                  S
+                    (sf
+                       "include module type of \
+                        Tezos_benchmark.Crypto_samplers.V%d"
+                       (if N.(number <= 022) then 1 else 2));
                 ];
             Dune.targets_rule
               ["crypto_samplers.ml"]
@@ -7351,7 +7359,10 @@ let hash = Protocol.hash
                 [
                   S "write-file";
                   S "%{targets}";
-                  S "include Tezos_benchmark.Crypto_samplers.V1";
+                  S
+                    (sf
+                       "include Tezos_benchmark.Crypto_samplers.V%d"
+                       (if N.(number <= 022) then 1 else 2));
                 ];
           ]
     in

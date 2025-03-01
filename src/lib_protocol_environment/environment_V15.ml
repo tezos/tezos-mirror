@@ -83,11 +83,11 @@ module type T = sig
        and type Bls.Public_key.t = Tezos_crypto.Signature.Bls.Public_key.t
        and type Bls.t = Tezos_crypto.Signature.Bls.t
        and type Signature.public_key_hash =
-        Tezos_crypto.Signature.V1.public_key_hash
-       and type Signature.public_key = Tezos_crypto.Signature.V1.public_key
-       and type Signature.signature = Tezos_crypto.Signature.V1.signature
-       and type Signature.t = Tezos_crypto.Signature.V1.t
-       and type Signature.watermark = Tezos_crypto.Signature.V1.watermark
+        Tezos_crypto.Signature.V2.public_key_hash
+       and type Signature.public_key = Tezos_crypto.Signature.V2.public_key
+       and type Signature.signature = Tezos_crypto.Signature.V2.signature
+       and type Signature.t = Tezos_crypto.Signature.V2.t
+       and type Signature.watermark = Tezos_crypto.Signature.V2.watermark
        and type Micheline.canonical_location = Micheline.canonical_location
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type Z.t = Z.t
@@ -338,7 +338,7 @@ struct
   module Bls = Tezos_crypto.Signature.Bls
 
   module Signature = struct
-    include Tezos_crypto.Signature.V1
+    include Tezos_crypto.Signature.V2
 
     let check ?watermark pk s bytes =
       (check
@@ -1589,9 +1589,6 @@ struct
       | Ok () -> Ok true
 
     let share_is_trap delegate share ~traps_fraction =
-      let delegate =
-        Tezos_crypto.Signature.V_latest.Of_V1.public_key_hash delegate
-      in
       match
         Tezos_crypto_dal.Trap.share_is_trap delegate share ~traps_fraction
       with
