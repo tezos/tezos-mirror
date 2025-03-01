@@ -15,7 +15,14 @@ depends: [
   "octez-libs" { = version }
   "octez-shell-libs" { = version }
   "octez-node-config" { = version }
-  "octez-version" { = version }
+  "octez-protocol-021-PsQuebec-libs" { = version }
+  "octez-protocol-022-PsRiotum-libs" { = version }
+]
+depopts: [
+  "octez-protocol-alpha-libs"
+]
+conflicts: [
+  "octez-protocol-alpha-libs" { != version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

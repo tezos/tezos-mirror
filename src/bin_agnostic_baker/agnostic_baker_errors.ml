@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2025 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -10,6 +11,8 @@ type error +=
   | Cannot_connect_to_node of string
   | Cannot_decode_node_data of string
   | Missing_current_baker
+  | Missing_agnostic_baker_plugin of string
+  | Baker_process_error
 
 let () =
   Error_monad.register_error_kind
@@ -47,8 +50,32 @@ let () =
     `Permanent
     ~id:"agnostic_baker.missing_current_baker"
     ~title:"Missing current baker"
-    ~description:"The current baker binary is missing."
+    ~description:"The current baker process is missing."
     ~pp:(fun ppf () -> Format.fprintf ppf "Missing current baker")
     Data_encoding.(unit)
     (function Missing_current_baker -> Some () | _ -> None)
-    (fun () -> Missing_current_baker)
+    (fun () -> Missing_current_baker) ;
+  Error_monad.register_error_kind
+    `Permanent
+    ~id:"agnostic_baker.missing_agnostic_baker_plugin"
+    ~title:"Missing agnostic baker plugin"
+    ~description:"Missing agnostic baker plugin."
+    ~pp:(fun ppf proto_hash ->
+      Format.fprintf
+        ppf
+        "Cannot find agnostic baker plugin for protocol %s"
+        proto_hash)
+    Data_encoding.(obj1 (req "proto_hash" string))
+    (function
+      | Missing_agnostic_baker_plugin proto_hash -> Some proto_hash | _ -> None)
+    (fun proto_hash -> Missing_agnostic_baker_plugin proto_hash) ;
+  Error_monad.register_error_kind
+    `Permanent
+    ~id:"agnostic_baker.baker_process_error"
+    ~title:"Underlying baker process error"
+    ~description:"There is an error in the underlying baker process."
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "Error in the underlying baker process")
+    Data_encoding.(unit)
+    (function Baker_process_error -> Some () | _ -> None)
+    (fun () -> Baker_process_error)

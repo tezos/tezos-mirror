@@ -14,18 +14,12 @@
   octez-libs.base.unix
   octez-shell-libs.validation
   octez-shell-libs.client-base-unix
-  octez-shell-libs.client-base
-  octez-libs.rpc
-  octez-libs.rpc-http-client
-  octez-libs.rpc-http-client-unix
-  octez-libs.rpc-http
-  octez-libs.cohttp-lwt-unix
   octez-node-config
-  octez-libs.clic
-  octez-libs.stdlib-unix
-  octez-libs.event-logging
-  octez-shell-libs.signer-services
-  octez-version.value)
+  octez-protocol-021-PsQuebec-libs.agnostic-baker
+  octez-protocol-022-PsRiotum-libs.agnostic-baker
+  (select void_for_linking-octez-protocol-alpha-libs-agnostic-baker from
+   (octez-protocol-alpha-libs.agnostic-baker -> void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty)
+   (-> void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty)))
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)
@@ -38,11 +32,9 @@
   -open Tezos_base
   -open Tezos_base_unix
   -open Tezos_validation
-  -open Tezos_client_base_unix
-  -open Tezos_client_base
-  -open Tezos_rpc
-  -open Tezos_rpc_http_client
-  -open Tezos_rpc_http_client_unix
-  -open Tezos_rpc_http
-  -open Tezos_stdlib_unix
-  -open Tezos_event_logging))
+  -open Tezos_client_base_unix))
+
+(rule
+ (action
+  (progn
+   (write-file void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty ""))))

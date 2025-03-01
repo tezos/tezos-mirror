@@ -3,7 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2018 Nomadic Development. <contact@tezcore.com>             *)
 (* Copyright (c) 2018-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
-(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2024-2025 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -212,6 +212,18 @@ module type SHELL_HELPERS = sig
     Tezos_protocol_environment.Context.t -> int32 option Lwt.t
 end
 
+(** Protocol specific plugin to expose functions helpful in the scope
+    of the agnostic baker binary. *)
+module type AGNOSTIC_BAKER_PLUGIN = sig
+  val hash : Protocol_hash.t
+
+  val run_baker_binary :
+    baker_args:string list ->
+    cancel_promise:int Lwt.t ->
+    logs_path:string option ->
+    int Lwt.t
+end
+
 (** Register a validation plugin for a specific protocol
     (according to its [Proto.hash]). *)
 val register_validation_plugin : (module T) -> unit
@@ -227,6 +239,9 @@ val register_http_cache_headers_plugin : (module HTTP_CACHE_HEADERS) -> unit
 
 (** Register a Shell_helpers plugin module *)
 val register_shell_helpers : (module SHELL_HELPERS) -> unit
+
+(** Register an Agnostic_baker_plugin module *)
+val register_agnostic_baker_plugin : (module AGNOSTIC_BAKER_PLUGIN) -> unit
 
 (** Retrieves the registered protocol with the provided hash and wraps it
     together with its validation plugin.
@@ -258,3 +273,7 @@ val find_http_cache_headers :
 
 (** Looks for a shell helpers plugin module for a specific protocol *)
 val find_shell_helpers : Protocol_hash.t -> (module SHELL_HELPERS) option
+
+(** Looks for an agnostic baker plugin module for a specific protocol *)
+val find_agnostic_baker_plugin :
+  Protocol_hash.t -> (module AGNOSTIC_BAKER_PLUGIN) option

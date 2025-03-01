@@ -3,12 +3,13 @@
 ## Overview
 
 Agnostic Baker is a protocol-independent binary that dynamically selects the
-appropriate baking binary based on the active protocol. It monitors the state of
-the blockchain and automatically switches to the correct binary when a new
+appropriate baking process based on the active protocol. It monitors the state of
+the blockchain and automatically switches to the correct process when a new
 protocol is encountered (for example, during migrations, or at startup).
 
 It is designed to simplify the baking process for users, such that they will no
-longer need to run two baker binaries at migration time.
+longer need to run two baker binaries at migration time. This makes the need for
+protocol specific baking binaries obsolete.
 
 ## Experimental purpose
 
@@ -29,10 +30,6 @@ for the protocol-dependent baking binaries:
 The `[OCTEZ-EXPERIMENTAL-AGNOSTIC-BAKER-COMMANDS]` list consists of arguments specific
 to the agnostic baker binary and they include:
 
-- `--binaries-directory` : where to find the baker binaries to use
-- `--endpoint` : endpoint to communicate with the connected node
-- `--base-dir` : directory dedicated to the agnostic baker (that can contain logs
-and configuration files)
 -- `--help` : displays help information
 
 The `[OCTEZ-BAKER-COMMANDS]` list consists of all the arguments that can be used
@@ -44,7 +41,7 @@ the agnostic baker to replace a baking command which would be
 ```
 
 they can do this by using the same `[OCTEZ-BAKER-COMMANDS]` and let the agnostic
-baker run the binary for `<protocol>`, information obtained from the node.
+baker run the baker process for `<protocol>`, information obtained from the node.
 
 Notice that the two types of arguments are separated by a clear `--`.
 
@@ -52,8 +49,8 @@ Notice that the two types of arguments are separated by a clear `--`.
 
 1. **Initialization**: The daemon starts and connects to the specified Tezos node.
 2. **Protocol Detection**: It fetches the currently active protocol. This is done via an RPC request on the `head` metadata against the Tezos node.
-3. **Baker Selection**: Based on the active protocol, it selects the corresponding `octez-baker-<protocol>` binary.
-4. **Baker Execution**: The chosen binary is executed with the specified arguments
+3. **Baker Selection**: Based on the active protocol, it selects the corresponding baking process.
+4. **Baker Execution**: The chosen baker process is executed with the specified arguments
 (`[OCTEZ-BAKER-COMMANDS]`).
 5. **Chain Monitoring**: The daemon continuously monitors the chain for new blocks and protocol changes (based on the voting period).
-6. **Protocol Updates**: If a new protocol is encountered, the daemon stops the current baker and starts a new one matching the new protocol.
+6. **Protocol Updates**: If a new protocol is encountered, the daemon stops the current baker process and starts a new one matching the new protocol. This is currently done via an Lwt cancelling mechanism.

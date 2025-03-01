@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2025 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -22,13 +23,8 @@
 
 type 'a t
 
-(** [create ~binaries_directory ~node_endpoint ~baker_args] returns a non
-    initialized daemon. *)
-val create :
-  binaries_directory:string option ->
-  node_endpoint:string ->
-  baker_args:string trace ->
-  'a t
+(** [create ~node_endpoint ~baker_args] returns a non initialized daemon. *)
+val create : node_endpoint:string -> baker_args:string list -> 'a t
 
 (** [run t] Runs the daemon responsible for the spawn/stop of the
     baker daemons. *)

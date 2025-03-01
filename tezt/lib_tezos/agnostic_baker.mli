@@ -60,6 +60,19 @@ type liquidity_baking_vote = Off | On | Pass
 (** Returns the string representation of a [liquidity_baking_vote]. *)
 val liquidity_baking_vote_to_string : liquidity_baking_vote -> string
 
+(** Returns the [liquidity_baking_vote] corresponding to a string, or None if the
+    string is not a valid liquidity baking vote. *)
+val liquidity_baking_vote_of_string_opt : string -> liquidity_baking_vote option
+
+(** Writes a liquidity baking votefile, as read by the bakers [--votefile]
+    argument.
+
+    If [path] is set, the vote file is written there. Otherwise, it is written
+    to a temporary file.
+
+    Returns the path to the file that was written. *)
+val liquidity_baking_votefile : ?path:string -> liquidity_baking_vote -> string
+
 (** Protocol status values. *)
 type protocol_status = Active | Frozen | Ignore
 
@@ -94,9 +107,9 @@ val protocol_status : Protocol.t -> protocol_status
     agnostic baker. This defaults to the empty list, which is a shortcut for "every known
     account".
 
-    [force_apply_from_round], [operations_pool], [state_recorder], [node_version_check_bypass],
-    [node_version_allowed] and [liquidity_baking_toggle_vote] are passed to the
-    baker daemon through the flags [--force-apply-from-round],
+    [votefile], [force_apply_from_round], [operations_pool], [state_recorder],
+    [node_version_check_bypass], [node_version_allowed] and [liquidity_baking_toggle_vote] are
+    passed to the baker daemon through the flags [--votefile], [--force-apply-from-round],
     [--operations-pool], [--record-state], [--node-version-check-bypass], [--node-version-allowed]
     and [--liquidity-baking-toggle-vote]. If [--liquidity-baking-toggle-vote]
     is [None], then [--liquidity-baking-toggle-vote] is not passed. If it is [Some x] then
@@ -115,6 +128,7 @@ val create :
   ?color:Log.Color.t ->
   ?event_pipe:string ->
   ?delegates:string list ->
+  ?votefile:string ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
   ?force_apply_from_round:int ->
   ?remote_mode:bool ->
@@ -152,6 +166,7 @@ val create_from_uris :
   ?color:Log.Color.t ->
   ?event_pipe:string ->
   ?delegates:string list ->
+  ?votefile:string ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
   ?force_apply_from_round:int ->
   ?remote_mode:bool ->
@@ -211,6 +226,7 @@ val init :
   ?event_pipe:string ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?delegates:string list ->
+  ?votefile:string ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
   ?force_apply_from_round:int ->
   ?remote_mode:bool ->

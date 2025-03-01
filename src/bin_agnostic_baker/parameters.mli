@@ -2,12 +2,16 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2025 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
 (** Default endpoint to contact the node. Based on the
     [Octez_node_config.Config_file.default_rpc_port]. *)
 val default_node_endpoint : string
+
+(** Default logs path for the agnostic baker. *)
+val default_daily_logs_path : string option
 
 val log_config : base_dir:string option -> Tezos_base.Internal_event_config.t
 

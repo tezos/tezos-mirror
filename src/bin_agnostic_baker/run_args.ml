@@ -2,10 +2,9 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2025 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
-
-let binaries_directory_arg = "--binaries-directory"
 
 let endpoint_arg = "--endpoint"
 
@@ -24,11 +23,8 @@ let print_help () =
      [OCTEZ-EXPERIMENTAL-AGNOSTIC-BAKER-COMMANDS] -- \
      [OCTEZ-BAKER-COMMANDS]@.@." ;
   Format.printf
-    "OCTEZ-EXPERIMENTAL-AGNOSTIC-BAKER-COMMANDS:\n\
-    \  %s: display help\n\
-    \  %s: path to the octez-baker binaries@.@."
-    help_arg
-    binaries_directory_arg ;
+    "OCTEZ-EXPERIMENTAL-AGNOSTIC-BAKER-COMMANDS:\n  %s: display help@.@."
+    help_arg ;
   Format.printf
     "OCTEZ-BAKER-COMMANDS:\n Run ./octez-baker-<PROTOCOL_HASH> --help@."
 
@@ -62,8 +58,6 @@ let get_arg_value ~arg ?(short_arg = "") =
 
 let get_endpoint = get_arg_value ~arg:endpoint_arg ~short_arg:endpoint_short_arg
 
-let get_binaries_directory = get_arg_value ~arg:binaries_directory_arg
-
 let fail_on_empty_baker_args baker_args =
   if List.is_empty baker_args then (
     Format.eprintf
@@ -77,7 +71,6 @@ let get_base_dir = get_arg_value ~arg:base_dir_arg ~short_arg:base_dir_short_arg
 type args = {
   node_endpoint : string;
   base_dir : string option;
-  binaries_directory : string option;
   baker_args : string list;
 }
 
@@ -96,6 +89,5 @@ let parse_args all_args =
       ~default:Parameters.default_node_endpoint
       (get_endpoint baker_args)
   in
-  let binaries_directory = get_binaries_directory agnostic_baker_args in
   let base_dir = get_base_dir baker_args in
-  {node_endpoint; base_dir; binaries_directory; baker_args}
+  {node_endpoint; base_dir; baker_args}
