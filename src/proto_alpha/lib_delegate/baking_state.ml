@@ -320,7 +320,7 @@ type prepared_block = {
 }
 
 (* The fields {current_level}, {delegate_slots}, {next_level_delegate_slots},
-   {next_level_proposed_round}, {dal_attestable_slots},
+   {next_level_latest_forge_request}, {dal_attestable_slots},
    {next_level_dal_attestable_slots} are updated only when we receive a block at
    a different level than {current_level}.  Note that this means that there is
    always a {latest_proposal}, which may be our own baked block. *)
@@ -337,7 +337,7 @@ type level_state = {
   elected_block : elected_block option;
   delegate_slots : delegate_slots;
   next_level_delegate_slots : delegate_slots;
-  next_level_proposed_round : Round.t option;
+  next_level_latest_forge_request : Round.t option;
   dal_attestable_slots : dal_attestable_slots;
   next_level_dal_attestable_slots : dal_attestable_slots;
 }
@@ -1338,7 +1338,7 @@ let pp_level_state fmt
       elected_block;
       delegate_slots;
       next_level_delegate_slots;
-      next_level_proposed_round;
+      next_level_latest_forge_request;
       dal_attestable_slots = _;
       next_level_dal_attestable_slots = _;
     } =
@@ -1363,7 +1363,7 @@ let pp_level_state fmt
     pp_delegate_slots
     next_level_delegate_slots
     (pp_option Round.pp)
-    next_level_proposed_round
+    next_level_latest_forge_request
 
 let pp_phase fmt = function
   | Idle -> Format.fprintf fmt "idle"

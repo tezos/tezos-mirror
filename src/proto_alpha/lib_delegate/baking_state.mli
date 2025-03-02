@@ -348,8 +348,8 @@ type level_state = {
       (** Delegate slots for the baker delegates at the current level *)
   next_level_delegate_slots : delegate_slots;
       (** Delegate slots for the baker delegates at the next level *)
-  next_level_proposed_round : Round.t option;
-      (** Some if a proposal has been injected for the next level on the given
+  next_level_latest_forge_request : Round.t option;
+      (** Some if a forge request has been sent for the next level on the given
           round *)
   dal_attestable_slots : dal_attestable_slots;
       (** For each (own) delegate having a DAL slot at the current level, store

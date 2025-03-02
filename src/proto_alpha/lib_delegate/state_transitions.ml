@@ -442,7 +442,7 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
           elected_block = None;
           delegate_slots;
           next_level_delegate_slots;
-          next_level_proposed_round = None;
+          next_level_latest_forge_request = None;
           dal_attestable_slots;
           next_level_dal_attestable_slots;
         }
@@ -772,7 +772,7 @@ let time_to_prepare_next_level_block state at_round =
   | Some elected_block, Some {delegate; _} ->
       let attestations = elected_block.attestation_qc in
       let new_level_state =
-        {state.level_state with next_level_proposed_round = Some at_round}
+        {state.level_state with next_level_latest_forge_request = Some at_round}
       in
       let new_state = {state with level_state = new_level_state} in
       let* action =

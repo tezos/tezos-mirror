@@ -371,10 +371,10 @@ let compute_next_potential_baking_time_at_next_level state =
         |> Result.to_option
       in
       (* Compute the maximum of [current_round_at_next_level] and
-         [next_level_proposed_round + 1]. It is the smallest round at next
+         [next_level_latest_forge_request + 1]. It is the smallest round at next
          level that is not expired and not already sent to the forge worker. *)
       let earliest_round =
-        match state.level_state.next_level_proposed_round with
+        match state.level_state.next_level_latest_forge_request with
         | None -> current_round_at_next_level
         | Some latest_forged_round ->
             Round.(max current_round_at_next_level (succ latest_forged_round))
@@ -715,7 +715,7 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
       elected_block;
       delegate_slots;
       next_level_delegate_slots;
-      next_level_proposed_round = None;
+      next_level_latest_forge_request = None;
       dal_attestable_slots;
       next_level_dal_attestable_slots;
     }
