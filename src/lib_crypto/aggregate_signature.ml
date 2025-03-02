@@ -461,16 +461,17 @@ let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 let zero = Bls12_381 Bls.zero
 
 let sign ?watermark (Secret_key.Bls12_381 sk) bytes =
-  Bls12_381 (Bls.sign ?watermark sk bytes)
+  Bls12_381 (Bls.sign_aug ?watermark sk bytes)
 
 let check ?watermark pk signature message =
   match (pk, signature) with
   | Public_key.Bls12_381 pk, Unknown signature ->
       Bls.of_bytes_opt signature
-      |> Option.map (fun signature -> Bls.check ?watermark pk signature message)
+      |> Option.map (fun signature ->
+             Bls.check_aug ?watermark pk signature message)
       |> Option.value ~default:false
   | Public_key.Bls12_381 pk, Bls12_381 signature ->
-      Bls.check ?watermark pk signature message
+      Bls.check_aug ?watermark pk signature message
 
 let generate_key ?seed () =
   let pkh, pk, sk = Bls.generate_key ?seed () in

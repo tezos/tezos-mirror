@@ -330,13 +330,25 @@ let sign ?watermark sk msg =
   let msg =
     match watermark with None -> msg | Some prefix -> Bytes.cat prefix msg
   in
+  Bls12_381_signature.MinPk.Pop.sign sk msg
+
+let sign_aug ?watermark sk msg =
+  let msg =
+    match watermark with None -> msg | Some prefix -> Bytes.cat prefix msg
+  in
   Bls12_381_signature.MinPk.Aug.sign sk msg
+
+let check_aug ?watermark pk signature msg =
+  let msg =
+    match watermark with None -> msg | Some prefix -> Bytes.cat prefix msg
+  in
+  Bls12_381_signature.MinPk.Aug.verify pk msg signature
 
 let check ?watermark pk signature msg =
   let msg =
     match watermark with None -> msg | Some prefix -> Bytes.cat prefix msg
   in
-  Bls12_381_signature.MinPk.Aug.verify pk msg signature
+  Bls12_381_signature.MinPk.Pop.verify pk msg signature
 
 (* [seed] must be at least of 32 bytes or [Bls12_381_signature.generate_sk] will
    throw an error. *)
