@@ -1164,24 +1164,18 @@ let compute_next_round_time state =
   in
   if is_first_block_in_protocol proposal then None
   else
-    match state.level_state.next_level_proposed_round with
-    | Some _proposed_round ->
-        (* TODO? do something, if we don't, we won't be able to
-           repropose a block at next level. *)
-        None
-    | None -> (
-        let predecessor_timestamp = proposal.predecessor.shell.timestamp in
-        let predecessor_round = proposal.predecessor.round in
-        let next_round = Round.succ state.round_state.current_round in
-        match
-          timestamp_of_round
-            state
-            ~predecessor_timestamp
-            ~predecessor_round
-            ~round:next_round
-        with
-        | Ok timestamp -> Some (timestamp, next_round)
-        | _ -> assert false)
+    let predecessor_timestamp = proposal.predecessor.shell.timestamp in
+    let predecessor_round = proposal.predecessor.round in
+    let next_round = Round.succ state.round_state.current_round in
+    match
+      timestamp_of_round
+        state
+        ~predecessor_timestamp
+        ~predecessor_round
+        ~round:next_round
+    with
+    | Ok timestamp -> Some (timestamp, next_round)
+    | _ -> assert false
 
 (* Pretty-printers *)
 

@@ -348,7 +348,7 @@ let compute_next_potential_baking_time_at_next_level state =
   let open Baking_state in
   match state.level_state.elected_block with
   | None -> Lwt.return_none
-  | Some elected_block -> (
+  | Some elected_block ->
       let*! () =
         Events.(
           emit
@@ -370,39 +370,38 @@ let compute_next_potential_baking_time_at_next_level state =
           ~predecessor_round
         |> Result.to_option
       in
-      (* Find the first baking round we own at next level that is greater or
-         equal than [current_round_at_next_level] *)
-      let*? first_potential_round, delegate =
-        first_potential_round_at_next_level
-          state
-          ~earliest_round:current_round_at_next_level
+      (* Compute the maximum of [current_round_at_next_level] and
+         [next_level_proposed_round + 1]. It is the smallest round at next
+         level that is not expired and not already sent to the forge worker. *)
+      let earliest_round =
+        match state.level_state.next_level_proposed_round with
+        | None -> current_round_at_next_level
+        | Some latest_forged_round ->
+            Round.(max current_round_at_next_level (succ latest_forged_round))
       in
-      (* Check if we don't have already injected a round greater or equal than
-         [first_potential_round]. *)
-      match state.level_state.next_level_proposed_round with
-      | Some injected_round when Round.(injected_round >= first_potential_round)
-        ->
-          let*! () = Events.(emit proposal_already_injected ()) in
-          Lwt.return_none
-      | None | Some _ ->
-          let*? first_potential_baking_time =
-            timestamp_of_round
-              state
-              ~predecessor_timestamp
-              ~predecessor_round
-              ~round:first_potential_round
-            |> Result.to_option
-          in
-          let*! () =
-            Events.(
-              emit
-                next_potential_slot
-                ( Int32.succ state.level_state.current_level,
-                  first_potential_round,
-                  first_potential_baking_time,
-                  delegate ))
-          in
-          return (first_potential_baking_time, first_potential_round))
+      (* Find the first baking round we own at next level that is greater or
+         equal than [earliest_round] *)
+      let*? first_potential_round, delegate =
+        first_potential_round_at_next_level state ~earliest_round
+      in
+      let*? first_potential_baking_time =
+        timestamp_of_round
+          state
+          ~predecessor_timestamp
+          ~predecessor_round
+          ~round:first_potential_round
+        |> Result.to_option
+      in
+      let*! () =
+        Events.(
+          emit
+            next_potential_slot
+            ( Int32.succ state.level_state.current_level,
+              first_potential_round,
+              first_potential_baking_time,
+              delegate ))
+      in
+      return (first_potential_baking_time, first_potential_round)
 
 (** From the current [state], the function returns an Lwt promise that
     fulfills once the nearest timeout is expired and at which the state
