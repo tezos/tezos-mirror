@@ -253,7 +253,7 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
     ?(use_threshold_encryption = default_threshold_encryption_registration)
     ?(use_dal = default_dal_registration)
     ?(use_multichain = default_multichain_registration) ?enable_tx_queue
-    ?spawn_rpc ~title ~tags body protocols =
+    ?spawn_rpc ?periodic_snapshot_path ~title ~tags body protocols =
   let dal_cases =
     match use_dal with
     | Register_both {extra_tags_with; extra_tags_without} ->
@@ -328,6 +328,7 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
                 ~enable_multichain
                 ?enable_tx_queue
                 ?spawn_rpc
+                ?periodic_snapshot_path
                 ~title
                 ~tags:(te_tags @ dal_tags @ multichain_tags @ tags)
                 body
@@ -10696,13 +10697,6 @@ let test_eip1559_transaction_object =
        ~address:Eth_account.bootstrap_accounts.(1).address)
 
 let test_apply_from_full_history_mode =
-  let genesis_time = Client.Time.of_notation_exn "2020-01-01T00:00:00Z" in
-  let genesis_timestamp = Client.At genesis_time in
-  let days n = Ptime.Span.of_int_s (n * 86400) in
-  let get_timestamp i =
-    Ptime.add_span genesis_time (days (i + 1))
-    |> Option.get |> Client.Time.to_notation
-  in
   register_all
     ~genesis_timestamp
     ~time_between_blocks:Nothing
@@ -11436,6 +11430,59 @@ let test_tx_queue_limit =
   in
   unit
 
+let test_observer_periodic_snapshot =
+  let gc = 2 in
+  register_all
+    ~periodic_snapshot_path:"periodic_snapshot/evm-%h-snapshot-%r-%l"
+    ~history_mode:(Rolling gc)
+    ~genesis_timestamp
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "observer"; "periodic"; "snapshot"]
+    ~title:"Can export periodic snapshots"
+    ~use_dal:Register_without_feature
+    ~use_threshold_encryption:Register_without_feature
+    ~use_multichain:Register_without_feature
+    ~websockets:false
+    ~kernels:[Latest]
+  @@ fun {sequencer; observer; sc_rollup_node; _} _protocol ->
+  let* () = Evm_node.wait_for_blueprint_applied observer 0 in
+  let* snapshot_file =
+    let res = ref None in
+    let _ =
+      let* _ = Evm_node.wait_for_gc_finished observer in
+      let* file = Evm_node.wait_for_finished_exporting_snapshot observer in
+      res := Some file ;
+      unit
+    in
+    let result_f () = return !res in
+    Log.info "Next block will trigger gc and periodic snapshot export." ;
+    let*@ _ = Rpc.produce_block ~timestamp:(get_timestamp gc) sequencer in
+    let* () = Evm_node.wait_for_blueprint_applied observer 1 in
+    Log.info "Produce blocks while snapshot is exporting." ;
+    bake_until
+      ~__LOC__
+      ~bake:(fun () ->
+        let*@ _ = produce_block sequencer in
+        unit)
+      ~result_f
+      ()
+  in
+
+  let* () = Evm_node.terminate sequencer in
+  let new_sequencer =
+    Evm_node.create
+      ~mode:(Evm_node.mode sequencer)
+      (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+  let*? import_process =
+    Evm_node.import_snapshot new_sequencer ~snapshot_file
+  in
+  let* () = Process.check @@ import_process in
+  let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
+  let* () = Evm_node.run new_sequencer in
+  let*@ _ = produce_block new_sequencer in
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -11588,4 +11635,5 @@ let () =
   test_spawn_rpc protocols ;
   test_observer_init_from_snapshot protocols ;
   test_tx_queue_nonce [Alpha] ;
-  test_tx_queue_limit [Alpha]
+  test_tx_queue_limit [Alpha] ;
+  test_observer_periodic_snapshot [Alpha]

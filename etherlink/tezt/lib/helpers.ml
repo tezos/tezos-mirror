@@ -63,6 +63,16 @@ let hex_256_of_address acc =
   (* prepend 24 leading zeros *)
   String.("0x" ^ make 24 '0' ^ s)
 
+let genesis_time = Client.Time.of_notation_exn "2020-01-01T00:00:00Z"
+
+let genesis_timestamp = Client.At genesis_time
+
+let days n = Ptime.Span.of_int_s (n * 86400)
+
+let get_timestamp i =
+  Ptime.add_span genesis_time (days (i + 1))
+  |> Option.get |> Client.Time.to_notation
+
 let next_rollup_node_level ~sc_rollup_node ~client =
   let* () = Client.bake_for_and_wait ~keys:[] client in
   Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node

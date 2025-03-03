@@ -315,6 +315,7 @@ let export ?snapshot_file ~compression ~data_dir () =
 
   let*! () = Lwt_utils_unix.create_dir (Filename.dirname dest_file) in
   let*! () = Lwt_unix.rename tmp_dest dest_file in
+  let*! () = Events.finished_exporting_snapshot dest_file in
   return dest_file
 
 let check_snapshot_exists snapshot_file =

@@ -111,6 +111,7 @@ type experimental_features = {
   spawn_rpc : int option;
   l2_chains : l2_chain list option;
   enable_tx_queue : tx_queue option;
+  periodic_snapshot_path : string option;
 }
 
 type sequencer = {

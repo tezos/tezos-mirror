@@ -622,7 +622,7 @@ evm_context_unexpected_l1_block:
           "provided_level": integer ∈ [-2^31-1, 2^31] } }
 
 evm_context_gc_waiter_failed:
-  description: garbage collector waiter failed with an exception:
+  description: garbage collector waiter failed with an exception: {exn}
   level: warning
   section: evm_node.dev.evm_context
   json format:
@@ -1735,6 +1735,19 @@ compressing_snapshot:
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
 
+finished_exporting_snapshot:
+  description: finished exporting snapshot {filename}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* finished_exporting_snapshot version 0 */
+      "finished_exporting_snapshot.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+
 still_exporting_snapshot:
   description: still exporting snapshot {filename} after {elapsed_time} ({progress}% done)
   level: notice
@@ -1948,6 +1961,14 @@ catching_up:
       "catching_up.v0":
         { "from": integer ∈ [-2^31-1, 2^31],
           "to": integer ∈ [-2^31-1, 2^31] } }
+
+ignored_periodic_snapshot_arg:
+  description: ignored the periodic snapshot feature since the EVM node is running in Archive mode
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* ignored_periodic_snapshot_arg version 0 */
+      "ignored_periodic_snapshot_arg.v0": any }
 
 ignored_kernel_arg:
   description: ignored the kernel command-line argument since the EVM state was already initialized

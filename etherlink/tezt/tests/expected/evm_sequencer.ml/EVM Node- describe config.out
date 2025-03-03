@@ -188,7 +188,10 @@
         || null
         /* None */
         || boolean
-        /* tx queue enable */ },
+        /* tx queue enable */,
+      "periodic_snapshot_path"?:
+        /* Path to the periodic snapshot file */
+        $unistring /* Some */ || null /* None */ },
   "proxy"?:
     { "finalized_view"?:
         boolean

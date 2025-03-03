@@ -65,6 +65,16 @@ let ignored_kernel_arg =
     ~level:Warning
     ()
 
+let ignored_periodic_snapshot =
+  declare_0
+    ~section
+    ~name:"ignored_periodic_snapshot_arg"
+    ~msg:
+      "ignored the periodic snapshot feature since the EVM node is running in \
+       Archive mode"
+    ~level:Warning
+    ()
+
 let catching_up_evm_event =
   Internal_event.Simple.declare_2
     ~section
@@ -286,6 +296,16 @@ let still_exporting_snapshot =
     ("elapsed_time", Time.System.Span.encoding)
     ("progress", Data_encoding.float)
 
+let finished_exporting_snapshot =
+  Internal_event.Simple.declare_1
+    ~level:Notice
+    ~section
+    ~pp1:(fun fmt filename ->
+      Format.pp_print_string fmt (Filename.basename filename))
+    ~name:"finished_exporting_snapshot"
+    ~msg:"finished exporting snapshot {filename}"
+    ("filename", Data_encoding.string)
+
 let compressing_snapshot =
   Internal_event.Simple.declare_1
     ~level:Notice
@@ -486,6 +506,8 @@ let failed_upgrade root_hash Ethereum_types.(Qty level) =
 
 let ignored_kernel_arg () = emit ignored_kernel_arg ()
 
+let ignored_periodic_snapshot () = emit ignored_periodic_snapshot ()
+
 let catching_up_evm_event ~from ~to_ = emit catching_up_evm_event (from, to_)
 
 let is_ready ~rpc_addr ~rpc_port ~websockets ~backend =
@@ -569,6 +591,9 @@ let still_exporting_snapshot ~total ~progress snapshot elapsed_time =
   emit
     still_exporting_snapshot
     (snapshot, elapsed_time, 100. *. float_of_int progress /. float_of_int total)
+
+let finished_exporting_snapshot snapshot =
+  emit finished_exporting_snapshot snapshot
 
 let compressing_snapshot snapshot = emit compressing_snapshot snapshot
 

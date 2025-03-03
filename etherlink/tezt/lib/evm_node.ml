@@ -432,6 +432,12 @@ let wait_for_import_finished ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"import_finished.v0"
   @@ Fun.const (Some ())
 
+let wait_for_finished_exporting_snapshot ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"finished_exporting_snapshot.v0"
+  @@ fun json ->
+  let filename = JSON.(json |> as_string) in
+  Some filename
+
 let wait_for_block_producer_locked ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"block_producer_locked.v0"
   @@ Fun.const (Some ())
@@ -1301,7 +1307,8 @@ let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false)
     ?(blueprints_publisher_order_enabled = false) ?(next_wasm_runtime = true)
     ?rpc_server ?(enable_websocket = false) ?max_websocket_message_length
-    ?(enable_tx_queue = false) ?tx_queue_config ?spawn_rpc () =
+    ?(enable_tx_queue = false) ?tx_queue_config ?spawn_rpc
+    ?periodic_snapshot_path () =
   JSON.update "experimental_features" @@ fun json ->
   conditional_json_put
     drop_duplicate_when_injection
@@ -1344,6 +1351,10 @@ let patch_config_with_experimental_feature
        (`O [("ping_interval", `Float 0.5); ("ping_timeout", `Float 2.)])
   |> optional_json_put spawn_rpc ~name:"spawn_rpc" (fun port ->
          `O [("protected_port", `Float (float_of_int port))])
+  |> optional_json_put
+       ~name:"periodic_snapshot_path"
+       periodic_snapshot_path
+       (fun path -> `String path)
 
 let patch_config_gc ?history_mode json =
   json
