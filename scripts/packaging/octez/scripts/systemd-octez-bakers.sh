@@ -11,7 +11,7 @@ fi
 # NB: we avoid selecting `-alpha` or `-next` bakers
 for file in /usr/bin/octez-baker-P*; do
   file=$(basename "$file")
-  proto=$(echo "$file" | sed 's/^octez-baker-//' )
+  proto=$(echo "$file" | sed 's/^octez-baker-//')
 
   # Enable or start/stop the systemd service based on the argument
   if [ "$1" = "start" ]; then

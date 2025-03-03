@@ -68,18 +68,17 @@ sudo apt-get update
 sudo apt-get upgrade -y -o DPkg::options::="--force-overwrite" octez-baker
 
 cat /etc/default/octez-node
-cat /etc/default/octez-baker-active
+cat /etc/default/octez-baker
 
 sudo systemctl restart octez-node.service
 sudo systemctl status octez-node.service
 
-sudo systemctl enable octez-baker-active
+sudo systemctl enable octez-baker
 sudo systemctl restart octez-baker.service
 
 sudo systemctl status octez-baker.service
 
-sudo systemctl status octez-baker-active.service
-sudo systemctl status octez-baker-next.service
+sudo systemctl status octez-baker.service
 
 ERR=0
 
@@ -87,7 +86,7 @@ ERR=0
 # we check the debconf parameters
 
 #shellcheck disable=SC1091
-. /etc/default/octez-baker-active
+. /etc/default/octez-baker
 
 # we check if the configuration of octez did not change
 BAKER_KEY_AFTER=$(sudo su tezos -c "octez-client -p $PROTOCOL show address baker" | head -1 | awk '{print $2}')
