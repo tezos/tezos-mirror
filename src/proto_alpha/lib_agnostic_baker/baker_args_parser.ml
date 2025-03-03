@@ -8,8 +8,11 @@
 open Configuration
 open Protocol.Alpha_context
 
+(** [parse_minimal_fees] parses integer valued fees to [Tez] values. *)
 let parse_minimal_fees = Tez.of_mutez_exn
 
+(** [parse_per_block_vote] parses string valued voting options to protocol
+    specific [Per_block_votes] values. *)
 let parse_per_block_vote =
   Option.map (function
       | "on" -> Per_block_votes.Per_block_vote_on
@@ -18,6 +21,7 @@ let parse_per_block_vote =
       (* This is unreachable because any other value would fail in CLI configuration parsing *)
       | _ -> assert false)
 
+(** [parse_operations] parses uri's to either [Remote] or [Local] operations sources. *)
 let parse_operations =
   let open Baking_configuration.Operations_source in
   Option.map (fun uri ->
@@ -27,6 +31,8 @@ let parse_operations =
           (* acts as if it were file even though it might no be *)
           Local {filename = Uri.to_string uri})
 
+(** [parse_state_recorder] parses a boolean flag to either [Filesystem] or [Memory]
+    baking configuration. *)
 let parse_state_recorder state_recorder =
   if state_recorder then Baking_configuration.Filesystem else Memory
 
