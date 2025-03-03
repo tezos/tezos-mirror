@@ -1639,7 +1639,7 @@ let jobs pipeline_type =
         job
           ~__POS__
           ~name:"test_sdk_bindings"
-          ~image:Images.rust_toolchain
+          ~image:Images.rust_sdk_bindings
           ~stage:Stages.test
           ~dependencies:dependencies_needs_start
           ~rules:
