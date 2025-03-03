@@ -13,8 +13,8 @@ type t
 (** A scheduler task. *)
 type task
 
-(** [task ~tm ~action] return a new task performing [action] according
-    to the time [tm].
+(** [task ~name ~tm ~action] return a new task named [name] performing
+    [action] according to the time [tm].
 
     The [tm] time format follows the standard cron syntax with five
     space-separated fields: minute, hour, day of month, month, and day
@@ -33,7 +33,7 @@ type task
 
     @raise Failure if the time specification is invalid.
     @raise Failure if the time string format is invalid. *)
-val task : tm:string -> action:(unit -> unit Lwt.t) -> task
+val task : name:string -> tm:string -> action:(unit -> unit Lwt.t) -> task
 
 (** [init ~tasks] creates an chronos scheduler performing the given
     [tasks]. *)

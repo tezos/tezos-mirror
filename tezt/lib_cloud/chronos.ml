@@ -16,7 +16,7 @@ type time = {
   day_of_week : int option; (* 0-6, Sunday = 0 *)
 }
 
-type task = {time : time; action : unit -> unit Lwt.t}
+type task = {name : string; time : time; action : unit -> unit Lwt.t}
 
 type t = {
   tasks : task list;
@@ -63,13 +63,13 @@ let time_to_string spec =
       to_string spec.day_of_week;
     ]
 
-let task ~tm ~action =
+let task ~name ~tm ~action =
   let time = time_of_string tm in
   let is_valid = validate_time time in
   if not is_valid then
     failwith
       (Format.asprintf "Invalid time specification: %s" (time_to_string time)) ;
-  {time; action}
+  {name; time; action}
 
 let init ~tasks =
   let shutdown, trigger_shutdown = Lwt.task () in
