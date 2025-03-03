@@ -6,6 +6,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Profiler = struct
+  include (val Profiler.wrap Agnostic_baker_profiler.agnostic_baker_profiler)
+
+  let[@warning "-32"] reset_block_section =
+    Agnostic_baker_profiler.create_reset_block_section
+      Agnostic_baker_profiler.agnostic_baker_profiler
+end
+
 open Agnostic_baker_errors
 
 (* Number of extra levels to keep the old baker alive before shutting it down.

@@ -6,6 +6,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let[@warning "-32"] may_start_profiler baking_dir =
+  match Tezos_profiler_unix.Profiler_instance.selected_backend () with
+  | Some {instance_maker; _} ->
+      let profiler_maker = instance_maker ~directory:baking_dir in
+      Agnostic_baker_profiler.init profiler_maker
+  | None -> ()
+
 let run () =
   let open Lwt_result_syntax in
   let Run_args.{node_endpoint; base_dir; baker_args} =
@@ -16,6 +23,7 @@ let run () =
       ~config:(Parameters.log_config ~base_dir)
       ()
   in
+  () [@profiler.overwrite may_start_profiler base_dir] ;
   let daemon = Daemon.create ~node_endpoint ~baker_args in
   let* (_ : unit) = Daemon.run daemon in
   let*! () = Lwt_utils.never_ending () in
