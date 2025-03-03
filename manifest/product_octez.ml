@@ -7197,13 +7197,9 @@ let hash = Protocol.hash
           [
             octez_base |> open_ ~m:"TzPervasives";
             client |> if_some |> open_;
-            embedded |> open_;
             main |> open_;
-            octez_validation |> open_;
             baking |> if_some |> open_;
             baking_commands |> if_some |> open_;
-            octez_client_commands |> open_;
-            octez_client_base_unix |> open_;
             octez_experimental_agnostic_baker_lib |> open_;
           ]
         ~linkall:true
