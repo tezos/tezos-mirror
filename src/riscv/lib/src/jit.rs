@@ -598,6 +598,97 @@ mod tests {
         }
     });
 
+    backend_test!(test_or, F, {
+        use Instruction as I;
+
+        use crate::machine_state::registers::NonZeroXRegister::*;
+
+        // Arrange
+        let scenarios: &[&[I]] = &[
+            // Bitwise or with all ones is all-ones.
+            &[
+                I::new_li(x1, !0, Uncompressed),
+                I::new_li(x3, 13872, Compressed),
+                I::new_or(x2, x1, x3, Compressed),
+            ],
+            // Bitwise or with itself is self.
+            &[
+                I::new_li(x1, 49666, Uncompressed),
+                I::new_or(x2, x1, x1, Compressed),
+            ],
+            // Bitwise or with 0 is self.
+            &[
+                I::new_li(x1, 540921, Uncompressed),
+                I::new_li(x3, 0, Compressed),
+                I::new_or(x2, x1, x3, Compressed),
+            ],
+        ];
+
+        let mut jit = JIT::<M1K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            let mut interpreted =
+                create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+            let mut block = create_state!(Interpreted, BlockLayout, F, M1K);
+            let hash = super::Hash::blake2b_hash(scenario).unwrap();
+
+            block.start_block();
+            for instr in scenario.iter() {
+                block.push_instr(*instr);
+            }
+
+            let mut interpreted_steps = 0;
+            let mut jitted_steps = 0;
+
+            let initial_pc = 0;
+            interpreted.hart.pc.write(initial_pc);
+            jitted.hart.pc.write(initial_pc);
+
+            // Act
+            let fun = jit
+                .compile(&hash, instructions(&block).as_slice())
+                .expect("Compilation should succeed");
+
+            let interpreted_res = unsafe {
+                // SAFETY: interpreted blocks are always callable
+                block.callable(&mut interpreted_bb)
+            }
+            .unwrap()
+            .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
+            let jitted_res = unsafe {
+                // # Safety - the jit is not dropped until after we
+                //            exit the for loop
+                fun.call(&mut jitted, initial_pc, &mut jitted_steps)
+            };
+
+            // Assert
+            assert_eq!(jitted_res, interpreted_res);
+            assert_eq!(
+                interpreted_steps, jitted_steps,
+                "Interpreted mode ran for {interpreted_steps}, compared to jit-mode of {jitted_steps}"
+            );
+
+            assert_eq!(interpreted_steps, scenario.len());
+
+            // every scenario expects x1 and x2 to be equal.
+            assert_eq!(
+                interpreted.hart.xregisters.read_nz(x1),
+                interpreted.hart.xregisters.read_nz(x2)
+            );
+            assert_eq!(
+                jitted.hart.xregisters.read_nz(x1),
+                jitted.hart.xregisters.read_nz(x2)
+            );
+
+            assert_eq_struct(
+                &interpreted.struct_ref::<FnManagerIdent>(),
+                &jitted.struct_ref::<FnManagerIdent>(),
+            );
+        }
+    });
+
     backend_test!(test_jit_recovers_from_compilation_failure, F, {
         use Instruction as I;
 

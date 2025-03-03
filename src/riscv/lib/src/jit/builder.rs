@@ -119,6 +119,10 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
         self.builder.ins().band(lhs, rhs)
     }
 
+    fn xvalue_bitwise_or(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
+        self.builder.ins().bor(lhs, rhs)
+    }
+
     fn ok<Value>(&mut self, val: Value) -> Self::IResult<Value> {
         val
     }

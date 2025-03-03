@@ -79,16 +79,6 @@ where
         self.write_nz(rd, result)
     }
 
-    /// Saves in `rd` the bitwise OR between the value in `rs1` and `rs2`
-    ///
-    /// Relevant RISC-V opcodes:
-    /// - `OR`
-    /// - `C.OR`
-    pub fn run_or(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
-        let result = self.read_nz(rs1) | self.read_nz(rs2);
-        self.write_nz(rd, result)
-    }
-
     /// Saves in `rd` the bitwise XOR between the value in `rs1` and `imm`
     ///
     /// Relevant RISC-V opcodes:
@@ -430,7 +420,10 @@ mod tests {
 
     use crate::{
         backend_test, create_state,
-        interpreter::{i::run_add, integer::run_and},
+        interpreter::{
+            i::run_add,
+            integer::{run_and, run_or},
+        },
         machine_state::{
             MachineCoreState, MachineCoreStateLayout, ProgramCounterUpdate,
             csregisters::{
@@ -709,7 +702,7 @@ mod tests {
 
             state.hart.xregisters.write(a0, v1);
             state.hart.xregisters.write(t3, v2);
-            state.hart.xregisters.run_or(nz::t3, nz::a0, nz::a0);
+            run_or(&mut state, nz::t3, nz::a0, nz::a0);
             prop_assert_eq!(state.hart.xregisters.read(a0), v1 | v2);
 
             state.hart.xregisters.write(t2, v1);
@@ -721,7 +714,7 @@ mod tests {
             state.hart.xregisters.write(a0, v1);
             run_and(&mut state, nz::a0, nz::a0, nz::a1);
             prop_assert_eq!(state.hart.xregisters.read(a1), v1);
-            state.hart.xregisters.run_or(nz::a0, nz::a0, nz::a1);
+            run_or(&mut state, nz::a0, nz::a0, nz::a1);
             prop_assert_eq!(state.hart.xregisters.read(a1), v1);
             state.hart.xregisters.run_xor(nz::a0, nz::a0, nz::a0);
             prop_assert_eq!(state.hart.xregisters.read(a0), 0);

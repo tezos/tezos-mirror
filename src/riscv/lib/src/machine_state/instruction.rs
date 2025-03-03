@@ -605,6 +605,7 @@ impl OpCode {
             Self::Nop => Some(Args::run_nop),
             Self::Add => Some(Args::run_add),
             Self::And => Some(Args::run_and),
+            Self::Or => Some(Args::run_or),
             Self::Li => Some(Args::run_li),
             _ => None,
         }
@@ -1138,8 +1139,8 @@ impl Args {
     impl_r_type!(i::run_add, run_add, non_zero);
     impl_r_type!(run_sub, non_zero);
     impl_r_type!(run_xor, non_zero);
-    impl_r_type!(run_or, non_zero);
     impl_r_type!(integer::run_and, run_and, non_zero);
+    impl_r_type!(integer::run_or, run_or, non_zero);
     impl_r_type!(run_sll, non_zero);
     impl_r_type!(run_srl, non_zero);
     impl_r_type!(run_sra, non_zero);
