@@ -92,12 +92,33 @@ let should_run task tm =
 let run ~now_tm t =
   Lwt_list.iter_p
     (fun task ->
-      if should_run task now_tm then
-        Lwt.catch (fun () -> task.action ()) (fun _exn -> Lwt.return_unit)
+      if should_run task now_tm then (
+        Log.info "chronos.%s: starting task" task.name ;
+        Lwt.catch
+          (fun () ->
+            let* () = task.action () in
+            Log.info "chronos.%s: task successfully executed" task.name ;
+            Lwt.return_unit)
+          (fun exn ->
+            Log.error
+              "chronos.%s: task failed with the following exception: %s"
+              task.name
+              (Printexc.to_string exn) ;
+            Lwt.return_unit))
       else Lwt.return_unit)
     t.tasks
 
 let start t =
+  Log.info
+    "chronos: starting with %d tasks:@;%a"
+    (List.length t.tasks)
+    (Format.pp_print_list ~pp_sep:Format.pp_print_newline (fun ppf task ->
+         Format.fprintf
+           ppf
+           "- '%s' with time '%s'"
+           task.name
+           (time_to_string task.time)))
+    t.tasks ;
   let rec loop last_tm =
     let now_tm = Unix.(gmtime (gettimeofday ())) in
     let* () =
@@ -115,4 +136,6 @@ let start t =
          t.shutdown;
        ])
 
-let shutdown t = Lwt.wakeup t.trigger_shutdown ()
+let shutdown t =
+  Log.info "chronos: shutdown" ;
+  Lwt.wakeup t.trigger_shutdown ()
