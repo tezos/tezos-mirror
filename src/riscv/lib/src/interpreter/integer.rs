@@ -5,6 +5,7 @@
 //! Implementation of internal opcodes appropriate for JIT compilation.
 
 use crate::{
+    instruction_context::ICB,
     machine_state::registers::{NonZeroXRegister, XRegisters},
     state_backend as backend,
 };
@@ -21,6 +22,24 @@ where
         let result = 0_u64.wrapping_sub(self.read_nz(rs2));
         self.write_nz(rd_rs1, result)
     }
+}
+
+/// Saves in `rd` the bitwise AND between the value in `rs1` and `rs2`
+///
+/// Relevant RISC-V opcodes:
+/// - `AND`
+/// - `C.AND`
+pub fn run_and(
+    icb: &mut impl ICB,
+    rs1: NonZeroXRegister,
+    rs2: NonZeroXRegister,
+    rd: NonZeroXRegister,
+) {
+    let lhs = icb.xregister_read(rs1);
+    let rhs = icb.xregister_read(rs2);
+
+    let res = icb.xvalue_bitwise_and(lhs, rhs);
+    icb.xregister_write(rd, res);
 }
 
 #[cfg(test)]
