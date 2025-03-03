@@ -148,6 +148,14 @@ module Cloud : sig
     unit Lwt.t
 end
 
+module Prometheus : sig
+  (** [get_query_endpoint ~query] returns the endpoint corresponding
+      to the prometheus server, extended with the [query] provided.
+      Returns [None] if the prometheus service is not running.
+      Useful to perform GET requests. *)
+  val get_query_endpoint : query:string -> Uri.t option
+end
+
 (** [register ~tags] register a set of jobs that can be used for setting
    requirements related to cloud scenarios. Some tags can be given for all the
    registered jobs. *)
