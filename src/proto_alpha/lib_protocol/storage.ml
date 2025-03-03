@@ -335,6 +335,14 @@ module Contract = struct
       end)
       (Signature.Public_key)
 
+  module Companion_key =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["companion_key"; "active"]
+      end)
+      (Bls.Public_key)
+
   module Staking_parameters =
     Indexed_context.Make_map
       (Registered)
@@ -1350,6 +1358,15 @@ module Cycle = struct
          (Make_index (Contract_repr.Index))
       (Signature.Public_key)
 
+  module Pending_companion_keys =
+    Make_indexed_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["pending_companion_keys"]
+         end))
+         (Make_index (Contract_repr.Index))
+      (Bls.Public_key)
+
   module Pending_staking_parameters =
     Make_indexed_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
@@ -1363,6 +1380,7 @@ end
 module Already_denounced = Cycle.Already_denounced
 module Dal_already_denounced = Cycle.Dal_already_denounced
 module Pending_consensus_keys = Cycle.Pending_consensus_keys
+module Pending_companion_keys = Cycle.Pending_companion_keys
 module Pending_staking_parameters = Cycle.Pending_staking_parameters
 
 module Stake = struct

@@ -183,6 +183,13 @@ module Contract : sig
        and type value = Signature.Public_key.t
        and type t := Raw_context.t
 
+  (** The active companion key of a delegate *)
+  module Companion_key :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Bls.Public_key.t
+       and type t := Raw_context.t
+
   (** The delegate of a contract, if any. *)
   module Delegate :
     Indexed_data_storage
@@ -468,7 +475,7 @@ module Delegates :
     with type t := Raw_context.t
      and type elt = Signature.Public_key_hash.t
 
-(** Set of all active consensus keys in cycle `current + consensus_rights_delay + 1` *)
+(** Set of all active consensus and companion keys in cycle `current + consensus_rights_delay + 1` *)
 module Consensus_keys :
   Data_set_storage
     with type t := Raw_context.t
@@ -480,6 +487,13 @@ module Pending_consensus_keys :
     with type t := Raw_context.t * Cycle_repr.t
      and type key = Contract_repr.t
      and type value = Signature.public_key
+
+(** The pending companion key of a delegate at the given cycle *)
+module Pending_companion_keys :
+  Indexed_data_storage
+    with type t := Raw_context.t * Cycle_repr.t
+     and type key = Contract_repr.t
+     and type value = Bls.Public_key.t
 
 (** All denunciations of the current and previous cycles that will have an effect
     (slashing, reward), i.e. all below 100%, deferred to the end of their
