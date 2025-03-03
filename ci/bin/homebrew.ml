@@ -38,6 +38,7 @@ let jobs pipeline_type : tezos_job list =
       ~__POS__
       ~name:"oc.install-homebrew"
       ~arch:Amd64
+      ~cpu:Very_high
       ~image
       ~stage
       ~dependencies:(Dependent [Job job_create_homebrew_formula])
