@@ -7,7 +7,7 @@
 //!
 //! Currently just for interperation only, but will expand to cover JIT.
 
-use super::{CACHE_INSTR, ICallLayout, ICallPlaced, run_instr};
+use super::{CACHE_INSTR, ICallPlaced, run_instr};
 use crate::{
     default::ConstDefault,
     jit::{JCall, JIT, state_access::JitStateAccess},
@@ -54,7 +54,7 @@ pub trait BCall<MC: MemoryConfig, M: ManagerBase> {
 }
 
 /// State Layout for Blocks
-pub type BlockLayout<MC> = (Atom<u8>, [ICallLayout<MC>; CACHE_INSTR]);
+pub type BlockLayout = (Atom<u8>, [Atom<Instruction>; CACHE_INSTR]);
 
 /// Functionality required to construct & execute blocks.
 ///
@@ -66,15 +66,13 @@ pub trait Block<MC: MemoryConfig, M: ManagerBase> {
     type BlockBuilder: Default;
 
     /// Bind the block to the given allocated state.
-    fn bind(allocated: AllocatedOf<BlockLayout<MC>, M>) -> Self
+    fn bind(allocated: AllocatedOf<BlockLayout, M>) -> Self
     where
         M::ManagerRoot: ManagerReadWrite;
 
     /// Given a manager morphism `f : &M -> N`, return the layout's allocated structure containing
     /// the constituents of `N` that were produced from the constituents of `&M`.
-    fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
-        &'a self,
-    ) -> AllocatedOf<BlockLayout<MC>, F::Output>;
+    fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(&'a self) -> AllocatedOf<BlockLayout, F::Output>;
 
     /// Ready a block for construction.
     ///
@@ -235,7 +233,7 @@ impl<MC: MemoryConfig, M: ManagerBase> Block<MC, M> for Interpreted<MC, M> {
         self.len_instr.write(0);
     }
 
-    fn bind(space: AllocatedOf<BlockLayout<MC>, M>) -> Self
+    fn bind(space: AllocatedOf<BlockLayout, M>) -> Self
     where
         M::ManagerRoot: ManagerReadWrite,
     {
@@ -245,9 +243,7 @@ impl<MC: MemoryConfig, M: ManagerBase> Block<MC, M> for Interpreted<MC, M> {
         }
     }
 
-    fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
-        &'a self,
-    ) -> AllocatedOf<BlockLayout<MC>, F::Output> {
+    fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(&'a self) -> AllocatedOf<BlockLayout, F::Output> {
         (
             self.len_instr.struct_ref::<F>(),
             self.instr.each_ref().map(|entry| entry.struct_ref::<F>()),
@@ -336,16 +332,14 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
         self.fallback.instr()
     }
 
-    fn bind(allocated: AllocatedOf<BlockLayout<MC>, M>) -> Self {
+    fn bind(allocated: AllocatedOf<BlockLayout, M>) -> Self {
         Self {
             fallback: Interpreted::bind(allocated),
             jit_fn: None,
         }
     }
 
-    fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
-        &'a self,
-    ) -> AllocatedOf<BlockLayout<MC>, F::Output> {
+    fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(&'a self) -> AllocatedOf<BlockLayout, F::Output> {
         self.fallback.struct_ref::<F>()
     }
 

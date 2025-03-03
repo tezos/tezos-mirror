@@ -83,7 +83,7 @@ impl<MC: memory::MemoryConfig, M: backend::ManagerClone> Clone for MachineCoreSt
 /// Layout for the machine state - everything required to fetch & run instructions.
 pub type MachineStateLayout<MC, CL> = (
     MachineCoreStateLayout<MC>,
-    <CL as CacheLayouts>::BlockCacheLayout<MC>,
+    <CL as CacheLayouts>::BlockCacheLayout,
 );
 
 /// The machine state contains everything required to fetch & run instructions.
@@ -94,7 +94,7 @@ pub struct MachineState<
     M: backend::ManagerBase,
 > {
     pub core: MachineCoreState<MC, M>,
-    pub block_cache: BlockCache<CL::BlockCacheLayout<MC>, B, MC, M>,
+    pub block_cache: BlockCache<CL::BlockCacheLayout, B, MC, M>,
 }
 
 impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M> + Clone, M: backend::ManagerClone>

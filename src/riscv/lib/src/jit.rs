@@ -295,7 +295,7 @@ mod tests {
             let mut interpreted =
                 create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
             let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
-            let mut block = create_state!(Interpreted, BlockLayout<M1K>, F, M1K);
+            let mut block = create_state!(Interpreted, BlockLayout, F, M1K);
 
             block.start_block();
             for instr in scenario.iter() {
@@ -368,7 +368,7 @@ mod tests {
             let mut interpreted =
                 create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
             let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
-            let mut block = create_state!(Interpreted, BlockLayout<M1K>, F, M1K);
+            let mut block = create_state!(Interpreted, BlockLayout, F, M1K);
 
             block.start_block();
             for instr in scenario.iter() {
@@ -440,7 +440,7 @@ mod tests {
 
         let mut interpreted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
         let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
-        let mut block = create_state!(Interpreted, BlockLayout<M1K>, F, M1K);
+        let mut block = create_state!(Interpreted, BlockLayout, F, M1K);
 
         block.start_block();
         for instr in scenario.iter() {
@@ -514,7 +514,7 @@ mod tests {
             let mut jit = JIT::<M1K, F::Manager>::new().unwrap();
 
             let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
-            let mut block = create_state!(Interpreted, BlockLayout<M1K>, F, M1K);
+            let mut block = create_state!(Interpreted, BlockLayout, F, M1K);
 
             block.start_block();
             for instr in failure.iter() {
