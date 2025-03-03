@@ -59,19 +59,18 @@ sudo systemctl status octez-node.service
 
 # give some time to the node to create the identity
 # otherwise the octez-client call below will give an error
-sleep 20
+/usr/share/octez-baker/wait-for-node-up.sh
 
 sudo su tezos -c "octez-client gen keys alice"
 key=$(sudo su tezos -c "octez-client show address alice" | grep Hash: | awk '{ print $2 }')
-echo "BAKER_KEY=$key" >> /etc/default/octez-baker-active
+echo "BAKER_KEY=$key" >> /etc/default/octez-baker
 
-sudo systemctl enable octez-baker-active
+sudo systemctl enable octez-baker
 sudo systemctl start octez-baker.service
 
 sudo systemctl status octez-baker.service
 
-sudo systemctl status octez-baker-active.service
-sudo systemctl status octez-baker-next.service
+sudo systemctl status octez-baker.service
 
 sudo su tezos -c "octez-node config show"
 
@@ -79,10 +78,12 @@ echo "-----------------------"
 cat /etc/default/octez-node
 
 echo "-----------------------"
-cat /etc/default/octez-baker-active
+cat /etc/default/octez-baker
 
 echo "-----------------------"
 tail /var/log/tezos/node.log
 
 echo "-----------------------"
-tail /var/log/tezos/baker-active.log
+for logfile in /var/log/tezos/baker-P*.log; do
+  tail "$logfile"
+done
