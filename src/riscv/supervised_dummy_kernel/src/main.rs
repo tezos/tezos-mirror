@@ -77,4 +77,15 @@ fn main() {
         test_write(cstr);
         test_write(c"\n");
     }
+
+    unsafe {
+        let mut buffer = [0u8; 256];
+        libc::getcwd(buffer.as_mut_ptr().cast(), buffer.len());
+
+        let cstr = CStr::from_bytes_with_nul_unchecked(&buffer);
+
+        test_write(c"The current working directory is: ");
+        test_write(cstr);
+        test_write(c"\n");
+    }
 }
