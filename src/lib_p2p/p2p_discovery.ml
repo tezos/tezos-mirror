@@ -43,22 +43,40 @@ module Message = struct
 end
 
 module Answer = struct
-  type t = {
+  type inner_state = {
     my_peer_id : P2p_peer.Id.t;
     pool : pool;
     discovery_port : int;
-    canceler : Lwt_canceler.t;
     trust_discovered_peers : bool;
-    mutable worker : unit Lwt.t;
   }
 
-  let create_socket st =
+  module Name = P2p_workers.Unique_name_maker (struct
+    let base = ["p2p_discovery"; "answer"]
+  end)
+
+  module Types = struct
+    type state = inner_state
+
+    type parameters = {
+      my_peer_id : P2p_peer.Id.t;
+      pool : pool;
+      discovery_port : int;
+      trust_discovered_peers : bool;
+    }
+  end
+
+  module Worker = P2p_workers.Make (Name) (P2p_workers.Loop_request) (Types)
+
+  type t = Worker.activated_worker
+
+  let create_socket worker =
     let open Lwt_syntax in
+    let st = Worker.state worker in
     Lwt.catch
       (fun () ->
         let socket = Lwt_unix.socket PF_INET SOCK_DGRAM 0 in
         Lwt_unix.set_close_on_exec socket ;
-        Lwt_canceler.on_cancel st.canceler (fun () ->
+        Lwt_canceler.on_cancel (Worker.canceler worker) (fun () ->
             let* r = Lwt_utils_unix.safe_close socket in
             Result.iter_error
               (Format.eprintf "Uncaught error: %a\n%!" pp_print_trace)
@@ -73,17 +91,18 @@ module Answer = struct
         let* () = Events.(emit create_socket_error) () in
         Lwt.fail exn)
 
-  let loop st =
+  let loop worker =
     let open Lwt_result_syntax in
+    let st = Worker.state worker in
     let* socket =
-      protect ~canceler:st.canceler (fun () ->
-          Lwt_result.ok @@ create_socket st)
+      protect ~canceler:(Worker.canceler worker) (fun () ->
+          Lwt_result.ok @@ create_socket worker)
     in
     (* Infinite loop, should never exit. *)
     let rec aux () =
       let buf = Bytes.create Message.length in
       let* rd =
-        protect ~canceler:st.canceler (fun () ->
+        protect ~canceler:(Worker.canceler worker) (fun () ->
             let*! content = Lwt_unix.recvfrom socket buf 0 Message.length [] in
             let*! () = Events.(emit message_received) () in
             return content)
@@ -114,35 +133,62 @@ module Answer = struct
     in
     aux ()
 
-  let worker_loop st =
-    let open Lwt_syntax in
-    let* r = loop st in
-    match r with
-    | Error (Canceled :: _) -> return_unit
-    | Error err ->
-        let* () = Events.(emit unexpected_error) ("answer", err) in
-        Error_monad.cancel_with_exceptions st.canceler
-    | Ok () ->
-        let* () = Events.(emit unexpected_exit) () in
-        Error_monad.cancel_with_exceptions st.canceler
+  module Handlers = struct
+    type self = Worker.callback Worker.t
+
+    type launch_error = tztrace
+
+    let on_launch :
+        self ->
+        Name.t ->
+        Types.parameters ->
+        (Types.state, launch_error) result Lwt.t =
+     fun _self _name {my_peer_id; discovery_port; trust_discovered_peers; pool} ->
+      Lwt.return_ok {my_peer_id; discovery_port; trust_discovered_peers; pool}
+
+    let on_request :
+        type response error.
+        self ->
+        (response, error) P2p_workers.Loop_request.t ->
+        (response, error) result Lwt.t =
+     fun self Loop -> loop self
+
+    let on_no_request _self = Lwt.return_unit
+
+    let on_close _self = Lwt.return_unit
+
+    let on_error :
+        type response error.
+        self ->
+        _ ->
+        (response, error) P2p_workers.Loop_request.t ->
+        error ->
+        [`Continue | `Shutdown] tzresult Lwt.t =
+     fun _self _ Loop error ->
+      let open Lwt_result_syntax in
+      match error with
+      | Canceled :: _ -> return `Shutdown
+      | err ->
+          let*! () = Events.(emit unexpected_error) ("answer", err) in
+          return `Shutdown
+
+    (* Considering the request loop should never exit, any completion that is
+       not an error should be considered as an unexpected exit.
+
+       Note that this will be removed by the next commit as [loop] will no
+       longer be an infinite loop, to let the worker handle it. *)
+    let on_completion self _request _result _status =
+      let open Lwt_syntax in
+      let* () = Events.(emit unexpected_exit) () in
+      Worker.trigger_shutdown self ;
+      return_unit
+  end
 
   let create my_peer_id pool ~trust_discovered_peers ~discovery_port =
-    {
-      canceler = Lwt_canceler.create ();
-      my_peer_id;
-      discovery_port;
-      trust_discovered_peers;
-      pool = Pool pool;
-      worker = Lwt.return_unit;
-    }
-
-  let activate st =
-    st.worker <-
-      Lwt_utils.worker
-        "discovery_answer"
-        ~on_event:Internal_event.Lwt_worker_logger.on_event
-        ~run:(fun () -> worker_loop st)
-        ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler)
+    Worker.create
+      ()
+      {my_peer_id; discovery_port; trust_discovered_peers; pool = Pool pool}
+      (module Handlers)
 end
 
 (* ************************************************************ *)
@@ -253,7 +299,8 @@ type t = {answer : Answer.t; sender : Sender.t}
 
 let create ~listening_port ~discovery_port ~discovery_addr
     ~trust_discovered_peers pool my_peer_id =
-  let answer =
+  let open Lwt_result_syntax in
+  let* answer =
     Answer.create my_peer_id pool ~discovery_port ~trust_discovered_peers
   in
   let sender =
@@ -264,10 +311,10 @@ let create ~listening_port ~discovery_port ~discovery_addr
       ~discovery_port
       ~discovery_addr
   in
-  {answer; sender}
+  return {answer; sender}
 
 let activate {answer; sender} =
-  Answer.activate answer ;
+  Answer.Worker.activate answer ;
   Sender.activate sender
 
 let wakeup t = Lwt_condition.signal t.sender.restart_discovery ()
@@ -275,6 +322,6 @@ let wakeup t = Lwt_condition.signal t.sender.restart_discovery ()
 let shutdown t =
   Lwt.join
     [
-      Error_monad.cancel_with_exceptions t.answer.canceler;
+      Answer.Worker.shutdown t.answer;
       Error_monad.cancel_with_exceptions t.sender.canceler;
     ]

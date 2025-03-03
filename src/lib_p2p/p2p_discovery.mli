@@ -49,7 +49,7 @@ val create :
   trust_discovered_peers:bool ->
   ('a, 'b, 'c) P2p_pool.t ->
   P2p_peer.Table.key ->
-  t
+  t tzresult Lwt.t
 
 val activate : t -> unit
 
