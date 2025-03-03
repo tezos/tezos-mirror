@@ -1514,7 +1514,6 @@ module Images = struct
       job_docker_authenticated
         ~__POS__
         ~arch
-        ~skip_docker_initialization:true
         ~stage
         ~name:("oc.docker:rust-sdk-bindings:" ^ arch_to_string_alt arch)
         ~description:

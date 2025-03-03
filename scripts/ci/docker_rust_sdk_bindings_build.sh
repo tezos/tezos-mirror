@@ -36,11 +36,14 @@
 
 set -eu
 
-set -x
-
-# rust_toolchain_image_name is set in the variables of '.gitlab-ci.yml'
+# rust_sdk_bindings_image_name is set in the variables of '.gitlab-ci.yml'
 # shellcheck disable=SC2154
-image_base="${rust_sdk_bindings_image_name}"
+if [ -z "${rust_sdk_bindings_image_name:-}" ]; then
+  echo "Impossible to create rust-sdk-bindings docker image. rust_sdk_bindings_image_name is undefined: It should be defined in .gitlab-ci.yml."
+  exit 1
+else
+  image_base="${rust_sdk_bindings_image_name}"
+fi
 
 image_tag="${rust_sdk_bindings_image_tag:-}"
 if [ -z "$image_tag" ]; then
@@ -52,19 +55,16 @@ image_name="${image_base}:${image_tag}"
 
 # shellcheck source=./scripts/ci/docker_registry.inc.sh
 . ./scripts/ci/docker_registry.inc.sh
-docker_image_ref_tag=$(echo "${CI_COMMIT_REF_NAME}" | sanitizeTag)
+
+if [ -z "${CI_COMMIT_REF_NAME:-}" ]; then
+  echo "Impossible to create rust-sdk-bindings docker image. CI_COMMIT_REF_NAME is undefined."
+  exit 1
+else
+  docker_image_ref_tag=$(echo "${CI_COMMIT_REF_NAME}" | sanitizeTag)
+fi
 
 # Store the image name for jobs that use it.
 echo "rust_sdk_bindings_image_tag=$image_tag" > rust_sdk_bindings_image_tag.env
-
-./scripts/ci/docker_initialize.sh
-
-# Build image unless it already exists in the registry.
-if docker manifest inspect "${image_name}" > /dev/null; then
-  echo "Image ${image_name} already exists in the registry, update tag ${image_base}:${CI_COMMIT_REF_SLUG}."
-  regctl image copy "${image_name}" "${image_base}:${CI_COMMIT_REF_SLUG}"
-  exit 0
-fi
 
 echo "Build ${image_name}"
 
@@ -72,6 +72,7 @@ echo "Build ${image_name}"
   "rust-sdk-bindings" \
   "${image_base}" \
   "${image_tag}" \
+  --push \
   --build-arg=BUILDKIT_INLINE_CACHE=1 \
   --cache-from="${image_base}:${docker_image_ref_tag}" \
   --cache-from="${image_base}:${CI_DEFAULT_BRANCH}" \
@@ -81,6 +82,3 @@ echo "Build ${image_name}"
   --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
   --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
   -t "${image_base}:${docker_image_ref_tag}"
-
-# Push image
-docker push --all-tags "${image_base}"

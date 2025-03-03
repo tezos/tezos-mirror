@@ -95,7 +95,8 @@ oc.docker:rust-sdk-bindings:amd64:
   - gcp
   dependencies: []
   timeout: 60 minutes
-  before_script: []
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/docker_rust_sdk_bindings_build.sh
   services:
