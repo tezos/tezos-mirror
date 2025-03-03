@@ -34,7 +34,7 @@ let name_of = function
   | Etherlink_operator -> "etherlink-operator"
   | Etherlink_dal_operator -> "etherlink-dal-operator"
   | Etherlink_dal_observer {slot_index} ->
-      Format.asprintf "etherlink-dal-observer-%d" slot_index
+      Format.asprintf "etherlink-dal-operator-%d" slot_index
   | Etherlink_producer i -> Format.asprintf "etherlink-producer-%d" i
 
 module Disconnect = struct
@@ -1870,7 +1870,11 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
                let* node =
                  Node.init
                    ~name
-                   ~arguments:[Peer bootstrap.node_p2p_endpoint]
+                   ~arguments:
+                     [
+                       Peer bootstrap.node_p2p_endpoint;
+                       History_mode (Rolling (Some 79));
+                     ]
                    network
                    agent
                in
@@ -2019,8 +2023,8 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
         time_between_blocks;
         sequencer = account.alias;
         genesis_timestamp = None;
-        max_blueprints_lag = None;
-        max_blueprints_ahead = None;
+        max_blueprints_lag = Some 300;
+        max_blueprints_ahead = Some 2000;
         max_blueprints_catchup = None;
         catchup_cooldown = None;
         max_number_of_chunks = None;
@@ -2050,9 +2054,11 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
                    JSON.annotate ~origin:"patch-config:cors_origins"
                    @@ `A [`String "*"]))
           json
-        |> JSON.update "experimental_features" (fun _ ->
-               JSON.annotate ~origin:"patch-config:experimental_features"
-               @@ `O [("enable_websocket", `Bool true)]))
+        |> Evm_node.patch_config_with_experimental_feature
+             ~enable_websocket:true
+             ~drop_duplicate_when_injection:true
+             ~blueprints_publisher_order_enabled:true
+             ())
       ~name:(Format.asprintf "etherlink-%s-evm-node" name)
       ~mode
       endpoint
@@ -2164,9 +2170,11 @@ let init_etherlink_producer_setup operator name ~bootstrap agent =
   let* () =
     Floodgate.Agent.run
       ~rpc_endpoint:endpoint
-      ~max_active_eoa:150
-      ~max_transaction_batch_length:50
+      ~max_active_eoa:210
+      ~max_transaction_batch_length:70
+      ~tick_interval:1.0
       ~controller:Tezt_etherlink.Eth_account.bootstrap_accounts.(0)
+      ~base_fee_factor:1000.0
       agent
   in
   return ()
@@ -2511,7 +2519,7 @@ let update_bakers_infos t =
   t.versions <- versions ;
   Lwt.return_unit
 
-let on_new_level t ?etherlink level =
+let on_new_level t level =
   let* () = wait_for_level t level in
   toplog "Start process level %d" level ;
   clean_up t (level - t.configuration.blocks_history) ;
@@ -2524,7 +2532,7 @@ let on_new_level t ?etherlink level =
       ~endpoint:t.bootstrap.node_rpc_endpoint
       ~level
       ~etherlink_operators:
-        (match etherlink with
+        (match t.etherlink with
         | None -> []
         | Some setup ->
             setup.operator.account :: setup.operator.batching_operators)
