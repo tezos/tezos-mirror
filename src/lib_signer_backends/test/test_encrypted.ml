@@ -228,7 +228,7 @@ let test_random _switch () =
   let* r =
     List.iter_es
       test_random
-      Tezos_crypto.Signature.[Ed25519; Secp256k1; P256; Bls_aug]
+      Tezos_crypto.Signature.[Ed25519; Secp256k1; P256; Bls]
   in
   match r with
   | Ok _ -> Lwt.return_unit

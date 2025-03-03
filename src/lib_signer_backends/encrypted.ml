@@ -135,7 +135,7 @@ module Raw = struct
         | None ->
             failwith
               "Corrupted wallet, deciphered key is not a valid P256 secret key")
-    | Some bytes, Encrypted_sk Signature.Bls_aug -> (
+    | Some bytes, Encrypted_sk Signature.Bls -> (
         match
           Data_encoding.Binary.of_bytes_opt
             Signature.Bls.Secret_key.encoding
@@ -303,7 +303,7 @@ let decrypt_payload cctxt ?name encrypted_sk =
     | Some (Encrypted_p256 encrypted_sk) ->
         return (Encrypted_sk Signature.P256, encrypted_sk)
     | Some (Encrypted_bls12_381 encrypted_sk) ->
-        return (Encrypted_sk Signature.Bls_aug, encrypted_sk)
+        return (Encrypted_sk Signature.Bls, encrypted_sk)
     | _ -> failwith "Not a Base58Check-encoded encrypted key"
   in
   let* o = noninteractive_decrypt_loop algo ~encrypted_sk !passwords in

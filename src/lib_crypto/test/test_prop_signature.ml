@@ -191,6 +191,6 @@ let () =
         (Ed25519, "Ed25519");
         (Secp256k1, "Secp256k1");
         (P256, "P256");
-        (Bls_aug, "Bls");
+        (Bls, "Bls");
       ]
   |> Alcotest.run ~__FILE__ "tezos-crypto-prop-signature"

@@ -635,7 +635,7 @@ let signature_size_of_algo : Tezos_crypto.Signature.algo -> int = function
   | Ed25519 -> Tezos_crypto.Signature.Ed25519.size
   | Secp256k1 -> Tezos_crypto.Signature.Secp256k1.size
   | P256 -> Tezos_crypto.Signature.P256.size
-  | Bls_aug ->
+  | Bls ->
       (* BLS signatures in operations are encoded with 2 extra bytes: a [ff]
          prefix and a tag [03]. *)
       Tezos_crypto.Signature.Bls.size + 2
@@ -1410,7 +1410,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
     | Ed25519 _ -> Tezos_crypto.Signature.Ed25519
     | Secp256k1 _ -> Secp256k1
     | P256 _ -> P256
-    | Bls _ -> Bls_aug
+    | Bls _ -> Bls
   in
   let apply_specified_options counter op =
     Annotated_manager_operation.set_source source op >>? fun op ->
