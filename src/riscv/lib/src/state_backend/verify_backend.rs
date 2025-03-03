@@ -56,7 +56,7 @@ impl ManagerBase for Verifier {
 
     type ManagerRoot = Self;
 
-    fn enrich_cell<V: super::EnrichedValueLinked<Self>>(
+    fn enrich_cell<V: super::EnrichedValueLinked>(
         underlying: Self::Region<V::E, 1>,
     ) -> Self::EnrichedCell<V> {
         EnrichedCell { underlying }
@@ -133,10 +133,10 @@ impl ManagerRead for Verifier {
         *Self::enriched_cell_ref_stored(cell)
     }
 
-    fn enriched_cell_read_derived<V>(cell: &Self::EnrichedCell<V>) -> V::D<Self::ManagerRoot>
+    fn enriched_cell_read_derived<V>(cell: &Self::EnrichedCell<V>) -> V::D
     where
-        V: super::EnrichedValueLinked<Self::ManagerRoot>,
-        V::D<Self::ManagerRoot>: Copy,
+        V: super::EnrichedValueLinked,
+        V::D: Copy,
     {
         let stored = Self::enriched_cell_ref_stored(cell);
         V::derive(stored)
@@ -210,7 +210,7 @@ impl ManagerWrite for Verifier {
 
     fn enriched_cell_write<V>(cell: &mut Self::EnrichedCell<V>, value: V::E)
     where
-        V: super::EnrichedValueLinked<Self>,
+        V: super::EnrichedValueLinked,
     {
         Self::region_write(&mut cell.underlying, 0, value);
     }
@@ -243,7 +243,7 @@ impl ManagerClone for Verifier {
     where
         V: EnrichedValue,
         V::E: Copy,
-        V::D<Self>: Copy,
+        V::D: Copy,
     {
         cell.clone()
     }
@@ -586,7 +586,7 @@ mod tests {
     }
 
     /// Construct a [`state_backend::EnrichedCell`] from a proptest value.
-    fn arb_to_enriched_cell<V: EnrichedValueLinked<Verifier>>(
+    fn arb_to_enriched_cell<V: EnrichedValueLinked>(
         value: Option<V::E>,
     ) -> state_backend::EnrichedCell<V, Verifier> {
         let cell = match value {
@@ -614,7 +614,7 @@ mod tests {
         impl EnrichedValue for Ident {
             type E = u64;
 
-            type D<M: ManagerBase> = Derived;
+            type D = Derived;
         }
 
         proptest::proptest!(|(initial: Option<u64>)| {
@@ -624,7 +624,7 @@ mod tests {
             proptest::prop_assert_eq!(stored, initial);
 
             let derived = handle_not_found(|| cell.read_derived()).ok();
-            let expected_derived = initial.as_ref().map(<Ident as EnrichedValueLinked<Verifier>>::derive);
+            let expected_derived = initial.as_ref().map(<Ident as EnrichedValueLinked>::derive);
             proptest::prop_assert_eq!(derived, expected_derived);
 
             let new_value = rand::random();
@@ -633,7 +633,7 @@ mod tests {
             let read_value = cell.read_stored();
             proptest::prop_assert_eq!(read_value, new_value);
 
-            let new_derived = <Ident as EnrichedValueLinked<Verifier>>::derive(&new_value);
+            let new_derived = <Ident as EnrichedValueLinked>::derive(&new_value);
             let read_derived = cell.read_derived();
             proptest::prop_assert_eq!(read_derived, new_derived);
         });

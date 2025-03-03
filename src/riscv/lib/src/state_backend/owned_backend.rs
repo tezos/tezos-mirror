@@ -33,13 +33,11 @@ impl ManagerBase for Owned {
 
     type DynRegion<const LEN: usize> = Box<[u8; LEN]>;
 
-    type EnrichedCell<V: EnrichedValue> = (V::E, V::D<Self>);
+    type EnrichedCell<V: EnrichedValue> = (V::E, V::D);
 
     type ManagerRoot = Self;
 
-    fn enrich_cell<V: EnrichedValueLinked<Self>>(
-        cell: Self::Region<V::E, 1>,
-    ) -> Self::EnrichedCell<V> {
+    fn enrich_cell<V: EnrichedValueLinked>(cell: Self::Region<V::E, 1>) -> Self::EnrichedCell<V> {
         let [value] = cell;
         let derived = V::derive(&value);
         (value, derived)
@@ -127,9 +125,10 @@ impl ManagerRead for Owned {
         cell.0
     }
 
-    fn enriched_cell_read_derived<V: EnrichedValue>(cell: &Self::EnrichedCell<V>) -> V::D<Self>
+    fn enriched_cell_read_derived<V>(cell: &Self::EnrichedCell<V>) -> V::D
     where
-        V::D<Self>: Copy,
+        V: EnrichedValue,
+        V::D: Copy,
     {
         cell.1
     }
@@ -195,7 +194,7 @@ impl ManagerWrite for Owned {
 
     fn enriched_cell_write<V>(cell: &mut Self::EnrichedCell<V>, value: V::E)
     where
-        V: EnrichedValueLinked<Self>,
+        V: EnrichedValueLinked,
     {
         let derived = V::derive(&value);
 
@@ -329,7 +328,7 @@ impl ManagerClone for Owned {
     fn clone_enriched_cell<V: EnrichedValue>(cell: &Self::EnrichedCell<V>) -> Self::EnrichedCell<V>
     where
         V::E: Copy,
-        V::D<Self>: Copy,
+        V::D: Copy,
     {
         #[allow(clippy::clone_on_copy)]
         cell.clone()
@@ -435,7 +434,7 @@ pub mod test_helpers {
 
         impl EnrichedValue for Enriching {
             type E = u64;
-            type D<M: ManagerBase + ?Sized> = T;
+            type D = T;
         }
 
         #[derive(Clone, Copy)]
@@ -482,7 +481,7 @@ pub mod test_helpers {
 
         impl EnrichedValue for Enriching {
             type E = u64;
-            type D<M: ManagerBase + ?Sized> = Fun;
+            type D = Fun;
         }
 
         impl<'a> From<&'a u64> for Fun {

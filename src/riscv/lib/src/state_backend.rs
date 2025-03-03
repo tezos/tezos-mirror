@@ -96,25 +96,27 @@ pub use trans::*;
 /// to derive lazily.
 ///
 /// This derived value does not form part of any stored state/commitments.
-pub trait EnrichedValue: 'static {
+pub trait EnrichedValue {
+    /// Type of the stored value which we want to enrich
     type E: 'static;
-    type D<M: ManagerBase>;
+
+    /// Type of the derived value that enriches the stored value
+    type D;
 }
 
-/// Specifies that there exists a path to derive `V::D` from `&V::E`,
-/// for a given manager.
-pub trait EnrichedValueLinked<M: ManagerBase>: EnrichedValue {
+/// Specifies that there exists a path to derive `V::D` from `&V::E`
+pub trait EnrichedValueLinked: EnrichedValue {
     /// Construct the derived value from the stored value, maps to
     /// the `From` trait by default.
-    fn derive(v: &Self::E) -> Self::D<M>;
+    fn derive(v: &Self::E) -> Self::D;
 }
 
-impl<Value, M: ManagerBase> EnrichedValueLinked<M> for Value
+impl<Value> EnrichedValueLinked for Value
 where
     Value: EnrichedValue,
-    Value::D<M>: for<'a> From<&'a Value::E>,
+    Value::D: for<'a> From<&'a Value::E>,
 {
-    fn derive(v: &Self::E) -> Self::D<M> {
+    fn derive(v: &Self::E) -> Self::D {
         v.into()
     }
 }
@@ -142,9 +144,7 @@ pub trait ManagerBase: Sized {
     type ManagerRoot: ManagerBase;
 
     /// Upgrade a single-element region to an enriched cell.
-    fn enrich_cell<V: EnrichedValueLinked<Self::ManagerRoot>>(
-        cell: Self::Region<V::E, 1>,
-    ) -> Self::EnrichedCell<V>;
+    fn enrich_cell<V: EnrichedValueLinked>(cell: Self::Region<V::E, 1>) -> Self::EnrichedCell<V>;
 
     /// Obtain a reference to the underlying region of an enriched cell.
     fn as_devalued_cell<V: EnrichedValue>(cell: &Self::EnrichedCell<V>) -> &Self::Region<V::E, 1>;
@@ -196,10 +196,10 @@ pub trait ManagerRead: ManagerBase {
         V::E: Copy;
 
     /// Read the derived value of the enriched cell.
-    fn enriched_cell_read_derived<V>(cell: &Self::EnrichedCell<V>) -> V::D<Self::ManagerRoot>
+    fn enriched_cell_read_derived<V>(cell: &Self::EnrichedCell<V>) -> V::D
     where
-        V: EnrichedValueLinked<Self::ManagerRoot>,
-        V::D<Self::ManagerRoot>: Copy;
+        V: EnrichedValueLinked,
+        V::D: Copy;
 
     /// Obtain a reference to the value contained in the enriched cell.
     fn enriched_cell_ref_stored<V>(cell: &Self::EnrichedCell<V>) -> &V::E
@@ -236,7 +236,7 @@ pub trait ManagerWrite: ManagerBase<ManagerRoot = Self> {
     /// Update the value contained in an enriched cell. The derived value will be recalculated.
     fn enriched_cell_write<V>(cell: &mut Self::EnrichedCell<V>, value: V::E)
     where
-        V: EnrichedValueLinked<Self>;
+        V: EnrichedValueLinked;
 }
 
 /// Manager with capabilities that require both read and write
@@ -297,7 +297,7 @@ pub trait ManagerClone: ManagerBase {
     where
         V: EnrichedValue,
         V::E: Copy,
-        V::D<Self>: Copy;
+        V::D: Copy;
 }
 
 /// Manager wrapper around `M` whose regions are immutable references to regions of `M`
@@ -312,9 +312,7 @@ impl<'backend, M: ManagerBase> ManagerBase for Ref<'backend, M> {
 
     type ManagerRoot = M::ManagerRoot;
 
-    fn enrich_cell<V: EnrichedValueLinked<Self::ManagerRoot>>(
-        cell: Self::Region<V::E, 1>,
-    ) -> Self::EnrichedCell<V> {
+    fn enrich_cell<V: EnrichedValueLinked>(cell: Self::Region<V::E, 1>) -> Self::EnrichedCell<V> {
         cell
     }
 
@@ -382,11 +380,10 @@ impl<M: ManagerRead> ManagerRead for Ref<'_, M> {
         M::region_ref(cell, 0)
     }
 
-    fn enriched_cell_read_derived<V: EnrichedValueLinked<Self::ManagerRoot>>(
-        cell: &Self::EnrichedCell<V>,
-    ) -> V::D<Self::ManagerRoot>
+    fn enriched_cell_read_derived<V>(cell: &Self::EnrichedCell<V>) -> V::D
     where
-        V::D<Self::ManagerRoot>: Copy,
+        V: EnrichedValueLinked,
+        V::D: Copy,
     {
         V::derive(M::region_ref(cell, 0))
     }
