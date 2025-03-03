@@ -11,8 +11,8 @@ if [ -z "${S3_BUCKET:-}" ]; then
   exit 1
 fi
 
-# We use a file to list releases so that we can control what is actually displayed.
-Releases_list="releases_list.json"
+# We use a file to list versions so that we can control what is actually displayed.
+versions_list_filename="versions.json"
 
 if [ -n "${AWS_KEY_RELEASE_PUBLISH}" ] && [ -n "${AWS_SECRET_RELEASE_PUBLISH}" ]; then
   export AWS_ACCESS_KEY_ID="${AWS_KEY_RELEASE_PUBLISH}"
@@ -35,15 +35,15 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
     #TODO: Add to docker image ?
     sudo apk add aws-cli gawk jq
 
-    aws s3 cp s3://"${S3_BUCKET}"/"$Releases_list" "./$Releases_list"
+    aws s3 cp s3://"${S3_BUCKET}"/"$versions_list_filename" "./$versions_list_filename"
 
-    # Add the new version to the $versions_list JSON file.
+    # Add the new version to the $versions_list_filename JSON file.
     # Since jq cannot modify the file in-place, we write to a temporary file first.
     if [ -n "${gitlab_release_rc_version}" ]; then
       rc="${gitlab_release_rc_version}"
-      jq ". += [{\"major\":${gitlab_release_major_version}, \"minor\":${gitlab_release_minor_version},\"rc\":${rc}}]" "./${Releases_list}" > "./tmp.json" && mv "./tmp.json" "./${Releases_list}"
+      jq ". += [{\"major\":${gitlab_release_major_version}, \"minor\":${gitlab_release_minor_version},\"rc\":${rc}}]" "./${versions_list_filename}" > "./tmp.json" && mv "./tmp.json" "./${versions_list_filename}"
     else
-      jq ". += [{\"major\":${gitlab_release_major_version}, \"minor\":${gitlab_release_minor_version}}]" "./${Releases_list}" > "./tmp.json" && mv "./tmp.json" "./${Releases_list}"
+      jq ". += [{\"major\":${gitlab_release_major_version}, \"minor\":${gitlab_release_minor_version}}]" "./${versions_list_filename}" > "./tmp.json" && mv "./tmp.json" "./${versions_list_filename}"
     fi
 
     # Upload binaries to S3 bucket
@@ -72,10 +72,10 @@ else
   echo "No tag found. No asset will be added to the release page."
 fi
 
-"${script_dir}"/create_release_page.sh "$Releases_list"
+"${script_dir}"/create_release_page.sh "$versions_list_filename"
 
 echo "Syncing files to remote s3 bucket"
-if aws s3 cp "./docs/release_page/style.css" "s3://${S3_BUCKET}/" --region "${REGION}" && aws s3 cp "./index.html" "s3://${S3_BUCKET}/" --region "${REGION}" && aws s3 cp "./$Releases_list" "s3://${S3_BUCKET}/" --region "${REGION}"; then
+if aws s3 cp "./docs/release_page/style.css" "s3://${S3_BUCKET}/" --region "${REGION}" && aws s3 cp "./index.html" "s3://${S3_BUCKET}/" --region "${REGION}" && aws s3 cp "./$versions_list_filename" "s3://${S3_BUCKET}/" --region "${REGION}"; then
   echo "Deployment successful!"
 else
   echo "Deployment failed. Please check the configuration and try again."
