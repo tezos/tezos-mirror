@@ -1633,6 +1633,24 @@ let jobs pipeline_type =
       in
       [job_test_sdk_rust]
     in
+    let jobs_sdk_bindings : tezos_job list =
+      let job_test_sdk_bindings =
+        job
+          ~__POS__
+          ~name:"test_sdk_bindings"
+          ~image:Images.rust_toolchain
+          ~stage:Stages.test
+          ~dependencies:dependencies_needs_start
+          ~rules:
+            (make_rules ~dependent:true ~changes:changeset_test_sdk_bindings ())
+          [
+            "make -C contrib/sdk-bindings check";
+            "make -C contrib/sdk-bindings test";
+          ]
+        |> enable_cargo_cache |> enable_sccache
+      in
+      [job_test_sdk_bindings]
+    in
     let jobs_kernels : tezos_job list =
       let make_job_kernel ?dependencies ?(stage = Stages.test) ~__POS__ ~name
           ~changes script =
@@ -1795,8 +1813,8 @@ let jobs pipeline_type =
             job_homebrew_trigger_full;
           ]
     in
-    jobs_debian @ jobs_misc @ jobs_sdk_rust @ jobs_kernels @ jobs_unit
-    @ jobs_install_octez @ jobs_tezt
+    jobs_debian @ jobs_misc @ jobs_sdk_rust @ jobs_sdk_bindings @ jobs_kernels
+    @ jobs_unit @ jobs_install_octez @ jobs_tezt
   in
 
   (*Coverage jobs *)

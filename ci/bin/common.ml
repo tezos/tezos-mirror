@@ -570,6 +570,14 @@ let changeset_test_sdk_rust =
     @ changeset_images (* Run if the [rust-toolchain] image is updated *)
     @ make ["sdk/rust/**/*"])
 
+(* TODO: add sdk/rust to the changesets once the bindings code depends
+   on the Rust SDK: https://linear.app/tezos/issue/SDK-59. *)
+let changeset_test_sdk_bindings =
+  Changeset.(
+    changeset_base
+    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    @ make ["contrib/sdk-bindings"])
+
 let changeset_test_kernels =
   Changeset.(
     changeset_base
