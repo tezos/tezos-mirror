@@ -643,14 +643,6 @@ module Scheduling = struct
       ~pp2:Round.pp
       ("round", Round.encoding)
 
-  let proposal_already_injected =
-    declare_0
-      ~section
-      ~name:"proposal_already_injected"
-      ~level:Debug
-      ~msg:"proposal already injected for next level, skipping..."
-      ()
-
   let next_potential_slot =
     declare_4
       ~section
