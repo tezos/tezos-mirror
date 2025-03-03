@@ -87,7 +87,6 @@ impl Decodable for TransactionContent {
     }
 }
 
-#[allow(dead_code)]
 #[derive(PartialEq, Debug, Clone)]
 pub enum Transactions {
     EthTxs(Vec<Transaction>),

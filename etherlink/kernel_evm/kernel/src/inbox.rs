@@ -7,7 +7,7 @@
 
 use crate::blueprint_storage::store_sequencer_blueprint;
 use crate::bridge::Deposit;
-use crate::chains::ChainConfig;
+use crate::chains::{ChainConfig, ChainFamily};
 use crate::configuration::{DalConfiguration, TezosContracts};
 use crate::dal::fetch_and_parse_sequencer_blueprint_from_dal;
 use crate::dal_slot_import_signal::DalSlotImportSignals;
@@ -27,7 +27,8 @@ use crate::storage::{
 use crate::tick_model::constants::TICKS_FOR_BLUEPRINT_INTERCEPT;
 use crate::tick_model::maximum_ticks_for_sequencer_chunk;
 use crate::transaction::{
-    Transaction, TransactionContent, Transactions, Transactions::EthTxs,
+    Transaction, TransactionContent, Transactions,
+    Transactions::{EthTxs, TezTxs},
 };
 use crate::upgrade::*;
 use crate::Error;
@@ -476,9 +477,11 @@ pub fn read_proxy_inbox<Host: Runtime>(
     garbage_collect_blocks: bool,
     chain_configuration: &ChainConfig,
 ) -> Result<Option<ProxyInboxContent>, anyhow::Error> {
-    let mut res = ProxyInboxContent {
-        transactions: EthTxs(vec![]),
+    let transactions = match ChainConfig::get_chain_family(chain_configuration) {
+        ChainFamily::Evm => EthTxs(vec![]),
+        ChainFamily::Michelson => TezTxs,
     };
+    let mut res = ProxyInboxContent { transactions };
     // The mutable variable is used to retrieve the information of whether the
     // inbox was empty or not. As we consume all the inbox in one go, if the
     // variable remains true, that means that the inbox was already consumed
