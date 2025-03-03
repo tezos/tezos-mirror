@@ -18,7 +18,7 @@ Package: octez-node
 Architecture: amd64 arm64
 Depends: adduser,
   logrotate,
-  octez-zcash-params,
+  octez-zcash-params ( = 1.0.0 ),
   ${misc:Depends},
   ${shlibs:Depends},
   debconf (>= 0.5) | debconf-2.0,

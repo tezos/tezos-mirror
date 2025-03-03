@@ -125,12 +125,9 @@ octez (0.0.1-1) unstable; urgency=medium
  -- Nomadic Labs <pkg@nomadic-labs.com>  Thu, 06 Jul 2017 09:19:24 +0000
 
 EOF
-cp scripts/packaging/octez/debian/changelog scripts/packaging/octez-data/debian/changelog
 
 # Set a version for the debian package we are building.
 debchange --changelog scripts/packaging/octez/debian/changelog \
-  --newversion "$DEBVERSION" "$DEBCHANGELOG"
-debchange --changelog scripts/packaging/octez-data/debian/changelog \
   --newversion "$DEBVERSION" "$DEBCHANGELOG"
 
 TARGET=all

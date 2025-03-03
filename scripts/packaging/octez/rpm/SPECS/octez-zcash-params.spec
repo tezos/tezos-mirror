@@ -1,8 +1,5 @@
 Name: octez-zcash-params
 Version: %{version}
-%if "%{epoch}" != ""
-Epoch: %{epoch}
-%endif
 Release: 1%{?dist}
 Summary: Octez zcash parameters
 License: MIT
