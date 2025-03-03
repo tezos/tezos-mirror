@@ -385,9 +385,17 @@ pub enum InstrCacheable {
     /// `BNE` - Sets the target address if registers contain different values,
     /// otherwise proceeds to the next instruction address.
     Bne(SBTypeArgs),
+    /// `BLT` - Sets branching address if `val(rs1) < val(rs2)` in signed comparison,
+    /// otherwise proceeds to the next instruction address.
     Blt(SBTypeArgs),
+    /// `BGE` - Sets branching address if `val(rs1) >= val(rs2)` in signed comparison,
+    /// otherwise proceeds to the next instruction address
     Bge(SBTypeArgs),
+    /// `BLTU` - Sets branching address if `val(rs1) < val(rs2)` in unsigned comparison,
+    /// otherwise proceeds to the next instruction address.
     Bltu(SBTypeArgs),
+    /// `BGEU` - Sets branching address if `val(rs1) >= val(rs2)` in unsigned comparison,
+    /// otherwise proceeds to the next instruction address
     Bgeu(SBTypeArgs),
 
     // RV64I U-type instructions
