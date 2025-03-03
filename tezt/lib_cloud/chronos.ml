@@ -16,7 +16,7 @@ type time = {
   day_of_week : int option; (* 0-6, Sunday = 0 *)
 }
 
-type task = {time : time; action : unit -> unit Lwt.t}
+type task = {name : string; time : time; action : unit -> unit Lwt.t}
 
 type t = {
   tasks : task list;
@@ -63,13 +63,13 @@ let time_to_string spec =
       to_string spec.day_of_week;
     ]
 
-let task ~tm ~action =
+let task ~name ~tm ~action =
   let time = time_of_string tm in
   let is_valid = validate_time time in
   if not is_valid then
     failwith
       (Format.asprintf "Invalid time specification: %s" (time_to_string time)) ;
-  {time; action}
+  {name; time; action}
 
 let init ~tasks =
   let shutdown, trigger_shutdown = Lwt.task () in
@@ -92,12 +92,33 @@ let should_run task tm =
 let run ~now_tm t =
   Lwt_list.iter_p
     (fun task ->
-      if should_run task now_tm then
-        Lwt.catch (fun () -> task.action ()) (fun _exn -> Lwt.return_unit)
+      if should_run task now_tm then (
+        Log.info "chronos.%s: starting task" task.name ;
+        Lwt.catch
+          (fun () ->
+            let* () = task.action () in
+            Log.info "chronos.%s: task successfully executed" task.name ;
+            Lwt.return_unit)
+          (fun exn ->
+            Log.error
+              "chronos.%s: task failed with the following exception: %s"
+              task.name
+              (Printexc.to_string exn) ;
+            Lwt.return_unit))
       else Lwt.return_unit)
     t.tasks
 
 let start t =
+  Log.info
+    "chronos: starting with %d tasks:@;%a"
+    (List.length t.tasks)
+    (Format.pp_print_list ~pp_sep:Format.pp_print_newline (fun ppf task ->
+         Format.fprintf
+           ppf
+           "- '%s' with time '%s'"
+           task.name
+           (time_to_string task.time)))
+    t.tasks ;
   let rec loop last_tm =
     let now_tm = Unix.(gmtime (gettimeofday ())) in
     let* () =
@@ -115,4 +136,6 @@ let start t =
          t.shutdown;
        ])
 
-let shutdown t = Lwt.wakeup t.trigger_shutdown ()
+let shutdown t =
+  Log.info "chronos: shutdown" ;
+  Lwt.wakeup t.trigger_shutdown ()
