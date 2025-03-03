@@ -127,3 +127,34 @@ impl TryFrom<u64> for FileDescriptorWriteable {
         }
     }
 }
+
+/// The number (count) of file descriptors
+pub struct FileDescriptorCount(u64);
+
+/// Hard limit on the number of file descriptors that a system call can work with
+///
+/// We also use this constant to implictly limit how much memory can be associated with a system
+/// call. For example, `ppoll` takes a pointer to an array of `struct pollfd`. If we don't limit
+/// the length of that array, then we might read an arbitrary amount of memory. This impacts the
+/// proof size dramatically as everything read would also be in the proof.
+const RLIMIT_NOFILE: u64 = 512;
+
+impl TryFrom<u64> for FileDescriptorCount {
+    type Error = Error;
+
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        // Enforce a limit on the number of file descriptors to prevent proof-size explosion.
+        // This is akin to enforcing RLIMIT_NOFILE in a real system.
+        if value > RLIMIT_NOFILE {
+            return Err(Error::InvalidArgument);
+        }
+        Ok(FileDescriptorCount(value))
+    }
+}
+
+impl FileDescriptorCount {
+    /// Extract the file descriptor count as a [`u64`].
+    pub fn count(&self) -> u64 {
+        self.0
+    }
+}

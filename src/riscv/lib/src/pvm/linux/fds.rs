@@ -18,14 +18,6 @@ use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerRead;
 use crate::state_backend::ManagerReadWrite;
 
-/// Hard limit on the number of file descriptors that a system call can work with
-///
-/// We also use this constant to implictly limit how much memory can be associated with a system
-/// call. For example, `ppoll` takes a pointer to an array of `struct pollfd`. If we don't limit
-/// the length of that array, then we might read an arbitrary amount of memory. This impacts the
-/// proof size dramatically as everything read would also be in the proof.
-const RLIMIT_NOFILE: u64 = 512;
-
 impl<M: ManagerBase> SupervisorState<M> {
     /// Write to a file descriptor.
     fn write_to_fd(
@@ -173,21 +165,18 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// example, the `timeout` parameter is ignored entirely.
     ///
     /// See: <https://man7.org/linux/man-pages/man2/poll.2.html>
-    pub(super) fn handle_ppoll(&mut self, core: &mut MachineCoreState<impl MemoryConfig, M>) -> bool
+    pub(super) fn handle_ppoll(
+        &mut self,
+        core: &mut MachineCoreState<impl MemoryConfig, M>,
+    ) -> Result<bool, Error>
     where
         M: ManagerReadWrite,
     {
         let fd_ptrs = core.hart.xregisters.read(registers::a0);
-        let num_fds = core.hart.xregisters.read(registers::a1);
-
-        // Enforce a limit on the number of file descriptors to prevent proof-size explosion.
-        // This is akin to enforcing RLIMIT_NOFILE in a real system.
-        if num_fds > RLIMIT_NOFILE {
-            core.hart
-                .xregisters
-                .write_system_call_error(Error::InvalidArgument);
-            return true;
-        }
+        let num_fds = core
+            .hart
+            .xregisters
+            .try_read::<parameters::FileDescriptorCount>(registers::a1)?;
 
         // The file descriptors are passed as `struct pollfd[]`.
         //
@@ -208,7 +197,7 @@ impl<M: ManagerBase> SupervisorState<M> {
         /// offsetof(struct pollfd, revents)
         const OFFSET_REVENTS: u64 = 6;
 
-        let Ok(fds) = (0..num_fds)
+        let Ok(fds) = (0..num_fds.count())
             .map(|i| {
                 core.main_memory.read::<i32>(
                     i.wrapping_mul(SIZE_POLLFD)
@@ -218,32 +207,27 @@ impl<M: ManagerBase> SupervisorState<M> {
             })
             .collect::<Result<Vec<_>, _>>()
         else {
-            core.hart.xregisters.write_system_call_error(Error::Fault);
-            return true;
+            return Err(Error::Fault);
         };
 
         // Only support the initial ppoll that Musl and Rust's init code issue
         if !fds.iter().all(|fd| [0, 1, 2].contains(fd)) {
-            core.hart
-                .xregisters
-                .write_system_call_error(Error::NoSystemCall);
-            return true;
+            return Err(Error::NoSystemCall);
         }
 
-        for i in 0..num_fds {
+        for i in 0..num_fds.count() {
             let revents_ptr = i
                 .wrapping_mul(SIZE_POLLFD)
                 .wrapping_add(OFFSET_REVENTS)
                 .wrapping_add(fd_ptrs);
-            let Ok(()) = core.main_memory.write_all(revents_ptr, &0u16.to_le_bytes()) else {
-                core.hart.xregisters.write_system_call_error(Error::Fault);
-                return true;
-            };
+
+            core.main_memory
+                .write_all(revents_ptr, &0u16.to_le_bytes())?;
         }
 
         // Indicate success by returning 0
         core.hart.xregisters.write(registers::a0, 0);
 
-        true
+        Ok(true)
     }
 }

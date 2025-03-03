@@ -411,7 +411,7 @@ impl<M: ManagerBase> SupervisorState<M> {
             OPENAT => self.handle_openat(),
             WRITE => self.handle_write(core, hooks),
             WRITEV => self.handle_writev(core, hooks),
-            PPOLL => return self.handle_ppoll(core),
+            PPOLL => self.handle_ppoll(core),
             READLINKAT => self.handle_readlinkat(),
             EXIT | EXITGROUP => self.handle_exit(core),
             SET_TID_ADDRESS => self.handle_set_tid_address(core),
