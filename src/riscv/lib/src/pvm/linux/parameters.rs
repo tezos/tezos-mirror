@@ -107,3 +107,23 @@ impl TryFrom<u64> for SigsetTSizeEightBytes {
         }
     }
 }
+
+/// A valid file descriptor, see write(2)
+pub enum FileDescriptorWriteable {
+    StandardOutput,
+    StandardError,
+}
+
+impl TryFrom<u64> for FileDescriptorWriteable {
+    type Error = Error;
+
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        // Check if the file descriptor is valid and can be written to.
+        // In our case, it's just standard output (1) and standard error (2).
+        match value {
+            1 => Ok(FileDescriptorWriteable::StandardOutput),
+            2 => Ok(FileDescriptorWriteable::StandardError),
+            _ => Err(Error::BadFileDescriptor),
+        }
+    }
+}

@@ -12,6 +12,8 @@ use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::registers;
 use crate::pvm::PvmHooks;
 use crate::pvm::linux::PAGE_SIZE;
+use crate::pvm::linux::parameters;
+use crate::pvm::linux::parameters::FileDescriptorWriteable;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerRead;
 use crate::state_backend::ManagerReadWrite;
@@ -30,7 +32,7 @@ impl<M: ManagerBase> SupervisorState<M> {
         &self,
         core: &mut MachineCoreState<impl MemoryConfig, M>,
         hooks: &mut PvmHooks,
-        fd: i32,
+        fd: parameters::FileDescriptorWriteable,
         addr: u64,
         length: u64,
     ) -> Result<u64, Error>
@@ -40,17 +42,6 @@ impl<M: ManagerBase> SupervisorState<M> {
         // Limit how much data we can write to prevent proof-size explosion
         let length = length.min(PAGE_SIZE.get());
 
-        // Check if the file desciprtor is valid and can be written to.
-        // In our case, it's just standard output (1) and standard error (2).
-        let mut write_data = match fd {
-            1 | 2 => |data| {
-                for &byte in data {
-                    (hooks.putchar_hook)(byte);
-                }
-            },
-            _ => return Err(Error::BadFileDescriptor),
-        };
-
         // TODO: RV-487: Memory mappings are not yet protected. We assume the kernel knows what
         // it's doing for now.
         let mut data = vec![0u8; length as usize];
@@ -58,7 +49,13 @@ impl<M: ManagerBase> SupervisorState<M> {
             return Err(Error::Fault);
         };
 
-        write_data(data.as_slice());
+        match fd {
+            FileDescriptorWriteable::StandardOutput | FileDescriptorWriteable::StandardError => {
+                for &byte in data.as_slice() {
+                    (hooks.putchar_hook)(byte);
+                }
+            }
+        };
 
         // Returning a positive value indicates success
         Ok(length)
@@ -72,11 +69,13 @@ impl<M: ManagerBase> SupervisorState<M> {
         &mut self,
         core: &mut MachineCoreState<impl MemoryConfig, M>,
         hooks: &mut PvmHooks,
-    ) -> bool
+    ) -> Result<bool, Error>
     where
         M: ManagerReadWrite,
     {
-        let fd = core.hart.xregisters.read(registers::a0) as i32;
+        // `write` takes an unsigned int as the first parameter
+        let fd: parameters::FileDescriptorWriteable =
+            (core.hart.xregisters.try_read::<u32>(registers::a0)? as u64).try_into()?;
         let addr = core.hart.xregisters.read(registers::a1);
         let length = core.hart.xregisters.read(registers::a2);
 
@@ -85,7 +84,7 @@ impl<M: ManagerBase> SupervisorState<M> {
             Err(err) => core.hart.xregisters.write_system_call_error(err),
         }
 
-        true
+        Ok(true)
     }
 
     /// Handle `writev` system call. Writes only to the first entry of the `iovec` array which has
@@ -96,17 +95,20 @@ impl<M: ManagerBase> SupervisorState<M> {
         &mut self,
         core: &mut MachineCoreState<impl MemoryConfig, M>,
         hooks: &mut PvmHooks,
-    ) -> bool
+    ) -> Result<bool, Error>
     where
         M: ManagerReadWrite,
     {
-        let fd = core.hart.xregisters.read(registers::a0) as i32;
+        // `writev` takes an unsigned long as the first parameter
+        let fd = core
+            .hart
+            .xregisters
+            .try_read::<parameters::FileDescriptorWriteable>(registers::a0)?;
         let iovec = core.hart.xregisters.read(registers::a1);
         let len = core.hart.xregisters.read(registers::a2);
 
         if len < 1 {
-            core.hart.xregisters.write(registers::a0, 0);
-            return true;
+            return Ok(true);
         }
 
         // `iovec` is a `struct iovec[]`.
@@ -139,15 +141,13 @@ impl<M: ManagerBase> SupervisorState<M> {
                 // TODO: RV-487: Memory mappings are not yet protected. We assume the kernel knows
                 // what it's doing for now.
                 let Ok(addr) = core.main_memory.read(struct_addr_base) else {
-                    core.hart.xregisters.write_system_call_error(Error::Fault);
-                    return true;
+                    return Err(Error::Fault);
                 };
 
                 // TODO: RV-487: Memory mappings are not yet protected. We assume the kernel knows
                 // what it's doing for now.
                 let Ok(length) = core.main_memory.read(struct_addr_len) else {
-                    core.hart.xregisters.write_system_call_error(Error::Fault);
-                    return true;
+                    return Err(Error::Fault);
                 };
 
                 if length > 0 {
@@ -157,8 +157,7 @@ impl<M: ManagerBase> SupervisorState<M> {
             }
 
             // We haven't found any data to write
-            core.hart.xregisters.write(registers::a0, 0);
-            return true;
+            return Ok(true);
         };
 
         match self.write_to_fd(core, hooks, fd, addr, length) {
@@ -166,7 +165,7 @@ impl<M: ManagerBase> SupervisorState<M> {
             Err(err) => core.hart.xregisters.write_system_call_error(err),
         }
 
-        true
+        Ok(true)
     }
 
     /// Handle `ppoll` system call in a way that only satisfies the usage by Musl's and the Rust

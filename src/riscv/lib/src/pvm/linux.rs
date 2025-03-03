@@ -409,8 +409,8 @@ impl<M: ManagerBase> SupervisorState<M> {
         let result = match system_call_no {
             GETCWD => self.handle_getcwd(core),
             OPENAT => self.handle_openat(),
-            WRITE => return self.handle_write(core, hooks),
-            WRITEV => return self.handle_writev(core, hooks),
+            WRITE => self.handle_write(core, hooks),
+            WRITEV => self.handle_writev(core, hooks),
             PPOLL => return self.handle_ppoll(core),
             READLINKAT => self.handle_readlinkat(),
             EXIT | EXITGROUP => self.handle_exit(core),
