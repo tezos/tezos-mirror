@@ -11,8 +11,8 @@ if [ -z "${S3_BUCKET:-}" ]; then
   exit 1
 fi
 
-# We use a file to list releases so that we can control what is acutally displayed.
-Releases_list="releases_list.txt"
+# We use a file to list releases so that we can control what is actually displayed.
+Releases_list="releases_list.json"
 
 if [ -n "${AWS_KEY_RELEASE_PUBLISH}" ] && [ -n "${AWS_SECRET_RELEASE_PUBLISH}" ]; then
   export AWS_ACCESS_KEY_ID="${AWS_KEY_RELEASE_PUBLISH}"
@@ -33,10 +33,18 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
   else
 
     #TODO: Add to docker image ?
-    sudo apk add aws-cli gawk
+    sudo apk add aws-cli gawk jq
 
     aws s3 cp s3://"${S3_BUCKET}"/"$Releases_list" "./$Releases_list"
-    echo "${CI_COMMIT_TAG}" >> "./$Releases_list"
+
+    # Add the new version to the $versions_list JSON file.
+    # Since jq cannot modify the file in-place, we write to a temporary file first.
+    if [ -n "${gitlab_release_rc_version}" ]; then
+      rc="${gitlab_release_rc_version}"
+      jq ". += [{\"major\":${gitlab_release_major_version}, \"minor\":${gitlab_release_minor_version},\"rc\":${rc}}]" "./${Releases_list}" > "./tmp.json" && mv "./tmp.json" "./${Releases_list}"
+    else
+      jq ". += [{\"major\":${gitlab_release_major_version}, \"minor\":${gitlab_release_minor_version}}]" "./${Releases_list}" > "./tmp.json" && mv "./tmp.json" "./${Releases_list}"
+    fi
 
     # Upload binaries to S3 bucket
     echo "Uploading binaries..."

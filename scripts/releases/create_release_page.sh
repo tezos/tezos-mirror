@@ -14,11 +14,15 @@ if [ -z "${Releases_list}" ]; then
   exit 1
 fi
 
-sudo apk add pandoc
+sudo apk add pandoc jq
 
 echo "# Octez Releases" >> index.md
 
-mapfile -t releases < <(tac "$Releases_list")
+# $Releases_list is a JSON file containing a list of records with major, minor, and rc fields.
+# Concatenate those version numbers, in reverse order, to extract the latest one
+# (without the rc number).
+# shellcheck disable=SC2162
+read -a releases <<< "$(jq -r '[.[] | "\(.major).\(.minor)" ] | reverse | join(" ")' "${Releases_list}")"
 latest=${releases[0]}
 
 # Define the content of the release page
