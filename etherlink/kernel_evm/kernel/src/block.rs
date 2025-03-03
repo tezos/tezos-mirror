@@ -628,6 +628,7 @@ mod tests {
     use crate::transaction::TransactionContent;
     use crate::transaction::TransactionContent::Ethereum;
     use crate::transaction::TransactionContent::EthereumDelayed;
+    use crate::transaction::Transactions::EthTxs;
     use crate::{retrieve_block_fees, retrieve_chain_id};
     use evm_execution::account_storage::{
         account_path, init_account_storage, EthereumAccountStorage,
@@ -647,7 +648,7 @@ mod tests {
 
     fn blueprint(transactions: Vec<Transaction>) -> Blueprint {
         Blueprint {
-            transactions,
+            transactions: EthTxs(transactions),
             timestamp: Timestamp::from(0i64),
         }
     }

@@ -10,7 +10,7 @@ use crate::sequencer_blueprint::{
     BlueprintWithDelayedHashes, UnsignedSequencerBlueprint,
 };
 use crate::storage::read_last_info_per_level_timestamp;
-use crate::transaction::{Transaction, TransactionContent};
+use crate::transaction::{Transaction, TransactionContent, Transactions::EthTxs};
 use crate::{delayed_inbox, DelayedInbox};
 use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
@@ -381,7 +381,7 @@ fn fetch_delayed_txs<Host: Runtime>(
     delayed_txs.extend(transactions_with_hashes);
     Ok((
         BlueprintValidity::Valid(Blueprint {
-            transactions: delayed_txs,
+            transactions: EthTxs(delayed_txs),
             timestamp: blueprint_with_hashes.timestamp,
         }),
         total_size,
@@ -540,7 +540,7 @@ fn read_all_chunks_and_validate<Host: Runtime>(
                     host,
                     Benchmarking,
                     "Number of transactions in blueprint: {}",
-                    blueprint.transactions.len()
+                    blueprint.transactions.number_of_txs()
                 );
                 Ok((Some(blueprint), size_with_delayed_transactions))
             } else {

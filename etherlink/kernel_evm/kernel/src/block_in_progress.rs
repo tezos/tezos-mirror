@@ -12,7 +12,7 @@ use crate::error::TransferError::CumulativeGasUsedOverflow;
 use crate::gas_price::base_fee_per_gas;
 use crate::storage::{self, object_path, receipt_path};
 use crate::tick_model;
-use crate::transaction::Transaction;
+use crate::transaction::{Transaction, Transactions::EthTxs};
 use anyhow::Context;
 use evm_execution::account_storage::EVM_ACCOUNTS_PATH;
 use primitive_types::{H160, H256, U256};
@@ -285,7 +285,9 @@ impl BlockInProgress {
         transactions_root: OwnedHash,
     ) -> BlockInProgress {
         // blueprint is turn into a ring to allow popping from the front
-        let ring = blueprint.transactions.into();
+        let ring = match blueprint.transactions {
+            EthTxs(transactions) => transactions.into(),
+        };
         BlockInProgress::new_with_ticks(
             current_block_number,
             parent_hash,

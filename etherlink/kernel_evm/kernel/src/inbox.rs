@@ -26,7 +26,9 @@ use crate::storage::{
 };
 use crate::tick_model::constants::TICKS_FOR_BLUEPRINT_INTERCEPT;
 use crate::tick_model::maximum_ticks_for_sequencer_chunk;
-use crate::transaction::{Transaction, TransactionContent};
+use crate::transaction::{
+    Transaction, TransactionContent, Transactions, Transactions::EthTxs,
+};
 use crate::upgrade::*;
 use crate::Error;
 use crate::{simulation, upgrade};
@@ -42,7 +44,7 @@ use tezos_smart_rollup_encoding::public_key::PublicKey;
 
 #[derive(Debug, PartialEq)]
 pub struct ProxyInboxContent {
-    pub transactions: Vec<Transaction>,
+    pub transactions: Transactions,
 }
 
 pub fn read_input<Host: Runtime, Mode: Parsable>(
@@ -475,7 +477,7 @@ pub fn read_proxy_inbox<Host: Runtime>(
     chain_configuration: &ChainConfig,
 ) -> Result<Option<ProxyInboxContent>, anyhow::Error> {
     let mut res = ProxyInboxContent {
-        transactions: vec![],
+        transactions: EthTxs(vec![]),
     };
     // The mutable variable is used to retrieve the information of whether the
     // inbox was empty or not. As we consume all the inbox in one go, if the
@@ -785,7 +787,7 @@ mod tests {
             tx_hash,
             content: Ethereum(tx),
         }];
-        assert_eq!(inbox_content.transactions, expected_transactions);
+        assert_eq!(inbox_content.transactions, EthTxs(expected_transactions));
     }
 
     #[test]
@@ -817,7 +819,7 @@ mod tests {
             tx_hash,
             content: Ethereum(tx),
         }];
-        assert_eq!(inbox_content.transactions, expected_transactions);
+        assert_eq!(inbox_content.transactions, EthTxs(expected_transactions));
     }
 
     #[test]
@@ -1069,7 +1071,7 @@ mod tests {
         assert_eq!(
             inbox_content,
             ProxyInboxContent {
-                transactions: vec![],
+                transactions: EthTxs(vec![]),
             }
         );
 
@@ -1093,7 +1095,7 @@ mod tests {
             tx_hash,
             content: Ethereum(tx),
         }];
-        assert_eq!(inbox_content.transactions, expected_transactions);
+        assert_eq!(inbox_content.transactions, EthTxs(expected_transactions));
     }
 
     #[test]
@@ -1155,7 +1157,7 @@ mod tests {
             tx_hash,
             content: Ethereum(tx),
         }];
-        assert_eq!(inbox_content.transactions, expected_transactions);
+        assert_eq!(inbox_content.transactions, EthTxs(expected_transactions));
     }
 
     #[test]

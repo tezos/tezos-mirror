@@ -5,23 +5,25 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::transaction::Transaction;
+use crate::transaction::Transactions;
 use rlp::{Decodable, DecoderError, Encodable};
-use tezos_ethereum::rlp_helpers::{self, append_timestamp, decode_timestamp};
+use tezos_ethereum::rlp_helpers::{
+    self, append_timestamp, decode_field, decode_timestamp,
+};
 
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
 /// The blueprint of a block is a list of transactions.
 #[derive(PartialEq, Debug, Clone)]
 pub struct Blueprint {
-    pub transactions: Vec<Transaction>,
+    pub transactions: Transactions,
     pub timestamp: Timestamp,
 }
 
 impl Encodable for Blueprint {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         stream.begin_list(2);
-        stream.append_list(&self.transactions);
+        stream.append(&self.transactions);
         append_timestamp(stream, self.timestamp);
     }
 }
@@ -36,8 +38,7 @@ impl Decodable for Blueprint {
         }
 
         let mut it = decoder.iter();
-        let transactions =
-            rlp_helpers::decode_list(&rlp_helpers::next(&mut it)?, "transactions")?;
+        let transactions = decode_field(&rlp_helpers::next(&mut it)?, "transactions")?;
         let timestamp = decode_timestamp(&rlp_helpers::next(&mut it)?)?;
 
         Ok(Blueprint {
@@ -51,7 +52,9 @@ impl Decodable for Blueprint {
 mod tests {
 
     use super::*;
-    use crate::transaction::TransactionContent::Ethereum;
+    use crate::transaction::{
+        Transaction, TransactionContent::Ethereum, Transactions::EthTxs,
+    };
     use primitive_types::{H160, U256};
     use rlp::Rlp;
     use tezos_ethereum::{
@@ -88,7 +91,7 @@ mod tests {
     #[test]
     fn test_encode_blueprint() {
         let proposal = Blueprint {
-            transactions: vec![dummy_transaction(0), dummy_transaction(1)],
+            transactions: EthTxs(vec![dummy_transaction(0), dummy_transaction(1)]),
             timestamp: Timestamp::from(0i64),
         };
         let encoded = proposal.rlp_bytes();

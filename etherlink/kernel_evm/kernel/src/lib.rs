@@ -407,6 +407,7 @@ mod tests {
     };
     use tezos_evm_runtime::runtime::MockKernelHost;
 
+    use crate::transaction::Transactions::EthTxs;
     use tezos_evm_runtime::runtime::Runtime;
     use tezos_smart_rollup::michelson::ticket::FA2_1Ticket;
     use tezos_smart_rollup::michelson::{
@@ -482,7 +483,7 @@ mod tests {
 
     fn blueprint(transactions: Vec<Transaction>) -> Blueprint {
         Blueprint {
-            transactions,
+            transactions: EthTxs(transactions),
             timestamp: Timestamp::from(0i64),
         }
     }
