@@ -721,6 +721,7 @@ module Manager = struct
         parameters : transfer_parameters option;
       }
     | Origination of {code : JSON.u; storage : JSON.u; balance : int}
+    | Update_consensus_key of {public_key : string; proof : string option}
     | Dal_publish_commitment of {
         index : int;
         commitment : Tezos_crypto_dal.Cryptobox.commitment;
@@ -742,6 +743,9 @@ module Manager = struct
   let call ?(dest = "KT1LfQjDNgPpdwMHbhzyQcD8GTE2L4rwxxpN") ?(amount = 0)
       ?(entrypoint = "default") ?(arg = `O [("prim", `String "Unit")]) () =
     Transfer {amount; dest; parameters = Some {entrypoint; arg}}
+
+  let update_consensus_key ~public_key ?proof () =
+    Update_consensus_key {public_key; proof}
 
   let dal_publish_commitment ~index ~commitment ~proof =
     Dal_publish_commitment {index; commitment; proof}
@@ -789,6 +793,14 @@ module Manager = struct
           ("balance", json_of_tez balance);
           ("script", script);
         ]
+    | Update_consensus_key {public_key; proof} ->
+        let proof =
+          match proof with
+          | None -> []
+          | Some proof -> [("proof", `String proof)]
+        in
+        [("kind", `String "update_consensus_key"); ("pk", `String public_key)]
+        @ proof
     | Dal_publish_commitment {index; commitment; proof} ->
         let slot_header =
           `O
@@ -865,7 +877,7 @@ module Manager = struct
         let gas_limit = Option.value gas_limit ~default:17_000 in
         let storage_limit = Option.value storage_limit ~default:0 in
         {source; counter; fee; gas_limit; storage_limit; payload}
-    | Reveal _ | Origination _ | Delegation _ ->
+    | Reveal _ | Origination _ | Delegation _ | Update_consensus_key _ ->
         let fee = Option.value fee ~default:1_450 in
         let gas_limit = Option.value gas_limit ~default:1_490 in
         let storage_limit = Option.value storage_limit ~default:0 in
