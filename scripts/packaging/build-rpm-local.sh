@@ -111,8 +111,7 @@ zcash() {
       cp "$packaging_dir/scripts/packaging/octez/rpm/SPECS/$pkg.spec" "$SPECS_DIR/"
       cd "$SPECS_DIR" || exit
       rpmbuild -ba --quiet \
-        --define "version $_VERSION" \
-        --define "epoch $_EPOCH" \
+        --define "version 1.0.0" \
         --define '_source_filedir %{nil}' \
         --define "_binary_payload w2T16.xzdio" \
         "$pkg.spec"
