@@ -31,11 +31,11 @@ override_dh_installdocs:
 	dh_installdocs -p octez-signer docs/README.octez-signer
 
 override_dh_installsystemd:
-	dh_installsystemd -p octez-node --no-enable --no-start
-	dh_installsystemd -p octez-smart-rollup-node --no-enable --no-start
-	dh_installsystemd -p octez-dal-node --no-enable --no-start
+	dh_installsystemd -p octez-node --no-start
+	dh_installsystemd -p octez-dal-node --no-start
+	dh_installsystemd -p octez-baker --no-start --name octez-baker-active
+	dh_installsystemd -p octez-smart-rollup-node --no-start
 	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-baker-next
-	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-baker-active
 	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-accuser-next
 	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-accuser-active
 
