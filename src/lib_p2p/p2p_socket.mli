@@ -203,6 +203,10 @@ val stat : ('msg, 'meta) t -> P2p_stat.t
 val add_closing_reason :
   reason:P2p_disconnection_reason.t -> ('msg, 'meta) t -> unit
 
+(** [close ?wait ~reason t] closes the internal worker created by {!accept}
+    that reads and writes messages from/to the peer. If [wait] is [true], we do not
+    close the socket before having cancelled all the current messages in the
+    write buffer (it defaults to false). *)
 val close :
   ?wait:bool ->
   reason:P2p_disconnection_reason.t ->
