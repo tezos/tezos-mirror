@@ -124,7 +124,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
 
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ctxt in
 
-  let* (_chain_family : Ethereum_types.chain_family) =
+  let* chain_family =
     match (config.experimental_features.l2_chains, enable_multichain) with
     | None, false -> return Ethereum_types.EVM
     | None, true -> tzfail (Node_error.Mismatched_multichain `Kernel)
@@ -140,6 +140,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
       ~evm_services:
         Evm_ro_context.(evm_services_methods ctxt time_between_blocks)
       ~data_dir
+      ~rpc_server_family:(Rpc_types.Single_chain_node_rpc_server chain_family)
       Stateless
       rpc_config
       (rpc_backend, ctxt.smart_rollup_address)

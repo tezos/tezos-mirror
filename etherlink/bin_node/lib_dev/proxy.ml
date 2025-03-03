@@ -96,7 +96,7 @@ let main
       ~rollup_node_endpoint
       ()
   in
-  let* (_chain_family : Ethereum_types.chain_family) =
+  let* chain_family =
     if finalized_view then
       if
         (* When finalized_view is set, it's too early to request the
@@ -117,6 +117,7 @@ let main
   in
   let* server_finalizer =
     Rpc_server.start_public_server
+      ~rpc_server_family:(Rpc_types.Single_chain_node_rpc_server chain_family)
       validation_mode
       config
       ((module Rollup_node_rpc), smart_rollup_address)

@@ -124,8 +124,8 @@ let monitor_performances ~data_dir =
   in
   Lwt.dont_wait aux (Fun.const ())
 
-let start_public_server ?delegate_health_check_to ?evm_services ?data_dir
-    validation (config : Configuration.t) ctxt =
+let start_public_server ~rpc_server_family:_ ?delegate_health_check_to
+    ?evm_services ?data_dir validation (config : Configuration.t) ctxt =
   let open Lwt_result_syntax in
   let*! can_start_performance_metrics =
     Octez_performance_metrics.supports_performance_metrics ()
@@ -166,7 +166,8 @@ let start_public_server ?delegate_health_check_to ?evm_services ?data_dir
   in
   return finalizer
 
-let start_private_server ?(block_production = `Disabled) config ctxt =
+let start_private_server ~rpc_server_family:_ ?(block_production = `Disabled)
+    config ctxt =
   let open Lwt_result_syntax in
   match config.Configuration.private_rpc with
   | Some private_rpc ->
