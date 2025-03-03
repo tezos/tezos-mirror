@@ -22,6 +22,7 @@ let starting_baker =
     ("proto", Protocol_hash.encoding)
     ("args", string)
     ~pp1:Protocol_hash.pp_short
+    ~pp2:Format.pp_print_string
 
 let baker_running =
   declare_1
