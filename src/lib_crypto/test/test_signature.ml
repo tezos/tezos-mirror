@@ -67,7 +67,7 @@ let test_size () =
   let expected =
     (* add 1 for the tag of union encoding *)
     (WithExceptions.Option.get ~loc:__LOC__
-    @@ Data_encoding.Binary.fixed_length Bls_aug.Public_key.encoding)
+    @@ Data_encoding.Binary.fixed_length Bls.Public_key.encoding)
     + 1
   in
   assert (Compare.Int.(expected = length))

@@ -161,7 +161,7 @@ let () =
         let name = "Bls12_381"
       end)
       (struct
-        include Signature.Bls_aug
+        include Signature.Bls
 
         let watermark_of_bytes b = b
       end)

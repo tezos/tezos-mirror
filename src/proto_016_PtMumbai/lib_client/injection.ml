@@ -638,7 +638,7 @@ let signature_size_of_algo : Tezos_crypto.Signature.algo -> int = function
   | Bls_aug ->
       (* BLS signatures in operations are encoded with 2 extra bytes: a [ff]
          prefix and a tag [03]. *)
-      Tezos_crypto.Signature.Bls_aug.size + 2
+      Tezos_crypto.Signature.Bls.size + 2
 
 (* This value is used as a safety guard for gas limit. *)
 let safety_guard = Gas.Arith.(integral_of_int_exn 100)
