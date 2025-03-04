@@ -538,8 +538,8 @@ module Reader = struct
       | Ok (size, _) ->
           (Sys.word_size / 8 * 11) + size + Lwt_pipe.Maybe_bounded.push_overhead
       | Error _ -> 0
-      (* we push Error only when we close the socket,
-                        we don't fear memory leaks in that case... *)
+      (* we push Error only when we close the socket, we don't fear memory leaks
+         in that case... *)
     in
     let bound = Option.map (fun max -> (max, compute_size)) size in
     let st =
