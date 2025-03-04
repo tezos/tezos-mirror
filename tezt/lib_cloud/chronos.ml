@@ -45,12 +45,23 @@
 
    Note: Steps are only accepted for minutes and hours.
 *)
+
+type field =
+  | All
+  | List of int list
+  | Range of {first : int; last : int; step : int option}
+  | Value of int
+
+(* Temporary 'unsupported' failwith function used to incrementally
+   implement all functionalities. *)
+let unsupported () = failwith "unsupported"
+
 type time = {
-  minute : int option;
-  hour : int option;
-  day : int option;
-  month : int option;
-  day_of_week : int option; (* 0-6, Sunday = 0 *)
+  minute : field;
+  hour : field;
+  day : field;
+  month : field;
+  day_of_week : field;
 }
 
 type task = {name : string; time : time; action : unit -> unit Lwt.t}
@@ -63,7 +74,11 @@ type t = {
 
 let validate_time s =
   let in_range ~v (min, max) =
-    Option.fold ~none:true ~some:(fun v -> v >= min && v <= max) v
+    match v with
+    | All -> true
+    | Value v -> v >= min && v <= max
+    | Range _ -> unsupported ()
+    | List _ -> unsupported ()
   in
   in_range ~v:s.minute (0, 59)
   && in_range ~v:s.hour (0, 23)
@@ -76,9 +91,8 @@ let time_of_string s =
   match xs with
   | [min; hour; day; month; dow] ->
       let parse str =
-        match str with "*" -> None | s -> Some (int_of_string s)
+        match str with "*" -> All | s -> Value (int_of_string s)
       in
-
       {
         minute = parse min;
         hour = parse hour;
@@ -89,7 +103,12 @@ let time_of_string s =
   | _ -> failwith (Format.asprintf "Invalid cron string format: %s" s)
 
 let time_to_string spec =
-  let to_string = Option.fold ~none:"*" ~some:string_of_int in
+  let to_string = function
+    | All -> "*"
+    | Value v -> string_of_int v
+    | Range _ -> unsupported ()
+    | List _ -> unsupported ()
+  in
   String.concat
     " "
     [
@@ -119,7 +138,13 @@ let init ~tasks =
    - Unix.tm_mon ranges from 0 to 11 (January = 0, December = 11)
    - Cron standard uses 1 to 12 (January = 1, December = 12) *)
 let should_run task tm =
-  let matches value = Option.fold ~none:true ~some:(Int.equal value) in
+  let matches t v =
+    match v with
+    | Value v -> Int.equal v t
+    | All -> true
+    | Range _ -> unsupported ()
+    | List _ -> unsupported ()
+  in
   matches tm.Unix.tm_min task.time.minute
   && matches tm.Unix.tm_hour task.time.hour
   && matches tm.Unix.tm_mday task.time.day
