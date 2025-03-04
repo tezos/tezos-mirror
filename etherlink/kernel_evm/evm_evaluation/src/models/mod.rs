@@ -245,9 +245,12 @@ pub struct Env {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(transparent)]
+pub struct HexBytes(#[serde(with = "hex::serde")] pub Vec<u8>);
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct SkipData {
-    #[serde(deserialize_with = "deserialize_vec_str_as_u8_vectors")]
-    pub datas: Vec<Vec<u8>>,
+    pub datas: HashMap<String, Vec<HexBytes>>,
 }
 
 #[cfg(test)]
