@@ -382,6 +382,10 @@ pub enum OpCode {
     Bltz,
     /// Jump to `pc + imm` if `val(rs2) >= 0`.
     Bgez,
+    /// Jump to `pc + imm` if `val(rs2) <= 0`.
+    Bltez,
+    /// Jump to `pc + imm` if `val(rs2) > 0`.
+    Bgz,
 }
 
 impl OpCode {
@@ -450,6 +454,8 @@ impl OpCode {
             Self::Bge => Args::run_bge,
             Self::Bltz => Args::run_bltz,
             Self::Bgez => Args::run_bgez,
+            Self::Bltez => Args::run_bltez,
+            Self::Bgz => Args::run_bgz,
             Self::Bltu => Args::run_bltu,
             Self::Bgeu => Args::run_bgeu,
             Self::Auipc => Args::run_auipc,
@@ -1353,6 +1359,8 @@ impl Args {
     impl_cb_type!(run_bnez);
     impl_cb_type!(run_bltz);
     impl_cb_type!(run_bgez);
+    impl_cb_type!(run_bltez);
+    impl_cb_type!(run_bgz);
     impl_ci_type!(load_store::run_li, run_li, non_zero);
     impl_cr_type!(run_neg, non_zero);
 

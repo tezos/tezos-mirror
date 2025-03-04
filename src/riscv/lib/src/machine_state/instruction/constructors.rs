@@ -819,6 +819,19 @@ impl Instruction {
         }
     }
 
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Bltez`].
+    pub(crate) fn new_bltez(rs1: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Bltez,
+            args: Args {
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
     /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Bge`].
     pub(crate) fn new_bge(
         rs1: NonZeroXRegister,
@@ -842,6 +855,19 @@ impl Instruction {
     pub(crate) fn new_bgez(rs1: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
         Self {
             opcode: OpCode::Bgez,
+            args: Args {
+                rs1: rs1.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Bgz`].
+    pub(crate) fn new_bgz(rs1: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Bgz,
             args: Args {
                 rs1: rs1.into(),
                 imm,
@@ -1478,9 +1504,9 @@ impl Instruction {
             (X::NonZero(rs1), X::NonZero(rs2)) if rs1 == rs2 => {
                 Instruction::new_nop(InstrWidth::Uncompressed)
             }
-            // If rs1 is x0, the condition to branch is whether `val(rs2) >= 0`.
+            // If rs1 is x0, the condition to branch is whether `val(rs2) > 0`.
             (X::X0, X::NonZero(rs1)) => {
-                Instruction::new_bgez(rs1, args.imm, InstrWidth::Uncompressed)
+                Instruction::new_bgz(rs1, args.imm, InstrWidth::Uncompressed)
             }
             // If rs2 is x0, the condition to branch is whether `val(rs1) < 0`.
             (X::NonZero(rs1), X::X0) => {
@@ -1503,9 +1529,9 @@ impl Instruction {
             (X::NonZero(rs1), X::NonZero(rs2)) if rs1 == rs2 => {
                 Instruction::new_j(args.imm, InstrWidth::Uncompressed)
             }
-            // If rs1 is x0, the condition to branch is whether `val(rs2) < 0`.
+            // If rs1 is x0, the condition to branch is whether `val(rs2) <= 0`.
             (X::X0, X::NonZero(rs1)) => {
-                Instruction::new_bltz(rs1, args.imm, InstrWidth::Uncompressed)
+                Instruction::new_bltez(rs1, args.imm, InstrWidth::Uncompressed)
             }
             // If rs2 is x0, the condition to branch is whether `val(rs1) >= 0`.
             (X::NonZero(rs1), X::X0) => {
