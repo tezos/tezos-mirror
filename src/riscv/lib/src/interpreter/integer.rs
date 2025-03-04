@@ -42,6 +42,24 @@ pub fn run_and(
     icb.xregister_write(rd, res);
 }
 
+/// Saves in `rd` the bitwise OR between the value in `rs1` and `rs2`
+///
+/// Relevant RISC-V opcodes:
+/// - `OR`
+/// - `C.OR`
+pub fn run_or(
+    icb: &mut impl ICB,
+    rs1: NonZeroXRegister,
+    rs2: NonZeroXRegister,
+    rd: NonZeroXRegister,
+) {
+    let lhs = icb.xregister_read(rs1);
+    let rhs = icb.xregister_read(rs2);
+
+    let res = icb.xvalue_bitwise_or(lhs, rhs);
+    icb.xregister_write(rd, res);
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{

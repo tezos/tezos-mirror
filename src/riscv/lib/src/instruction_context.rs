@@ -52,6 +52,9 @@ pub trait ICB {
     /// Perform a bitwise and of two **XValues**, returning the new value.
     fn xvalue_bitwise_and(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue;
 
+    /// Perform a bitwise or of two **XValues**, returning the new value.
+    fn xvalue_bitwise_or(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue;
+
     /// Representation for the manipulation of fallible operations.
     type IResult<Value>;
 
@@ -96,6 +99,11 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
     #[inline(always)]
     fn xvalue_bitwise_and(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
         lhs & rhs
+    }
+
+    #[inline(always)]
+    fn xvalue_bitwise_or(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
+        lhs | rhs
     }
 
     type IResult<In> = Result<In, Exception>;
