@@ -55,6 +55,14 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
     aws s3 sync "./octez-binaries/x86_64/" "s3://${S3_BUCKET}/${gitlab_release}/binaries/x86_64/" --region "${REGION}"
     aws s3 sync "./octez-binaries/arm64/" "s3://${S3_BUCKET}/${gitlab_release}/binaries/arm64/" --region "${REGION}"
 
+    # Create and push archives
+    tar -czf "${gitlab_release}.tar.gz" --transform 's|^\octez-binaries/x86_64/|octez/|' octez-binaries/x86_64/*
+    aws s3 cp "./${gitlab_release}.tar.gz" "s3://${S3_BUCKET}/${gitlab_release}/binaries/x86_64/" --region "${REGION}"
+    sha256sum "${gitlab_release}.tar.gz" >> "./x86_64_sha256sums.txt"
+    tar -czf "${gitlab_release}.tar.gz" --transform 's|^\octez-binaries/arm64/|octez/|' octez-binaries/arm64/*
+    sha256sum "${gitlab_release}.tar.gz" >> "./arm64_sha256sums.txt"
+    aws s3 cp "./${gitlab_release}.tar.gz" "s3://${S3_BUCKET}/${gitlab_release}/binaries/arm64/" --region "${REGION}"
+
     # Push checksums for x86_64 binaries
     echo "Generating checksums for x86_64 binaries"
     for binary in ./octez-binaries/x86_64/*; do
