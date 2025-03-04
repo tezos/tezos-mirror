@@ -149,7 +149,7 @@ let create ?runner ?path ?name ?color ?event_pipe ?(delegates = []) ?votefile
   on_event agnostic_baker (handle_event agnostic_baker) ;
   agnostic_baker
 
-let run ?event_level ?event_sections_levels (agnostic_baker : t) =
+let run ?env ?event_level ?event_sections_levels (agnostic_baker : t) =
   (match agnostic_baker.status with
   | Not_running -> ()
   | Running _ ->
@@ -239,6 +239,7 @@ let run ?event_level ?event_sections_levels (agnostic_baker : t) =
     unit
   in
   run
+    ?env
     ?event_level
     ?event_sections_levels
     agnostic_baker
@@ -265,12 +266,12 @@ let wait_for_ready agnostic_baker =
         resolver :: agnostic_baker.persistent_state.pending_ready ;
       check_event agnostic_baker "agnostic baker started" promise
 
-let init ?runner ?(path = Uses.path Constant.octez_experimental_agnostic_baker)
-    ?name ?color ?event_level ?event_pipe ?event_sections_levels
-    ?(delegates = []) ?votefile ?liquidity_baking_toggle_vote
-    ?force_apply_from_round ?remote_mode ?operations_pool ?dal_node
-    ?dal_node_timeout_percentage ?state_recorder ?node_version_check_bypass
-    ?node_version_allowed node client =
+let init ?env ?runner
+    ?(path = Uses.path Constant.octez_experimental_agnostic_baker) ?name ?color
+    ?event_level ?event_pipe ?event_sections_levels ?(delegates = []) ?votefile
+    ?liquidity_baking_toggle_vote ?force_apply_from_round ?remote_mode
+    ?operations_pool ?dal_node ?dal_node_timeout_percentage ?state_recorder
+    ?node_version_check_bypass ?node_version_allowed node client =
   let* () = Node.wait_for_ready node in
   let agnostic_baker =
     create
@@ -293,7 +294,7 @@ let init ?runner ?(path = Uses.path Constant.octez_experimental_agnostic_baker)
       node
       client
   in
-  let* () = run ?event_level ?event_sections_levels agnostic_baker in
+  let* () = run ?env ?event_level ?event_sections_levels agnostic_baker in
   let* () = wait_for_ready agnostic_baker in
   return agnostic_baker
 
