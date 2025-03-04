@@ -71,7 +71,7 @@ exists="true"
 for layer_target in $valid_layer_targets; do
   image_name="${image_base}/${layer_target}:${image_tag}"
   if ! docker manifest inspect "${image_name}" > /dev/null 2>&1; then
-    echo "Image ${image_name} does not exists in the registry, re-build."
+    echo "Image ${image_name} does not exist in the registry, re-build."
     exists="false"
   else
     image_name_extra=${image_base}/${layer_target}:${arch}--${CI_COMMIT_REF_SLUG}
