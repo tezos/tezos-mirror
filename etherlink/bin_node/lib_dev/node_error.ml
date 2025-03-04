@@ -20,6 +20,7 @@ type error +=
     }
   | Out_of_sync of {level_expected : int32; level_received : int32}
   | Cannot_handle_flushed_blueprint of Ethereum_types.quantity
+  | Unexpected_multichain
 
 let () =
   register_error_kind
@@ -84,4 +85,14 @@ let () =
         level)
     Data_encoding.(obj1 (req "level" Ethereum_types.quantity_encoding))
     (function Cannot_handle_flushed_blueprint level -> Some level | _ -> None)
-    (fun level -> Cannot_handle_flushed_blueprint level)
+    (fun level -> Cannot_handle_flushed_blueprint level) ;
+  register_error_kind
+    `Permanent
+    ~id:"unexpected_multichain"
+    ~title:"Multiple chains configured to a single chain node"
+    ~description:
+      "Observer, proxy, and rpc nodes follow a single chain. However, the \
+       configuration attempted to configure multiple chains."
+    Data_encoding.empty
+    (function Unexpected_multichain -> Some () | _ -> None)
+    (fun () -> Unexpected_multichain)
