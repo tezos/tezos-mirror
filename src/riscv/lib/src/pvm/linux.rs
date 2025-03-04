@@ -6,6 +6,7 @@ mod addr;
 mod error;
 mod fds;
 mod fs;
+mod memory;
 mod rng;
 
 use std::ffi::CStr;
@@ -15,6 +16,7 @@ use tezos_smart_rollup_constants::riscv::SBI_FIRMWARE_TEZOS;
 
 use self::addr::VirtAddr;
 use self::error::Error;
+use self::memory::STACK_SIZE;
 use super::Pvm;
 use super::PvmHooks;
 use crate::machine_state::CacheLayouts;
@@ -127,19 +129,6 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase>
         self.core.main_memory.write_all(stack_ptr, data)?;
 
         Ok(stack_ptr)
-    }
-
-    /// Configure the stack for a new process.
-    fn prepare_stack(&mut self)
-    where
-        M: ManagerWrite,
-    {
-        let mem_size = MC::TOTAL_BYTES as u64;
-        let init_stack_ptr = mem_size.saturating_sub(mem_size % PAGE_SIZE);
-        self.core
-            .hart
-            .xregisters
-            .write(registers::sp, init_stack_ptr);
     }
 
     /// Initialise the stack for a Linux program. Preparing the stack is a major part of Linux's
@@ -259,6 +248,59 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase> Pvm<MC
         Ok(())
     }
 
+    /// Configure the stack for a new process.
+    fn prepare_stack(&mut self) -> Result<(), MachineError>
+    where
+        M: ManagerReadWrite,
+    {
+        let stack_top = VirtAddr::new(MC::TOTAL_BYTES as u64);
+        let program_break = self.system_state.program_end.read();
+
+        // We must fit at least one guard page between the program break and the stack
+        let guarded_stack_space = stack_top - program_break;
+        if guarded_stack_space < PAGE_SIZE.get() as i64 {
+            return Err(MachineError::MemoryTooSmall);
+        }
+
+        let unaligned_stack_space = STACK_SIZE.min(guarded_stack_space as u64 - PAGE_SIZE.get());
+        let stack_bottom = (stack_top - unaligned_stack_space)
+            .align_up(PAGE_SIZE)
+            .ok_or(MachineError::MemoryTooSmall)?;
+
+        // If the stack top wasn't aligned, the stack bottom may be higher than the stack top after
+        // aligning it upwards
+        if stack_top < stack_bottom {
+            return Err(MachineError::MemoryTooSmall);
+        }
+
+        // At this point we know that `stack_top` >= `stack_bottom`
+        let stack_space = (stack_top - stack_bottom) as usize;
+
+        // Guard the stack with a guard page. This prevents stack overflows spilling into the heap
+        // or even worse, the program's .bss or .data area.
+        let stack_guard = stack_bottom - PAGE_SIZE.get();
+        self.machine_state.core.main_memory.protect_pages(
+            stack_guard.to_machine_address(),
+            PAGE_SIZE.get() as usize,
+            Permissions::None,
+        )?;
+
+        // Make sure the stack region is readable and writable
+        self.machine_state.core.main_memory.protect_pages(
+            stack_bottom.to_machine_address(),
+            stack_space,
+            Permissions::ReadWrite,
+        )?;
+
+        self.machine_state
+            .core
+            .hart
+            .xregisters
+            .write(registers::sp, stack_top.to_machine_address());
+
+        Ok(())
+    }
+
     /// Install a Linux program and configure the Hart to start it.
     pub fn setup_linux_process(&mut self, program: &Program<MC>) -> Result<(), MachineError>
     where
@@ -267,7 +309,7 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase> Pvm<MC
         self.load_program(program)?;
 
         // The stack needs to be prepared before we can push anything to it
-        self.machine_state.prepare_stack();
+        self.prepare_stack()?;
 
         // Auxiliary values vector
         let mut auxv = vec![(AuxVectorKey::PageSize, PAGE_SIZE.get())];
