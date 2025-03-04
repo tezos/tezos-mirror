@@ -2,6 +2,14 @@
 #
 # SPDX-License-Identifier: MIT
 
+TEST_DIR = test
+
+UNIFFI_GENERATED_FILES = $(TEST_DIR)/libtezos.so $(TEST_DIR)/tezos.py
+
 .PHONY: clean
 clean:
-	@rm -f test/libtezos.so test/tezos.py
+	@rm -f $(UNIFFI_GENERATED_FILES)
+
+.PHONY: test
+test: $(UNIFFI_GENERATED_FILES)
+	@pytest $(TEST_DIR) -v

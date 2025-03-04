@@ -16,5 +16,12 @@ clean:
 	@make -C python/ clean
 
 .PHONY: test
-test:
+test: test-rust test-bindings
+
+.PHONY: test-rust
+test-rust:
 	@make -C rust/ test
+
+.PHONY: test-bindings
+test-bindings: bindings
+	@make -C python/ test
