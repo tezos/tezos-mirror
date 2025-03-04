@@ -84,10 +84,6 @@ let range =
 
 let field = Angstrom.choice [range; list; all; value]
 
-(* Temporary 'unsupported' failwith function used to incrementally
-   implement all functionalities. *)
-let unsupported () = failwith "unsupported"
-
 type time = {
   minute : field;
   hour : field;
