@@ -8268,7 +8268,6 @@ let fast_withdrawal ?(expect_failure = false) ~sender ~endpoint ~amount_wei
       ~value:amount_wei
       ~gas:16_000_000
   in
-
   wait_for_application ~produce_block call_fast_withdrawal
 
 let test_fast_withdraw_feature_flag_deactivated =
@@ -8351,8 +8350,7 @@ let test_fast_withdraw_feature_flag_deactivated =
   if not (err =~ rex "Error") then Test.fail "Test should fail with error" ;
   unit
 
-let execute_payout ~service_provider_pkh ~exchanger
-    ~fast_withdrawal_contract_address ~service_provider_proxy client receipt =
+let find_and_decode_fast_withdrawal_event ~receipt =
   let fast_withdrawal_event_signature =
     "FastWithdrawal(bytes22,uint256,uint256,uint256,bytes,address)"
   in
@@ -8410,7 +8408,13 @@ let execute_payout ~service_provider_pkh ~exchanger
           l2_caller )
     | _ -> assert false
   in
+  return (target, withdrawal_id, amount, timestamp, payload, l2_caller)
 
+let execute_payout ~service_provider_pkh ~exchanger
+    ~fast_withdrawal_contract_address ~service_provider_proxy client receipt =
+  let* target, withdrawal_id, amount, timestamp, payload, l2_caller =
+    find_and_decode_fast_withdrawal_event ~receipt
+  in
   Client.transfer
     ~fee:(Tez.of_int 1) (* Small fee for the transaction *)
     ~fee_cap:(Tez.of_int 1)
@@ -8433,6 +8437,76 @@ let execute_payout ~service_provider_pkh ~exchanger
          payload
          l2_caller)
     client
+
+let test_fast_withdrawal_l2_caller =
+  let commitment_period = 5 and challenge_window = 5 in
+  register_all
+    ~tags:["fast_withdrawal"; "deposit"]
+    ~title:"Deposit and fast withdraw tez with forwarding contract"
+    ~commitment_period
+    ~challenge_window
+    ~enable_fast_withdrawal:true
+    ~time_between_blocks:Nothing
+    ~kernels:[Kernel.Ghostnet; Kernel.Latest]
+  @@ fun {sequencer; _} _protocol ->
+  let fast_withdrawal_contract_address =
+    "KT1TczPwz5KjAuuJKvkTmttS7bBioT5gjQ4Y"
+  in
+  let produce_block () = Rpc.produce_block sequencer in
+  let endpoint = Evm_node.endpoint sequencer in
+  let* withdrawal_forwarder_contract =
+    Solidity_contracts.call_fast_withdrawal ()
+  in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  (* deploy the contract *)
+  let* () =
+    Eth_cli.add_abi
+      ~label:withdrawal_forwarder_contract.label
+      ~abi:withdrawal_forwarder_contract.abi
+      ()
+  in
+  let* withdrawal_forwarder_contract_address, _tx =
+    Eth_cli.deploy
+      ~source_private_key:sender.Eth_account.private_key
+      ~endpoint
+      ~abi:withdrawal_forwarder_contract.label
+      ~bin:withdrawal_forwarder_contract.bin
+    |> Helpers.wait_for_application ~produce_block
+  in
+
+  let withdraw_amount = Tez.of_int 50 in
+
+  (* Define the Tezos address that will receive the fast withdrawal on L1. *)
+  let withdraw_receiver = "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX" in
+
+  (* Define the amount for fast withdrawal as 50 tez (half of the deposited amount). *)
+  let withdraw_amount_wei = Wei.of_tez withdraw_amount in
+
+  let* tx_hash =
+    Eth_cli.contract_send
+      ~source_private_key:sender.Eth_account.private_key
+      ~endpoint
+      ~abi_label:withdrawal_forwarder_contract.label
+      ~address:withdrawal_forwarder_contract_address
+      ~method_call:
+        (sf
+           "forwardWithdrawal(\"%s\", \"%s\")"
+           withdraw_receiver
+           fast_withdrawal_contract_address)
+      ~value:withdraw_amount_wei
+      ~gas:16_000_000
+    |> wait_for_application ~produce_block
+  in
+
+  let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+  let receipt = Option.get receipt in
+
+  let* _, _, _, _, _, l2_caller =
+    find_and_decode_fast_withdrawal_event ~receipt
+  in
+  Check.((withdrawal_forwarder_contract_address = l2_caller) string)
+    ~error_msg:"Expected %L as L2 caller instead of %R" ;
+  unit
 
 let test_deposit_and_fast_withdraw =
   let commitment_period = 5 and challenge_window = 5 in
@@ -10937,6 +11011,7 @@ let () =
   test_fast_withdrawal_feature_flag protocols ;
   test_deposit_and_fast_withdraw protocols ;
   test_fast_withdraw_feature_flag_deactivated protocols ;
+  test_fast_withdrawal_l2_caller protocols ;
   test_trace_call protocols ;
   test_trace_empty_block protocols ;
   test_trace_block protocols ;
