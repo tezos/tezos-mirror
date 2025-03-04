@@ -622,6 +622,7 @@ mod tests {
     use crate::block::GENESIS_PARENT_HASH;
     use crate::configuration::{DalConfiguration, Limits, TezosContracts};
     use crate::delayed_inbox::Hash;
+    use crate::sequencer_blueprint::rlp_roundtrip;
     use crate::storage::store_last_info_per_level_timestamp;
     use primitive_types::H256;
     use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -795,5 +796,27 @@ mod tests {
     #[test]
     fn test_invalid_sequencer_blueprint_is_removed_with_dal() {
         test_invalid_sequencer_blueprint_is_removed(true)
+    }
+
+    #[test]
+    fn test_block_header_roundtrip() {
+        let blueprint_header = BlueprintHeader {
+            number: 42.into(),
+            timestamp: Timestamp::from(10),
+        };
+        let evm_block_header = EVMBlockHeader {
+            hash: H256::from([42u8; 32]),
+            receipts_root: vec![23; 5],
+            transactions_root: vec![18; 5],
+        };
+
+        rlp_roundtrip(evm_block_header.clone());
+
+        let block_header = BlockHeader {
+            blueprint_header,
+            evm_block_header,
+        };
+
+        rlp_roundtrip(block_header);
     }
 }
