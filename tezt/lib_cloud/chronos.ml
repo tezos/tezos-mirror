@@ -7,7 +7,44 @@
 
 (* Scheduler in OCaml that mimics cron functionality. *)
 
-(* Needs to be extended to support ranges, multiple values and step values. *)
+(* Follows mostly https://man.freebsd.org/cgi/man.cgi?crontab%285%29:
+
+   The format of a cron command is very much the V7 standard, with a
+   number of upward-compatible extensions. Each line has five time and
+   date fields.
+
+   Commands are executed when the minute, hour, and month of year
+   fields match the current time, and when at least one of the two day
+   fields (day of month, or day of week) matches the current time.
+
+   The time and date fields are:
+
+   field	   allowed values
+   -----	   --------------
+   minute	   0-59
+   hour            0-23
+   day of month    1-31
+   month	   1-12
+   day of week     0-6
+
+   A field may be an asterisk `*`, which always stands for `first-last`.
+
+   Ranges of numbers are allowed. Ranges are two numbers separated
+   with a hyphen. The specified range is inclusive. For example, 8-11
+   for an `hours` entry specifies execution at hours 8, 9, 10 and 11.
+
+   Lists are allowed. A list is a set of numbers (or ranges) separated
+   by commas. Examples: `1,2,5,9`.
+
+   Step values can be used in conjunction with ranges. Following a
+   range with `/<number>` specifies skips of the number's value
+   through the range. For example, `0-23/2` can be used in the hours
+   field to specify command execution every other hour (the
+   alternative in the V7 standard is
+   `0,2,4,6,8,10,12,14,16,18,20,22`).
+
+   Note: Steps are only accepted for minutes and hours.
+*)
 type time = {
   minute : int option;
   hour : int option;
