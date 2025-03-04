@@ -71,6 +71,10 @@ let () =
     (function Invalid_consensus_key_update_tz4 pk -> Some pk | _ -> None)
     (fun pk -> Invalid_consensus_key_update_tz4 pk)
 
+type 'a kind =
+  | Consensus : Signature.public_key kind
+  | Companion : Bls.Public_key.t option kind
+
 type pk = Raw_context.consensus_pk = {
   delegate : Signature.Public_key_hash.t;
   consensus_pk : Signature.Public_key.t;
@@ -151,7 +155,8 @@ let active_key ctxt delegate =
   let* pk = active_pubkey ctxt delegate in
   return (pkh pk)
 
-let raw_pending_updates ctxt ?up_to_cycle delegate =
+let raw_pending_updates (type a) ctxt ?up_to_cycle ~(kind : a kind) delegate :
+    (Cycle_repr.t * a) list tzresult Lwt.t =
   let open Lwt_result_syntax in
   let relevant_cycles =
     let level = Raw_context.current_level ctxt in
@@ -168,23 +173,40 @@ let raw_pending_updates ctxt ?up_to_cycle delegate =
     Cycle_repr.(first_cycle ---> last_cycle)
   in
   let delegate = Contract_repr.Implicit delegate in
+  let find (type a) (ctxt, cycle) delegate (kind : a kind) :
+      a option tzresult Lwt.t =
+    match kind with
+    | Consensus -> Storage.Pending_consensus_keys.find (ctxt, cycle) delegate
+    | Companion ->
+        let* pk = Storage.Pending_companion_keys.find (ctxt, cycle) delegate in
+        return (Option.map Option.some pk)
+  in
   List.filter_map_es
     (fun cycle ->
-      let* pending_for_cycle =
-        Storage.Pending_consensus_keys.find (ctxt, cycle) delegate
-      in
+      let* pending_for_cycle = find (ctxt, cycle) delegate kind in
       pending_for_cycle |> Option.map (fun pk -> (cycle, pk)) |> return)
     relevant_cycles
 
 let pending_updates ctxt delegate =
   let open Lwt_result_syntax in
-  let* updates = raw_pending_updates ctxt delegate in
+  let* updates = raw_pending_updates ctxt ~kind:Consensus delegate in
   return
     (List.map (fun (c, pk) -> (c, Signature.Public_key.hash pk, pk)) updates)
 
+let pending_companion_updates ctxt delegate =
+  let open Lwt_result_syntax in
+  let* updates = raw_pending_updates ctxt ~kind:Companion delegate in
+  return
+    (List.filter_map
+       (fun (c, pk) ->
+         Option.map (fun pk -> (c, Bls.Public_key.hash pk, pk)) pk)
+       updates)
+
 let raw_active_pubkey_for_cycle ctxt delegate cycle =
   let open Lwt_result_syntax in
-  let* pendings = raw_pending_updates ctxt ~up_to_cycle:cycle delegate in
+  let* pendings =
+    raw_pending_updates ctxt ~up_to_cycle:cycle ~kind:Consensus delegate
+  in
   let* active = active_pubkey ctxt delegate in
   let current_cycle = (Raw_context.current_level ctxt).cycle in
   match List.hd (List.rev pendings) with

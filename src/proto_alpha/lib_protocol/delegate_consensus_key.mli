@@ -88,6 +88,12 @@ val pending_updates :
   tzresult
   Lwt.t
 
+(** Returns the list of pending companion key updates in upcoming cycles. *)
+val pending_companion_updates :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  (Cycle_repr.t * Bls.Public_key_hash.t * Bls.Public_key.t) list tzresult Lwt.t
+
 (** Register a consensus-key update. *)
 val register_update :
   Raw_context.t ->
