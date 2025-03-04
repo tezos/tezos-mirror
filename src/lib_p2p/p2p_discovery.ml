@@ -184,17 +184,6 @@ end
 (* Sender  *)
 
 module Sender = struct
-  type t = {
-    canceler : Lwt_canceler.t;
-    my_peer_id : P2p_peer.Id.t;
-    listening_port : int;
-    discovery_port : int;
-    discovery_addr : Ipaddr.V4.t;
-    pool : pool;
-    restart_discovery : unit Lwt_condition.t;
-    mutable worker : unit Lwt.t;
-  }
-
   module Config = struct
     type t = {delay : float; loop : int}
 
@@ -204,6 +193,18 @@ module Sender = struct
 
     let max_loop = 10
   end
+
+  type inner_state = {
+    mutable config : Config.t;
+    canceler : Lwt_canceler.t;
+    my_peer_id : P2p_peer.Id.t;
+    listening_port : int;
+    discovery_port : int;
+    discovery_addr : Ipaddr.V4.t;
+    pool : pool;
+    restart_discovery : unit Lwt_condition.t;
+    mutable worker : unit Lwt.t;
+  }
 
   let broadcast_message st =
     let open Lwt_syntax in
@@ -231,8 +232,9 @@ module Sender = struct
         return_unit)
       (fun _exn -> Events.(emit broadcast_error) ())
 
-  let rec worker_loop sender_config st =
+  let rec worker_loop st =
     let open Lwt_syntax in
+    let sender_config = st.config in
     let* r =
       Lwt_result.bind
         (protect ~canceler:st.canceler (fun () ->
@@ -250,19 +252,26 @@ module Sender = struct
                ])
     in
     match r with
-    | Ok config when config.Config.loop = Config.max_loop ->
-        let new_sender_config = {config with Config.loop = pred config.loop} in
-        worker_loop new_sender_config st
-    | Ok config ->
-        let new_sender_config = Config.increase_delay config in
-        worker_loop new_sender_config st
-    | Error (Canceled :: _) -> return_unit
-    | Error err ->
+    | Ok config -> worker_loop_completion config st
+    | Error trace -> worker_loop_error trace st
+
+  and worker_loop_completion config st =
+    if config.Config.loop = Config.max_loop then
+      st.config <- {config with Config.loop = pred config.loop}
+    else st.config <- Config.increase_delay config ;
+    worker_loop st
+
+  and worker_loop_error err st =
+    let open Lwt_syntax in
+    match err with
+    | Canceled :: _ -> return_unit
+    | err ->
         let* () = Events.(emit unexpected_error) ("sender", err) in
         Error_monad.cancel_with_exceptions st.canceler
 
   let create my_peer_id pool ~listening_port ~discovery_port ~discovery_addr =
     {
+      config = Config.initial;
       canceler = Lwt_canceler.create ();
       my_peer_id;
       listening_port;
@@ -278,13 +287,13 @@ module Sender = struct
       Lwt_utils.worker
         "discovery_sender"
         ~on_event:Internal_event.Lwt_worker_logger.on_event
-        ~run:(fun () -> worker_loop Config.initial st)
+        ~run:(fun () -> worker_loop st)
         ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler)
 end
 
 (* ********************************************************************** *)
 
-type t = {answer : Answer.t; sender : Sender.t}
+type t = {answer : Answer.t; sender : Sender.inner_state}
 
 let create ~listening_port ~discovery_port ~discovery_addr
     ~trust_discovered_peers pool my_peer_id =
