@@ -442,3 +442,62 @@ where
 
     MerkleTree::make_merkle_node(children)
 }
+
+#[cfg(test)]
+mod tests {
+    use proptest::{prop_assert, prop_assert_eq, proptest};
+    use tests::verify_backend::handle_not_found;
+
+    use super::*;
+    use crate::state_backend::{
+        Cells, ManagerWrite,
+        proof_backend::{ProofGen, ProofRegion},
+    };
+
+    const CELLS_SIZE: usize = 32;
+
+    // When producing a proof from a `ProofGen` state, values written during
+    // the execution of the tick being proven should not be blinded, whereas
+    // values which were not accessed should be blinded.
+    #[test]
+    fn test_proof_blinding() {
+        type TestLayout = (Array<u64, CELLS_SIZE>, Array<u64, CELLS_SIZE>);
+
+        proptest!(|(value_before: u64, value_after: u64, i in 0..CELLS_SIZE)| {
+            // Bind `ProofGen` cells and write at one address
+            let cells1 = [value_before; CELLS_SIZE];
+            let mut proof_region1: ProofRegion<u64, CELLS_SIZE, Ref<'_, Owned>> =
+                ProofRegion::bind(&cells1);
+            ProofGen::<Ref<'_, Owned>>::region_write(&mut proof_region1, i, value_after);
+            let proof_cells1: Cells<u64, CELLS_SIZE, Ref<'_, ProofGen<Ref<'_, Owned>>>> =
+                Cells::bind(&proof_region1);
+
+            // Bind `ProofGen` cells and do not access them
+            let cells2 = [value_before; CELLS_SIZE];
+            let proof_region2: ProofRegion<u64, CELLS_SIZE, Ref<'_, Owned>> =
+                ProofRegion::bind(&cells2);
+            let proof_cells2: Cells<u64, CELLS_SIZE, Ref<'_, ProofGen<Ref<'_, Owned>>>> =
+                Cells::bind(&proof_region2);
+
+            let proof_state = (proof_cells1, proof_cells2);
+
+            let merkle_proof = <TestLayout as ProofLayout>::to_merkle_tree(proof_state)
+                .unwrap()
+                .to_merkle_proof()
+                .unwrap();
+            let proof_tree = ProofTree::Present(&merkle_proof);
+
+            let verifier_state = <TestLayout as ProofLayout>::from_proof(proof_tree).unwrap();
+
+            // The first component of the state was present in the proof, can be
+            // fully read, and contains the initial state.
+            prop_assert_eq!(verifier_state.0.read_all(), vec![value_before; CELLS_SIZE]);
+
+            // The second component of the state is fully blinded: no values can
+            // be read from the array.
+            for i in 0..CELLS_SIZE {
+                prop_assert!(handle_not_found(|| verifier_state.1.read(i)).is_err());
+            }
+        })
+    }
+}
