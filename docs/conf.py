@@ -51,7 +51,7 @@ extensions = [
 
 # Sitemap
 sitemap_url_scheme = '{link}'
-html_baseurl = 'https://tezos.gitlab.io/'
+html_baseurl = 'https://octez.tezos.com/docs/'
 
 # pushfeedback.com
 pushfeedback_project = '42c4fpgh27'
