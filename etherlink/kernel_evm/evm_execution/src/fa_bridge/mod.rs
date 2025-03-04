@@ -51,6 +51,7 @@ use crate::{
     precompiles::{PrecompileBTreeMap, PrecompileOutcome, SYSTEM_ACCOUNT_ADDRESS},
     trace::TracerInput,
     transaction::TransactionContext,
+    transaction_layer_data::CallContext,
     withdrawal_counter::WithdrawalCounter,
     EthereumError,
 };
@@ -152,7 +153,13 @@ pub fn execute_fa_deposit<'a, Host: Runtime>(
         tracer_input,
     );
 
-    handler.begin_initial_transaction(false, Some(gas_limit))?;
+    handler.begin_initial_transaction(
+        CallContext {
+            is_static: false,
+            is_creation: false,
+        },
+        Some(gas_limit),
+    )?;
 
     // It's ok if internal proxy call fails, we will update the ticket table anyways.
     let ticket_owner = if let Some(proxy) = deposit.proxy {
@@ -259,7 +266,13 @@ pub fn execute_fa_withdrawal<Host: Runtime>(
             });
         }
 
-        handler.begin_inter_transaction(false, gas_limit)?;
+        handler.begin_inter_transaction(
+            CallContext {
+                is_static: false,
+                is_creation: false,
+            },
+            gas_limit,
+        )?;
 
         // Execute the withdrawal in the transaction layer and clean it based
         // on the result.

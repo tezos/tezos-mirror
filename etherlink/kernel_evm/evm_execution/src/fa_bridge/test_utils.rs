@@ -31,6 +31,7 @@ use crate::{
         self, precompile_set, FA_BRIDGE_PRECOMPILE_ADDRESS, SYSTEM_ACCOUNT_ADDRESS,
     },
     run_transaction,
+    transaction_layer_data::CallContext,
     utilities::keccak256_hash,
     withdrawal_counter::WITHDRAWAL_COUNTER_PATH,
 };
@@ -408,7 +409,13 @@ pub fn fa_bridge_precompile_call_withdraw(
     );
 
     handler
-        .begin_initial_transaction(false, Some(30_000_000))
+        .begin_initial_transaction(
+            CallContext {
+                is_static: false,
+                is_creation: false,
+            },
+            Some(30_000_000),
+        )
         .unwrap();
 
     let res = execute_fa_withdrawal(&mut handler, caller, withdrawal);

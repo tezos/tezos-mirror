@@ -176,6 +176,7 @@ mod tests {
         handler::{EvmHandler, ExecutionOutcome, ExecutionResult},
         precompiles::{self, FA_BRIDGE_PRECOMPILE_ADDRESS},
         transaction::TransactionContext,
+        transaction_layer_data::CallContext,
         utilities::{bigint_to_u256, keccak256_hash},
     };
 
@@ -337,7 +338,15 @@ mod tests {
             None,
         );
 
-        handler.begin_initial_transaction(false, None).unwrap();
+        handler
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: false,
+                },
+                None,
+            )
+            .unwrap();
 
         let result = handler.execute_call(
             FA_BRIDGE_PRECOMPILE_ADDRESS,

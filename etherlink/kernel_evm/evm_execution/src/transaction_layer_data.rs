@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023-2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -11,15 +12,23 @@ use evm::Config;
 use primitive_types::H160;
 use std::collections::BTreeSet;
 
+pub struct CallContext {
+    /// Whether the current transaction is static or not, ie, if the
+    /// transaction is allowed to update durable storage.
+    pub is_static: bool,
+    /// Whether the current transaction is a contract creation or not.
+    pub is_creation: bool,
+}
+
 /// Data related to the current transaction layer
 pub struct TransactionLayerData<'config> {
     /// Gasometer for the current transaction layer. If this value is
     /// `None`, then the current transaction has no gas limit and no
     /// gas accounting.
     pub gasometer: Option<Gasometer<'config>>,
-    /// Whether the current transaction is static or not, ie, if the
-    /// transaction is allowed to update durable storage.
-    pub is_static: bool,
+    /// Call context.
+    /// See `CallContext` for more documentation.
+    pub call_context: CallContext,
     /// The log records gathered in this layer of transactions and any
     /// committed sub layers.
     pub logs: Vec<Log>,
@@ -42,13 +51,17 @@ impl<'config> TransactionLayerData<'config> {
     /// will be no gasometer.
     pub fn new(
         is_static: bool,
+        is_creation: bool,
         gas_limit: Option<u64>,
         config: &'config Config,
         accessed_storage_keys: AccessRecord,
     ) -> Self {
         TransactionLayerData {
             gasometer: gas_limit.map(|gl| Gasometer::new(gl, config)),
-            is_static,
+            call_context: CallContext {
+                is_static,
+                is_creation,
+            },
             logs: vec![],
             deleted_contracts: BTreeSet::new(),
             withdrawals: vec![],
