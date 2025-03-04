@@ -52,6 +52,26 @@ type field =
   | Range of {first : int; last : int; step : int option}
   | Value of int
 
+let whitespace =
+  let open Angstrom in
+  let is_whitespace c = Char.equal ' ' c in
+  take_while1 is_whitespace
+
+let digits =
+  let open Angstrom in
+  let is_digit = function '0' .. '9' -> true | _ -> false in
+  int_of_string <$> take_while1 is_digit
+
+let value =
+  let open Angstrom in
+  lift (fun n -> Value n) digits
+
+let all =
+  let open Angstrom in
+  lift (fun _ -> All) (char '*')
+
+let field = Angstrom.choice [all; value]
+
 (* Temporary 'unsupported' failwith function used to incrementally
    implement all functionalities. *)
 let unsupported () = failwith "unsupported"
@@ -63,6 +83,15 @@ type time = {
   month : field;
   day_of_week : field;
 }
+
+let parser =
+  let open Angstrom in
+  (fun minute hour day month day_of_week ->
+    {minute; hour; day; month; day_of_week})
+  <$> field <* whitespace <*> field <* whitespace <*> field <* whitespace
+  <*> field <* whitespace <*> field
+
+let parse s = Angstrom.parse_string parser ~consume:All s
 
 type task = {name : string; time : time; action : unit -> unit Lwt.t}
 
@@ -87,37 +116,32 @@ let validate_time s =
   && in_range ~v:s.day_of_week (0, 6)
 
 let time_of_string s =
-  let xs = String.split_on_char ' ' s in
-  match xs with
-  | [min; hour; day; month; dow] ->
-      let parse str =
-        match str with "*" -> All | s -> Value (int_of_string s)
-      in
-      {
-        minute = parse min;
-        hour = parse hour;
-        day = parse day;
-        month = parse month;
-        day_of_week = parse dow;
-      }
-  | _ -> failwith (Format.asprintf "Invalid cron string format: %s" s)
+  match parse s with
+  | Ok v -> v
+  | Error _ -> failwith (Format.asprintf "Invalid cron string format: %s" s)
 
-let time_to_string spec =
-  let to_string = function
-    | All -> "*"
-    | Value v -> string_of_int v
+let pp_time ppf spec =
+  let pp ppf = function
+    | All -> Format.fprintf ppf "*"
+    | Value v -> Format.pp_print_int ppf v
     | Range _ -> unsupported ()
     | List _ -> unsupported ()
   in
-  String.concat
-    " "
-    [
-      to_string spec.minute;
-      to_string spec.hour;
-      to_string spec.day;
-      to_string spec.month;
-      to_string spec.day_of_week;
-    ]
+  Format.fprintf
+    ppf
+    "%a %a %a %a %a"
+    pp
+    spec.minute
+    pp
+    spec.hour
+    pp
+    spec.day
+    pp
+    spec.month
+    pp
+    spec.day_of_week
+
+let time_to_string tm = Format.asprintf "%a" pp_time tm
 
 let task ~name ~tm ~action =
   let time = time_of_string tm in
