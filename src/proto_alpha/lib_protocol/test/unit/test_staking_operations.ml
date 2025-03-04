@@ -571,3 +571,205 @@ let () =
   register_test
     ~title:"Finn: Finn finalizes staker1 and staker2 in a single batch."
   @@ fun () -> finn_finalize_batch
+
+(* Finn POC: Following Raphael's remark we test what happens if the
+   finalize operation is submitted twice in a block. We create 3
+   stakers whose unstake requests are finalized from a diffrerent
+   account (finn). Note that we delay unstake requests so that they
+   are issued in different cycles. *)
+let finn_finalize_interferance =
+  let open Lwt_result_syntax in
+  let amount = Tez_helpers.of_int 10_000 in
+  let* b, delegate = Context.init_with_constants1 constants in
+  let* b, finn = originate_implicit_unrevealed_account ~amount b delegate in
+  let* finn_account = Context.Contract.manager (B b) finn in
+  (* We need to manually reveal finn in order to create a batch later *)
+  let* reveal_finn = Op.revelation ~fee:Tez.zero (B b) finn_account.pk in
+  let* b = Block.bake ~operation:reveal_finn b in
+  let* b = bake_set_delegate_parameters_until_activation b ~delegate in
+  let create_staker_and_delegate amount block delegate =
+    let* b, staker =
+      originate_implicit_unrevealed_account ~amount block delegate
+    in
+    let* delegate_account = Context.Contract.manager (B b) delegate in
+    let* set_delegate =
+      Op.delegation ~force_reveal:true (B b) staker (Some delegate_account.pkh)
+    in
+    let* b = Block.bake ~operation:set_delegate b in
+    return (b, staker)
+  in
+  let* b, staker1 = create_staker_and_delegate amount b delegate in
+  let* b, staker2 = create_staker_and_delegate amount b delegate in
+  let* b, staker3 = create_staker_and_delegate amount b delegate in
+  let* b = bake_set_delegate_parameters_until_activation b ~delegate in
+  let margin = Tez_helpers.of_int 1 in
+  let staked_amount = Tez_helpers.(amount -! margin) in
+  let stake_and_bake staker block staked_amount =
+    let* stake_op =
+      Op.transaction
+        ~entrypoint:Protocol.Alpha_context.Entrypoint.stake
+        ~fee:Tez.zero
+        (B block)
+        staker
+        staker
+        staked_amount
+    in
+    let* b = Block.bake ~operation:stake_op block in
+    let* () =
+      check_balances
+        b
+        ~staker:staker1
+        ~spendable:margin
+        ~staked:staked_amount
+        ()
+    in
+    return b
+  in
+  (* Stake 9_999 tez for each staker1 and staker2 with delegate. *)
+  let* b = stake_and_bake staker1 b staked_amount in
+  let* b = stake_and_bake staker2 b staked_amount in
+  let* b = stake_and_bake staker3 b staked_amount in
+  let unstake_and_bake staker unstake_amount spendable_balance block =
+    let* unstake_op =
+      Op.transaction
+        ~entrypoint:Protocol.Alpha_context.Entrypoint.unstake
+        ~fee:Tez.zero
+        (B block)
+        staker
+        staker
+        unstake_amount
+    in
+    let* b = Block.bake ~operation:unstake_op block in
+    let* () =
+      check_balances
+        b
+        ~staker
+        ~spendable:spendable_balance
+        ~staked:Tez.zero
+        ~unstaked_frozen:unstake_amount
+        ()
+    in
+    return b
+  in
+  let* b = unstake_and_bake staker1 staked_amount margin b in
+  let* b = unstake_and_bake staker2 staked_amount margin b in
+  let* b = unstake_and_bake staker3 staked_amount margin b in
+  let* b =
+    Block.bake_until_n_cycle_end
+      (constants.consensus_rights_delay + Constants.slashing_delay + 1)
+      b
+  in
+  (* Both staker1 and staker 2 should be finalizable now. *)
+  let* () =
+    check_balances
+      b
+      ~staker:staker1
+      ~spendable:margin
+      ~staked:Tez.zero
+      ~unstaked_frozen:Tez.zero
+      ~unstaked_finalizable:staked_amount
+      ()
+  in
+  let* () =
+    check_balances
+      b
+      ~staker:staker2
+      ~spendable:margin
+      ~staked:Tez.zero
+      ~unstaked_frozen:Tez.zero
+      ~unstaked_finalizable:staked_amount
+      ()
+  in
+  let* () =
+    check_balances
+      b
+      ~staker:staker3
+      ~spendable:margin
+      ~staked:Tez.zero
+      ~unstaked_frozen:Tez.zero
+      ~unstaked_finalizable:staked_amount
+      ()
+  in
+
+  (* Ensure finalising for an unallocated account doesn't cause the batch to fail. *)
+  let non_allocated_contract = Contract.Implicit (Account.new_account ()).pkh in
+  let* () =
+    check_balances
+      b
+      ~staker:non_allocated_contract
+      ~spendable:Tez.zero
+      ~staked:Tez.zero
+      ~unstaked_frozen:Tez.zero
+      ~unstaked_finalizable:Tez.zero
+      ()
+  in
+  (* Now we need to manually create a batch of finalization ops signed
+     by Finn. *)
+  let finalize_staker source destination =
+    Op.transaction
+      ~entrypoint:Protocol.Alpha_context.Entrypoint.finalize_unstake
+      ~fee:Tez.zero
+      (B b)
+      source
+      destination
+      Tez_helpers.zero
+  in
+  let* batch =
+    let* finalize1 = finalize_staker finn staker1 in
+    let* finalize2 = finalize_staker finn staker2 in
+    let* finalize_non_allocated = finalize_staker finn non_allocated_contract in
+    let* finalize3 = finalize_staker finn staker3 in
+    Op.batch_operations
+      ~recompute_counters:true
+      ~source:finn
+      (B b)
+      [finalize1; finalize2; finalize_non_allocated; finalize3]
+  in
+  let* finalize_self = finalize_staker staker2 staker2 in
+  let* b = Block.bake ~operations:[finalize_self; batch] b in
+  (* we assert finalized work *)
+  let* () =
+    check_balances
+      b
+      ~staker:staker1
+      ~spendable:amount
+      ~staked:Tez.zero
+      ~unstaked_frozen:Tez.zero
+      ~unstaked_finalizable:Tez.zero
+      ()
+  in
+  let* () =
+    check_balances
+      b
+      ~staker:staker2
+      ~spendable:amount
+      ~staked:Tez.zero
+      ~unstaked_frozen:Tez.zero
+      ~unstaked_finalizable:Tez.zero
+      ()
+  in
+  let* () =
+    check_balances
+      b
+      ~staker:staker3
+      ~spendable:amount
+      ~staked:Tez.zero
+      ~unstaked_frozen:Tez.zero
+      ~unstaked_finalizable:Tez.zero
+      ()
+  in
+  check_balances
+    b
+    ~staker:non_allocated_contract
+    ~spendable:Tez.zero
+    ~staked:Tez.zero
+    ~unstaked_frozen:Tez.zero
+    ~unstaked_finalizable:Tez.zero
+    ()
+
+let () =
+  register_test
+    ~title:
+      "Finn: Finn batch finalizes correctly even if one of the stakers submits \
+       a finalize operation in parallel."
+  @@ fun () -> finn_finalize_interferance
