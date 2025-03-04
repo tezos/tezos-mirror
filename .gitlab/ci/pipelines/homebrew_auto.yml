@@ -32,7 +32,7 @@ oc.install-homebrew:
   image: debian:bookworm
   stage: build
   tags:
-  - gcp
+  - gcp_very_high_cpu
   needs:
   - oc.build-homebrew
   dependencies: []
