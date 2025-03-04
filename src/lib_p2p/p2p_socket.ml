@@ -605,7 +605,9 @@ module Reader = struct
     let on_close _w = Lwt.return_unit
   end
 
-  let run ?size conn encoding canceler =
+  (* [?messages] can be specified for testing purposes, it is safe as long
+     as this function is not exposed. *)
+  let run ?messages ?size conn encoding canceler =
     let open Lwt_result_syntax in
     let compute_size = function
       | Ok (size, _) ->
@@ -615,7 +617,9 @@ module Reader = struct
          in that case... *)
     in
     let bound = Option.map (fun max -> (max, compute_size)) size in
-    let messages = Lwt_pipe.Maybe_bounded.create ?bound () in
+    let messages =
+      Option.value messages ~default:(Lwt_pipe.Maybe_bounded.create ?bound ())
+    in
     Lwt_canceler.on_cancel canceler (fun () ->
         Lwt_pipe.Maybe_bounded.close messages ;
         Lwt.return_unit) ;
@@ -774,7 +778,9 @@ module Writer = struct
     let on_close _w = Lwt.return_unit
   end
 
-  let run ?size ?binary_chunks_size conn encoding canceler =
+  (* [?messages] can be specified for testing purposes, it is safe as long
+     as this function is not exposed. *)
+  let run ?messages ?size ?binary_chunks_size conn encoding canceler =
     let open Lwt_result_syntax in
     let binary_chunks_size =
       match binary_chunks_size with
@@ -800,7 +806,9 @@ module Writer = struct
           + Lwt_pipe.Maybe_bounded.push_overhead
     in
     let bound = Option.map (fun max -> (max, compute_size)) size in
-    let messages = Lwt_pipe.Maybe_bounded.create ?bound () in
+    let messages =
+      Option.value messages ~default:(Lwt_pipe.Maybe_bounded.create ?bound ())
+    in
     Lwt_canceler.on_cancel canceler (fun () ->
         Lwt_pipe.Maybe_bounded.close messages ;
         let rec loop () =
@@ -1070,6 +1078,8 @@ module Internal_for_tests = struct
     let canceler = Lwt_canceler.create () in
     let* reader =
       Reader.run ~messages:reader conn (make_crashing_encoding ()) canceler
-    and* writer = Writer.run conn (make_crashing_encoding ()) canceler in
+    and* writer =
+      Writer.run ~messages:writer conn (make_crashing_encoding ()) canceler
+    in
     return {conn; reader; writer; canceler}
 end

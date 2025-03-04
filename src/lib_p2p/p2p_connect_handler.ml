@@ -913,8 +913,7 @@ module Internal_for_tests = struct
              ~canceler:_
              authenticated_connection
              _encoding ->
-          Lwt.return_ok
-            (P2p_socket.Internal_for_tests.mock authenticated_connection));
+          P2p_socket.Internal_for_tests.mock authenticated_connection);
     }
 
   let dumb_config : config =

@@ -301,5 +301,5 @@ module Internal_for_tests : sig
     ?reader:(int * 'msg) tzresult Lwt_pipe.Maybe_bounded.t ->
     ?writer:(bytes list * unit tzresult Lwt.u option) Lwt_pipe.Maybe_bounded.t ->
     'meta authenticated_connection ->
-    ('msg, 'meta) t
+    ('msg, 'meta) t tzresult Lwt.t
 end
