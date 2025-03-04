@@ -1,7 +1,7 @@
 [package]
 name = "octez-evm-node-wasm-runtime"
 version = "0.0.0-dev"
-authors = [ "Etherlink Core Engineers <contact@tezos.com>" ]
+authors = ["Etherlink Core Engineers <contact@tezos.com>"]
 edition = "2021"
 
 [lib]
@@ -13,11 +13,15 @@ ocaml-build = { version = "1.*", features = ["dune"] }
 [dependencies]
 hex = "*"
 ocaml = { version = "1.1.0" }
-wasmer = { path = "../../src/rust_deps/wasmer-3.3.0/lib/api", default-features = false, features = ["cranelift", "jit"] }
+wasmer = { path = "../../src/rust_deps/wasmer-3.3.0/lib/api", default-features = false, features = [
+    "cranelift",
+    "jit",
+] }
 wasmer-compiler-cranelift = { path = "../../src/rust_deps/wasmer-3.3.0/lib/compiler-cranelift" }
 tezos_crypto_rs = { version = "0.6", path = "../../sdk/rust/crypto", default-features = false }
 log = "0.4"
 env_logger = "0.11"
+octez-riscv = { path = "../../src/riscv/lib", features = ["ocaml-api"] }
 librustzcash = { path = "../../src/rustzcash_deps" }
 tezos-smart-rollup-core = { path = "../../src/kernel_sdk/core" }
 tezos-smart-rollup-host = { path = "../../src/kernel_sdk/host" }

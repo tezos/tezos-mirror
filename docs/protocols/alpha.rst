@@ -54,3 +54,5 @@ Minor Changes
 
 Internal
 --------
+
+- Added ``octez_riscv_pvm`` as a dependency for the protocol environment (:gl:`!15918`)

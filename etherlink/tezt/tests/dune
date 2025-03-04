@@ -12,7 +12,7 @@
   tezt-tezos
   tezt_etherlink
   octez-evm-node-libs.evm_node_lib_dev_encoding
-  octez-rustzcash-deps
+  octez-rust-deps
   tezos-protocol-alpha.protocol)
  (preprocess (staged_pps ppx_import ppx_deriving.show))
  (library_flags (:standard -linkall))
