@@ -142,4 +142,6 @@ module type T = sig
   module Skip_list : [%sig "v15/skip_list.mli"]
 
   module Smart_rollup : [%sig "v15/smart_rollup.mli"]
+
+  module Riscv : [%sig "v15/riscv.mli"]
 end
