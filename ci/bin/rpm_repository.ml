@@ -268,12 +268,6 @@ let jobs pipeline_type =
     [
       job_install_bin
         ~__POS__
-        ~name:"oc.install_bin_fedora_39"
-        ~dependencies:(Dependent [Job job_rpm_repo_fedora])
-        ~image:Images.fedora_39
-        ["./scripts/packaging/tests/rpm/rpm-install.sh fedora 39"];
-      job_install_bin
-        ~__POS__
         ~name:"oc.install_bin_fedora_39.doc"
         ~dependencies:(Dependent [Job job_rpm_repo_fedora])
         ~image:Images.fedora_39
@@ -300,12 +294,6 @@ let jobs pipeline_type =
   in
   let test_rockylinux_packages_jobs =
     [
-      job_install_bin
-        ~__POS__
-        ~name:"oc.install_bin_rockylinux_9.3"
-        ~dependencies:(Dependent [Job job_rpm_repo_rockylinux])
-        ~image:Images.rockylinux_93
-        ["./scripts/packaging/tests/rpm/rpm-install.sh rockylinux 9.3"];
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_rockylinux_9.3.doc"
