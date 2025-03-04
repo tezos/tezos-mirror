@@ -185,8 +185,9 @@ let init ~tasks =
 
 (* Check if a task should run at the given time.
 
-   The `+ 1` is needed because OCaml's Unix module and the cron
-   standard use different numbering conventions for months:
+   The `(succ tm.Unix.tm_mon)` is needed because OCaml's Unix module
+   and the cron standard use different numbering conventions for
+   months:
    - Unix.tm_mon ranges from 0 to 11 (January = 0, December = 11)
    - Cron standard uses 1 to 12 (January = 1, December = 12) *)
 
