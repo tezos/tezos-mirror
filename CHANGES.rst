@@ -301,3 +301,5 @@ Protocol
 
 Miscellaneous
 -------------
+
+- Revert Renamed ``Bls`` file from the crypto library in ``Bls_aug.ml``. (MR :gl:`!17051`).

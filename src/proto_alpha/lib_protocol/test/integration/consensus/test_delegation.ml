@@ -1583,7 +1583,7 @@ let test_bls_account_self_delegate ~allow_tz4_delegate_enable () =
           Environment.Ecoproto_error
             (Contract_delegate_storage.Forbidden_tz4_delegate pkh);
         ]
-        when Signature.Bls_aug.Public_key_hash.(pkh = tz4_pkh) ->
+        when Signature.Bls.Public_key_hash.(pkh = tz4_pkh) ->
           return_unit
       | err ->
           failwith
