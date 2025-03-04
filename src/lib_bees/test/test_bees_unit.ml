@@ -39,7 +39,7 @@ type error += TzCrashError
 
 exception RaisedExn
 
-let create_handlers (type a) ?on_completion () =
+let create_handlers (type a) ?on_completion ?(slow = false) () =
   (module struct
     type self = a Worker.t
 
@@ -49,8 +49,9 @@ let create_handlers (type a) ?on_completion () =
         =
      fun _w request ->
       let open Lwt_result_syntax in
+      let*! () = if slow then Lwt_unix.sleep 0.2 else Lwt.return_unit in
       match request with
-      | Request.RqA _i -> return_unit
+      | Request.RqA _i -> (return_unit : (r, request_error) result Lwt.t)
       | Request.RqB -> return_unit
       | Request.RqErr Crash -> Lwt.return_error `CrashError
       | Request.RqErr Simple -> Lwt.return_error `SimpleError
@@ -109,7 +110,7 @@ let create_bounded ?on_completion =
   let table = Worker.create_table (Bounded {size = 2}) in
   create table (create_handlers ?on_completion ())
 
-let create_dropbox ?on_completion =
+let create_dropbox ?on_completion ?slow =
   let table =
     let open Worker in
     let merge _w (Any_request (neu, neu_metadata)) (old : _ option) =
@@ -127,7 +128,7 @@ let create_dropbox ?on_completion =
     in
     Worker.create_table (Dropbox {merge})
   in
-  create table (create_handlers ?on_completion ())
+  create table (create_handlers ?slow ?on_completion ())
 
 open Mocked_worker.Request
 
@@ -257,6 +258,7 @@ let test_push_crashing_request () =
 let test_cancel_worker () =
   let open Lwt_result_syntax in
   let* w = create_queue "canceled_worker" in
+  assert_status w "Running" ;
   let*! () = push_and_assert_history w [Box RqB] in
   assert_status w "Running" ;
   let*! () = Worker.shutdown w in
@@ -291,7 +293,10 @@ let test_async_dropbox () =
   let t_each, u_each = Lwt.task () in
   let nb_completion = ref 0 in
   let* w =
+    (* We want slow request in order to make sure that all the injected
+       requests are merged while the first one is being treated *)
     create_dropbox
+      ~slow:true
       ~on_completion:(fun () ->
         let open Lwt_syntax in
         incr nb_completion ;
@@ -302,10 +307,13 @@ let test_async_dropbox () =
   in
   let rq = RqA 1 in
   let n = 10 in
-  (* One blocking request is sent *)
+  (* First request is sent *)
   Worker.Dropbox.put_request w rq ;
-  (* While the blocking request is handled, n other requests are sent *)
-  (* There requests should be merged into one *)
+  (* Sleep in order to make sure that the first request is handled
+     before the others one are sent *)
+  let*! () = Lwt_unix.sleep 0.1 in
+  (* While the first request is handled, n other requests are sent *)
+  (* These requests should be merged into one *)
   for _i = 1 to n do
     Worker.Dropbox.put_request w rq
   done ;
@@ -322,27 +330,47 @@ let wrap_qcheck test () =
   let _ = QCheck_alcotest.to_alcotest test in
   Lwt_result_syntax.return_unit
 
-let _tests_history =
+let wrap_event_loop fn () =
+  Lwt.return @@ Tezos_base_unix.Event_loop.main_run ~eio:true fn
+
+let tests_history =
   ( "Queue history",
     [
       Tztest.tztest
         "Random normal requests"
         `Quick
-        (wrap_qcheck (test_random_requests create_queue));
+        (wrap_event_loop @@ wrap_qcheck (test_random_requests create_queue));
       Tztest.tztest
         "Random normal requests on Bounded"
         `Quick
-        (wrap_qcheck (test_random_requests create_bounded));
+        (wrap_event_loop @@ wrap_qcheck (test_random_requests create_bounded));
     ] )
 
-let _tests_status =
+let tests_status =
   ( "Status",
     [
-      Tztest.tztest "Canceled worker" `Quick test_cancel_worker;
-      Tztest.tztest "Crashing requests" `Quick test_push_crashing_request;
+      Tztest.tztest
+        "Canceled worker"
+        `Quick
+        (wrap_event_loop @@ test_cancel_worker);
+      Tztest.tztest
+        "Crashing requests"
+        `Quick
+        (wrap_event_loop @@ test_push_crashing_request);
     ] )
 
-let _tests_buffer =
-  ("Buffer handling", [Tztest.tztest "Dropbox/Async" `Quick test_async_dropbox])
+let tests_buffer =
+  ( "Buffer handling",
+    [
+      Tztest.tztest
+        "Dropbox/Async"
+        `Quick
+        (wrap_event_loop @@ test_async_dropbox);
+    ] )
 
-let () = Alcotest_lwt.run ~__FILE__ "Bees_workers" [] |> Lwt_main.run
+let () =
+  Alcotest_lwt.run
+    ~__FILE__
+    "Bees_workers"
+    [tests_history; tests_status; tests_buffer]
+  |> Lwt_main.run
