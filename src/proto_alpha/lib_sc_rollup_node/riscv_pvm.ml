@@ -26,13 +26,9 @@ let to_pvm_input (input : Sc_rollup.input) : Backend.input =
         ( Raw_level.to_int32 inbox_level,
           Z.to_int64 message_counter,
           Sc_rollup.Inbox_message.unsafe_to_string payload )
-  | Sc_rollup.(Reveal (Metadata data)) ->
-      let bytes =
-        Data_encoding.Binary.to_string_exn Sc_rollup.Metadata.encoding data
-      in
-      Reveal bytes
-  (* TODO: RV-504 Encode remaining types of reveal *)
-  | Sc_rollup.(Reveal _) -> assert false
+  | Sc_rollup.(Reveal reveal_data) ->
+      let reveal_data_bytes = Sc_rollup.reveal_response_to_bytes reveal_data in
+      Reveal (String.of_bytes reveal_data_bytes)
 
 let of_pvm_input_request (_input_request : Backend.input_request) :
     Sc_rollup.input_request =

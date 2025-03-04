@@ -66,6 +66,27 @@ type reveal_data =
 
 type input = Inbox_message of inbox_message | Reveal of reveal_data
 
+(** [reveal_response_to_bytes reveal_data] computes the bytes to be sent to PVMs
+    when performing a reveal request.
+    Useful for unifying the encodings used by the WASM and RISC-V PVMs *)
+let reveal_response_to_bytes reveal_data =
+  match reveal_data with
+  | Raw_data data -> Bytes.of_string data
+  | Metadata data ->
+      Data_encoding.Binary.to_bytes_exn Sc_rollup_metadata_repr.encoding data
+  | Dal_page content_bytes ->
+      Option.value ~default:Bytes.empty content_bytes
+      (* [content_opt] is [None] when the slot was not confirmed in the L1.
+         In this case, we return empty bytes.
+
+         Note that the kernel can identify this unconfirmed slot scenario because
+         all confirmed pages have a size of 4KiB. Thus, a page can only be considered
+         empty (0KiB) if it is unconfirmed. *)
+  | Dal_parameters dal_parameters ->
+      Data_encoding.Binary.to_bytes_exn
+        Sc_rollup_dal_parameters_repr.encoding
+        dal_parameters
+
 let pp_inbox_message fmt {inbox_level; message_counter; _} =
   Format.fprintf
     fmt
