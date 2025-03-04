@@ -74,7 +74,15 @@ let list =
   let open Angstrom in
   lift (fun values -> List values) (sep_by1 (char ',') digits)
 
-let field = Angstrom.choice [list; all; value]
+let range =
+  let open Angstrom in
+  lift3
+    (fun first last step -> Range {first; last; step})
+    digits
+    (char '-' *> digits)
+    (option None (Option.some <$> char '/' *> digits))
+
+let field = Angstrom.choice [range; list; all; value]
 
 (* Temporary 'unsupported' failwith function used to incrementally
    implement all functionalities. *)
@@ -106,18 +114,23 @@ type t = {
 }
 
 let validate_time s =
-  let in_range ~v (min, max) =
+  let in_range ~kind ~v (min, max) =
+    let check v = v >= min && v <= max in
     match v with
     | All -> true
-    | Value v -> v >= min && v <= max
-    | Range _ -> unsupported ()
+    | Value v -> check v
+    | Range {first; last; step} -> (
+        let b = first <= last && check first && check last in
+        match (step, kind) with
+        | None, _ | Some _, (`hour | `minute) -> b
+        | Some _, (`day | `month | `day_of_week) -> false)
     | List vs -> List.for_all (fun v -> v >= min && v <= max) vs
   in
-  in_range ~v:s.minute (0, 59)
-  && in_range ~v:s.hour (0, 23)
-  && in_range ~v:s.day (1, 31)
-  && in_range ~v:s.month (1, 12)
-  && in_range ~v:s.day_of_week (0, 6)
+  in_range ~kind:`minute ~v:s.minute (0, 59)
+  && in_range ~kind:`hour ~v:s.hour (0, 23)
+  && in_range ~kind:`day ~v:s.day (1, 31)
+  && in_range ~kind:`month ~v:s.month (1, 12)
+  && in_range ~kind:`day_of_week ~v:s.day_of_week (0, 6)
 
 let time_of_string s =
   match parse s with
@@ -128,7 +141,13 @@ let pp_time ppf spec =
   let pp ppf = function
     | All -> Format.fprintf ppf "*"
     | Value v -> Format.pp_print_int ppf v
-    | Range _ -> unsupported ()
+    | Range {first; last; step} ->
+        Format.fprintf
+          ppf
+          "%d-%d%s"
+          first
+          last
+          (Option.fold ~none:"" ~some:(Format.sprintf "/%d") step)
     | List vs ->
         Format.pp_print_list
           ~pp_sep:(fun ppf () -> Format.fprintf ppf ",")
@@ -170,12 +189,15 @@ let init ~tasks =
    standard use different numbering conventions for months:
    - Unix.tm_mon ranges from 0 to 11 (January = 0, December = 11)
    - Cron standard uses 1 to 12 (January = 1, December = 12) *)
+
 let should_run task tm =
   let matches t v =
     match v with
     | Value v -> Int.equal v t
     | All -> true
-    | Range _ -> unsupported ()
+    | Range {first; last; step = None} -> first <= t && t <= last
+    | Range {first; last; step = Some step} ->
+        first <= t && t <= last && first mod step = t mod step
     | List vs -> List.mem t vs
   in
   matches tm.Unix.tm_min task.time.minute
