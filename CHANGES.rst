@@ -31,6 +31,9 @@ Node
 Client
 ------
 
+- Update signer messages encoding. Signing message for BLS (Tz4) addresses now
+  contain signing version. (MR :gl:`!16986`)
+
 Baker
 -----
 
