@@ -3355,6 +3355,7 @@ test_sdk_bindings:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . $HOME/.venv/bin/activate
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -C contrib/sdk-bindings check
