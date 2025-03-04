@@ -134,6 +134,7 @@ val create :
   ?remote_mode:bool ->
   ?operations_pool:string ->
   ?dal_node:Dal_node.t ->
+  ?dal_node_timeout_percentage:int ->
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
   ?node_version_allowed:string ->
@@ -172,6 +173,7 @@ val create_from_uris :
   ?remote_mode:bool ->
   ?operations_pool:string ->
   ?dal_node_rpc_endpoint:Endpoint.t ->
+  ?dal_node_timeout_percentage:int ->
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
   ?node_version_allowed:string ->
@@ -232,6 +234,7 @@ val init :
   ?remote_mode:bool ->
   ?operations_pool:string ->
   ?dal_node:Dal_node.t ->
+  ?dal_node_timeout_percentage:int ->
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
   ?node_version_allowed:string ->
