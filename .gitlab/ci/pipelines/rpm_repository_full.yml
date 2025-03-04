@@ -389,24 +389,6 @@ rpm_repo_fedora:
     - stuck_or_timeout_failure
     - runner_system_failure
 
-oc.install_bin_fedora_39:
-  image: fedora:39
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - rpm_repo_fedora
-  dependencies: []
-  timeout: 60 minutes
-  script:
-  - ./scripts/packaging/tests/rpm/rpm-install.sh fedora 39
-  variables: {}
-  retry:
-    max: 2
-    when:
-    - stuck_or_timeout_failure
-    - runner_system_failure
-
 oc.install_bin_fedora_39.doc:
   image: fedora:39
   stage: publishing_tests
@@ -449,24 +431,6 @@ oc.install_bin_fedora_39_systemd:
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: fedora
     RELEASE: "39"
-
-oc.install_bin_rockylinux_9.3:
-  image: rockylinux:9.3
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - rpm_repo_rockylinux
-  dependencies: []
-  timeout: 60 minutes
-  script:
-  - ./scripts/packaging/tests/rpm/rpm-install.sh rockylinux 9.3
-  variables: {}
-  retry:
-    max: 2
-    when:
-    - stuck_or_timeout_failure
-    - runner_system_failure
 
 oc.install_bin_rockylinux_9.3.doc:
   image: rockylinux:9.3

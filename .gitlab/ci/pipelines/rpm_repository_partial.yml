@@ -204,24 +204,6 @@ rpm_repo_rockylinux:
     - stuck_or_timeout_failure
     - runner_system_failure
 
-oc.install_bin_rockylinux_9.3:
-  image: rockylinux:9.3
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - rpm_repo_rockylinux
-  dependencies: []
-  timeout: 60 minutes
-  script:
-  - ./scripts/packaging/tests/rpm/rpm-install.sh rockylinux 9.3
-  variables: {}
-  retry:
-    max: 2
-    when:
-    - stuck_or_timeout_failure
-    - runner_system_failure
-
 oc.install_bin_rockylinux_9.3.doc:
   image: rockylinux:9.3
   stage: publishing_tests
