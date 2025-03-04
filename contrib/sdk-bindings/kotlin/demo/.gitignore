@@ -3,3 +3,7 @@
 
 # Ignore Gradle build output directory
 build
+
+# UniFFI generated files
+app/src/main/kotlin/org/example/tezos/*
+app/src/main/resources/libtezos.so
