@@ -7,4 +7,3 @@
 *.dsc
 *.tar.*
 octez/debian/changelog
-octez-data/debian/changelog
