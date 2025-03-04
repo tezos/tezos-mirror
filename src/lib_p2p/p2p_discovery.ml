@@ -196,23 +196,58 @@ module Sender = struct
 
   type inner_state = {
     mutable config : Config.t;
-    canceler : Lwt_canceler.t;
     my_peer_id : P2p_peer.Id.t;
     listening_port : int;
     discovery_port : int;
     discovery_addr : Ipaddr.V4.t;
     pool : pool;
     restart_discovery : unit Lwt_condition.t;
-    mutable worker : unit Lwt.t;
   }
 
-  let broadcast_message st =
+  module Name = P2p_workers.Unique_name_maker (struct
+    let base = ["p2p_discovery"; "sender"]
+  end)
+
+  module Types = struct
+    type state = inner_state
+
+    type parameters = {
+      my_peer_id : P2p_peer.Id.t;
+      listening_port : int;
+      discovery_port : int;
+      discovery_addr : Ipaddr.V4.t;
+      pool : pool;
+    }
+  end
+
+  module Request = struct
+    type ('response, 'error) t = Loop : (Config.t, tztrace) t
+
+    type view = View : ('response, 'error) t -> view
+
+    let view r = View r
+
+    let encoding =
+      let open Data_encoding in
+      conv (fun (View Loop) -> ()) (fun () -> View Loop) unit
+
+    let pp ppf (View Loop) = Format.fprintf ppf "loop"
+
+    let default_callback_value = View Loop
+  end
+
+  module Worker = P2p_workers.Make (Name) (Request) (Types)
+
+  type t = Worker.activated_worker
+
+  let broadcast_message worker =
     let open Lwt_syntax in
+    let st = Worker.state worker in
     let msg = Message.make st.my_peer_id st.listening_port in
     Lwt.catch
       (fun () ->
         let socket = Lwt_unix.(socket PF_INET SOCK_DGRAM 0) in
-        Lwt_canceler.on_cancel st.canceler (fun () ->
+        Lwt_canceler.on_cancel (Worker.canceler worker) (fun () ->
             let* r = Lwt_utils_unix.safe_close socket in
             Result.iter_error
               (Format.eprintf "Uncaught error: %a\n%!" pp_print_trace)
@@ -232,68 +267,101 @@ module Sender = struct
         return_unit)
       (fun _exn -> Events.(emit broadcast_error) ())
 
-  let rec worker_loop st =
-    let open Lwt_syntax in
+  let loop worker =
+    let open Lwt_result_syntax in
+    let st = Worker.state worker in
     let sender_config = st.config in
-    let* r =
-      Lwt_result.bind
-        (protect ~canceler:st.canceler (fun () ->
-             Lwt_result.ok @@ broadcast_message st))
-      @@ fun () ->
-      protect ~canceler:st.canceler (fun () ->
-          Lwt_result.ok
-          @@ Lwt.pick
-               [
-                 (let* () = Lwt_condition.wait st.restart_discovery in
-                  return Config.initial);
-                 (let* () = Lwt_unix.sleep sender_config.Config.delay in
-                  return
-                    {sender_config with Config.loop = succ sender_config.loop});
-               ])
-    in
-    match r with
-    | Ok config -> worker_loop_completion config st
-    | Error trace -> worker_loop_error trace st
+    Lwt_result.bind
+      (protect (fun () -> Lwt_result.ok @@ broadcast_message worker))
+    @@ fun () ->
+    protect (fun () ->
+        Lwt.pick
+          [
+            (let*! () = Lwt_condition.wait st.restart_discovery in
+             return Config.initial);
+            (let*! () = Lwt_unix.sleep sender_config.Config.delay in
+             return {sender_config with Config.loop = succ sender_config.loop});
+          ])
 
-  and worker_loop_completion config st =
+  let loop_completion config st =
     if config.Config.loop = Config.max_loop then
       st.config <- {config with Config.loop = pred config.loop}
     else st.config <- Config.increase_delay config ;
-    worker_loop st
+    Lwt.return_unit
 
-  and worker_loop_error err st =
+  let loop_error err =
     let open Lwt_syntax in
     match err with
     | Canceled :: _ -> return_unit
-    | err ->
-        let* () = Events.(emit unexpected_error) ("sender", err) in
-        Error_monad.cancel_with_exceptions st.canceler
+    | err -> Events.(emit unexpected_error) ("sender", err)
+
+  module Handlers = struct
+    type self = Worker.callback Worker.t
+
+    type launch_error = tztrace
+
+    let on_launch :
+        self ->
+        Name.t ->
+        Types.parameters ->
+        (Types.state, launch_error) result Lwt.t =
+     fun _self
+         _name
+         {my_peer_id; listening_port; discovery_port; discovery_addr; pool} ->
+      Lwt.return_ok
+        {
+          config = Config.initial;
+          my_peer_id;
+          listening_port;
+          discovery_port;
+          discovery_addr;
+          restart_discovery = Lwt_condition.create ();
+          pool;
+        }
+
+    let on_request :
+        type response error.
+        self -> (response, error) Request.t -> (response, error) result Lwt.t =
+     fun self Loop -> loop self
+
+    let on_no_request _self = Lwt.return_unit
+
+    let on_close _self = Lwt.return_unit
+
+    let on_error :
+        type response error.
+        self ->
+        _ ->
+        (response, error) Request.t ->
+        error ->
+        [`Continue | `Shutdown] tzresult Lwt.t =
+     fun _self _ Loop error ->
+      let open Lwt_result_syntax in
+      let*! () = loop_error error in
+      return `Shutdown
+
+    let on_completion :
+        type resp err. self -> (resp, err) Request.t -> resp -> _ -> unit Lwt.t
+        =
+     fun self Loop config _status -> loop_completion config (Worker.state self)
+  end
 
   let create my_peer_id pool ~listening_port ~discovery_port ~discovery_addr =
-    {
-      config = Config.initial;
-      canceler = Lwt_canceler.create ();
-      my_peer_id;
-      listening_port;
-      discovery_port;
-      discovery_addr;
-      restart_discovery = Lwt_condition.create ();
-      pool = Pool pool;
-      worker = Lwt.return_unit;
-    }
-
-  let activate st =
-    st.worker <-
-      Lwt_utils.worker
-        "discovery_sender"
-        ~on_event:Internal_event.Lwt_worker_logger.on_event
-        ~run:(fun () -> worker_loop st)
-        ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler)
+    Worker.create
+      ()
+      {
+        my_peer_id;
+        listening_port;
+        discovery_port;
+        discovery_addr;
+        pool = Pool pool;
+      }
+      (module Handlers)
 end
 
 (* ********************************************************************** *)
 
-type t = {answer : Answer.t; sender : Sender.inner_state}
+type t = {answer : Answer.t; sender : Sender.t}
 
 let create ~listening_port ~discovery_port ~discovery_addr
     ~trust_discovered_peers pool my_peer_id =
@@ -301,7 +369,7 @@ let create ~listening_port ~discovery_port ~discovery_addr
   let* answer =
     Answer.create my_peer_id pool ~discovery_port ~trust_discovered_peers
   in
-  let sender =
+  let* sender =
     Sender.create
       my_peer_id
       pool
@@ -313,13 +381,12 @@ let create ~listening_port ~discovery_port ~discovery_addr
 
 let activate {answer; sender} =
   Answer.Worker.activate answer ;
-  Sender.activate sender
+  Sender.Worker.activate sender
 
-let wakeup t = Lwt_condition.signal t.sender.restart_discovery ()
+let wakeup t =
+  Lwt_condition.signal
+    (Sender.Worker.state t.sender.worker_state).restart_discovery
+    ()
 
 let shutdown t =
-  Lwt.join
-    [
-      Answer.Worker.shutdown t.answer;
-      Error_monad.cancel_with_exceptions t.sender.canceler;
-    ]
+  Lwt.join [Answer.Worker.shutdown t.answer; Sender.Worker.shutdown t.sender]
