@@ -431,7 +431,7 @@ mod tests {
                 xstatus::{MPPValue, MStatus, SPPValue},
             },
             hart_state::{HartState, HartStateLayout},
-            memory::{Address, M1K},
+            memory::{Address, M4K},
             mode::Mode,
             registers::{XRegisters, XRegistersLayout, a0, a1, a2, fa0, nz, t0, t1, t2, t3},
         },
@@ -460,7 +460,7 @@ mod tests {
         ];
 
         for (imm, rs1, rd, res) in imm_rs1_rd_res {
-            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
 
             state.hart.xregisters.write(a0, rs1);
             state.hart.xregisters.write(t0, imm as u64);
@@ -693,7 +693,7 @@ mod tests {
     backend_test!(test_bitwise_reg, F, {
         // TODO: RV-512: move to integer.rs once all are supported.
         proptest!(|(v1 in any::<u64>(), v2 in any::<u64>())| {
-            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
 
             state.hart.xregisters.write(a0, v1);
             state.hart.xregisters.write(t3, v2);
@@ -775,14 +775,14 @@ mod tests {
     });
 
     backend_test!(test_ebreak, F, {
-        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
 
         let ret_val = state.hart.run_ebreak();
         assert_eq!(ret_val, Exception::Breakpoint);
     });
 
     backend_test!(test_fence, F, {
-        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(

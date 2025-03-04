@@ -66,7 +66,7 @@ mod tests {
         backend_test, create_state,
         machine_state::{
             MachineCoreState, MachineCoreStateLayout,
-            memory::M1K,
+            memory::M4K,
             registers::nz::{self, a0},
         },
     };
@@ -79,7 +79,7 @@ mod tests {
         ];
 
         for (rs2, rd, res) in rs2val_rd_res {
-            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
 
             state.hart.xregisters.write_nz(a0, rs2);
             state.hart.xregisters.run_neg(rd, nz::a0);

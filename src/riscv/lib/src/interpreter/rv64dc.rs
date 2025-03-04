@@ -85,17 +85,20 @@ mod test {
                 CSRegister,
                 xstatus::{ExtensionValue, MStatus},
             },
-            memory::M1K,
+            memory::{M4K, MemoryConfig},
             registers::{fa2, fa3, parse_xregister, sp},
         },
         traps::Exception,
     };
 
     const ZERO_OFFSET: i64 = 0;
-    const OUT_OF_BOUNDS_OFFSET: i64 = 1024;
+
+    type MC = M4K;
+
+    const OUT_OF_BOUNDS_OFFSET: i64 = MC::TOTAL_BYTES as i64;
 
     backend_test!(test_cfsd_cfld, F, {
-        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<MC>, F, MC);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -134,7 +137,7 @@ mod test {
     });
 
     backend_test!(test_cfsdsp_cfldsp, F, {
-        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+        let state = create_state!(MachineCoreState, MachineCoreStateLayout<MC>, F, MC);
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(

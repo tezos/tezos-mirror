@@ -237,9 +237,9 @@ mod test {
         ($name:ident, $lr: ident, $sc: ident, $align: expr, $t: ident) => {
             backend_test!($name, F, {
                 use $crate::machine_state::registers::nz;
-                use $crate::machine_state::memory::M1K;
+                use $crate::machine_state::memory::M4K;
 
-                let state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+                let state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
                 let state_cell = std::cell::RefCell::new(state);
 
                 proptest!(|(
@@ -281,9 +281,9 @@ mod test {
     macro_rules! test_amo {
         ($instr: ident, $f: expr, $align: expr, $t: ident) => {
             backend_test!($instr, F, {
-                use $crate::machine_state::memory::M1K;
+                use $crate::machine_state::memory::M4K;
 
-                let state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+                let state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
                 let state_cell = std::cell::RefCell::new(state);
 
                 proptest!(|(

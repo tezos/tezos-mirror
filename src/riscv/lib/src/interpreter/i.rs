@@ -29,7 +29,7 @@ pub fn run_add(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::machine_state::{MachineCoreState, memory::M1K};
+    use crate::machine_state::{MachineCoreState, memory::M4K};
     use crate::{
         backend_test, create_state,
         machine_state::{MachineCoreStateLayout, registers::nz},
@@ -45,7 +45,7 @@ mod tests {
         ];
 
         for (imm, rs1, res) in imm_rs1_res {
-            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
 
             state.hart.xregisters.write_nz(nz::a0, rs1);
             state.hart.xregisters.write_nz(nz::t0, imm as u64);

@@ -540,7 +540,7 @@ mod test {
     use super::{Block, BlockHash, BlockLayout, InlineJit, Interpreted};
     use crate::{
         backend_test, create_state,
-        machine_state::{instruction::Instruction, memory::M1K, registers::nz},
+        machine_state::{instruction::Instruction, memory::M4K, registers::nz},
         parser::instruction::InstrWidth,
         state_backend::test_helpers::TestBackendFactory,
     };
@@ -549,20 +549,20 @@ mod test {
         ($F: ty, $block_name:ident, $bb_name:ident, $expr: block) => {{
             type M<F> = <F as TestBackendFactory>::Manager;
 
-            fn inner<B: Block<M1K, M<F>> + Clone, F: TestBackendFactory>(
+            fn inner<B: Block<M4K, M<F>> + Clone, F: TestBackendFactory>(
                 $block_name: &mut B,
-                $bb_name: &mut <B as Block<M1K, M<F>>>::BlockBuilder,
+                $bb_name: &mut <B as Block<M4K, M<F>>>::BlockBuilder,
             ) {
                 $expr
             }
 
-            let mut block = create_state!(Interpreted, BlockLayout, $F, M1K);
-            let mut bb = <Interpreted<M1K, M<$F>> as Block<M1K, M<$F>>>::BlockBuilder::default();
+            let mut block = create_state!(Interpreted, BlockLayout, $F, M4K);
+            let mut bb = <Interpreted<M4K, M<$F>> as Block<M4K, M<$F>>>::BlockBuilder::default();
 
             inner::<_, $F>(&mut block, &mut bb);
 
-            let mut block = create_state!(InlineJit, BlockLayout, $F, M1K);
-            let mut bb = <InlineJit<M1K, M<$F>> as Block<M1K, M<$F>>>::BlockBuilder::default();
+            let mut block = create_state!(InlineJit, BlockLayout, $F, M4K);
+            let mut bb = <InlineJit<M4K, M<$F>> as Block<M4K, M<$F>>>::BlockBuilder::default();
 
             inner::<_, $F>(&mut block, &mut bb);
         }};

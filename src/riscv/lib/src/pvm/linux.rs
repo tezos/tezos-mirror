@@ -520,12 +520,12 @@ mod tests {
     use super::*;
     use crate::{
         backend_test, create_state,
-        machine_state::{MachineCoreStateLayout, memory::M1K},
+        machine_state::{MachineCoreStateLayout, memory::M4K},
     };
 
     // Check that the `set_tid_address` system call is working correctly.
     backend_test!(set_tid_address, F, {
-        type MemLayout = M1K;
+        type MemLayout = M4K;
         const MEM_BYTES: usize = MemLayout::TOTAL_BYTES;
 
         let mut machine_state = create_state!(
@@ -557,7 +557,7 @@ mod tests {
 
     // Check `ppoll` system call the way it is used in Musl and Rust's initialisation code.
     backend_test!(ppoll_init_fds, F, {
-        type MemLayout = M1K;
+        type MemLayout = M4K;
 
         let mut machine_state = create_state!(
             MachineCoreState,
@@ -606,7 +606,7 @@ mod tests {
 
     // Check that the `rt_sigaction` system call is working correctly for a basic case.
     backend_test!(rt_sigaction_no_handler, F, {
-        type MemLayout = M1K;
+        type MemLayout = M4K;
 
         let mut machine_state = create_state!(
             MachineCoreState,

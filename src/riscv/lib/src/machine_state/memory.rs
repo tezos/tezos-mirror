@@ -5,6 +5,8 @@
 mod config;
 mod state;
 
+use std::num::NonZeroU64;
+
 use tezos_smart_rollup_constants::riscv::SbiError;
 use thiserror::Error;
 
@@ -12,6 +14,29 @@ use super::registers::XValue;
 use crate::state_backend::{
     AllocatedOf, CommitmentLayout, Elem, FnManager, ManagerBase, ManagerClone, ManagerDeserialise,
     ManagerRead, ManagerSerialise, ManagerWrite, ProofLayout, Ref,
+};
+
+/// Number of bits needed so you can address every byte in a page
+pub const OFFSET_BITS: u64 = 12;
+
+/// Size of a page
+pub const PAGE_SIZE: NonZeroU64 = {
+    const PAGE_SIZE: u64 = 1 << OFFSET_BITS;
+
+    // Compile-time check: Page size must be positive
+    const _: () = {
+        if PAGE_SIZE < 1 {
+            panic!()
+        }
+    };
+
+    match NonZeroU64::new(PAGE_SIZE) {
+        Some(page_size) => page_size,
+        None => {
+            // SAFETY: The compile-time check above ensures this branch cannot be reached
+            unsafe { std::hint::unreachable_unchecked() }
+        }
+    }
 };
 
 /// Memory address
@@ -103,4 +128,4 @@ pub trait MemoryConfig: 'static {
 }
 
 // Re-export memory configurations
-pub use config::{M1G, M1K, M1M, M4G, M8K, M64M};
+pub use config::{M1G, M1M, M4G, M4K, M8K, M64M};
