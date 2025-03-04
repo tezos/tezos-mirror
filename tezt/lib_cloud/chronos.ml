@@ -70,7 +70,11 @@ let all =
   let open Angstrom in
   lift (fun _ -> All) (char '*')
 
-let field = Angstrom.choice [all; value]
+let list =
+  let open Angstrom in
+  lift (fun values -> List values) (sep_by1 (char ',') digits)
+
+let field = Angstrom.choice [list; all; value]
 
 (* Temporary 'unsupported' failwith function used to incrementally
    implement all functionalities. *)
@@ -107,7 +111,7 @@ let validate_time s =
     | All -> true
     | Value v -> v >= min && v <= max
     | Range _ -> unsupported ()
-    | List _ -> unsupported ()
+    | List vs -> List.for_all (fun v -> v >= min && v <= max) vs
   in
   in_range ~v:s.minute (0, 59)
   && in_range ~v:s.hour (0, 23)
@@ -125,7 +129,12 @@ let pp_time ppf spec =
     | All -> Format.fprintf ppf "*"
     | Value v -> Format.pp_print_int ppf v
     | Range _ -> unsupported ()
-    | List _ -> unsupported ()
+    | List vs ->
+        Format.pp_print_list
+          ~pp_sep:(fun ppf () -> Format.fprintf ppf ",")
+          Format.pp_print_int
+          ppf
+          vs
   in
   Format.fprintf
     ppf
@@ -167,7 +176,7 @@ let should_run task tm =
     | Value v -> Int.equal v t
     | All -> true
     | Range _ -> unsupported ()
-    | List _ -> unsupported ()
+    | List vs -> List.mem t vs
   in
   matches tm.Unix.tm_min task.time.minute
   && matches tm.Unix.tm_hour task.time.hour
