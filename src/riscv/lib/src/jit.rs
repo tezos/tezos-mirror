@@ -8,6 +8,8 @@
 mod builder;
 pub mod state_access;
 
+use std::collections::HashMap;
+
 use cranelift::codegen::CodegenError;
 use cranelift::codegen::ir::types::I64;
 use cranelift::codegen::settings::SetError;
@@ -27,6 +29,7 @@ use self::state_access::register_jsa_symbols;
 use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::instruction::Instruction;
 use crate::machine_state::{MachineCoreState, memory::MemoryConfig};
+use crate::state_backend::hash::Hash;
 use crate::traps::EnvironException;
 
 /// Alias for the function signature produced by the JIT compilation.
@@ -54,6 +57,12 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JCall<MC, JSA> {
     ) -> Result<(), EnvironException> {
         (self.fun)(core, pc, steps);
         Ok(())
+    }
+}
+
+impl<MC: MemoryConfig, JSA: JitStateAccess> Clone for JCall<MC, JSA> {
+    fn clone(&self) -> Self {
+        Self { fun: self.fun }
     }
 }
 
@@ -93,8 +102,8 @@ pub struct JIT<MC: MemoryConfig, JSA: JitStateAccess> {
     /// Imported [JitStateAccess] functions.
     jsa_imports: JsaImports<MC, JSA>,
 
-    /// Counter for naming of functions
-    next_id: usize,
+    /// Cache of compilation results.
+    cache: HashMap<Hash, Option<JCall<MC, JSA>>>,
 }
 
 impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
@@ -119,8 +128,8 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
             builder_context: FunctionBuilderContext::new(),
             ctx: codegen::Context::new(),
             module,
-            next_id: 0,
             jsa_imports,
+            cache: Default::default(),
         })
     }
 
@@ -130,8 +139,13 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
     /// unsupported instructions, `None` will be returned.
     pub fn compile<'a>(
         &mut self,
+        hash: &Hash,
         instr: impl IntoIterator<Item = &'a Instruction>,
     ) -> Option<JCall<MC, JSA>> {
+        if let Some(compilation_result) = self.cache.get(hash) {
+            return compilation_result.clone();
+        }
+
         let mut builder = self.start();
 
         for i in instr {
@@ -157,7 +171,12 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
 
         builder.end();
 
-        let fun = self.finalise();
+        let name = hex::encode(hash);
+
+        let fun = self.finalise(&name);
+        let jcall = JCall { fun };
+
+        self.cache.insert(*hash, Some(jcall.clone()));
 
         Some(JCall { fun })
     }
@@ -206,16 +225,8 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
         }
     }
 
-    /// Produce a unique name, that can be used when a function is finalised.
-    fn name(&mut self) -> impl AsRef<str> {
-        let name = self.next_id.to_string();
-        self.next_id += 1;
-        name
-    }
-
     /// Finalise the function currently under construction.
-    fn finalise(&mut self) -> JitFn<MC, JSA> {
-        let name = self.name();
+    fn finalise(&mut self, name: &str) -> JitFn<MC, JSA> {
         let id = self
             .module
             .declare_function(name.as_ref(), Linkage::Export, &self.ctx.func.signature)
@@ -289,13 +300,15 @@ mod tests {
         ];
 
         let mut jit = JIT::<M1K, F::Manager>::new().unwrap();
-        let interpreted_bb = InterpretedBlockBuilder;
+        let mut interpreted_bb = InterpretedBlockBuilder;
 
         for scenario in scenarios {
             let mut interpreted =
                 create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
             let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
             let mut block = create_state!(Interpreted, BlockLayout, F, M1K);
+
+            let hash = super::Hash::blake2b_hash(scenario).unwrap();
 
             block.start_block();
             for instr in scenario.iter() {
@@ -311,12 +324,12 @@ mod tests {
 
             // Act
             let fun = jit
-                .compile(instructions(&block).as_slice())
+                .compile(&hash, instructions(&block).as_slice())
                 .expect("Compilation of CNop should succeed");
 
             let interpreted_res = unsafe {
                 // SAFETY: interpreted blocks are always callable
-                block.callable(&interpreted_bb)
+                block.callable(&mut interpreted_bb)
             }
             .unwrap()
             .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
@@ -362,13 +375,15 @@ mod tests {
         ];
 
         let mut jit = JIT::<M1K, F::Manager>::new().unwrap();
-        let interpreted_bb = InterpretedBlockBuilder;
+        let mut interpreted_bb = InterpretedBlockBuilder;
 
         for scenario in scenarios {
             let mut interpreted =
                 create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
             let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
             let mut block = create_state!(Interpreted, BlockLayout, F, M1K);
+
+            let hash = super::Hash::blake2b_hash(scenario).unwrap();
 
             block.start_block();
             for instr in scenario.iter() {
@@ -384,12 +399,12 @@ mod tests {
 
             // Act
             let fun = jit
-                .compile(instructions(&block).as_slice())
+                .compile(&hash, instructions(&block).as_slice())
                 .expect("Compilation should succeed");
 
             let interpreted_res = unsafe {
                 // SAFETY: interpreted blocks are always callable
-                block.callable(&interpreted_bb)
+                block.callable(&mut interpreted_bb)
             }
             .unwrap()
             .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
@@ -436,11 +451,13 @@ mod tests {
         ];
 
         let mut jit = JIT::<M1K, F::Manager>::new().unwrap();
-        let interpreted_bb = InterpretedBlockBuilder;
+        let mut interpreted_bb = InterpretedBlockBuilder;
 
         let mut interpreted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
         let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
         let mut block = create_state!(Interpreted, BlockLayout, F, M1K);
+
+        let hash = super::Hash::blake2b_hash(scenario).unwrap();
 
         block.start_block();
         for instr in scenario.iter() {
@@ -456,12 +473,12 @@ mod tests {
 
         // Act
         let fun = jit
-            .compile(instructions(&block).as_slice())
+            .compile(&hash, instructions(&block).as_slice())
             .expect("Compilation should succeed");
 
         let interpreted_res = unsafe {
             // SAFETY: interpreted blocks are always callable
-            block.callable(&interpreted_bb)
+            block.callable(&mut interpreted_bb)
         }
         .unwrap()
         .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
@@ -517,13 +534,14 @@ mod tests {
         ];
 
         let mut jit = JIT::<M1K, F::Manager>::new().unwrap();
-        let interpreted_bb = InterpretedBlockBuilder;
+        let mut interpreted_bb = InterpretedBlockBuilder;
 
         for scenario in scenarios {
             let mut interpreted =
                 create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
             let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
             let mut block = create_state!(Interpreted, BlockLayout, F, M1K);
+            let hash = super::Hash::blake2b_hash(scenario).unwrap();
 
             block.start_block();
             for instr in scenario.iter() {
@@ -539,12 +557,12 @@ mod tests {
 
             // Act
             let fun = jit
-                .compile(instructions(&block).as_slice())
+                .compile(&hash, instructions(&block).as_slice())
                 .expect("Compilation should succeed");
 
             let interpreted_res = unsafe {
                 // SAFETY: interpreted blocks are always callable
-                block.callable(&interpreted_bb)
+                block.callable(&mut interpreted_bb)
             }
             .unwrap()
             .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
@@ -599,12 +617,14 @@ mod tests {
         ];
 
         let success: &[I] = &[I::new_nop(Compressed)];
+        let success_hash = super::Hash::blake2b_hash(success).unwrap();
 
         for failure in failure_scenarios.iter() {
             let mut jit = JIT::<M1K, F::Manager>::new().unwrap();
 
             let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M1K>, F, M1K);
             let mut block = create_state!(Interpreted, BlockLayout, F, M1K);
+            let failure_hash = super::Hash::blake2b_hash(failure).unwrap();
 
             block.start_block();
             for instr in failure.iter() {
@@ -619,7 +639,7 @@ mod tests {
             jitted.hart.xregisters.write_nz(x1, 1);
 
             // Act
-            let res = jit.compile(instructions(&block).as_slice());
+            let res = jit.compile(&failure_hash, instructions(&block).as_slice());
 
             assert!(
                 res.is_none(),
@@ -632,7 +652,7 @@ mod tests {
             }
 
             let fun = jit
-                .compile(instructions(&block).as_slice())
+                .compile(&success_hash, instructions(&block).as_slice())
                 .expect("Compilation of subsequent functions should succeed");
             let jitted_res = unsafe {
                 // # Safety - the jit is not dropped until after we

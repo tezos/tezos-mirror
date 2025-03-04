@@ -16,6 +16,7 @@ use crate::{
         instruction::Instruction,
         memory::{Address, MemoryConfig},
     },
+    state_backend::hash::Hash,
     state_backend::{
         AllocatedOf, Atom, Cell, EnrichedCell, FnManager, ManagerBase, ManagerClone, ManagerRead,
         ManagerReadWrite, ManagerWrite, Ref,
@@ -39,10 +40,12 @@ pub trait BCall<MC: MemoryConfig, M: ManagerBase> {
     /// Run a block against the machine state.
     ///
     /// When calling this function, there must be no partial block in progress. To ensure
-    /// this, you must always run [`Block::complete_block`] prior to fetching
+    /// this, you must always run [`BlockCache::complete_current_block`] prior to fetching
     /// and running a new block.
     ///
     /// There _must_ also be sufficient steps remaining, to execute the block in full.
+    ///
+    /// [`BlockCache::complete_current_block`]: super::BlockCache::complete_current_block
     fn run_block(
         &self,
         core: &mut MachineCoreState<MC, M>,
@@ -62,7 +65,7 @@ pub type BlockLayout = (Atom<u8>, [Atom<Instruction>; CACHE_INSTR]);
 /// Blocks will never contain more than [`CACHE_INSTR`] instructions.
 pub trait Block<MC: MemoryConfig, M: ManagerBase> {
     /// Block construction may require additional state not kept in storage,
-    /// this is then passed as a parameter to [`Block::complete_block`].
+    /// this is then passed as a parameter to [`Block::callable`].
     type BlockBuilder: Default;
 
     /// Bind the block to the given allocated state.
@@ -89,13 +92,6 @@ pub trait Block<MC: MemoryConfig, M: ManagerBase> {
     fn num_instr(&self) -> usize
     where
         M: ManagerRead;
-
-    /// Mark a block as complete.
-    ///
-    /// This may trigger effects such as JIT-compilation.
-    fn complete_block(&mut self, builder: &mut Self::BlockBuilder)
-    where
-        M: ManagerReadWrite;
 
     /// Invalidate a block, it will no longer be callable.
     fn invalidate(&mut self)
@@ -124,10 +120,40 @@ pub trait Block<MC: MemoryConfig, M: ManagerBase> {
     /// as this block may be run via `BCall::run_block`.
     unsafe fn callable<'a>(
         &mut self,
-        block_builder: &'a Self::BlockBuilder,
+        block_builder: &'a mut Self::BlockBuilder,
     ) -> Option<&mut (impl BCall<MC, M> + ?Sized + 'a)>
     where
         M: ManagerRead + 'a;
+
+    /// Returns the block hash of instructions
+    fn block_hash(&self) -> &BlockHash;
+}
+
+/// The hash of a block is by default `Dirty` - ie it may be under construction.
+///
+/// Only once blocks are made callable, within the specific context of the current backend, is
+/// the hash calculated. At this point the block is declared `Runnable`.
+#[derive(Debug, PartialEq, Eq)]
+pub enum BlockHash {
+    /// This block may be under construction.
+    ///
+    /// In order for any such block to run, it may be made runnable. First by calculating
+    /// its block hash and triggering any side effects (such as JIT compilation).
+    Dirty,
+    /// This block can be run.
+    Runnable(Hash),
+}
+
+impl BlockHash {
+    fn is_dirty(&self) -> bool {
+        self == &Self::Dirty
+    }
+
+    fn make_runnable(&mut self, instr: &[&Instruction]) {
+        *self = Hash::blake2b_hash(instr)
+            .map(Self::Runnable)
+            .unwrap_or(Self::Dirty);
+    }
 }
 
 /// Interpreted blocks are built automatically, and require no additional context.
@@ -144,6 +170,28 @@ pub struct InterpretedBlockBuilder;
 pub struct Interpreted<MC: MemoryConfig, M: ManagerBase> {
     instr: [EnrichedCell<ICallPlaced<MC, M>, M>; CACHE_INSTR],
     len_instr: Cell<u8, M>,
+    hash: BlockHash,
+}
+
+impl<MC: MemoryConfig, M: ManagerBase> Interpreted<MC, M> {
+    /// Calculate the [`BlockHash`] from the instructions in the block.
+    ///
+    /// If the block is already runnable, it will not re-calculate the block hash.
+    fn update_block_hash(&mut self)
+    where
+        M: ManagerRead,
+    {
+        let len = self.len_instr.read() as usize;
+
+        let instr = self
+            .instr
+            .iter()
+            .take(len)
+            .map(|i| i.read_ref_stored())
+            .collect::<Vec<_>>();
+
+        self.hash.make_runnable(&instr)
+    }
 }
 
 impl<MC: MemoryConfig, M: ManagerBase> BCall<MC, M> for [EnrichedCell<ICallPlaced<MC, M>, M>] {
@@ -184,14 +232,6 @@ impl<MC: MemoryConfig, M: ManagerBase> Block<MC, M> for Interpreted<MC, M> {
         self.len_instr.read() as usize
     }
 
-    fn complete_block(&mut self, _builder: &mut Self::BlockBuilder)
-    where
-        M: ManagerReadWrite,
-    {
-        // This does nothing in the interpreted world, but will e.g. under JIT
-        // (compilation gets triggered)
-    }
-
     #[inline]
     fn instr(&self) -> &[EnrichedCell<ICallPlaced<MC, M>, M>]
     where
@@ -205,6 +245,7 @@ impl<MC: MemoryConfig, M: ManagerBase> Block<MC, M> for Interpreted<MC, M> {
         M: ManagerWrite,
     {
         self.len_instr.write(0);
+        self.hash = BlockHash::Dirty;
     }
 
     fn push_instr(&mut self, instr: Instruction)
@@ -214,12 +255,14 @@ impl<MC: MemoryConfig, M: ManagerBase> Block<MC, M> for Interpreted<MC, M> {
         let len = self.len_instr.read();
         self.instr[len as usize].write(instr);
         self.len_instr.write(len + 1);
+        self.hash = BlockHash::Dirty;
     }
 
     fn reset(&mut self)
     where
         M: ManagerReadWrite,
     {
+        self.hash = BlockHash::Dirty;
         self.len_instr.write(0);
         self.instr
             .iter_mut()
@@ -230,6 +273,7 @@ impl<MC: MemoryConfig, M: ManagerBase> Block<MC, M> for Interpreted<MC, M> {
     where
         M: ManagerWrite,
     {
+        self.hash = BlockHash::Dirty;
         self.len_instr.write(0);
     }
 
@@ -240,6 +284,7 @@ impl<MC: MemoryConfig, M: ManagerBase> Block<MC, M> for Interpreted<MC, M> {
         Self {
             len_instr: space.0,
             instr: space.1.map(EnrichedCell::bind),
+            hash: BlockHash::Dirty,
         }
     }
 
@@ -256,17 +301,25 @@ impl<MC: MemoryConfig, M: ManagerBase> Block<MC, M> for Interpreted<MC, M> {
     #[inline]
     unsafe fn callable<'a>(
         &mut self,
-        _bb: &'a Self::BlockBuilder,
+        _bb: &'a mut Self::BlockBuilder,
     ) -> Option<&mut (impl BCall<MC, M> + ?Sized + 'a)>
     where
         M: ManagerRead + 'a,
     {
         let len = self.len_instr.read();
         if len > 0 {
+            if self.hash.is_dirty() {
+                self.update_block_hash();
+            }
+
             Some(&mut self.instr[0..len as usize])
         } else {
             None
         }
+    }
+
+    fn block_hash(&self) -> &BlockHash {
+        &self.hash
     }
 }
 
@@ -275,6 +328,7 @@ impl<MC: MemoryConfig, M: ManagerClone> Clone for Interpreted<MC, M> {
         Self {
             len_instr: self.len_instr.clone(),
             instr: self.instr.clone(),
+            hash: BlockHash::Dirty,
         }
     }
 }
@@ -284,10 +338,15 @@ impl<MC: MemoryConfig, M: ManagerClone> Clone for Interpreted<MC, M> {
 /// Not all instructions are currently supported, when a block contains
 /// unsupported instructions, a fallback to [`Interpreted`] mode occurs.
 ///
-/// Blocks are compiled upon calling [`Block::complete_block`], in a *stop the world* fashion.
+/// Blocks are compiled upon calling [`Block::callable`], in a *stop the world* fashion.
 pub struct InlineJit<MC: MemoryConfig, M: JitStateAccess> {
     fallback: Interpreted<MC, M>,
     jit_fn: Option<JCall<MC, M>>,
+    /// Whether or not compilation has been attempted.
+    ///
+    /// **N.B.** compilation may fail, in which case `compiled` will still be true, and fallback
+    /// should occur to the interpreted block.
+    compiled: bool,
 }
 
 impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
@@ -297,6 +356,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     where
         M: ManagerWrite,
     {
+        self.compiled = false;
         self.jit_fn = None;
         self.fallback.start_block()
     }
@@ -305,6 +365,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     where
         M: ManagerWrite,
     {
+        self.compiled = false;
         self.jit_fn = None;
         self.fallback.invalidate()
     }
@@ -313,6 +374,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     where
         M: ManagerReadWrite,
     {
+        self.compiled = false;
         self.jit_fn = None;
         self.fallback.reset()
     }
@@ -321,6 +383,7 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     where
         M: ManagerReadWrite,
     {
+        self.compiled = false;
         self.jit_fn = None;
         self.fallback.push_instr(instr)
     }
@@ -336,28 +399,12 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
         Self {
             fallback: Interpreted::bind(allocated),
             jit_fn: None,
+            compiled: false,
         }
     }
 
     fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(&'a self) -> AllocatedOf<BlockLayout, F::Output> {
         self.fallback.struct_ref::<F>()
-    }
-
-    fn complete_block(&mut self, jit: &mut Self::BlockBuilder) {
-        self.fallback.complete_block(&mut jit.1);
-
-        if <Self as Block<MC, M>>::num_instr(self) > 0 {
-            let instr = self
-                .fallback
-                .instr
-                .iter()
-                .take(<Self as Block<MC, M>>::num_instr(self))
-                .map(|i| i.read_ref_stored());
-
-            let jitfn = jit.0.compile(instr);
-
-            self.jit_fn = jitfn;
-        }
     }
 
     /// # SAFETY
@@ -369,16 +416,37 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
     /// as this block may be run via [`BCall::run_block`].
     unsafe fn callable<'a>(
         &mut self,
-        block_builder: &'a Self::BlockBuilder,
+        block_builder: &'a mut Self::BlockBuilder,
     ) -> Option<&mut (impl BCall<MC, M> + ?Sized + 'a)>
     where
         M: ManagerRead + 'a,
     {
-        if self.fallback.callable(&block_builder.1).is_some() {
-            Some(self)
-        } else {
-            None
+        if self.compiled {
+            return Some(self);
         }
+
+        // Trigger hashing of the block, if callable
+        self.fallback.callable(&mut block_builder.1);
+
+        let BlockHash::Runnable(hash) = &self.fallback.hash else {
+            // Block is not callable
+            return None;
+        };
+
+        // trigger JIT compilation
+        let instr = self
+            .fallback
+            .instr
+            .iter()
+            .take(<Self as Block<MC, M>>::num_instr(self))
+            .map(|i| i.read_ref_stored());
+
+        let jitfn = block_builder.0.compile(hash, instr);
+
+        self.jit_fn = jitfn;
+        self.compiled = true;
+
+        Some(self)
     }
 
     fn num_instr(&self) -> usize
@@ -386,6 +454,10 @@ impl<MC: MemoryConfig, M: JitStateAccess> Block<MC, M> for InlineJit<MC, M> {
         M: ManagerRead,
     {
         self.fallback.num_instr()
+    }
+
+    fn block_hash(&self) -> &BlockHash {
+        &self.fallback.hash
     }
 }
 
@@ -415,6 +487,16 @@ impl<MC: MemoryConfig, M: JitStateAccess> BCall<MC, M> for InlineJit<MC, M> {
             //         `BCall`.
             Some(jcall) => unsafe { jcall.call(core, instr_pc, steps) },
             None => self.fallback.instr().run_block(core, instr_pc, steps),
+        }
+    }
+}
+
+impl<MC: MemoryConfig, M: JitStateAccess + ManagerClone> Clone for InlineJit<MC, M> {
+    fn clone(&self) -> Self {
+        Self {
+            fallback: self.fallback.clone(),
+            jit_fn: None,
+            compiled: false,
         }
     }
 }
@@ -451,4 +533,128 @@ where
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::{Block, BlockHash, BlockLayout, InlineJit, Interpreted};
+    use crate::{
+        backend_test, create_state,
+        machine_state::{instruction::Instruction, memory::M1K, registers::nz},
+        parser::instruction::InstrWidth,
+        state_backend::test_helpers::TestBackendFactory,
+    };
+
+    macro_rules! run_in_block_impl {
+        ($F: ty, $block_name:ident, $bb_name:ident, $expr: block) => {{
+            type M<F> = <F as TestBackendFactory>::Manager;
+
+            fn inner<B: Block<M1K, M<F>> + Clone, F: TestBackendFactory>(
+                $block_name: &mut B,
+                $bb_name: &mut <B as Block<M1K, M<F>>>::BlockBuilder,
+            ) {
+                $expr
+            }
+
+            let mut block = create_state!(Interpreted, BlockLayout, $F, M1K);
+            let mut bb = <Interpreted<M1K, M<$F>> as Block<M1K, M<$F>>>::BlockBuilder::default();
+
+            inner::<_, $F>(&mut block, &mut bb);
+
+            let mut block = create_state!(InlineJit, BlockLayout, $F, M1K);
+            let mut bb = <InlineJit<M1K, M<$F>> as Block<M1K, M<$F>>>::BlockBuilder::default();
+
+            inner::<_, $F>(&mut block, &mut bb);
+        }};
+    }
+
+    backend_test!(empty_block_not_callable, F, {
+        run_in_block_impl!(F, block, bb, {
+            assert_eq!(block.num_instr(), 0);
+            assert_eq!(block.block_hash(), &BlockHash::Dirty);
+            // Safety: block builder alive for the duration of this scope
+            assert!(unsafe { block.callable(bb) }.is_none());
+            assert_eq!(block.block_hash(), &BlockHash::Dirty);
+        });
+    });
+
+    backend_test!(block_with_instr_callable, F, {
+        run_in_block_impl!(F, block, bb, {
+            block.push_instr(Instruction::new_nop(InstrWidth::Compressed));
+
+            // Safety: block builder alive for the duration of this scope
+            assert!(unsafe { block.callable(bb) }.is_some());
+            assert!(matches!(block.block_hash(), BlockHash::Runnable(_)));
+        });
+    });
+
+    backend_test!(block_made_dirty_on_clone, F, {
+        run_in_block_impl!(F, block, bb, {
+            block.push_instr(Instruction::new_nop(InstrWidth::Compressed));
+
+            // Safety: block builder alive for the duration of this scope
+            assert!(unsafe { block.callable(bb) }.is_some());
+
+            let new_block = block.clone();
+            assert!(matches!(new_block.block_hash(), BlockHash::Dirty));
+        });
+    });
+
+    backend_test!(block_made_dirty_on_push, F, {
+        run_in_block_impl!(F, block, bb, {
+            block.push_instr(Instruction::new_nop(InstrWidth::Compressed));
+            assert!(matches!(block.block_hash(), BlockHash::Dirty));
+
+            // Safety: block builder alive for the duration of this scope
+            assert!(unsafe { block.callable(bb) }.is_some());
+            assert!(matches!(block.block_hash(), BlockHash::Runnable(_)));
+
+            // push
+            block.push_instr(Instruction::new_nop(InstrWidth::Compressed));
+            assert!(matches!(block.block_hash(), BlockHash::Dirty));
+        });
+    });
+
+    backend_test!(block_hash_unique_for_unique_instructions_sanity, F, {
+        run_in_block_impl!(F, block, bb, {
+            block.push_instr(Instruction::new_nop(InstrWidth::Compressed));
+            block.push_instr(Instruction::new_li(nz::a2, 3, InstrWidth::Compressed));
+
+            // Safety: block builder alive for the duration of this scope
+            assert!(unsafe { block.callable(bb) }.is_some());
+            let BlockHash::Runnable(hash_1) = block.block_hash() else {
+                unreachable!()
+            };
+            let hash_1 = *hash_1;
+
+            block.reset();
+            assert!(matches!(block.block_hash(), BlockHash::Dirty));
+
+            block.push_instr(Instruction::new_nop(InstrWidth::Compressed));
+
+            // Safety: block builder alive for the duration of this scope
+            assert!(unsafe { block.callable(bb) }.is_some());
+            let BlockHash::Runnable(hash_2) = block.block_hash() else {
+                unreachable!()
+            };
+
+            assert_ne!(
+                hash_1, *hash_2,
+                "Hashes for unique sets of instructions must not match"
+            );
+
+            block.push_instr(Instruction::new_li(nz::a2, 3, InstrWidth::Compressed));
+
+            // Safety: block builder alive for the duration of this scope
+            assert!(unsafe { block.callable(bb) }.is_some());
+            let BlockHash::Runnable(hash_3) = block.block_hash() else {
+                unreachable!()
+            };
+
+            assert_eq!(
+                hash_1, *hash_3,
+                "Hashes for identical instructions must match"
+            );
+        });
+    });
 }
