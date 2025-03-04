@@ -3,7 +3,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::block::GENESIS_PARENT_HASH;
 use crate::block_storage;
 use crate::blueprint::Blueprint;
 use crate::configuration::{Configuration, ConfigurationMode};
@@ -14,7 +13,7 @@ use crate::sequencer_blueprint::{
 };
 use crate::storage::read_last_info_per_level_timestamp;
 use crate::{delayed_inbox, DelayedInbox};
-use primitive_types::U256;
+use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use tezos_ethereum::rlp_helpers;
@@ -268,6 +267,7 @@ fn fetch_delayed_txs<Host: Runtime>(
 // wish to refuse such blueprints.
 pub const DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS: i64 = 300i64;
 
+#[allow(clippy::too_many_arguments)]
 fn parse_and_validate_blueprint<Host: Runtime>(
     host: &mut Host,
     bytes: &[u8],
@@ -275,20 +275,16 @@ fn parse_and_validate_blueprint<Host: Runtime>(
     current_blueprint_size: usize,
     evm_node_flag: bool,
     max_blueprint_lookahead_in_seconds: i64,
+    parent_hash: H256,
+    head_timestamp: Timestamp,
 ) -> anyhow::Result<(BlueprintValidity, usize)> {
     // Decode
     match rlp::decode::<BlueprintWithDelayedHashes>(bytes) {
         Err(e) => Ok((BlueprintValidity::DecoderError(e), bytes.len())),
         Ok(blueprint_with_hashes) => {
-            let head = block_storage::read_current(host);
-            let (head_hash, head_timestamp) = match head {
-                Ok(block) => (block.hash, block.timestamp),
-                Err(_) => (GENESIS_PARENT_HASH, Timestamp::from(0)),
-            };
-
             // Validate parent hash
             #[cfg(not(feature = "benchmark"))]
-            if head_hash != blueprint_with_hashes.parent_hash {
+            if parent_hash != blueprint_with_hashes.parent_hash {
                 return Ok((BlueprintValidity::InvalidParentHash, bytes.len()));
             }
 
@@ -364,6 +360,8 @@ fn read_all_chunks_and_validate<Host: Runtime>(
     blueprint_path: &OwnedPath,
     nb_chunks: u16,
     config: &mut Configuration,
+    parent_hash: H256,
+    previous_timestamp: Timestamp,
 ) -> anyhow::Result<(Option<Blueprint>, usize)> {
     let mut chunks = vec![];
     let mut size = 0;
@@ -404,6 +402,8 @@ fn read_all_chunks_and_validate<Host: Runtime>(
                 size,
                 *evm_node_flag,
                 *max_blueprint_lookahead_in_seconds,
+                parent_hash,
+                previous_timestamp,
             )?;
             if let (BlueprintValidity::Valid(blueprint), size_with_delayed_transactions) =
                 validity
@@ -427,6 +427,8 @@ pub fn read_blueprint<Host: Runtime>(
     host: &mut Host,
     config: &mut Configuration,
     number: U256,
+    parent_hash: H256,
+    previous_timestamp: Timestamp,
 ) -> anyhow::Result<(Option<Blueprint>, usize)> {
     let blueprint_path = blueprint_path(number)?;
     let exists = host.store_has(&blueprint_path)?.is_some();
@@ -442,8 +444,14 @@ pub fn read_blueprint<Host: Runtime>(
         let available_chunks = n_subkeys as u16 - 1;
         if available_chunks == nb_chunks {
             // All chunks are available
-            let (blueprint, size) =
-                read_all_chunks_and_validate(host, &blueprint_path, nb_chunks, config)?;
+            let (blueprint, size) = read_all_chunks_and_validate(
+                host,
+                &blueprint_path,
+                nb_chunks,
+                config,
+                parent_hash,
+                previous_timestamp,
+            )?;
             Ok((blueprint, size))
         } else {
             if available_chunks > nb_chunks {
@@ -473,8 +481,16 @@ pub fn read_next_blueprint<Host: Runtime>(
     host: &mut Host,
     config: &mut Configuration,
 ) -> anyhow::Result<(Option<Blueprint>, usize)> {
-    let number = read_next_blueprint_number(host)?;
-    read_blueprint(host, config, number)
+    let (number, parent_hash, previous_timestamp) =
+        match block_storage::read_current(host) {
+            Ok(block) => (block.number + 1, block.hash, block.timestamp),
+            Err(_) => (
+                U256::zero(),
+                crate::block::GENESIS_PARENT_HASH,
+                Timestamp::from(0),
+            ),
+        };
+    read_blueprint(host, config, number, parent_hash, previous_timestamp)
 }
 
 pub fn drop_blueprint<Host: Runtime>(host: &mut Host, number: U256) -> Result<(), Error> {
@@ -494,6 +510,7 @@ pub fn clear_all_blueprints<Host: Runtime>(host: &mut Host) -> Result<(), Error>
 mod tests {
 
     use super::*;
+    use crate::block::GENESIS_PARENT_HASH;
     use crate::configuration::{DalConfiguration, Limits, TezosContracts};
     use crate::delayed_inbox::Hash;
     use crate::storage::store_last_info_per_level_timestamp;
@@ -575,6 +592,8 @@ mod tests {
             0,
             false,
             500,
+            GENESIS_PARENT_HASH,
+            Timestamp::from(0),
         )
         .expect("Should be able to parse blueprint");
         assert_eq!(
@@ -635,6 +654,8 @@ mod tests {
             0,
             false,
             500,
+            GENESIS_PARENT_HASH,
+            Timestamp::from(0),
         )
         .expect("Should be able to parse blueprint");
         assert_eq!(validity.0, BlueprintValidity::InvalidParentHash);
