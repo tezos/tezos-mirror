@@ -9,6 +9,10 @@ LIB_DIR = app/src/main/kotlin/org/example/tezos
 build: $(RESOURCES_DIR)/libtezos.so $(LIB_DIR)/tezos.kt
 	@./gradlew build
 
+.PHONY: test
+test: build
+	@./gradlew test
+
 .PHONY: clean
 clean:
 	@./gradlew clean
