@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
-# SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2024-2025 TriliTech <contact@trili.tech>
 #
 # SPDX-License-Identifier: MIT
 
@@ -16,6 +16,9 @@ endif
 # We don't want to check all features in CI, so we provide this varible to configure it.
 CHECK_FEATURES ?= --all-features
 
+# Mechanism to allow enabling additional features - for example JIT
+SANDBOX_ENABLE_FEATURES ?= 
+
 # The version of nightly that we use for anything that requires it
 NIGHTLY_VERSION = nightly-2025-01-30
 
@@ -27,12 +30,12 @@ build: riscv-dummy.elf riscv-dummy-sdk.elf riscv-sandbox
 
 .PHONY: riscv-sandbox
 riscv-sandbox::
-	@cargo build --release --package riscv-sandbox $(NATIVE_OPT)
+	@cargo build --release --package riscv-sandbox $(NATIVE_OPT) $(SANDBOX_ENABLE_FEATURES:%=-F%)
 	@ln -f target/$(NATIVE_TARGET)/release/riscv-sandbox $@
 
 .PHONY: riscv-sandbox.prof
 riscv-sandbox.prof::
-	@cargo build --profile profiling --package riscv-sandbox
+	@cargo build --profile profiling --package riscv-sandbox $(SANDBOX_ENABLE_FEATURES:%=-F%)
 	@ln -f target/profiling/riscv-sandbox $@
 
 riscv-dummy.elf::

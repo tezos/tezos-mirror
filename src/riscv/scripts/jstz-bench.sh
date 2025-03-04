@@ -8,13 +8,14 @@
 
 set -e
 
-USAGE="Usage: -t <num_transfers> [ -s: static inbox ] [ -p: profile with samply ] [ -n: run natively ] [ -i <num_iterations>: number of runs ]"
+USAGE="Usage: -t <num_transfers> [ -s: static inbox ] [ -p: profile with samply ] [ -n: run natively ] [ -i <num_iterations>: number of runs ] [ -j: enable inline jit ]"
 DEFAULT_ROLLUP_ADDRESS="sr163Lv22CdE8QagCwf48PWDTquk6isQwv57"
 
 ITERATIONS="1"
 TX=""
 STATIC_INBOX=""
 SANDBOX_BIN="riscv-sandbox"
+SANDBOX_ENABLE_FEATURES=""
 PROFILING_WRAPPER=""
 SAMPLY_OUT="riscv-sandbox-profile.json"
 NATIVE=""
@@ -23,7 +24,7 @@ CURR=$(pwd)
 RISCV_DIR=$(dirname "$0")/..
 cd "$RISCV_DIR"
 
-while getopts "i:t:spn" OPTION; do
+while getopts "i:t:spnj" OPTION; do
   case "$OPTION" in
   i)
     ITERATIONS="$OPTARG"
@@ -40,6 +41,9 @@ while getopts "i:t:spn" OPTION; do
     ;;
   n)
     NATIVE=$(make --silent -C jstz print-native-target | grep -wv make)
+    ;;
+  j)
+    SANDBOX_ENABLE_FEATURES="${SANDBOX_ENABLE_FEATURES} inline-jit"
     ;;
   *)
     echo "$USAGE"
@@ -60,7 +64,7 @@ if [ -n "$NATIVE" ] && [ -z "$STATIC_INBOX" ]; then
 fi
 
 echo "[INFO]: building sandbox"
-make "$SANDBOX_BIN" &> /dev/null
+make SANDBOX_ENABLE_FEATURES="$SANDBOX_ENABLE_FEATURES" "$SANDBOX_BIN" &> /dev/null
 echo "[INFO]: building bench tool"
 make -C jstz inbox-bench &> /dev/null
 
