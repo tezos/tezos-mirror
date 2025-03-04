@@ -677,6 +677,9 @@ pub enum MachineError {
 
     #[error("Device tree error: {0}")]
     DeviceTreeError(vm_fdt::Error),
+
+    #[error("Memory too small to properly configure the machine")]
+    MemoryTooSmall,
 }
 
 #[cfg(test)]

@@ -11,9 +11,10 @@ mod rng;
 use std::ffi::CStr;
 use std::num::NonZeroU64;
 
-use error::Error;
 use tezos_smart_rollup_constants::riscv::SBI_FIRMWARE_TEZOS;
 
+use self::addr::VirtAddr;
+use self::error::Error;
 use super::Pvm;
 use super::PvmHooks;
 use crate::machine_state::CacheLayouts;
@@ -25,6 +26,7 @@ use crate::machine_state::memory::Address;
 use crate::machine_state::memory::Memory;
 use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::memory::PAGE_SIZE;
+use crate::machine_state::memory::Permissions;
 use crate::machine_state::mode::Mode;
 use crate::machine_state::registers;
 use crate::program::Program;
@@ -194,19 +196,65 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase>
 
         Ok(())
     }
+}
 
+impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase> Pvm<MC, CL, B, M> {
     /// Load the program into memory and set the PC to its entrypoint.
     fn load_program(&mut self, program: &Program<MC>) -> Result<(), MachineError>
     where
         M: ManagerReadWrite,
     {
         // Reset hart state & set pc to entrypoint
-        self.core.hart.reset(program.entrypoint);
+        self.machine_state.core.hart.reset(program.entrypoint);
+
+        let program_start = program.segments.keys().min().copied().unwrap_or(0);
+        let program_end = program
+            .segments
+            .iter()
+            .map(|(addr, data)| addr.saturating_add(data.len() as u64))
+            .max()
+            .unwrap_or(0);
+        let program_length = program_end.saturating_sub(program_start) as usize;
+
+        // Allow the program to be written to main memory
+        self.machine_state.core.main_memory.protect_pages(
+            program_start,
+            program_length,
+            Permissions::Write,
+        )?;
 
         // Write program to main memory
-        for (addr, data) in program.segments.iter() {
-            self.core.main_memory.write_all(*addr, data)?;
+        for (&addr, data) in program.segments.iter() {
+            self.machine_state.core.main_memory.write_all(addr, data)?;
         }
+
+        // Remove access to the program that has just been placed into memory
+        self.machine_state.core.main_memory.protect_pages(
+            program_start,
+            program_length,
+            Permissions::None,
+        )?;
+
+        // Configure memory permissions using the ELF program headers, if present
+        if let Some(program_headers) = &program.program_headers {
+            for mem_perms in program_headers.permissions.iter() {
+                self.machine_state.core.main_memory.protect_pages(
+                    mem_perms.start_address,
+                    mem_perms.length as usize,
+                    mem_perms.permissions,
+                )?;
+            }
+        }
+
+        // Other parts of the supervisor make use of program start and end to properly divide the
+        // memory. These addresses need to be properly aligned.
+        let program_start = VirtAddr::new(program_start).align_down(PAGE_SIZE);
+        self.system_state.program_start.write(program_start);
+
+        let program_end = VirtAddr::new(program_end)
+            .align_up(PAGE_SIZE)
+            .ok_or(MachineError::MemoryTooSmall)?;
+        self.system_state.program_end.write(program_end);
 
         Ok(())
     }
@@ -219,7 +267,7 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase>
         self.load_program(program)?;
 
         // The stack needs to be prepared before we can push anything to it
-        self.prepare_stack();
+        self.machine_state.prepare_stack();
 
         // Auxiliary values vector
         let mut auxv = vec![(AuxVectorKey::PageSize, PAGE_SIZE.get())];
@@ -228,23 +276,22 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase>
         if let Some(prog_headers) = &program.program_headers {
             // Program headers are an array of a C struct. The struct for 64-bit ELF requires 8
             // byte alignment.
-            let prog_headers_ptr = self.push_stack(8, prog_headers.contents)?;
+            let prog_headers_ptr = self.machine_state.push_stack(8, prog_headers.contents)?;
 
             auxv.push((AuxVectorKey::NumProgramHeaders, prog_headers.num_entries));
             auxv.push((AuxVectorKey::ProgramHeaderSize, prog_headers.entry_size));
             auxv.push((AuxVectorKey::ProgramHeadersPtr, prog_headers_ptr));
         }
 
-        self.init_linux_stack(&[c"tezos-smart-rollup"], &[], &auxv)?;
+        self.machine_state
+            .init_linux_stack(&[c"tezos-smart-rollup"], &[], &auxv)?;
 
         // The user program may not access the M or S privilege level
-        self.core.hart.mode.write(Mode::User);
+        self.machine_state.core.hart.mode.write(Mode::User);
 
         Ok(())
     }
-}
 
-impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase> Pvm<MC, CL, B, M> {
     /// Check if the supervised process has requested an exit.
     pub fn has_exited(&self) -> Option<u64>
     where
@@ -260,13 +307,21 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase> Pvm<MC
 }
 
 /// Layout for the Linux supervisor state
-pub type SupervisorStateLayout = (Atom<u64>, Atom<bool>, Atom<u64>);
+pub type SupervisorStateLayout = (
+    Atom<u64>,
+    Atom<bool>,
+    Atom<u64>,
+    Atom<VirtAddr>,
+    Atom<VirtAddr>,
+);
 
 /// Linux supervisor state
 pub struct SupervisorState<M: ManagerBase> {
     tid_address: Cell<u64, M>,
     exited: Cell<bool, M>,
     exit_code: Cell<u64, M>,
+    program_start: Cell<VirtAddr, M>,
+    program_end: Cell<VirtAddr, M>,
 }
 
 impl<M: ManagerBase> SupervisorState<M> {
@@ -276,6 +331,8 @@ impl<M: ManagerBase> SupervisorState<M> {
             tid_address: space.0,
             exited: space.1,
             exit_code: space.2,
+            program_start: space.3,
+            program_end: space.4,
         }
     }
 
@@ -288,6 +345,8 @@ impl<M: ManagerBase> SupervisorState<M> {
             self.tid_address.struct_ref::<F>(),
             self.exited.struct_ref::<F>(),
             self.exit_code.struct_ref::<F>(),
+            self.program_start.struct_ref::<F>(),
+            self.program_end.struct_ref::<F>(),
         )
     }
 
@@ -519,6 +578,8 @@ impl<M: ManagerClone> Clone for SupervisorState<M> {
             tid_address: self.tid_address.clone(),
             exited: self.exited.clone(),
             exit_code: self.exit_code.clone(),
+            program_start: self.program_start.clone(),
+            program_end: self.program_end.clone(),
         }
     }
 }
