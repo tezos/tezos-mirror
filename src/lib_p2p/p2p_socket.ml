@@ -562,7 +562,7 @@ module Reader = struct
         ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler) ;
     st
 
-  let shutdown st = Error_monad.cancel_with_exceptions st.canceler
+  let shutdown _st = Lwt.return_unit
 end
 
 type 'msg encoded_message = bytes list
@@ -702,16 +702,14 @@ module Writer = struct
         ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler) ;
     st
 
-  let shutdown st =
-    let open Lwt_syntax in
-    let* () = Error_monad.cancel_with_exceptions st.canceler in
-    st.worker
+  let shutdown st = st.worker
 end
 
 type ('msg, 'meta) t = {
   conn : 'meta authenticated_connection;
   reader : ('msg, 'meta) Reader.t;
   writer : ('msg, 'meta) Writer.t;
+  canceler : Lwt_canceler.t;
 }
 
 let equal {conn = {scheduled_conn = conn2; _}; _}
@@ -775,7 +773,7 @@ let accept ?incoming_message_queue_size ?outgoing_message_queue_size
           encoding
           canceler
       in
-      let conn = {conn; reader; writer} in
+      let conn = {conn; reader; writer; canceler} in
       Lwt_canceler.on_cancel canceler (fun () ->
           let open Lwt_syntax in
           let* (_ : unit tzresult) =
@@ -874,6 +872,7 @@ let close ?(wait = false) ~reason st =
   (* [st.conn.scheduled_conn] is closed by [Reader.shutdown] and
      [Writer.shutdown], the reason must be added before. *)
   P2p_io_scheduler.add_closing_reason ~reason st.conn.scheduled_conn ;
+  let* () = Error_monad.cancel_with_exceptions st.canceler in
   let* () = Reader.shutdown st.reader in
   let* () = Writer.shutdown st.writer in
   Lwt.return_unit
@@ -934,10 +933,11 @@ module Internal_for_tests = struct
 
   let mock ?(reader = Lwt_pipe.Maybe_bounded.create ())
       ?(writer = Lwt_pipe.Maybe_bounded.create ()) conn =
+    let canceler = Lwt_canceler.create () in
     let reader =
       Reader.
         {
-          canceler = Lwt_canceler.create ();
+          canceler;
           conn;
           encoding = make_crashing_encoding ();
           messages = reader;
@@ -947,7 +947,7 @@ module Internal_for_tests = struct
     let writer =
       Writer.
         {
-          canceler = Lwt_canceler.create ();
+          canceler;
           conn;
           encoding = make_crashing_encoding ();
           messages = writer;
@@ -955,5 +955,5 @@ module Internal_for_tests = struct
           binary_chunks_size = 0;
         }
     in
-    {conn; reader; writer}
+    {conn; reader; writer; canceler}
 end
