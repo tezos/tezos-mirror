@@ -246,17 +246,35 @@ enum BlueprintParsing {
 }
 
 #[cfg_attr(feature = "benchmark", inline(never))]
-#[allow(clippy::too_many_arguments)]
 fn next_bip_from_blueprints<Host: Runtime>(
     host: &mut Host,
-    current_block_number: U256,
-    current_block_parent_hash: H256,
-    previous_timestamp: Timestamp,
     tick_counter: &TickCounter,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
     minimum_base_fee_per_gas: U256,
 ) -> Result<BlueprintParsing, anyhow::Error> {
+    let (
+        current_block_number,
+        current_block_parent_hash,
+        previous_timestamp,
+        receipts_root,
+        transactions_root,
+    ) = match block_storage::read_current(host) {
+        Ok(block) => (
+            block.number + 1,
+            block.hash,
+            block.timestamp,
+            block.receipts_root,
+            block.transactions_root,
+        ),
+        Err(_) => (
+            U256::zero(),
+            GENESIS_PARENT_HASH,
+            Timestamp::from(0),
+            vec![0; 32],
+            vec![0; 32],
+        ),
+    };
     let (blueprint, size) = read_blueprint(
         host,
         config,
@@ -287,6 +305,8 @@ fn next_bip_from_blueprints<Host: Runtime>(
                 current_block_parent_hash,
                 tick_counter.c,
                 gas_price,
+                receipts_root,
+                transactions_root,
             );
 
             tezos_evm_logging::log!(
@@ -305,8 +325,6 @@ fn compute_bip<Host: Runtime>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     mut block_in_progress: BlockInProgress,
-    previous_receipts_root: &[u8],
-    previous_transactions_root: &[u8],
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
     tick_counter: &mut TickCounter,
@@ -355,12 +373,7 @@ fn compute_bip<Host: Runtime>(
             *tick_counter =
                 TickCounter::finalize(block_in_progress.estimated_ticks_in_run);
             let new_block = block_in_progress
-                .finalize_and_store(
-                    host,
-                    &constants,
-                    previous_receipts_root,
-                    previous_transactions_root,
-                )
+                .finalize_and_store(host, &constants)
                 .context("Failed to finalize the block in progress")?;
             Ok(BlockComputationResult::Finished {
                 included_delayed_transactions,
@@ -461,28 +474,6 @@ pub fn produce<Host: Runtime>(
     // in blocks is set to the pool address.
     let coinbase = sequencer_pool_address.unwrap_or_default();
 
-    let (
-        current_block_number,
-        current_block_parent_hash,
-        previous_timestamp,
-        previous_receipts_root,
-        previous_transactions_root,
-    ) = match block_storage::read_current(host) {
-        Ok(block) => (
-            block.number + 1,
-            block.hash,
-            block.timestamp,
-            block.receipts_root,
-            block.transactions_root,
-        ),
-        Err(_) => (
-            U256::zero(),
-            GENESIS_PARENT_HASH,
-            Timestamp::from(0),
-            vec![0; 32],
-            vec![0; 32],
-        ),
-    };
     let mut evm_account_storage =
         init_account_storage().context("Failed to initialize EVM account storage")?;
     let mut tick_counter = TickCounter::new(0u64);
@@ -493,13 +484,11 @@ pub fn produce<Host: Runtime>(
         precompiles::precompile_set::<SafeStorage<&mut Host>>(config.enable_fa_bridge);
 
     // Check if there's a BIP in storage to resume its execution
-    let (processed_blueprint, block_in_progress_provenance, block_in_progress) =
+    let (block_in_progress_provenance, block_in_progress) =
         match storage::read_block_in_progress(&safe_host)? {
-            Some(block_in_progress) => (
-                block_in_progress.number,
-                BlockInProgressProvenance::Storage,
-                block_in_progress,
-            ),
+            Some(block_in_progress) => {
+                (BlockInProgressProvenance::Storage, block_in_progress)
+            }
             None => {
                 // Using `safe_host.host` allows to escape from the failsafe storage, which is necessary
                 // because the sequencer pool address is located outside of `/evm/world_state`.
@@ -508,9 +497,6 @@ pub fn produce<Host: Runtime>(
                 // Execute at most one of the stored blueprints
                 let block_in_progress = match next_bip_from_blueprints(
                     safe_host.host,
-                    current_block_number,
-                    current_block_parent_hash,
-                    previous_timestamp,
                     &tick_counter,
                     config,
                     &kernel_upgrade,
@@ -530,20 +516,15 @@ pub fn produce<Host: Runtime>(
                 // We are going to execute a new block, we copy the storage to allow
                 // to revert if the block fails.
                 safe_host.start()?;
-                (
-                    current_block_number,
-                    BlockInProgressProvenance::Blueprint,
-                    *block_in_progress,
-                )
+                (BlockInProgressProvenance::Blueprint, *block_in_progress)
             }
         };
 
+    let processed_blueprint = block_in_progress.number;
     match compute_bip(
         &mut safe_host,
         &outbox_queue,
         block_in_progress,
-        &previous_receipts_root,
-        &previous_transactions_root,
         &precompiles,
         &mut evm_account_storage,
         &mut tick_counter,
@@ -1322,6 +1303,8 @@ mod tests {
             U256::from(1),
             transactions,
             block_constants.block_fees.base_fee_per_gas(),
+            vec![0; 32],
+            vec![0; 32],
         );
         // run is almost full wrt ticks
         let limits = Limits::default();

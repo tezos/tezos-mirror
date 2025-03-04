@@ -204,12 +204,14 @@ mod test {
             0,
             timestamp.into(),
             U256::zero(),
+            vec![0; 32],
+            vec![0; 32],
         );
         bip.estimated_ticks_in_block = TOLERANCE;
 
         register_block(&mut host, &bip).unwrap();
         bip.clone()
-            .finalize_and_store(&mut host, &dummy_block_constants, &[], &[])
+            .finalize_and_store(&mut host, &dummy_block_constants)
             .unwrap();
 
         // At tolerance, gas price should be min.
@@ -222,7 +224,7 @@ mod test {
         // register more blocks - now double tolerance
         bip.number = 1.into();
         register_block(&mut host, &bip).unwrap();
-        bip.finalize_and_store(&mut host, &dummy_block_constants, &[], &[])
+        bip.finalize_and_store(&mut host, &dummy_block_constants)
             .unwrap();
         let gas_price_now = base_fee_per_gas(&host, timestamp.into(), min);
 
