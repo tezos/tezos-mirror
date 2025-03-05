@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1208,6 +1209,7 @@ module Target = struct
     c_library_flags : string list option;
     conflicts : t list;
     deps : t list;
+    link_deps : Manifest_link_deps.t list;
     tests_deps : t option list;
     dune : Dune.s_expr;
     flags : Flags.t option;
@@ -1370,6 +1372,28 @@ module Target = struct
         name_for_errors target
     | Internal {kind; _} -> kind_name_for_errors kind
 
+  module TargetLinkDeps = Manifest_link_deps.LinkDeps (struct
+    type target = t
+
+    type internal_target = internal
+
+    type target_kind = kind
+
+    let get_internal = get_internal
+
+    let get_link_deps t = t.link_deps
+
+    let is_internal_kind_lib = is_internal_kind_lib
+
+    let debug_name = name_for_errors
+
+    let debug_kind = kind_name_for_errors
+
+    let path_of_internal_target t = t.path
+
+    let error = error
+  end)
+
   let register_internal ({path; opam; product; kind; _} as internal) =
     let path = sanitize_path path in
     if not !can_register then
@@ -1443,6 +1467,7 @@ module Target = struct
     ?dep_globs:string list ->
     ?dep_globs_rec:string list ->
     ?deps:t option list ->
+    ?link_deps:Manifest_link_deps.t option list ->
     ?dune:Dune.s_expr ->
     ?flags:Flags.t ->
     ?foreign_archives:string list ->
@@ -1510,8 +1535,8 @@ module Target = struct
 
   let internal ~product make_kind ?all_modules_except ?bisect_ppx
       ?c_library_flags ?(conflicts = []) ?(dep_files = []) ?(dep_globs = [])
-      ?(dep_globs_rec = []) ?(deps = []) ?(dune = Dune.[]) ?flags
-      ?foreign_archives ?foreign_stubs ?ctypes ?implements ?inline_tests
+      ?(dep_globs_rec = []) ?(deps = []) ?(link_deps = []) ?(dune = Dune.[])
+      ?flags ?foreign_archives ?foreign_stubs ?ctypes ?implements ?inline_tests
       ?inline_tests_deps ?inline_tests_link_flags ?inline_tests_libraries
       ?wrapped ?documentation ?(link_flags = []) ?(linkall = false) ?modes
       ?modules ?(modules_without_implementation = [])
@@ -1528,6 +1553,10 @@ module Target = struct
     let kind = make_kind names in
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
+    let link_deps = List.filter_map Fun.id link_deps in
+    let deps, link_deps =
+      TargetLinkDeps.compute_deps ~target_kind:kind ~target_deps:deps ~link_deps
+    in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
     let ppx_runtime_libraries = List.filter_map Fun.id ppx_runtime_libraries in
     let implements =
@@ -1862,6 +1891,7 @@ module Target = struct
         c_library_flags;
         conflicts;
         deps;
+        link_deps;
         dune;
         flags;
         foreign_archives;
@@ -1915,6 +1945,11 @@ module Target = struct
         dep_globs_rec;
         enabled_if;
       }
+
+  let rust_archive link_deps target =
+    target
+    |> Option.map @@ TargetLinkDeps.register_target link_deps
+    |> Option.to_list |> List.flatten
 
   let public_lib ?internal_name =
     internal @@ fun public_name ->
@@ -2419,6 +2454,7 @@ module Sub_lib = struct
        ?dep_globs
        ?dep_globs_rec
        ?deps
+       ?link_deps
        ?dune
        ?flags
        ?foreign_archives
@@ -2507,6 +2543,7 @@ module Sub_lib = struct
       ?c_library_flags
       ?conflicts
       ?deps
+      ?link_deps
       ?dep_files
       ?dep_globs
       ?dep_globs_rec
@@ -2626,6 +2663,8 @@ module Product (M : sig
   val source : string list
 end) =
 struct
+  let rust_archive = Target.rust_archive
+
   let public_lib = Target.public_lib ~product:M.name ~source:M.source
 
   let private_lib = Target.private_lib ~product:M.name ~source:M.source

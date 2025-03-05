@@ -4,6 +4,7 @@
 SOURCE=JSON_AST.ml JSON_parser.mli JSON_parser.ml JSON_lexer.ml \
        dgraph.mli dgraph.ml \
        tezos_protocol.ml \
+       manifest_link_deps.mli manifest_link_deps.ml \
        manifest.mli manifest.ml \
        externals.ml \
        internals.ml \

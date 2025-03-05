@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -709,6 +710,9 @@ type bisect_ppx = No | Yes | With_sigterm
     - [deps]: a list of targets to add as dependencies using [(libraries)]
       in the [dune] file.
 
+    - [link_deps]: a list of libraries which should be linked at linking time
+      for executables depending on this target.
+
     - [dune]: added to the [dune] file after this target.
       A typical use is to add [rule] or [install] stanzas.
 
@@ -859,6 +863,7 @@ type 'a maker =
   ?dep_globs:string list ->
   ?dep_globs_rec:string list ->
   ?deps:target list ->
+  ?link_deps:Manifest_link_deps.t option list ->
   ?dune:Dune.s_expr ->
   ?flags:Flags.t ->
   ?foreign_archives:string list ->
@@ -1190,6 +1195,10 @@ module Product (M : sig
       The meaning and the content of [source] is product-dependent. *)
   val source : string list
 end) : sig
+  (** Register a rust archive *)
+  val rust_archive :
+    Manifest_link_deps.t list -> target -> Manifest_link_deps.t list
+
   (** Register and return an internal public library.
 
     The ['a] argument of [maker] is [string]: it is the public name.
