@@ -24,21 +24,6 @@ impl<M> XRegisters<M>
 where
     M: backend::ManagerReadWrite,
 {
-    /// Add `imm` to val(rs1) and store the result in `rd`
-    ///
-    /// Relevant RISC-V opcodes:
-    /// - `ADDI`
-    /// - `C.ADDI`
-    /// - `C.ADDI4SPN`
-    /// - `C.ADDI16SP`
-    pub fn run_addi(&mut self, imm: i64, rs1: NonZeroXRegister, rd: NonZeroXRegister) {
-        // Return the lower XLEN (64 bits in our case) bits of the addition
-        // Irrespective of sign, the result is the same, casting to u64 for addition
-        let rval = self.read_nz(rs1);
-        let result = rval.wrapping_add(imm as u64);
-        self.write_nz(rd, result)
-    }
-
     /// Perform [`val(rs1) - val(rs2)`] and store the result in `rd`
     ///
     /// Relevant RISC-V opcodes:
@@ -423,6 +408,7 @@ mod tests {
     use crate::backend_test;
     use crate::create_state;
     use crate::interpreter::integer::run_add;
+    use crate::interpreter::integer::run_addi;
     use crate::interpreter::integer::run_and;
     use crate::interpreter::integer::run_or;
     use crate::machine_state::MachineCoreState;
@@ -478,7 +464,7 @@ mod tests {
 
             state.hart.xregisters.write(a0, rs1);
             state.hart.xregisters.write(t0, imm as u64);
-            state.hart.xregisters.run_addi(imm, nz::a0, rd);
+            run_addi(&mut state, imm, nz::a0, rd);
             assert_eq!(state.hart.xregisters.read_nz(rd), res);
             run_add(&mut state, nz::a0, nz::t0, nz::a0);
             assert_eq!(state.hart.xregisters.read(a0), res);

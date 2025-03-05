@@ -650,6 +650,7 @@ impl OpCode {
             Self::Or => Some(Args::run_or),
             Self::Li => Some(Args::run_li),
             Self::J => Some(Args::run_j),
+            Self::Addi => Some(Args::run_addi),
             _ => None,
         }
     }
@@ -816,6 +817,15 @@ macro_rules! impl_i_type {
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart.xregisters.$fn(self.imm, self.rs1.x, self.rd.nzx);
             Ok(Next(self.width))
+        }
+    };
+
+    ($impl: path, $fn: ident, non_zero) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+            $impl(icb, self.imm, self.rs1.nzx, self.rd.nzx);
+            icb.ok(Next(self.width))
         }
     };
 }
@@ -1199,7 +1209,7 @@ impl Args {
     impl_r_type!(run_sraw, non_zero_rd);
 
     // RV64I I-type instructions
-    impl_i_type!(run_addi, non_zero);
+    impl_i_type!(integer::run_addi, run_addi, non_zero);
     impl_i_type!(run_addiw, non_zero_rd);
     impl_i_type!(run_xori, non_zero);
     impl_i_type!(run_ori, non_zero);

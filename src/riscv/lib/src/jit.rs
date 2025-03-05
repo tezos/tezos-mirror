@@ -697,6 +697,48 @@ mod tests {
         }
     });
 
+    backend_test!(test_addi, F, {
+        use Instruction as I;
+
+        use crate::machine_state::registers::NonZeroXRegister::*;
+
+        let assert_x1_is_five = |core: &MachineCoreState<M4K, F::Manager>| {
+            assert_eq!(core.hart.xregisters.read_nz(x1), 5);
+        };
+
+        let scenarios: &[Scenario<'_, F>] = &[
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_addi(x1, x1, 2, Compressed),
+                    I::new_addi(x1, x1, 3, Uncompressed),
+                ])
+                .set_assert_hook(&assert_x1_is_five)
+                .build(),
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_addi(x1, x1, i64::MAX, Compressed),
+                    I::new_addi(x1, x1, i64::MAX, Compressed),
+                    I::new_addi(x1, x1, 7, Uncompressed),
+                ])
+                .set_assert_hook(&assert_x1_is_five)
+                .build(),
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_addi(x1, x3, 7, Compressed),
+                    I::new_addi(x1, x1, -2, Uncompressed),
+                ])
+                .set_assert_hook(&assert_x1_is_five)
+                .build(),
+        ];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
+
     backend_test!(test_jit_recovers_from_compilation_failure, F, {
         use crate::machine_state::registers::NonZeroXRegister::*;
 
