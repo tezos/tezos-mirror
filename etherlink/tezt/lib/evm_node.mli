@@ -141,7 +141,7 @@ val preimages_dir : t -> string
 
 val supports_threshold_encryption : t -> bool
 
-(** [create ?name ?runner ?mode ?history ?data_dir ?rpc_addr ?rpc_port
+(** [create ?name ?runner ?mode ?history ?data_dir ?rpc_addr ?rpc_port ?spawn_rpc
     rollup_node_endpoint] creates an EVM node server.
 
     The server listens to requests at address [rpc_addr] and the port
@@ -163,6 +163,7 @@ val create :
   ?rpc_addr:string ->
   ?rpc_port:int ->
   ?restricted_rpcs:string ->
+  ?spawn_rpc:int ->
   string ->
   t
 
@@ -342,6 +343,7 @@ val init :
   ?rpc_port:int ->
   ?restricted_rpcs:string ->
   ?history_mode:history_mode ->
+  ?spawn_rpc:int ->
   string ->
   t Lwt.t
 

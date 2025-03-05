@@ -360,12 +360,8 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ~patch_config:seq_patch_config
       ~mode:sequencer_mode
       ?history_mode
+      ?spawn_rpc
       (Sc_rollup_node.endpoint sc_rollup_node)
-  in
-  let* _ =
-    match spawn_rpc with
-    | Some _ -> Evm_node.wait_for_spawn_rpc_ready sequencer
-    | None -> unit
   in
   let* observer =
     run_new_observer_node
