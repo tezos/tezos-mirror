@@ -9,7 +9,7 @@ module type COMPONENT = sig
   val base : string list
 end
 
-module UniqueNameMaker (Component : COMPONENT) = struct
+module Unique_name_maker (Component : COMPONENT) = struct
   let base = "lib_p2p" :: Component.base
 
   type t = unit
@@ -36,7 +36,7 @@ end
 
 type ('response, 'error) loop = Loop : (unit, tztrace) loop
 
-module LoopRequest :
+module Loop_request :
   P2P_REQUEST with type ('response, 'error) t = ('response, 'error) loop =
 struct
   type ('response, 'error) t = ('response, 'error) loop

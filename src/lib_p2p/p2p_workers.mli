@@ -26,7 +26,7 @@ end
 (** This functor generates a [Name] module out of a base, and generates a name
     for unique workers: once a worker has been spawned from a table, no other
     worker can be spawned again. *)
-module UniqueNameMaker : functor (Component : COMPONENT) ->
+module Unique_name_maker : functor (Component : COMPONENT) ->
   Tezos_base.Worker_intf.NAME with type t = unit
 
 (** Module signature that is equivalent to the {!Tezos_base.Worker_intf.REQUEST} with
@@ -50,7 +50,7 @@ type ('response, 'error) loop = Loop : (unit, tztrace) loop
 (** The request for P2P workers is generally not useful.
     This module can be used as a [P2p_request] that serve only to loop again
     and return its result by a callback. *)
-module LoopRequest :
+module Loop_request :
   P2P_REQUEST with type ('response, 'error) t = ('response, 'error) loop
 
 (** The functor generates a valid [Worker], using [P2p_request] for requests.
