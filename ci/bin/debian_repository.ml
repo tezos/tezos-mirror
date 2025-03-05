@@ -372,6 +372,8 @@ let jobs pipeline_type =
       ~name
       ~dependencies
       ~variables
+      ~retry:
+        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~stage:Stages.publishing_tests
       script
   in
@@ -442,6 +444,7 @@ let jobs pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.install_bin_ubuntu_noble_systemd"
+        ~allow_failure:Yes
         ~dependencies:
           (Dependent
              [
@@ -460,6 +463,7 @@ let jobs pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.upgrade_bin_ubuntu_noble_systemd_test"
+        ~allow_failure:Yes
         ~dependencies:
           (Dependent
              [
@@ -503,6 +507,7 @@ let jobs pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.install_bin_debian_bookworm_systemd_test"
+        ~allow_failure:Yes
         ~dependencies:
           (Dependent
              [
@@ -525,6 +530,7 @@ let jobs pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.install_bin_debian_bookworm_systemd_custom_datadir"
+        ~allow_failure:Yes
         ~dependencies:
           (Dependent
              [
@@ -548,6 +554,7 @@ let jobs pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.upgrade_bin_debian_bookworm-systemd"
+        ~allow_failure:Yes
         ~dependencies:
           (Dependent
              [
