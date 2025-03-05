@@ -120,6 +120,10 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
         self.builder.ins().uextend(I64, value)
     }
 
+    fn xvalue_negate(&mut self, value: Self::XValue) -> Self::XValue {
+        self.builder.ins().ineg(value)
+    }
+
     fn xvalue_wrapping_add(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
         // wrapping add; does not depend on whether operands are signed
         self.builder.ins().iadd(lhs, rhs)

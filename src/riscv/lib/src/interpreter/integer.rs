@@ -3,25 +3,18 @@
 // SPDX-License-Identifier: MIT
 
 //! Implementation of integer arithmetic operations for RISC-V over the ICB.
-// TODO: RV 519: Update remaining 'neg' handler in the file to work over the ICB
 
 use crate::instruction_context::ICB;
 use crate::machine_state::registers::NonZeroXRegister;
-use crate::machine_state::registers::XRegisters;
-use crate::state_backend as backend;
 
-impl<M> XRegisters<M>
-where
-    M: backend::ManagerReadWrite,
-{
-    /// Moves the two's complement representation of `rs1` into `rd`.
-    ///
-    /// Relevant RISC-V opcodes:
-    /// - SUB
-    pub fn run_neg(&mut self, rd_rs1: NonZeroXRegister, rs2: NonZeroXRegister) {
-        let result = 0_u64.wrapping_sub(self.read_nz(rs2));
-        self.write_nz(rd_rs1, result)
-    }
+/// Moves the two's complement representation of `rs1` into `rd`.
+///
+/// Relevant RISC-V opcodes:
+/// - SUB
+pub fn run_neg(icb: &mut impl ICB, rd_rs1: NonZeroXRegister, rs2: NonZeroXRegister) {
+    let rs2_val = icb.xregister_read_nz(rs2);
+    let result = icb.xvalue_negate(rs2_val);
+    icb.xregister_write_nz(rd_rs1, result)
 }
 
 /// Copies the value in register `rs2` into register `rd_rs1`.
@@ -164,6 +157,7 @@ mod tests {
     use crate::interpreter::integer::run_add;
     use crate::interpreter::integer::run_addi;
     use crate::interpreter::integer::run_mv;
+    use crate::interpreter::integer::run_neg;
     use crate::interpreter::integer::run_sub;
     use crate::machine_state::MachineCoreState;
     use crate::machine_state::MachineCoreStateLayout;
@@ -182,7 +176,7 @@ mod tests {
             let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
 
             state.hart.xregisters.write_nz(a0, rs2);
-            state.hart.xregisters.run_neg(rd, nz::a0);
+            run_neg(&mut state, rd, a0);
             assert_eq!(state.hart.xregisters.read_nz(rd), res);
         }
     });

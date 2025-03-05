@@ -123,6 +123,12 @@ pub trait ICB {
             self.xregister_write_nz(reg, value)
         }
     }
+
+    /// Integer negation of the given `XValue`.
+    fn xvalue_negate(&mut self, value: Self::XValue) -> Self::XValue {
+        let zero = self.xvalue_of_imm(0);
+        self.xvalue_wrapping_sub(zero, value)
+    }
 }
 
 impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {

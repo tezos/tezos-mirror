@@ -644,6 +644,7 @@ impl OpCode {
     pub fn to_lowering<I: ICB>(self) -> Option<IcbLoweringFn<I>> {
         match self {
             Self::Mv => Some(Args::run_mv),
+            Self::Neg => Some(Args::run_neg),
             Self::Nop => Some(Args::run_nop),
             Self::Add => Some(Args::run_add),
             Self::Sub => Some(Args::run_sub),
@@ -1414,6 +1415,7 @@ impl Args {
 
     // RV32C compressed instructions
     impl_cr_nz_type!(integer::run_mv, run_mv);
+    impl_cr_nz_type!(integer::run_neg, run_neg);
     impl_cb_type!(run_beqz);
     impl_cb_type!(run_bnez);
     impl_cb_type!(run_bltz);
@@ -1421,7 +1423,6 @@ impl Args {
     impl_cb_type!(run_bltez);
     impl_cb_type!(run_bgz);
     impl_ci_type!(load_store::run_li, run_li, non_zero);
-    impl_cr_type!(run_neg, non_zero);
 
     fn run_j<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
         let addr = branching::run_j(icb, self.imm);

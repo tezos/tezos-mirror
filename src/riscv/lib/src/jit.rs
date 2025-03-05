@@ -272,6 +272,8 @@ impl<MC: MemoryConfig, M: JitStateAccess> Default for JIT<MC, M> {
 
 #[cfg(test)]
 mod tests {
+    use std::i64;
+
     use Instruction as I;
 
     use super::*;
@@ -495,6 +497,54 @@ mod tests {
                     I::new_mv(x3, x2, Compressed),
                 ])
                 .set_assert_hook(&assert_x2_is_one)
+                .build(),
+        ];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
+
+    backend_test!(test_negate, F, {
+        use Instruction as I;
+
+        use crate::machine_state::registers::NonZeroXRegister::*;
+
+        let assert_x1_x2_equal = |core: &MachineCoreState<M4K, F::Manager>| {
+            assert_eq!(
+                core.hart.xregisters.read_nz(x1),
+                core.hart.xregisters.read_nz(x2)
+            );
+        };
+
+        let scenarios: &[Scenario<'_, F>] = &[
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(x1, -1, Compressed),
+                    I::new_li(x3, 1, Compressed),
+                    I::new_neg(x2, x3, Compressed),
+                ])
+                .set_assert_hook(&assert_x1_x2_equal)
+                .build(),
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(x1, 1, Uncompressed),
+                    I::new_neg(x3, x1, Uncompressed),
+                    I::new_neg(x2, x3, Compressed),
+                ])
+                .set_assert_hook(&assert_x1_x2_equal)
+                .build(),
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(x1, i64::MIN, Uncompressed),
+                    I::new_neg(x2, x1, Uncompressed),
+                ])
+                .set_assert_hook(&|core: &MachineCoreState<M4K, F::Manager>| {
+                    assert_eq!(core.hart.xregisters.read_nz(x2), i64::MIN as u64);
+                })
                 .build(),
         ];
 
