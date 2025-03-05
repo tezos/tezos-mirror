@@ -847,24 +847,24 @@ let parse_conf encoding file =
         in
         exit 1)
 
-let register (module Args : Scenarios_cli.Layer1) =
+let register (module Cli : Scenarios_cli.Layer1) =
   let configuration =
-    let stake = Option.value ~default:[] Args.stake in
+    let stake = Option.value ~default:[] Cli.stake in
     let network : Network.t option =
-      match Args.network with
+      match Cli.network with
       | `Mainnet -> Some `Mainnet
       | `Ghostnet -> Some `Ghostnet
     in
     let stresstest =
       Option.map
         (fun (pkh, pk, tps, seed) -> {pkh; pk; tps; seed})
-        Args.stresstest
+        Cli.stresstest
     in
-    let maintenance_delay = Option.value ~default:0 Args.maintenance_delay in
-    let snapshot = Option.value ~default:"" Args.snapshot in
+    let maintenance_delay = Option.value ~default:0 Cli.maintenance_delay in
+    let snapshot = Option.value ~default:"" Cli.snapshot in
     {stake; network; stresstest; maintenance_delay; snapshot}
   in
-  let vms_conf = Option.map (parse_conf vms_conf_encoding) Args.vms_config in
+  let vms_conf = Option.map (parse_conf vms_conf_encoding) Cli.vms_config in
   toplog "Parsing CLI done" ;
   let vms =
     `Bootstrap
@@ -886,7 +886,7 @@ let register (module Args : Scenarios_cli.Layer1) =
   let default_docker_image =
     Option.map
       (fun tag -> Agent.Configuration.Octez_release {tag})
-      Args.octez_release
+      Cli.octez_release
   in
   let default_vm_configuration ~name =
     Agent.Configuration.make ?docker_image:default_docker_image ~name ()
