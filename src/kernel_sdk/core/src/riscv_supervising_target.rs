@@ -4,33 +4,19 @@
 
 extern crate std;
 
+#[path = "riscv_hermit_target.rs"]
+mod hermit_target;
+
 use crate::smart_rollup_core::ReadInputMessageInfo;
 use std::{
     io::{self, Write},
     slice::from_raw_parts,
 };
 
-#[inline]
-pub(super) unsafe fn read_input(
-    _message_info: *mut ReadInputMessageInfo,
-    _dst: *mut u8,
-    _max_bytes: usize,
-) -> i32 {
-    unimplemented!()
-}
-
-#[inline]
-pub(super) unsafe fn write_output(_src: *const u8, _num_bytes: usize) -> i32 {
-    unimplemented!()
-}
-
-#[inline]
-pub(super) unsafe fn write_debug(src: *const u8, num_bytes: usize) {
-    let buffer = unsafe { from_raw_parts(src, num_bytes) };
-    io::stdout()
-        .write_all(buffer)
-        .expect("Writing to stdout failed");
-}
+// Re-use SBI definitions from HermitOS target
+pub(crate) use hermit_target::{
+    read_input, reveal, reveal_metadata, reveal_preimage, write_debug, write_output,
+};
 
 #[inline]
 pub(super) unsafe fn store_has(_path: *const u8, _path_len: usize) -> i32 {
@@ -95,31 +81,6 @@ pub(super) unsafe fn store_copy(
 }
 
 #[inline]
-pub(super) unsafe fn reveal_preimage(
-    _hash_addr: *const u8,
-    _hash_len: usize,
-    _destination_addr: *mut u8,
-    _max_bytes: usize,
-) -> i32 {
-    unimplemented!()
-}
-
-#[inline]
-pub(super) unsafe fn reveal(
-    _payload_addr: *const u8,
-    _payload_len: usize,
-    _destination_addr: *mut u8,
-    _max_bytes: usize,
-) -> i32 {
-    unimplemented!()
-}
-
-#[inline]
 pub(super) unsafe fn store_value_size(_path: *const u8, _path_len: usize) -> i32 {
-    unimplemented!()
-}
-
-#[inline]
-pub(super) unsafe fn reveal_metadata(_buffer: *mut u8, _max_bytes: usize) -> i32 {
     unimplemented!()
 }

@@ -49,7 +49,7 @@ fn check_sbi_result(result: isize) -> Result<usize, i32> {
 }
 
 #[inline]
-pub(super) unsafe fn read_input(
+pub(crate) unsafe fn read_input(
     message_info: *mut ReadInputMessageInfo,
     dst: *mut u8,
     max_bytes: usize,
@@ -78,12 +78,12 @@ pub(super) unsafe fn read_input(
 }
 
 #[inline]
-pub(super) unsafe fn write_output(_src: *const u8, _num_bytes: usize) -> i32 {
+pub(crate) unsafe fn write_output(_src: *const u8, _num_bytes: usize) -> i32 {
     unimplemented!()
 }
 
 #[inline]
-pub(super) unsafe fn write_debug(src: *const u8, num_bytes: usize) {
+pub(crate) unsafe fn write_debug(src: *const u8, num_bytes: usize) {
     let buffer = unsafe { from_raw_parts(src, num_bytes) };
     io::stdout()
         .write_all(buffer)
@@ -153,7 +153,7 @@ pub(super) unsafe fn store_copy(
 }
 
 #[inline]
-pub(super) unsafe fn reveal_preimage(
+pub(crate) unsafe fn reveal_preimage(
     hash_addr: *const u8,
     hash_len: usize,
     destination_addr: *mut u8,
@@ -166,7 +166,7 @@ pub(super) unsafe fn reveal_preimage(
 }
 
 #[inline]
-pub(super) unsafe fn reveal(
+pub(crate) unsafe fn reveal(
     request_addr: *const u8,
     request_len: usize,
     response_addr: *mut u8,
@@ -200,7 +200,7 @@ pub(super) unsafe fn store_value_size(_path: *const u8, _path_len: usize) -> i32
 }
 
 #[inline]
-pub(super) unsafe fn reveal_metadata(buffer: *mut u8, max_bytes: usize) -> i32 {
+pub(crate) unsafe fn reveal_metadata(buffer: *mut u8, max_bytes: usize) -> i32 {
     let request_payload = [1u8]; // reveal request tag
 
     reveal(

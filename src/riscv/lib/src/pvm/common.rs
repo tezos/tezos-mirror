@@ -231,14 +231,18 @@ impl<
         M: state_backend::ManagerReadWrite,
     {
         #[cfg(feature = "supervisor")]
-        return self
-            .system_state
-            .handle_system_call(&mut self.machine_state.core, hooks);
+        return handle_system_call(
+            &mut self.machine_state.core,
+            &mut self.system_state,
+            &mut self.status,
+            &mut self.reveal_request,
+            hooks,
+        );
 
         sbi::handle_call(
             &mut self.status,
             &mut self.reveal_request,
-            &mut self.machine_state,
+            &mut self.machine_state.core,
             hooks,
             exception,
         )
@@ -277,14 +281,18 @@ impl<
         self.machine_state
             .step_max_handle::<Infallible>(step_bounds, |machine_state, exception| {
                 #[cfg(feature = "supervisor")]
-                return Ok(self
-                    .system_state
-                    .handle_system_call(&mut machine_state.core, hooks));
+                return Ok(handle_system_call(
+                    &mut machine_state.core,
+                    &mut self.system_state,
+                    &mut self.status,
+                    &mut self.reveal_request,
+                    hooks,
+                ));
 
                 Ok(sbi::handle_call(
                     &mut self.status,
                     &mut self.reveal_request,
-                    machine_state,
+                    &mut machine_state.core,
                     hooks,
                     exception,
                 ))
@@ -298,7 +306,10 @@ impl<
     where
         M: state_backend::ManagerReadWrite,
     {
-        sbi::provide_no_input(&mut self.status, &mut self.machine_state)
+        sbi::provide_no_input(
+            &mut self.status,
+            &mut self.machine_state.core.hart.xregisters,
+        )
     }
 
     /// Provide input. Returns `false` if the machine state is not expecting
@@ -309,7 +320,7 @@ impl<
     {
         sbi::provide_input(
             &mut self.status,
-            &mut self.machine_state,
+            &mut self.machine_state.core,
             level,
             counter,
             payload,
@@ -322,7 +333,7 @@ impl<
     where
         M: state_backend::ManagerReadWrite,
     {
-        sbi::provide_reveal_response(&mut self.status, &mut self.machine_state, reveal_data)
+        sbi::provide_reveal_response(&mut self.status, &mut self.machine_state.core, reveal_data)
     }
 
     /// Get the current machine status.
@@ -359,6 +370,24 @@ impl<
             system_state: self.system_state.clone(),
         }
     }
+}
+
+#[cfg(feature = "supervisor")]
+fn handle_system_call<MC, M>(
+    core: &mut machine_state::MachineCoreState<MC, M>,
+    system_state: &mut linux::SupervisorState<M>,
+    status: &mut Cell<PvmStatus, M>,
+    reveal_request: &mut RevealRequest<M>,
+    hooks: &mut PvmHooks,
+) -> bool
+where
+    MC: memory::MemoryConfig,
+    M: state_backend::ManagerReadWrite,
+{
+    system_state.handle_system_call(core, hooks, |core| {
+        sbi::handle_tezos(core, status, reveal_request);
+        status.read() == PvmStatus::Evaluating
+    })
 }
 
 #[cfg(test)]

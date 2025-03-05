@@ -10,6 +10,7 @@ mod rng;
 use std::{ffi::CStr, num::NonZeroU64};
 
 use error::Error;
+use tezos_smart_rollup_constants::riscv::SBI_FIRMWARE_TEZOS;
 
 use super::{Pvm, PvmHooks};
 use crate::{
@@ -283,12 +284,14 @@ impl<M: ManagerBase> SupervisorState<M> {
     }
 
     /// Handle a Linux system call.
-    pub fn handle_system_call(
+    pub fn handle_system_call<MC>(
         &mut self,
-        core: &mut MachineCoreState<impl MemoryConfig, M>,
+        core: &mut MachineCoreState<MC, M>,
         hooks: &mut PvmHooks,
+        on_tezos: impl FnOnce(&mut MachineCoreState<MC, M>) -> bool,
     ) -> bool
     where
+        MC: MemoryConfig,
         M: ManagerReadWrite,
     {
         // We need to jump to the next instruction. The ECall instruction which triggered this
@@ -313,6 +316,7 @@ impl<M: ManagerBase> SupervisorState<M> {
             RT_SIGACTION => return self.handle_rt_sigaction(core),
             RT_SIGPROCMASK => return self.handle_rt_sigprocmask(core),
             GETRANDOM => return self.handle_getrandom(core),
+            SBI_FIRMWARE_TEZOS => return on_tezos(core),
             _ => {}
         }
 
@@ -523,6 +527,18 @@ mod tests {
         machine_state::{MachineCoreStateLayout, memory::M4K},
     };
 
+    /// Default handler for the `on_tezos` parameter of [`SupervisorState::handle_system_call`]
+    fn default_on_tezos_handler<MC, M>(core: &mut MachineCoreState<MC, M>) -> bool
+    where
+        MC: MemoryConfig,
+        M: ManagerWrite,
+    {
+        core.hart
+            .xregisters
+            .write_system_call_error(Error::NoSystemCall);
+        true
+    }
+
     // Check that the `set_tid_address` system call is working correctly.
     backend_test!(set_tid_address, F, {
         type MemLayout = M4K;
@@ -548,8 +564,11 @@ mod tests {
             .xregisters
             .write(registers::a0, tid_address);
 
-        let result =
-            supervisor_state.handle_system_call(&mut machine_state, &mut PvmHooks::default());
+        let result = supervisor_state.handle_system_call(
+            &mut machine_state,
+            &mut PvmHooks::default(),
+            default_on_tezos_handler,
+        );
         assert!(result);
 
         assert_eq!(supervisor_state.tid_address.read(), tid_address);
@@ -589,8 +608,11 @@ mod tests {
             machine_state.hart.xregisters.write(registers::a3, 0);
             machine_state.hart.xregisters.write(registers::a7, PPOLL);
 
-            let result =
-                supervisor_state.handle_system_call(&mut machine_state, &mut PvmHooks::default());
+            let result = supervisor_state.handle_system_call(
+                &mut machine_state,
+                &mut PvmHooks::default(),
+                default_on_tezos_handler,
+            );
             assert!(result);
 
             let ret = machine_state.hart.xregisters.read(registers::a0);
@@ -642,8 +664,11 @@ mod tests {
         machine_state.hart.xregisters.write(registers::a3, 8);
 
         // Perform the system call
-        let result =
-            supervisor_state.handle_system_call(&mut machine_state, &mut PvmHooks::default());
+        let result = supervisor_state.handle_system_call(
+            &mut machine_state,
+            &mut PvmHooks::default(),
+            default_on_tezos_handler,
+        );
         assert!(result);
 
         // Check if the location where the old handler was is now zeroed out
