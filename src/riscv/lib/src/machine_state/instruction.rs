@@ -39,8 +39,6 @@ use crate::instruction_context::ICB;
 use crate::instruction_context::IcbFnResult;
 use crate::instruction_context::IcbLoweringFn;
 use crate::interpreter::branching;
-use crate::interpreter::c;
-use crate::interpreter::i;
 use crate::interpreter::integer;
 use crate::interpreter::load_store;
 use crate::machine_state::ProgramCounterUpdate::Next;
@@ -1184,7 +1182,7 @@ macro_rules! impl_f_r_type {
 
 impl Args {
     // RV64I R-type instructions
-    impl_r_type!(i::run_add, run_add, non_zero);
+    impl_r_type!(integer::run_add, run_add, non_zero);
     impl_r_type!(run_sub, non_zero);
     impl_r_type!(run_xor, non_zero);
     impl_r_type!(integer::run_and, run_and, non_zero);
@@ -1403,7 +1401,7 @@ impl Args {
     impl_csr_imm_type!(run_csrrci);
 
     // RV32C compressed instructions
-    impl_cr_nz_type!(c::run_mv, run_mv);
+    impl_cr_nz_type!(integer::run_mv, run_mv);
     impl_cb_type!(run_beqz);
     impl_cb_type!(run_bnez);
     impl_cb_type!(run_bltz);
@@ -1460,7 +1458,7 @@ impl Args {
     }
 
     fn run_nop<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
-        c::run_nop(icb);
+        integer::run_nop(icb);
         let pcu = ProgramCounterUpdate::Next(self.width);
         icb.ok(pcu)
     }

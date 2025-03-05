@@ -422,7 +422,7 @@ mod tests {
 
     use crate::backend_test;
     use crate::create_state;
-    use crate::interpreter::i::run_add;
+    use crate::interpreter::integer::run_add;
     use crate::interpreter::integer::run_and;
     use crate::interpreter::integer::run_or;
     use crate::machine_state::MachineCoreState;

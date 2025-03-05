@@ -1,3 +1,9 @@
+// SPDX-FileCopyrightText: 2025 TriliTech <contact@trili.tech>
+//
+// SPDX-License-Identifier: MIT
+
+//! Implementation of load and store instructions for RISC-V over the ICB.
+
 use crate::instruction_context::ICB;
 use crate::machine_state::registers::NonZeroXRegister;
 

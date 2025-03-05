@@ -2,7 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-//! Implementation of internal branching opcodes.
+//! Implementation of branching and jumping instructions for RISC-V over the ICB.
+// TODO: RV-520: Update remaining 'jump' handlers in the file to work over the ICB.
 
 use crate::instruction_context::ICB;
 use crate::machine_state::hart_state::HartState;

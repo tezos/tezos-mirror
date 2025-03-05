@@ -1,14 +1,12 @@
-// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2025 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
 mod atomics;
 pub mod branching;
-pub mod c;
 mod common_memory;
 pub mod float;
-pub mod i;
 pub mod integer;
 pub mod load_store;
 pub mod rv32a;
