@@ -284,8 +284,6 @@ let default_keep_alive = false
 
 let default_finalized_view = false
 
-let default_verbose = false
-
 let default_rollup_node_endpoint = Uri.of_string "http://localhost:8932"
 
 let default_rollup_node_tracking = true
@@ -1557,139 +1555,38 @@ let evm_node_endpoint_resolved network evm_node_endpoint =
        (fun network -> Uri.of_string (observer_evm_node_endpoint network))
        network)
 
-let preimages_endpoint_resolved network preimages_endpoint =
-  Option.either
-    preimages_endpoint
-    (Option.map default_preimages_endpoint network)
-
 module Cli = struct
-  let create ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit ?cors_origins
-      ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
-      ?tx_pool_tx_per_addr_limit ?keep_alive ?rollup_node_endpoint
-      ?dont_track_rollup_node ?verbose ?preimages ?preimages_endpoint
-      ?native_execution_policy ?time_between_blocks ?max_number_of_chunks
-      ?private_rpc_port ?sequencer_key ?evm_node_endpoint
-      ?threshold_encryption_bundler_endpoint ?log_filter_max_nb_blocks
-      ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
-      ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-      ?sequencer_sidecar_endpoint ?restricted_rpcs ?finalized_view
-      ?proxy_ignore_block_param ?dal_slots ?network ?history_mode () =
-    let public_rpc =
-      default_rpc
-        ?rpc_port
-        ?rpc_addr
-        ?batch_limit:rpc_batch_limit
-        ?cors_origins
-        ?cors_headers
-        ?restricted_rpcs
-        ()
-    in
-    let private_rpc =
-      Option.map (fun port -> default_rpc ~rpc_port:port ()) private_rpc_port
-    in
-    let sequencer =
-      Option.map
-        (fun sequencer ->
-          sequencer_config_dft
-            ?time_between_blocks
-            ?max_number_of_chunks
-            ?max_blueprints_lag
-            ?max_blueprints_ahead
-            ?max_blueprints_catchup
-            ?catchup_cooldown
-            ~sequencer
-            ?dal_slots
-            ())
-        sequencer_key
-    in
-    let threshold_encryption_sequencer =
-      Option.map
-        (fun sequencer ->
-          threshold_encryption_sequencer_config_dft
-            ?time_between_blocks
-            ?max_number_of_chunks
-            ?max_blueprints_lag
-            ?max_blueprints_ahead
-            ?max_blueprints_catchup
-            ?catchup_cooldown
-            ~sequencer
-            ?sidecar_endpoint:sequencer_sidecar_endpoint
-            ?dal_slots
-            ())
-        sequencer_key
-    in
+  let default ~data_dir ?evm_node_endpoint ?network () =
     let observer =
       Option.map
-        (fun evm_node_endpoint ->
-          let rollup_node_tracking = Option.map not dont_track_rollup_node in
-          observer_config_dft
-            ~evm_node_endpoint
-            ?threshold_encryption_bundler_endpoint
-            ?rollup_node_tracking
-            ())
+        (fun evm_node_endpoint -> observer_config_dft ~evm_node_endpoint ())
         (evm_node_endpoint_resolved network evm_node_endpoint)
-    in
-    let proxy =
-      default_proxy
-        ?evm_node_endpoint
-        ?ignore_block_param:proxy_ignore_block_param
-        ()
-    in
-    let log_filter =
-      default_filter_config
-        ?max_nb_blocks:log_filter_max_nb_blocks
-        ?max_nb_logs:log_filter_max_nb_logs
-        ?chunk_size:log_filter_chunk_size
-        ()
-    in
-    let rollup_node_endpoint =
-      Option.value ~default:default_rollup_node_endpoint rollup_node_endpoint
     in
     let kernel_execution =
       kernel_execution_config_dft
         ~data_dir
-        ?preimages
-        ?preimages_endpoint:
-          (preimages_endpoint_resolved network preimages_endpoint)
-        ?native_execution_policy
+        ?preimages_endpoint:(Option.map default_preimages_endpoint network)
         ()
     in
-    let experimental_features =
-      match network with
-      | None -> default_experimental_features
-      | Some network ->
-          let l2_chains = Some [{chain_id = chain_id network}] in
-          {default_experimental_features with l2_chains}
-    in
     {
-      public_rpc;
-      private_rpc;
-      log_filter;
+      public_rpc = default_rpc ();
+      private_rpc = None;
+      log_filter = default_filter_config ();
       kernel_execution;
-      sequencer;
-      threshold_encryption_sequencer;
+      sequencer = None;
+      threshold_encryption_sequencer = None;
       observer;
-      proxy;
-      tx_pool_timeout_limit =
-        Option.value
-          ~default:default_tx_pool_timeout_limit
-          tx_pool_timeout_limit;
-      tx_pool_addr_limit =
-        Option.value ~default:default_tx_pool_addr_limit tx_pool_addr_limit;
-      tx_pool_tx_per_addr_limit =
-        Option.value
-          ~default:default_tx_pool_tx_per_addr_limit
-          tx_pool_tx_per_addr_limit;
-      keep_alive = Option.value ~default:default_keep_alive keep_alive;
-      rollup_node_endpoint;
-      verbose =
-        (if Option.value verbose ~default:default_verbose then Debug
-         else Internal_event.Notice);
-      experimental_features;
+      proxy = default_proxy ();
+      tx_pool_timeout_limit = default_tx_pool_timeout_limit;
+      tx_pool_addr_limit = default_tx_pool_addr_limit;
+      tx_pool_tx_per_addr_limit = default_tx_pool_tx_per_addr_limit;
+      keep_alive = false;
+      rollup_node_endpoint = default_rollup_node_endpoint;
+      verbose = Internal_event.Notice;
+      experimental_features = default_experimental_features;
       fee_history = default_fee_history;
-      finalized_view =
-        Option.value ~default:default_finalized_view finalized_view;
-      history_mode;
+      finalized_view = default_finalized_view;
+      history_mode = None;
     }
 
   let patch_kernel_execution_config kernel_execution ?preimages
@@ -1743,9 +1640,10 @@ module Cli = struct
         configuration.public_rpc
     in
     let private_rpc =
-      Option.map
-        (patch_rpc ?rpc_port:private_rpc_port)
-        configuration.private_rpc
+      match configuration.private_rpc with
+      | None ->
+          Option.map (fun rpc_port -> default_rpc ~rpc_port ()) private_rpc_port
+      | Some rpc -> Some (patch_rpc ?rpc_port:private_rpc_port rpc)
     in
     let keep_alive =
       Option.value keep_alive ~default:configuration.keep_alive
@@ -1991,6 +1889,54 @@ module Cli = struct
       finalized_view = finalized_view || configuration.finalized_view;
       history_mode = Option.either history_mode configuration.history_mode;
     }
+
+  let create ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit ?cors_origins
+      ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
+      ?tx_pool_tx_per_addr_limit ?keep_alive ?rollup_node_endpoint
+      ?dont_track_rollup_node ?verbose ?preimages ?preimages_endpoint
+      ?native_execution_policy ?time_between_blocks ?max_number_of_chunks
+      ?private_rpc_port ?sequencer_key ?evm_node_endpoint
+      ?threshold_encryption_bundler_endpoint ?log_filter_max_nb_blocks
+      ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
+      ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+      ?sequencer_sidecar_endpoint ?restricted_rpcs ?finalized_view
+      ?proxy_ignore_block_param ?dal_slots ?network ?history_mode () =
+    default ~data_dir ?network ?evm_node_endpoint ()
+    |> patch_configuration_from_args
+         ?rpc_addr
+         ?rpc_port
+         ?rpc_batch_limit
+         ?cors_origins
+         ?cors_headers
+         ?tx_pool_timeout_limit
+         ?tx_pool_addr_limit
+         ?tx_pool_tx_per_addr_limit
+         ?keep_alive
+         ?rollup_node_endpoint
+         ?dont_track_rollup_node
+         ?verbose
+         ?preimages
+         ?preimages_endpoint
+         ?native_execution_policy
+         ?time_between_blocks
+         ?max_number_of_chunks
+         ?private_rpc_port
+         ?sequencer_key
+         ?evm_node_endpoint
+         ?threshold_encryption_bundler_endpoint
+         ?log_filter_max_nb_blocks
+         ?log_filter_max_nb_logs
+         ?log_filter_chunk_size
+         ?max_blueprints_lag
+         ?max_blueprints_ahead
+         ?max_blueprints_catchup
+         ?catchup_cooldown
+         ?sequencer_sidecar_endpoint
+         ?restricted_rpcs
+         ?finalized_view
+         ?proxy_ignore_block_param
+         ?dal_slots
+         ?history_mode
 
   let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?cors_origins ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
