@@ -67,11 +67,11 @@ assets/jstz assets/jstz.checksum::
 
 .PHONY: build-deps
 build-deps:
-	@make -C jstz build-deps
-	@make -C dummy_kernel build-deps
-	@make -C supervised_dummy_kernel build-deps
-	@make -C dummy_sdk_kernel build-deps
+	# Ensure the toolchain is installed.
+	# The second command triggers installation for Rustup 1.28+.
+	@rustup show active-toolchain || rustup toolchain install
 	@rustup component add rustfmt clippy
+
 ifneq ($(NATIVE_TARGET),)
 	@rustup target add $(NATIVE_TARGET)
 endif
@@ -79,9 +79,14 @@ endif
 	# Install Nightly for formatting with its Rustfmt, and running Miri
 	@rustup toolchain install $(NIGHTLY_VERSION) -c rustfmt miri rust-src
 
-	# Iterate through all the toolchains. 'rustup show' will install the
-	# toolchain in addition to showing toolchain information.
-	@find . -iname 'rust-toolchain*' -execdir rustup show active-toolchain \; 2>/dev/null
+	# Iterate through all the toolchains. 'rustup show' (before Rustup 1.28) and
+	# 'rustup toolchain install' (Rustup 1.28+) will install the toolchain. 
+	@find . -iname 'rust-toolchain*' -execdir sh -c "rustup show active-toolchain || rustup toolchain install" \; 2>/dev/null
+
+	@make -C jstz build-deps
+	@make -C dummy_kernel build-deps
+	@make -C supervised_dummy_kernel build-deps
+	@make -C dummy_sdk_kernel build-deps
 
 .PHONY: test
 test: build
