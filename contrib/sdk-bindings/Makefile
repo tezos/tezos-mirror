@@ -28,3 +28,4 @@ test-rust:
 test-bindings: bindings
 	@make -C python/ test
 	@make -C kotlin/demo test
+	@make -C swift test
