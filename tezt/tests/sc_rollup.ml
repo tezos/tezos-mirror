@@ -499,14 +499,7 @@ let test_store_schema_regression =
     ~regression:true
     {
       variant = None;
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7760
-
-            sqlite3 has been removed from the e2e image in
-            https://gitlab.com/tezos/tezos/-/merge_requests/16769, breaking this test.
-
-            It is therefore disabled in CI
-      *)
-      tags = [Tag.ci_disabled; "store"; "schema"];
+      tags = ["store"; "schema"];
       description = "Rollup node: regression on store schema";
     }
     ~kind:"wasm_2_0_0"

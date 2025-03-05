@@ -342,19 +342,24 @@ ENV NODE_OPTIONS="--dns-result-order=ipv4first"
 # See https://docs.docker.com/build/building/best-practices/#using-pipes
 SHELL ["/bin/ash", "-euo", "pipefail", "-c"]
 
-# [sqlite-libs] from [alpine:3.20] installed in [runtime] image
-# we need [sqlite-libs] from [alpine:3.21] installed in [e2etest]
-RUN apk del sqlite-dev sqlite-libs
 # hadolint ignore=DL3018,DL3019
 RUN apk update \
- && apk add --no-cache curl \
- ## Add npm from 3.21 main repository instead of 3.20 to get a newer version of nodejs.
- ## Should solve related hanging problems  cf. https://github.com/npm/cli/issues/4028
- ## Notes: npm is in community, node in main. npm version is currently identical in 3.20 and 3.21
- && apk add npm --repository=https://dl-cdn.alpinelinux.org/alpine/v3.21/main \
- && apk add git file make jq websocat \
- gcc clang lld ca-certificates build-base musl-dev libusb-dev linux-headers \
-    procps-ng \
+ && apk add --no-cache curl git file make jq websocat gcc clang lld \
+ && apk add --no-cache ca-certificates build-base musl-dev libusb-dev linux-headers procps-ng
+
+## Add npm from 3.21 main repository instead of 3.20 to get a newer version (v22) of nodejs.
+## Should solve related hanging problems  cf.
+## - https://github.com/npm/cli/issues/4028
+## - https://gitlab.alpinelinux.org/alpine/aports/-/merge_requests/75639
+## Notes:
+## - [npm] is in community, node in main. npm version is currently identical in 3.20 and 3.21
+## - [node] v22 requires [sqlite-libs] from 3.21 as well otherwise [node] will not run,
+##   but the version that was installed in the [runtime] image was from 3.20;
+##   so we reinstall it with a different version
+## - for compatibility reasons, this requires to have [sqlite-dev] from 3.21 as well
+# hadolint ignore=DL3018
+RUN apk del sqlite-dev sqlite-libs \
+ && apk add --no-cache sqlite-dev npm --repository=https://dl-cdn.alpinelinux.org/alpine/v3.21/main \
  # We need datadog-ci to send JUnit files to Datadog in tezt
  # jobs. Cf. [scripts/ci/tezt.sh].
  # Version number should be kept in sync with the one of the
