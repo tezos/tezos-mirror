@@ -72,6 +72,12 @@ Proxy Server
 Protocol Compiler And Environment
 ---------------------------------
 
+- Environment V15 uses signature V2. This change impacts the way BLS signatures
+  are handled. In previous environments that used signature V1, the BLS
+  signatures were expected to be produced with the ``Augmented`` cryptographic
+  scheme. Starting from V15, they are expected to be produced with the ``Proof
+  of possession`` cryptographic scheme. (MR :gl:`!17036`)
+
 Codec
 -----
 
