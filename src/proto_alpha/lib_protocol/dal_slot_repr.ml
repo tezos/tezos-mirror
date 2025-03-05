@@ -459,54 +459,9 @@ module History = struct
 
     let encoding =
       let open Data_encoding in
-      (* ADAL/TODO: https://gitlab.com/tezos/tezos/-/issues/7554
-
-         The two legacy cases below can be removed once migration from Quebec to
-         R is done, assuming no legacy cells could be used in refutation anymore
-         (i.e. ~3 months after migrating to Content_v2). If so, the code in
-         protocol S can be simplfied.
-
-         However, make sure to not modify the tags (2) and (3) of the regular
-         cases below, as this would break the ability to read normal Content_v2
-         cells. *)
       union
         ~tag_size:`Uint8
         [
-          (* Legacy cases: we should be able to decode the content of the old
-             cells from the previous protocol in case of refutation. But, we
-             don't construct cells of that protocol anymore. *)
-          case
-            ~title:"unattested"
-            (Tag 0)
-            (merge_objs
-               (obj1 (req "kind" (constant "unattested")))
-               Header.id_encoding)
-            (fun _x -> None)
-            (fun ((), slot_id) ->
-              (* The old [Unattested] case is translated to [Unpublished]. When
-                 a slot was not attested, we act as if it was not published at
-                 all. *)
-              Unpublished slot_id);
-          case
-            ~title:"attested"
-            (Tag 1)
-            (merge_objs
-               (obj1 (req "kind" (constant "attested")))
-               Header.encoding)
-            (fun _x -> None)
-            (fun ((), slot_header) ->
-              (* The old [Attested] case is translated to [Published], with some
-                 extra placeholder fields. In this case, we act as if it were
-                 attested by all the bakers (i.e., a 100% attestation rate). *)
-              Published
-                {
-                  header = slot_header;
-                  publisher = Contract_repr.zero;
-                  is_proto_attested = true;
-                  attested_shards = 1;
-                  total_shards = 1;
-                });
-          (* New/normal cases *)
           case
             ~title:"unpublished"
             (Tag 2)
