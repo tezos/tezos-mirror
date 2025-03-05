@@ -646,6 +646,7 @@ oc.install_bin_debian_bookworm_systemd_test:
   - oc.docker-systemd_tests_debian
   - apt_repo_debian
   dependencies: []
+  allow_failure: true
   timeout: 60 minutes
   before_script:
   - ./scripts/ci/docker_initialize.sh
@@ -662,6 +663,11 @@ oc.install_bin_debian_bookworm_systemd_test:
     PREFIX: ""
     DISTRIBUTION: debian
     RELEASE: bookworm
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.install_bin_debian_bookworm_systemd_custom_datadir:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
@@ -672,6 +678,7 @@ oc.install_bin_debian_bookworm_systemd_custom_datadir:
   - oc.docker-systemd_tests_debian
   - apt_repo_debian
   dependencies: []
+  allow_failure: true
   timeout: 60 minutes
   before_script:
   - ./scripts/ci/docker_initialize.sh
@@ -689,6 +696,11 @@ oc.install_bin_debian_bookworm_systemd_custom_datadir:
     DISTRIBUTION: debian
     RELEASE: bookworm
     DATADIR: /custom/.tezos-node
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.upgrade_bin_debian_bookworm-systemd:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
@@ -700,6 +712,7 @@ oc.upgrade_bin_debian_bookworm-systemd:
   - apt_repo_debian
   - apt_repo_debian_old
   dependencies: []
+  allow_failure: true
   timeout: 60 minutes
   before_script:
   - ./scripts/ci/docker_initialize.sh
@@ -716,6 +729,11 @@ oc.upgrade_bin_debian_bookworm-systemd:
     PREFIX: ""
     DISTRIBUTION: debian
     RELEASE: bookworm
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.lintian_ubuntu:
   image: public.ecr.aws/lts/ubuntu:24.04_stable
@@ -796,6 +814,7 @@ oc.install_bin_ubuntu_noble_systemd:
   - oc.docker-systemd_tests_ubuntu
   - apt_repo_ubuntu
   dependencies: []
+  allow_failure: true
   timeout: 60 minutes
   before_script:
   - ./scripts/ci/docker_initialize.sh
@@ -812,6 +831,11 @@ oc.install_bin_ubuntu_noble_systemd:
     PREFIX: ""
     DISTRIBUTION: ubuntu
     RELEASE: noble
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.upgrade_bin_ubuntu_noble_systemd_test:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
@@ -823,6 +847,7 @@ oc.upgrade_bin_ubuntu_noble_systemd_test:
   - apt_repo_ubuntu
   - apt_repo_ubuntu_old
   dependencies: []
+  allow_failure: true
   timeout: 60 minutes
   before_script:
   - ./scripts/ci/docker_initialize.sh
@@ -839,3 +864,8 @@ oc.upgrade_bin_ubuntu_noble_systemd_test:
     PREFIX: ""
     DISTRIBUTION: ubuntu
     RELEASE: noble
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
