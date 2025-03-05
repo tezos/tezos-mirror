@@ -1,7 +1,7 @@
 #!/bin/sh
 # shellcheck disable=SC2320,SC3044
 
-# This script builds the riscv unit tests, located here https://github.com/riscv-collab/riscv-gnu-toolchain.
+# This script builds the riscv unit tests, located here: https://github.com/trilitech/riscv-tests
 # It assumes that a GNU riscv toolchin is installed locally.
 # To install the GNU riscv toolchain, follow the instructions here: https://github.com/riscv-collab/riscv-gnu-toolchain
 
@@ -25,10 +25,13 @@ echo "Building riscv unit tests in temporary directory $build_dir"
 
 pushd "$build_dir" || exit
 
-git clone --recursive https://github.com/riscv/riscv-tests . || {
+git clone --recursive https://github.com/trilitech/riscv-tests . || {
   echo "cloning failed" >&2
   clean_up 1
 }
+
+echo "Saving commit hash"
+git rev-parse HEAD > "$self"/riscv-tests.commit
 
 autoconf || {
   echo "autoconf failed" >&2
