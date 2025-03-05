@@ -7115,7 +7115,7 @@ let hash = Protocol.hash
         ~with_macos_security_framework:true
         ~deps:
           [
-            minimal_rust_deps.lib;
+            octez_rust_deps;
             octez_base |> open_ ~m:"TzPervasives"
             |> error_monad_module N.(number <= 018);
             dal |> if_some |> open_;
