@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+mod addr;
 mod error;
 mod fds;
 mod fs;
