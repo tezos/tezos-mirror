@@ -17,11 +17,18 @@ let () =
           let module M = Scenarios_cli.Layer1 () in
           `layer1 (module M : Scenarios_cli.Layer1) );
         (Clap.case "BASIC" @@ fun () -> `basic);
+        ( Clap.case
+            ~description:
+              "Perform tasks unrelated to any particular scenario such as \
+               `terraform destroy` or `prometheus import` jobs."
+            "CLOUD"
+        @@ fun () -> `cloud );
       ]
   in
   Tezt_cloud.register ~tags:[Tag.cloud] ;
   (match command with
   | `basic -> Basic.register ()
   | `dal m -> Dal.register m
-  | `layer1 m -> Layer1.register m) ;
+  | `layer1 m -> Layer1.register m
+  | `cloud -> ()) ;
   Test.run ()
