@@ -1193,8 +1193,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             // In the upcoming Cancun fork, the semantic of this behaviour will change.
             Precondition::PreconditionErr(ExitReason::Error(ExitError::CreateCollision))
         } else {
-            // TODO: https://gitlab.com/tezos/tezos/-/issues/6716
-            // Create collision and failed transfers should use up all the gas
             match self.is_colliding(address) {
                 Ok(false) => Precondition::PassPrecondition,
                 Ok(true) => {
