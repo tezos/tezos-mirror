@@ -10,6 +10,10 @@ set -e
 # wrapper script if available
 debsystemctl=$(command -v deb-systemd-invoke || echo systemctl)
 
+if [ -e /etc/default/octez-node ]; then
+  . /etc/default/octez-node
+fi
+
 case "${1}" in
 remove)
   # Clean up the temporary directory
@@ -18,7 +22,6 @@ remove)
   rm -Rf /run/octez-node
   ;;
 purge)
-  DATADIR=/var/tezos
   # display a warning before proceding
   db_get octez-node/purge_warning || true
   case "$RET" in
