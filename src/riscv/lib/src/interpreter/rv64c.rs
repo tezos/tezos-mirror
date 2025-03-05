@@ -7,10 +7,10 @@
 //!
 //! U:C-16
 
-use crate::{
-    machine_state::registers::{NonZeroXRegister, XRegister, XRegisters},
-    state_backend as backend,
-};
+use crate::machine_state::registers::NonZeroXRegister;
+use crate::machine_state::registers::XRegister;
+use crate::machine_state::registers::XRegisters;
+use crate::state_backend as backend;
 
 impl<M> XRegisters<M>
 where
@@ -63,18 +63,23 @@ where
 
 #[cfg(test)]
 mod tests {
-    use proptest::{arbitrary::any, prop_assert, prop_assert_eq, proptest};
+    use proptest::arbitrary::any;
+    use proptest::prop_assert;
+    use proptest::prop_assert_eq;
+    use proptest::proptest;
 
-    use crate::{
-        backend_test, create_state,
-        machine_state::{
-            MachineCoreState, MachineCoreStateLayout,
-            hart_state::{HartState, HartStateLayout},
-            memory::M4K,
-            registers::{a3, a4, nz, t0},
-        },
-        traps::Exception,
-    };
+    use crate::backend_test;
+    use crate::create_state;
+    use crate::machine_state::MachineCoreState;
+    use crate::machine_state::MachineCoreStateLayout;
+    use crate::machine_state::hart_state::HartState;
+    use crate::machine_state::hart_state::HartStateLayout;
+    use crate::machine_state::memory::M4K;
+    use crate::machine_state::registers::a3;
+    use crate::machine_state::registers::a4;
+    use crate::machine_state::registers::nz;
+    use crate::machine_state::registers::t0;
+    use crate::traps::Exception;
 
     backend_test!(test_caddiw, F, {
         proptest!(|(

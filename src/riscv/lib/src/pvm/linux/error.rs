@@ -2,10 +2,11 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{
-    machine_state::registers::{XRegisters, XValue, a0},
-    state_backend::{ManagerBase, ManagerWrite},
-};
+use crate::machine_state::registers::XRegisters;
+use crate::machine_state::registers::XValue;
+use crate::machine_state::registers::a0;
+use crate::state_backend::ManagerBase;
+use crate::state_backend::ManagerWrite;
 
 /// Linux system call error codes
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]

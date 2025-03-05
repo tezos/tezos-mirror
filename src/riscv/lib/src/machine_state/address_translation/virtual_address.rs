@@ -12,13 +12,11 @@
 //! See sections 5.4, 5.5, 5.6
 
 use super::PAGE_OFFSET_WIDTH;
-use crate::{
-    bits::{ones, u64},
-    machine_state::{
-        csregisters::{CSRRepr, satp::SvLength},
-        memory::Address,
-    },
-};
+use crate::bits::ones;
+use crate::bits::u64;
+use crate::machine_state::csregisters::CSRRepr;
+use crate::machine_state::csregisters::satp::SvLength;
+use crate::machine_state::memory::Address;
 
 /// Obtain `VPN[index]` from a VPN field specified by `sv_length` Standard.
 ///
@@ -55,7 +53,8 @@ pub fn get_vpn_idx(v_addr: Address, sv_length: &SvLength, index: usize) -> Optio
 mod tests {
     use proptest::proptest;
 
-    use crate::machine_state::{address_translation::virtual_address, csregisters::satp::SvLength};
+    use crate::machine_state::address_translation::virtual_address;
+    use crate::machine_state::csregisters::satp::SvLength;
 
     #[test]
     pub fn test_virtual_address() {

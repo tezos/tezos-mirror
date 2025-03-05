@@ -4,11 +4,10 @@
 
 //! Implementation of internal opcodes appropriate for JIT compilation.
 
-use crate::{
-    instruction_context::ICB,
-    machine_state::registers::{NonZeroXRegister, XRegisters},
-    state_backend as backend,
-};
+use crate::instruction_context::ICB;
+use crate::machine_state::registers::NonZeroXRegister;
+use crate::machine_state::registers::XRegisters;
+use crate::state_backend as backend;
 
 impl<M> XRegisters<M>
 where
@@ -62,14 +61,13 @@ pub fn run_or(
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        backend_test, create_state,
-        machine_state::{
-            MachineCoreState, MachineCoreStateLayout,
-            memory::M4K,
-            registers::nz::{self, a0},
-        },
-    };
+    use crate::backend_test;
+    use crate::create_state;
+    use crate::machine_state::MachineCoreState;
+    use crate::machine_state::MachineCoreStateLayout;
+    use crate::machine_state::memory::M4K;
+    use crate::machine_state::registers::nz;
+    use crate::machine_state::registers::nz::a0;
 
     backend_test!(test_negate, F, {
         let rs2val_rd_res = [

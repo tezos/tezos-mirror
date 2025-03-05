@@ -3,11 +3,20 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{
-    Elem, EnrichedValue, EnrichedValueLinked, FnManager, ManagerBase, ManagerClone,
-    ManagerDeserialise, ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite, Ref,
-    proof_backend::{ProofGen, merkle::AccessInfoAggregatable},
-};
+use super::Elem;
+use super::EnrichedValue;
+use super::EnrichedValueLinked;
+use super::FnManager;
+use super::ManagerBase;
+use super::ManagerClone;
+use super::ManagerDeserialise;
+use super::ManagerRead;
+use super::ManagerReadWrite;
+use super::ManagerSerialise;
+use super::ManagerWrite;
+use super::Ref;
+use super::proof_backend::ProofGen;
+use super::proof_backend::merkle::AccessInfoAggregatable;
 
 /// Link a stored value directly with a derived value -
 /// that would either be expensive to compute each time, or cannot
@@ -576,14 +585,16 @@ impl<const LEN: usize, M: ManagerClone> Clone for DynCells<LEN, M> {
 pub(crate) mod tests {
     use serde::ser::SerializeTuple;
 
-    use crate::{
-        backend_test,
-        default::ConstDefault,
-        state_backend::{
-            Array, DynCells, Elem, FnManagerIdent, ManagerAlloc, ManagerBase,
-            layout::{Atom, Layout},
-        },
-    };
+    use crate::backend_test;
+    use crate::default::ConstDefault;
+    use crate::state_backend::Array;
+    use crate::state_backend::DynCells;
+    use crate::state_backend::Elem;
+    use crate::state_backend::FnManagerIdent;
+    use crate::state_backend::ManagerAlloc;
+    use crate::state_backend::ManagerBase;
+    use crate::state_backend::layout::Atom;
+    use crate::state_backend::layout::Layout;
 
     /// Dummy type that helps us implement custom normalisation via [Elem]
     #[repr(packed)]

@@ -2,16 +2,17 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{
-    collections::{BTreeSet, HashMap},
-    time::Duration,
-};
+use std::collections::BTreeSet;
+use std::collections::HashMap;
+use std::time::Duration;
 
 use comfy_table::Cell;
 use itertools::Itertools;
-use numfmt::{Formatter, Numeric};
+use numfmt::Formatter;
+use numfmt::Numeric;
 
-use crate::commands::bench::{BenchStats, NamedStats};
+use crate::commands::bench::BenchStats;
+use crate::commands::bench::NamedStats;
 
 /// Produce a string by formatting the number with the given `separator` and `precision`
 pub fn thousand_format<N: Numeric>(content: N, num_decimals: u8) -> String {

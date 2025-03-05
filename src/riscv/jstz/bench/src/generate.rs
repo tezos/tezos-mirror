@@ -5,20 +5,36 @@
 use std::error::Error;
 use std::path::Path;
 
-use base64::{Engine, engine::general_purpose::URL_SAFE};
-use bincode::config::{Configuration, Fixint, LittleEndian};
-use http::{HeaderMap, Method, Uri};
-use jstz_crypto::{
-    hash::Hash, keypair_from_passphrase, public_key::PublicKey, public_key_hash::PublicKeyHash,
-    secret_key::SecretKey, smart_function_hash::SmartFunctionHash,
-};
-use jstz_proto::context::account::{Address, Addressable, Nonce, ParsedCode};
-use jstz_proto::operation::{Content, DeployFunction, Operation, RunFunction, SignedOperation};
-use serde::{Serialize, Serializer};
+use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE;
+use bincode::config::Configuration;
+use bincode::config::Fixint;
+use bincode::config::LittleEndian;
+use http::HeaderMap;
+use http::Method;
+use http::Uri;
+use jstz_crypto::hash::Hash;
+use jstz_crypto::keypair_from_passphrase;
+use jstz_crypto::public_key::PublicKey;
+use jstz_crypto::public_key_hash::PublicKeyHash;
+use jstz_crypto::secret_key::SecretKey;
+use jstz_crypto::smart_function_hash::SmartFunctionHash;
+use jstz_proto::context::account::Address;
+use jstz_proto::context::account::Addressable;
+use jstz_proto::context::account::Nonce;
+use jstz_proto::context::account::ParsedCode;
+use jstz_proto::operation::Content;
+use jstz_proto::operation::DeployFunction;
+use jstz_proto::operation::Operation;
+use jstz_proto::operation::RunFunction;
+use jstz_proto::operation::SignedOperation;
+use serde::Serialize;
+use serde::Serializer;
 use tezos_data_encoding::enc::BinWriter;
 use tezos_smart_rollup::inbox::ExternalMessageFrame;
 use tezos_smart_rollup::types::SmartRollupAddress;
-use tezos_smart_rollup::utils::inbox::file::{InboxFile, Message};
+use tezos_smart_rollup::utils::inbox::file::InboxFile;
+use tezos_smart_rollup::utils::inbox::file::Message;
 
 const BINCODE_CONFIGURATION: Configuration<LittleEndian, Fixint> = bincode::config::legacy();
 

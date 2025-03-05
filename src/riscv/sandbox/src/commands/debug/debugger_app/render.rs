@@ -3,29 +3,35 @@
 //
 // SPDX-License-Identifier: MIT
 
-use octez_riscv::{
-    machine_state::{
-        csregisters::{
-            self, CSRegister,
-            satp::SvLength,
-            xstatus::{ExtensionValue, MPPValue, MStatus, SPPValue},
-        },
-        registers,
-    },
-    state_backend::ManagerRead,
-    stepper::{Stepper, StepperStatus},
-};
-use ratatui::{
-    prelude::*,
-    style::Stylize,
-    symbols::border,
-    widgets::{block::*, *},
-};
+use octez_riscv::machine_state::csregisters;
+use octez_riscv::machine_state::csregisters::CSRegister;
+use octez_riscv::machine_state::csregisters::satp::SvLength;
+use octez_riscv::machine_state::csregisters::xstatus::ExtensionValue;
+use octez_riscv::machine_state::csregisters::xstatus::MPPValue;
+use octez_riscv::machine_state::csregisters::xstatus::MStatus;
+use octez_riscv::machine_state::csregisters::xstatus::SPPValue;
+use octez_riscv::machine_state::registers;
+use octez_riscv::state_backend::ManagerRead;
+use octez_riscv::stepper::Stepper;
+use octez_riscv::stepper::StepperStatus;
+use ratatui::prelude::*;
+use ratatui::style::Stylize;
+use ratatui::symbols::border;
+use ratatui::widgets::block::*;
+use ratatui::widgets::*;
 
-use super::{
-    BLUE, DebuggerApp, GRAY, GREEN, Instruction, NEXT_STYLE_FG, ORANGE, RED, SATPModeState,
-    SELECTED_STYLE_FG, TranslationState, YELLOW,
-};
+use super::BLUE;
+use super::DebuggerApp;
+use super::GRAY;
+use super::GREEN;
+use super::Instruction;
+use super::NEXT_STYLE_FG;
+use super::ORANGE;
+use super::RED;
+use super::SATPModeState;
+use super::SELECTED_STYLE_FG;
+use super::TranslationState;
+use super::YELLOW;
 
 macro_rules! xregister_line {
     ($self: ident, $reg: ident) => {
@@ -561,7 +567,9 @@ where
 {
     fn render(self, area: Rect, buf: &mut Buffer) {
         // Split main layout from bottom instructions bar
-        use Constraint::{Fill, Length, Percentage};
+        use Constraint::Fill;
+        use Constraint::Length;
+        use Constraint::Percentage;
         let outer_layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints(vec![Fill(1), Length(1)])

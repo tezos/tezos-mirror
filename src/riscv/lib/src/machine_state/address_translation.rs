@@ -2,23 +2,24 @@
 //
 // SPDX-License-Identifier: MIT
 
-use strum::{EnumCount, EnumIter};
+use strum::EnumCount;
+use strum::EnumIter;
 
-use super::{
-    MachineCoreState,
-    csregisters::{
-        CSRRepr, CSRegister,
-        satp::{Satp, SvLength, TranslationAlgorithm},
-    },
-    memory::{self, Address, OutOfBounds},
-    mode::Mode,
-};
-use crate::{
-    bits::Bits64,
-    machine_state::{address_translation::pte::PageTableEntry, memory::Memory},
-    state_backend::{self as backend},
-    traps::Exception,
-};
+use super::MachineCoreState;
+use super::csregisters::CSRRepr;
+use super::csregisters::CSRegister;
+use super::csregisters::satp::Satp;
+use super::csregisters::satp::SvLength;
+use super::csregisters::satp::TranslationAlgorithm;
+use super::memory;
+use super::memory::Address;
+use super::memory::OutOfBounds;
+use super::mode::Mode;
+use crate::bits::Bits64;
+use crate::machine_state::address_translation::pte::PageTableEntry;
+use crate::machine_state::memory::Memory;
+use crate::state_backend as backend;
+use crate::traps::Exception;
 
 mod physical_address;
 pub mod pte;

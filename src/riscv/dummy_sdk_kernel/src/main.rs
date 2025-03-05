@@ -2,7 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-use tezos_smart_rollup::{entrypoint, prelude::Runtime};
+use tezos_smart_rollup::entrypoint;
+use tezos_smart_rollup::prelude::Runtime;
 use tezos_smart_rollup_constants::core::PREIMAGE_HASH_SIZE;
 
 #[entrypoint::main]

@@ -4,19 +4,22 @@
 // SPDX-License-Identifier: MIT
 
 use super::csregisters::xstatus::MStatus;
-use crate::{
-    bits::u64,
-    default::ConstDefault,
-    machine_state::{
-        csregisters::{self, CSRegister, xstatus},
-        memory::Address,
-        mode::{Mode, TrapMode},
-        registers,
-        reservation_set::{self, ReservationSet},
-    },
-    state_backend::{self as backend, Atom, Cell},
-    traps::{Interrupt, TrapContext},
-};
+use crate::bits::u64;
+use crate::default::ConstDefault;
+use crate::machine_state::csregisters;
+use crate::machine_state::csregisters::CSRegister;
+use crate::machine_state::csregisters::xstatus;
+use crate::machine_state::memory::Address;
+use crate::machine_state::mode::Mode;
+use crate::machine_state::mode::TrapMode;
+use crate::machine_state::registers;
+use crate::machine_state::reservation_set;
+use crate::machine_state::reservation_set::ReservationSet;
+use crate::state_backend as backend;
+use crate::state_backend::Atom;
+use crate::state_backend::Cell;
+use crate::traps::Interrupt;
+use crate::traps::TrapContext;
 
 /// RISC-V hart state
 pub struct HartState<M: backend::ManagerBase> {

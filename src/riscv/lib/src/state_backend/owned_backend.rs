@@ -3,19 +3,28 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{
-    array, fmt,
-    marker::PhantomData,
-    mem::{self, MaybeUninit},
-};
+use std::array;
+use std::fmt;
+use std::marker::PhantomData;
+use std::mem;
+use std::mem::MaybeUninit;
 
 use serde::ser::SerializeTuple;
 
-use super::{
-    AllocatedOf, Elem, EnrichedValue, EnrichedValueLinked, Layout, ManagerAlloc, ManagerBase,
-    ManagerClone, ManagerDeserialise, ManagerRead, ManagerReadWrite, ManagerSerialise,
-    ManagerWrite, StaticCopy,
-};
+use super::AllocatedOf;
+use super::Elem;
+use super::EnrichedValue;
+use super::EnrichedValueLinked;
+use super::Layout;
+use super::ManagerAlloc;
+use super::ManagerBase;
+use super::ManagerClone;
+use super::ManagerDeserialise;
+use super::ManagerRead;
+use super::ManagerReadWrite;
+use super::ManagerSerialise;
+use super::ManagerWrite;
+use super::StaticCopy;
 
 /// Manager that allows state binders to own the state storage
 #[derive(Clone, Copy, Debug)]
@@ -338,11 +347,16 @@ impl ManagerClone for Owned {
 #[cfg(test)]
 pub mod test_helpers {
     use super::*;
-    use crate::state_backend::{
-        Cell, Cells, DynCells, EnrichedCell, FnManagerIdent, Ref,
-        proof_backend::{ProofDynRegion, ProofGen, ProofRegion},
-        test_helpers::TestBackendFactory,
-    };
+    use crate::state_backend::Cell;
+    use crate::state_backend::Cells;
+    use crate::state_backend::DynCells;
+    use crate::state_backend::EnrichedCell;
+    use crate::state_backend::FnManagerIdent;
+    use crate::state_backend::Ref;
+    use crate::state_backend::proof_backend::ProofDynRegion;
+    use crate::state_backend::proof_backend::ProofGen;
+    use crate::state_backend::proof_backend::ProofRegion;
+    use crate::state_backend::test_helpers::TestBackendFactory;
 
     /// Test backend factory for the owned state manager
     pub struct OwnedTestBackendFactory;

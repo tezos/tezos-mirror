@@ -8,34 +8,45 @@
 
 use std::collections::HashSet;
 use std::error::Error;
+use std::fs;
+use std::io;
 use std::marker::PhantomData;
-use std::net::{TcpListener, TcpStream};
+use std::net::TcpListener;
+use std::net::TcpStream;
 use std::ops::Bound;
-use std::{fs, io};
 
 use gdbstub::arch::Arch;
 use gdbstub::common::Signal;
-use gdbstub::conn::{Connection, ConnectionExt};
-use gdbstub::stub::{GdbStub, SingleThreadStopReason, run_blocking};
+use gdbstub::conn::Connection;
+use gdbstub::conn::ConnectionExt;
+use gdbstub::stub::GdbStub;
+use gdbstub::stub::SingleThreadStopReason;
+use gdbstub::stub::run_blocking;
+use gdbstub::target::Target;
+use gdbstub::target::TargetError;
+use gdbstub::target::TargetResult;
 use gdbstub::target::ext::base::BaseOps;
-use gdbstub::target::ext::base::singlethread::{
-    SingleThreadBase, SingleThreadResume, SingleThreadResumeOps, SingleThreadSingleStep,
-    SingleThreadSingleStepOps,
-};
-use gdbstub::target::ext::breakpoints::{
-    Breakpoints, BreakpointsOps, SwBreakpoint, SwBreakpointOps,
-};
+use gdbstub::target::ext::base::singlethread::SingleThreadBase;
+use gdbstub::target::ext::base::singlethread::SingleThreadResume;
+use gdbstub::target::ext::base::singlethread::SingleThreadResumeOps;
+use gdbstub::target::ext::base::singlethread::SingleThreadSingleStep;
+use gdbstub::target::ext::base::singlethread::SingleThreadSingleStepOps;
+use gdbstub::target::ext::breakpoints::Breakpoints;
+use gdbstub::target::ext::breakpoints::BreakpointsOps;
+use gdbstub::target::ext::breakpoints::SwBreakpoint;
+use gdbstub::target::ext::breakpoints::SwBreakpointOps;
 use gdbstub::target::ext::exec_file::ExecFile;
-use gdbstub::target::{Target, TargetError, TargetResult};
 use gdbstub_arch::riscv::reg::RiscvCoreRegs;
-use octez_riscv::machine_state::{
-    block_cache::bcall::InterpretedBlockBuilder,
-    memory::{M1G, Memory, OutOfBounds},
-};
+use octez_riscv::machine_state::block_cache::bcall::InterpretedBlockBuilder;
+use octez_riscv::machine_state::memory::M1G;
+use octez_riscv::machine_state::memory::Memory;
+use octez_riscv::machine_state::memory::OutOfBounds;
 use octez_riscv::pvm::PvmHooks;
 use octez_riscv::state_backend::FnManagerIdent;
+use octez_riscv::stepper::StepResult;
+use octez_riscv::stepper::Stepper;
+use octez_riscv::stepper::StepperStatus;
 use octez_riscv::stepper::pvm::PvmStepper;
-use octez_riscv::stepper::{StepResult, Stepper, StepperStatus};
 use tezos_smart_rollup::utils::inbox::InboxBuilder;
 
 use crate::cli::GdbServerOptions;

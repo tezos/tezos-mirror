@@ -6,14 +6,16 @@
 pub mod binary;
 mod chunked_io;
 
-use std::{
-    io::{self, Write},
-    path::{Path, PathBuf},
-};
+use std::io;
+use std::io::Write;
+use std::path::Path;
+use std::path::PathBuf;
 
 use thiserror::Error;
 
-pub use crate::state_backend::hash::{DIGEST_SIZE, Hash, HashError};
+pub use crate::state_backend::hash::DIGEST_SIZE;
+pub use crate::state_backend::hash::Hash;
+pub use crate::state_backend::hash::HashError;
 
 const CHUNK_SIZE: usize = 4096;
 

@@ -5,9 +5,10 @@
 // TODO: RV-121: We want to access the crypto functions through the Tezos crypto crate instead of
 // needing to define them here.
 
-use tezos_smart_rollup_constants::riscv::{
-    SBI_FIRMWARE_TEZOS, SBI_TEZOS_BLAKE2B_HASH256, SBI_TEZOS_ED25519_SIGN, SBI_TEZOS_ED25519_VERIFY,
-};
+use tezos_smart_rollup_constants::riscv::SBI_FIRMWARE_TEZOS;
+use tezos_smart_rollup_constants::riscv::SBI_TEZOS_BLAKE2B_HASH256;
+use tezos_smart_rollup_constants::riscv::SBI_TEZOS_ED25519_SIGN;
+use tezos_smart_rollup_constants::riscv::SBI_TEZOS_ED25519_VERIFY;
 
 pub unsafe fn ed25519_verify(pk: &[u8; 32], sig: &[u8; 64], msg: &[u8]) -> bool {
     let result: isize;

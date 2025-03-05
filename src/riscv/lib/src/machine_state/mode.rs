@@ -2,7 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{default::ConstDefault, machine_state::csregisters::Privilege};
+use crate::default::ConstDefault;
+use crate::machine_state::csregisters::Privilege;
 
 /// Modes the hardware state can be in when running code
 #[derive(

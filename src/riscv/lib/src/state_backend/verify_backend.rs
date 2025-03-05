@@ -2,21 +2,25 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{
-    array,
-    collections::BTreeMap,
-    mem::{self, MaybeUninit},
-    ops::Index,
-    panic::resume_unwind,
-    slice,
-};
+use std::array;
+use std::collections::BTreeMap;
+use std::mem;
+use std::mem::MaybeUninit;
+use std::ops::Index;
+use std::panic::resume_unwind;
+use std::slice;
 
 use range_collections::RangeSet2;
 
-use super::{
-    Cell, EnrichedValue, ManagerBase, ManagerClone, ManagerRead, ManagerReadWrite, ManagerWrite,
-};
-use crate::state_backend::{owned_backend::Owned, proof_backend::merkle::MERKLE_LEAF_SIZE};
+use super::Cell;
+use super::EnrichedValue;
+use super::ManagerBase;
+use super::ManagerClone;
+use super::ManagerRead;
+use super::ManagerReadWrite;
+use super::ManagerWrite;
+use crate::state_backend::owned_backend::Owned;
+use crate::state_backend::proof_backend::merkle::MERKLE_LEAF_SIZE;
 
 /// Panic payload that is raised when a value isn't present in a part of the Verifier backend.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -496,7 +500,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state_backend::{self, Cells, DynCells, EnrichedValueLinked};
+    use crate::state_backend;
+    use crate::state_backend::Cells;
+    use crate::state_backend::DynCells;
+    use crate::state_backend::EnrichedValueLinked;
 
     /// Ensures that page indices are properly calculated.
     #[test]

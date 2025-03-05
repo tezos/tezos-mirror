@@ -14,21 +14,30 @@ pub mod xstatus;
 use num_enum::TryFromPrimitive;
 use root::RootCSRegister;
 use strum::IntoEnumIterator;
-use values::{CSRValues, CSRValuesLayout, MStatusValue};
+use values::CSRValues;
+use values::CSRValuesLayout;
+use values::MStatusValue;
 
-use self::{
-    bits::NormaliseFields,
-    satp::Satp,
-    values::CSRValue,
-    xstatus::{ExtensionValue, MNStatus, MStatus, SStatus},
-};
-use super::{hart_state::HartState, memory::Address, mode::TrapMode};
-use crate::{
-    bits::{Bits64, ones, u64},
-    machine_state::mode::Mode,
-    state_backend::{self as backend, ManagerRead},
-    traps::{Exception, Interrupt, TrapContext, TrapKind},
-};
+use self::bits::NormaliseFields;
+use self::satp::Satp;
+use self::values::CSRValue;
+use self::xstatus::ExtensionValue;
+use self::xstatus::MNStatus;
+use self::xstatus::MStatus;
+use self::xstatus::SStatus;
+use super::hart_state::HartState;
+use super::memory::Address;
+use super::mode::TrapMode;
+use crate::bits::Bits64;
+use crate::bits::ones;
+use crate::bits::u64;
+use crate::machine_state::mode::Mode;
+use crate::state_backend as backend;
+use crate::state_backend::ManagerRead;
+use crate::traps::Exception;
+use crate::traps::Interrupt;
+use crate::traps::TrapContext;
+use crate::traps::TrapKind;
 
 /// Privilege required to access a CSR
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -1675,23 +1684,24 @@ impl<M: backend::ManagerClone> Clone for CSRegisters<M> {
 mod tests {
     use strum::IntoEnumIterator;
 
-    use crate::{
-        backend_test,
-        bits::Bits64,
-        create_state,
-        machine_state::{
-            csregisters::{
-                CSRRepr, CSRegister, CSRegisters, CSRegistersLayout, Exception, values::CSRValue,
-                xstatus::MStatus,
-            },
-            mode::Mode,
-        },
-        traps::{Interrupt, TrapContext},
-    };
+    use crate::backend_test;
+    use crate::bits::Bits64;
+    use crate::create_state;
+    use crate::machine_state::csregisters::CSRRepr;
+    use crate::machine_state::csregisters::CSRegister;
+    use crate::machine_state::csregisters::CSRegisters;
+    use crate::machine_state::csregisters::CSRegistersLayout;
+    use crate::machine_state::csregisters::Exception;
+    use crate::machine_state::csregisters::values::CSRValue;
+    use crate::machine_state::csregisters::xstatus::MStatus;
+    use crate::machine_state::mode::Mode;
+    use crate::traps::Interrupt;
+    use crate::traps::TrapContext;
 
     #[test]
     fn test_privilege_access() {
-        use crate::machine_state::csregisters::{CSRegister as csreg, check_privilege as check};
+        use crate::machine_state::csregisters::CSRegister as csreg;
+        use crate::machine_state::csregisters::check_privilege as check;
 
         let is_illegal_instr = |e| -> bool { e == Exception::IllegalInstruction };
 
@@ -1713,9 +1723,9 @@ mod tests {
 
     #[test]
     fn test_read_write_access() {
-        use crate::machine_state::csregisters::{
-            CSRegister as csreg, Exception, check_write as check,
-        };
+        use crate::machine_state::csregisters::CSRegister as csreg;
+        use crate::machine_state::csregisters::Exception;
+        use crate::machine_state::csregisters::check_write as check;
 
         let is_illegal_instr = |e| -> bool { e == Exception::IllegalInstruction };
 

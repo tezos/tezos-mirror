@@ -3,18 +3,27 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{
-    Array, Atom, DynArray, Layout, Many, Ref, RefProofGenOwnedAlloc,
-    hash::HashError,
-    owned_backend::Owned,
-    proof_backend::{
-        merkle::{MERKLE_ARITY, MERKLE_LEAF_SIZE, MerkleTree, MerkleWriter, chunks_to_writer},
-        proof::{MerkleProof, MerkleProofLeaf},
-        tree::Tree,
-    },
-    verify_backend,
-};
-use crate::{array_utils::boxed_array, default::ConstDefault, storage::binary};
+use super::Array;
+use super::Atom;
+use super::DynArray;
+use super::Layout;
+use super::Many;
+use super::Ref;
+use super::RefProofGenOwnedAlloc;
+use super::hash::HashError;
+use super::owned_backend::Owned;
+use super::proof_backend::merkle::MERKLE_ARITY;
+use super::proof_backend::merkle::MERKLE_LEAF_SIZE;
+use super::proof_backend::merkle::MerkleTree;
+use super::proof_backend::merkle::MerkleWriter;
+use super::proof_backend::merkle::chunks_to_writer;
+use super::proof_backend::proof::MerkleProof;
+use super::proof_backend::proof::MerkleProofLeaf;
+use super::proof_backend::tree::Tree;
+use super::verify_backend;
+use crate::array_utils::boxed_array;
+use crate::default::ConstDefault;
+use crate::storage::binary;
 
 /// Errors that may occur when parsing a Merkle proof
 #[derive(Debug, thiserror::Error)]
@@ -445,14 +454,16 @@ where
 
 #[cfg(test)]
 mod tests {
-    use proptest::{prop_assert, prop_assert_eq, proptest};
+    use proptest::prop_assert;
+    use proptest::prop_assert_eq;
+    use proptest::proptest;
     use tests::verify_backend::handle_not_found;
 
     use super::*;
-    use crate::state_backend::{
-        Cells, ManagerWrite,
-        proof_backend::{ProofGen, ProofRegion},
-    };
+    use crate::state_backend::Cells;
+    use crate::state_backend::ManagerWrite;
+    use crate::state_backend::proof_backend::ProofGen;
+    use crate::state_backend::proof_backend::ProofRegion;
 
     const CELLS_SIZE: usize = 32;
 

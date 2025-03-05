@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use octez_riscv::{
-    pvm::node_pvm::{NodePvm, PvmStorage},
-    storage::{Repo, StorageError},
-};
+use octez_riscv::pvm::node_pvm::NodePvm;
+use octez_riscv::pvm::node_pvm::PvmStorage;
+use octez_riscv::storage::Repo;
+use octez_riscv::storage::StorageError;
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::TestRunner;

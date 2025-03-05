@@ -4,22 +4,19 @@
 
 use strum::IntoEnumIterator;
 
-use crate::{
-    machine_state::{
-        AccessType, MachineCoreState,
-        csregisters::{
-            CSRegister,
-            effects::handle_csr_effect,
-            xstatus::{MPPValue, SPPValue},
-        },
-        hart_state::HartState,
-        memory::{self, Address},
-        mode::Mode,
-        registers::XRegister,
-    },
-    state_backend::{self as backend},
-    traps::Exception,
-};
+use crate::machine_state::AccessType;
+use crate::machine_state::MachineCoreState;
+use crate::machine_state::csregisters::CSRegister;
+use crate::machine_state::csregisters::effects::handle_csr_effect;
+use crate::machine_state::csregisters::xstatus::MPPValue;
+use crate::machine_state::csregisters::xstatus::SPPValue;
+use crate::machine_state::hart_state::HartState;
+use crate::machine_state::memory;
+use crate::machine_state::memory::Address;
+use crate::machine_state::mode::Mode;
+use crate::machine_state::registers::XRegister;
+use crate::state_backend as backend;
+use crate::traps::Exception;
 
 impl<M> HartState<M>
 where
@@ -137,17 +134,18 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        backend_test, create_state,
-        machine_state::{
-            MachineCoreState, MachineCoreStateLayout,
-            csregisters::{CSRRepr, CSRegister, xstatus},
-            memory::M4K,
-            mode::Mode,
-            registers::{a0, t0},
-        },
-        traps::Exception,
-    };
+    use crate::backend_test;
+    use crate::create_state;
+    use crate::machine_state::MachineCoreState;
+    use crate::machine_state::MachineCoreStateLayout;
+    use crate::machine_state::csregisters::CSRRepr;
+    use crate::machine_state::csregisters::CSRegister;
+    use crate::machine_state::csregisters::xstatus;
+    use crate::machine_state::memory::M4K;
+    use crate::machine_state::mode::Mode;
+    use crate::machine_state::registers::a0;
+    use crate::machine_state::registers::t0;
+    use crate::traps::Exception;
 
     backend_test!(test_sfence, F, {
         type L = MachineCoreStateLayout<M4K>;

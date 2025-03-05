@@ -6,23 +6,22 @@
 //!
 //! Chapter 12 - "D" Standard Extension for Double-Precision Floating-Point
 
-use rustc_apfloat::{
-    Float, Status, StatusAnd,
-    ieee::{Double, Single},
-};
+use rustc_apfloat::Float;
+use rustc_apfloat::Status;
+use rustc_apfloat::StatusAnd;
+use rustc_apfloat::ieee::Double;
+use rustc_apfloat::ieee::Single;
 
 use super::float::FloatExt;
-use crate::{
-    machine_state::{
-        MachineCoreState,
-        hart_state::HartState,
-        memory,
-        registers::{FRegister, FValue, XRegister},
-    },
-    parser::instruction::InstrRoundingMode,
-    state_backend as backend,
-    traps::Exception,
-};
+use crate::machine_state::MachineCoreState;
+use crate::machine_state::hart_state::HartState;
+use crate::machine_state::memory;
+use crate::machine_state::registers::FRegister;
+use crate::machine_state::registers::FValue;
+use crate::machine_state::registers::XRegister;
+use crate::parser::instruction::InstrRoundingMode;
+use crate::state_backend as backend;
+use crate::traps::Exception;
 
 impl From<Double> for FValue {
     fn from(f: Double) -> Self {
@@ -550,22 +549,23 @@ mod tests {
     use arbitrary_int::u5;
     use proptest::prelude::*;
 
-    use crate::{
-        backend_test,
-        bits::Bits64,
-        create_state,
-        machine_state::{
-            MachineCoreState, MachineCoreStateLayout,
-            csregisters::{
-                CSRegister,
-                xstatus::{ExtensionValue, MStatus},
-            },
-            hart_state::{HartState, HartStateLayout},
-            memory::M4K,
-            registers::{fa2, fa3, parse_fregister, parse_xregister, t0},
-        },
-        traps::Exception,
-    };
+    use crate::backend_test;
+    use crate::bits::Bits64;
+    use crate::create_state;
+    use crate::machine_state::MachineCoreState;
+    use crate::machine_state::MachineCoreStateLayout;
+    use crate::machine_state::csregisters::CSRegister;
+    use crate::machine_state::csregisters::xstatus::ExtensionValue;
+    use crate::machine_state::csregisters::xstatus::MStatus;
+    use crate::machine_state::hart_state::HartState;
+    use crate::machine_state::hart_state::HartStateLayout;
+    use crate::machine_state::memory::M4K;
+    use crate::machine_state::registers::fa2;
+    use crate::machine_state::registers::fa3;
+    use crate::machine_state::registers::parse_fregister;
+    use crate::machine_state::registers::parse_xregister;
+    use crate::machine_state::registers::t0;
+    use crate::traps::Exception;
 
     backend_test!(test_fmv_d, F, {
         let state = create_state!(HartState, HartStateLayout, F);

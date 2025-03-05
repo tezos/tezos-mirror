@@ -15,33 +15,71 @@
 mod constructors;
 pub mod tagged_instruction;
 
-use std::fmt::{self, Debug, Formatter};
+use std::fmt;
+use std::fmt::Debug;
+use std::fmt::Formatter;
 
-use serde::{Deserialize, Serialize};
-use tagged_instruction::{ArgsShape, TaggedInstruction, opcode_to_argsshape};
+use serde::Deserialize;
+use serde::Serialize;
+use tagged_instruction::ArgsShape;
+use tagged_instruction::TaggedInstruction;
+use tagged_instruction::opcode_to_argsshape;
 
-use super::{
-    MachineCoreState, ProgramCounterUpdate,
-    csregisters::CSRegister,
-    memory::{Address, MemoryConfig},
-    registers::{FRegister, NonZeroXRegister, XRegister, nz},
-};
-use crate::{
-    default::ConstDefault,
-    instruction_context::{ICB, IcbFnResult, IcbLoweringFn},
-    interpreter::{branching, c, i, integer, load_store},
-    machine_state::ProgramCounterUpdate::{Next, Set},
-    parser::instruction::{
-        AmoArgs, CIBDTypeArgs, CIBNZTypeArgs, CIBTypeArgs, CJTypeArgs, CNZRTypeArgs, CRJTypeArgs,
-        CRTypeArgs, CSSDTypeArgs, CSSTypeArgs, CsrArgs, CsriArgs, FCmpArgs, FLoadArgs,
-        FR1ArgWithRounding, FR2ArgsWithRounding, FR3ArgsWithRounding, FRArgs, FRegToXRegArgs,
-        FRegToXRegArgsWithRounding, FStoreArgs, ITypeArgs, InstrCacheable, InstrRoundingMode,
-        InstrWidth, NonZeroRdITypeArgs, NonZeroRdRTypeArgs, NonZeroRdUJTypeArgs, RTypeArgs,
-        UJTypeArgs, XRegToFRegArgs, XRegToFRegArgsWithRounding,
-    },
-    state_backend::{ManagerBase, ManagerReadWrite},
-    traps::Exception,
-};
+use super::MachineCoreState;
+use super::ProgramCounterUpdate;
+use super::csregisters::CSRegister;
+use super::memory::Address;
+use super::memory::MemoryConfig;
+use super::registers::FRegister;
+use super::registers::NonZeroXRegister;
+use super::registers::XRegister;
+use super::registers::nz;
+use crate::default::ConstDefault;
+use crate::instruction_context::ICB;
+use crate::instruction_context::IcbFnResult;
+use crate::instruction_context::IcbLoweringFn;
+use crate::interpreter::branching;
+use crate::interpreter::c;
+use crate::interpreter::i;
+use crate::interpreter::integer;
+use crate::interpreter::load_store;
+use crate::machine_state::ProgramCounterUpdate::Next;
+use crate::machine_state::ProgramCounterUpdate::Set;
+use crate::parser::instruction::AmoArgs;
+use crate::parser::instruction::CIBDTypeArgs;
+use crate::parser::instruction::CIBNZTypeArgs;
+use crate::parser::instruction::CIBTypeArgs;
+use crate::parser::instruction::CJTypeArgs;
+use crate::parser::instruction::CNZRTypeArgs;
+use crate::parser::instruction::CRJTypeArgs;
+use crate::parser::instruction::CRTypeArgs;
+use crate::parser::instruction::CSSDTypeArgs;
+use crate::parser::instruction::CSSTypeArgs;
+use crate::parser::instruction::CsrArgs;
+use crate::parser::instruction::CsriArgs;
+use crate::parser::instruction::FCmpArgs;
+use crate::parser::instruction::FLoadArgs;
+use crate::parser::instruction::FR1ArgWithRounding;
+use crate::parser::instruction::FR2ArgsWithRounding;
+use crate::parser::instruction::FR3ArgsWithRounding;
+use crate::parser::instruction::FRArgs;
+use crate::parser::instruction::FRegToXRegArgs;
+use crate::parser::instruction::FRegToXRegArgsWithRounding;
+use crate::parser::instruction::FStoreArgs;
+use crate::parser::instruction::ITypeArgs;
+use crate::parser::instruction::InstrCacheable;
+use crate::parser::instruction::InstrRoundingMode;
+use crate::parser::instruction::InstrWidth;
+use crate::parser::instruction::NonZeroRdITypeArgs;
+use crate::parser::instruction::NonZeroRdRTypeArgs;
+use crate::parser::instruction::NonZeroRdUJTypeArgs;
+use crate::parser::instruction::RTypeArgs;
+use crate::parser::instruction::UJTypeArgs;
+use crate::parser::instruction::XRegToFRegArgs;
+use crate::parser::instruction::XRegToFRegArgsWithRounding;
+use crate::state_backend::ManagerBase;
+use crate::state_backend::ManagerReadWrite;
+use crate::traps::Exception;
 
 /// An instruction formed of an opcode and flat arguments.
 ///
@@ -2447,10 +2485,10 @@ impl From<&FCmpArgs> for Args {
 #[cfg(test)]
 mod test {
     use super::Register;
-    use crate::{
-        default::ConstDefault,
-        machine_state::registers::{FRegister, NonZeroXRegister, XRegister},
-    };
+    use crate::default::ConstDefault;
+    use crate::machine_state::registers::FRegister;
+    use crate::machine_state::registers::NonZeroXRegister;
+    use crate::machine_state::registers::XRegister;
 
     // Ensure no undefined behaviour when reading any field from `Register::DEFAULT`
     #[test]

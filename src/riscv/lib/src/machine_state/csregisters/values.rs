@@ -8,28 +8,40 @@ mod xip;
 
 use mstatus::MStatusLayout;
 pub(super) use mstatus::MStatusValue;
-use xip::{XipCell, XipCellLayout};
+use xip::XipCell;
+use xip::XipCellLayout;
 
-use super::{
-    CSRegisters,
-    effects::{NoEffect, handle_csr_effect},
-    root::RootCSRegister,
-};
+use super::CSRegisters;
+use super::effects::NoEffect;
+use super::effects::handle_csr_effect;
+use super::root::RootCSRegister;
+use crate::bits::Bits64;
+use crate::state_backend::AllocatedOf;
+use crate::state_backend::Cell;
+use crate::state_backend::CommitmentLayout;
+use crate::state_backend::EffectCell;
+use crate::state_backend::EffectCellLayout;
+use crate::state_backend::FnManager;
+use crate::state_backend::FromProofResult;
+use crate::state_backend::Layout;
+use crate::state_backend::ManagerAlloc;
+use crate::state_backend::ManagerBase;
+use crate::state_backend::ManagerRead;
+use crate::state_backend::ManagerReadWrite;
+use crate::state_backend::ManagerSerialise;
+use crate::state_backend::ManagerWrite;
+use crate::state_backend::ProofLayout;
+use crate::state_backend::ProofPart;
+use crate::state_backend::ProofTree;
+use crate::state_backend::Ref;
+use crate::state_backend::RefProofGenOwnedAlloc;
+use crate::state_backend::hash::Hash;
+use crate::state_backend::hash::HashError;
+use crate::state_backend::owned_backend::Owned;
 use crate::state_backend::proof_backend::merkle::AccessInfoAggregatable;
-use crate::{
-    bits::Bits64,
-    state_backend::{
-        AllocatedOf, Cell, CommitmentLayout, EffectCell, EffectCellLayout, FnManager,
-        FromProofResult, Layout, ManagerAlloc, ManagerBase, ManagerRead, ManagerReadWrite,
-        ManagerSerialise, ManagerWrite, ProofLayout, ProofPart, ProofTree, Ref,
-        RefProofGenOwnedAlloc,
-        hash::{Hash, HashError},
-        owned_backend::Owned,
-        proof_backend::merkle::MerkleTree,
-        verify_backend,
-    },
-    storage::binary,
-};
+use crate::state_backend::proof_backend::merkle::MerkleTree;
+use crate::state_backend::verify_backend;
+use crate::storage::binary;
 
 /// Representation of a value in a CSR
 pub type CSRRepr = u64;
@@ -1718,7 +1730,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
 
     use strum::IntoEnumIterator;
 

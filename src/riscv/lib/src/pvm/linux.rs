@@ -7,26 +7,35 @@ mod fds;
 mod fs;
 mod rng;
 
-use std::{ffi::CStr, num::NonZeroU64};
+use std::ffi::CStr;
+use std::num::NonZeroU64;
 
 use error::Error;
 use tezos_smart_rollup_constants::riscv::SBI_FIRMWARE_TEZOS;
 
-use super::{Pvm, PvmHooks};
-use crate::{
-    machine_state::{
-        CacheLayouts, MachineCoreState, MachineError, MachineState,
-        block_cache::bcall::Block,
-        memory::{Address, Memory, MemoryConfig},
-        mode::Mode,
-        registers,
-    },
-    program::Program,
-    state_backend::{
-        AllocatedOf, Atom, Cell, FnManager, ManagerBase, ManagerClone, ManagerRead,
-        ManagerReadWrite, ManagerWrite, Ref,
-    },
-};
+use super::Pvm;
+use super::PvmHooks;
+use crate::machine_state::CacheLayouts;
+use crate::machine_state::MachineCoreState;
+use crate::machine_state::MachineError;
+use crate::machine_state::MachineState;
+use crate::machine_state::block_cache::bcall::Block;
+use crate::machine_state::memory::Address;
+use crate::machine_state::memory::Memory;
+use crate::machine_state::memory::MemoryConfig;
+use crate::machine_state::mode::Mode;
+use crate::machine_state::registers;
+use crate::program::Program;
+use crate::state_backend::AllocatedOf;
+use crate::state_backend::Atom;
+use crate::state_backend::Cell;
+use crate::state_backend::FnManager;
+use crate::state_backend::ManagerBase;
+use crate::state_backend::ManagerClone;
+use crate::state_backend::ManagerRead;
+use crate::state_backend::ManagerReadWrite;
+use crate::state_backend::ManagerWrite;
+use crate::state_backend::Ref;
 
 /// Size of a memory page in bytes
 pub const PAGE_SIZE: u64 = 4096;
@@ -522,10 +531,10 @@ mod tests {
     use rand::Rng;
 
     use super::*;
-    use crate::{
-        backend_test, create_state,
-        machine_state::{MachineCoreStateLayout, memory::M4K},
-    };
+    use crate::backend_test;
+    use crate::create_state;
+    use crate::machine_state::MachineCoreStateLayout;
+    use crate::machine_state::memory::M4K;
 
     /// Default handler for the `on_tezos` parameter of [`SupervisorState::handle_system_call`]
     fn default_on_tezos_handler<MC, M>(core: &mut MachineCoreState<MC, M>) -> bool

@@ -3,27 +3,37 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{fmt, ops::Bound, path::Path};
+use std::fmt;
+use std::ops::Bound;
+use std::path::Path;
 
 use thiserror::Error;
 
-use crate::{
-    machine_state::{
-        TestCacheLayouts,
-        block_cache::bcall::{Interpreted, InterpretedBlockBuilder},
-        memory::M64M,
-        mode::Mode,
-    },
-    program::Program,
-    pvm::common::{Pvm, PvmHooks, PvmLayout, PvmStatus},
-    state_backend::{
-        self, AllocatedOf, CommitmentLayout, ProofLayout, ProofTree, Ref,
-        owned_backend::Owned,
-        proof_backend::{ProofDynRegion, ProofGen, ProofRegion, proof::MerkleProof},
-        verify_backend::Verifier,
-    },
-    storage::{self, Hash, Repo},
-};
+use crate::machine_state::TestCacheLayouts;
+use crate::machine_state::block_cache::bcall::Interpreted;
+use crate::machine_state::block_cache::bcall::InterpretedBlockBuilder;
+use crate::machine_state::memory::M64M;
+use crate::machine_state::mode::Mode;
+use crate::program::Program;
+use crate::pvm::common::Pvm;
+use crate::pvm::common::PvmHooks;
+use crate::pvm::common::PvmLayout;
+use crate::pvm::common::PvmStatus;
+use crate::state_backend;
+use crate::state_backend::AllocatedOf;
+use crate::state_backend::CommitmentLayout;
+use crate::state_backend::ProofLayout;
+use crate::state_backend::ProofTree;
+use crate::state_backend::Ref;
+use crate::state_backend::owned_backend::Owned;
+use crate::state_backend::proof_backend::ProofDynRegion;
+use crate::state_backend::proof_backend::ProofGen;
+use crate::state_backend::proof_backend::ProofRegion;
+use crate::state_backend::proof_backend::proof::MerkleProof;
+use crate::state_backend::verify_backend::Verifier;
+use crate::storage;
+use crate::storage::Hash;
+use crate::storage::Repo;
 
 pub type StateLayout = (
     PvmLayout<M64M, TestCacheLayouts>,

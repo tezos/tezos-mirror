@@ -12,11 +12,13 @@
 #![allow(non_snake_case)]
 
 use super::physical_address;
-use crate::{
-    bits::{Bits64, ConstantBits, ones, u64},
-    csr,
-    machine_state::csregisters::{CSRRepr, satp::SvLength},
-};
+use crate::bits::Bits64;
+use crate::bits::ConstantBits;
+use crate::bits::ones;
+use crate::bits::u64;
+use crate::csr;
+use crate::machine_state::csregisters::CSRRepr;
+use crate::machine_state::csregisters::satp::SvLength;
 
 /// Structure representing the raw bits of a PPN field.
 ///
@@ -68,12 +70,12 @@ csr! {
 
 #[cfg(test)]
 mod tests {
-    use proptest::{prop_assert_eq, proptest};
+    use proptest::prop_assert_eq;
+    use proptest::proptest;
 
-    use crate::{
-        bits::Bits64,
-        machine_state::{address_translation::pte::PageTableEntry, csregisters::satp::SvLength},
-    };
+    use crate::bits::Bits64;
+    use crate::machine_state::address_translation::pte::PageTableEntry;
+    use crate::machine_state::csregisters::satp::SvLength;
 
     #[test]
     pub fn test_pte_fields() {

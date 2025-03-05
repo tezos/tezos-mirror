@@ -3,35 +3,48 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{
-    borrow::Cow,
-    collections::{BTreeMap, HashMap, HashSet},
-    ops::Bound,
-};
+use std::borrow::Cow;
+use std::collections::BTreeMap;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::ops::Bound;
 
 use color_eyre::Result;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use goblin::{elf, elf::Elf, elf::header::ET_DYN};
-use octez_riscv::{
-    bits::Bits64,
-    kernel_loader::Error,
-    machine_state::{
-        AccessType, CacheLayouts, MachineCoreState,
-        block_cache::bcall::InterpretedBlockBuilder,
-        csregisters::satp::{Satp, SvLength, TranslationAlgorithm},
-        memory::{self, Address},
-        mode::Mode,
-    },
-    program::Program,
-    pvm::PvmHooks,
-    state_backend::ManagerReadWrite,
-    stepper::{StepResult, Stepper, StepperStatus, pvm::PvmStepper, test::TestStepper},
-};
-use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
+use crossterm::event;
+use crossterm::event::Event;
+use crossterm::event::KeyCode;
+use crossterm::event::KeyEventKind;
+use goblin::elf;
+use goblin::elf::Elf;
+use goblin::elf::header::ET_DYN;
+use octez_riscv::bits::Bits64;
+use octez_riscv::kernel_loader::Error;
+use octez_riscv::machine_state::AccessType;
+use octez_riscv::machine_state::CacheLayouts;
+use octez_riscv::machine_state::MachineCoreState;
+use octez_riscv::machine_state::block_cache::bcall::InterpretedBlockBuilder;
+use octez_riscv::machine_state::csregisters::satp::Satp;
+use octez_riscv::machine_state::csregisters::satp::SvLength;
+use octez_riscv::machine_state::csregisters::satp::TranslationAlgorithm;
+use octez_riscv::machine_state::memory;
+use octez_riscv::machine_state::memory::Address;
+use octez_riscv::machine_state::mode::Mode;
+use octez_riscv::program::Program;
+use octez_riscv::pvm::PvmHooks;
+use octez_riscv::state_backend::ManagerReadWrite;
+use octez_riscv::stepper::StepResult;
+use octez_riscv::stepper::Stepper;
+use octez_riscv::stepper::StepperStatus;
+use octez_riscv::stepper::pvm::PvmStepper;
+use octez_riscv::stepper::test::TestStepper;
+use ratatui::prelude::*;
+use ratatui::style::palette::tailwind;
+use ratatui::widgets::*;
 use rustc_demangle::demangle;
 use tezos_smart_rollup::utils::inbox::Inbox;
 
-use super::{errors, tui};
+use super::errors;
+use super::tui;
 use crate::commands::debug::DebugOptions;
 mod render;
 mod updates;
@@ -500,7 +513,8 @@ mod test {
     use octez_riscv::machine_state::memory::M1G;
 
     use super::*;
-    use crate::{ExitMode, posix_exit_mode};
+    use crate::ExitMode;
+    use crate::posix_exit_mode;
 
     #[test]
     fn test_max_steps_respected() {

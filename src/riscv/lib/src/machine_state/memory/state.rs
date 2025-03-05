@@ -4,13 +4,20 @@
 
 use std::mem;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 
-use super::{Address, Memory, OutOfBounds};
-use crate::state_backend::{
-    DynCells, Elem, ManagerBase, ManagerClone, ManagerDeserialise, ManagerRead, ManagerSerialise,
-    ManagerWrite,
-};
+use super::Address;
+use super::Memory;
+use super::OutOfBounds;
+use crate::state_backend::DynCells;
+use crate::state_backend::Elem;
+use crate::state_backend::ManagerBase;
+use crate::state_backend::ManagerClone;
+use crate::state_backend::ManagerDeserialise;
+use crate::state_backend::ManagerRead;
+use crate::state_backend::ManagerSerialise;
+use crate::state_backend::ManagerWrite;
 
 /// Machine's memory
 pub struct MemoryImpl<const PAGES: usize, const TOTAL_BYTES: usize, M: ManagerBase> {
@@ -129,11 +136,11 @@ where
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::{
-        backend_test,
-        machine_state::memory::{M4K, Memory, MemoryConfig},
-        state_backend::owned_backend::Owned,
-    };
+    use crate::backend_test;
+    use crate::machine_state::memory::M4K;
+    use crate::machine_state::memory::Memory;
+    use crate::machine_state::memory::MemoryConfig;
+    use crate::state_backend::owned_backend::Owned;
 
     #[test]
     fn bounds_check() {

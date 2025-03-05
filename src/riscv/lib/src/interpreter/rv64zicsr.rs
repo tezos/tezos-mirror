@@ -2,10 +2,10 @@
 //!
 //! Chapter 9 - Unprivileged spec
 
-use crate::{
-    machine_state::{csregisters, hart_state::HartState, registers},
-    state_backend as backend,
-};
+use crate::machine_state::csregisters;
+use crate::machine_state::hart_state::HartState;
+use crate::machine_state::registers;
+use crate::state_backend as backend;
 
 impl<M> HartState<M>
 where

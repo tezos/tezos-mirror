@@ -2,12 +2,14 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::ops::{AddAssign, Bound};
+use std::ops::AddAssign;
+use std::ops::Bound;
 
-use crate::{
-    machine_state::{CacheLayouts, MachineCoreState, memory::MemoryConfig},
-    state_backend::{ManagerBase, ManagerRead},
-};
+use crate::machine_state::CacheLayouts;
+use crate::machine_state::MachineCoreState;
+use crate::machine_state::memory::MemoryConfig;
+use crate::state_backend::ManagerBase;
+use crate::state_backend::ManagerRead;
 
 pub mod pvm;
 pub mod test;

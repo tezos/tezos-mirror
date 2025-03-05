@@ -1,14 +1,16 @@
-use std::io::{Cursor, Seek, SeekFrom, Write};
+use std::io::Cursor;
+use std::io::Seek;
+use std::io::SeekFrom;
+use std::io::Write;
 
-use derive_more::{Error, From};
-use goblin::{
-    elf::Elf,
-    elf::header::{ET_DYN, ET_EXEC},
-    elf::{
-        Header,
-        program_header::{PT_LOAD, ProgramHeader},
-    },
-};
+use derive_more::Error;
+use derive_more::From;
+use goblin::elf::Elf;
+use goblin::elf::Header;
+use goblin::elf::header::ET_DYN;
+use goblin::elf::header::ET_EXEC;
+use goblin::elf::program_header::PT_LOAD;
+use goblin::elf::program_header::ProgramHeader;
 
 #[derive(Debug, From, Error, derive_more::Display)]
 pub enum Error {

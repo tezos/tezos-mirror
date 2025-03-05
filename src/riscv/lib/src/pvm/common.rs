@@ -2,26 +2,28 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{
-    convert::Infallible,
-    fmt,
-    io::{Write, stdout},
-    ops::Bound,
-};
+use std::convert::Infallible;
+use std::fmt;
+use std::io::Write;
+use std::io::stdout;
+use std::ops::Bound;
 
 #[cfg(feature = "supervisor")]
 use super::linux;
-use super::reveals::{RevealRequest, RevealRequestLayout};
-use crate::{
-    default::ConstDefault,
-    machine_state::{self, block_cache::bcall, memory},
-    pvm::sbi,
-    state_backend::{
-        self, Atom, Cell,
-        proof_backend::{ProofDynRegion, ProofGen, ProofRegion},
-    },
-    traps::EnvironException,
-};
+use super::reveals::RevealRequest;
+use super::reveals::RevealRequestLayout;
+use crate::default::ConstDefault;
+use crate::machine_state;
+use crate::machine_state::block_cache::bcall;
+use crate::machine_state::memory;
+use crate::pvm::sbi;
+use crate::state_backend;
+use crate::state_backend::Atom;
+use crate::state_backend::Cell;
+use crate::state_backend::proof_backend::ProofDynRegion;
+use crate::state_backend::proof_backend::ProofGen;
+use crate::state_backend::proof_backend::ProofRegion;
+use crate::traps::EnvironException;
 
 /// PVM configuration
 pub struct PvmHooks<'a> {
@@ -394,24 +396,29 @@ where
 mod tests {
     use std::mem;
 
-    use rand::{Fill, thread_rng};
-    use tezos_smart_rollup_constants::riscv::{
-        REVEAL_REQUEST_MAX_SIZE, SBI_CONSOLE_PUTCHAR, SBI_FIRMWARE_TEZOS, SBI_TEZOS_INBOX_NEXT,
-        SBI_TEZOS_REVEAL,
-    };
+    use rand::Fill;
+    use rand::thread_rng;
+    use tezos_smart_rollup_constants::riscv::REVEAL_REQUEST_MAX_SIZE;
+    use tezos_smart_rollup_constants::riscv::SBI_CONSOLE_PUTCHAR;
+    use tezos_smart_rollup_constants::riscv::SBI_FIRMWARE_TEZOS;
+    use tezos_smart_rollup_constants::riscv::SBI_TEZOS_INBOX_NEXT;
+    use tezos_smart_rollup_constants::riscv::SBI_TEZOS_REVEAL;
 
     use super::*;
-    use crate::{
-        backend_test, create_state,
-        machine_state::{
-            TestCacheLayouts,
-            block_cache::bcall::InterpretedBlockBuilder,
-            memory::Memory,
-            registers::{a0, a1, a2, a3, a6, a7},
-        },
-        state_backend::owned_backend::Owned,
-    };
-    use crate::{machine_state::memory::M1M, state_backend::test_helpers::TestBackendFactory};
+    use crate::backend_test;
+    use crate::create_state;
+    use crate::machine_state::TestCacheLayouts;
+    use crate::machine_state::block_cache::bcall::InterpretedBlockBuilder;
+    use crate::machine_state::memory::M1M;
+    use crate::machine_state::memory::Memory;
+    use crate::machine_state::registers::a0;
+    use crate::machine_state::registers::a1;
+    use crate::machine_state::registers::a2;
+    use crate::machine_state::registers::a3;
+    use crate::machine_state::registers::a6;
+    use crate::machine_state::registers::a7;
+    use crate::state_backend::owned_backend::Owned;
+    use crate::state_backend::test_helpers::TestBackendFactory;
 
     #[test]
     fn test_read_input() {

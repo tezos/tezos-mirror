@@ -6,17 +6,16 @@
 use std::fmt;
 
 use enum_tag::EnumTag;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 
 use super::XRegisterParsed;
-use crate::{
-    default::ConstDefault,
-    interpreter::float::RoundingMode,
-    machine_state::{
-        csregisters::CSRegister,
-        registers::{FRegister, NonZeroXRegister, XRegister},
-    },
-};
+use crate::default::ConstDefault;
+use crate::interpreter::float::RoundingMode;
+use crate::machine_state::csregisters::CSRegister;
+use crate::machine_state::registers::FRegister;
+use crate::machine_state::registers::NonZeroXRegister;
+use crate::machine_state::registers::XRegister;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 pub struct RTypeArgs {

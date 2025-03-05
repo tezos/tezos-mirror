@@ -4,12 +4,12 @@
 
 //! Implementation of internal branching opcodes.
 
-use crate::{
-    instruction_context::ICB,
-    machine_state::{hart_state::HartState, memory::Address, registers::NonZeroXRegister},
-    parser::instruction::InstrWidth,
-    state_backend as backend,
-};
+use crate::instruction_context::ICB;
+use crate::machine_state::hart_state::HartState;
+use crate::machine_state::memory::Address;
+use crate::machine_state::registers::NonZeroXRegister;
+use crate::parser::instruction::InstrWidth;
+use crate::state_backend as backend;
 
 impl<M> HartState<M>
 where
@@ -96,14 +96,12 @@ pub fn run_j<I: ICB>(icb: &mut I, imm: i64) -> <I as ICB>::XValue {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        backend_test, create_state,
-        machine_state::{
-            hart_state::{HartState, HartStateLayout},
-            registers::nz,
-        },
-        parser::instruction::InstrWidth,
-    };
+    use crate::backend_test;
+    use crate::create_state;
+    use crate::machine_state::hart_state::HartState;
+    use crate::machine_state::hart_state::HartStateLayout;
+    use crate::machine_state::registers::nz;
+    use crate::parser::instruction::InstrWidth;
 
     backend_test!(test_jalr, F, {
         let ipc_imm_irs1_rs1_rd_fpc_frd = [

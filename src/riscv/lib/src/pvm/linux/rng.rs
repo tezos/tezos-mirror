@@ -3,15 +3,14 @@
 // SPDX-License-Identifier: MIT
 
 use super::SupervisorState;
-use crate::{
-    machine_state::{
-        MachineCoreState,
-        memory::{Memory, MemoryConfig},
-        registers,
-    },
-    pvm::linux::error::Error,
-    state_backend::{ManagerBase, ManagerRead, ManagerWrite},
-};
+use crate::machine_state::MachineCoreState;
+use crate::machine_state::memory::Memory;
+use crate::machine_state::memory::MemoryConfig;
+use crate::machine_state::registers;
+use crate::pvm::linux::error::Error;
+use crate::state_backend::ManagerBase;
+use crate::state_backend::ManagerRead;
+use crate::state_backend::ManagerWrite;
 
 impl<M: ManagerBase> SupervisorState<M> {
     /// Handle `getrandom` system call. We don't support non-determinism, so we return a fixed

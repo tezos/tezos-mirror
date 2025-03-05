@@ -6,7 +6,8 @@
 //!
 //! Chapter 16,5 - Unprivileged spec
 
-use crate::{instruction_context::ICB, machine_state::registers::NonZeroXRegister};
+use crate::instruction_context::ICB;
+use crate::machine_state::registers::NonZeroXRegister;
 
 /// Copies the value in register `rs2` into register `rd_rs1`.
 ///
@@ -44,12 +45,13 @@ pub fn run_nop(_icb: &mut impl ICB) {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::machine_state::{MachineCoreState, memory::M4K};
-    use crate::{
-        backend_test, create_state,
-        interpreter::i::run_add,
-        machine_state::{MachineCoreStateLayout, registers::nz},
-    };
+    use crate::backend_test;
+    use crate::create_state;
+    use crate::interpreter::i::run_add;
+    use crate::machine_state::MachineCoreState;
+    use crate::machine_state::MachineCoreStateLayout;
+    use crate::machine_state::memory::M4K;
+    use crate::machine_state::registers::nz;
 
     backend_test!(test_add_mv, F, {
         let imm_rs1_res = [

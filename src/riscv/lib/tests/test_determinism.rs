@@ -7,14 +7,15 @@ mod common;
 use std::ops::Bound;
 
 use common::*;
-use octez_riscv::{
-    machine_state::{
-        DefaultCacheLayouts, block_cache::bcall::InterpretedBlockBuilder, memory::M64M,
-    },
-    pvm::PvmLayout,
-    state_backend::{RefOwnedAlloc, hash},
-    stepper::{Stepper, StepperStatus, pvm::PvmStepper},
-};
+use octez_riscv::machine_state::DefaultCacheLayouts;
+use octez_riscv::machine_state::block_cache::bcall::InterpretedBlockBuilder;
+use octez_riscv::machine_state::memory::M64M;
+use octez_riscv::pvm::PvmLayout;
+use octez_riscv::state_backend::RefOwnedAlloc;
+use octez_riscv::state_backend::hash;
+use octez_riscv::stepper::Stepper;
+use octez_riscv::stepper::StepperStatus;
+use octez_riscv::stepper::pvm::PvmStepper;
 
 #[test]
 #[ignore]

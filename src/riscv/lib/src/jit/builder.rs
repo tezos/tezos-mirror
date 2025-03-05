@@ -6,19 +6,19 @@
 //!
 //! [instructions]: crate::machine_state::instruction::Instruction
 
-use cranelift::{
-    codegen::ir::{InstBuilder, MemFlags, Type, Value, types::I64},
-    frontend::FunctionBuilder,
-};
+use cranelift::codegen::ir::InstBuilder;
+use cranelift::codegen::ir::MemFlags;
+use cranelift::codegen::ir::Type;
+use cranelift::codegen::ir::Value;
+use cranelift::codegen::ir::types::I64;
+use cranelift::frontend::FunctionBuilder;
 
-use super::state_access::{JitStateAccess, JsaCalls};
-use crate::{
-    instruction_context::ICB,
-    machine_state::{
-        memory::{Address, MemoryConfig},
-        registers::NonZeroXRegister as XRegister,
-    },
-};
+use super::state_access::JitStateAccess;
+use super::state_access::JsaCalls;
+use crate::instruction_context::ICB;
+use crate::machine_state::memory::Address;
+use crate::machine_state::memory::MemoryConfig;
+use crate::machine_state::registers::NonZeroXRegister as XRegister;
 
 /// Builder context used when lowering individual instructions within a block.
 pub(super) struct Builder<'a, MC: MemoryConfig, JSA: JitStateAccess> {

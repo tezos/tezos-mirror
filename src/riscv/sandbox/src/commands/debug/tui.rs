@@ -5,9 +5,12 @@
 // Ratatui boilerplate
 // https://github.com/ratatui-org/ratatui-website/blob/main/code/counter-app-error-handling/src/tui.rs
 
-use std::io::{self, Stdout, stdout};
+use std::io;
+use std::io::Stdout;
+use std::io::stdout;
 
-use crossterm::{execute, terminal::*};
+use crossterm::execute;
+use crossterm::terminal::*;
 use ratatui::prelude::*;
 
 /// A type alias for the terminal type used in this application

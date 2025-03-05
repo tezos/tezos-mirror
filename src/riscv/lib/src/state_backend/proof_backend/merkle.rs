@@ -4,16 +4,16 @@
 
 //! Merkle trees used for proof generation by the PVM
 
-use std::{convert::Infallible, num::NonZeroUsize};
+use std::convert::Infallible;
+use std::num::NonZeroUsize;
 
-use super::{
-    DynAccess,
-    proof::{MerkleProof, MerkleProofLeaf},
-};
-use crate::state_backend::{
-    hash::{Hash, HashError},
-    proof_backend::tree::{ModifyResult, impl_modify_map_collect},
-};
+use super::DynAccess;
+use super::proof::MerkleProof;
+use super::proof::MerkleProofLeaf;
+use crate::state_backend::hash::Hash;
+use crate::state_backend::hash::HashError;
+use crate::state_backend::proof_backend::tree::ModifyResult;
+use crate::state_backend::proof_backend::tree::impl_modify_map_collect;
 
 // TODO RV-322: Choose optimal Merkleisation parameters for main memory.
 /// Size of the Merkle leaf used for Merkleising [`DynArrays`].
@@ -388,13 +388,15 @@ mod tests {
 
     use proptest::prelude::*;
 
-    use super::{
-        CompressedAccessInfo, CompressedMerkleTree, MERKLE_LEAF_SIZE, MerkleTree, chunks_to_writer,
-    };
-    use crate::state_backend::{
-        hash::{Hash, HashError},
-        proof_backend::proof::{MerkleProof, MerkleProofLeaf},
-    };
+    use super::CompressedAccessInfo;
+    use super::CompressedMerkleTree;
+    use super::MERKLE_LEAF_SIZE;
+    use super::MerkleTree;
+    use super::chunks_to_writer;
+    use crate::state_backend::hash::Hash;
+    use crate::state_backend::hash::HashError;
+    use crate::state_backend::proof_backend::proof::MerkleProof;
+    use crate::state_backend::proof_backend::proof::MerkleProofLeaf;
 
     impl CompressedMerkleTree {
         /// Get the root hash of a compressed Merkle tree

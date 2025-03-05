@@ -2,20 +2,27 @@
 //
 // SPDX-License-Identifier: MIT
 
-use comfy_table::{
-    Attribute, Cell, CellAlignment, Color, ContentArrangement, Table,
-    modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL,
-};
+use comfy_table::Attribute;
+use comfy_table::Cell;
+use comfy_table::CellAlignment;
+use comfy_table::Color;
+use comfy_table::ContentArrangement;
+use comfy_table::Table;
+use comfy_table::modifiers::UTF8_ROUND_CORNERS;
+use comfy_table::presets::UTF8_FULL;
 use itertools::Itertools;
 
-use self::utils::{
-    NamedBenchInstrStats, prepend_cell, tableify_bench_stats, thousand_format, vec_cell_factory_ref,
-};
-use crate::{
-    cli::{SortInstr, SortRuns, TableSortArgs},
-    commands::bench::{BenchStats, NamedStats},
-    table::utils::format_opt_duration,
-};
+use self::utils::NamedBenchInstrStats;
+use self::utils::prepend_cell;
+use self::utils::tableify_bench_stats;
+use self::utils::thousand_format;
+use self::utils::vec_cell_factory_ref;
+use crate::cli::SortInstr;
+use crate::cli::SortRuns;
+use crate::cli::TableSortArgs;
+use crate::commands::bench::BenchStats;
+use crate::commands::bench::NamedStats;
+use crate::table::utils::format_opt_duration;
 
 pub mod utils;
 

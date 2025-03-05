@@ -3,22 +3,21 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{fs, io::Write, ops::Bound};
+use std::fs;
+use std::io::Write;
+use std::ops::Bound;
 
 use goldenfile::Mint;
-use octez_riscv::{
-    machine_state::{
-        block_cache::bcall::InterpretedBlockBuilder,
-        memory::M1M,
-        mode::Mode,
-        registers::{XRegister, XValue, gp},
-    },
-    state_backend::ManagerRead,
-    stepper::{
-        Stepper,
-        test::{TestStepper, TestStepperResult::*},
-    },
-};
+use octez_riscv::machine_state::block_cache::bcall::InterpretedBlockBuilder;
+use octez_riscv::machine_state::memory::M1M;
+use octez_riscv::machine_state::mode::Mode;
+use octez_riscv::machine_state::registers::XRegister;
+use octez_riscv::machine_state::registers::XValue;
+use octez_riscv::machine_state::registers::gp;
+use octez_riscv::state_backend::ManagerRead;
+use octez_riscv::stepper::Stepper;
+use octez_riscv::stepper::test::TestStepper;
+use octez_riscv::stepper::test::TestStepperResult::*;
 
 const TESTS_DIR: &str = "../../../tezt/tests/riscv-tests/generated";
 const GOLDEN_DIR: &str = "tests/expected";

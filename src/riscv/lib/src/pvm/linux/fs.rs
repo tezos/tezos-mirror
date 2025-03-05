@@ -4,15 +4,14 @@
 
 //! Implementations of system calls related to the file system
 
-use super::{SupervisorState, error::Error};
-use crate::{
-    machine_state::{
-        MachineCoreState,
-        memory::{Memory, MemoryConfig},
-        registers,
-    },
-    state_backend::{ManagerBase, ManagerReadWrite},
-};
+use super::SupervisorState;
+use super::error::Error;
+use crate::machine_state::MachineCoreState;
+use crate::machine_state::memory::Memory;
+use crate::machine_state::memory::MemoryConfig;
+use crate::machine_state::registers;
+use crate::state_backend::ManagerBase;
+use crate::state_backend::ManagerReadWrite;
 
 impl<M: ManagerBase> SupervisorState<M> {
     /// Handle the `openat` system call. All access to the file system is denied.

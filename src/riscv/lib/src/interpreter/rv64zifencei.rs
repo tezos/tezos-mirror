@@ -4,12 +4,12 @@
 
 //! Implementation of Zifencei extension for RISC-V
 
-use crate::{
-    machine_state::{
-        AccessType, CacheLayouts, MachineState, block_cache::bcall::Block, memory::MemoryConfig,
-    },
-    state_backend,
-};
+use crate::machine_state::AccessType;
+use crate::machine_state::CacheLayouts;
+use crate::machine_state::MachineState;
+use crate::machine_state::block_cache::bcall::Block;
+use crate::machine_state::memory::MemoryConfig;
+use crate::state_backend;
 
 impl<MC, CL, B, M> MachineState<MC, CL, B, M>
 where

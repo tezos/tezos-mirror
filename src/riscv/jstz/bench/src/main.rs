@@ -5,8 +5,10 @@
 use std::error::Error;
 use std::path::Path;
 
-use clap::{Parser, Subcommand};
-use generate::{handle_generate, handle_generate_script};
+use clap::Parser;
+use clap::Subcommand;
+use generate::handle_generate;
+use generate::handle_generate_script;
 use results::handle_results;
 
 mod generate;

@@ -6,28 +6,34 @@
 mod move_semantics;
 mod pointer_apply;
 
-use std::{fs, str};
+use std::fs;
+use std::str;
 
 use arbitrary_int::u31;
-use move_semantics::{ImmutableState, MutableState};
-use num_enum::{IntoPrimitive, TryFromPrimitive};
-use ocaml::{Pointer, ToValue};
-use pointer_apply::{ApplyReadOnly, apply_imm, apply_mut};
-use sha2::{Digest, Sha256};
+use move_semantics::ImmutableState;
+use move_semantics::MutableState;
+use num_enum::IntoPrimitive;
+use num_enum::TryFromPrimitive;
+use ocaml::Pointer;
+use ocaml::ToValue;
+use pointer_apply::ApplyReadOnly;
+use pointer_apply::apply_imm;
+use pointer_apply::apply_mut;
+use sha2::Digest;
+use sha2::Sha256;
 
-use crate::{
-    pvm::{
-        PvmHooks, PvmStatus,
-        node_pvm::{NodePvm, PvmStorage, PvmStorageError},
-    },
-    state_backend::{
-        ManagerReadWrite, hash::Hash, owned_backend::Owned, proof_backend::proof::serialise_proof,
-    },
-};
-use crate::{
-    state_backend::proof_backend::proof,
-    storage::{self, StorageError},
-};
+use crate::pvm::PvmHooks;
+use crate::pvm::PvmStatus;
+use crate::pvm::node_pvm::NodePvm;
+use crate::pvm::node_pvm::PvmStorage;
+use crate::pvm::node_pvm::PvmStorageError;
+use crate::state_backend::ManagerReadWrite;
+use crate::state_backend::hash::Hash;
+use crate::state_backend::owned_backend::Owned;
+use crate::state_backend::proof_backend::proof;
+use crate::state_backend::proof_backend::proof::serialise_proof;
+use crate::storage;
+use crate::storage::StorageError;
 
 const HERMIT_LOADER: &[u8] = include_bytes!("../../assets/hermit-loader");
 

@@ -8,7 +8,8 @@
 
 use std::panic;
 
-use color_eyre::{config::HookBuilder, eyre};
+use color_eyre::config::HookBuilder;
+use color_eyre::eyre;
 
 use super::tui;
 
