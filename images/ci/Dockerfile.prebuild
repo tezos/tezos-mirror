@@ -91,6 +91,10 @@ WORKDIR /home/tezos
 COPY --chown=tezos:tezos scripts/create_opam_repo.sh scripts/version.sh octez-deps.opam.locked ./
 
 COPY --chown=tezos:tezos stdcompat.opam.locked ./
+COPY --chown=tezos:tezos scripts/kiss-fetch.sh /tmp/
+
+ENV OPAMFETCH="/tmp/kiss-fetch.sh"
+ENV KISSCACHE="http://kisscache.kisscache.svc.cluster.local"
 
 # Run the script, then clean up; we only need the result of the script (the opam repository).
 RUN ./create_opam_repo.sh \

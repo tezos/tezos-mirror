@@ -2,6 +2,12 @@
 
 set -eu
 
+# use opam proxy, if available
+# shellcheck disable=SC2034
+OPAMFETCH="/tmp/kiss-fetch.sh"
+# shellcheck disable=SC2034
+KISSCACHE="http://kisscache.kisscache.svc.cluster.local"
+
 # When running the script manually, version.sh is in: scripts/
 # But in the Dockerfile, the script is copied to: ./
 if [ -e scripts/version.sh ]; then
