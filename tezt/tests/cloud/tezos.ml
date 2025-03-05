@@ -14,10 +14,36 @@ module Node = struct
   include Tezt_tezos.Node
 
   module Agent = struct
-    let create ?rpc_external ?(metadata_size_limit = true) ?(arguments = [])
-        ?data_dir ?(path = Uses.path Constant.octez_node) ?name ?net_addr agent
-        =
+    let create ?(group = "L1") ?rpc_external ?(metadata_size_limit = true)
+        ?(arguments = []) ?data_dir ?(path = Uses.path Constant.octez_node)
+        ?name ?net_addr cloud agent =
       let* path = Agent.copy agent ~source:path in
+      let* () =
+        Cloud.register_binary
+          cloud
+          ~agents:[agent]
+          ~group
+          ~name:(Filename.basename path)
+          ()
+      in
+      let* () =
+        Cloud.register_binary
+          cloud
+          ~agents:[agent]
+          ~group
+          ~name:"octez-validator"
+          ()
+      in
+      let* () =
+        if Option.is_some rpc_external then
+          Cloud.register_binary
+            cloud
+            ~agents:[agent]
+            ~group
+            ~name:"octez-rpc-process"
+            ()
+        else Lwt.return_unit
+      in
       let runner = Agent.runner agent in
       let rpc_port = Agent.next_available_port agent in
       let net_port = Agent.next_available_port agent in
@@ -40,11 +66,35 @@ module Node = struct
         arguments
       |> Lwt.return
 
-    let init ?rpc_external ?(metadata_size_limit = true) ?(arguments = [])
-        ?data_dir ?(path = Uses.path Constant.octez_node) ?net_addr ?name agent
-        =
+    let init ?(group = "L1") ?rpc_external ?(metadata_size_limit = true)
+        ?(arguments = []) ?data_dir ?(path = Uses.path Constant.octez_node)
+        ?net_addr ?name cloud agent =
       let runner = Agent.runner agent in
       let* path = Agent.copy agent ~source:path in
+      let* () =
+        Cloud.register_binary
+          cloud
+          ~agents:[agent]
+          ~group
+          ~name:(Filename.basename path)
+          ()
+      in
+      let* () =
+        Cloud.register_binary
+          cloud
+          ~agents:[agent]
+          ~group
+          ~name:"octez-validator"
+          ()
+      in
+      let* () =
+        Cloud.register_binary
+          cloud
+          ~agents:[agent]
+          ~group
+          ~name:"octez-rpc-process"
+          ()
+      in
       let rpc_port = Agent.next_available_port agent in
       let net_port = Agent.next_available_port agent in
       let metrics_port = Agent.next_available_port agent in
@@ -83,10 +133,18 @@ module Dal_node = struct
   include Tezt_tezos.Dal_node
 
   module Agent = struct
-    let create_from_endpoint ?net_port
+    let create_from_endpoint ?(group = "DAL") ?net_port
         ?(path = Uses.path Constant.octez_dal_node) ?name ?rpc_port
-        ~l1_node_endpoint agent =
+        ~l1_node_endpoint cloud agent =
       let* path = Agent.copy agent ~source:path in
+      let* () =
+        Cloud.register_binary
+          cloud
+          ~agents:[agent]
+          ~group
+          ~name:(Filename.basename path)
+          ()
+      in
       let runner = Agent.runner agent in
       let rpc_port =
         match rpc_port with
@@ -151,10 +209,19 @@ module Floodgate = struct
   include Tezt_etherlink.Floodgate
 
   module Agent = struct
-    let run ?(path = "floodgate") ?scenario ~rpc_endpoint ~controller
-        ?relay_endpoint ?max_active_eoa ?max_transaction_batch_length
-        ?spawn_interval ?tick_interval ?base_fee_factor ?initial_balance agent =
+    let run ?(group = "Etherlink") ?(path = "floodgate") ?scenario ~rpc_endpoint
+        ~controller ?relay_endpoint ?max_active_eoa
+        ?max_transaction_batch_length ?spawn_interval ?tick_interval
+        ?base_fee_factor ?initial_balance cloud agent =
       let* path = Agent.copy agent ~source:path in
+      let* () =
+        Cloud.register_binary
+          cloud
+          ~agents:[agent]
+          ~group
+          ~name:(Filename.basename path)
+          ()
+      in
       let runner = Agent.runner agent in
       run
         ?runner
@@ -177,9 +244,19 @@ module Sc_rollup_node = struct
   include Tezt_tezos.Sc_rollup_node
 
   module Agent = struct
-    let create ?(path = Uses.path Constant.octez_smart_rollup_node) ?name
-        ?default_operator ?operators ?dal_node ~base_dir agent mode l1_node =
+    let create ?(group = "Etherlink")
+        ?(path = Uses.path Constant.octez_smart_rollup_node) ?name
+        ?default_operator ?operators ?dal_node ~base_dir cloud agent mode
+        l1_node =
       let* path = Agent.copy agent ~source:path in
+      let* () =
+        Cloud.register_binary
+          cloud
+          ~agents:[agent]
+          ~group
+          ~name:(Filename.basename path)
+          ()
+      in
       let runner = Agent.runner agent in
       let rpc_port = Agent.next_available_port agent in
       let metrics_port = Agent.next_available_port agent in
@@ -259,16 +336,25 @@ module Evm_node = struct
 
   module Agent = struct
     (* Use for compatibility with `tezt-cloud`. *)
-    let create ?(path = Uses.path Constant.octez_evm_node) ?name ?data_dir ?mode
-        endpoint agent =
+    let create ?(group = "Etherlink")
+        ?(path = Uses.path Constant.octez_evm_node) ?name ?data_dir ?mode
+        endpoint cloud agent =
       let* path = Agent.copy agent ~source:path in
+      let* () =
+        Cloud.register_binary
+          cloud
+          ~agents:[agent]
+          ~group
+          ~name:(Filename.basename path)
+          ()
+      in
       let runner = Agent.runner agent in
       let rpc_port = Agent.next_available_port agent in
       create ?name ~path ?runner ?data_dir ~rpc_port ?mode endpoint
       |> Lwt.return
 
-    let init ?patch_config ?name ?mode ?data_dir rollup_node agent =
-      let* evm_node = create ?name ?mode ?data_dir rollup_node agent in
+    let init ?patch_config ?name ?mode ?data_dir rollup_node cloud agent =
+      let* evm_node = create ?name ?mode ?data_dir rollup_node cloud agent in
       let* () = Process.check @@ spawn_init_config evm_node in
       let* () =
         match patch_config with
@@ -295,10 +381,18 @@ module Baker = struct
   include Baker
 
   module Agent = struct
-    let init ?env ?name ~delegates ~protocol
+    let init ?(group = "L1") ?env ?name ~delegates ~protocol
         ?(path = Uses.path (Protocol.baker protocol)) ~client ?dal_node
-        ?dal_node_timeout_percentage node agent =
+        ?dal_node_timeout_percentage node cloud agent =
       let* path = Agent.copy agent ~source:path in
+      let* () =
+        Cloud.register_binary
+          cloud
+          ~agents:[agent]
+          ~group
+          ~name:(Filename.basename path)
+          ()
+      in
       let runner = Agent.runner agent in
       init
         ?env
@@ -319,9 +413,17 @@ module Accuser = struct
   include Accuser
 
   module Agent = struct
-    let init ?name ~protocol ?(path = Uses.path (Protocol.accuser protocol))
-        node agent =
+    let init ?(group = "L1") ?name ~protocol
+        ?(path = Uses.path (Protocol.accuser protocol)) node cloud agent =
       let* path = Agent.copy agent ~source:path in
+      let* () =
+        Cloud.register_binary
+          cloud
+          ~agents:[agent]
+          ~group
+          ~name:(Filename.basename path)
+          ()
+      in
       let runner = Agent.runner agent in
       init ?name ~event_level:`Notice ?runner ~path ~protocol node
   end
@@ -333,8 +435,9 @@ module Teztale = struct
   module Server = struct
     include Teztale.Server
 
-    let run agent ?(path = Uses.path Constant.teztale_server) ?address ?name
-        ?port ?users ?admin ?public_directory () =
+    let run ?(group = "teztale") cloud agent
+        ?(path = Uses.path Constant.teztale_server) ?address ?name ?port ?users
+        ?admin ?public_directory () =
       let runner = Agent.runner agent in
       let port =
         match port with
@@ -342,6 +445,14 @@ module Teztale = struct
         | None -> Agent.next_available_port agent
       in
       let* path = Agent.copy agent ~source:path in
+      let* () =
+        Cloud.register_binary
+          cloud
+          ~agents:[agent]
+          ~group
+          ~name:(Filename.basename path)
+          ()
+      in
       Teztale.Server.run
         ?runner
         ~path
@@ -357,10 +468,19 @@ module Teztale = struct
   module Archiver = struct
     include Teztale.Archiver
 
-    let run agent ?(path = Uses.path Constant.teztale_archiver) ?name ~node_port
-        user feed =
+    let run ?(group = "teztale") cloud agent
+        ?(path = Uses.path Constant.teztale_archiver) ?name ~node_port user feed
+        =
       let runner = Agent.runner agent in
       let* path = Agent.copy agent ~source:path in
+      let* () =
+        Cloud.register_binary
+          cloud
+          ~agents:[agent]
+          ~group
+          ~name:(Filename.basename path)
+          ()
+      in
       Teztale.Archiver.run ?runner ~path ?name ~node_port user feed
   end
 
@@ -377,8 +497,8 @@ module Teztale = struct
 
   let run_server
       ?(path =
-        Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-server" ()))) agent
-      =
+        Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-server" ()))) cloud
+      agent =
     let public_directory = "/tmp/teztale/public" in
     let* () = create_dir public_directory in
     let aliases_filename =
@@ -401,7 +521,7 @@ module Teztale = struct
         ~destination:public_directory
         agent
     in
-    let* server = Server.run ~path ~public_directory agent () in
+    let* server = Server.run ~path ~public_directory cloud agent () in
     let address =
       match Agent.point agent with
       | None -> "127.0.0.1"
@@ -414,7 +534,7 @@ module Teztale = struct
   let add_archiver
       ?(path =
         Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-archiver" ()))) t
-      agent ~node_name ~node_port =
+      cloud agent ~node_name ~node_port =
     let user = user ~agent_name:(Agent.name agent) ~node_name in
     let feed : interface list =
       [{address = t.address; port = t.server.conf.interface.port}]
@@ -427,7 +547,7 @@ module Teztale = struct
            t.server
            user)
     in
-    let* archiver = Archiver.run agent ~path user feed ~node_port in
+    let* archiver = Archiver.run cloud agent ~path user feed ~node_port in
     t.archivers <- archiver :: t.archivers ;
     Lwt.return_unit
 

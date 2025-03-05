@@ -123,7 +123,7 @@ module Node = struct
   include Node
 
   let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ~name network
-      agent =
+      cloud agent =
     toplog "Inititializing an L1 node for %s" name ;
     match network with
     | (`Mainnet | `Ghostnet | `Nextnet _ | `Weeklynet _ | `Rionet) as network
@@ -141,6 +141,7 @@ module Node = struct
                 ~arguments
                 ~data_dir
                 ~name
+                cloud
                 agent
             in
             let* () = may_copy_node_identity_file agent node identity_file in
@@ -167,6 +168,7 @@ module Node = struct
                   ]
                 ?data_dir
                 ~name
+                cloud
                 agent
             in
             let* () = may_copy_node_identity_file agent node identity_file in
@@ -241,7 +243,9 @@ module Node = struct
         match data_dir with
         | None ->
             let rpc_external = Cli.node_external_rpc_server in
-            let* node = Node.Agent.create ~net_addr ~rpc_external ~name agent in
+            let* node =
+              Node.Agent.create ~net_addr ~rpc_external ~name cloud agent
+            in
             let* () = Node.config_init node [Cors_origin "*"] in
             let* () =
               match dal_config with
@@ -279,6 +283,7 @@ module Node = struct
                 ~arguments
                 ~data_dir
                 ~name
+                cloud
                 agent
             in
             let* () = may_copy_node_identity_file agent node identity_file in
@@ -362,7 +367,7 @@ module Dal_reverse_proxy = struct
                ("location /", [Directive (sf "proxy_pass %s" default_endpoint)]);
            ] ))
 
-  let init_reverse_proxy ~next_agent ~default_endpoint
+  let init_reverse_proxy cloud ~next_agent ~default_endpoint
       (proxified_dal_nodes : (int * string) Seq.t) =
     (* A NGINX reverse proxy which balances load between producer DAL
        nodes based on the requested slot index. *)
@@ -427,6 +432,7 @@ module Dal_reverse_proxy = struct
       Dal_node.Agent.create_from_endpoint
         ~name:"bootstrap-dal-node"
         ~rpc_port:port
+        cloud
         agent
         ~l1_node_endpoint
     in
@@ -1212,13 +1218,14 @@ let init_public_network cloud (configuration : configuration)
             ?identity_file:configuration.bootstrap_node_identity_file
             ~name:"bootstrap-node"
             configuration.network
+            cloud
             agent
         in
         let* dal_node =
           if not configuration.with_dal then Lwt.return_none
           else
             let* dal_node =
-              Dal_node.Agent.create ~name:"bootstrap-dal-node" agent ~node
+              Dal_node.Agent.create ~name:"bootstrap-dal-node" cloud agent ~node
             in
 
             let* () =
@@ -1275,6 +1282,7 @@ let init_public_network cloud (configuration : configuration)
           | Some teztale ->
               Teztale.add_archiver
                 teztale
+                cloud
                 agent
                 ~node_name:(Node.name node)
                 ~node_port:(Node.rpc_port node)
@@ -1407,6 +1415,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       ~dal_config
       ~name
       configuration.network
+      cloud
       agent
   in
   let* () = Node.wait_for_ready bootstrap_node in
@@ -1417,6 +1426,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
         Dal_node.Agent.create
           ~net_port:dal_bootstrap_node_net_port
           ~name:"bootstrap-dal-node"
+          cloud
           agent
           ~node:bootstrap_node
       in
@@ -1575,6 +1585,7 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
       ~arguments:Node.[Peer bootstrap.node_p2p_endpoint]
       ~name:(Format.asprintf "baker-node-%d" i)
       configuration.network
+      cloud
       agent
   in
   let* dal_node =
@@ -1584,6 +1595,7 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
         Dal_node.Agent.create
           ~name:(Format.asprintf "baker-dal-node-%d" i)
           ~node
+          cloud
           agent
       in
       let* () =
@@ -1611,6 +1623,7 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
         let* () =
           Teztale.add_archiver
             teztale
+            cloud
             agent
             ~node_name:(Node.name node)
             ~node_port:(Node.rpc_port node)
@@ -1635,6 +1648,7 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
       ~client
       ?dal_node
       node
+      cloud
       agent
   in
   let* () =
@@ -1661,6 +1675,7 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
       ~name
       ~arguments:Node.[Peer bootstrap.node_p2p_endpoint]
       configuration.network
+      cloud
       agent
   in
   let endpoint = Client.Node node in
@@ -1681,6 +1696,7 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
     Dal_node.Agent.create
       ~name:(Format.asprintf "producer-dal-node-%i" i)
       ~node
+      cloud
       agent
   in
   let () = toplog "Init producer: init DAL node config" in
@@ -1730,6 +1746,7 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
     | Some teztale ->
         Teztale.add_archiver
           teztale
+          cloud
           agent
           ~node_name:(Node.name node)
           ~node_port:(Node.rpc_port node)
@@ -1747,12 +1764,14 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
       ~name
       ~arguments:[Peer bootstrap.node_p2p_endpoint]
       configuration.network
+      cloud
       agent
   in
   let* dal_node =
     Dal_node.Agent.create
       ~name:(Format.asprintf "observer-dal-node-%i" i)
       ~node
+      cloud
       agent
   in
   let* () =
@@ -1792,6 +1811,7 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
     | Some teztale ->
         Teztale.add_archiver
           teztale
+          cloud
           agent
           ~node_name:(Node.name node)
           ~node_port:(Node.rpc_port node)
@@ -1799,7 +1819,7 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
   Lwt.return {node; dal_node; topic}
 
 let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
-    ~memtrace =
+    ~memtrace ~cloud =
   match dal_slots with
   | [] ->
       toplog "Etherlink will run without DAL support" ;
@@ -1817,9 +1837,10 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
           ~arguments:
             [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
           network
+          cloud
           agent
       in
-      let* dal_node = Dal_node.Agent.create ~name ~node agent in
+      let* dal_node = Dal_node.Agent.create ~name ~node cloud agent in
       let* () =
         Dal_node.init_config
           ~expected_pow:(Network.expected_pow network)
@@ -1850,9 +1871,10 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
           ~arguments:
             [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
           network
+          cloud
           agent
       in
-      let* default_dal_node = Dal_node.Agent.create ~name ~node agent in
+      let* default_dal_node = Dal_node.Agent.create ~name ~node cloud agent in
       let* () =
         Dal_node.init_config
           ~expected_pow:(Network.expected_pow network)
@@ -1876,9 +1898,10 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
                        History_mode (Rolling (Some 79));
                      ]
                    network
+                   cloud
                    agent
                in
-               let* dal_node = Dal_node.Agent.create ~name ~node agent in
+               let* dal_node = Dal_node.Agent.create ~name ~node cloud agent in
                let* () =
                  Dal_node.init_config
                    ~expected_pow:(Network.expected_pow network)
@@ -1891,6 +1914,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
       in
       let* reverse_proxy_dal_node =
         Dal_reverse_proxy.init_reverse_proxy
+          cloud
           ~next_agent
           ~default_endpoint
           (List.to_seq dal_slots_and_nodes)
@@ -1910,6 +1934,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
       ~arguments:
         [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
       configuration.network
+      cloud
       agent
   in
   let endpoint = Client.Node node in
@@ -1965,6 +1990,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
       ~network:configuration.network
       ~otel
       ~memtrace:configuration.memtrace
+      ~cloud
   in
   let operators =
     List.map
@@ -1978,6 +2004,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
       ~default_operator:account.alias
       ~operators
       ?dal_node
+      cloud
       agent
       Operator
       node
@@ -2062,6 +2089,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
       ~name:(Format.asprintf "etherlink-%s-evm-node" name)
       ~mode
       endpoint
+      cloud
       agent
   in
   let () = toplog "Init Etherlink: launching the EVM node: done" in
@@ -2089,12 +2117,13 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
   in
   return operator
 
-let init_etherlink_producer_setup operator name ~bootstrap agent =
+let init_etherlink_producer_setup operator name ~bootstrap cloud agent =
   let* node =
     Node.Agent.init
       ~rpc_external:Cli.node_external_rpc_server
       ~name:(Format.asprintf "etherlink-%s-node" name)
       ~arguments:[Peer bootstrap.node_p2p_endpoint; Synchronisation_threshold 0]
+      cloud
       agent
   in
   let endpoint = Client.Node node in
@@ -2122,6 +2151,7 @@ let init_etherlink_producer_setup operator name ~bootstrap agent =
     Sc_rollup_node.Agent.create
       ~name:(Format.asprintf "etherlink-%s-rollup-node" name)
       ~base_dir:(Client.base_dir client)
+      cloud
       agent
       Observer
       node
@@ -2160,6 +2190,7 @@ let init_etherlink_producer_setup operator name ~bootstrap agent =
       ~name:(Format.asprintf "etherlink-%s-evm-node" name)
       ~mode
       endpoint
+      cloud
       agent
   in
   let* () =
@@ -2175,6 +2206,7 @@ let init_etherlink_producer_setup operator name ~bootstrap agent =
       ~tick_interval:1.0
       ~controller:Tezt_etherlink.Eth_account.bootstrap_accounts.(0)
       ~base_fee_factor:1000.0
+      cloud
       agent
   in
   return ()
@@ -2212,6 +2244,7 @@ let init_etherlink cloud configuration etherlink_configuration ~bootstrap
              operator
              (Format.asprintf "producer-%d" i)
              ~bootstrap
+             cloud
              agent)
     |> Lwt.join
   in
@@ -2461,11 +2494,6 @@ let init ~(configuration : configuration) etherlink_configuration cloud
   let otel = Cloud.open_telemetry_endpoint cloud in
   (* Adds monitoring for all agents for octez-dal-node and octez-node
      TODO: monitor only specific agents for specific binaries *)
-  let* () =
-    Cloud.register_binary cloud ~group:"DAL" ~name:"octez-dal-node" ()
-  in
-  let* () = Cloud.register_binary cloud ~group:"L1" ~name:"octez-node" () in
-  let* () = Cloud.register_binary cloud ~name:"main.exe" () in
   Lwt.return
     {
       cloud;

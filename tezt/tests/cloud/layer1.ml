@@ -311,7 +311,7 @@ type 'network t = {
   stresstesters : stresstester list;
 }
 
-let init_baker_i i (configuration : configuration) ~peers
+let init_baker_i i (configuration : configuration) cloud ~peers
     (accounts : baker_account list) (agent, node, name) =
   let delay = i * configuration.maintenance_delay in
   let* client =
@@ -337,6 +337,7 @@ let init_baker_i i (configuration : configuration) ~peers
         ~protocol
         ~client
         node
+        cloud
         agent
     in
     let* () = Baker.wait_for_ready baker in
@@ -377,7 +378,7 @@ let init_stresstest_i i configuration ~pkh ~pk ~peers (agent, node, name) tps :
   let accounts = List.map (fun a -> a.Account.public_key_hash) accounts in
   Lwt.return {agent; node; client; accounts}
 
-let init_network ~peers (configuration : configuration) teztale
+let init_network ~peers (configuration : configuration) cloud teztale
     ((agent, node, _) as resources) =
   toplog "init_network: Initializing the bootstrap node" ;
   let* client, delegates =
@@ -391,6 +392,7 @@ let init_network ~peers (configuration : configuration) teztale
   let* () =
     Teztale.add_archiver
       teztale
+      cloud
       agent
       ~node_name:(Node.name node)
       ~node_port:(Node.rpc_port node)
@@ -401,9 +403,9 @@ let init_network ~peers (configuration : configuration) teztale
   Lwt.return (bootstrap, delegates)
 
 (** Reserves resources for later usage. *)
-let agent_and_node next_agent ~name =
+let agent_and_node next_agent cloud ~name =
   let* agent = next_agent ~name in
-  let* node = Node.Agent.create ~metadata_size_limit:false ~name agent in
+  let* node = Node.Agent.create ~metadata_size_limit:false ~name cloud agent in
   Lwt.return (agent, node, name)
 
 (** Distribute the delegate accounts according to stake specification *)
@@ -491,9 +493,9 @@ let distribute_delegates stake baker_accounts =
   |> print_list "Distribution" ;
   List.map (List.map fst) distribution
 
-let number_of_bakers ~snapshot ~network agent =
+let number_of_bakers ~snapshot ~network cloud agent =
   let* node =
-    Node.Agent.create ~metadata_size_limit:false ~name:"tmp-node" agent
+    Node.Agent.create ~metadata_size_limit:false ~name:"tmp-node" cloud agent
   in
   let* snapshot = Node.ensure_snapshot agent snapshot in
   let* () =
@@ -519,7 +521,7 @@ let init ~(configuration : configuration) cloud next_agent =
   (* First, we allocate agents and node address/port in order to have the
      peer list known when initializing. *)
   let* ((bootstrap_agent, bootstrap_node, _) as bootstrap) =
-    agent_and_node next_agent ~name:"bootstrap"
+    agent_and_node next_agent cloud ~name:"bootstrap"
   in
   let* stresstest_agents =
     match configuration.stresstest with
@@ -527,7 +529,7 @@ let init ~(configuration : configuration) cloud next_agent =
     | Some {tps; _} ->
         List.init (nb_stresstester configuration.network tps) (fun i -> i)
         |> Lwt_list.map_s @@ fun i ->
-           agent_and_node next_agent ~name:(sf "stresstest-%d" i)
+           agent_and_node next_agent cloud ~name:(sf "stresstest-%d" i)
   in
   let* baker_agents =
     let* n =
@@ -535,13 +537,14 @@ let init ~(configuration : configuration) cloud next_agent =
         number_of_bakers
           ~snapshot:configuration.snapshot
           ~network:configuration.network
+          cloud
           bootstrap_agent
       else Lwt.return (List.length configuration.stake)
     in
     let () = toplog "Preparing agents for bakers (%d)" n in
     List.init n (fun i -> i)
     |> Lwt_list.map_s @@ fun i ->
-       agent_and_node next_agent ~name:(sf "baker-%d" i)
+       agent_and_node next_agent cloud ~name:(sf "baker-%d" i)
   in
   let* teztale = init_teztale cloud bootstrap_agent in
   let* () = init_explorus cloud bootstrap_node in
@@ -551,7 +554,7 @@ let init ~(configuration : configuration) cloud next_agent =
       (stresstest_agents @ baker_agents)
   in
   let* bootstrap, baker_accounts =
-    init_network ~peers configuration teztale bootstrap
+    init_network ~peers configuration cloud teztale bootstrap
   in
   let peers = Node.point_str bootstrap_node :: peers in
   let* bakers =
@@ -620,7 +623,7 @@ let init ~(configuration : configuration) cloud next_agent =
       (fun i accounts ->
         let ((_, node, _) as agent) = List.nth baker_agents i in
         let peers = List.filter (( <> ) (Node.point_str node)) peers in
-        init_baker_i i ~peers configuration accounts agent)
+        init_baker_i i ~peers configuration cloud accounts agent)
       distribution
   in
   let* stresstesters =
