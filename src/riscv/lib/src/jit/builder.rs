@@ -18,7 +18,7 @@ use super::state_access::JsaCalls;
 use crate::instruction_context::ICB;
 use crate::machine_state::memory::Address;
 use crate::machine_state::memory::MemoryConfig;
-use crate::machine_state::registers::NonZeroXRegister as XRegister;
+use crate::machine_state::registers::NonZeroXRegister;
 
 /// Builder context used when lowering individual instructions within a block.
 pub(super) struct Builder<'a, MC: MemoryConfig, JSA: JitStateAccess> {
@@ -96,12 +96,12 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
     type XValue = Value;
     type IResult<Value> = Value;
 
-    fn xregister_read(&mut self, reg: XRegister) -> Self::XValue {
+    fn xregister_read_nz(&mut self, reg: NonZeroXRegister) -> Self::XValue {
         self.jsa_call
             .xreg_read(&mut self.builder, self.core_ptr_val, reg)
     }
 
-    fn xregister_write(&mut self, reg: XRegister, value: Self::XValue) {
+    fn xregister_write_nz(&mut self, reg: NonZeroXRegister, value: Self::XValue) {
         self.jsa_call
             .xreg_write(&mut self.builder, self.core_ptr_val, reg, value)
     }
