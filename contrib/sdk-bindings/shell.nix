@@ -3,10 +3,19 @@ let
   pkgs = import nixpkgs { config = {}; overlays = []; };
 in
 
-pkgs.mkShell {
+pkgs.mkShell.override {
+  inherit (pkgs.swift) stdenv;
+} {
   buildInputs = [
     # Rust
     pkgs.rustup
+
+    # Swift
+    pkgs.swift
+    pkgs.swiftpm
+    pkgs.swift-format
+    pkgs.swiftPackages.Foundation
+    pkgs.swiftPackages.XCTest
 
     # Python
     pkgs.python39
@@ -17,5 +26,11 @@ pkgs.mkShell {
     pkgs.kotlin
     pkgs.ktlint
     pkgs.gradle
+  ];
+
+  LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
+    pkgs.swiftPackages.Dispatch
+    pkgs.swiftPackages.Foundation
+    pkgs.swiftPackages.XCTest
   ];
 }
