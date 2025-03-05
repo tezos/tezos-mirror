@@ -656,6 +656,10 @@ impl OpCode {
             Self::JrImm => Some(Args::run_jr_imm),
             Self::Addi => Some(Args::run_addi),
             Self::Andi => Some(Args::run_andi),
+            Self::Slt => Some(Args::run_slt),
+            Self::Sltu => Some(Args::run_sltu),
+            Self::Slti => Some(Args::run_slti),
+            Self::Sltiu => Some(Args::run_sltiu),
             _ => None,
         }
     }
@@ -796,6 +800,15 @@ macro_rules! impl_r_type {
             icb.ok(pcu)
         }
     };
+
+    ($impl: path, $fn: ident, non_zero_rd) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+            $impl(icb, self.rs1.x, self.rs2.x, self.rd.nzx);
+            icb.ok(Next(self.width))
+        }
+    };
 }
 
 macro_rules! impl_i_type {
@@ -830,6 +843,15 @@ macro_rules! impl_i_type {
         /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
             $impl(icb, self.imm, self.rs1.nzx, self.rd.nzx);
+            icb.ok(Next(self.width))
+        }
+    };
+
+    ($impl: path, $fn: ident, non_zero_rd) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+            $impl(icb, self.imm, self.rs1.x, self.rd.nzx);
             icb.ok(Next(self.width))
         }
     };
@@ -1205,8 +1227,8 @@ impl Args {
     impl_r_type!(run_sll, non_zero);
     impl_r_type!(run_srl, non_zero);
     impl_r_type!(run_sra, non_zero);
-    impl_r_type!(run_slt, non_zero_rd);
-    impl_r_type!(run_sltu, non_zero_rd);
+    impl_r_type!(integer::run_slt, run_slt, non_zero_rd);
+    impl_r_type!(integer::run_sltu, run_sltu, non_zero_rd);
     impl_r_type!(run_addw, non_zero_rd);
     impl_r_type!(run_subw, non_zero_rd);
     impl_r_type!(run_sllw, non_zero_rd);
@@ -1225,8 +1247,8 @@ impl Args {
     impl_i_type!(run_slliw, non_zero_rd);
     impl_i_type!(run_srliw, non_zero_rd);
     impl_i_type!(run_sraiw, non_zero_rd);
-    impl_i_type!(run_slti, non_zero_rd);
-    impl_i_type!(run_sltiu, non_zero_rd);
+    impl_i_type!(integer::run_slti, run_slti, non_zero_rd);
+    impl_i_type!(integer::run_sltiu, run_sltiu, non_zero_rd);
     impl_load_type!(run_lb);
     impl_load_type!(run_lh);
     impl_load_type!(run_lw);

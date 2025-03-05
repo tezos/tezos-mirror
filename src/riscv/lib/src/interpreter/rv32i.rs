@@ -13,7 +13,6 @@ use crate::machine_state::memory;
 use crate::machine_state::memory::Address;
 use crate::machine_state::mode::Mode;
 use crate::machine_state::registers::NonZeroXRegister;
-use crate::machine_state::registers::XRegister;
 use crate::machine_state::registers::XRegisters;
 use crate::parser::instruction::FenceSet;
 use crate::parser::instruction::InstrWidth;
@@ -49,50 +48,6 @@ where
     /// - `C.XOR`
     pub fn run_xor(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
         let result = self.read_nz(rs1) ^ self.read_nz(rs2);
-        self.write_nz(rd, result)
-    }
-
-    /// `SLTI` I-type instruction
-    ///
-    /// Places the value 1 in `rd` if val(rs1) is less than the immediate
-    /// when treated as signed integers, 0 otherwise
-    pub fn run_slti(&mut self, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
-        let result = if (self.read(rs1) as i64) < imm { 1 } else { 0 };
-        self.write_nz(rd, result)
-    }
-
-    /// `SLTIU` I-type instruction
-    ///
-    /// Places the value 1 in `rd` if val(rs1) is less than the immediate
-    /// when treated as unsigned integers, 0 otherwise
-    pub fn run_sltiu(&mut self, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
-        let result = if self.read(rs1) < (imm as u64) { 1 } else { 0 };
-        self.write_nz(rd, result)
-    }
-
-    /// `SLT` R-type instruction
-    ///
-    /// Places the value 1 in `rd` if val(rs1) < val(rs2)
-    /// when treated as signed integers, 0 otherwise
-    pub fn run_slt(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
-        let result = if (self.read(rs1) as i64) < (self.read(rs2) as i64) {
-            1
-        } else {
-            0
-        };
-        self.write_nz(rd, result)
-    }
-
-    /// `SLTU` R-type instruction
-    ///
-    /// Places the value 1 in `rd` if val(rs1) < val(rs2)
-    /// when treated as unsigned integers, 0 otherwise
-    pub fn run_sltu(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
-        let result = if self.read(rs1) < self.read(rs2) {
-            1
-        } else {
-            0
-        };
         self.write_nz(rd, result)
     }
 }
@@ -400,14 +355,11 @@ mod tests {
     use crate::machine_state::memory::Address;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::mode::Mode;
-    use crate::machine_state::registers::XRegisters;
-    use crate::machine_state::registers::XRegistersLayout;
     use crate::machine_state::registers::a0;
     use crate::machine_state::registers::a1;
     use crate::machine_state::registers::a2;
     use crate::machine_state::registers::fa0;
     use crate::machine_state::registers::nz;
-    use crate::machine_state::registers::t0;
     use crate::machine_state::registers::t1;
     use crate::machine_state::registers::t2;
     use crate::machine_state::registers::t3;
@@ -778,30 +730,6 @@ mod tests {
             assert_eq!(state.pc.read(), init_pc);
             assert_eq!(new_pc, res_pc);
             assert_eq!(state.xregisters.read_nz(rd), res_rd);
-        }
-    });
-
-    backend_test!(test_slt, F, {
-        let mut xregs = create_state!(XRegisters, F);
-
-        let v1_v2_exp_expu = [
-            (0, 0, 0, 0),
-            (-1_i64 as u64, 0, 1, 0),
-            (123123123, -1_i64 as u64, 0, 1),
-            (123, 123123, 1, 1),
-        ];
-
-        for (v1, v2, exp, expu) in v1_v2_exp_expu {
-            xregs.write(a1, v1);
-            xregs.write(a2, v2);
-            xregs.run_slt(a1, a2, nz::t0);
-            assert_eq!(xregs.read(t0), exp);
-            xregs.run_sltu(a1, a2, nz::t1);
-            assert_eq!(xregs.read(t1), expu);
-            xregs.run_slti(v2 as i64, a1, nz::t0);
-            assert_eq!(xregs.read(t0), exp);
-            xregs.run_sltiu(v2 as i64, a1, nz::t0);
-            assert_eq!(xregs.read(t0), expu);
         }
     });
 

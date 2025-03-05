@@ -288,6 +288,9 @@ mod tests {
     use crate::machine_state::block_cache::bcall::InterpretedBlockBuilder;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::memory::MemoryConfig;
+    use crate::machine_state::registers::NonZeroXRegister;
+    use crate::machine_state::registers::XRegister;
+    use crate::machine_state::registers::nz;
     use crate::parser::instruction::InstrWidth::*;
     use crate::state_backend::FnManagerIdent;
     use crate::state_backend::ManagerRead;
@@ -444,6 +447,11 @@ mod tests {
             self
         }
 
+        fn set_setup_hook(mut self, setup_hook: Box<SetupHook<F>>) -> Self {
+            self.setup_hook = Some(setup_hook);
+            self
+        }
+
         fn build(self) -> Scenario<F> {
             Scenario {
                 initial_pc: self.initial_pc,
@@ -453,6 +461,12 @@ mod tests {
                 assert_hook: self.assert_hook,
             }
         }
+    }
+
+    macro_rules! setup_hook {
+        ($core:ident, $F:ident, $block:expr) => {
+            Box::new(move |$core: &mut MachineCoreState<M4K, $F::Manager>| $block)
+        };
     }
 
     macro_rules! assert_hook {
@@ -952,6 +966,121 @@ mod tests {
                 ])
                 .set_assert_hook(assert_x1_and_x2_equal)
                 .build(),
+        ];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
+
+    backend_test!(test_set_less_than, F, {
+        use crate::machine_state::registers::XRegister::*;
+
+        const TRUE: u64 = 1;
+        const FALSE: u64 = 0;
+
+        let test_slt = |constructor: fn(NonZeroXRegister, XRegister, XRegister) -> I,
+                        lhs: (XRegister, i64),
+                        rhs: (XRegister, i64),
+                        expected: u64|
+         -> Scenario<F> {
+            ScenarioBuilder::default()
+                .set_setup_hook(setup_hook!(core, F, {
+                    core.hart.xregisters.write(lhs.0, lhs.1 as u64);
+                    core.hart.xregisters.write(rhs.0, rhs.1 as u64);
+                }))
+                .set_instructions(&[constructor(nz::ra, lhs.0, rhs.0)])
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(
+                        expected,
+                        core.hart.xregisters.read_nz(nz::ra),
+                        "Expected {expected} for Slt* lhs: {lhs:?}, rhs: {rhs:?}"
+                    )
+                }))
+                .build()
+        };
+
+        let test_slt_imm = |constructor: fn(NonZeroXRegister, XRegister, i64) -> I,
+                            lhs: (XRegister, i64),
+                            rhs: i64,
+                            expected: u64|
+         -> Scenario<F> {
+            ScenarioBuilder::default()
+                .set_setup_hook(setup_hook!(core, F, {
+                    core.hart.xregisters.write(lhs.0, lhs.1 as u64);
+                }))
+                .set_instructions(&[constructor(nz::ra, lhs.0, rhs)])
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(
+                        expected,
+                        core.hart.xregisters.read_nz(nz::ra),
+                        "Expected {expected} for Slt* lhs: {lhs:?}, rhs: {rhs:?}"
+                    )
+                }))
+                .build()
+        };
+
+        let scenarios: &[Scenario<F>] = &[
+            // -------------------------
+            // equal values always false
+            // -------------------------
+            // Slt
+            test_slt(I::new_slt, (x1, 1), (x2, 1), FALSE),
+            test_slt(I::new_slt, (x0, 1), (x2, 0), FALSE),
+            test_slt(I::new_slt, (x3, -1), (x2, -1), FALSE),
+            // Sltu
+            test_slt(I::new_sltu, (x1, 1), (x2, 1), FALSE),
+            test_slt(I::new_sltu, (x0, 1), (x2, 0), FALSE),
+            test_slt(I::new_sltu, (x3, -1), (x2, -1), FALSE),
+            // Slti
+            test_slt_imm(I::new_slti, (x1, 1), 1, FALSE),
+            test_slt_imm(I::new_slti, (x0, 1), 0, FALSE),
+            test_slt_imm(I::new_slti, (x3, -1), -1, FALSE),
+            // Sltiu
+            test_slt_imm(I::new_sltiu, (x1, 1), 1, FALSE),
+            test_slt_imm(I::new_sltiu, (x0, 1), 0, FALSE),
+            test_slt_imm(I::new_sltiu, (x3, -1), -1, FALSE),
+            // --------------------------------
+            // greater than values always false
+            // --------------------------------
+            // Slt
+            test_slt(I::new_slt, (x1, 3), (x2, 1), FALSE),
+            test_slt(I::new_slt, (x0, 0), (x2, -2), FALSE),
+            test_slt(I::new_slt, (x3, -1), (x2, -5), FALSE),
+            // Sltu
+            test_slt(I::new_sltu, (x1, 1), (x2, 1), FALSE),
+            test_slt(I::new_sltu, (x2, 5), (x0, 0), FALSE),
+            test_slt(I::new_sltu, (x3, -1), (x2, 2), FALSE),
+            // Slti
+            test_slt_imm(I::new_slti, (x1, 2), 1, FALSE),
+            test_slt_imm(I::new_slti, (x5, 1), 0, FALSE),
+            test_slt_imm(I::new_slti, (x3, -5), -6, FALSE),
+            // Sltiu
+            test_slt_imm(I::new_sltiu, (x1, 5), 1, FALSE),
+            test_slt_imm(I::new_sltiu, (x3, -1), 15, FALSE),
+            test_slt_imm(I::new_sltiu, (x3, -1), -6, FALSE),
+            // ----------------------------
+            // less than values always true
+            // ----------------------------
+            // Slt
+            test_slt(I::new_slt, (x1, 2), (x2, 5), TRUE),
+            test_slt(I::new_slt, (x0, 0), (x2, 3), TRUE),
+            test_slt(I::new_slt, (x3, -5), (x2, -3), TRUE),
+            // Sltu
+            test_slt(I::new_sltu, (x1, 1), (x2, -1), TRUE),
+            test_slt(I::new_sltu, (x0, 0), (x3, 5), TRUE),
+            test_slt(I::new_sltu, (x3, -2), (x2, -1), TRUE),
+            // Slti
+            test_slt_imm(I::new_slti, (x1, 2), 5, TRUE),
+            test_slt_imm(I::new_slti, (x5, 0), 3, TRUE),
+            test_slt_imm(I::new_slti, (x3, -6), -5, TRUE),
+            // Sltiu
+            test_slt_imm(I::new_sltiu, (x1, 3), 5, TRUE),
+            test_slt_imm(I::new_sltiu, (x3, 5), -15, TRUE),
+            test_slt_imm(I::new_sltiu, (x3, -7), -6, TRUE),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
