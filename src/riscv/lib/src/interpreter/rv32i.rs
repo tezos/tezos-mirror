@@ -24,19 +24,6 @@ impl<M> XRegisters<M>
 where
     M: backend::ManagerReadWrite,
 {
-    /// Perform [`val(rs1) - val(rs2)`] and store the result in `rd`
-    ///
-    /// Relevant RISC-V opcodes:
-    /// - SUB
-    /// - C.SUB
-    pub fn run_sub(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
-        let lhs = self.read_nz(rs1);
-        let rhs = self.read_nz(rs2);
-        // Wrapped subtraction in two's complement behaves the same for signed and unsigned
-        let result = lhs.wrapping_sub(rhs);
-        self.write_nz(rd, result)
-    }
-
     /// Saves in `rd` the bitwise OR between the value in `rs1` and `imm`
     ///
     /// Relevant RISC-V opcodes:
@@ -397,8 +384,6 @@ mod tests {
 
     use crate::backend_test;
     use crate::create_state;
-    use crate::interpreter::integer::run_add;
-    use crate::interpreter::integer::run_addi;
     use crate::interpreter::integer::run_and;
     use crate::interpreter::integer::run_andi;
     use crate::interpreter::integer::run_or;
@@ -429,46 +414,6 @@ mod tests {
     use crate::parser::instruction::FenceSet;
     use crate::parser::instruction::InstrWidth;
     use crate::traps::Exception;
-
-    backend_test!(test_add_sub, F, {
-        let imm_rs1_rd_res = [
-            (0_i64, 0_u64, nz::t3, 0_u64),
-            (0, 0xFFF0_0420, nz::t2, 0xFFF0_0420),
-            (-1, 0, nz::t4, 0xFFFF_FFFF_FFFF_FFFF),
-            (
-                1_000_000,
-                -123_000_987_i64 as u64,
-                nz::a2,
-                -122_000_987_i64 as u64,
-            ),
-            (1_000_000, 123_000_987, nz::a2, 124_000_987),
-            (
-                -1,
-                -321_000_000_000_i64 as u64,
-                nz::a1,
-                -321_000_000_001_i64 as u64,
-            ),
-        ];
-
-        for (imm, rs1, rd, res) in imm_rs1_rd_res {
-            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
-
-            state.hart.xregisters.write(a0, rs1);
-            state.hart.xregisters.write(t0, imm as u64);
-            run_addi(&mut state, imm, nz::a0, rd);
-            assert_eq!(state.hart.xregisters.read_nz(rd), res);
-            run_add(&mut state, nz::a0, nz::t0, nz::a0);
-            assert_eq!(state.hart.xregisters.read(a0), res);
-            // test sub with: res - imm = rs1 and res - rs1 = imm
-            state.hart.xregisters.write(a0, res);
-            state.hart.xregisters.write(t0, imm as u64);
-            state.hart.xregisters.run_sub(nz::a0, nz::t0, nz::a1);
-            assert_eq!(state.hart.xregisters.read(a1), rs1);
-            // now rs1 is in register a1
-            state.hart.xregisters.run_sub(nz::a0, nz::a1, nz::a1);
-            assert_eq!(state.hart.xregisters.read(a1), imm as u64);
-        }
-    });
 
     backend_test!(test_auipc, F, {
         let pc_imm_res_rd = [

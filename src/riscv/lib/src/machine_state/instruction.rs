@@ -646,6 +646,7 @@ impl OpCode {
             Self::Mv => Some(Args::run_mv),
             Self::Nop => Some(Args::run_nop),
             Self::Add => Some(Args::run_add),
+            Self::Sub => Some(Args::run_sub),
             Self::And => Some(Args::run_and),
             Self::Or => Some(Args::run_or),
             Self::Li => Some(Args::run_li),
@@ -1194,7 +1195,7 @@ macro_rules! impl_f_r_type {
 impl Args {
     // RV64I R-type instructions
     impl_r_type!(integer::run_add, run_add, non_zero);
-    impl_r_type!(run_sub, non_zero);
+    impl_r_type!(integer::run_sub, run_sub, non_zero);
     impl_r_type!(run_xor, non_zero);
     impl_r_type!(integer::run_and, run_and, non_zero);
     impl_r_type!(integer::run_or, run_or, non_zero);

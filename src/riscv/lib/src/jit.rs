@@ -530,6 +530,51 @@ mod tests {
         scenario.run(&mut jit, &mut interpreted_bb);
     });
 
+    backend_test!(test_sub, F, {
+        use Instruction as I;
+
+        use crate::machine_state::registers::NonZeroXRegister::*;
+
+        let scenarios: &[Scenario<'_, F>] = &[
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(x1, 10, Uncompressed),
+                    I::new_sub(x2, x1, x1, Compressed),
+                ])
+                .set_assert_hook(&|core: &MachineCoreState<M4K, F::Manager>| {
+                    assert_eq!(core.hart.xregisters.read_nz(x2), 0);
+                })
+                .build(),
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(x1, 10, Compressed),
+                    I::new_li(x3, -10, Uncompressed),
+                    I::new_sub(x2, x1, x3, Uncompressed),
+                ])
+                .set_assert_hook(&|core: &MachineCoreState<M4K, F::Manager>| {
+                    assert_eq!(core.hart.xregisters.read_nz(x2), 20);
+                })
+                .build(),
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(x1, 10, Uncompressed),
+                    I::new_li(x3, 100, Compressed),
+                    I::new_sub(x2, x1, x3, Compressed),
+                ])
+                .set_assert_hook(&|core: &MachineCoreState<M4K, F::Manager>| {
+                    assert_eq!(core.hart.xregisters.read_nz(x2), (-90_i64) as u64);
+                })
+                .build(),
+        ];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
+
     backend_test!(test_and, F, {
         use crate::machine_state::registers::NonZeroXRegister::*;
 

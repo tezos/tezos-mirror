@@ -75,6 +75,24 @@ pub fn run_add(
     icb.xregister_write_nz(rd, result)
 }
 
+/// Perform [`val(rs1) - val(rs2)`] and store the result in `rd`
+///
+/// Relevant RISC-V opcodes:
+/// - SUB
+/// - C.SUB
+pub fn run_sub(
+    icb: &mut impl ICB,
+    rs1: NonZeroXRegister,
+    rs2: NonZeroXRegister,
+    rd: NonZeroXRegister,
+) {
+    let lhs = icb.xregister_read_nz(rs1);
+    let rhs = icb.xregister_read_nz(rs2);
+    // Wrapped subtraction in two's complement behaves the same for signed and unsigned
+    let result = icb.xvalue_wrapping_sub(lhs, rhs);
+    icb.xregister_write_nz(rd, result)
+}
+
 /// Saves in `rd` the bitwise AND between the value in `rs1` and `rs2`
 ///
 /// Relevant RISC-V opcodes:
@@ -144,7 +162,9 @@ mod tests {
     use crate::backend_test;
     use crate::create_state;
     use crate::interpreter::integer::run_add;
+    use crate::interpreter::integer::run_addi;
     use crate::interpreter::integer::run_mv;
+    use crate::interpreter::integer::run_sub;
     use crate::machine_state::MachineCoreState;
     use crate::machine_state::MachineCoreStateLayout;
     use crate::machine_state::memory::M4K;
@@ -187,6 +207,46 @@ mod tests {
             assert_eq!(state.hart.xregisters.read_nz(nz::a3), res);
             run_mv(&mut state, nz::a4, nz::a3);
             assert_eq!(state.hart.xregisters.read_nz(nz::a4), res);
+        }
+    });
+
+    backend_test!(test_add_sub, F, {
+        let imm_rs1_rd_res = [
+            (0_i64, 0_u64, nz::t3, 0_u64),
+            (0, 0xFFF0_0420, nz::t2, 0xFFF0_0420),
+            (-1, 0, nz::t4, 0xFFFF_FFFF_FFFF_FFFF),
+            (
+                1_000_000,
+                -123_000_987_i64 as u64,
+                nz::a2,
+                -122_000_987_i64 as u64,
+            ),
+            (1_000_000, 123_000_987, nz::a2, 124_000_987),
+            (
+                -1,
+                -321_000_000_000_i64 as u64,
+                nz::a1,
+                -321_000_000_001_i64 as u64,
+            ),
+        ];
+
+        for (imm, rs1, rd, res) in imm_rs1_rd_res {
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+
+            state.hart.xregisters.write_nz(a0, rs1);
+            state.hart.xregisters.write_nz(nz::t0, imm as u64);
+            run_addi(&mut state, imm, nz::a0, rd);
+            assert_eq!(state.hart.xregisters.read_nz(rd), res);
+            run_add(&mut state, nz::a0, nz::t0, nz::a0);
+            assert_eq!(state.hart.xregisters.read_nz(a0), res);
+            // test sub with: res - imm = rs1 and res - rs1 = imm
+            state.hart.xregisters.write_nz(a0, res);
+            state.hart.xregisters.write_nz(nz::t0, imm as u64);
+            run_sub(&mut state, nz::a0, nz::t0, nz::a1);
+            assert_eq!(state.hart.xregisters.read_nz(nz::a1), rs1);
+            // now rs1 is in register a1
+            run_sub(&mut state, nz::a0, nz::a1, nz::a1);
+            assert_eq!(state.hart.xregisters.read_nz(nz::a1), imm as u64);
         }
     });
 }
