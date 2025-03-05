@@ -832,7 +832,9 @@ module Signer_implementation : Client_keys.SIGNER = struct
   let import_secret_key ~io pk_uri =
     public_key_hash_maybe_prompt ~first_import:io pk_uri
 
-  let sign ?watermark (sk_uri : sk_uri) msg =
+  let sign ?version:_ ?watermark (sk_uri : sk_uri) msg =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7812
+       handle version *)
     let open Lwt_result_syntax in
     let* ledger_uri = Ledger_uri.parse (sk_uri :> Uri.t) in
     let* {curve; path; _} = Ledger_uri.full_account ledger_uri in

@@ -25,6 +25,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type version = Version_0 | Version_1 | Version_2
+
+let version_encoding =
+  let open Data_encoding in
+  conv_with_guard
+    (function Version_0 -> 0 | Version_1 -> 1 | Version_2 -> 2)
+    (function
+      | 0 -> Ok Version_0
+      | 1 -> Ok Version_1
+      | 2 -> Ok Version_2
+      | _ -> Error "Invalid signature version")
+    int8
+
+let version_arg =
+  let open Tezos_rpc.Arg in
+  make
+    ~descr:"Supported signature version are version '0','1' and '2'(default)"
+    ~name:"version"
+    ~destruct:(function
+      | "0" -> Ok Version_0
+      | "1" -> Ok Version_1
+      | "2" -> Ok Version_2
+      | _ -> Error "Invalid signature version")
+    ~construct:(function
+      | Version_0 -> "0" | Version_1 -> "1" | Version_2 -> "2")
+    ()
+
 module type CONV = sig
   module V_from : S.COMMON_SIGNATURE
 
@@ -69,10 +96,16 @@ module type CONV_OPT = sig
   val get_signature_exn : V_from.t -> V_to.t
 end
 
-module V_latest = Signature_v2
+module V_latest = struct
+  let version = Version_2
+
+  include Signature_v2
+end
 
 module V0 = struct
   include Signature_v0
+
+  let version = Version_0
 
   module Of_V_latest :
     CONV_OPT with module V_from := V_latest and module V_to := Signature_v0 =
@@ -156,6 +189,8 @@ end
 module V1 = struct
   include Signature_v1
 
+  let version = Version_1
+
   module Of_V_latest :
     CONV_OPT with module V_from := V_latest and module V_to := Signature_v1 =
   struct
@@ -237,6 +272,8 @@ end
 
 module V2 = struct
   include Signature_v2
+
+  let version = Version_2
 
   module Of_V_latest :
     CONV_OPT with module V_from := V_latest and module V_to := Signature_v2 =

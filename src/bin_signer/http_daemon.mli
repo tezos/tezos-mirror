@@ -28,6 +28,7 @@ val run_https :
   port:int ->
   cert:string ->
   key:string ->
+  ?signing_version:Signature.version ->
   ?magic_bytes:int list ->
   check_high_watermark:bool ->
   require_auth:bool ->
@@ -37,6 +38,7 @@ val run_https :
 val run_http :
   host:string ->
   port:int ->
+  ?signing_version:Signature.version ->
   ?magic_bytes:int list ->
   check_high_watermark:bool ->
   require_auth:bool ->

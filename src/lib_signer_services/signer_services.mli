@@ -27,7 +27,7 @@ val sign :
   ( [`POST],
     unit,
     unit * Tezos_crypto.Signature.Public_key_hash.t,
-    Tezos_crypto.Signature.t option,
+    Tezos_crypto.Signature.t option * Signature.version option,
     Bytes.t,
     Tezos_crypto.Signature.t )
   Tezos_rpc.Service.t

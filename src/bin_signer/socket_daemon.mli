@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 val run :
+  ?signing_version:Signature.version ->
   ?magic_bytes:int list ->
   ?timeout:Time.System.Span.t ->
   check_high_watermark:bool ->

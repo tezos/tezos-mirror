@@ -25,7 +25,7 @@
 
 module Events = Signer_events.Http_daemon
 
-let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
+let run (cctxt : #Client_context.wallet) ~hosts ?signing_version ?magic_bytes
     ~check_high_watermark ~require_auth mode =
   let open Lwt_result_syntax in
   let dir = Tezos_rpc.Directory.empty in
@@ -33,8 +33,14 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
     Tezos_rpc.Directory.register1
       dir
       Signer_services.sign
-      (fun pkh signature data ->
+      (fun pkh (signature, req_version) data ->
+        let pkh =
+          match req_version with
+          | Some version -> Signer_messages.Pkh_with_version (pkh, version)
+          | None -> Signer_messages.Pkh pkh
+        in
         Handler.sign
+          ?signing_version
           ?magic_bytes
           ~check_high_watermark
           ~require_auth
@@ -85,8 +91,8 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
           failwith "Port already in use."
       | exn -> fail_with_exn exn)
 
-let run_https ~host ~port ~cert ~key ?magic_bytes ~check_high_watermark
-    ~require_auth (cctxt : #Client_context.wallet) =
+let run_https ~host ~port ~cert ~key ?signing_version ?magic_bytes
+    ~check_high_watermark ~require_auth (cctxt : #Client_context.wallet) =
   let open Lwt_syntax in
   let* points =
     Lwt_utils_unix.getaddrinfo
@@ -105,13 +111,14 @@ let run_https ~host ~port ~cert ~key ?magic_bytes ~check_high_watermark
       run
         (cctxt : #Client_context.wallet)
         ~hosts
+        ?signing_version
         ?magic_bytes
         ~check_high_watermark
         ~require_auth
         mode
 
-let run_http ~host ~port ?magic_bytes ~check_high_watermark ~require_auth
-    (cctxt : #Client_context.wallet) =
+let run_http ~host ~port ?signing_version ?magic_bytes ~check_high_watermark
+    ~require_auth (cctxt : #Client_context.wallet) =
   let open Lwt_syntax in
   let* points =
     Lwt_utils_unix.getaddrinfo
@@ -128,6 +135,7 @@ let run_http ~host ~port ?magic_bytes ~check_high_watermark ~require_auth
       run
         (cctxt : #Client_context.wallet)
         ~hosts
+        ?signing_version
         ?magic_bytes
         ~check_high_watermark
         ~require_auth

@@ -84,7 +84,7 @@ module type M = sig
   val logger : RPC_client_unix.logger option
 end
 
-let register_default_signer ?other_registrations ?logger
+let register_default_signer ?signing_version ?other_registrations ?logger
     (cctxt : Client_context.io_wallet) =
   let module Remote_params = struct
     let authenticate pkhs payload =
@@ -104,7 +104,16 @@ let register_default_signer ?other_registrations ?logger
             | _ -> None)
           keys
       with
-      | sk_uri :: _ -> Client_keys.sign cctxt sk_uri payload
+      | sk_uri :: _ -> (
+          match signing_version with
+          | Some Signature.Version_0 ->
+              let* sign = Client_keys.V0.sign cctxt sk_uri payload in
+              return @@ Signature.V_latest.Of_V0.signature sign
+          | Some Signature.Version_1 ->
+              let* sign = Client_keys.V1.sign cctxt sk_uri payload in
+              return @@ Signature.V_latest.Of_V1.signature sign
+          | Some Signature.Version_2 -> Client_keys.V2.sign cctxt sk_uri payload
+          | None -> Client_keys.V_latest.sign cctxt sk_uri payload)
       | [] ->
           failwith
             "remote signer expects authentication signature, but no authorized \
@@ -157,15 +166,18 @@ let register_signer (module C : M) (cctxt : Client_context.io_wallet)
        module C *)
     match C.logger with Some logger -> logger | None -> rpc_config.logger
   in
-  let other_registrations =
+  let other_registrations, signing_version =
     match parsed_config_file with
-    | None -> None
+    | None -> (None, None)
     | Some parsed_config_file -> (
+        let version =
+          parsed_config_file.Client_config.Cfg_file.signing_version
+        in
         match C.other_registrations with
-        | Some r -> Some (r parsed_config_file)
-        | None -> None)
+        | Some r -> (Some (r parsed_config_file), version)
+        | None -> (None, version))
   in
-  register_default_signer ?other_registrations ~logger cctxt
+  register_default_signer ?signing_version ?other_registrations ~logger cctxt
 
 (** Warn the user if there are duplicate URIs in the sources (may or may
     not be a misconfiguration). *)

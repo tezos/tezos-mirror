@@ -264,10 +264,19 @@ let check_authorization cctxt pkh data require_auth signature =
       then return_unit
       else failwith "invalid authentication signature"
 
-let sign ?magic_bytes ~check_high_watermark ~require_auth
+let sign ?signing_version ?magic_bytes ~check_high_watermark ~require_auth
     (cctxt : #Client_context.wallet)
     Signer_messages.Sign.Request.{pkh; data; signature} =
   let open Lwt_result_syntax in
+  let pkh, version =
+    match pkh with
+    | Pkh pkh -> (pkh, signing_version)
+    | Pkh_with_version (pkh, req_version) ->
+        ( pkh,
+          match signing_version with
+          | Some _v -> signing_version
+          | None -> Some req_version )
+  in
   let*! () =
     Events.(emit request_for_signing)
       (Bytes.length data, pkh, TzEndian.get_uint8 data 0)
@@ -276,7 +285,17 @@ let sign ?magic_bytes ~check_high_watermark ~require_auth
   let* () = check_magic_byte name magic_bytes data in
   let* () = check_authorization cctxt pkh data require_auth signature in
   let*! () = Events.(emit signing_data) name in
-  let sign = Client_keys.sign cctxt sk_uri in
+  let sign bytes =
+    match version with
+    | Some Version_0 ->
+        let* s = Client_keys.V0.sign cctxt sk_uri bytes in
+        return (Signature.V_latest.Of_V0.signature s)
+    | Some Version_1 ->
+        let* s = Client_keys.V1.sign cctxt sk_uri bytes in
+        return (Signature.V_latest.Of_V1.signature s)
+    | Some Version_2 -> Client_keys.V2.sign cctxt sk_uri bytes
+    | None -> Client_keys.V_latest.sign cctxt sk_uri bytes
+  in
   if check_high_watermark then
     High_watermark.mark_if_block_or_endorsement cctxt pkh data sign
   else sign data

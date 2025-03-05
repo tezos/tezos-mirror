@@ -45,8 +45,17 @@ struct
     | Deterministic_nonce_request
     | Deterministic_nonce_hash_request
 
-  let build_request pkh data signature = function
-    | Sign_request -> Request.Sign {Sign.Request.pkh; data; signature}
+  let build_request ?version (pkh : Tezos_crypto.Signature.public_key_hash) data
+      signature request =
+    match request with
+    | Sign_request ->
+        let pkh =
+          match (pkh, version) with
+          | _, None -> Pkh pkh
+          | (Ed25519 _ | Secp256k1 _ | P256 _), Some _ -> Pkh pkh
+          | Bls _, Some version -> Pkh_with_version (pkh, version)
+        in
+        Request.Sign {Sign.Request.pkh; data; signature}
     | Deterministic_nonce_request ->
         Request.Deterministic_nonce
           {Deterministic_nonce.Request.pkh; data; signature}
@@ -73,12 +82,12 @@ struct
         in
         return_some signature
 
-  let with_signer_operation path pkh msg request_type enc =
+  let with_signer_operation ?version path pkh msg request_type enc =
     let open Lwt_result_syntax in
     let f () =
       Tezos_base_unix.Socket.with_connection path (fun conn ->
           let* signature = maybe_authenticate pkh msg conn in
-          let req = build_request pkh msg signature request_type in
+          let req = build_request ?version pkh msg signature request_type in
           let* () = Tezos_base_unix.Socket.send conn Request.encoding req in
           Tezos_base_unix.Socket.recv conn (result_encoding enc))
     in
@@ -98,14 +107,20 @@ struct
     in
     loop 3
 
-  let sign ?watermark path pkh msg =
+  let sign ?version ?watermark path pkh msg =
     let msg =
       match watermark with
       | None -> msg
       | Some watermark ->
           Bytes.cat (Tezos_crypto.Signature.bytes_of_watermark watermark) msg
     in
-    with_signer_operation path pkh msg Sign_request Sign.Response.encoding
+    with_signer_operation
+      ?version
+      path
+      pkh
+      msg
+      Sign_request
+      Sign.Response.encoding
 
   let deterministic_nonce path pkh msg =
     with_signer_operation
@@ -191,10 +206,10 @@ struct
 
     let import_secret_key ~io:_ = public_key_hash
 
-    let sign ?watermark uri msg =
+    let sign ?version ?watermark uri msg =
       let open Lwt_result_syntax in
       let* path, pkh = parse (uri : sk_uri :> Uri.t) in
-      sign ?watermark path pkh msg
+      sign ?version ?watermark path pkh msg
 
     let deterministic_nonce uri msg =
       let open Lwt_result_syntax in
@@ -258,10 +273,10 @@ struct
 
     let import_secret_key ~io:_ = public_key_hash
 
-    let sign ?watermark uri msg =
+    let sign ?version ?watermark uri msg =
       let open Lwt_result_syntax in
       let* path, pkh = parse (uri : sk_uri :> Uri.t) in
-      sign ?watermark path pkh msg
+      sign ?version ?watermark path pkh msg
 
     let deterministic_nonce uri msg =
       let open Lwt_result_syntax in
