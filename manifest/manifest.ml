@@ -1467,7 +1467,7 @@ module Target = struct
     ?dep_globs:string list ->
     ?dep_globs_rec:string list ->
     ?deps:t option list ->
-    ?link_deps:Manifest_link_deps.t option list ->
+    ?link_deps:Manifest_link_deps.t list ->
     ?dune:Dune.s_expr ->
     ?flags:Flags.t ->
     ?foreign_archives:string list ->
@@ -1553,7 +1553,6 @@ module Target = struct
     let kind = make_kind names in
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
-    let link_deps = List.filter_map Fun.id link_deps in
     let deps, link_deps =
       TargetLinkDeps.compute_deps ~target_kind:kind ~target_deps:deps ~link_deps
     in

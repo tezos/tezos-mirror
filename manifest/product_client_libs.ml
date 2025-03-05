@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2021-2023 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2022-2023 Trili Tech <contact@trili.tech>                   *)
+(* Copyright (c) 2022-2025 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -71,7 +71,6 @@ let _octez_codec_kaitai =
     ~with_macos_security_framework:true
     ~deps:
       ([
-         octez_rust_deps (* for rustzcash *);
          bls12_381_archive;
          data_encoding |> open_;
          kaitai_of_data_encoding;

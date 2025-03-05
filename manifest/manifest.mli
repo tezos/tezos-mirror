@@ -863,7 +863,7 @@ type 'a maker =
   ?dep_globs:string list ->
   ?dep_globs_rec:string list ->
   ?deps:target list ->
-  ?link_deps:Manifest_link_deps.t option list ->
+  ?link_deps:Manifest_link_deps.t list ->
   ?dune:Dune.s_expr ->
   ?flags:Flags.t ->
   ?foreign_archives:string list ->
@@ -1195,7 +1195,7 @@ module Product (M : sig
       The meaning and the content of [source] is product-dependent. *)
   val source : string list
 end) : sig
-  (** Register a rust archive *)
+  (** Register a Rust archive *)
   val rust_archive :
     Manifest_link_deps.t list -> target -> Manifest_link_deps.t list
 
