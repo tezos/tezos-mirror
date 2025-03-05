@@ -75,22 +75,45 @@ type tx_queue = {
   max_size : int;
   max_transaction_batch_length : int option;
   max_lifespan_s : int;
+  tx_per_addr_limit : int64;
 }
 
 let default_tx_queue =
-  {max_size = 1000; max_transaction_batch_length = None; max_lifespan_s = 2}
+  {
+    max_size = 1000;
+    max_transaction_batch_length = None;
+    max_lifespan_s = 2;
+    tx_per_addr_limit = 16L;
+  }
 
 let tx_queue_encoding =
   let open Data_encoding in
   conv
-    (fun {max_size; max_transaction_batch_length; max_lifespan_s} ->
-      (max_size, max_transaction_batch_length, max_lifespan_s))
-    (fun (max_size, max_transaction_batch_length, max_lifespan_s) ->
-      {max_size; max_transaction_batch_length; max_lifespan_s})
-    (obj3
-       (req "max_size" int31)
-       (opt "max_transaction_batch_length" int31)
-       (dft "max_lifespan" int31 default_tx_queue.max_lifespan_s))
+    (fun {
+           max_size;
+           max_transaction_batch_length;
+           max_lifespan_s;
+           tx_per_addr_limit;
+         } ->
+      (max_size, max_transaction_batch_length, max_lifespan_s, tx_per_addr_limit))
+    (fun ( max_size,
+           max_transaction_batch_length,
+           max_lifespan_s,
+           tx_per_addr_limit ) ->
+      {
+        max_size;
+        max_transaction_batch_length;
+        max_lifespan_s;
+        tx_per_addr_limit;
+      })
+    (obj4
+       (dft "max_size" int31 default_tx_queue.max_size)
+       (dft
+          "max_transaction_batch_length"
+          (option int31)
+          default_tx_queue.max_transaction_batch_length)
+       (dft "max_lifespan" int31 default_tx_queue.max_lifespan_s)
+       (dft "tx_per_addr_limit" int64 default_tx_queue.tx_per_addr_limit))
 
 let tx_queue_opt_encoding =
   let open Data_encoding in

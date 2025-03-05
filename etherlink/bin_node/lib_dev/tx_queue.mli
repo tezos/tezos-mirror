@@ -66,7 +66,7 @@ val inject :
   next_nonce:Ethereum_types.quantity ->
   Ethereum_types.legacy_transaction_object ->
   Ethereum_types.hex ->
-  unit tzresult Lwt.t
+  (unit, string) result tzresult Lwt.t
 
 (** [confirm hash] is to be called by an external component to advertise a
     transaction has been included in a blueprint. *)

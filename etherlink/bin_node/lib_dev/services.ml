@@ -692,10 +692,12 @@ let dispatch_request (rpc : Configuration.rpc)
                 | Ok (next_nonce, transaction_object) -> (
                     let* tx_hash =
                       if Configuration.is_tx_queue_enabled config then
-                        let* () =
+                        let* res =
                           Tx_queue.inject ~next_nonce transaction_object tx_raw
                         in
-                        return (Ok transaction_object.hash)
+                        match res with
+                        | Ok () -> return (Ok transaction_object.hash)
+                        | Error errs -> return (Error errs)
                       else Tx_pool.add transaction_object txn
                     in
                     match tx_hash with
@@ -933,10 +935,12 @@ let dispatch_private_request (rpc : Configuration.rpc)
               let* tx_hash =
                 if Configuration.is_tx_queue_enabled config then
                   let transaction = Ethereum_types.hex_encode_string raw_txn in
-                  let* () =
+                  let* res =
                     Tx_queue.inject ~next_nonce transaction_object transaction
                   in
-                  return @@ Ok transaction_object.hash
+                  match res with
+                  | Ok () -> return (Ok transaction_object.hash)
+                  | Error errs -> return (Error errs)
                 else Tx_pool.add transaction_object raw_txn
               in
               match tx_hash with
