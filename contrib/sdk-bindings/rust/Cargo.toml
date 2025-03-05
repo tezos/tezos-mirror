@@ -1,0 +1,18 @@
+[package]
+name = "tezos-bindings"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "tezos"
+crate-type = [ "cdylib", "staticlib" ]
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/uniffi-bindgen.rs"
+
+[dependencies]
+uniffi = { version = "0.29", features = [ "cli" ] }
+
+[dev-dependencies]
+uniffi = { version = "0.29", features = [ "build" ] }
