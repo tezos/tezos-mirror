@@ -25,6 +25,9 @@ fi
 # If it's a release, we actually push the assets to the s3 bucket
 if [ -n "${CI_COMMIT_TAG}" ]; then
 
+  # Initialize octez release variables needed later to determine relevant version information:
+  # - major and minor version numbers (resp. [gitlab_release_major_version], [gitlab_release_minor_version])
+  # - and, optionally, release candidate version number ([gitlab_release_rc_version]).
   # shellcheck source=./scripts/ci/octez-release.sh
   . ./scripts/ci/octez-release.sh
 
@@ -39,6 +42,7 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
 
     # Add the new version to the $versions_list_filename JSON file.
     # Since jq cannot modify the file in-place, we write to a temporary file first.
+    # [gitlab_release_major_version] and [gitlab_release_minor_version] defined in [./scripts/ci/octez-release.sh]
     if [ -n "${gitlab_release_rc_version}" ]; then
       rc="${gitlab_release_rc_version}"
       jq ". += [{\"major\":${gitlab_release_major_version}, \"minor\":${gitlab_release_minor_version},\"rc\":${rc}}]" "./${versions_list_filename}" > "./tmp.json" && mv "./tmp.json" "./${versions_list_filename}"
