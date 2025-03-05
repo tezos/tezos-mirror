@@ -123,6 +123,15 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
         self.builder.ins().bor(lhs, rhs)
     }
 
+    /// Read the effective current program counter by adding `self.pc_offset` (due to instructions
+    /// already lowered into this block) to `self.pc_val` (the initial value of the program counter
+    /// for the block).
+    fn pc_read(&mut self) -> Self::XValue {
+        self.builder
+            .ins()
+            .iadd_imm(self.pc_val, self.pc_offset as i64)
+    }
+
     fn ok<Value>(&mut self, val: Value) -> Self::IResult<Value> {
         val
     }

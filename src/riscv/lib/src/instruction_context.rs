@@ -21,7 +21,10 @@ use crate::{
 /// Type of function that may be used to lower [`Instructions`] to IR.
 ///
 /// [`Instructions`]: crate::machine_state::instruction::Instruction
-pub type IcbLoweringFn<I> = unsafe fn(&Args, &mut I) -> <I as ICB>::IResult<ProgramCounterUpdate>;
+pub type IcbLoweringFn<I> = unsafe fn(&Args, &mut I) -> IcbFnResult<I>;
+
+/// Result of lowering an instruction.
+pub type IcbFnResult<I> = <I as ICB>::IResult<ProgramCounterUpdate<<I as ICB>::XValue>>;
 
 /// Instruction Context Builder contains operations required to
 /// execute RISC-V instructions.
@@ -54,6 +57,9 @@ pub trait ICB {
 
     /// Perform a bitwise or of two **XValues**, returning the new value.
     fn xvalue_bitwise_or(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue;
+
+    /// Perform a read of the program counter.
+    fn pc_read(&mut self) -> Self::XValue;
 
     /// Representation for the manipulation of fallible operations.
     type IResult<Value>;
@@ -104,6 +110,11 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
     #[inline(always)]
     fn xvalue_bitwise_or(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
         lhs | rhs
+    }
+
+    #[inline(always)]
+    fn pc_read(&mut self) -> Self::XValue {
+        self.hart.pc.read()
     }
 
     type IResult<In> = Result<In, Exception>;

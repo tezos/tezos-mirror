@@ -23,19 +23,6 @@ impl<M> HartState<M>
 where
     M: backend::ManagerReadWrite,
 {
-    /// Performs an unconditional control transfer. The immediate is added to
-    /// the pc to form the jump target address.
-    ///
-    /// Relevant RISC-V opcodes:
-    /// - C.J
-    /// - JAL
-    /// - BEQ
-    /// - C.BEQZ
-    pub fn run_j(&mut self, imm: i64) -> Address {
-        let current_pc = self.pc.read();
-        current_pc.wrapping_add(imm as u64)
-    }
-
     /// Performs an unconditional control transfer to the address in register `rs1`.
     ///
     /// Relevant RISC-V opcodes:
@@ -84,7 +71,7 @@ where
         imm: i64,
         rs1: NonZeroXRegister,
         width: InstrWidth,
-    ) -> ProgramCounterUpdate {
+    ) -> ProgramCounterUpdate<Address> {
         let current_pc = self.pc.read();
 
         if self.xregisters.read_nz(rs1) == 0 {
@@ -107,7 +94,7 @@ where
         imm: i64,
         rs1: NonZeroXRegister,
         width: InstrWidth,
-    ) -> ProgramCounterUpdate {
+    ) -> ProgramCounterUpdate<Address> {
         let current_pc = self.pc.read();
 
         // Branch if `val(rs1) != val(rs2)`, jumping `imm` bytes ahead.
@@ -151,6 +138,7 @@ mod tests {
 
     use crate::{
         backend_test, create_state,
+        interpreter::branching::run_j,
         machine_state::{
             MachineCoreState, MachineCoreStateLayout, ProgramCounterUpdate,
             hart_state::{HartState, HartStateLayout},
@@ -163,7 +151,7 @@ mod tests {
         parser::instruction::InstrWidth,
     };
 
-    backend_test!(run_cj, F, {
+    backend_test!(test_run_j, F, {
         let test_case = [
             (42, 42, 84),
             (0, 1000, 1000),
@@ -175,7 +163,7 @@ mod tests {
             let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
 
             state.hart.pc.write(init_pc);
-            let new_pc = state.hart.run_j(imm);
+            let new_pc = run_j(&mut state, imm);
 
             assert_eq!(state.hart.pc.read(), init_pc);
             assert_eq!(new_pc, res_pc);

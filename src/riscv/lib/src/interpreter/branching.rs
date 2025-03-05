@@ -5,6 +5,7 @@
 //! Implementation of internal branching opcodes.
 
 use crate::{
+    instruction_context::ICB,
     machine_state::{hart_state::HartState, memory::Address, registers::NonZeroXRegister},
     parser::instruction::InstrWidth,
     state_backend as backend,
@@ -77,6 +78,20 @@ where
 
         imm as u64 & !1
     }
+}
+
+/// Performs an unconditional control transfer. The immediate is added to
+/// the pc to form the jump target address.
+///
+/// Relevant RISC-V opcodes:
+/// - C.J
+/// - JAL
+/// - BEQ
+/// - C.BEQZ
+pub fn run_j<I: ICB>(icb: &mut I, imm: i64) -> <I as ICB>::XValue {
+    let imm = icb.xvalue_of_imm(imm);
+    let current_pc = icb.pc_read();
+    icb.xvalue_wrapping_add(current_pc, imm)
 }
 
 #[cfg(test)]

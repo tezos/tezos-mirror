@@ -184,7 +184,7 @@ where
         rs1: NonZeroXRegister,
         rs2: NonZeroXRegister,
         width: InstrWidth,
-    ) -> ProgramCounterUpdate {
+    ) -> ProgramCounterUpdate<Address> {
         let current_pc = self.pc.read();
 
         if self.xregisters.read_nz(rs1) == self.xregisters.read_nz(rs2) {
@@ -207,7 +207,7 @@ where
         rs1: NonZeroXRegister,
         rs2: NonZeroXRegister,
         width: InstrWidth,
-    ) -> ProgramCounterUpdate {
+    ) -> ProgramCounterUpdate<Address> {
         if self.xregisters.read_nz(rs1) != self.xregisters.read_nz(rs2) {
             let current_pc = self.pc.read();
             ProgramCounterUpdate::Set(current_pc.wrapping_add(imm as u64))
@@ -227,7 +227,7 @@ where
         rs1: NonZeroXRegister,
         rs2: NonZeroXRegister,
         width: InstrWidth,
-    ) -> ProgramCounterUpdate {
+    ) -> ProgramCounterUpdate<Address> {
         let lhs = self.xregisters.read_nz(rs1) as i64;
         let rhs = self.xregisters.read_nz(rs2) as i64;
 
@@ -249,7 +249,7 @@ where
         imm: i64,
         rs1: NonZeroXRegister,
         width: InstrWidth,
-    ) -> ProgramCounterUpdate {
+    ) -> ProgramCounterUpdate<Address> {
         let lhs = self.xregisters.read_nz(rs1) as i64;
 
         if lhs >= 0 {
@@ -270,7 +270,7 @@ where
         imm: i64,
         rs1: NonZeroXRegister,
         width: InstrWidth,
-    ) -> ProgramCounterUpdate {
+    ) -> ProgramCounterUpdate<Address> {
         let lhs = self.xregisters.read_nz(rs1) as i64;
 
         if lhs > 0 {
@@ -292,7 +292,7 @@ where
         rs1: NonZeroXRegister,
         rs2: NonZeroXRegister,
         width: InstrWidth,
-    ) -> ProgramCounterUpdate {
+    ) -> ProgramCounterUpdate<Address> {
         let lhs = self.xregisters.read_nz(rs1);
         let rhs = self.xregisters.read_nz(rs2);
 
@@ -315,7 +315,7 @@ where
         rs1: NonZeroXRegister,
         rs2: NonZeroXRegister,
         width: InstrWidth,
-    ) -> ProgramCounterUpdate {
+    ) -> ProgramCounterUpdate<Address> {
         let lhs = self.xregisters.read_nz(rs1) as i64;
         let rhs = self.xregisters.read_nz(rs2) as i64;
 
@@ -338,7 +338,7 @@ where
         imm: i64,
         rs1: NonZeroXRegister,
         width: InstrWidth,
-    ) -> ProgramCounterUpdate {
+    ) -> ProgramCounterUpdate<Address> {
         let lhs = self.xregisters.read_nz(rs1) as i64;
 
         if lhs < 0 {
@@ -359,7 +359,7 @@ where
         imm: i64,
         rs1: NonZeroXRegister,
         width: InstrWidth,
-    ) -> ProgramCounterUpdate {
+    ) -> ProgramCounterUpdate<Address> {
         let lhs = self.xregisters.read_nz(rs1) as i64;
 
         if lhs <= 0 {
@@ -383,7 +383,7 @@ where
         rs1: NonZeroXRegister,
         rs2: NonZeroXRegister,
         width: InstrWidth,
-    ) -> ProgramCounterUpdate {
+    ) -> ProgramCounterUpdate<Address> {
         let lhs = self.xregisters.read_nz(rs1);
         let rhs = self.xregisters.read_nz(rs2);
 

@@ -87,7 +87,7 @@ use std::u64;
 use bcall::{BCall, Block};
 
 use super::address_translation::PAGE_OFFSET_WIDTH;
-use super::instruction::Instruction;
+use super::instruction::{Instruction, RunInstr};
 use super::{MachineCoreState, memory::MemoryConfig};
 use super::{ProgramCounterUpdate, memory::Address};
 use crate::machine_state::address_translation::PAGE_SIZE;
@@ -129,10 +129,7 @@ impl<MC: MemoryConfig, M: ManagerBase> EnrichedValue for ICallPlaced<MC, M> {
 ///
 /// [OpCode]: super::instruction::OpCode
 pub struct ICall<MC: MemoryConfig, M: ManagerBase> {
-    /// SAFETY: This function must be called with an `Args` belonging to the same `OpCode` as
-    /// the one used to dispatch this function.
-    run_instr:
-        unsafe fn(&Args, &mut MachineCoreState<MC, M>) -> Result<ProgramCounterUpdate, Exception>,
+    run_instr: RunInstr<MC, M>,
 }
 
 impl<MC: MemoryConfig, M: ManagerBase> Clone for ICall<MC, M> {
@@ -151,7 +148,7 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICall<MC, M> {
         &self,
         args: &Args,
         core: &mut MachineCoreState<MC, M>,
-    ) -> Result<ProgramCounterUpdate, Exception> {
+    ) -> Result<ProgramCounterUpdate<Address>, Exception> {
         (self.run_instr)(args, core)
     }
 }
@@ -828,7 +825,7 @@ impl<BCL: BlockCacheLayout, B: Block<MC, M> + Clone, MC: MemoryConfig, M: Manage
 fn run_instr<MC: MemoryConfig, M: ManagerReadWrite>(
     instr: &EnrichedCell<ICallPlaced<MC, M>, M>,
     core: &mut MachineCoreState<MC, M>,
-) -> Result<ProgramCounterUpdate, Exception> {
+) -> Result<ProgramCounterUpdate<Address>, Exception> {
     let args = instr.read_ref_stored().args();
     let icall = instr.read_derived();
 
