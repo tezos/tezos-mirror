@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos_tezlink_latest"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+
+rlp.workspace = true
+
+tezos_ethereum.workspace = true
+primitive-types.workspace = true
+tezos-smart-rollup.workspace = true
