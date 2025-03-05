@@ -30,6 +30,7 @@ type callback = [`Accepted | `Confirmed | `Dropped | `Refused] -> unit Lwt.t
 val start :
   config:Configuration.tx_queue ->
   evm_node_endpoint:Uri.t ->
+  keep_alive:bool ->
   unit ->
   unit tzresult Lwt.t
 

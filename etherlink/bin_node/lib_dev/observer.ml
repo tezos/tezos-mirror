@@ -209,7 +209,11 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
   let* () =
     match config.experimental_features.enable_tx_queue with
     | Some tx_queue_config ->
-        Tx_queue.start ~evm_node_endpoint ~config:tx_queue_config ()
+        Tx_queue.start
+          ~evm_node_endpoint
+          ~config:tx_queue_config
+          ~keep_alive:config.keep_alive
+          ()
     | None ->
         let mode =
           if config.finalized_view then
