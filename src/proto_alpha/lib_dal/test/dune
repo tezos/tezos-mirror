@@ -7,7 +7,6 @@
  (libraries
   tezt.core
   bls12-381.archive
-  octez-rust-deps
   octez-libs.base
   octez-protocol-alpha-libs.dal
   tezos-protocol-alpha.protocol
@@ -31,6 +30,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
+  octez-rust-deps
   src_proto_alpha_lib_dal_test_tezt_lib
   tezt)
  (link_flags

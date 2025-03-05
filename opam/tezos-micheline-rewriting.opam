@@ -12,9 +12,9 @@ depends: [
   "ocaml" { >= "4.14" }
   "zarith" { >= "1.13" & < "1.14" }
   "octez-libs" { = version }
+  "octez-rust-deps" { with-test & = version }
   "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
   "bls12-381" { with-test & = version }
-  "octez-rust-deps" { with-test & = version }
   "tezos-protocol-alpha" { with-test & = version }
   "octez-protocol-alpha-libs" { with-test & = version }
 ]

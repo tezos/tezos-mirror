@@ -7,7 +7,6 @@
  (libraries
   tezt.core
   bls12-381.archive
-  octez-rust-deps
   octez-libs.base
   octez-libs.stdlib-unix
   octez-libs.test-helpers
@@ -40,6 +39,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
+  octez-rust-deps
   src_lib_smart_rollup_node_test__tezt_lib
   tezt)
  (link_flags

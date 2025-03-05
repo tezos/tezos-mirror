@@ -7,7 +7,6 @@
  (libraries
   tezt.core
   bls12-381.archive
-  octez-rustzcash-deps
   octez-libs.base
   octez-shell-libs.mockup-commands
   octez-shell-libs.client-base-unix
@@ -27,6 +26,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
+  octez-rust-deps
   src_lib_client_base_unix_test_tezt_lib
   tezt)
  (link_flags

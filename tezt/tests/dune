@@ -5,10 +5,10 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
+  octez-rust-deps
   octez-libs.test-helpers
   octez-libs.tezt-wrapper
   str
-  octez-rust-deps
   bls12-381.archive
   bls12-381
   tezt-tezos

@@ -10,8 +10,8 @@
   test_blueprint_roundtrip
   test_bitset_nonce)
  (libraries
-  bls12-381.archive
   octez-evm-node-libs.evm_node_rust_deps
+  bls12-381.archive
   octez-libs.base
   octez-libs.base.unix
   octez-libs.base-test-helpers
