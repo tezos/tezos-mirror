@@ -1327,6 +1327,11 @@ module Target = struct
           "Manifest.Target.inline_tests_backend cannot be given no_target"
     | Some target -> Inline_tests_backend target
 
+  let is_internal_kind_lib (kind : kind) =
+    match kind with
+    | Public_library _ | Private_library _ -> true
+    | Public_executable _ | Private_executable _ | Test_executable _ -> false
+
   let convert_to_identifier = String.map @@ function '-' | '.' -> '_' | c -> c
 
   (* List of all targets, in reverse order of registration. *)
@@ -1345,6 +1350,25 @@ module Target = struct
 
   (* Set to [false] by [generate] to prevent further modifying the above references. *)
   let can_register = ref true
+
+  let kind_name_for_errors kind =
+    match kind with
+    | Public_library {public_name = name; _}
+    | Private_library name
+    | Public_executable ({public_name = name; _}, _)
+    | Private_executable (name, _)
+    | Test_executable {names = name, _; _} ->
+        name
+
+  (* Note: this function is redefined below for the version with optional targets. *)
+  let rec name_for_errors = function
+    | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> name
+    | Optional target
+    | Re_export target
+    | Select {package = target; _}
+    | Open (target, _) ->
+        name_for_errors target
+    | Internal {kind; _} -> kind_name_for_errors kind
 
   let register_internal ({path; opam; product; kind; _} as internal) =
     let path = sanitize_path path in
@@ -1372,25 +1396,6 @@ module Target = struct
     | _ -> ()) ;
     registered := internal :: !registered ;
     Some (Internal internal)
-
-  let kind_name_for_errors kind =
-    match kind with
-    | Public_library {public_name = name; _}
-    | Private_library name
-    | Public_executable ({public_name = name; _}, _)
-    | Private_executable (name, _)
-    | Test_executable {names = name, _; _} ->
-        name
-
-  (* Note: this function is redefined below for the version with optional targets. *)
-  let rec name_for_errors = function
-    | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> name
-    | Optional target
-    | Re_export target
-    | Select {package = target; _}
-    | Open (target, _) ->
-        name_for_errors target
-    | Internal {kind; _} -> kind_name_for_errors kind
 
   let rec names_for_dune = function
     | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> (name, [])
@@ -1520,6 +1525,7 @@ module Target = struct
       ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
       ?(with_macos_security_framework = false) ?(source = []) ~path ?enabled_if
       names =
+    let kind = make_kind names in
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1540,7 +1546,6 @@ module Target = struct
       in
       List.flatten (List.map (get_opens []) deps)
     in
-    let kind = make_kind names in
     let preprocess, inline_tests =
       match
         ( inline_tests,
@@ -2699,11 +2704,7 @@ let generate_dune (internal : Target.internal) =
     in
     (libraries, ppx_runtime_libraries, List.rev !empty_files_to_create)
   in
-  let is_lib =
-    match internal.kind with
-    | Public_library _ | Private_library _ -> true
-    | Public_executable _ | Private_executable _ | Test_executable _ -> false
-  in
+  let is_lib = Target.is_internal_kind_lib internal.kind in
   let library_flags =
     if internal.linkall && is_lib then Some Dune.[S ":standard"; S "-linkall"]
     else None
