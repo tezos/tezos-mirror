@@ -422,6 +422,9 @@ val wait_for_tx_queue_transaction_confirmed :
     {!wait_for} and returns the number of transactions injected. *)
 val wait_for_tx_queue_injecting_transaction : ?timeout:float -> t -> int Lwt.t
 
+(** [wait_for_tx_queue_cleared ?timeout evm_node] waits for the [tx_queue_cleared.v0]. *)
+val wait_for_tx_queue_cleared : ?timeout:float -> t -> unit Lwt.t
+
 (** [wait_for_shutdown ?can_terminate evm_node] waits until a node terminates
     and return its status. If the node is not running, make the test fail. If
     [can_terminate] is `true` and the node was already terminated, returns

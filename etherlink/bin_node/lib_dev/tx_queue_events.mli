@@ -13,6 +13,9 @@ val is_ready : unit -> unit Lwt.t
 (** [shutdown ()] advertises that the [Tx_queue] is shutting down. *)
 val shutdown : unit -> unit Lwt.t
 
+(** [cleared ()] advertises that the [Tx_queue] finished clearing. *)
+val cleared : unit -> unit Lwt.t
+
 (** [injecting_transactions nb] advertises [nb] transactions are about to be
     injected to the relay endpoint with a batch of [eth_sendRawTransaction]. *)
 val injecting_transactions : int -> unit Lwt.t

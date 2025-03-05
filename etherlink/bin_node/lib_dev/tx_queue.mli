@@ -38,6 +38,9 @@ val start :
     to be processed. *)
 val shutdown : unit -> unit tzresult Lwt.t
 
+(** [clear ()] removes the tx queue data but keeps the allocated space *)
+val clear : unit -> unit tzresult Lwt.t
+
 (** [inject ?callback tx_object raw_txn] pushes the raw transaction
     [raw_txn] to the worker queue.
 

@@ -10843,6 +10843,82 @@ let test_tx_queue =
   in
   unit
 
+let test_tx_queue_clear =
+  register_all
+    ~title:"Tx_queue clears after delayed inbox flush"
+    ~tags:["evm"; "tx_queue"; "clear"; "delayed_inbox"; "flush"]
+    ~enable_tx_queue:true
+    ~time_between_blocks:Nothing
+    ~delayed_inbox_timeout:0
+    ~delayed_inbox_min_levels:1
+    ~kernels:[Latest]
+    ~use_dal:Register_without_feature
+    ~use_threshold_encryption:Register_without_feature
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           sequencer;
+           observer;
+           proxy;
+           _;
+         }
+             _protocol ->
+  let* () = Evm_node.terminate observer in
+  let* () =
+    Evm_node.run ~extra_arguments:["--dont-track-rollup-node"] observer
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~value:(Wei.of_eth_int 1)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  let* _ =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      ~sender:Constant.bootstrap3
+      raw_tx
+  in
+
+  (* Mark at which level the delayed inbox item was added. *)
+  let* add_level = Client.level client in
+  let wait_for_processed_l1_level_add =
+    Evm_node.wait_for_processed_l1_level ~level:add_level sequencer
+  in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+
+  (* Mark at which level the delayed inbox was flushed. *)
+  let* flushed_level = Client.level client in
+  let wait_for_processed_l1_level_flushed =
+    Evm_node.wait_for_processed_l1_level ~level:flushed_level sequencer
+  in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client
+  and* _ = wait_for_processed_l1_level_add in
+
+  (* Produce one L2 block. The sequencer is aware of the delayed inbox
+     item but refuses to include it. *)
+  let wait_for_flush = Evm_node.wait_for_flush_delayed_inbox sequencer in
+  let wait_for_clear = Evm_node.wait_for_tx_queue_cleared observer in
+  let*@ _ = Rpc.produce_block ~with_delayed_transactions:false sequencer in
+
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client
+  and* _ = wait_for_flush
+  and* _ = wait_for_processed_l1_level_flushed
+  and* () = wait_for_clear in
+  unit
+
 let test_spawn_rpc =
   let fresh_port = Port.fresh () in
   register_all
@@ -11072,5 +11148,6 @@ let () =
   test_eip1559_transaction_object [Alpha] ;
   test_apply_from_full_history_mode protocols ;
   test_tx_queue [Alpha] ;
+  test_tx_queue_clear [Alpha] ;
   test_spawn_rpc protocols ;
   test_observer_init_from_snapshot protocols

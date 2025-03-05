@@ -582,6 +582,10 @@ let wait_for_tx_queue_injecting_transaction ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"tx_queue_injecting_transaction.v0"
   @@ fun json -> JSON.(json |> as_int |> Option.some)
 
+let wait_for_tx_queue_cleared ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"tx_queue_cleared.v0"
+  @@ Fun.const (Some ())
+
 let wait_for_split ?level evm_node =
   wait_for_event evm_node ~event:"evm_context_gc_split.v0" @@ fun json ->
   let event_level = JSON.(json |-> "level" |> as_int) in

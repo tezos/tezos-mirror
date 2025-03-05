@@ -1400,6 +1400,14 @@ tx_queue_rpc_error:
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
 
+tx_queue_cleared:
+  description: cleared the tx queue
+  level: notice
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_cleared version 0 */
+      "tx_queue_cleared.v0": any }
+
 shutting_down_tx_queue:
   description: stopping the tx queue
   level: notice
