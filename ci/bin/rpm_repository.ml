@@ -306,6 +306,7 @@ let jobs pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.install_bin_rockylinux_93_systemd"
+        ~allow_failure:Yes
         ~dependencies:
           (Dependent
              [

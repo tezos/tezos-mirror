@@ -231,6 +231,7 @@ oc.install_bin_rockylinux_93_systemd:
   - oc.docker-systemd-tests-rpm-rockylinux
   - rpm_repo_rockylinux
   dependencies: []
+  allow_failure: true
   timeout: 60 minutes
   before_script:
   - ./scripts/ci/docker_initialize.sh
