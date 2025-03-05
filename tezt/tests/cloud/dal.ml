@@ -122,8 +122,8 @@ module Node = struct
 
   include Node
 
-  let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ~name network
-      cloud agent =
+  let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ~rpc_external
+      ~name network cloud agent =
     toplog "Inititializing an L1 node for %s" name ;
     match network with
     | (`Mainnet | `Ghostnet | `Nextnet _ | `Weeklynet _ | `Rionet) as network
@@ -133,7 +133,6 @@ module Node = struct
         let net_addr = "[::]" in
         match data_dir with
         | Some data_dir ->
-            let rpc_external = Cli.node_external_rpc_server in
             let* node =
               Node.Agent.create
                 ~rpc_external
@@ -155,7 +154,6 @@ module Node = struct
               "No data dir given, we will attempt to bootstrap the node from a \
                rolling snapshot." ;
             toplog "Creating the agent." ;
-            let rpc_external = Cli.node_external_rpc_server in
             let* node =
               Node.Agent.create
                 ~rpc_external
@@ -242,7 +240,6 @@ module Node = struct
         let net_addr = "127.0.0.1" in
         match data_dir with
         | None ->
-            let rpc_external = Cli.node_external_rpc_server in
             let* node =
               Node.Agent.create ~net_addr ~rpc_external ~name cloud agent
             in
@@ -271,7 +268,6 @@ module Node = struct
             let* () = wait_for_ready node in
             Lwt.return node
         | Some data_dir ->
-            let rpc_external = Cli.node_external_rpc_server in
             let arguments =
               [No_bootstrap_peers; Synchronisation_threshold 0; Cors_origin "*"]
               @ arguments
@@ -470,6 +466,8 @@ type configuration = {
   metrics_retention : int;
   bootstrap_node_identity_file : string option;
   bootstrap_dal_node_identity_file : string option;
+  external_rpc : bool;
+  dal_incentives : bool;
 }
 
 type bootstrap = {
@@ -1216,6 +1214,7 @@ let init_public_network cloud (configuration : configuration)
         let* node =
           Node.init
             ?identity_file:configuration.bootstrap_node_identity_file
+            ~rpc_external:configuration.external_rpc
             ~name:"bootstrap-node"
             configuration.network
             cloud
@@ -1412,6 +1411,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
     Node.init
       ?data_dir
       ?identity_file:configuration.bootstrap_node_identity_file
+      ~rpc_external:configuration.external_rpc
       ~dal_config
       ~name
       configuration.network
@@ -1480,7 +1480,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
        @ etherlink_batching_operator_keys)
     in
     let overrides =
-      if Cli.dal_incentives then
+      if configuration.dal_incentives then
         [
           (["dal_parametric"; "incentives_enable"], `Bool true);
           (["dal_parametric"; "rewards_ratio"; "numerator"], `String "1");
@@ -1584,6 +1584,7 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
       ?data_dir
       ~arguments:Node.[Peer bootstrap.node_p2p_endpoint]
       ~name:(Format.asprintf "baker-node-%d" i)
+      ~rpc_external:configuration.external_rpc
       configuration.network
       cloud
       agent
@@ -1674,6 +1675,7 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
       ?data_dir
       ~name
       ~arguments:Node.[Peer bootstrap.node_p2p_endpoint]
+      ~rpc_external:configuration.external_rpc
       configuration.network
       cloud
       agent
@@ -1763,6 +1765,7 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
       ?data_dir
       ~name
       ~arguments:[Peer bootstrap.node_p2p_endpoint]
+      ~rpc_external:configuration.external_rpc
       configuration.network
       cloud
       agent
@@ -1819,7 +1822,7 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
   Lwt.return {node; dal_node; topic}
 
 let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
-    ~memtrace ~cloud =
+    ~memtrace ~rpc_external ~cloud =
   match dal_slots with
   | [] ->
       toplog "Etherlink will run without DAL support" ;
@@ -1836,6 +1839,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
           ~name
           ~arguments:
             [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
+          ~rpc_external
           network
           cloud
           agent
@@ -1870,6 +1874,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
           ~name
           ~arguments:
             [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
+          ~rpc_external
           network
           cloud
           agent
@@ -1897,6 +1902,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~otel
                        Peer bootstrap.node_p2p_endpoint;
                        History_mode (Rolling (Some 79));
                      ]
+                   ~rpc_external
                    network
                    cloud
                    agent
@@ -1933,6 +1939,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
       ~name
       ~arguments:
         [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
+      ~rpc_external:configuration.external_rpc
       configuration.network
       cloud
       agent
@@ -1988,6 +1995,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
       ~next_agent
       ~dal_slots:etherlink_configuration.etherlink_dal_slots
       ~network:configuration.network
+      ~rpc_external:configuration.external_rpc
       ~otel
       ~memtrace:configuration.memtrace
       ~cloud
@@ -2117,10 +2125,11 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
   in
   return operator
 
-let init_etherlink_producer_setup operator name ~bootstrap cloud agent =
+let init_etherlink_producer_setup operator name ~bootstrap ~rpc_external cloud
+    agent =
   let* node =
     Node.Agent.init
-      ~rpc_external:Cli.node_external_rpc_server
+      ~rpc_external
       ~name:(Format.asprintf "etherlink-%s-node" name)
       ~arguments:[Peer bootstrap.node_p2p_endpoint; Synchronisation_threshold 0]
       cloud
@@ -2244,6 +2253,7 @@ let init_etherlink cloud configuration etherlink_configuration ~bootstrap
              operator
              (Format.asprintf "producer-%d" i)
              ~bootstrap
+             ~rpc_external:configuration.external_rpc
              cloud
              agent)
     |> Lwt.join
@@ -2263,37 +2273,6 @@ let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
           Node.as_rpc_endpoint etherlink.operator.node
       | [], [], [], None -> bootstrap.node_rpc_endpoint)
   | _ -> bootstrap.node_rpc_endpoint
-
-module Alert = struct
-  open Tezt_cloud
-
-  let receiver =
-    match Cli.Alerts.dal_slack_webhook with
-    | None -> Alert.null_receiver
-    | Some api_url ->
-        Alert.slack_receiver ~name:"slack-notifications" ~api_url ()
-
-  let alert =
-    Alert.make
-      ~route:
-        (Alert.route
-           ~group_wait:"10s"
-           ~group_interval:"10s"
-           ~repeat_interval:"12h"
-             (* In the future, probably we should make this value equals to Cli.metrics_retention *)
-           receiver)
-      ~group_name:"tezt"
-      ~name:"LowDALAttestedCommitmentsRatio"
-      ~for_:"5m"
-      ~severity:Info
-      ~expr:{|vector(1)|}
-      ~summary:"DAL attested commitments ratio over the last 12 hours"
-      ~description:
-        {|'DAL attested commitments ratio over the last 12 hours: {{ with query "avg_over_time(tezt_dal_commitments_ratio{kind=\"attested\"}[12h])" }}{{ . | first | value | printf "%.2f%%" }}{{ end }}'|}
-      ()
-
-  let alerts = [alert]
-end
 
 let init ~(configuration : configuration) etherlink_configuration cloud
     next_agent =
@@ -2684,85 +2663,121 @@ let rec loop t level =
   let* t = p in
   loop t (level + 1)
 
-let configuration, etherlink_configuration =
-  let stake = Cli.stake in
-  let stake_machine_type = Cli.stake_machine_type in
-  let dal_node_producers =
-    let last_index = ref 0 in
-    List.init Cli.producers (fun i ->
-        match List.nth_opt Cli.dal_producers_slot_indices i with
-        | None ->
-            incr last_index ;
-            !last_index
-        | Some index ->
-            last_index := index ;
-            index)
-  in
-  let observer_slot_indices = Cli.observer_slot_indices in
-  let observer_pkhs = Cli.observer_pkhs in
-  let protocol = Cli.protocol in
-  let producer_machine_type = Cli.producer_machine_type in
-  let etherlink = Cli.etherlink in
-  let etherlink_sequencer = Cli.etherlink_sequencer in
-  let etherlink_producers = Cli.etherlink_producers in
-  let disconnect = Cli.disconnect in
-  let network = Cli.network in
-  let bootstrap = Cli.bootstrap in
-  let etherlink_dal_slots = Cli.etherlink_dal_slots in
-  let teztale = Cli.teztale in
-  let memtrace = Cli.memtrace in
-  let data_dir = Cli.data_dir in
-  let fundraiser =
-    Option.fold
-      ~none:(Sys.getenv_opt "TEZT_CLOUD_FUNDRAISER")
-      ~some:Option.some
-      Cli.fundraiser
-  in
-  let etherlink_chain_id = Cli.etherlink_chain_id in
-  let etherlink =
-    if etherlink then
-      Some
-        {
-          etherlink_sequencer;
-          etherlink_producers;
-          etherlink_dal_slots;
-          chain_id = etherlink_chain_id;
-        }
-    else None
-  in
-  let blocks_history = Cli.blocks_history in
-  let metrics_retention = Cli.metrics_retention in
-  let bootstrap_node_identity_file = Cli.bootstrap_node_identity_file in
-  let bootstrap_dal_node_identity_file = Cli.bootstrap_dal_node_identity_file in
-  let with_dal = Cli.with_dal in
-  let bakers = Cli.bakers in
-  let t =
-    {
-      with_dal;
-      stake;
-      bakers;
-      stake_machine_type;
-      dal_node_producers;
-      observer_slot_indices;
-      observer_pkhs;
-      protocol;
-      producer_machine_type;
-      disconnect;
-      network;
-      bootstrap;
-      teztale;
-      memtrace;
-      data_dir;
-      fundraiser;
-      blocks_history;
-      metrics_retention;
-      bootstrap_node_identity_file;
-      bootstrap_dal_node_identity_file;
-    }
-  in
-  (t, etherlink)
+let register (module Cli : Scenarios_cli.Dal) =
+  let module Alert = struct
+    open Tezt_cloud
 
-let benchmark () =
+    let receiver =
+      match Cli.Alerts.dal_slack_webhook with
+      | None -> Alert.null_receiver
+      | Some api_url ->
+          Alert.slack_receiver ~name:"slack-notifications" ~api_url ()
+
+    let alert =
+      Alert.make
+        ~route:
+          (Alert.route
+             ~group_wait:"10s"
+             ~group_interval:"10s"
+             ~repeat_interval:"12h"
+               (* In the future, probably we should make this value equals to Cli.metrics_retention *)
+             receiver)
+        ~group_name:"tezt"
+        ~name:"LowDALAttestedCommitmentsRatio"
+        ~for_:"5m"
+        ~severity:Info
+        ~expr:{|vector(1)|}
+        ~summary:"DAL attested commitments ratio over the last 12 hours"
+        ~description:
+          {|'DAL attested commitments ratio over the last 12 hours: {{ with query "avg_over_time(tezt_dal_commitments_ratio{kind=\"attested\"}[12h])" }}{{ . | first | value | printf "%.2f%%" }}{{ end }}'|}
+        ()
+
+    let alerts = [alert]
+  end in
+  let configuration, etherlink_configuration =
+    let stake = Cli.stake in
+    let stake_machine_type = Cli.stake_machine_type in
+    let dal_node_producers =
+      let last_index = ref 0 in
+      List.init Cli.producers (fun i ->
+          match List.nth_opt Cli.dal_producers_slot_indices i with
+          | None ->
+              incr last_index ;
+              !last_index
+          | Some index ->
+              last_index := index ;
+              index)
+    in
+    let observer_slot_indices = Cli.observer_slot_indices in
+    let observer_pkhs = Cli.observer_pkhs in
+    let protocol = Cli.protocol in
+    let producer_machine_type = Cli.producer_machine_type in
+    let etherlink = Cli.etherlink in
+    let etherlink_sequencer = Cli.etherlink_sequencer in
+    let etherlink_producers = Cli.etherlink_producers in
+    let disconnect = Cli.disconnect in
+    let network = Cli.network in
+    let bootstrap = Cli.bootstrap in
+    let etherlink_dal_slots = Cli.etherlink_dal_slots in
+    let teztale = Cli.teztale in
+    let memtrace = Cli.memtrace in
+    let data_dir = Cli.data_dir in
+    let fundraiser =
+      Option.fold
+        ~none:(Sys.getenv_opt "TEZT_CLOUD_FUNDRAISER")
+        ~some:Option.some
+        Cli.fundraiser
+    in
+    let etherlink_chain_id = Cli.etherlink_chain_id in
+    let etherlink =
+      if etherlink then
+        Some
+          {
+            etherlink_sequencer;
+            etherlink_producers;
+            etherlink_dal_slots;
+            chain_id = etherlink_chain_id;
+          }
+      else None
+    in
+    let blocks_history = Cli.blocks_history in
+    let metrics_retention = Cli.metrics_retention in
+    let bootstrap_node_identity_file = Cli.bootstrap_node_identity_file in
+    let bootstrap_dal_node_identity_file =
+      Cli.bootstrap_dal_node_identity_file
+    in
+    let with_dal = Cli.with_dal in
+    let bakers = Cli.bakers in
+    let external_rpc = Cli.node_external_rpc_server in
+    let dal_incentives = Cli.dal_incentives in
+    let t =
+      {
+        with_dal;
+        bakers;
+        stake;
+        stake_machine_type;
+        dal_node_producers;
+        observer_slot_indices;
+        observer_pkhs;
+        protocol;
+        producer_machine_type;
+        disconnect;
+        network;
+        bootstrap;
+        teztale;
+        memtrace;
+        data_dir;
+        fundraiser;
+        blocks_history;
+        metrics_retention;
+        bootstrap_node_identity_file;
+        bootstrap_dal_node_identity_file;
+        external_rpc;
+        dal_incentives;
+      }
+    in
+    (t, etherlink)
+  in
   toplog "Parsing CLI done" ;
   let vms =
     [
@@ -2862,7 +2877,7 @@ let benchmark () =
       | Some fundraiser_key -> ["--fundraiser"; fundraiser_key])
     ~__FILE__
     ~title:"DAL node benchmark"
-    ~tags:[Tag.cloud; "dal"; "benchmark"]
+    ~tags:[]
     ~alerts:Alert.alerts
     (fun cloud ->
       toplog "Creating the agents" ;
@@ -2889,5 +2904,3 @@ let benchmark () =
       let* t = init ~configuration etherlink_configuration cloud next_agent in
       toplog "Starting main loop" ;
       loop t (t.first_level + 1))
-
-let register () = benchmark ()

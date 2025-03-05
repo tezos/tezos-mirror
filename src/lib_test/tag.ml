@@ -52,5 +52,3 @@ let services = "services"
 let unix = "unix"
 
 let slow = "slow"
-
-let cloud = "cloud"

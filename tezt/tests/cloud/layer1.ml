@@ -847,29 +847,24 @@ let parse_conf encoding file =
         in
         exit 1)
 
-let configuration =
-  let stake = Option.value ~default:[] Scenarios_cli.Layer1.stake in
-  let network : Network.t option =
-    match Scenarios_cli.network with
-    | `Mainnet -> Some `Mainnet
-    | `Ghostnet -> Some `Ghostnet
-    | _ -> None
+let register (module Cli : Scenarios_cli.Layer1) =
+  let configuration =
+    let stake = Option.value ~default:[] Cli.stake in
+    let network : Network.t option =
+      match Cli.network with
+      | `Mainnet -> Some `Mainnet
+      | `Ghostnet -> Some `Ghostnet
+    in
+    let stresstest =
+      Option.map
+        (fun (pkh, pk, tps, seed) -> {pkh; pk; tps; seed})
+        Cli.stresstest
+    in
+    let maintenance_delay = Option.value ~default:0 Cli.maintenance_delay in
+    let snapshot = Option.value ~default:"" Cli.snapshot in
+    {stake; network; stresstest; maintenance_delay; snapshot}
   in
-  let stresstest =
-    Option.map
-      (fun (pkh, pk, tps, seed) -> {pkh; pk; tps; seed})
-      Scenarios_cli.Layer1.stresstest
-  in
-  let maintenance_delay =
-    Option.value ~default:0 Scenarios_cli.Layer1.maintenance_delay
-  in
-  let snapshot = Option.value ~default:"" Scenarios_cli.Layer1.snapshot in
-  {stake; network; stresstest; maintenance_delay; snapshot}
-
-let vms_conf =
-  Option.map (parse_conf vms_conf_encoding) Scenarios_cli.Layer1.vms_config
-
-let benchmark () =
+  let vms_conf = Option.map (parse_conf vms_conf_encoding) Cli.vms_config in
   toplog "Parsing CLI done" ;
   let vms =
     `Bootstrap
@@ -891,7 +886,7 @@ let benchmark () =
   let default_docker_image =
     Option.map
       (fun tag -> Agent.Configuration.Octez_release {tag})
-      Scenarios_cli.octez_release
+      Cli.octez_release
   in
   let default_vm_configuration ~name =
     Agent.Configuration.make ?docker_image:default_docker_image ~name ()
@@ -937,7 +932,7 @@ let benchmark () =
     ~proxy_files:[Uses.path Constant.yes_wallet; configuration.snapshot]
     ~__FILE__
     ~title:"L1 simulation"
-    ~tags:[Tag.cloud; "l1"]
+    ~tags:[]
   @@ fun cloud ->
   let configuration : configuration =
     (* Some checks for mandatory options defined as optional because CLI
@@ -969,5 +964,3 @@ let benchmark () =
        loop level
      in
      loop)
-
-let register () = benchmark ()

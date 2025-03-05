@@ -72,4 +72,4 @@
       database file path
     - [scp] that file one your computer
 *)
-val register : unit -> unit
+val register : (module Scenarios_cli.Layer1) -> unit
