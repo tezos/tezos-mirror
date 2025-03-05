@@ -513,3 +513,8 @@ let aggregate_signature_opt signatures =
       Bls.aggregate_signature_opt signatures
       |> Option.map (fun s -> Bls12_381 s)
   | Error _ -> None
+
+let aggregate_public_key_opt ?subgroup_check pks =
+  List.map (function Public_key.Bls12_381 s -> s) pks
+  |> Bls.aggregate_public_key_opt ?subgroup_check
+  |> Option.map (fun s -> Public_key.Bls12_381 s)
