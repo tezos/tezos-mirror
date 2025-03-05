@@ -518,3 +518,8 @@ let aggregate_public_key_opt ?subgroup_check pks =
   List.map (function Public_key.Bls12_381 s -> s) pks
   |> Bls.aggregate_public_key_opt ?subgroup_check
   |> Option.map (fun s -> Public_key.Bls12_381 s)
+
+let aggregate_public_key_lc_opt pks_with_weights =
+  List.map (function w, Public_key.Bls12_381 s -> (w, s)) pks_with_weights
+  |> Bls.aggregate_public_key_lc_opt
+  |> Option.map (fun s -> Public_key.Bls12_381 s)
