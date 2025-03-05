@@ -20,7 +20,6 @@ use std::{
     mem, slice,
 };
 
-use merkle::AccessInfo;
 use serde::ser::SerializeTuple;
 
 use super::{
@@ -61,7 +60,7 @@ impl<M: ManagerBase> ManagerBase for ProofGen<M> {
 /// additionally records read locations.
 impl<M: ManagerRead> ManagerRead for ProofGen<M> {
     fn region_read<E: Copy, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> E {
-        region.set_read();
+        region.set_access_info();
         match region.writes.get(&index) {
             Some(elem) => *elem,
             None => M::region_read(&region.source, index),
@@ -69,12 +68,12 @@ impl<M: ManagerRead> ManagerRead for ProofGen<M> {
     }
 
     fn region_ref<E: 'static, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> &E {
-        region.set_read();
+        region.set_access_info();
         region.unrecorded_ref(index)
     }
 
     fn region_read_all<E: Copy, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E> {
-        region.set_read();
+        region.set_access_info();
         let mut elems = M::region_read_all(&region.source);
         for (index, elem) in region.writes.iter() {
             elems[*index] = *elem;
@@ -134,12 +133,12 @@ impl<M: ManagerBase> ManagerWrite for ProofGen<M> {
         index: usize,
         value: E,
     ) {
-        region.set_write();
+        region.set_access_info();
         region.writes.insert(index, value);
     }
 
     fn region_write_all<E: Copy, const LEN: usize>(region: &mut Self::Region<E, LEN>, value: &[E]) {
-        region.set_write();
+        region.set_access_info();
         for (index, elem) in value.iter().enumerate() {
             region.writes.insert(index, *elem);
         }
@@ -196,7 +195,7 @@ impl<M: ManagerRead> ManagerReadWrite for ProofGen<M> {
         index: usize,
         value: E,
     ) -> E {
-        region.set_read_write();
+        region.set_access_info();
         let elem = M::region_read(&region.source, index);
         region.writes.insert(index, value);
         elem
@@ -244,7 +243,7 @@ impl<M: ManagerSerialise> ManagerSerialise for ProofGen<M> {
 pub struct ProofRegion<E: 'static, const LEN: usize, M: ManagerBase> {
     source: M::Region<E, LEN>,
     writes: BTreeMap<usize, E>,
-    access: Cell<AccessInfo>,
+    access: Cell<bool>,
 }
 
 impl<M: ManagerBase, E: 'static, const LEN: usize> ProofRegion<E, LEN, M> {
@@ -253,28 +252,18 @@ impl<M: ManagerBase, E: 'static, const LEN: usize> ProofRegion<E, LEN, M> {
         Self {
             source,
             writes: BTreeMap::new(),
-            access: Cell::new(AccessInfo::NoAccess),
+            access: Cell::new(false),
         }
     }
 
     /// Get a copy of the access log.
-    pub fn get_access_info(&self) -> AccessInfo {
+    pub fn get_access_info(&self) -> bool {
         self.access.get()
     }
 
-    /// Set the access log to `Read` or, if previously `Write`, to `ReadWrite`.
-    pub fn set_read(&self) {
-        self.access.set(self.access.get().and_read())
-    }
-
-    /// Set the access log to `Write` or, if previously `Read`, to `ReadWrite`.
-    pub fn set_write(&self) {
-        self.access.set(self.access.get().and_write())
-    }
-
-    /// Set the access log to `ReadWrite`.
-    pub fn set_read_write(&self) {
-        self.access.set(AccessInfo::ReadWrite)
+    /// Record that the regions has been accessed
+    pub fn set_access_info(&self) {
+        self.access.set(true)
     }
 
     /// Get a reference to the wrapper region.
@@ -391,23 +380,8 @@ impl<V: EnrichedValue, M: ManagerBase> ProofEnrichedCell<V, M> {
     }
 
     /// Get a copy of the access log.
-    pub fn get_access_info(&self) -> AccessInfo {
+    pub fn get_access_info(&self) -> bool {
         self.underlying.access.get()
-    }
-
-    /// Set the access log to `Read` or, if previously `Write`, to `ReadWrite`.
-    pub fn set_read(&self) {
-        self.underlying.set_read()
-    }
-
-    /// Set the access log to `Write` or, if previously `Read`, to `ReadWrite`.
-    pub fn set_write(&mut self) {
-        self.underlying.set_write()
-    }
-
-    /// Set the access log to `ReadWrite`.
-    pub fn set_read_write(&self) {
-        self.underlying.set_read_write()
     }
 }
 
@@ -432,7 +406,7 @@ impl DynAccess {
 mod tests {
     use std::collections::VecDeque;
 
-    use proptest::{array, prop_assert_eq, proptest};
+    use proptest::{array, prop_assert, prop_assert_eq, proptest};
     use tests::merkle::MerkleTree;
 
     use super::merkle::MERKLE_LEAF_SIZE;
@@ -452,32 +426,32 @@ mod tests {
             let region: ProofRegion<u64, CELLS_SIZE, Ref<'_, Owned>> = ProofRegion::bind(&cells);
             let mut region: Cells<u64, CELLS_SIZE, ProofGen<Ref<'_, Owned>>> = Cells::bind(region);
 
-            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::NoAccess);
+            prop_assert!(!region.region_ref().get_access_info());
             let value = region.read(i);
             prop_assert_eq!(value, value_before);
-            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::Read);
+            prop_assert!(region.region_ref().get_access_info());
             region.write(i, value_after);
-            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::ReadWrite);
+            prop_assert!(region.region_ref().get_access_info());
 
             // A write followed by a read
             let cells = [value_before; CELLS_SIZE];
             let region: ProofRegion<u64, CELLS_SIZE, Ref<'_, Owned>> = ProofRegion::bind(&cells);
             let mut region: Cells<u64, CELLS_SIZE, ProofGen<Ref<'_, Owned>>> = Cells::bind(region);
-            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::NoAccess);
+            prop_assert!(!region.region_ref().get_access_info());
             region.write(i, value_after);
-            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::Write);
+            prop_assert!(region.region_ref().get_access_info());
             let value = region.read(i);
             prop_assert_eq!(value, value_after);
-            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::ReadWrite);
+            prop_assert!(region.region_ref().get_access_info());
 
             // Replace
             let cells = [value_before; CELLS_SIZE];
             let region: ProofRegion<u64, CELLS_SIZE, Ref<'_, Owned>> = ProofRegion::bind(&cells);
             let mut region: Cells<u64, CELLS_SIZE, ProofGen<Ref<'_, Owned>>> = Cells::bind(region);
-            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::NoAccess);
+            prop_assert!(!region.region_ref().get_access_info());
             let value = region.replace(i, value_after);
             prop_assert_eq!(value, value_before);
-            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::ReadWrite);
+            prop_assert!(region.region_ref().get_access_info());
 
             let data_before = [value_before; CELLS_SIZE];
             let data_after = [value_after; CELLS_SIZE];
@@ -486,23 +460,23 @@ mod tests {
             let cells = data_before;
             let region: ProofRegion<u64, CELLS_SIZE, Ref<'_, Owned>> = ProofRegion::bind(&cells);
             let mut region: Cells<u64, CELLS_SIZE, ProofGen<Ref<'_, Owned>>> = Cells::bind(region);
-            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::NoAccess);
+            prop_assert!(!region.region_ref().get_access_info());
             let values = region.read_all();
             prop_assert_eq!(values.as_slice(), data_before);
-            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::Read);
+            prop_assert!(region.region_ref().get_access_info());
             region.write_all(&data_after);
-            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::ReadWrite);
+            prop_assert!(region.region_ref().get_access_info());
 
             // A write_all followed by a read_all
             let cells = data_before;
             let region: ProofRegion<u64, CELLS_SIZE, Ref<'_, Owned>> = ProofRegion::bind(&cells);
             let mut region: Cells<u64, CELLS_SIZE, ProofGen<Ref<'_, Owned>>> = Cells::bind(region);
-            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::NoAccess);
+            prop_assert!(!region.region_ref().get_access_info());
             region.write_all(&data_after);
-            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::Write);
+            prop_assert!(region.region_ref().get_access_info());
             let values = region.read_all();
             prop_assert_eq!(values.as_slice(), data_after);
-            prop_assert_eq!(region.region_ref().get_access_info(), AccessInfo::ReadWrite);
+            prop_assert!(region.region_ref().get_access_info());
 
             // Check correct Merkleisation
             let cells = [value_before; CELLS_SIZE];
@@ -522,7 +496,7 @@ mod tests {
             match merkle_tree {
                 MerkleTree::Leaf(hash, access_info, _) => {
                     prop_assert_eq!(hash, initial_root_hash);
-                    prop_assert_eq!(access_info, AccessInfo::Write);
+                    prop_assert!(access_info);
                 }
                 _ => panic!("Expected Merkle tree to contain a single written leaf"),
             }
@@ -661,10 +635,8 @@ mod tests {
                     MerkleTree::Leaf(_, access_info, _) => {
                         assert_eq!(
                             access_info,
-                            AccessInfo::from_bools(
-                                read_leaves.contains(&leaf),
+                            read_leaves.contains(&leaf) ||
                                 written_leaves.contains(&leaf)
-                            )
                         );
                         leaf += 1;
                     }
@@ -695,26 +667,26 @@ mod tests {
             // A read followed by a write
             let value = [value_before];
             let mut proof_cell: ProofEnrichedCell<Enriching, Ref<'_, Owned>> = ProofEnrichedCell::bind(&value);
-            prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::NoAccess);
+            prop_assert!(!proof_cell.get_access_info());
             let value = ProofGen::<Ref<'_, Owned>>::enriched_cell_read_stored(&proof_cell);
             prop_assert_eq!(value, value_before);
             let derived = ProofGen::<Ref<'_, Owned>>::enriched_cell_read_derived(&proof_cell);
             prop_assert_eq!(derived, T::from(&value_before));
-            prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::Read);
+            prop_assert!(proof_cell.get_access_info());
             ProofGen::<Ref<'_, Owned>>::enriched_cell_write(&mut proof_cell, value_after);
-            prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::ReadWrite);
+            prop_assert!(proof_cell.get_access_info());
 
             // A write followed by a read
             let value = [value_before];
             let mut proof_cell: ProofEnrichedCell<Enriching, Ref<'_, Owned>> = ProofEnrichedCell::bind(&value);
-            prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::NoAccess);
+            prop_assert!(!proof_cell.get_access_info());
             ProofGen::<Ref<'_, Owned>>::enriched_cell_write(&mut proof_cell, value_after);
-            prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::Write);
+            prop_assert!(proof_cell.get_access_info());
             let value = ProofGen::<Ref<'_, Owned>>::enriched_cell_read_stored(&proof_cell);
             prop_assert_eq!(value, value_after);
             let derived = ProofGen::<Ref<'_, Owned>>::enriched_cell_read_derived(&proof_cell);
             prop_assert_eq!(derived, T::from(&value_after));
-            prop_assert_eq!(proof_cell.get_access_info(), AccessInfo::ReadWrite);
+            prop_assert!(proof_cell.get_access_info());
         });
     }
 }

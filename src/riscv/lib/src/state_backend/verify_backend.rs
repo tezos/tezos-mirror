@@ -20,7 +20,7 @@ use crate::state_backend::{owned_backend::Owned, proof_backend::merkle::MERKLE_L
 
 /// Panic payload that is raised when a value isn't present in a part of the Verifier backend.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-struct NotFound;
+pub(crate) struct NotFound;
 
 /// Raise a [`NotFound`] panic.
 fn not_found() -> ! {
@@ -34,7 +34,9 @@ fn not_found() -> ! {
 /// Catch errors that the verifier backend may raise during the invocation of `f` and return them
 /// as [`Err`].
 #[cfg(test)]
-fn handle_not_found<R, F: FnOnce() -> R + std::panic::UnwindSafe>(f: F) -> Result<R, NotFound> {
+pub(crate) fn handle_not_found<R, F: FnOnce() -> R + std::panic::UnwindSafe>(
+    f: F,
+) -> Result<R, NotFound> {
     match std::panic::catch_unwind(f) {
         Ok(res) => Ok(res),
         Err(err) => match err.downcast::<NotFound>() {

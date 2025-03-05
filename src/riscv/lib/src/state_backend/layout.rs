@@ -128,7 +128,7 @@ macro_rules! struct_layout {
             }
 
             use $crate::state_backend::proof_backend::merkle::{
-                AccessInfo, AccessInfoAggregatable, MerkleTree,
+                AccessInfoAggregatable, MerkleTree,
             };
 
             impl <
@@ -140,13 +140,13 @@ macro_rules! struct_layout {
                     [<$field_name:upper>]
                 ),+
             > {
-                fn aggregate_access_info(&self) -> AccessInfo {
+                fn aggregate_access_info(&self) -> bool {
                     let children = [
                         $(
                             self.$field_name.aggregate_access_info()
                         ),+
                     ];
-                    AccessInfo::fold(&children)
+                    children.iter().any(|&x| x)
                 }
             }
 

@@ -15,7 +15,7 @@ use super::{
     effects::{NoEffect, handle_csr_effect},
     root::RootCSRegister,
 };
-use crate::state_backend::proof_backend::merkle::{AccessInfo, AccessInfoAggregatable};
+use crate::state_backend::proof_backend::merkle::AccessInfoAggregatable;
 use crate::{
     bits::Bits64,
     state_backend::{
@@ -1475,7 +1475,7 @@ where
     MStatus: AccessInfoAggregatable + serde::Serialize,
     MIP: AccessInfoAggregatable + serde::Serialize,
 {
-    fn aggregate_access_info(&self) -> AccessInfo {
+    fn aggregate_access_info(&self) -> bool {
         let children = [
             self.mstatus.aggregate_access_info(),
             self.mip.aggregate_access_info(),
@@ -1712,7 +1712,7 @@ where
             self.dscratch0.aggregate_access_info(),
             self.dscratch1.aggregate_access_info(),
         ];
-        AccessInfo::fold(&children)
+        children.iter().any(|&x| x)
     }
 }
 
