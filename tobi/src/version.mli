@@ -22,3 +22,9 @@ val parse : string -> t
 
     [parse (show v)] is always equal to [v]. *)
 val show : t -> string
+
+(** Test equality between two versions. *)
+val equal : t -> t -> bool
+
+(** Current committed version, i.e. [Old "HEAD"]. *)
+val head : t

@@ -32,6 +32,15 @@ module CLI = struct
         ~dummy:Version.Dev
         ~parse:(fun s -> Some (Version.parse s))
         ~show:Version.show
+
+    let component_and_version =
+      let parse str =
+        match str_split_once str '.' with
+        | None -> Some (str, Version.head)
+        | Some (name, version) -> Some (name, Version.parse version)
+      in
+      let show (name, version) = name ^ "." ^ Version.show version in
+      Clap.typ ~name:"component.version" ~dummy:("", Version.head) ~parse ~show
   end
 
   let verbose =
@@ -57,9 +66,24 @@ module CLI = struct
           Dev
       in
       `list version
+
+    let install =
+      Clap.case "install" ~description:"Install some component(s)." @@ fun () ->
+      let components =
+        Clap.list
+          Type.component_and_version
+          ~placeholder:"COMPONENT"
+          ~description:
+            "Name of a component to install. COMPONENT can be of the form NAME \
+             or NAME.VERSION, where VERSION is a Git commit hash, branch name \
+             or tag. It cannot be 'dev'. If VERSION is omitted, it defaults to \
+             HEAD."
+          ()
+      in
+      `install components
   end
 
-  let command = Clap.subcommand Command.[list]
+  let command = Clap.subcommand Command.[list; install]
 
   let () = Clap.close ()
 end
@@ -74,6 +98,7 @@ let main () =
   (* Dispatch commands. *)
   match CLI.command with
   | `list version -> Cmd_list.run ~verbose:CLI.verbose version
+  | `install components -> Cmd_install.run ~verbose:CLI.verbose components
 
 (* Entrypoint: call [main] and handle errors. *)
 let () =

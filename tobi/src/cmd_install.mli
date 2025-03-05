@@ -5,12 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Dev | Old of string
+open Misc
 
-let parse = function "dev" -> Dev | v -> Old v
-
-let show = function Dev -> "dev" | Old v -> v
-
-let equal = (( = ) : t -> t -> bool)
-
-let head = Old "HEAD"
+(** Run the [install] CLI command. *)
+val run :
+  verbose:bool -> (string * Version.t) list -> (unit, [> `failed] error) result
