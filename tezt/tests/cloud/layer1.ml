@@ -932,7 +932,7 @@ let register (module Args : Scenarios_cli.Layer1) =
     ~proxy_files:[Uses.path Constant.yes_wallet; configuration.snapshot]
     ~__FILE__
     ~title:"L1 simulation"
-    ~tags:[Tag.cloud; "layer1"]
+    ~tags:[]
   @@ fun cloud ->
   let configuration : configuration =
     (* Some checks for mandatory options defined as optional because CLI

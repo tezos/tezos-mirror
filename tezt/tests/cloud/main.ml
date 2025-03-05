@@ -25,10 +25,9 @@ let () =
         @@ fun () -> `cloud );
       ]
   in
-  Tezt_cloud.register ~tags:[Tag.cloud] ;
   (match command with
   | `basic -> Basic.register ()
   | `dal m -> Dal.register m
   | `layer1 m -> Layer1.register m
-  | `cloud -> ()) ;
+  | `cloud -> Tezt_cloud.register ~tags:[]) ;
   Test.run ()

@@ -2877,7 +2877,7 @@ let register (module Cli : Scenarios_cli.Dal) =
       | Some fundraiser_key -> ["--fundraiser"; fundraiser_key])
     ~__FILE__
     ~title:"DAL node benchmark"
-    ~tags:[Tag.cloud; "dal"; "benchmark"]
+    ~tags:[]
     ~alerts:Alert.alerts
     (fun cloud ->
       toplog "Creating the agents" ;
