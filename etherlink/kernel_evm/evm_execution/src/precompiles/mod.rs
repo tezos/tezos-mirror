@@ -29,6 +29,7 @@ use crate::EthereumError;
 use alloc::collections::btree_map::BTreeMap;
 use blake2::blake2f_precompile;
 use ecdsa::ecrecover_precompile;
+use evm::executor::stack::PrecompileFailure;
 use evm::{Context, ExitReason, Handler, Transfer};
 use fa_bridge::fa_bridge_precompile;
 use hash::{ripemd160_precompile, sha256_precompile};
@@ -162,6 +163,21 @@ pub const WITHDRAWAL_ADDRESS: H160 = H160([
     0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
 ]);
 
+// This precompile is part of EIP-4844 which we don't support
+// on Etherlink, as they are related to blobs.
+// See: https://eips.ethereum.org/EIPS/eip-4844#point-evaluation-precompile
+fn kzg_point_evaluation<Host: Runtime>(
+    _handler: &mut EvmHandler<Host>,
+    _input: &[u8],
+    _context: &Context,
+    _is_static: bool,
+    _transfer: Option<Transfer>,
+) -> Result<PrecompileOutcome, EthereumError> {
+    Err(EthereumError::PrecompileFailed(PrecompileFailure::Fatal {
+        exit_status: evm::ExitFatal::NotSupported,
+    }))
+}
+
 pub fn evm_precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
     BTreeMap::from([
         (
@@ -199,6 +215,10 @@ pub fn evm_precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
         (
             H160::from_low_u64_be(9u64),
             blake2f_precompile as PrecompileFn<Host>,
+        ),
+        (
+            H160::from_low_u64_be(10u64),
+            kzg_point_evaluation as PrecompileFn<Host>,
         ),
     ])
 }
