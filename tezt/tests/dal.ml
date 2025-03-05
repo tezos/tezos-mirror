@@ -5091,8 +5091,8 @@ module History_rpcs = struct
   (* In the following function, no migration is performed (expect from genesis
      to alpha) when [migration_level] is equal to or smaller than 1. *)
   let scenario ?(migration_level = 1) ~slot_index ~first_cell_level
-      ~first_dal_level ~last_confirmed_published_level protocol dal_parameters
-      client node dal_node =
+      ~first_dal_level ~last_confirmed_published_level prev_protocol protocol
+      dal_parameters client node dal_node =
     let module Map_int = Map.Make (Int) in
     Log.info "slot_index = %d" slot_index ;
     let client = Client.with_dal_node client ~dal_node in
@@ -5211,10 +5211,9 @@ module History_rpcs = struct
                int
                ~error_msg:"Unexpected cell index: got %L, expected %R")) ;
         let cell_kind = JSON.(content |-> "kind" |> as_string) in
-        (* ADAL/TODO: https://gitlab.com/tezos/tezos/-/issues/7554
-
-           Remove the legacy cases below once migration from Q to R is done. See
-           issue above for more details. *)
+        (* This case is only usefull when testing migration fro Q to R. Once the
+           testing of Q->R migration is not done anymore, we can set
+           content_is_legacy to false. *)
         let content_is_legacy =
           cell_kind = "attested" || cell_kind = "unattested"
         in
@@ -5229,15 +5228,11 @@ module History_rpcs = struct
              ([>=first_level_new_proto]) or in the previous protocol, but
              [attestation_lag] before the activation of the new one. In fact,
              for the migration, we invalidate all publications in the previous
-             protocol that would be attested in the new one.
-
-             ADAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/7554
-
-             The second part of Cond 3 needs to be adapted when the migration
-             test is from protocol R to Alpha. *)
+             protocol that would be attested in the new one. *)
           cell_slot_index = slot_index
           && cell_level > starting_level
-          && (cell_level >= first_level_new_proto
+          && (prev_protocol <> Protocol.Quebec
+             || cell_level >= first_level_new_proto
              || cell_level < first_level_new_proto - lag)
         in
         let expected_kind =
@@ -5309,6 +5304,7 @@ module History_rpcs = struct
         ~first_dal_level:1
         ~last_confirmed_published_level:3
         protocol
+        protocol
         dal_parameters
         node
         client
@@ -5323,8 +5319,6 @@ module History_rpcs = struct
       scenario
       protocols
 
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7754
-     The test currently fails, so it is disabled. *)
   let test_commitments_history_rpcs_with_migration ~migrate_from ~migrate_to
       ~migration_level =
     let slot_index = 3 in
@@ -5346,12 +5340,13 @@ module History_rpcs = struct
         ~first_dal_level:1
         ~last_confirmed_published_level
         ~migration_level
+        migrate_from
         migrate_to
         dal_parameters
     in
 
     let description = "test commitments history with migration" in
-    let tags = ["rpc"; "skip_list"; Tag.memory_3k; Tag.ci_disabled] in
+    let tags = ["rpc"; "skip_list"; Tag.memory_3k] in
     test_l1_migration_scenario
       ~migrate_from
       ~migrate_to
