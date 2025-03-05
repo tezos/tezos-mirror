@@ -127,6 +127,18 @@ pub fn run_addi(icb: &mut impl ICB, imm: i64, rs1: NonZeroXRegister, rd: NonZero
     icb.xregister_write_nz(rd, result)
 }
 
+/// Saves in `rd` the bitwise AND between the value in `rs1` and `imm`
+///
+/// Relevant RISC-V opcodes:
+/// - `ANDI`
+/// - `C.ANDI`
+pub fn run_andi(icb: &mut impl ICB, imm: i64, rs1: NonZeroXRegister, rd: NonZeroXRegister) {
+    let lhs = icb.xregister_read_nz(rs1);
+    let rhs = icb.xvalue_of_imm(imm);
+    let res = icb.xvalue_bitwise_and(lhs, rhs);
+    icb.xregister_write_nz(rd, res);
+}
+
 #[cfg(test)]
 mod tests {
     use crate::backend_test;

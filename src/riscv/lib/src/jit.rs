@@ -739,19 +739,66 @@ mod tests {
         }
     });
 
+    backend_test!(test_andi, F, {
+        use Instruction as I;
+
+        use crate::machine_state::registers::NonZeroXRegister::*;
+
+        let assert_x1_and_x2_equal = |core: &MachineCoreState<M4K, F::Manager>| {
+            assert_eq!(
+                core.hart.xregisters.read_nz(x1),
+                core.hart.xregisters.read_nz(x2)
+            );
+        };
+
+        let scenarios: &[Scenario<'_, F>] = &[
+            // Bitwise and with all ones is self.
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(x1, 13872, Uncompressed),
+                    I::new_andi(x2, x1, !0, Compressed),
+                ])
+                .set_assert_hook(&assert_x1_and_x2_equal)
+                .build(),
+            // Bitwise and with itself is self.
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(x1, 49666, Uncompressed),
+                    I::new_andi(x2, x1, 49666, Compressed),
+                ])
+                .set_assert_hook(&assert_x1_and_x2_equal)
+                .build(),
+            // Bitwise and with 0 is 0.
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(x1, 0, Uncompressed),
+                    I::new_andi(x2, x1, 50230, Compressed),
+                ])
+                .set_assert_hook(&assert_x1_and_x2_equal)
+                .build(),
+        ];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
+
     backend_test!(test_jit_recovers_from_compilation_failure, F, {
         use crate::machine_state::registers::NonZeroXRegister::*;
 
         // Arrange
         let failure_scenarios: &[&[I]] = &[
             &[
-                // does not currently lowering
-                I::new_andi(x1, x1, 13, Uncompressed),
+                // does not currently support lowering.
+                I::new_xori(x1, x1, 13, Uncompressed),
             ],
             &[
                 I::new_nop(Uncompressed),
-                // does not currently lowering
-                I::new_andi(x1, x1, 13, Uncompressed),
+                // does not currently support lowering.
+                I::new_xori(x1, x1, 13, Uncompressed),
             ],
         ];
 

@@ -37,16 +37,6 @@ where
         self.write_nz(rd, result)
     }
 
-    /// Saves in `rd` the bitwise AND between the value in `rs1` and `imm`
-    ///
-    /// Relevant RISC-V opcodes:
-    /// - `ANDI`
-    /// - `C.ANDI`
-    pub fn run_andi(&mut self, imm: i64, rs1: NonZeroXRegister, rd: NonZeroXRegister) {
-        let result = self.read_nz(rs1) & (imm as u64);
-        self.write_nz(rd, result)
-    }
-
     /// Saves in `rd` the bitwise OR between the value in `rs1` and `imm`
     ///
     /// Relevant RISC-V opcodes:
@@ -410,6 +400,7 @@ mod tests {
     use crate::interpreter::integer::run_add;
     use crate::interpreter::integer::run_addi;
     use crate::interpreter::integer::run_and;
+    use crate::interpreter::integer::run_andi;
     use crate::interpreter::integer::run_or;
     use crate::machine_state::MachineCoreState;
     use crate::machine_state::MachineCoreStateLayout;
@@ -657,36 +648,36 @@ mod tests {
 
     backend_test!(test_bitwise, F, {
         proptest!(|(val in any::<u64>(), imm in any::<u64>())| {
-            let mut state = create_state!(XRegisters, F);
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
 
             // The sign-extension of an immediate on 12 bits has bits 31:11 equal the sign-bit
             let prefix_mask = 0xFFFF_FFFF_FFFF_F800;
             let negative_imm = imm | prefix_mask;
             let positive_imm = imm & !prefix_mask;
 
-            state.write(a0, val);
-            state.run_andi(negative_imm as i64, nz::a0, nz::a1);
-            prop_assert_eq!(state.read(a1), val & negative_imm);
+            state.hart.xregisters.write(a0, val);
+            run_andi(&mut state, negative_imm as i64, nz::a0, nz::a1);
+            prop_assert_eq!(state.hart.xregisters.read(a1), val & negative_imm);
 
-            state.write(a1, val);
-            state.run_andi(positive_imm as i64, nz::a1, nz::a2);
-            prop_assert_eq!(state.read(a2), val & positive_imm);
+            state.hart.xregisters.write(a1, val);
+            run_andi(&mut state, positive_imm as i64, nz::a1, nz::a2);
+            prop_assert_eq!(state.hart.xregisters.read(a2), val & positive_imm);
 
-            state.write(a0, val);
-            state.run_ori(negative_imm as i64, nz::a0, nz::a0);
-            prop_assert_eq!(state.read(a0), val | negative_imm);
+            state.hart.xregisters.write(a0, val);
+            state.hart.xregisters.run_ori(negative_imm as i64, nz::a0, nz::a0);
+            prop_assert_eq!(state.hart.xregisters.read(a0), val | negative_imm);
 
-            state.write(a0, val);
-            state.run_ori(positive_imm as i64, nz::a0, nz::a1);
-            prop_assert_eq!(state.read(a1), val | positive_imm);
+            state.hart.xregisters.write(a0, val);
+            state.hart.xregisters.run_ori(positive_imm as i64, nz::a0, nz::a1);
+            prop_assert_eq!(state.hart.xregisters.read(a1), val | positive_imm);
 
-            state.write(t2, val);
-            state.run_xori(negative_imm as i64, nz::t2, nz::t2);
-            prop_assert_eq!(state.read(t2), val ^ negative_imm);
+            state.hart.xregisters.write(t2, val);
+            state.hart.xregisters.run_xori(negative_imm as i64, nz::t2, nz::t2);
+            prop_assert_eq!(state.hart.xregisters.read(t2), val ^ negative_imm);
 
-            state.write(t2, val);
-            state.run_xori(positive_imm as i64, nz::t2, nz::t1);
-            prop_assert_eq!(state.read(t1), val ^ positive_imm);
+            state.hart.xregisters.write(t2, val);
+            state.hart.xregisters.run_xori(positive_imm as i64, nz::t2, nz::t1);
+            prop_assert_eq!(state.hart.xregisters.read(t1), val ^ positive_imm);
         })
     });
 

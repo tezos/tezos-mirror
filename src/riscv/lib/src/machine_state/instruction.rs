@@ -651,6 +651,7 @@ impl OpCode {
             Self::Li => Some(Args::run_li),
             Self::J => Some(Args::run_j),
             Self::Addi => Some(Args::run_addi),
+            Self::Andi => Some(Args::run_andi),
             _ => None,
         }
     }
@@ -1213,7 +1214,7 @@ impl Args {
     impl_i_type!(run_addiw, non_zero_rd);
     impl_i_type!(run_xori, non_zero);
     impl_i_type!(run_ori, non_zero);
-    impl_i_type!(run_andi, non_zero);
+    impl_i_type!(integer::run_andi, run_andi, non_zero);
     impl_i_type!(run_slli, non_zero);
     impl_i_type!(run_srli, non_zero);
     impl_i_type!(run_srai, non_zero);
