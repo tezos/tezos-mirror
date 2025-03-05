@@ -8,6 +8,7 @@ TimeoutSec=600s
 EnvironmentFile=-/etc/default/octez-node
 WorkingDirectory=~
 Restart=on-failure
+TimeoutStartSec=infinity
 TimeoutSec=1500
 User=tezos
 ExecStartPre=/usr/share/octez-node/octez-node-prestart.sh
