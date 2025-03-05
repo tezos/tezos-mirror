@@ -32,6 +32,7 @@ depends: [
   "octez-smart-rollup-wasm-debugger-lib"
   "tezos-dal-node-services"
   "octez-performance-metrics"
+  "octez-protocol-021-PsQuebec-libs"
 ]
 conflicts: [
   "websocket"
