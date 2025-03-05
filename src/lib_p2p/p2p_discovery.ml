@@ -48,6 +48,7 @@ module Answer = struct
     pool : pool;
     discovery_port : int;
     trust_discovered_peers : bool;
+    socket : Lwt_unix.file_descr;
   }
 
   module Name = P2p_workers.Unique_name_maker (struct
@@ -69,14 +70,13 @@ module Answer = struct
 
   type t = Worker.activated_worker
 
-  let create_socket worker =
+  let create_socket discovery_port canceler =
     let open Lwt_syntax in
-    let st = Worker.state worker in
     Lwt.catch
       (fun () ->
         let socket = Lwt_unix.socket PF_INET SOCK_DGRAM 0 in
         Lwt_unix.set_close_on_exec socket ;
-        Lwt_canceler.on_cancel (Worker.canceler worker) (fun () ->
+        Lwt_canceler.on_cancel canceler (fun () ->
             let* r = Lwt_utils_unix.safe_close socket in
             Result.iter_error
               (Format.eprintf "Uncaught error: %a\n%!" pp_print_trace)
@@ -84,7 +84,7 @@ module Answer = struct
             return_unit) ;
         Lwt_unix.setsockopt socket SO_BROADCAST true ;
         Lwt_unix.setsockopt socket SO_REUSEADDR true ;
-        let addr = Lwt_unix.ADDR_INET (Unix.inet_addr_any, st.discovery_port) in
+        let addr = Lwt_unix.ADDR_INET (Unix.inet_addr_any, discovery_port) in
         let* () = Lwt_unix.bind socket addr in
         return socket)
       (fun exn ->
@@ -94,44 +94,36 @@ module Answer = struct
   let loop worker =
     let open Lwt_result_syntax in
     let st = Worker.state worker in
-    let* socket =
-      protect ~canceler:(Worker.canceler worker) (fun () ->
-          Lwt_result.ok @@ create_socket worker)
+    let buf = Bytes.create Message.length in
+    let* rd =
+      protect (fun () ->
+          let*! content = Lwt_unix.recvfrom st.socket buf 0 Message.length [] in
+          let*! () = Events.(emit message_received) () in
+          return content)
     in
-    (* Infinite loop, should never exit. *)
-    let rec aux () =
-      let buf = Bytes.create Message.length in
-      let* rd =
-        protect ~canceler:(Worker.canceler worker) (fun () ->
-            let*! content = Lwt_unix.recvfrom socket buf 0 Message.length [] in
-            let*! () = Events.(emit message_received) () in
-            return content)
-      in
-      match rd with
-      | len, Lwt_unix.ADDR_INET (remote_addr, _)
-        when Compare.Int.equal len Message.length -> (
-          match Data_encoding.Binary.of_bytes_opt Message.encoding buf with
-          | Some (key, remote_peer_id, remote_port)
-            when Compare.String.equal key Message.key
-                 && not (P2p_peer.Id.equal remote_peer_id st.my_peer_id) -> (
-              let s_addr = Unix.string_of_inet_addr remote_addr in
-              match P2p_addr.of_string_opt s_addr with
-              | None ->
-                  let*! () = Events.(emit parse_error) s_addr in
-                  aux ()
-              | Some addr ->
-                  let (Pool pool) = st.pool in
-                  let*! () = Events.(emit register_new) (addr, remote_port) in
-                  P2p_pool.register_new_point
-                    ~trusted:st.trust_discovered_peers
-                    pool
-                    (addr, remote_port)
-                  |> ignore ;
-                  aux ())
-          | _ -> aux ())
-      | _ -> aux ()
-    in
-    aux ()
+    match rd with
+    | len, Lwt_unix.ADDR_INET (remote_addr, _)
+      when Compare.Int.equal len Message.length -> (
+        match Data_encoding.Binary.of_bytes_opt Message.encoding buf with
+        | Some (key, remote_peer_id, remote_port)
+          when Compare.String.equal key Message.key
+               && not (P2p_peer.Id.equal remote_peer_id st.my_peer_id) -> (
+            let s_addr = Unix.string_of_inet_addr remote_addr in
+            match P2p_addr.of_string_opt s_addr with
+            | None ->
+                let*! () = Events.(emit parse_error) s_addr in
+                return_unit
+            | Some addr ->
+                let (Pool pool) = st.pool in
+                let*! () = Events.(emit register_new) (addr, remote_port) in
+                P2p_pool.register_new_point
+                  ~trusted:st.trust_discovered_peers
+                  pool
+                  (addr, remote_port)
+                |> ignore ;
+                return_unit)
+        | _ -> return_unit)
+    | _ -> return_unit
 
   module Handlers = struct
     type self = Worker.callback Worker.t
@@ -143,8 +135,14 @@ module Answer = struct
         Name.t ->
         Types.parameters ->
         (Types.state, launch_error) result Lwt.t =
-     fun _self _name {my_peer_id; discovery_port; trust_discovered_peers; pool} ->
-      Lwt.return_ok {my_peer_id; discovery_port; trust_discovered_peers; pool}
+     fun self _name {my_peer_id; discovery_port; trust_discovered_peers; pool} ->
+      let open Lwt_result_syntax in
+      let* socket =
+        protect (fun () ->
+            Lwt_result.ok @@ create_socket discovery_port (Worker.canceler self))
+      in
+      Lwt.return_ok
+        {my_peer_id; discovery_port; trust_discovered_peers; pool; socket}
 
     let on_request :
         type response error.
@@ -172,16 +170,7 @@ module Answer = struct
           let*! () = Events.(emit unexpected_error) ("answer", err) in
           return `Shutdown
 
-    (* Considering the request loop should never exit, any completion that is
-       not an error should be considered as an unexpected exit.
-
-       Note that this will be removed by the next commit as [loop] will no
-       longer be an infinite loop, to let the worker handle it. *)
-    let on_completion self _request _result _status =
-      let open Lwt_syntax in
-      let* () = Events.(emit unexpected_exit) () in
-      Worker.trigger_shutdown self ;
-      return_unit
+    let on_completion _self _request _result _status = Lwt.return_unit
   end
 
   let create my_peer_id pool ~trust_discovered_peers ~discovery_port =
