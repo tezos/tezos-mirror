@@ -166,13 +166,6 @@ let id t = t.id
 let raw_socket () =
   let open Lwt_syntax in
   let sock = Lwt_unix.socket ~cloexec:true PF_INET6 SOCK_STREAM 0 in
-  (* By setting [SO_KEEPALIVE] to [true], the socket is configured to send
-     periodic keep-alive probes to verify that the connection is still
-     active.
-
-     It reset (send TCP RST message and close) if the peer is
-     unresponsive. *)
-  Lwt_unix.(setsockopt sock SO_KEEPALIVE true) ;
   (* By setting [TCP_USER_TIMEOUT], we ensure that a dead connection is reported
      after at most [ms] milliseconds. This option allows the connection timeout
      to be much shorter than the default behavior—which can last several minutes
@@ -193,16 +186,58 @@ let raw_socket () =
       | Some value -> Some (int_of_string value)
     with _ -> Some default
   in
-  match ms_opt with
-  | None -> (* The user opt-out from the socket option *) Lwt.return sock
-  | Some ms -> (
-      match Socket.set_tcp_user_timeout (Lwt_unix.unix_file_descr sock) ~ms with
+  let* sock =
+    match ms_opt with
+    | None -> (* The user opt-out from the socket option *) Lwt.return sock
+    | Some ms -> (
+        match
+          Socket.set_tcp_user_timeout (Lwt_unix.unix_file_descr sock) ~ms
+        with
+        | Ok () | Error `Unsupported -> Lwt.return sock
+        | Error (`Unix_error exn) ->
+            (* Socket option [TCP_USER_TIMEOUT] is not mandatory, this is why we only emit an
+               event at [Info] level. *)
+            let* () =
+              Events.(emit set_socket_option_tcp_user_timeout_failed)
+                [Error_monad.error_of_exn exn]
+            in
+            Lwt.return sock)
+  in
+  (* By setting [TCP_KEEPALIVE], we ensure that the connection stays alive
+     for NAT or firewalls between the node and the other peer. If no TCP
+     packet is sent after [ms] milliseconds, an empty TCP message will be
+     sent. If not acknowledged before intv, some retries will be made (number
+     depending on OS, default 9 for linux) after [intv] seconds. The connection
+     will be dropped if no ACK is received. *)
+  let keepalive_opts =
+    let default =
+      (* after 10s of inactivity, and every 5s if no ACK *)
+      (10000, 5000)
+    in
+    match Sys.getenv_opt "OCTEZ_P2P_TCP_KEEPALIVE" with
+    | Some "0" -> None
+    | None ->
+        (* Sends a keepalive starting at 10 seconds of inactivity and every 5
+           seconds interval *)
+        Some default
+    | Some value -> (
+        match String.split ',' value with
+        | [ms] -> Some (int_of_string ms, snd default)
+        | [ms; intv] -> Some (int_of_string ms, int_of_string intv)
+        | _ -> None)
+  in
+  match keepalive_opts with
+  | None -> Lwt.return sock
+  | Some (ms, intv) -> (
+      match
+        Socket.set_tcp_keepalive (Lwt_unix.unix_file_descr sock) ~ms ~intv
+      with
       | Ok () | Error `Unsupported -> Lwt.return sock
       | Error (`Unix_error exn) ->
-          (* Socket option [TCP_USER_TIMEOUT] is not mandatory, this is why we only emit an
-             event at [Info] level. *)
+          (* Socket option [TCP_KEEPALIVE] is not mandatory, this is why we
+             only emit an event at [Info] level. *)
           let* () =
-            Events.(emit set_socket_option_tcp_user_timeout_failed)
+            Events.(emit set_socket_option_tcp_keepalive_failed)
               [Error_monad.error_of_exn exn]
           in
           Lwt.return sock)
