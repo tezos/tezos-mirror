@@ -8,6 +8,33 @@
 module Agent = Agent
 module Types = Types
 
+module Chronos : sig
+  (** A scheduler task. *)
+  type task
+
+  (** [task ~name ~tm ~action] return a new task named [name] performing
+    [action] according to the time [tm].
+
+    The [tm] time format follows the standard cron syntax with five
+    space-separated fields: minute, hour, day of month, month, and day
+    of week. Each field can be either a specific number within its
+    valid range (minute: 0-59, hour: 0-23, day: 1-31, month: 1-12, day
+    of week: 0-6 where 0 is Sunday) or an asterisk '*' to indicate
+    "any value".
+
+    Relies on UTC (Coordinated Universal Time), also known as GMT for
+    time. Remember Paris is (UTC+1).
+
+    For example, "30 2 * * 1" means "2:30 AM every Monday (GMT)".
+
+    Currently, the implementation only supports single values or
+    asterisks - ranges, lists and step values are not yet supported.
+
+    @raise Failure if the time specification is invalid.
+    @raise Failure if the time string format is invalid. *)
+  val task : name:string -> tm:string -> action:(unit -> unit Lwt.t) -> task
+end
+
 module Alert : sig
   (* A receiver of an alert. *)
   type receiver
@@ -87,7 +114,10 @@ module Cloud : sig
       proxy mode. This can be used for example when an argument is
       provided via an environment variable instead of a command-line
       argument.
- *)
+
+      [tasks] represent Chronos tasks that will be registered in a
+      Chronos.t process. If [tasks] is empty, no Chronos process will
+      be started. *)
   val register :
     ?proxy_files:string list ->
     ?proxy_args:string list ->
@@ -97,6 +127,7 @@ module Cloud : sig
     tags:string list ->
     ?seed:Test.seed ->
     ?alerts:Alert.t list ->
+    ?tasks:Chronos.task list ->
     (t -> unit Lwt.t) ->
     unit
 
