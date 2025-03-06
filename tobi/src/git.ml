@@ -92,3 +92,33 @@ let with_checkout_into_tmp ~git_reference ~path ?other_paths f =
     checkout_into_tmp ~git_reference ~path ?other_paths ()
   in
   Fun.protect ~finally:checkout_result.cleanup @@ fun () -> f checkout_result
+
+let is_a_commit_hash str =
+  String.length str = 40
+  && String.for_all
+       (function 'a' .. 'f' | '0' .. '9' -> true | _ -> false)
+       str
+
+let rev_parse =
+  (* Memoization makes it easy to query Git only once per reference.
+     It also makes sure that the meaning of references stays consistent.
+     For instance, even if someone commits to a branch, [Git.rev_parse] will
+     always return the same commit hash for this branch.
+     Although this is a bit limited because if one asks, say, [HEAD] and then [HEAD^],
+     there is no guarantee that the result of [Git.rev_parse] for [HEAD^]
+     is actually the parent of the result of [Git.rev_parse] for [HEAD].
+     Just don't call Git while Tobi is running and you'll be fine. *)
+  memoize @@ fun git_reference ->
+  let* lines = Run.command_lines "git" ["rev-parse"; git_reference] in
+  match List.filter (fun line -> String.trim line <> "") lines with
+  | [] -> fail "'git rev-parse %s' returned nothing" git_reference
+  | _ :: _ :: _ ->
+      fail "'git rev-parse %s' returned more than one value" git_reference
+  | [line] ->
+      if not (is_a_commit_hash line) then
+        fail
+          "'git rev-parse %s' returned something that does not look like a \
+           commit hash: %S"
+          git_reference
+          line
+      else Ok line

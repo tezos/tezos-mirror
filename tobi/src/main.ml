@@ -50,6 +50,12 @@ module CLI = struct
       ~description:"Be more talkative."
       false
 
+  let dry_run =
+    Clap.flag
+      ~set_long:"dry-run"
+      ~description:"Do not write any file; only print what would be done."
+      false
+
   (* Subcommands. *)
   module Command = struct
     let list =
@@ -80,7 +86,17 @@ module CLI = struct
              HEAD."
           ()
       in
-      `install components
+      let jobs =
+        (* TODO: default value should be the number of CPU cores *)
+        Clap.default_int
+          ~long:"jobs"
+          ~short:'j'
+          ~description:
+            "Maximum number of processes to spawn when stuff can be done in \
+             parallel."
+          20
+      in
+      `install (components, `jobs jobs)
   end
 
   let command = Clap.subcommand Command.[list; install]
@@ -98,7 +114,8 @@ let main () =
   (* Dispatch commands. *)
   match CLI.command with
   | `list version -> Cmd_list.run ~verbose:CLI.verbose version
-  | `install components -> Cmd_install.run ~verbose:CLI.verbose components
+  | `install (components, `jobs jobs) ->
+      Cmd_install.run ~verbose:CLI.verbose ~dry_run:CLI.dry_run ~jobs components
 
 (* Entrypoint: call [main] and handle errors. *)
 let () =

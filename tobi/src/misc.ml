@@ -34,6 +34,29 @@ let str_split_once str char =
       let right = String.sub str (pos + 1) (String.length str - pos - 1) in
       Some (left, right)
 
+(* Copied from Tezt. *)
+let quote_shell s =
+  let contains_single_quote = ref false in
+  let needs_quotes = ref false in
+  let categorize = function
+    | '\'' ->
+        needs_quotes := true ;
+        contains_single_quote := true
+    | 'a' .. 'z'
+    | 'A' .. 'Z'
+    | '0' .. '9'
+    | '-' | '_' | '.' | '+' | '/' | ':' | '@' | '%' ->
+        ()
+    | _ -> needs_quotes := true
+  in
+  String.iter categorize s ;
+  if not !needs_quotes then s
+  else if not !contains_single_quote then "'" ^ s ^ "'"
+  else Filename.quote s
+
+let quote_command command arguments =
+  String.concat " " (List.map quote_shell (command :: arguments))
+
 let close fd = try Unix.close fd with Unix.Unix_error _ -> ()
 
 type 'a error = {code : 'a; message : string list}

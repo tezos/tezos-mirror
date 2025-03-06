@@ -9,4 +9,8 @@ open Misc
 
 (** Run the [install] CLI command. *)
 val run :
-  verbose:bool -> (string * Version.t) list -> (unit, [> `failed] error) result
+  verbose:bool ->
+  dry_run:bool ->
+  jobs:int ->
+  (string * Version.t) list ->
+  (unit, [> `failed] error) result
