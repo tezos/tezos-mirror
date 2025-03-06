@@ -25,6 +25,7 @@ use serde::ser::SerializeTuple;
 
 use super::EnrichedValue;
 use super::EnrichedValueLinked;
+use super::FnManager;
 use super::ManagerBase;
 use super::ManagerRead;
 use super::ManagerReadWrite;
@@ -403,6 +404,25 @@ impl DynAccess {
     /// has been accessed.
     pub fn includes_range(&self, r: std::ops::Range<usize>) -> bool {
         self.0.range(r).next().is_some()
+    }
+}
+
+/// Natural transformation from a manager `M` to a proof-generating manager `ProofGen<M>`
+pub enum ProofWrapper {}
+
+impl<M: ManagerBase> FnManager<M> for ProofWrapper {
+    type Output = ProofGen<M>;
+
+    fn map_region<E: 'static, const LEN: usize>(
+        input: <M as ManagerBase>::Region<E, LEN>,
+    ) -> <ProofGen<M> as ManagerBase>::Region<E, LEN> {
+        ProofRegion::bind(input)
+    }
+
+    fn map_dyn_region<const LEN: usize>(
+        input: <M as ManagerBase>::DynRegion<LEN>,
+    ) -> <ProofGen<M> as ManagerBase>::DynRegion<LEN> {
+        ProofDynRegion::bind(input)
     }
 }
 

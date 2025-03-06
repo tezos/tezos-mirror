@@ -26,9 +26,8 @@ use crate::state_backend::ProofLayout;
 use crate::state_backend::ProofTree;
 use crate::state_backend::Ref;
 use crate::state_backend::owned_backend::Owned;
-use crate::state_backend::proof_backend::ProofDynRegion;
 use crate::state_backend::proof_backend::ProofGen;
-use crate::state_backend::proof_backend::ProofRegion;
+use crate::state_backend::proof_backend::ProofWrapper;
 use crate::state_backend::proof_backend::proof::MerkleProof;
 use crate::state_backend::verify_backend::Verifier;
 use crate::storage;
@@ -84,24 +83,6 @@ impl<M: state_backend::ManagerBase> State<M> {
     where
         M: state_backend::ManagerRead,
     {
-        enum ProofWrapper {}
-
-        impl<M: state_backend::ManagerBase> state_backend::FnManager<M> for ProofWrapper {
-            type Output = ProofGen<M>;
-
-            fn map_region<E: 'static, const LEN: usize>(
-                input: <M as state_backend::ManagerBase>::Region<E, LEN>,
-            ) -> <ProofGen<M> as state_backend::ManagerBase>::Region<E, LEN> {
-                ProofRegion::bind(input)
-            }
-
-            fn map_dyn_region<const LEN: usize>(
-                input: <M as state_backend::ManagerBase>::DynRegion<LEN>,
-            ) -> <ProofGen<M> as state_backend::ManagerBase>::DynRegion<LEN> {
-                ProofDynRegion::bind(input)
-            }
-        }
-
         State::bind(self.struct_ref::<ProofWrapper>())
     }
 }

@@ -20,9 +20,8 @@ use crate::pvm::sbi;
 use crate::state_backend;
 use crate::state_backend::Atom;
 use crate::state_backend::Cell;
-use crate::state_backend::proof_backend::ProofDynRegion;
 use crate::state_backend::proof_backend::ProofGen;
-use crate::state_backend::proof_backend::ProofRegion;
+use crate::state_backend::proof_backend::ProofWrapper;
 use crate::traps::EnvironException;
 
 /// PVM configuration
@@ -189,24 +188,6 @@ impl<
     where
         M: state_backend::ManagerRead,
     {
-        enum ProofWrapper {}
-
-        impl<M: state_backend::ManagerBase> state_backend::FnManager<M> for ProofWrapper {
-            type Output = ProofGen<M>;
-
-            fn map_region<E: 'static, const LEN: usize>(
-                input: <M as state_backend::ManagerBase>::Region<E, LEN>,
-            ) -> <ProofGen<M> as state_backend::ManagerBase>::Region<E, LEN> {
-                ProofRegion::bind(input)
-            }
-
-            fn map_dyn_region<const LEN: usize>(
-                input: <M as state_backend::ManagerBase>::DynRegion<LEN>,
-            ) -> <ProofGen<M> as state_backend::ManagerBase>::DynRegion<LEN> {
-                ProofDynRegion::bind(input)
-            }
-        }
-
         let space = self.struct_ref::<ProofWrapper>();
         Pvm::bind(space, bcall::InterpretedBlockBuilder)
     }
