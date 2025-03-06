@@ -86,7 +86,7 @@ let accept st =
   Lwt_mutex.unlock accept_lock ;
   return res
 
-module Name = P2p_workers.UniqueNameMaker (struct
+module Name = P2p_workers.Unique_name_maker (struct
   let base = ["p2p"; "welcome"]
 end)
 
@@ -99,7 +99,7 @@ module Types = struct
   }
 end
 
-module Worker = P2p_workers.Make (Name) (Types)
+module Worker = P2p_workers.Make (Name) (P2p_workers.Loop_request) (Types)
 
 type t = Worker.activated_worker
 
