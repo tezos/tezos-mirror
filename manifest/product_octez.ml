@@ -2498,6 +2498,7 @@ let octez_p2p =
         octez_stdlib |> open_;
         octez_p2p_services |> open_;
         octez_version;
+        octez_workers;
         prometheus;
         octez_base_p2p_identity_file |> open_;
       ]
