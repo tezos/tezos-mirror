@@ -1,0 +1,5 @@
+# UniFFI generated files
+uniffi_bindings/tezos.swift
+uniffi_bindings/tezosFFI.h
+uniffi_bindings/tezosFFI.modulemap
+resources/libtezos.so

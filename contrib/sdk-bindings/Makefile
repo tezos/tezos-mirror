@@ -15,6 +15,7 @@ clean:
 	@make -C rust/ clean
 	@make -C python/ clean
 	@make -C kotlin/demo clean
+	@make -C swift clean
 
 .PHONY: test
 test: test-rust test-bindings

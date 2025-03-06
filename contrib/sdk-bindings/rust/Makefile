@@ -22,8 +22,13 @@ generate-kotlin: build
 	@cargo run --features uniffi/cli --bin uniffi-bindgen -- generate --language kotlin --out-dir ../kotlin/demo/app/src/main/kotlin --library target/release/libtezos.so
 	@cp target/release/libtezos.so ../kotlin/demo/app/src/main/resources/libtezos.so
 
+.PHONY: generate-swift
+generate-swift: build
+	@cargo run --features uniffi/cli --bin uniffi-bindgen -- generate --language swift --out-dir ../swift/uniffi_bindings --library target/release/libtezos.a
+	@cp target/release/libtezos.so ../swift/resources/libtezos.so
+
 .PHONY: generate-bindings
-generate-bindings: generate-python generate-kotlin
+generate-bindings: generate-python generate-kotlin generate-swift
 
 .PHONY: clean
 clean:
