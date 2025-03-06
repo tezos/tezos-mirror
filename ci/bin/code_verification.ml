@@ -152,6 +152,7 @@ module Opam = struct
            Therefore, a retry was added. This should be removed once the
            underlying tests have been fixed. *)
       ~retry:{max = 2; when_ = []}
+      ~timeout:(Minutes 90)
       ~rules:
         (opam_rules
            pipeline_type

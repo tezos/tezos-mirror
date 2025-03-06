@@ -1697,7 +1697,7 @@ opam:all_6:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -1778,7 +1778,7 @@ opam:exec_6:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -1850,7 +1850,7 @@ opam:all_2:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -1935,7 +1935,7 @@ opam:all_1:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -2009,7 +2009,7 @@ opam:all_3:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -2092,7 +2092,7 @@ opam:exec_4:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -2163,7 +2163,7 @@ opam:all_4:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -2245,7 +2245,7 @@ opam:exec_1:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -2326,7 +2326,7 @@ opam:all_5:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -2411,7 +2411,7 @@ opam:all_7:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
   - key: opam-sccache
     paths:
