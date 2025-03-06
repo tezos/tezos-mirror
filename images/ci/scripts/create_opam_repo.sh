@@ -88,8 +88,36 @@ OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
 # Clean up: remove packages that we do not actually want to install.
 rm -rf packages/"$dummy_pkg" packages/octez-deps
 
+# Retry mechanism for [opam admin add-hashes]
+# The [opam admin add-hashes] command often hangs when fetching hashes from erratique.ch.
+# To mitigate this, we implement a retry mechanism with exponential backoff.
+# This approach retries the command up to 3 times with increasing delays between attempts.
+# If the command fails, it waits for a specified delay before retrying.
+# The delay increases exponentially to reduce the load on the server and give it time to recover.
+MAX_RETRIES=3
+# Initial delay, in seconds.
+# Actual delays are 10, 30 and 90 seconds.
+RETRY_DELAY=10
+
 echo "Add safer hashes."
 opam admin list --short | while read -r line; do
-  opam admin add-hashes sha256 sha512 -p "$line"
+  for i in $(seq 1 $MAX_RETRIES); do
+    if opam admin add-hashes sha256 sha512 -p "$line"; then
+      echo "Hashes added successfully."
+      break
+    else
+      echo "Failed to add hashes. Attempt $i of $MAX_RETRIES ❌"
+      if [ $i -lt $MAX_RETRIES ]; then
+        echo "Retrying in $RETRY_DELAY seconds..."
+        sleep $RETRY_DELAY
+        # Use exponential backoff
+        RETRY_DELAY=$((RETRY_DELAY * 3))
+      else
+        echo "All attempts to add hashes failed. 🚨"
+        exit 1
+      fi
+    fi
+  done
 done
+
 cd ..
