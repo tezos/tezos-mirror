@@ -6569,6 +6569,7 @@ let test_reset =
       ~mode:(Evm_node.mode sequencer)
       ~data_dir:(Evm_node.data_dir sequencer)
       ~rpc_port:(Evm_node.rpc_port sequencer)
+      ?spawn_rpc:(Evm_node.spawn_rpc sequencer)
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Evm_node.run sequencer in
