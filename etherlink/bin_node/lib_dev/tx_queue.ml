@@ -340,6 +340,7 @@ type state = {
   address_nonce : Address_nonce.t;
   config : Configuration.tx_queue;
   keep_alive : bool;
+  mutable locked : bool;
 }
 
 module Types = struct
@@ -375,6 +376,9 @@ module Request = struct
         -> (Ethereum_types.quantity, tztrace) t
     | Tick : {evm_node_endpoint : Uri.t} -> (unit, tztrace) t
     | Clear : (unit, tztrace) t
+    | Lock_transactions : (unit, tztrace) t
+    | Unlock_transactions : (unit, tztrace) t
+    | Is_locked : (bool, tztrace) t
 
   type view = View : _ t -> view
 
@@ -440,6 +444,24 @@ module Request = struct
                 Some ((), next_nonce, address)
             | _ -> None)
           (fun _ -> assert false);
+        case
+          Json_only
+          ~title:"Lock_transactions"
+          (obj1 (req "request" (constant "lock_transactions")))
+          (function View Lock_transactions -> Some () | _ -> None)
+          (fun _ -> assert false);
+        case
+          Json_only
+          ~title:"Unlock_transactions"
+          (obj1 (req "request" (constant "unlock_transactions")))
+          (function View Unlock_transactions -> Some () | _ -> None)
+          (fun _ -> assert false);
+        case
+          Json_only
+          ~title:"Is_locked"
+          (obj1 (req "request" (constant "is_locked")))
+          (function View Is_locked -> Some () | _ -> None)
+          (fun _ -> assert false);
       ]
 
   let pp fmt (View r) =
@@ -453,6 +475,9 @@ module Request = struct
     | Clear -> fprintf fmt "Clear"
     | Nonce {next_nonce = _; address = Address (Hex address)} ->
         fprintf fmt "Nonce %s" address
+    | Lock_transactions -> Format.fprintf fmt "Locking the transactions"
+    | Unlock_transactions -> Format.fprintf fmt "Unlocking the transactions"
+    | Is_locked -> Format.fprintf fmt "Checking if the tx queue is locked"
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -537,6 +562,7 @@ let clear
        address_nonce;
        config = _;
        keep_alive = _;
+       locked = _;
      } :
       state) =
   (* full matching so when a new element is added to the state it's not
@@ -547,6 +573,12 @@ let clear
   String.Hashtbl.clear address_nonce ;
   Queue.clear queue ;
   ()
+
+let lock_transactions state = state.locked <- true
+
+let unlock_transactions state = state.locked <- false
+
+let is_locked state = state.locked
 
 module Handlers = struct
   open Request
@@ -708,6 +740,9 @@ module Handlers = struct
           Address_nonce.next_gap state.address_nonce ~addr ~next_nonce
         in
         return @@ Ethereum_types.Qty next_gap
+    | Lock_transactions -> return (lock_transactions state)
+    | Unlock_transactions -> return (unlock_transactions state)
+    | Is_locked -> return (is_locked state)
 
   type launch_error = tztrace
 
@@ -729,6 +764,7 @@ module Handlers = struct
            be revisited if needs be. *)
         config;
         keep_alive;
+        locked = false;
       }
 
   let on_error (type a b) _self _status_request (_r : (a, b) Request.t)
@@ -846,6 +882,17 @@ let shutdown () =
   let*! () = Tx_queue_events.shutdown () in
   let*! () = Worker.shutdown w in
   return_unit
+
+let lock_transactions () =
+  bind_worker @@ fun w -> push_request w Lock_transactions
+
+let unlock_transactions () =
+  bind_worker @@ fun w -> push_request w Unlock_transactions
+
+let is_locked () =
+  let open Lwt_result_syntax in
+  let*? worker = Lazy.force worker in
+  Worker.Queue.push_request_and_wait worker Is_locked |> handle_request_error
 
 module Internal_for_tests = struct
   module Nonce_bitset = Nonce_bitset

@@ -30,7 +30,7 @@ you start using them, you probably want to use `octez-evm-node check config
   This limits is for pending transactions the node has seen.
   configurable with `tx_per_addr_limit`. (!16903)
 - An sequencer EVM node can uses the tx_queue to speed the inclusion
-  of transaction. (!17134)
+  of transaction. (!17134 !17100)
 
 ## Version 0.19 (2025-03-10)
 
