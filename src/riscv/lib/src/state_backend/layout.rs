@@ -87,59 +87,67 @@ impl<const LEN: usize> Layout for DynArray<LEN> {
 /// ```
 #[macro_export]
 macro_rules! struct_layout {
-    ($vis:vis struct $layout_t:ident {
-        $($field_vis:vis $field_name:ident: $cell_repr:ty),+
-        $( , )?
-    }) => {
+    (
+        $vis:vis struct $layout_t:ident $(< $($param:ident),+ >)? {
+            $($field_vis:vis $field_name:ident: $cell_repr:ty),+
+            $(,)?
+        }
+    ) => {
         paste::paste! {
             #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq, Eq)]
             $vis struct [<$layout_t F>]<
                 $(
-                    [<$field_name:upper>]
+                    [<$field_name:camel>]
                 ),+
             > {
                 $(
-                    $field_vis $field_name: [<$field_name:upper>]
+                    $field_vis $field_name: [<$field_name:camel>]
                 ),+
             }
 
-            $vis type $layout_t = [<$layout_t F>]<
+            $vis type $layout_t $(< $($param),+ >)? = [<$layout_t F>]<
                 $(
                     $cell_repr
                 ),+
             >;
 
-            impl $crate::state_backend::Layout for $layout_t {
+            impl <
+                $(
+                    [<$field_name:camel>]: $crate::state_backend::Layout
+                ),+
+            > $crate::state_backend::Layout for [<$layout_t F>]<
+                $(
+                    [<$field_name:camel>]
+                ),+
+            > {
                 type Allocated<M: $crate::state_backend::ManagerBase> = [<$layout_t F>]<
                     $(
-                        AllocatedOf<$cell_repr, M>
+                        <[<$field_name:camel>] as $crate::state_backend::Layout>::Allocated<M>
                     ),+
                 >;
 
+                #[inline]
                 fn allocate<M: $crate::state_backend::ManagerAlloc>(
                     backend: &mut M,
                 ) -> Self::Allocated<M> {
                     Self::Allocated {
-                        $($field_name: <$cell_repr as $crate::state_backend::Layout>::allocate(
+                        $($field_name: <[<$field_name:camel>] as $crate::state_backend::Layout>::allocate(
                             backend
                         )),+
                     }
                 }
             }
 
-            use $crate::state_backend::proof_backend::merkle::{
-                AccessInfoAggregatable, MerkleTree,
-            };
-
             impl <
                 $(
-                    [<$field_name:upper>]: AccessInfoAggregatable + serde::Serialize
+                    [<$field_name:camel>]: $crate::state_backend::proof_backend::merkle::AccessInfoAggregatable + serde::Serialize
                 ),+
-            > AccessInfoAggregatable for [<$layout_t F>]<
+            > $crate::state_backend::proof_backend::merkle::AccessInfoAggregatable for [<$layout_t F>]<
                 $(
-                    [<$field_name:upper>]
+                    [<$field_name:camel>]
                 ),+
             > {
+                #[inline]
                 fn aggregate_access_info(&self) -> bool {
                     let children = [
                         $(
@@ -150,73 +158,59 @@ macro_rules! struct_layout {
                 }
             }
 
-            impl $crate::state_backend::CommitmentLayout for $layout_t {
-                fn state_hash<M: $crate::state_backend::ManagerRead + $crate::state_backend::ManagerSerialise>(state: AllocatedOf<Self, M>
+            impl <
+                $(
+                    [<$field_name:camel>]: $crate::state_backend::CommitmentLayout
+                ),+
+            > $crate::state_backend::CommitmentLayout for [<$layout_t F>]<
+                $(
+                    [<$field_name:camel>]
+                ),+
+            > {
+                #[inline]
+                fn state_hash<M: $crate::state_backend::ManagerRead + $crate::state_backend::ManagerSerialise>(
+                    state: AllocatedOf<Self, M>
                 ) -> Result<$crate::storage::Hash, $crate::storage::HashError> {
-                    $crate::storage::Hash::blake2b_hash(state)
+                    $crate::storage::Hash::combine(&[
+                        $(
+                            [<$field_name:camel>]::state_hash(state.$field_name)?
+                        ),+
+                    ])
                 }
             }
 
-            impl $crate::state_backend::ProofLayout for $layout_t {
+            impl <
+                $(
+                    [<$field_name:camel>]: $crate::state_backend::ProofLayout
+                ),+
+            > $crate::state_backend::ProofLayout for [<$layout_t F>]<
+                $(
+                    [<$field_name:camel>]
+                ),+
+            > {
+                #[inline]
                 fn to_merkle_tree(
                     state: $crate::state_backend::RefProofGenOwnedAlloc<Self>,
                 ) -> Result<$crate::state_backend::proof_backend::merkle::MerkleTree, $crate::storage::HashError> {
-                    let serialised = $crate::storage::binary::serialise(&state)?;
-                    MerkleTree::make_merkle_leaf(serialised, state.aggregate_access_info())
+                    $crate::state_backend::proof_backend::merkle::MerkleTree::make_merkle_node(
+                        vec![
+                            $(
+                                [<$field_name:camel>]::to_merkle_tree(state.$field_name)?
+                            ),+
+                        ]
+                    )
                 }
 
+                #[inline]
                 fn from_proof(
                     proof: $crate::state_backend::ProofTree,
                 ) -> Result<Self::Allocated<$crate::state_backend::verify_backend::Verifier>, $crate::state_backend::FromProofError> {
-                    if let $crate::state_backend::ProofTree::Present(proof) = proof {
-                        match proof {
-                            $crate::state_backend::proof_backend::tree::Tree::Leaf(_) => {
-                                Err($crate::state_backend::FromProofError::UnexpectedLeaf)
-                            }
-
-                            $crate::state_backend::proof_backend::tree::Tree::Node(branches) => {
-                                let mut branches = branches.iter();
-
-                                let expected_branches = 0 $(
-                                    + { let $field_name = 1; $field_name }
-                                )+;
-                                let successful_branches = 0;
-
-                                $(
-                                    let $field_name = branches.next().ok_or($crate::state_backend::FromProofError::BadNumberOfBranches {
-                                        got: successful_branches,
-                                        expected: expected_branches,
-                                    })?;
-                                    let $field_name = <$cell_repr as $crate::state_backend::ProofLayout>::from_proof($crate::state_backend::ProofTree::Present($field_name))?;
-                                    let successful_branches = successful_branches + 1;
-                                )+
-
-                                if branches.last().is_some() {
-                                    // There were more branches, this is bad.
-                                    return Err($crate::state_backend::FromProofError::BadNumberOfBranches {
-                                        got: successful_branches + 1,
-                                        expected: expected_branches,
-                                    });
-                                }
-
-                                Ok(
-                                    Self::Allocated {
-                                        $(
-                                            $field_name
-                                        ),+
-                                    }
-                                )
-                            }
-                        }
-                    } else {
-                        Ok(
-                            Self::Allocated {
-                                $(
-                                    $field_name: <$cell_repr as $crate::state_backend::ProofLayout>::from_proof($crate::state_backend::ProofTree::Absent)?
-                                ),+
-                            }
-                        )
-                    }
+                    let [ $($field_name),+ ] = *proof.into_branches()?;
+                    Ok(Self::Allocated {
+                        $(
+                            $field_name: [<$field_name:camel>]::from_proof($field_name)?
+                        ),+
+                    })
                 }
             }
         }
