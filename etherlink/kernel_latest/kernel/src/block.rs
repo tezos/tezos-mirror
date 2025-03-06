@@ -466,14 +466,13 @@ fn promote_block<Host: Runtime>(
     safe_host: &mut SafeStorage<&mut Host>,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress_provenance: &BlockInProgressProvenance,
-    block: EthBlock,
+    block_header: BlockHeader<ChainHeader>,
     config: &mut Configuration,
     delayed_txs: Vec<TransactionHash>,
 ) -> anyhow::Result<()> {
     if let BlockInProgressProvenance::Storage = block_in_progress_provenance {
         storage::delete_block_in_progress(safe_host)?;
     }
-    let block_header = BlockHeader::from(block);
     safe_host.promote()?;
     safe_host.promote_trace()?;
     drop_blueprint(safe_host.host, block_header.blueprint_header.number)?;
@@ -613,11 +612,12 @@ pub fn produce<Host: Runtime>(
             included_delayed_transactions,
             block,
         }) => {
+            let block_header: BlockHeader<ChainHeader> = (*block).into();
             promote_block(
                 &mut safe_host,
                 &outbox_queue,
                 &block_in_progress_provenance,
-                *block,
+                block_header,
                 config,
                 included_delayed_transactions,
             )?;
