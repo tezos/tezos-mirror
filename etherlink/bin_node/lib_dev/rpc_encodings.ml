@@ -1077,27 +1077,31 @@ let unsupported_methods : string list =
     "engine_newPayloadV4";
   ]
 
-let map_method_name ~restrict method_name =
-  let disabled =
-    match restrict with
-    | Configuration.Pattern {regex; _} -> Re.execp regex method_name
-    | Whitelist l -> not (List.mem ~equal:String.equal method_name l)
-    | Blacklist l -> List.mem ~equal:String.equal method_name l
-    | Unrestricted -> false
-  in
+let map_method_name ~rpc_server_family ~restrict method_name =
+  match rpc_server_family with
+  | Rpc_types.Multichain_sequencer_rpc_server
+  | Rpc_types.Single_chain_node_rpc_server Ethereum_types.EVM
+  | Rpc_types.Single_chain_node_rpc_server Ethereum_types.Michelson -> (
+      let disabled =
+        match restrict with
+        | Configuration.Pattern {regex; _} -> Re.execp regex method_name
+        | Whitelist l -> not (List.mem ~equal:String.equal method_name l)
+        | Blacklist l -> List.mem ~equal:String.equal method_name l
+        | Unrestricted -> false
+      in
 
-  if disabled then Disabled
-  else
-    match
-      List.find
-        (fun (module M : METHOD) -> M.method_ = method_name)
-        supported_methods
-    with
-    | Some (module M) -> Method (M.Method, (module M))
-    | None ->
-        if List.mem ~equal:( = ) method_name unsupported_methods then
-          Unsupported
-        else Unknown
+      if disabled then Disabled
+      else
+        match
+          List.find
+            (fun (module M : METHOD) -> M.method_ = method_name)
+            supported_methods
+        with
+        | Some (module M) -> Method (M.Method, (module M))
+        | None ->
+            if List.mem ~equal:( = ) method_name unsupported_methods then
+              Unsupported
+            else Unknown)
 
 type websocket_subscription = {
   id : Ethereum_types.Subscription.id;

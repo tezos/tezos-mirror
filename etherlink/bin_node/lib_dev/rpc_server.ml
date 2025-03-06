@@ -124,8 +124,9 @@ let monitor_performances ~data_dir =
   in
   Lwt.dont_wait aux (Fun.const ())
 
-let start_public_server ~rpc_server_family:_ ?delegate_health_check_to
-    ?evm_services ?data_dir validation (config : Configuration.t) ctxt =
+let start_public_server ~(rpc_server_family : Rpc_types.rpc_server_family)
+    ?delegate_health_check_to ?evm_services ?data_dir validation
+    (config : Configuration.t) ctxt =
   let open Lwt_result_syntax in
   let*! can_start_performance_metrics =
     Octez_performance_metrics.supports_performance_metrics ()
@@ -152,7 +153,13 @@ let start_public_server ~rpc_server_family:_ ?delegate_health_check_to
   in
 
   let directory =
-    Services.directory ?delegate_health_check_to rpc validation config ctxt
+    Services.directory
+      ~rpc_server_family
+      ?delegate_health_check_to
+      rpc
+      validation
+      config
+      ctxt
     |> register_evm_services
     |> Evm_directory.register_metrics "/metrics"
   in
@@ -166,13 +173,18 @@ let start_public_server ~rpc_server_family:_ ?delegate_health_check_to
   in
   return finalizer
 
-let start_private_server ~rpc_server_family:_ ?(block_production = `Disabled)
-    config ctxt =
+let start_private_server ~(rpc_server_family : Rpc_types.rpc_server_family)
+    ?(block_production = `Disabled) config ctxt =
   let open Lwt_result_syntax in
   match config.Configuration.private_rpc with
   | Some private_rpc ->
       let directory =
-        Services.private_directory private_rpc ~block_production config ctxt
+        Services.private_directory
+          ~rpc_server_family
+          private_rpc
+          ~block_production
+          config
+          ctxt
         |> Evm_directory.register_metrics "/metrics"
       in
       let* finalizer = start_server private_rpc directory in
