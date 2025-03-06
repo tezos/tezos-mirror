@@ -29,11 +29,16 @@ let job_build ?rules ?(expire_in = Gitlab_ci.Types.(Duration (Days 1))) ~arch ()
          ~name:"teztale-binaries"
          ~expire_in
          ~when_:On_success
-         ["octez-teztale-*"])
+         ["teztale-binaries/" ^ arch_string ^ "/octez-teztale-*"])
     ~before_script:
       [
         "./scripts/ci/take_ownership.sh";
         ". ./scripts/version.sh";
         "eval $(opam env)";
+      ]
+    ~after_script:
+      [
+        "mkdir -p ./teztale-binaries/" ^ arch_string;
+        "mv octez-teztale-* ./teztale-binaries/" ^ arch_string ^ "/";
       ]
     ["make teztale"]
