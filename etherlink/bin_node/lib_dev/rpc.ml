@@ -122,6 +122,13 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
     }
   in
 
+  let* (_chain_family : Ethereum_types.chain_family) =
+    match config.experimental_features.l2_chains with
+    | None -> return Ethereum_types.EVM
+    | Some [l2_chain] -> Evm_ro_context.read_chain_family ctxt l2_chain.chain_id
+    | _ -> tzfail Node_error.Unexpected_multichain
+  in
+
   let* server_public_finalizer =
     Rpc_server.start_public_server
       ~delegate_health_check_to:evm_node_endpoint

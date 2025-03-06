@@ -192,6 +192,14 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     ~tx_pool_size_info:Tx_pool.size_info
     ~smart_rollup_address ;
 
+  let* (_chain_family : Ethereum_types.chain_family) =
+    match config.experimental_features.l2_chains with
+    | None -> return EVM
+    | Some [l2_chain] ->
+        Evm_ro_context.read_chain_family ro_ctxt l2_chain.chain_id
+    | _ -> tzfail Node_error.Unexpected_multichain
+  in
+
   let* finalizer_public_server =
     Rpc_server.start_public_server
       ~evm_services:
