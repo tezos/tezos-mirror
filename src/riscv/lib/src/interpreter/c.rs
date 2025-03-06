@@ -21,8 +21,8 @@ use crate::machine_state::registers::NonZeroXRegister;
 /// - SRL
 /// - SRA
 pub fn run_mv(icb: &mut impl ICB, rd_rs1: NonZeroXRegister, rs2: NonZeroXRegister) {
-    let rs2_val = icb.xregister_read(rs2);
-    icb.xregister_write(rd_rs1, rs2_val)
+    let rs2_val = icb.xregister_read_nz(rs2);
+    icb.xregister_write_nz(rd_rs1, rs2_val)
 }
 
 /// Does nothing.

@@ -34,11 +34,11 @@ pub fn run_and(
     rs2: NonZeroXRegister,
     rd: NonZeroXRegister,
 ) {
-    let lhs = icb.xregister_read(rs1);
-    let rhs = icb.xregister_read(rs2);
+    let lhs = icb.xregister_read_nz(rs1);
+    let rhs = icb.xregister_read_nz(rs2);
 
     let res = icb.xvalue_bitwise_and(lhs, rhs);
-    icb.xregister_write(rd, res);
+    icb.xregister_write_nz(rd, res);
 }
 
 /// Saves in `rd` the bitwise OR between the value in `rs1` and `rs2`
@@ -52,11 +52,11 @@ pub fn run_or(
     rs2: NonZeroXRegister,
     rd: NonZeroXRegister,
 ) {
-    let lhs = icb.xregister_read(rs1);
-    let rhs = icb.xregister_read(rs2);
+    let lhs = icb.xregister_read_nz(rs1);
+    let rhs = icb.xregister_read_nz(rs2);
 
     let res = icb.xvalue_bitwise_or(lhs, rhs);
-    icb.xregister_write(rd, res);
+    icb.xregister_write_nz(rd, res);
 }
 
 #[cfg(test)]

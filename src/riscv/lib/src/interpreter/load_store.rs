@@ -24,7 +24,7 @@ use crate::machine_state::registers::NonZeroXRegister;
 /// - SUB
 pub fn run_li(icb: &mut impl ICB, imm: i64, rd_rs1: NonZeroXRegister) {
     let imm = icb.xvalue_of_imm(imm);
-    icb.xregister_write(rd_rs1, imm)
+    icb.xregister_write_nz(rd_rs1, imm)
 }
 
 #[cfg(test)]

@@ -20,11 +20,11 @@ pub fn run_add(
     rs2: NonZeroXRegister,
     rd: NonZeroXRegister,
 ) {
-    let lhs = icb.xregister_read(rs1);
-    let rhs = icb.xregister_read(rs2);
+    let lhs = icb.xregister_read_nz(rs1);
+    let rhs = icb.xregister_read_nz(rs2);
     // Wrapped addition in two's complement behaves the same for signed and unsigned
     let result = icb.xvalue_wrapping_add(lhs, rhs);
-    icb.xregister_write(rd, result)
+    icb.xregister_write_nz(rd, result)
 }
 
 #[cfg(test)]
