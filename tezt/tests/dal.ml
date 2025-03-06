@@ -333,7 +333,8 @@ let generate_protocol_parameters base protocol parameter_overrides =
     Protocol.write_parameter_file ~base parameter_overrides
   in
   let* client = Client.init_mockup ~parameter_file ~protocol () in
-  Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
+  Client.RPC.call_via_endpoint client
+  @@ RPC.get_chain_block_context_constants ()
 
 (* Compute the L1 history mode. This function may update the protocol parameters
    and this is why it needs additional, a priori unrelated parameters. *)
@@ -861,7 +862,7 @@ let craft_dal_attestation ?level ?round ?payload_level ~signer ~nb_slots
     match level with Some level -> return level | None -> Client.level client
   in
   let* json =
-    Client.RPC.call client
+    Client.RPC.call_via_endpoint client
     @@ RPC.get_chain_block_helper_validators
          ~level
          ~delegate:signer.Account.public_key_hash
@@ -887,7 +888,7 @@ let craft_dal_attestation ?level ?round ?payload_level ~signer ~nb_slots
         let* round =
           match round with
           | None ->
-              Client.RPC.call client
+              Client.RPC.call_via_endpoint client
               @@ RPC.get_chain_block_helper_round ~block ()
           | Some round -> return round
         in
@@ -1295,13 +1296,11 @@ let test_slot_management_logic protocol parameters cryptobox node client
       Mempool.classified_typ
       ~error_msg:"Expected all the operations to be applied. Got %L") ;
   let* () = bake_for client in
-  let* bytes =
-    Client.RPC.call client @@ RPC.get_chain_block_context_raw_bytes ()
-  in
+  let* bytes = Node.RPC.call node @@ RPC.get_chain_block_context_raw_bytes () in
   if JSON.(bytes |-> "dal" |> is_null) then
     Test.fail "Expected the context to contain some information about the DAL" ;
   let* operations_result =
-    Client.RPC.call client @@ RPC.get_chain_block_operations ()
+    Node.RPC.call node @@ RPC.get_chain_block_operations ()
   in
   let fees_error =
     Failed
@@ -7610,7 +7609,7 @@ let scenario_tutorial_dal_baker =
       let* () = bake_for ~count:(num_cycles * blocks_per_cycle) client in
 
       let* attestation_rights =
-        Client.RPC.call client
+        Node.RPC.call node
         @@ RPC.get_chain_block_helper_attestation_rights
              ~delegate:my_baker.public_key_hash
              ()
@@ -7629,7 +7628,7 @@ let scenario_tutorial_dal_baker =
 
       (* Only test the request can be processed *)
       let* _ =
-        Client.RPC.call client @@ RPC.get_chain_block_context_dal_shards ()
+        Node.RPC.call node @@ RPC.get_chain_block_context_dal_shards ()
       in
 
       (* Launch dal node (Step 4) *)
