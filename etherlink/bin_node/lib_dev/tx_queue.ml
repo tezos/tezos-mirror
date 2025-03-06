@@ -21,6 +21,7 @@ type 'a variant_callback = 'a -> unit Lwt.t
 (** tx is in the queue and wait to be injected into the upstream
     node. *)
 type queue_request = {
+  hash : Ethereum_types.hash;
   payload : Ethereum_types.hex;  (** payload of the transaction *)
   queue_callback : queue_variant variant_callback;
       (** callback to call with the response given by the upstream
@@ -502,7 +503,7 @@ let send_transactions_batch ~evm_node_endpoint ~keep_alive transactions =
   else
     let rev_batch, callbacks =
       Seq.fold_left
-        (fun (rev_batch, callbacks) {payload; queue_callback} ->
+        (fun (rev_batch, callbacks) {hash = _; payload; queue_callback} ->
           let req_id = Uuidm.(v4_gen uuid_seed () |> to_string ~upper:false) in
           let txn =
             Rpc_encodings.JSONRPC.
@@ -691,7 +692,9 @@ module Handlers = struct
                   ~next_nonce
                   ~nonce:tx_nonce
               in
-              Queue.add {payload; queue_callback} state.queue ;
+              Queue.add
+                {hash = tx_object.hash; payload; queue_callback}
+                state.queue ;
               return (Ok ()))
         else
           return
