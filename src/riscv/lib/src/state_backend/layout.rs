@@ -77,13 +77,13 @@ impl<const LEN: usize> Layout for DynArray<LEN> {
 /// use octez_riscv::machine_state::csregisters::CSRRepr;
 /// use octez_riscv::struct_layout;
 ///
-/// struct_layout!(
+/// struct_layout! {
 ///     pub struct ExampleLayout {
 ///         satp_ppn: Atom<CSRRepr>,
 ///         mode: Atom<u8>,
 ///         cached: Atom<bool>,
 ///     }
-/// );
+/// }
 /// ```
 #[macro_export]
 macro_rules! struct_layout {

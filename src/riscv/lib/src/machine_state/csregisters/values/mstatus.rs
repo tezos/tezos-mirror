@@ -134,7 +134,7 @@ impl<M: ManagerClone> Clone for MStatusValue<M> {
     }
 }
 
-struct_layout!(
+struct_layout! {
     pub struct MStatusLayout {
         pub sie: Atom<bool>,
         pub mie: Atom<bool>,
@@ -156,7 +156,7 @@ struct_layout!(
         pub sbe: Atom<bool>,
         pub mbe: Atom<bool>,
     }
-);
+}
 
 #[inline(always)]
 fn compute_sd(fs: ExtensionValue, xs: ExtensionValue) -> bool {
