@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024-2025 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -265,6 +265,7 @@ test_case!(test_suite_rv64ui_p_jalr, "rv64ui-p-jalr");
 test_case!(test_suite_rv64ui_p_lb, "rv64ui-p-lb");
 test_case!(test_suite_rv64ui_p_lbu, "rv64ui-p-lbu");
 test_case!(test_suite_rv64ui_p_ld, "rv64ui-p-ld");
+test_case!(test_suite_rv64ui_p_ld_st, "rv64ui-p-ld_st");
 test_case!(test_suite_rv64ui_p_lh, "rv64ui-p-lh");
 test_case!(test_suite_rv64ui_p_lhu, "rv64ui-p-lhu");
 test_case!(test_suite_rv64ui_p_lui, "rv64ui-p-lui");
@@ -293,6 +294,7 @@ test_case!(test_suite_rv64ui_p_srl, "rv64ui-p-srl");
 test_case!(test_suite_rv64ui_p_srli, "rv64ui-p-srli");
 test_case!(test_suite_rv64ui_p_srliw, "rv64ui-p-srliw");
 test_case!(test_suite_rv64ui_p_srlw, "rv64ui-p-srlw");
+test_case!(test_suite_rv64ui_p_st_ld, "rv64ui-p-st_ld");
 test_case!(test_suite_rv64ui_p_sub, "rv64ui-p-sub");
 test_case!(test_suite_rv64ui_p_subw, "rv64ui-p-subw");
 test_case!(test_suite_rv64ui_p_sw, "rv64ui-p-sw");
@@ -318,6 +320,7 @@ test_case!(test_suite_rv64ui_v_jalr, "rv64ui-v-jalr");
 test_case!(test_suite_rv64ui_v_lb, "rv64ui-v-lb");
 test_case!(test_suite_rv64ui_v_lbu, "rv64ui-v-lbu");
 test_case!(test_suite_rv64ui_v_ld, "rv64ui-v-ld");
+test_case!(test_suite_rv64ui_v_ld_st, "rv64ui-v-ld_st");
 test_case!(test_suite_rv64ui_v_lh, "rv64ui-v-lh");
 test_case!(test_suite_rv64ui_v_lhu, "rv64ui-v-lhu");
 test_case!(test_suite_rv64ui_v_lui, "rv64ui-v-lui");
@@ -346,6 +349,7 @@ test_case!(test_suite_rv64ui_v_srl, "rv64ui-v-srl");
 test_case!(test_suite_rv64ui_v_srli, "rv64ui-v-srli");
 test_case!(test_suite_rv64ui_v_srliw, "rv64ui-v-srliw");
 test_case!(test_suite_rv64ui_v_srlw, "rv64ui-v-srlw");
+test_case!(test_suite_rv64ui_v_st_ld, "rv64ui-v-st_ld");
 test_case!(test_suite_rv64ui_v_sub, "rv64ui-v-sub");
 test_case!(test_suite_rv64ui_v_subw, "rv64ui-v-subw");
 test_case!(test_suite_rv64ui_v_sw, "rv64ui-v-sw");
