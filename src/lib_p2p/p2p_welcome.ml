@@ -156,7 +156,7 @@ let create ?reuse_port ?addr ~backlog connect_handler port =
 
 let activate w = Worker.activate w
 
-let shutdown (w : t) = Worker.shutdown w.worker_state
+let shutdown (w : t) = Worker.shutdown w
 
 module Internal_for_tests = struct
   let create ?reuse_port = create ?reuse_port

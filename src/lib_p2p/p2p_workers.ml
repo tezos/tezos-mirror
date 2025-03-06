@@ -87,4 +87,6 @@ struct
     return {worker_state; activate}
 
   let activate worker = Lwt.wakeup worker.activate ()
+
+  let shutdown worker = shutdown worker.worker_state
 end
