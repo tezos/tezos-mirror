@@ -94,4 +94,8 @@ module Make : functor
 
   (** [activate worker] starts the worker loop. *)
   val activate : activated_worker -> unit
+
+  (** [shutdown worker] triggers a worker termination and waits for its
+      completion. *)
+  val shutdown : activated_worker -> unit Lwt.t
 end
