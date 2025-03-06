@@ -350,6 +350,9 @@ val init :
 (** Get the RPC port given as [--rpc-port] to a node. *)
 val rpc_port : t -> int
 
+(** Get the spawn_rpc value given on creation. *)
+val spawn_rpc : t -> int option
+
 (** [spawn_run ?extra_arguments evm_node] same as {!run} but spawns a
     process. *)
 val spawn_run : ?extra_arguments:string list -> t -> Process.t

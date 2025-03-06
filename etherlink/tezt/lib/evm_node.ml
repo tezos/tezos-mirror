@@ -830,6 +830,8 @@ let name evm_node = evm_node.name
 
 let rpc_port evm_node = evm_node.persistent_state.rpc_port
 
+let spawn_rpc evm_node = evm_node.persistent_state.spawn_rpc
+
 let data_dir evm_node = evm_node.persistent_state.data_dir
 
 let data_dir_arg evm_node = ["--data-dir"; evm_node.persistent_state.data_dir]
