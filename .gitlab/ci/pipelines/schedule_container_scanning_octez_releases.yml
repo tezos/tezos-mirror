@@ -30,13 +30,9 @@ container_scanning:
   dependencies: []
   timeout: 60 minutes
   script:
-  - gtcs scan > scan.log
-  - grep "Vulnerability DB:" -B2 -A4 scan.log
+  - gtcs scan
   variables:
     GIT_STRATEGY: fetch
     CS_IMAGE: tezos/tezos:latest
     SECURE_LOG_LEVEL: debug
     CS_DOCKERFILE_PATH: build.Dockerfile
-  artifacts:
-    paths:
-    - scan.log
