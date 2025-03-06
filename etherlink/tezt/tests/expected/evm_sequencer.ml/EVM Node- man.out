@@ -478,7 +478,7 @@ Miscellaneous commands:
                      [--bootstrap-account <0x...>]
                      [--set-code <0x...,0x....>] [--enable-fa-bridge]
                      [--enable-dal] [--dal-slots <0,1,4,6,...>]
-                     [--enable-multichain]
+                     [--enable-multichain] [--l2-chain-id <1>]
                      [--max-delayed-inbox-blueprint-length <1000>]
                      [--enable-fast-withdrawal]
     Transforms the JSON list of instructions to a RLP list
@@ -509,6 +509,7 @@ Miscellaneous commands:
     --enable-dal: enable flag enable_dal in the installer config
     --dal-slots <0,1,4,6,...>: value for dal_slots in the installer config
     --enable-multichain: enable flag enable_multichain in the installer config
+    --l2-chain-id <1>: specify one of the chain ids in the kernel, can be used several times
     --max-delayed-inbox-blueprint-length <1000>: value for max_delayed_inbox_blueprint_length in the installer config
     --enable-fast-withdrawal: enable flag enable_fast_withdrawal in the installer config
   
