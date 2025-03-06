@@ -533,7 +533,7 @@ struct
         ?subgroup_check:bool -> Public_key.t list -> Public_key.t option
 
       val aggregate_public_key_weighted_opt :
-        (Z.t * Public_key.t) list -> Public_key.t option
+        ?subgroup_check:bool -> (Z.t * Public_key.t) list -> Public_key.t option
     end
 
     module type SPLIT_SIGNATURE = sig

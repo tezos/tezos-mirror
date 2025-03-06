@@ -265,12 +265,13 @@ module MinPk = struct
         Bls12_381.G1.to_compressed_bytes res)
       pks
 
-  let aggregate_public_key_weighted_opt pks_with_weights =
+  let aggregate_public_key_weighted_opt ?(subgroup_check = true)
+      pks_with_weights =
     let weights, pks = List.split pks_with_weights in
     let scalars = List.map Bls12_381.Fr.of_z weights |> Array.of_list in
     let pks =
       Bls12_381.G1.affine_array_of_compressed_bytes_opt
-        ~subgroup_check:true
+        ~subgroup_check
         (Array.of_list pks)
     in
     Option.map
@@ -590,12 +591,13 @@ module MinSig = struct
         Bls12_381.G2.to_compressed_bytes res)
       pks
 
-  let aggregate_public_key_weighted_opt pks_with_weights =
+  let aggregate_public_key_weighted_opt ?(subgroup_check = true)
+      pks_with_weights =
     let weights, pks = List.split pks_with_weights in
     let scalars = List.map Bls12_381.Fr.of_z weights |> Array.of_list in
     let pks =
       Bls12_381.G2.affine_array_of_compressed_bytes_opt
-        ~subgroup_check:true
+        ~subgroup_check
         (Array.of_list pks)
     in
     Option.map

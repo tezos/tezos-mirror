@@ -462,7 +462,7 @@ module type AGGREGATE_SIGNATURE = sig
       key as a weighted sum of the list of public keys and their weights in
       [pk_with_weights_list]. *)
   val aggregate_public_key_weighted_opt :
-    (Z.t * Public_key.t) list -> Public_key.t option
+    ?subgroup_check:bool -> (Z.t * Public_key.t) list -> Public_key.t option
 end
 
 module type SPLIT_SIGNATURE = sig

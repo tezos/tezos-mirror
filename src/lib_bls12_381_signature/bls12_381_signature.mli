@@ -127,7 +127,8 @@ module MinPk : sig
 
   (** [aggregate_public_key_weighted_opt [(w_1, pk_1);(w_2, pk_2);...]] aggregates the public
       keys [pk_i] multiplied by their weights [w_i], i.e it returns the sum of [w_i * pk_i]. *)
-  val aggregate_public_key_weighted_opt : (Z.t * pk) list -> pk option
+  val aggregate_public_key_weighted_opt :
+    ?subgroup_check:bool -> (Z.t * pk) list -> pk option
 
   (** Basic scheme described in
       {{:https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-04#section-3.1}
@@ -321,7 +322,8 @@ module MinSig : sig
 
   (** [aggregate_public_key_weighted_opt [(w_1, pk_1);(w_2, pk_2);...]] aggregates the public
       keys [pk_i] multiplied by their weights [w_i], i.e it returns the sum of [w_i * pk_i]. *)
-  val aggregate_public_key_weighted_opt : (Z.t * pk) list -> pk option
+  val aggregate_public_key_weighted_opt :
+    ?subgroup_check:bool -> (Z.t * pk) list -> pk option
 
   (** Basic scheme described in
       {{:https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-04#section-3.1}
