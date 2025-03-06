@@ -241,6 +241,14 @@ let evm_node_config =
       ]
 
 let evm_node_lib_dev =
+  let quebec =
+    List.find (fun proto -> Protocol.short_hash proto = "PsQuebec") Protocol.all
+  in
+  let plugin =
+    match Protocol.plugin quebec with
+    | Some target -> target
+    | None -> (* unreachable *) assert false
+  in
   octez_evm_node_lib
     "evm_node_lib_dev"
     ~path:"etherlink/bin_node/lib_dev"
@@ -280,6 +288,7 @@ let evm_node_lib_dev =
         supported_installers;
         wasm_runtime;
         performance_metrics;
+        plugin;
       ]
 
 let evm_node_lib_dev_client =

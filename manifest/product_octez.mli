@@ -127,6 +127,8 @@ module Protocol : sig
 
   val main : t -> Manifest.target
 
+  val plugin : t -> Manifest.target option
+
   val alpha : t
 
   (** List of all protocols. *)

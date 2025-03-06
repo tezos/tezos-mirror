@@ -36,7 +36,8 @@
   tezos-dal-node-services
   octez-evm-node-libs.evm_node_supported_installers
   octez-evm-node-libs.evm_node_wasm_runtime
-  octez-performance-metrics)
+  octez-performance-metrics
+  octez-protocol-021-PsQuebec-libs.plugin)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
