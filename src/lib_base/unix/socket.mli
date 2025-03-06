@@ -88,3 +88,25 @@ val set_tcp_user_timeout :
   Unix.file_descr ->
   ms:int ->
   (unit, [`Unix_error of exn | `Unsupported]) result
+
+(** [set_tcp_keep_alive fd ~ms ~intv] enables and sets the TCP keep alive timeout on
+    socket [fd]. If a message sent on this socket is not acknowledged within
+    [ms] milliseconds, empty TCP packets will be sent each [intv] ms.
+
+    This function uses:
+      - [SO_KEEPALIVE], [TCP_KEEPIDLE], [TCP_KEEPINTVL] socket options on linux
+      - [SO_KEEPALIVE], [TCP_KEEPALIVE] on macos.
+
+    @param fd the file descriptor of the socket.
+    @param ms the timeout value in milliseconds.
+    @param intv the delay to wait before retrying another probe
+    @return [Ok ()] if the option was successfully set, or [Error
+      (`Unix_error exn)] if a Unix error occurred, or [Error
+      `Unsupported] if the KEEP_ALIVE option is not supported on
+      this platform.
+*)
+val set_tcp_keepalive :
+  Unix.file_descr ->
+  ms:int ->
+  intv:int ->
+  (unit, [`Unix_error of exn | `Unsupported]) result
