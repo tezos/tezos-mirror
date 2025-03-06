@@ -136,6 +136,7 @@ module Request = struct
       }
         -> (Ethereum_types.legacy_transaction_object option, tztrace) t
     | Tick : (unit, tztrace) t
+    | Clear : (unit, tztrace) t
 
   type view = View : _ t -> view
 
@@ -178,6 +179,12 @@ module Request = struct
              (req "transaction_hash" Ethereum_types.hash_encoding))
           (function View (Find {txn_hash}) -> Some ((), txn_hash) | _ -> None)
           (fun _ -> assert false);
+        case
+          Json_only
+          ~title:"Clear"
+          (obj1 (req "request" (constant "clear")))
+          (function View Clear -> Some () | _ -> None)
+          (fun _ -> assert false);
       ]
 
   let pp fmt (View r) =
@@ -188,6 +195,7 @@ module Request = struct
         fprintf fmt "Confirm %s" txn_hash
     | Find {txn_hash = Hash (Hex txn_hash)} -> fprintf fmt "Find %s" txn_hash
     | Tick -> fprintf fmt "Tick"
+    | Clear -> fprintf fmt "Clear"
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -347,6 +355,13 @@ module Handlers = struct
           (fun {pending_callback; _} ->
             Lwt.async (fun () -> pending_callback `Dropped))
           txns
+    | Clear ->
+        (* clear values and keep the allocated space *)
+        String.Hashtbl.clear state.pending ;
+        String.Hashtbl.clear state.tx_object ;
+        Queue.clear state.queue ;
+        let*! () = Tx_queue_events.cleared () in
+        return_unit
 
   type launch_error = tztrace
 
@@ -461,6 +476,11 @@ let find txn_hash =
   let open Lwt_result_syntax in
   let*? w = Lazy.force worker in
   Worker.Queue.push_request_and_wait w (Find {txn_hash}) |> handle_request_error
+
+let clear () =
+  let open Lwt_result_syntax in
+  let*? w = Lazy.force worker in
+  Worker.Queue.push_request_and_wait w Clear |> handle_request_error
 
 let shutdown () =
   let open Lwt_result_syntax in

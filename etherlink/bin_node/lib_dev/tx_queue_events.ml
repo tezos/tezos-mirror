@@ -25,6 +25,14 @@ let shutdown =
     ~level:Notice
     ()
 
+let cleared =
+  declare_0
+    ~section
+    ~name:"tx_queue_cleared"
+    ~msg:"cleared the tx queue"
+    ~level:Notice
+    ()
+
 let injecting_transactions =
   declare_1
     ~name:"tx_queue_injecting_transaction"
@@ -68,6 +76,8 @@ let transaction_confirmed =
 let is_ready () = emit is_ready ()
 
 let shutdown () = emit shutdown ()
+
+let cleared () = emit cleared ()
 
 let injecting_transactions n = emit injecting_transactions n
 

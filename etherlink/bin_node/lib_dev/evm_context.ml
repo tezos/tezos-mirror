@@ -442,6 +442,11 @@ module State = struct
     (* Find the [l2_level] evm_state. *)
     let*! context = Irmin_context.checkout_exn ctxt.index checkpoint in
     let*! evm_state = Irmin_context.PVMState.get context in
+    (* Clear the TX queue if needed, to preserve its invariants about nonces always increasing. *)
+    let* () =
+      when_ (Configuration.is_tx_queue_enabled ctxt.configuration)
+      @@ Tx_queue.clear
+    in
     (* Clear the store. *)
     let* () = Evm_store.reset_after conn ~l2_level in
     let* pending_upgrade = Evm_store.Kernel_upgrades.find_latest_pending conn in

@@ -55,6 +55,8 @@
 
 - **experimental feature** The `tx_queue` respect the configuration
 field `keep_alive` for it's RPC. (!16894)
+- **experimental feature** `tx_queue` clears itself when a delayed
+inbox flush has happened. (!17091)
 
 ### Storage changes
 
