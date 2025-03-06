@@ -754,7 +754,11 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
             build_with_input ~f module_ parameters
         | Txpool_content.Method ->
             let f (_ : unit option) =
-              let* txpool_content = Tx_pool.get_tx_pool_content () in
+              let* txpool_content =
+                if Configuration.is_tx_queue_enabled config then
+                  Tx_queue.content ()
+                else Tx_pool.get_tx_pool_content ()
+              in
               rpc_ok txpool_content
             in
             build ~f module_ parameters

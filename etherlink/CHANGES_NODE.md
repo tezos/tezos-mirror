@@ -35,6 +35,8 @@ you start using them, you probably want to use `octez-evm-node check config
 - Observer nodes can now be run with `periodic_snapshot_path` defined in
   the configuration. It exports a snapshot to the given path every time they
   perform a garbage collection. (!17038)
+- `Txpool_content` RPC now works for the `tx_queue` as well, it displays its
+  information mapped into a `tx_pool` object to avoid breaking changes. (!17102)
 
 ## Version 0.19 (2025-03-10)
 

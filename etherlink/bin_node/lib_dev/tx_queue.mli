@@ -103,6 +103,10 @@ val unlock_transactions : unit -> unit tzresult Lwt.t
 (** [is_locked] checks if the queue is locked. *)
 val is_locked : unit -> bool tzresult Lwt.t
 
+(** [content ()] returns the queued and pending transactions of the tx_queue
+    mapped into a tx_pool to mimic {!Tx_pool.get_tx_pool_content}. Semantics of pending and queued are not equal to {!Tx_pool.get_tx_pool_content} *)
+val content : unit -> Ethereum_types.txpool tzresult Lwt.t
+
 (**/*)
 
 module Internal_for_tests : sig
