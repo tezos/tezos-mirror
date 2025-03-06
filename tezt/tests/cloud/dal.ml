@@ -2612,21 +2612,7 @@ module Tasks = struct
   (* Relies on GMT for time.
 
      /!\ Remember Paris is (UTC+1).
-
-     - Fixme: implement multiple values in Chronos taks creation.
-       Such that the following becomes `0 0,6,12,18 * * *`.
-
-       https://gitlab.com/tezos/tezos/-/issues/7790
   *)
-  let task_name n = Format.asprintf "report-%d" n
-
-  let tms =
-    [
-      (task_name 0, "0 0 * * *");
-      (task_name 6, "0 6 * * *");
-      (task_name 12, "0 12 * * *");
-      (task_name 18, "0 18 * * *");
-    ]
 
   let tasks ~dal_slack_webhook ~configuration =
     match dal_slack_webhook with
@@ -2634,7 +2620,7 @@ module Tasks = struct
     | Some webhook ->
         let webhook = Uri.of_string webhook in
         let action () = action ~webhook ~configuration () in
-        List.map (fun (name, tm) -> Chronos.task ~name ~tm ~action) tms
+        [Chronos.task ~name:"network-overview" ~tm:"* 0-23/6 * * *" ~action]
 end
 
 let init ~(configuration : configuration) etherlink_configuration cloud
