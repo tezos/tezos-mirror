@@ -136,7 +136,14 @@ let registry_uri () =
   let uri = Format.asprintf "%s/%s/%s" hostname project_id docker_registry in
   Lwt.return uri
 
-let rec wait_process ?(sleep = 4) ~is_ready ~run () =
+let pp_process_status fmt = function
+  | Unix.WEXITED n -> Format.fprintf fmt "EXITED %n" n
+  | Unix.WSIGNALED n -> Format.fprintf fmt "SIGNALED %n" n
+  | Unix.WSTOPPED n -> Format.fprintf fmt "STOPPED %n" n
+
+exception Process_failed of Unix.process_status
+
+let rec wait_process ?(sleep = 4) ~is_ready ~run ?(propagate_error = false) () =
   let process = run () in
   let* status = Process.wait process in
   match status with
@@ -149,14 +156,17 @@ let rec wait_process ?(sleep = 4) ~is_ready ~run () =
           (Process.name process)
           sleep ;
         let* () = Lwt_unix.sleep (float_of_int sleep) in
-        wait_process ~sleep ~is_ready ~run ())
-  | _ ->
+        wait_process ~sleep ~is_ready ~run ~propagate_error ())
+  | e ->
       Log.info
-        "Process '%s' failed. Let's wait %d seconds"
+        "Process '%s' failed with %a. Let's wait %d seconds"
         (Process.name process)
+        pp_process_status
+        e
         sleep ;
       let* () = Lwt_unix.sleep (float_of_int sleep) in
-      wait_process ~sleep ~is_ready ~run ()
+      if propagate_error then Lwt.fail (Process_failed e)
+      else wait_process ~sleep ~is_ready ~run ()
 
 let run_command ?cmd_wrapper cmd args =
   match cmd_wrapper with
