@@ -119,6 +119,12 @@ let dune_configurator = external_lib "dune-configurator" V.True
 
 let dynlink = external_lib "dynlink" V.True ~opam:""
 
+let eio = external_lib "eio" V.True
+
+let eio_posix = external_lib "eio_posix" V.True
+
+let lwt_eio = external_lib "lwt_eio" V.True
+
 let eqaf = external_lib "eqaf" V.True
 
 let ezgzip = external_lib "ezgzip" V.True

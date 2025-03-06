@@ -17,7 +17,10 @@
   uri
   octez-libs.event-logging
   lwt-exit
-  terminal)
+  terminal
+  eio
+  eio_posix
+  lwt_eio)
  (inline_tests
   (flags -verbose)
   (modes native)

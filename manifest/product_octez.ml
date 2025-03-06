@@ -1867,6 +1867,9 @@ let octez_base_unix =
         octez_event_logging |> open_;
         lwt_exit;
         terminal;
+        eio;
+        eio_posix;
+        lwt_eio;
       ]
     ~inline_tests:ppx_expect
     ~inline_tests_libraries:[bls12_381_archive]
@@ -1911,7 +1914,7 @@ let _octez_base_tests =
 
 let _octez_base_unix_tests =
   tezt
-    ["test_unix_error"; "test_syslog"]
+    ["test_unix_error"; "test_syslog"; "test_event_loop"]
     ~path:"src/lib_base/unix/test"
     ~with_macos_security_framework:true
     ~opam:"octez-libs"
@@ -1927,6 +1930,7 @@ let _octez_base_unix_tests =
         qcheck_alcotest;
         alcotezt;
         tezt_lib;
+        eio;
       ]
 
 let octez_base_test_helpers =

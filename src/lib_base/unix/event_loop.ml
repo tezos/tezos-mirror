@@ -5,17 +5,53 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The [Event_loop] module provides an abstraction layer on top of promises
-    for use in the Octez codebase.
+type t = {env : Eio_unix.Stdenv.base; main_switch : Eio.Switch.t}
 
-    For now, it is just an alias for [Lwt_main.run], but [Lwt] use is about to
-    change / be replaced in the near future, following the recent adoption of
-    OCaml 5 and the opportunity to use parallelism.
+let instance = ref None
 
-    Some components will use [eio*] libs, and if your library or binary uses
-    these components, you *MUST* use this module instead of the traditionnal
-    [Lwt_main.run].
-*)
+exception Not_initialized
 
-(** Alias of [Lwt_main.run] *)
-let main_run = Lwt_main.run
+let env () = Option.map (fun {env; _} -> env) !instance
+
+let env_exn () =
+  match env () with None -> raise Not_initialized | Some env -> env
+
+let main_switch () = Option.map (fun {main_switch; _} -> main_switch) !instance
+
+let main_switch_exn () =
+  match main_switch () with
+  | None -> raise Not_initialized
+  | Some main_switch -> main_switch
+
+let init_eio_loop ~env ~switch () =
+  (* Having [!instance <> None] should only happen if [main_run] is
+     called within [main_run]. It will be caught up by [Eio_posix.main_run]
+     but we can [assert false] just in case the error is not caught
+     for some reason. *)
+  assert (!instance = None) ;
+  instance := Some {env; main_switch = switch}
+
+let main_run ?(eio = false) promise =
+  if eio then (
+    let debug = Sys.getenv_opt "LWT_EIO_DEBUG" <> None in
+    Eio_posix.run @@ fun env ->
+    Lwt_eio.with_event_loop ~debug ~clock:env#clock @@ fun () ->
+    Eio.Switch.run @@ fun switch ->
+    init_eio_loop ~env ~switch () ;
+    let res = Lwt_eio.run_lwt promise in
+    (* While it shouldn't be necessary, there might be cases where
+       Event_loop.main_run will be called consecutively as
+
+       ```
+       let () = Event_loop.main_run (* some initialization code *)
+
+       let () = Event_loop.main_run (* main promise *)
+       ```
+
+       If the instance is not reset, the second Event_loop will use the main
+       switch from the first one, which is relevant at this moment of the code.
+       Forcing it to be [None] should avoid this issue, and also avoid some
+       value never being garbage collected. *)
+    instance := None ;
+    res)
+  else Lwt_main.run @@ promise ()

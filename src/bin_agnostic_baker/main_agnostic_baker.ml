@@ -29,15 +29,15 @@ let () =
         | exn -> failwith "%s" (Printexc.to_string exn))
   in
   Stdlib.exit
-    (Tezos_base_unix.Event_loop.main_run
-       (let*! retcode =
-          let*! r = Lwt_exit.wrap_and_exit main_promise in
-          match r with
-          | Ok () -> Lwt.return 0
-          | Error errs ->
-              Format.eprintf "%a" Error_monad.pp_print_trace errs ;
-              Lwt.return 1
-        in
-        Format.pp_print_flush Format.err_formatter () ;
-        Format.pp_print_flush Format.std_formatter () ;
-        Lwt.return retcode))
+    (Tezos_base_unix.Event_loop.main_run (fun () ->
+         let*! retcode =
+           let*! r = Lwt_exit.wrap_and_exit main_promise in
+           match r with
+           | Ok () -> Lwt.return 0
+           | Error errs ->
+               Format.eprintf "%a" Error_monad.pp_print_trace errs ;
+               Lwt.return 1
+         in
+         Format.pp_print_flush Format.err_formatter () ;
+         Format.pp_print_flush Format.std_formatter () ;
+         Lwt.return retcode))

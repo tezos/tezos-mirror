@@ -159,39 +159,39 @@ let main commands =
     | None -> Tezos_clic.dispatch commands ctxt argv
   in
   Stdlib.exit
-    (Tezos_base_unix.Event_loop.main_run
-       (let*! retcode =
-          let*! r =
-            Lwt.catch run (function
-                | Failure msg -> failwith "%s" msg
-                | exn -> failwith "%s" (Printexc.to_string exn))
-          in
-          match r with
-          | Ok () -> Lwt.return 0
-          | Error [Tezos_clic.Version] ->
-              let version =
-                Tezos_version_value.Bin_version.octez_version_string
-              in
-              Format.printf "%s\n" version ;
-              Lwt.return 0
-          | Error [Tezos_clic.Help command] ->
-              Tezos_clic.usage
-                Format.std_formatter
-                ~executable_name
-                ~global_options
-                (match command with None -> [] | Some c -> [c]) ;
-              Lwt.return 0
-          | Error errs ->
-              Tezos_clic.pp_cli_errors
-                Format.err_formatter
-                ~executable_name
-                ~global_options
-                ~default:Error_monad.pp
-                errs ;
-              Lwt.return 1
-        in
-        Format.pp_print_flush Format.err_formatter () ;
-        Format.pp_print_flush Format.std_formatter () ;
-        Lwt.return retcode))
+    (Tezos_base_unix.Event_loop.main_run (fun () ->
+         let*! retcode =
+           let*! r =
+             Lwt.catch run (function
+                 | Failure msg -> failwith "%s" msg
+                 | exn -> failwith "%s" (Printexc.to_string exn))
+           in
+           match r with
+           | Ok () -> Lwt.return 0
+           | Error [Tezos_clic.Version] ->
+               let version =
+                 Tezos_version_value.Bin_version.octez_version_string
+               in
+               Format.printf "%s\n" version ;
+               Lwt.return 0
+           | Error [Tezos_clic.Help command] ->
+               Tezos_clic.usage
+                 Format.std_formatter
+                 ~executable_name
+                 ~global_options
+                 (match command with None -> [] | Some c -> [c]) ;
+               Lwt.return 0
+           | Error errs ->
+               Tezos_clic.pp_cli_errors
+                 Format.err_formatter
+                 ~executable_name
+                 ~global_options
+                 ~default:Error_monad.pp
+                 errs ;
+               Lwt.return 1
+         in
+         Format.pp_print_flush Format.err_formatter () ;
+         Format.pp_print_flush Format.std_formatter () ;
+         Lwt.return retcode))
 
 let () = main commands
