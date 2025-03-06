@@ -3,16 +3,16 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{
-    error::Error,
-    fs::{self, File},
-};
+use std::error::Error;
+use std::fs;
+use std::fs::File;
 
-pub(crate) use crate::commands::bench::stats::{BenchStats, NamedStats};
-use crate::{
-    cli::{self, BenchOptions, BenchRunOptions},
-    table,
-};
+use crate::cli;
+use crate::cli::BenchOptions;
+use crate::cli::BenchRunOptions;
+pub(crate) use crate::commands::bench::stats::BenchStats;
+pub(crate) use crate::commands::bench::stats::NamedStats;
+use crate::table;
 
 pub mod commands;
 mod data;
@@ -42,7 +42,9 @@ fn show_results(stats: &BenchStats, opts: &BenchRunOptions) {
 }
 
 pub fn bench(opts: BenchOptions) -> Result<(), Box<dyn Error>> {
-    use commands::{compare, parser, run};
+    use commands::compare;
+    use commands::parser;
+    use commands::run;
     match opts.bench_command {
         cli::BenchSubcommand::Run(bench_run_opts) => run::run(bench_run_opts),
         cli::BenchSubcommand::Compare(bench_run_opts) => compare::compare(bench_run_opts),

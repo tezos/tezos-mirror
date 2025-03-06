@@ -2,11 +2,20 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{
-    AllocatedOf, Array, Atom, DynArray, Layout, ManagerSerialise, Many,
-    hash::{self, Hash, HashError, HashWriter},
-    proof_backend::merkle::{MERKLE_ARITY, MERKLE_LEAF_SIZE, chunks_to_writer},
-};
+use super::AllocatedOf;
+use super::Array;
+use super::Atom;
+use super::DynArray;
+use super::Layout;
+use super::ManagerSerialise;
+use super::Many;
+use super::hash;
+use super::hash::Hash;
+use super::hash::HashError;
+use super::hash::HashWriter;
+use super::proof_backend::merkle::MERKLE_ARITY;
+use super::proof_backend::merkle::MERKLE_LEAF_SIZE;
+use super::proof_backend::merkle::chunks_to_writer;
 use crate::default::ConstDefault;
 
 /// [`Layouts`] which may be used for commitments

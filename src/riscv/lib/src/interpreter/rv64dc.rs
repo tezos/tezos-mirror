@@ -7,14 +7,13 @@
 //!
 //! U:C-16
 
-use crate::{
-    machine_state::{
-        MachineCoreState, memory,
-        registers::{FRegister, XRegister, sp},
-    },
-    state_backend as backend,
-    traps::Exception,
-};
+use crate::machine_state::MachineCoreState;
+use crate::machine_state::memory;
+use crate::machine_state::registers::FRegister;
+use crate::machine_state::registers::XRegister;
+use crate::machine_state::registers::sp;
+use crate::state_backend as backend;
+use crate::traps::Exception;
 
 impl<MC, M> MachineCoreState<MC, M>
 where
@@ -75,21 +74,21 @@ mod test {
     use arbitrary_int::u5;
     use proptest::prelude::*;
 
-    use crate::{
-        backend_test,
-        bits::Bits64,
-        create_state,
-        machine_state::{
-            MachineCoreState, MachineCoreStateLayout,
-            csregisters::{
-                CSRegister,
-                xstatus::{ExtensionValue, MStatus},
-            },
-            memory::{M4K, MemoryConfig},
-            registers::{fa2, fa3, parse_xregister, sp},
-        },
-        traps::Exception,
-    };
+    use crate::backend_test;
+    use crate::bits::Bits64;
+    use crate::create_state;
+    use crate::machine_state::MachineCoreState;
+    use crate::machine_state::MachineCoreStateLayout;
+    use crate::machine_state::csregisters::CSRegister;
+    use crate::machine_state::csregisters::xstatus::ExtensionValue;
+    use crate::machine_state::csregisters::xstatus::MStatus;
+    use crate::machine_state::memory::M4K;
+    use crate::machine_state::memory::MemoryConfig;
+    use crate::machine_state::registers::fa2;
+    use crate::machine_state::registers::fa3;
+    use crate::machine_state::registers::parse_xregister;
+    use crate::machine_state::registers::sp;
+    use crate::traps::Exception;
 
     const ZERO_OFFSET: i64 = 0;
 

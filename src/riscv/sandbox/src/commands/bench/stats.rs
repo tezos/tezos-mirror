@@ -7,10 +7,13 @@ use std::time::Duration;
 
 use itertools::Itertools;
 use meansd::MeanSD;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 
-use super::data::{BenchData, InstructionData};
-use crate::{format_status, table::utils::thousand_format};
+use super::data::BenchData;
+use super::data::InstructionData;
+use crate::format_status;
+use crate::table::utils::thousand_format;
 
 /// Serializable data for instruction-level statistics
 #[derive(Serialize, Deserialize, Debug, Clone)]

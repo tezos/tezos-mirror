@@ -22,24 +22,27 @@
 
 use std::marker::PhantomData;
 
-use cranelift::{
-    codegen::ir::{
-        AbiParam, FuncRef, InstBuilder, Signature, Value,
-        types::{I8, I64},
-    },
-    frontend::FunctionBuilder,
-};
-use cranelift_jit::{JITBuilder, JITModule};
-use cranelift_module::{FuncId, Linkage, Module, ModuleResult};
+use cranelift::codegen::ir::AbiParam;
+use cranelift::codegen::ir::FuncRef;
+use cranelift::codegen::ir::InstBuilder;
+use cranelift::codegen::ir::Signature;
+use cranelift::codegen::ir::Value;
+use cranelift::codegen::ir::types::I8;
+use cranelift::codegen::ir::types::I64;
+use cranelift::frontend::FunctionBuilder;
+use cranelift_jit::JITBuilder;
+use cranelift_jit::JITModule;
+use cranelift_module::FuncId;
+use cranelift_module::Linkage;
+use cranelift_module::Module;
+use cranelift_module::ModuleResult;
 
-use crate::{
-    machine_state::{
-        MachineCoreState,
-        memory::MemoryConfig,
-        registers::{NonZeroXRegister, XValue},
-    },
-    state_backend::{ManagerReadWrite, owned_backend::Owned},
-};
+use crate::machine_state::MachineCoreState;
+use crate::machine_state::memory::MemoryConfig;
+use crate::machine_state::registers::NonZeroXRegister;
+use crate::machine_state::registers::XValue;
+use crate::state_backend::ManagerReadWrite;
+use crate::state_backend::owned_backend::Owned;
 
 const PC_WRITE_SYMBOL: &str = "JSA::pc_write";
 

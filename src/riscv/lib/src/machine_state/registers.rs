@@ -10,7 +10,8 @@ use std::fmt;
 
 use arbitrary_int::u5;
 
-use crate::{default::ConstDefault, machine_state::backend};
+use crate::default::ConstDefault;
+use crate::machine_state::backend;
 
 /// Integer register index
 #[allow(non_camel_case_types)] // To make names consistent with specification
@@ -614,7 +615,8 @@ mod tests {
     use strum::IntoEnumIterator;
 
     use super::*;
-    use crate::{backend_test, create_state};
+    use crate::backend_test;
+    use crate::create_state;
 
     backend_test!(test_zero, F, {
         let mut registers = create_state!(XRegisters, XRegistersLayout, F);

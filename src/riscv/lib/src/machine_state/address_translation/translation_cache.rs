@@ -35,16 +35,24 @@
 
 use strum::EnumCount;
 
-use super::{AccessType, PAGE_OFFSET_WIDTH};
-use crate::{
-    bits::ones,
-    cache_utils::FenceCounter,
-    machine_state::{csregisters::CSRRepr, memory::Address, mode::Mode},
-    state_backend::{
-        AllocatedOf, Atom, Cell, FnManager, ManagerBase, ManagerClone, ManagerRead,
-        ManagerReadWrite, ManagerWrite, Many, Ref,
-    },
-};
+use super::AccessType;
+use super::PAGE_OFFSET_WIDTH;
+use crate::bits::ones;
+use crate::cache_utils::FenceCounter;
+use crate::machine_state::csregisters::CSRRepr;
+use crate::machine_state::memory::Address;
+use crate::machine_state::mode::Mode;
+use crate::state_backend::AllocatedOf;
+use crate::state_backend::Atom;
+use crate::state_backend::Cell;
+use crate::state_backend::FnManager;
+use crate::state_backend::ManagerBase;
+use crate::state_backend::ManagerClone;
+use crate::state_backend::ManagerRead;
+use crate::state_backend::ManagerReadWrite;
+use crate::state_backend::ManagerWrite;
+use crate::state_backend::Many;
+use crate::state_backend::Ref;
 
 /// Bit mask to obtain the offset into a page
 const OFFSET_MASK: u64 = ones(PAGE_OFFSET_WIDTH as u64);

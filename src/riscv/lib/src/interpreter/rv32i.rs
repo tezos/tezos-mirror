@@ -6,18 +6,19 @@
 //!
 //! Chapter 2 - Unprivileged spec
 
-use crate::{
-    machine_state::{
-        MachineCoreState, ProgramCounterUpdate,
-        hart_state::HartState,
-        memory::{self, Address},
-        mode::Mode,
-        registers::{NonZeroXRegister, XRegister, XRegisters},
-    },
-    parser::instruction::{FenceSet, InstrWidth},
-    state_backend::{self as backend},
-    traps::Exception,
-};
+use crate::machine_state::MachineCoreState;
+use crate::machine_state::ProgramCounterUpdate;
+use crate::machine_state::hart_state::HartState;
+use crate::machine_state::memory;
+use crate::machine_state::memory::Address;
+use crate::machine_state::mode::Mode;
+use crate::machine_state::registers::NonZeroXRegister;
+use crate::machine_state::registers::XRegister;
+use crate::machine_state::registers::XRegisters;
+use crate::parser::instruction::FenceSet;
+use crate::parser::instruction::InstrWidth;
+use crate::state_backend as backend;
+use crate::traps::Exception;
 
 impl<M> XRegisters<M>
 where
@@ -413,31 +414,44 @@ where
 
 #[cfg(test)]
 mod tests {
-    use proptest::{
-        prelude::{any, prop},
-        prop_assert_eq, prop_assume, proptest,
-    };
+    use proptest::prelude::any;
+    use proptest::prelude::prop;
+    use proptest::prop_assert_eq;
+    use proptest::prop_assume;
+    use proptest::proptest;
 
-    use crate::{
-        backend_test, create_state,
-        interpreter::{
-            i::run_add,
-            integer::{run_and, run_or},
-        },
-        machine_state::{
-            MachineCoreState, MachineCoreStateLayout, ProgramCounterUpdate,
-            csregisters::{
-                CSRRepr, CSRegister,
-                xstatus::{MPPValue, MStatus, SPPValue},
-            },
-            hart_state::{HartState, HartStateLayout},
-            memory::{Address, M4K},
-            mode::Mode,
-            registers::{XRegisters, XRegistersLayout, a0, a1, a2, fa0, nz, t0, t1, t2, t3},
-        },
-        parser::instruction::{FenceSet, InstrWidth},
-        traps::Exception,
-    };
+    use crate::backend_test;
+    use crate::create_state;
+    use crate::interpreter::i::run_add;
+    use crate::interpreter::integer::run_and;
+    use crate::interpreter::integer::run_or;
+    use crate::machine_state::MachineCoreState;
+    use crate::machine_state::MachineCoreStateLayout;
+    use crate::machine_state::ProgramCounterUpdate;
+    use crate::machine_state::csregisters::CSRRepr;
+    use crate::machine_state::csregisters::CSRegister;
+    use crate::machine_state::csregisters::xstatus::MPPValue;
+    use crate::machine_state::csregisters::xstatus::MStatus;
+    use crate::machine_state::csregisters::xstatus::SPPValue;
+    use crate::machine_state::hart_state::HartState;
+    use crate::machine_state::hart_state::HartStateLayout;
+    use crate::machine_state::memory::Address;
+    use crate::machine_state::memory::M4K;
+    use crate::machine_state::mode::Mode;
+    use crate::machine_state::registers::XRegisters;
+    use crate::machine_state::registers::XRegistersLayout;
+    use crate::machine_state::registers::a0;
+    use crate::machine_state::registers::a1;
+    use crate::machine_state::registers::a2;
+    use crate::machine_state::registers::fa0;
+    use crate::machine_state::registers::nz;
+    use crate::machine_state::registers::t0;
+    use crate::machine_state::registers::t1;
+    use crate::machine_state::registers::t2;
+    use crate::machine_state::registers::t3;
+    use crate::parser::instruction::FenceSet;
+    use crate::parser::instruction::InstrWidth;
+    use crate::traps::Exception;
 
     backend_test!(test_add_sub, F, {
         let imm_rs1_rd_res = [

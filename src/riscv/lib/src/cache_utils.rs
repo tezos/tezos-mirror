@@ -3,17 +3,23 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{convert::Infallible, marker::PhantomData};
+use std::convert::Infallible;
+use std::marker::PhantomData;
 
-use crate::{
-    default::ConstDefault,
-    machine_state::memory::Address,
-    state_backend::{
-        AllocatedOf, CommitmentLayout, FromProofResult, Layout, ManagerAlloc, ManagerBase,
-        ManagerSerialise, Many, ProofLayout, ProofTree,
-    },
-    storage::{Hash, HashError},
-};
+use crate::default::ConstDefault;
+use crate::machine_state::memory::Address;
+use crate::state_backend::AllocatedOf;
+use crate::state_backend::CommitmentLayout;
+use crate::state_backend::FromProofResult;
+use crate::state_backend::Layout;
+use crate::state_backend::ManagerAlloc;
+use crate::state_backend::ManagerBase;
+use crate::state_backend::ManagerSerialise;
+use crate::state_backend::Many;
+use crate::state_backend::ProofLayout;
+use crate::state_backend::ProofTree;
+use crate::storage::Hash;
+use crate::storage::HashError;
 
 /// Integer to keep track of the fence counter
 #[derive(

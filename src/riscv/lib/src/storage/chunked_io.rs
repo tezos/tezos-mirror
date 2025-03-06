@@ -2,13 +2,16 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{
-    cmp,
-    collections::VecDeque,
-    io::{self, Cursor},
-};
+use std::cmp;
+use std::collections::VecDeque;
+use std::io;
+use std::io::Cursor;
 
-use super::{CHUNK_SIZE, Hash, StorageError, Store, binary};
+use super::CHUNK_SIZE;
+use super::Hash;
+use super::StorageError;
+use super::Store;
+use super::binary;
 
 /// Simple writer that stores data in chunks of size [`CHUNK_SIZE`]
 pub struct ChunkWriter<'a> {

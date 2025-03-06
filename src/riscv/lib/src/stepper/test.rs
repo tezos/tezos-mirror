@@ -4,25 +4,33 @@
 
 mod posix;
 
-use std::{collections::BTreeMap, ops::Bound};
+use std::collections::BTreeMap;
+use std::ops::Bound;
 
-use derive_more::{Error, From};
-use posix::{PosixState, PosixStateLayout};
+use derive_more::Error;
+use derive_more::From;
+use posix::PosixState;
+use posix::PosixStateLayout;
 
-use super::{StepResult, Stepper, StepperStatus};
-use crate::{
-    kernel_loader,
-    machine_state::{
-        CacheLayouts, MachineCoreState, MachineError, MachineState, MachineStateLayout,
-        StepManyResult, TestCacheLayouts,
-        block_cache::bcall::{Block, Interpreted},
-        memory::{M1G, MemoryConfig},
-        mode,
-    },
-    program::Program,
-    state_backend::owned_backend::Owned,
-    traps::EnvironException,
-};
+use super::StepResult;
+use super::Stepper;
+use super::StepperStatus;
+use crate::kernel_loader;
+use crate::machine_state::CacheLayouts;
+use crate::machine_state::MachineCoreState;
+use crate::machine_state::MachineError;
+use crate::machine_state::MachineState;
+use crate::machine_state::MachineStateLayout;
+use crate::machine_state::StepManyResult;
+use crate::machine_state::TestCacheLayouts;
+use crate::machine_state::block_cache::bcall::Block;
+use crate::machine_state::block_cache::bcall::Interpreted;
+use crate::machine_state::memory::M1G;
+use crate::machine_state::memory::MemoryConfig;
+use crate::machine_state::mode;
+use crate::program::Program;
+use crate::state_backend::owned_backend::Owned;
+use crate::traps::EnvironException;
 
 #[derive(Clone, Debug)]
 pub enum TestStepperResult {

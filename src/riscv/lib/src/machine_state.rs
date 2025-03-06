@@ -20,34 +20,44 @@ extern crate proptest;
 use std::ops::Bound;
 
 pub use address_translation::AccessType;
-use address_translation::{
-    PAGE_SIZE,
-    translation_cache::{TranslationCache, TranslationCacheLayout},
-};
-use block_cache::{
-    BlockCache,
-    bcall::{BCall, Block},
-};
-pub use cache_layouts::{CacheLayouts, DefaultCacheLayouts, TestCacheLayouts};
+use address_translation::PAGE_SIZE;
+use address_translation::translation_cache::TranslationCache;
+use address_translation::translation_cache::TranslationCacheLayout;
+use block_cache::BlockCache;
+use block_cache::bcall::BCall;
+use block_cache::bcall::Block;
+pub use cache_layouts::CacheLayouts;
+pub use cache_layouts::DefaultCacheLayouts;
+pub use cache_layouts::TestCacheLayouts;
+use csregisters::CSRRepr;
 use csregisters::CSRegister;
-use csregisters::{CSRRepr, values::CSRValue};
-use hart_state::{HartState, HartStateLayout};
+use csregisters::values::CSRValue;
+use hart_state::HartState;
+use hart_state::HartStateLayout;
 use instruction::Instruction;
-use memory::{Address, Memory, MemoryConfig, OutOfBounds};
+use memory::Address;
+use memory::Memory;
+use memory::MemoryConfig;
+use memory::OutOfBounds;
 use mode::Mode;
 
-use crate::{
-    bits::u64,
-    devicetree,
-    parser::{
-        instruction::{Instr, InstrCacheable, InstrUncacheable, InstrWidth},
-        is_compressed, parse_compressed_instruction, parse_uncompressed_instruction,
-    },
-    program::Program,
-    range_utils::{bound_saturating_sub, less_than_bound, unwrap_bound},
-    state_backend::{self as backend, ManagerReadWrite},
-    traps::{EnvironException, Exception},
-};
+use crate::bits::u64;
+use crate::devicetree;
+use crate::parser::instruction::Instr;
+use crate::parser::instruction::InstrCacheable;
+use crate::parser::instruction::InstrUncacheable;
+use crate::parser::instruction::InstrWidth;
+use crate::parser::is_compressed;
+use crate::parser::parse_compressed_instruction;
+use crate::parser::parse_uncompressed_instruction;
+use crate::program::Program;
+use crate::range_utils::bound_saturating_sub;
+use crate::range_utils::less_than_bound;
+use crate::range_utils::unwrap_bound;
+use crate::state_backend as backend;
+use crate::state_backend::ManagerReadWrite;
+use crate::traps::EnvironException;
+use crate::traps::Exception;
 
 /// Layout for the machine 'run state' - which contains everything required for the running of
 /// instructions.
@@ -396,7 +406,8 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::Ma
     where
         M: backend::ManagerReadWrite,
     {
-        use ProgramCounterUpdate::{Next, Set};
+        use ProgramCounterUpdate::Next;
+        use ProgramCounterUpdate::Set;
 
         let core = &mut self.core;
 
@@ -669,50 +680,65 @@ pub enum MachineError {
 mod tests {
     use std::ops::Bound;
 
-    use proptest::{prop_assert_eq, proptest};
+    use proptest::prop_assert_eq;
+    use proptest::proptest;
 
-    use super::{
-        MachineState, MachineStateLayout,
-        block_cache::bcall::{Interpreted, InterpretedBlockBuilder},
-        instruction::{
-            Instruction, OpCode,
-            tagged_instruction::{TaggedArgs, TaggedInstruction, TaggedRegister},
-        },
-        registers::XRegister,
-    };
-    use crate::{
-        backend_test,
-        bits::{Bits64, FixedWidthBits, u16},
-        create_state,
-        default::ConstDefault,
-        machine_state::{
-            DefaultCacheLayouts, TestCacheLayouts,
-            address_translation::{
-                PAGE_SIZE,
-                pte::{PPNField, PageTableEntry},
-            },
-            csregisters::{
-                CSRRepr, CSRegister,
-                satp::{Satp, TranslationAlgorithm},
-                xstatus::{self, MStatus},
-            },
-            memory::{self, M1M, M4K, M8K, Memory},
-            mode::Mode,
-            registers::{NonZeroXRegister, a0, a1, a2, nz, t0, t1, t2},
-        },
-        parser::{
-            XRegisterParsed::*,
-            instruction::{
-                CIBNZTypeArgs, Instr, InstrCacheable, InstrWidth, SBTypeArgs, SplitITypeArgs,
-            },
-            parse_block,
-        },
-        state_backend::{
-            FnManagerIdent,
-            test_helpers::{TestBackendFactory, assert_eq_struct, copy_via_serde},
-        },
-        traps::{EnvironException, Exception, TrapContext},
-    };
+    use super::MachineState;
+    use super::MachineStateLayout;
+    use super::block_cache::bcall::Interpreted;
+    use super::block_cache::bcall::InterpretedBlockBuilder;
+    use super::instruction::Instruction;
+    use super::instruction::OpCode;
+    use super::instruction::tagged_instruction::TaggedArgs;
+    use super::instruction::tagged_instruction::TaggedInstruction;
+    use super::instruction::tagged_instruction::TaggedRegister;
+    use super::registers::XRegister;
+    use crate::backend_test;
+    use crate::bits::Bits64;
+    use crate::bits::FixedWidthBits;
+    use crate::bits::u16;
+    use crate::create_state;
+    use crate::default::ConstDefault;
+    use crate::machine_state::DefaultCacheLayouts;
+    use crate::machine_state::TestCacheLayouts;
+    use crate::machine_state::address_translation::PAGE_SIZE;
+    use crate::machine_state::address_translation::pte::PPNField;
+    use crate::machine_state::address_translation::pte::PageTableEntry;
+    use crate::machine_state::csregisters::CSRRepr;
+    use crate::machine_state::csregisters::CSRegister;
+    use crate::machine_state::csregisters::satp::Satp;
+    use crate::machine_state::csregisters::satp::TranslationAlgorithm;
+    use crate::machine_state::csregisters::xstatus;
+    use crate::machine_state::csregisters::xstatus::MStatus;
+    use crate::machine_state::memory;
+    use crate::machine_state::memory::M1M;
+    use crate::machine_state::memory::M4K;
+    use crate::machine_state::memory::M8K;
+    use crate::machine_state::memory::Memory;
+    use crate::machine_state::mode::Mode;
+    use crate::machine_state::registers::NonZeroXRegister;
+    use crate::machine_state::registers::a0;
+    use crate::machine_state::registers::a1;
+    use crate::machine_state::registers::a2;
+    use crate::machine_state::registers::nz;
+    use crate::machine_state::registers::t0;
+    use crate::machine_state::registers::t1;
+    use crate::machine_state::registers::t2;
+    use crate::parser::XRegisterParsed::*;
+    use crate::parser::instruction::CIBNZTypeArgs;
+    use crate::parser::instruction::Instr;
+    use crate::parser::instruction::InstrCacheable;
+    use crate::parser::instruction::InstrWidth;
+    use crate::parser::instruction::SBTypeArgs;
+    use crate::parser::instruction::SplitITypeArgs;
+    use crate::parser::parse_block;
+    use crate::state_backend::FnManagerIdent;
+    use crate::state_backend::test_helpers::TestBackendFactory;
+    use crate::state_backend::test_helpers::assert_eq_struct;
+    use crate::state_backend::test_helpers::copy_via_serde;
+    use crate::traps::EnvironException;
+    use crate::traps::Exception;
+    use crate::traps::TrapContext;
 
     backend_test!(test_step, F, {
         let state = create_state!(

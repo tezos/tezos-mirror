@@ -2,10 +2,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{
-    machine_state::csregisters::effects::CSREffect,
-    state_backend::{AllocatedOf, ManagerBase},
-};
+use crate::machine_state::csregisters::effects::CSREffect;
+use crate::state_backend::AllocatedOf;
+use crate::state_backend::ManagerBase;
 
 /// Layout for [`XipCell`]
 pub type XipCellLayout = ();

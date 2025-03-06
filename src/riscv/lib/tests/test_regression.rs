@@ -2,19 +2,22 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{fs, io::Write, ops::Bound};
+use std::fs;
+use std::io::Write;
+use std::ops::Bound;
 
-use octez_riscv::{
-    jit::JIT,
-    machine_state::{
-        DefaultCacheLayouts,
-        block_cache::bcall::{Block, InlineJit, Interpreted, InterpretedBlockBuilder},
-        memory::M64M,
-    },
-    pvm::PvmHooks,
-    state_backend::owned_backend::Owned,
-    stepper::{Stepper, StepperStatus, pvm::PvmStepper},
-};
+use octez_riscv::jit::JIT;
+use octez_riscv::machine_state::DefaultCacheLayouts;
+use octez_riscv::machine_state::block_cache::bcall::Block;
+use octez_riscv::machine_state::block_cache::bcall::InlineJit;
+use octez_riscv::machine_state::block_cache::bcall::Interpreted;
+use octez_riscv::machine_state::block_cache::bcall::InterpretedBlockBuilder;
+use octez_riscv::machine_state::memory::M64M;
+use octez_riscv::pvm::PvmHooks;
+use octez_riscv::state_backend::owned_backend::Owned;
+use octez_riscv::stepper::Stepper;
+use octez_riscv::stepper::StepperStatus;
+use octez_riscv::stepper::pvm::PvmStepper;
 use tezos_smart_rollup_utils::inbox::InboxBuilder;
 
 const GOLDEN_DIR: &str = "tests/expected/jstz";

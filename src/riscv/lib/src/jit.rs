@@ -15,7 +15,8 @@ use cranelift::codegen::ir::types::I64;
 use cranelift::codegen::settings::SetError;
 use cranelift::frontend::FunctionBuilderContext;
 use cranelift::prelude::*;
-use cranelift_jit::{JITBuilder, JITModule};
+use cranelift_jit::JITBuilder;
+use cranelift_jit::JITModule;
 use cranelift_module::Linkage;
 use cranelift_module::Module;
 use cranelift_module::ModuleError;
@@ -26,9 +27,10 @@ use self::builder::Builder;
 use self::state_access::JsaCalls;
 use self::state_access::JsaImports;
 use self::state_access::register_jsa_symbols;
+use crate::machine_state::MachineCoreState;
 use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::instruction::Instruction;
-use crate::machine_state::{MachineCoreState, memory::MemoryConfig};
+use crate::machine_state::memory::MemoryConfig;
 use crate::state_backend::hash::Hash;
 use crate::traps::EnvironException;
 
@@ -271,15 +273,22 @@ impl<MC: MemoryConfig, M: JitStateAccess> Default for JIT<MC, M> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::machine_state::{MachineCoreState, MachineCoreStateLayout, memory::M4K};
-    use crate::machine_state::{
-        block_cache::bcall::{BCall, Block, BlockLayout, Interpreted, InterpretedBlockBuilder},
-        memory::MemoryConfig,
-    };
-    use crate::parser::instruction::InstrWidth::{self, *};
+    use crate::backend_test;
+    use crate::create_state;
+    use crate::machine_state::MachineCoreState;
+    use crate::machine_state::MachineCoreStateLayout;
+    use crate::machine_state::block_cache::bcall::BCall;
+    use crate::machine_state::block_cache::bcall::Block;
+    use crate::machine_state::block_cache::bcall::BlockLayout;
+    use crate::machine_state::block_cache::bcall::Interpreted;
+    use crate::machine_state::block_cache::bcall::InterpretedBlockBuilder;
+    use crate::machine_state::memory::M4K;
+    use crate::machine_state::memory::MemoryConfig;
+    use crate::parser::instruction::InstrWidth;
+    use crate::parser::instruction::InstrWidth::*;
+    use crate::state_backend::FnManagerIdent;
+    use crate::state_backend::ManagerRead;
     use crate::state_backend::test_helpers::assert_eq_struct;
-    use crate::state_backend::{FnManagerIdent, ManagerRead};
-    use crate::{backend_test, create_state};
 
     fn instructions<MC: MemoryConfig, M>(block: &Interpreted<MC, M>) -> Vec<Instruction>
     where

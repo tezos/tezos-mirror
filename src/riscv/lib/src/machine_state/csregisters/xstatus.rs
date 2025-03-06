@@ -13,12 +13,11 @@
 #![allow(non_snake_case)]
 
 use super::bits::NormaliseFields;
-use crate::{
-    bits::{Bits64, ConstantBits},
-    csr,
-    default::ConstDefault,
-    machine_state::mode::Mode,
-};
+use crate::bits::Bits64;
+use crate::bits::ConstantBits;
+use crate::csr;
+use crate::default::ConstDefault;
+use crate::machine_state::mode::Mode;
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
@@ -343,10 +342,11 @@ impl NormaliseFields for MNStatus {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        bits::Bits64,
-        machine_state::csregisters::xstatus::{ExtensionValue, MPPValue, SPPValue, XLenValue},
-    };
+    use crate::bits::Bits64;
+    use crate::machine_state::csregisters::xstatus::ExtensionValue;
+    use crate::machine_state::csregisters::xstatus::MPPValue;
+    use crate::machine_state::csregisters::xstatus::SPPValue;
+    use crate::machine_state::csregisters::xstatus::XLenValue;
 
     #[test]
     fn test_status_fields() {

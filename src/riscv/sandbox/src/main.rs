@@ -6,7 +6,8 @@
 use std::error::Error;
 
 use cli::ExitMode;
-use octez_riscv::{machine_state::mode::Mode, stepper::StepperStatus};
+use octez_riscv::machine_state::mode::Mode;
+use octez_riscv::stepper::StepperStatus;
 
 mod cli;
 mod commands;
@@ -35,7 +36,10 @@ fn posix_exit_mode(exit_mode: &ExitMode) -> Mode {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    use commands::{bench, debug, gdb_server, run};
+    use commands::bench;
+    use commands::debug;
+    use commands::gdb_server;
+    use commands::run;
     let cli = cli::parse();
     match cli.command {
         cli::Mode::Run(opts) => run(opts),

@@ -3,16 +3,17 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{error::Error, fs};
+use std::error::Error;
+use std::fs;
 
-use octez_riscv::{
-    machine_state::memory::M1G,
-    stepper::{pvm::PvmStepper, test::TestStepper},
-};
+use octez_riscv::machine_state::memory::M1G;
+use octez_riscv::stepper::pvm::PvmStepper;
+use octez_riscv::stepper::test::TestStepper;
 use tezos_smart_rollup::utils::inbox::InboxBuilder;
 use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 
-use crate::{cli::DebugOptions, posix_exit_mode};
+use crate::cli::DebugOptions;
+use crate::posix_exit_mode;
 
 mod debugger_app;
 mod errors;

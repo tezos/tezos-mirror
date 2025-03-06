@@ -2,19 +2,21 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{
-    machine_state::{
-        CacheLayouts, MachineState,
-        block_cache::bcall::Block,
-        memory::MemoryConfig,
-        mode::Mode,
-        registers::{a0, a7},
-    },
-    state_backend::{
-        AllocatedOf, Atom, Cell, ManagerBase, ManagerRead, ManagerReadWrite, ManagerWrite,
-    },
-    traps::EnvironException,
-};
+use crate::machine_state::CacheLayouts;
+use crate::machine_state::MachineState;
+use crate::machine_state::block_cache::bcall::Block;
+use crate::machine_state::memory::MemoryConfig;
+use crate::machine_state::mode::Mode;
+use crate::machine_state::registers::a0;
+use crate::machine_state::registers::a7;
+use crate::state_backend::AllocatedOf;
+use crate::state_backend::Atom;
+use crate::state_backend::Cell;
+use crate::state_backend::ManagerBase;
+use crate::state_backend::ManagerRead;
+use crate::state_backend::ManagerReadWrite;
+use crate::state_backend::ManagerWrite;
+use crate::traps::EnvironException;
 
 /// Layout for [`PosixState`]
 pub type PosixStateLayout = (Atom<u64>, Atom<u8>, Atom<Mode>);

@@ -4,14 +4,13 @@
 
 use std::fs;
 
-use octez_riscv::{
-    machine_state::{
-        DefaultCacheLayouts, block_cache::bcall::InterpretedBlockBuilder, memory::M64M,
-    },
-    pvm::PvmHooks,
-    stepper::pvm::PvmStepper,
-};
-use rand::{Rng, seq::SliceRandom};
+use octez_riscv::machine_state::DefaultCacheLayouts;
+use octez_riscv::machine_state::block_cache::bcall::InterpretedBlockBuilder;
+use octez_riscv::machine_state::memory::M64M;
+use octez_riscv::pvm::PvmHooks;
+use octez_riscv::stepper::pvm::PvmStepper;
+use rand::Rng;
+use rand::seq::SliceRandom;
 use tezos_smart_rollup_utils::inbox::InboxBuilder;
 
 pub fn make_stepper_factory() -> impl Fn() -> PvmStepper<'static, M64M, DefaultCacheLayouts> {

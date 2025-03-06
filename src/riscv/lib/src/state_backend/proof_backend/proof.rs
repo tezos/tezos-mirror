@@ -16,11 +16,12 @@
 
 use itertools::Itertools;
 
-use super::tree::{ModifyResult, Tree, impl_modify_map_collect};
-use crate::{
-    state_backend::hash::Hash,
-    storage::{DIGEST_SIZE, HashError},
-};
+use super::tree::ModifyResult;
+use super::tree::Tree;
+use super::tree::impl_modify_map_collect;
+use crate::state_backend::hash::Hash;
+use crate::storage::DIGEST_SIZE;
+use crate::storage::HashError;
 
 /// Structure of a proof transitioning from state A to state B.
 ///
@@ -359,16 +360,21 @@ pub fn deserialise_proof(
 #[cfg(test)]
 mod tests {
     use proptest::proptest;
-    use rand::{Fill, thread_rng};
+    use rand::Fill;
+    use rand::thread_rng;
 
-    use super::{
-        DeserialiseError, MerkleProof, MerkleProofLeaf, Shape, TAG_BLIND, TAG_NODE, TAG_READ,
-        serialise_proof,
-    };
-    use crate::{
-        state_backend::proof_backend::proof::{Proof, deserialise_proof},
-        storage::{DIGEST_SIZE, Hash},
-    };
+    use super::DeserialiseError;
+    use super::MerkleProof;
+    use super::MerkleProofLeaf;
+    use super::Shape;
+    use super::TAG_BLIND;
+    use super::TAG_NODE;
+    use super::TAG_READ;
+    use super::serialise_proof;
+    use crate::state_backend::proof_backend::proof::Proof;
+    use crate::state_backend::proof_backend::proof::deserialise_proof;
+    use crate::storage::DIGEST_SIZE;
+    use crate::storage::Hash;
 
     /// Utility struct that computes the bounds of a [`MerkleProof`] serialisation
     /// based on total number of nodes in the tree and total size of raw data in the leafs.

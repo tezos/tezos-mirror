@@ -6,10 +6,9 @@
 //!
 //! Chapter 7 - Unprivileged spec
 
-use crate::{
-    machine_state::registers::{XRegister, XRegisters},
-    state_backend as backend,
-};
+use crate::machine_state::registers::XRegister;
+use crate::machine_state::registers::XRegisters;
+use crate::state_backend as backend;
 
 impl<M> XRegisters<M>
 where
@@ -101,12 +100,18 @@ where
 
 #[cfg(test)]
 mod test {
-    use proptest::{prelude::any, prop_assert_eq, proptest};
+    use proptest::prelude::any;
+    use proptest::prop_assert_eq;
+    use proptest::proptest;
 
-    use crate::{
-        backend_test, create_state,
-        machine_state::registers::{XRegisters, XRegistersLayout, a0, a1, a2, a3},
-    };
+    use crate::backend_test;
+    use crate::create_state;
+    use crate::machine_state::registers::XRegisters;
+    use crate::machine_state::registers::XRegistersLayout;
+    use crate::machine_state::registers::a0;
+    use crate::machine_state::registers::a1;
+    use crate::machine_state::registers::a2;
+    use crate::machine_state::registers::a3;
 
     backend_test!(test_div_rem_invariant, F, {
         proptest!(|(

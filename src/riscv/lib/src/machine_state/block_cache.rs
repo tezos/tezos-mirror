@@ -84,25 +84,40 @@ pub mod bcall;
 use std::marker::PhantomData;
 use std::u64;
 
-use bcall::{BCall, Block};
+use bcall::BCall;
+use bcall::Block;
 
+use super::MachineCoreState;
+use super::ProgramCounterUpdate;
 use super::address_translation::PAGE_OFFSET_WIDTH;
-use super::instruction::{Instruction, RunInstr};
-use super::{MachineCoreState, memory::MemoryConfig};
-use super::{ProgramCounterUpdate, memory::Address};
+use super::instruction::Instruction;
+use super::instruction::RunInstr;
+use super::memory::Address;
+use super::memory::MemoryConfig;
+use crate::cache_utils::FenceCounter;
+use crate::cache_utils::Sizes;
 use crate::machine_state::address_translation::PAGE_SIZE;
 use crate::machine_state::instruction::Args;
 use crate::parser::instruction::InstrWidth;
-use crate::state_backend::{
-    self, AllocatedOf, Atom, Cell, EnrichedCell, EnrichedValue, ManagerBase, ManagerClone,
-    ManagerRead, ManagerReadWrite, ManagerSerialise, ManagerWrite, Ref, proof_backend,
-};
-use crate::traps::{EnvironException, Exception};
-use crate::{cache_utils::FenceCounter, state_backend::FnManager};
-use crate::{
-    cache_utils::Sizes,
-    storage::{Hash, HashError},
-};
+use crate::state_backend;
+use crate::state_backend::AllocatedOf;
+use crate::state_backend::Atom;
+use crate::state_backend::Cell;
+use crate::state_backend::EnrichedCell;
+use crate::state_backend::EnrichedValue;
+use crate::state_backend::FnManager;
+use crate::state_backend::ManagerBase;
+use crate::state_backend::ManagerClone;
+use crate::state_backend::ManagerRead;
+use crate::state_backend::ManagerReadWrite;
+use crate::state_backend::ManagerSerialise;
+use crate::state_backend::ManagerWrite;
+use crate::state_backend::Ref;
+use crate::state_backend::proof_backend;
+use crate::storage::Hash;
+use crate::storage::HashError;
+use crate::traps::EnvironException;
+use crate::traps::Exception;
 
 /// Mask for getting the offset within a page
 const PAGE_OFFSET_MASK: usize = (1 << PAGE_OFFSET_WIDTH) - 1;
@@ -838,24 +853,32 @@ fn run_instr<MC: MemoryConfig, M: ManagerReadWrite>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        backend_test, create_state,
-        default::ConstDefault,
-        machine_state::{
-            MachineCoreState, MachineCoreStateLayout, MachineState, MachineStateLayout,
-            TestCacheLayouts,
-            address_translation::PAGE_SIZE,
-            block_cache::bcall::{Interpreted, InterpretedBlockBuilder},
-            instruction::{
-                Instruction, OpCode,
-                tagged_instruction::{TaggedArgs, TaggedInstruction, TaggedRegister},
-            },
-            memory::{self, M4K, Memory},
-            mode::Mode,
-            registers::{XRegister, a1, nz, t0, t1},
-        },
-        state_backend::owned_backend::Owned,
-    };
+    use crate::backend_test;
+    use crate::create_state;
+    use crate::default::ConstDefault;
+    use crate::machine_state::MachineCoreState;
+    use crate::machine_state::MachineCoreStateLayout;
+    use crate::machine_state::MachineState;
+    use crate::machine_state::MachineStateLayout;
+    use crate::machine_state::TestCacheLayouts;
+    use crate::machine_state::address_translation::PAGE_SIZE;
+    use crate::machine_state::block_cache::bcall::Interpreted;
+    use crate::machine_state::block_cache::bcall::InterpretedBlockBuilder;
+    use crate::machine_state::instruction::Instruction;
+    use crate::machine_state::instruction::OpCode;
+    use crate::machine_state::instruction::tagged_instruction::TaggedArgs;
+    use crate::machine_state::instruction::tagged_instruction::TaggedInstruction;
+    use crate::machine_state::instruction::tagged_instruction::TaggedRegister;
+    use crate::machine_state::memory;
+    use crate::machine_state::memory::M4K;
+    use crate::machine_state::memory::Memory;
+    use crate::machine_state::mode::Mode;
+    use crate::machine_state::registers::XRegister;
+    use crate::machine_state::registers::a1;
+    use crate::machine_state::registers::nz;
+    use crate::machine_state::registers::t0;
+    use crate::machine_state::registers::t1;
+    use crate::state_backend::owned_backend::Owned;
 
     pub type TestLayout = Layout<TEST_CACHE_BITS, TEST_CACHE_SIZE>;
 

@@ -3,7 +3,11 @@
 // SPDX-License-Identifier: MIT
 
 use super::state::MemoryImpl;
-use crate::state_backend::{AllocatedOf, DynArray, FnManager, ManagerBase, Ref};
+use crate::state_backend::AllocatedOf;
+use crate::state_backend::DynArray;
+use crate::state_backend::FnManager;
+use crate::state_backend::ManagerBase;
+use crate::state_backend::Ref;
 
 /// State layout for the memory component
 pub struct MemoryConfig<const PAGES: usize, const TOTAL_BYTES: usize>(DynArray<TOTAL_BYTES>);

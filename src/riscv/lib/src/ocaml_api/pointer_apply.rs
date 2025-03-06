@@ -4,7 +4,8 @@
 
 //! Defines extension traits for [`ocaml::Pointer`] holding either [`super::ImmutableState<T>`] or a [`super::MutableState<T>`]
 
-use super::move_semantics::{ImmutableState, MutableState};
+use super::move_semantics::ImmutableState;
+use super::move_semantics::MutableState;
 
 ocaml::custom!(ImmutableState<T>);
 ocaml::custom!(MutableState<T>);

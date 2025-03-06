@@ -3,9 +3,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{error::Error, path::Path};
+use std::error::Error;
+use std::path::Path;
 
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::Parser;
+use clap::Subcommand;
+use clap::ValueEnum;
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum Mode {

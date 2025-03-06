@@ -4,14 +4,20 @@
 
 use std::fmt::Debug;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 use thiserror::Error;
 
-use super::{
-    Args, CSRegister, FRegister, InstrRoundingMode, Instruction, NonZeroXRegister, OpCode,
-    XRegister,
-};
-use crate::{default::ConstDefault, parser::instruction::InstrWidth};
+use super::Args;
+use super::CSRegister;
+use super::FRegister;
+use super::InstrRoundingMode;
+use super::Instruction;
+use super::NonZeroXRegister;
+use super::OpCode;
+use super::XRegister;
+use crate::default::ConstDefault;
+use crate::parser::instruction::InstrWidth;
 
 #[derive(Error, Debug)]
 /// Errors that may be returned when converting between tagged and untagged registers.
@@ -368,13 +374,10 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        default::ConstDefault,
-        machine_state::{
-            instruction::Args,
-            registers::{FRegister, XRegister},
-        },
-    };
+    use crate::default::ConstDefault;
+    use crate::machine_state::instruction::Args;
+    use crate::machine_state::registers::FRegister;
+    use crate::machine_state::registers::XRegister;
 
     #[test]
     fn test_miri_instruction_serde() {

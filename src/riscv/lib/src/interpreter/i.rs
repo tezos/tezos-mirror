@@ -6,7 +6,8 @@
 //!
 //! Chapter 5,1 - Unprivileged spec
 
-use crate::{instruction_context::ICB, machine_state::registers::NonZeroXRegister};
+use crate::instruction_context::ICB;
+use crate::machine_state::registers::NonZeroXRegister;
 
 /// Perform `val(rs1) + val(rs2)` and store the result in `rd`
 ///
@@ -29,11 +30,12 @@ pub fn run_add(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::machine_state::{MachineCoreState, memory::M4K};
-    use crate::{
-        backend_test, create_state,
-        machine_state::{MachineCoreStateLayout, registers::nz},
-    };
+    use crate::backend_test;
+    use crate::create_state;
+    use crate::machine_state::MachineCoreState;
+    use crate::machine_state::MachineCoreStateLayout;
+    use crate::machine_state::memory::M4K;
+    use crate::machine_state::registers::nz;
     backend_test!(test_add, F, {
         let imm_rs1_res = [
             (0_i64, 0_u64, 0_u64),

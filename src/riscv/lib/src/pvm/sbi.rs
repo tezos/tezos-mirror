@@ -7,28 +7,49 @@
 
 use std::cmp::min;
 
-use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
-use tezos_smart_rollup_constants::{
-    core::MAX_INPUT_MESSAGE_SIZE,
-    riscv::{
-        REVEAL_DATA_MAX_SIZE, REVEAL_REQUEST_MAX_SIZE, SBI_CONSOLE_PUTCHAR, SBI_DBCN,
-        SBI_DBCN_CONSOLE_WRITE_BYTE, SBI_FIRMWARE_TEZOS, SBI_SHUTDOWN, SBI_SRST,
-        SBI_SRST_SYSTEM_RESET, SBI_TEZOS_BLAKE2B_HASH256, SBI_TEZOS_ED25519_SIGN,
-        SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_REVEAL, SbiError,
-    },
-};
+use ed25519_dalek::Signature;
+use ed25519_dalek::Signer;
+use ed25519_dalek::SigningKey;
+use ed25519_dalek::VerifyingKey;
+use tezos_smart_rollup_constants::core::MAX_INPUT_MESSAGE_SIZE;
+use tezos_smart_rollup_constants::riscv::REVEAL_DATA_MAX_SIZE;
+use tezos_smart_rollup_constants::riscv::REVEAL_REQUEST_MAX_SIZE;
+use tezos_smart_rollup_constants::riscv::SBI_CONSOLE_PUTCHAR;
+use tezos_smart_rollup_constants::riscv::SBI_DBCN;
+use tezos_smart_rollup_constants::riscv::SBI_DBCN_CONSOLE_WRITE_BYTE;
+use tezos_smart_rollup_constants::riscv::SBI_FIRMWARE_TEZOS;
+use tezos_smart_rollup_constants::riscv::SBI_SHUTDOWN;
+use tezos_smart_rollup_constants::riscv::SBI_SRST;
+use tezos_smart_rollup_constants::riscv::SBI_SRST_SYSTEM_RESET;
+use tezos_smart_rollup_constants::riscv::SBI_TEZOS_BLAKE2B_HASH256;
+use tezos_smart_rollup_constants::riscv::SBI_TEZOS_ED25519_SIGN;
+use tezos_smart_rollup_constants::riscv::SBI_TEZOS_ED25519_VERIFY;
+use tezos_smart_rollup_constants::riscv::SBI_TEZOS_INBOX_NEXT;
+use tezos_smart_rollup_constants::riscv::SBI_TEZOS_REVEAL;
+use tezos_smart_rollup_constants::riscv::SbiError;
 
-use super::{PvmHooks, PvmStatus, reveals::RevealRequest};
-use crate::{
-    machine_state::{
-        AccessType, MachineCoreState,
-        memory::{Memory, MemoryConfig},
-        registers::{XRegisters, XValue, a0, a1, a2, a3, a6, a7},
-    },
-    parser::instruction::InstrUncacheable,
-    state_backend::{CellRead, CellReadWrite, CellWrite, ManagerReadWrite, ManagerWrite},
-    traps::EnvironException,
-};
+use super::PvmHooks;
+use super::PvmStatus;
+use super::reveals::RevealRequest;
+use crate::machine_state::AccessType;
+use crate::machine_state::MachineCoreState;
+use crate::machine_state::memory::Memory;
+use crate::machine_state::memory::MemoryConfig;
+use crate::machine_state::registers::XRegisters;
+use crate::machine_state::registers::XValue;
+use crate::machine_state::registers::a0;
+use crate::machine_state::registers::a1;
+use crate::machine_state::registers::a2;
+use crate::machine_state::registers::a3;
+use crate::machine_state::registers::a6;
+use crate::machine_state::registers::a7;
+use crate::parser::instruction::InstrUncacheable;
+use crate::state_backend::CellRead;
+use crate::state_backend::CellReadWrite;
+use crate::state_backend::CellWrite;
+use crate::state_backend::ManagerReadWrite;
+use crate::state_backend::ManagerWrite;
+use crate::traps::EnvironException;
 
 /// Write the SBI error code as the return value.
 #[inline]

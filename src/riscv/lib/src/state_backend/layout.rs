@@ -363,7 +363,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{backend_test, default::ConstDefault};
+    use crate::backend_test;
+    use crate::default::ConstDefault;
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     struct MyFoo(u64);

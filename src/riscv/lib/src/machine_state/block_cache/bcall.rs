@@ -7,22 +7,32 @@
 //!
 //! Currently just for interperation only, but will expand to cover JIT.
 
-use super::{CACHE_INSTR, ICallPlaced, run_instr};
-use crate::{
-    default::ConstDefault,
-    jit::{JCall, JIT, state_access::JitStateAccess},
-    machine_state::{
-        MachineCoreState, ProgramCounterUpdate,
-        instruction::Instruction,
-        memory::{Address, MemoryConfig},
-    },
-    state_backend::hash::Hash,
-    state_backend::{
-        AllocatedOf, Atom, Cell, EnrichedCell, FnManager, ManagerBase, ManagerClone, ManagerRead,
-        ManagerReadWrite, ManagerWrite, Ref,
-    },
-    traps::{EnvironException, Exception},
-};
+use super::CACHE_INSTR;
+use super::ICallPlaced;
+use super::run_instr;
+use crate::default::ConstDefault;
+use crate::jit::JCall;
+use crate::jit::JIT;
+use crate::jit::state_access::JitStateAccess;
+use crate::machine_state::MachineCoreState;
+use crate::machine_state::ProgramCounterUpdate;
+use crate::machine_state::instruction::Instruction;
+use crate::machine_state::memory::Address;
+use crate::machine_state::memory::MemoryConfig;
+use crate::state_backend::AllocatedOf;
+use crate::state_backend::Atom;
+use crate::state_backend::Cell;
+use crate::state_backend::EnrichedCell;
+use crate::state_backend::FnManager;
+use crate::state_backend::ManagerBase;
+use crate::state_backend::ManagerClone;
+use crate::state_backend::ManagerRead;
+use crate::state_backend::ManagerReadWrite;
+use crate::state_backend::ManagerWrite;
+use crate::state_backend::Ref;
+use crate::state_backend::hash::Hash;
+use crate::traps::EnvironException;
+use crate::traps::Exception;
 
 /// A block derived from a sequence of [`Instruction`] that can be directly run
 /// over the [`MachineCoreState`].
@@ -537,13 +547,18 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::{Block, BlockHash, BlockLayout, InlineJit, Interpreted};
-    use crate::{
-        backend_test, create_state,
-        machine_state::{instruction::Instruction, memory::M4K, registers::nz},
-        parser::instruction::InstrWidth,
-        state_backend::test_helpers::TestBackendFactory,
-    };
+    use super::Block;
+    use super::BlockHash;
+    use super::BlockLayout;
+    use super::InlineJit;
+    use super::Interpreted;
+    use crate::backend_test;
+    use crate::create_state;
+    use crate::machine_state::instruction::Instruction;
+    use crate::machine_state::memory::M4K;
+    use crate::machine_state::registers::nz;
+    use crate::parser::instruction::InstrWidth;
+    use crate::state_backend::test_helpers::TestBackendFactory;
 
     macro_rules! run_in_block_impl {
         ($F: ty, $block_name:ident, $bb_name:ident, $expr: block) => {{

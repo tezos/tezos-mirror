@@ -12,10 +12,10 @@
 #![allow(non_snake_case)]
 
 use super::PAGE_OFFSET_WIDTH;
-use crate::{
-    bits::{ones, u64},
-    machine_state::{csregisters::satp::SvLength, memory::Address},
-};
+use crate::bits::ones;
+use crate::bits::u64;
+use crate::machine_state::csregisters::satp::SvLength;
+use crate::machine_state::memory::Address;
 
 /// Obtain `PPN[index]` from a PPN field specified by `sv_length` Standard.
 ///
@@ -93,7 +93,8 @@ pub fn set_ppn_idx(
 mod tests {
     use proptest::proptest;
 
-    use crate::machine_state::csregisters::{CSRRepr, satp::SvLength};
+    use crate::machine_state::csregisters::CSRRepr;
+    use crate::machine_state::csregisters::satp::SvLength;
 
     #[test]
     pub fn test_physical_address() {

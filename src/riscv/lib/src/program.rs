@@ -2,9 +2,13 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{borrow::Cow, collections::BTreeMap, marker::PhantomData};
+use std::borrow::Cow;
+use std::collections::BTreeMap;
+use std::marker::PhantomData;
 
-use crate::{kernel_loader, machine_state::memory, parser::parse_block};
+use crate::kernel_loader;
+use crate::machine_state::memory;
+use crate::parser::parse_block;
 
 /// RISC-V program
 pub struct Program<'a, MC> {
@@ -131,13 +135,17 @@ impl<'a, MC: memory::MemoryConfig> Program<'a, MC> {
 
 #[cfg(test)]
 mod tests {
-    use std::{cell::RefCell, collections::BTreeMap, fs, io::Cursor, marker::PhantomData};
+    use std::cell::RefCell;
+    use std::collections::BTreeMap;
+    use std::fs;
+    use std::io::Cursor;
+    use std::marker::PhantomData;
 
-    use crate::{
-        kernel_loader::{self, Memory},
-        machine_state::memory::{self, M1M},
-        program::Program,
-    };
+    use crate::kernel_loader;
+    use crate::kernel_loader::Memory;
+    use crate::machine_state::memory;
+    use crate::machine_state::memory::M1M;
+    use crate::program::Program;
 
     #[test]
     fn test_impl_memory_program() {

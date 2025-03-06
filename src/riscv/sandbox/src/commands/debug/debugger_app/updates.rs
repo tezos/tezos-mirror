@@ -3,21 +3,26 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{borrow::Cow, collections::HashMap, ops::Range};
+use std::borrow::Cow;
+use std::collections::HashMap;
+use std::ops::Range;
 
-use octez_riscv::{
-    bits::Bits64,
-    machine_state::{
-        AccessType,
-        csregisters::{CSRegister, satp::Satp},
-        memory::{Address, Memory},
-    },
-    parser::{instruction::Instr, parse},
-    state_backend::{ManagerRead, ManagerReadWrite},
-    stepper::{Stepper, StepperStatus},
-};
+use octez_riscv::bits::Bits64;
+use octez_riscv::machine_state::AccessType;
+use octez_riscv::machine_state::csregisters::CSRegister;
+use octez_riscv::machine_state::csregisters::satp::Satp;
+use octez_riscv::machine_state::memory::Address;
+use octez_riscv::machine_state::memory::Memory;
+use octez_riscv::parser::instruction::Instr;
+use octez_riscv::parser::parse;
+use octez_riscv::state_backend::ManagerRead;
+use octez_riscv::state_backend::ManagerReadWrite;
+use octez_riscv::stepper::Stepper;
+use octez_riscv::stepper::StepperStatus;
 
-use super::{DebuggerApp, Instruction, PC_CONTEXT};
+use super::DebuggerApp;
+use super::Instruction;
+use super::PC_CONTEXT;
 
 impl<'a, S> DebuggerApp<'a, S>
 where

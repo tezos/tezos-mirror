@@ -399,9 +399,12 @@ pub type RefProofGenOwnedAlloc<'a, 'b, L> =
 
 #[cfg(test)]
 pub(crate) mod test_helpers {
-    use super::{
-        AllocatedOf, Layout, ManagerClone, ManagerDeserialise, ManagerReadWrite, ManagerSerialise,
-    };
+    use super::AllocatedOf;
+    use super::Layout;
+    use super::ManagerClone;
+    use super::ManagerDeserialise;
+    use super::ManagerReadWrite;
+    use super::ManagerSerialise;
     use crate::jit::state_access::JitStateAccess;
 
     /// Generate a test against all test backends.

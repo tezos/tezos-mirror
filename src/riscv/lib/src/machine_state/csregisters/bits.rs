@@ -171,7 +171,8 @@ pub trait NormaliseFields {
 
 #[cfg(test)]
 mod tests {
-    use crate::bits::{Bits64, ConstantBits};
+    use crate::bits::Bits64;
+    use crate::bits::ConstantBits;
 
     csr! {
         pub struct Test {

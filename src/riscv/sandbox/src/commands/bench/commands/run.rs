@@ -2,37 +2,38 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{
-    collections::HashSet,
-    error::Error,
-    fs,
-    ops::Bound,
-    path::{Path, PathBuf},
-};
+use std::collections::HashSet;
+use std::error::Error;
+use std::fs;
+use std::ops::Bound;
+use std::path::Path;
+use std::path::PathBuf;
 
 use enum_tag::EnumTag;
-use octez_riscv::{
-    machine_state::{
-        AccessType,
-        memory::{Address, Memory},
-    },
-    parser::{instruction::Instr, parse},
-    state_backend::ManagerRead,
-    stepper::{StepResult, Stepper, StepperStatus},
-};
+use octez_riscv::machine_state::AccessType;
+use octez_riscv::machine_state::memory::Address;
+use octez_riscv::machine_state::memory::Memory;
+use octez_riscv::parser::instruction::Instr;
+use octez_riscv::parser::parse;
+use octez_riscv::state_backend::ManagerRead;
+use octez_riscv::stepper::StepResult;
+use octez_riscv::stepper::Stepper;
+use octez_riscv::stepper::StepperStatus;
 
-use crate::{
-    cli::{BenchMode, BenchRunOptions},
-    commands::{
-        bench::{
-            BenchStats,
-            data::{BenchData, FineBenchData, InstrGetError, InstrType, SimpleBenchData},
-            save_to_file, show_results,
-        },
-        run::{BlockImpl, UseStepper, general_run},
-    },
-    format_status,
-};
+use crate::cli::BenchMode;
+use crate::cli::BenchRunOptions;
+use crate::commands::bench::BenchStats;
+use crate::commands::bench::data::BenchData;
+use crate::commands::bench::data::FineBenchData;
+use crate::commands::bench::data::InstrGetError;
+use crate::commands::bench::data::InstrType;
+use crate::commands::bench::data::SimpleBenchData;
+use crate::commands::bench::save_to_file;
+use crate::commands::bench::show_results;
+use crate::commands::run::BlockImpl;
+use crate::commands::run::UseStepper;
+use crate::commands::run::general_run;
+use crate::format_status;
 
 /// Helper function to look in the [`Stepper`] to peek for the current [`Instr`]
 /// Assumes the program counter will be a multiple of 2.

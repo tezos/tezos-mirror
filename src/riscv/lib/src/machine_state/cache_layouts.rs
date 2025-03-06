@@ -8,7 +8,8 @@
 //! In future, this may be expanded to other compile-time-sized types that form
 //! part of the machine state (e.g. main memory).
 
-use super::block_cache::{self, BlockCacheLayout};
+use super::block_cache;
+use super::block_cache::BlockCacheLayout;
 
 /// Configuration bucket for the size of caches.
 pub enum Sizes<const BLOCK_CACHE_BITS: usize, const BLOCK_CACHE_SIZE: usize> {}

@@ -4,16 +4,17 @@
 
 //! Implementations of system calls related to file descriptors
 
-use super::{SupervisorState, error::Error};
-use crate::{
-    machine_state::{
-        MachineCoreState,
-        memory::{Memory, MemoryConfig},
-        registers,
-    },
-    pvm::{PvmHooks, linux::PAGE_SIZE},
-    state_backend::{ManagerBase, ManagerRead, ManagerReadWrite},
-};
+use super::SupervisorState;
+use super::error::Error;
+use crate::machine_state::MachineCoreState;
+use crate::machine_state::memory::Memory;
+use crate::machine_state::memory::MemoryConfig;
+use crate::machine_state::registers;
+use crate::pvm::PvmHooks;
+use crate::pvm::linux::PAGE_SIZE;
+use crate::state_backend::ManagerBase;
+use crate::state_backend::ManagerRead;
+use crate::state_backend::ManagerReadWrite;
 
 /// Hard limit on the number of file descriptors that a system call can work with
 ///

@@ -4,7 +4,8 @@
 
 use std::sync::Once;
 
-use jstz_crypto::{hash::Hash, smart_function_hash::SmartFunctionHash};
+use jstz_crypto::hash::Hash;
+use jstz_crypto::smart_function_hash::SmartFunctionHash;
 use jstz_kernel::TICKETER;
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::prelude::Runtime;

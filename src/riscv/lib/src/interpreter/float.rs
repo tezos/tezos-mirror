@@ -4,23 +4,26 @@
 
 //! Core-logic implementation of F/D instructions.
 
-use std::{
-    fmt::{self, Display},
-    ops::Neg,
-};
+use std::fmt;
+use std::fmt::Display;
+use std::ops::Neg;
 
-use rustc_apfloat::{Float, FloatConvert, Round, Status, StatusAnd};
+use rustc_apfloat::Float;
+use rustc_apfloat::FloatConvert;
+use rustc_apfloat::Round;
+use rustc_apfloat::Status;
+use rustc_apfloat::StatusAnd;
 
-use crate::{
-    machine_state::{
-        csregisters::{CSRRepr, CSRegister, CSRegisters},
-        hart_state::HartState,
-        registers::{FRegister, FValue, XRegister},
-    },
-    parser::instruction::InstrRoundingMode,
-    state_backend as backend,
-    traps::Exception,
-};
+use crate::machine_state::csregisters::CSRRepr;
+use crate::machine_state::csregisters::CSRegister;
+use crate::machine_state::csregisters::CSRegisters;
+use crate::machine_state::hart_state::HartState;
+use crate::machine_state::registers::FRegister;
+use crate::machine_state::registers::FValue;
+use crate::machine_state::registers::XRegister;
+use crate::parser::instruction::InstrRoundingMode;
+use crate::state_backend as backend;
+use crate::traps::Exception;
 
 pub trait FloatExt: Float + Into<FValue> + Copy + Neg + From<FValue> {
     /// The canonical NaN has a positive sign and all

@@ -7,6 +7,7 @@
 //!
 //! Section 8.2 - Unprivileged spec
 
+use crate::machine_state::backend;
 /// Executing a LR.x instructions registers a reservation set on the address
 /// from which data was loaded. The success of a SC.x instruction is conditional
 /// on there being a valid reservation which includes the word or doubleword
@@ -17,7 +18,7 @@
 /// that a hart can only hold one reservation at a time, and that an SC can only
 /// pair with the most recent LR, and LR with the next following SC, in program
 /// order."
-use crate::machine_state::backend::{self, Cell};
+use crate::machine_state::backend::Cell;
 
 pub struct ReservationSet<M: backend::ManagerBase> {
     start_addr: Cell<u64, M>,

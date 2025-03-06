@@ -3,15 +3,15 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{
-    machine_state::{
-        AccessType, MachineCoreState,
-        memory::{self, Memory, OutOfBounds},
-        registers::{NonZeroXRegister, XRegister},
-    },
-    state_backend as backend,
-    traps::Exception,
-};
+use crate::machine_state::AccessType;
+use crate::machine_state::MachineCoreState;
+use crate::machine_state::memory;
+use crate::machine_state::memory::Memory;
+use crate::machine_state::memory::OutOfBounds;
+use crate::machine_state::registers::NonZeroXRegister;
+use crate::machine_state::registers::XRegister;
+use crate::state_backend as backend;
+use crate::traps::Exception;
 
 impl<MC, M> MachineCoreState<MC, M>
 where

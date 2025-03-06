@@ -8,17 +8,22 @@
 pub mod instruction;
 
 use core::ops::Range;
-use std::fmt::{self, Display, Formatter};
+use std::fmt;
+use std::fmt::Display;
+use std::fmt::Formatter;
 
-use arbitrary_int::{u3, u5};
+use arbitrary_int::u3;
+use arbitrary_int::u5;
 use instruction::*;
 
 use crate::bits::u16;
-use crate::machine_state::registers::{NonZeroXRegister, x0};
-use crate::machine_state::{
-    csregisters::CSRegister,
-    registers::{FRegister, XRegister, parse_fregister, parse_xregister},
-};
+use crate::machine_state::csregisters::CSRegister;
+use crate::machine_state::registers::FRegister;
+use crate::machine_state::registers::NonZeroXRegister;
+use crate::machine_state::registers::XRegister;
+use crate::machine_state::registers::parse_fregister;
+use crate::machine_state::registers::parse_xregister;
+use crate::machine_state::registers::x0;
 
 /// Given an instruction encoded as a little-endian `u32`, extract `n` bits
 /// starting at `pos`.
@@ -1419,24 +1424,24 @@ pub fn parse_segment(contents: &[u8], range: Range<usize>) -> Vec<Instr> {
 mod tests {
     use std::collections::HashMap;
 
-    use super::{
-        XRegisterParsed::*,
-        instruction::{
-            CsrArgs, Instr, InstrCacheable::*, NonZeroRdITypeArgs, SBTypeArgs, UJTypeArgs,
-        },
-        parse_block,
-    };
-    use crate::{
-        machine_state::{
-            csregisters::CSRegister::mcause,
-            registers::{NonZeroXRegister, XRegister::*},
-        },
-        parser::{
-            NonZeroRdUJTypeArgs, SplitITypeArgs,
-            instruction::{CIBNZTypeArgs, CIBTypeArgs, InstrUncacheable},
-            parse_compressed_instruction, parse_compressed_instruction_inner,
-        },
-    };
+    use super::XRegisterParsed::*;
+    use super::instruction::CsrArgs;
+    use super::instruction::Instr;
+    use super::instruction::InstrCacheable::*;
+    use super::instruction::NonZeroRdITypeArgs;
+    use super::instruction::SBTypeArgs;
+    use super::instruction::UJTypeArgs;
+    use super::parse_block;
+    use crate::machine_state::csregisters::CSRegister::mcause;
+    use crate::machine_state::registers::NonZeroXRegister;
+    use crate::machine_state::registers::XRegister::*;
+    use crate::parser::NonZeroRdUJTypeArgs;
+    use crate::parser::SplitITypeArgs;
+    use crate::parser::instruction::CIBNZTypeArgs;
+    use crate::parser::instruction::CIBTypeArgs;
+    use crate::parser::instruction::InstrUncacheable;
+    use crate::parser::parse_compressed_instruction;
+    use crate::parser::parse_compressed_instruction_inner;
 
     // rv64ui-p-addiw
     // 0000000080000000 <_start>:

@@ -2,7 +2,9 @@ use std::error::Error;
 
 use itertools::Itertools;
 
-use crate::{cli::BenchCompareOptions, commands::bench::load_from_file, table};
+use crate::cli::BenchCompareOptions;
+use crate::commands::bench::load_from_file;
+use crate::table;
 
 pub fn compare(opts: BenchCompareOptions) -> Result<(), Box<dyn Error>> {
     let files = opts.comparison_files()?;

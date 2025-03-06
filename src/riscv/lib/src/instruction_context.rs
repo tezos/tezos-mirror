@@ -7,16 +7,14 @@
 //! By providing these building blocks for various execution formats, the same implementation can
 //! be used for both interpretation and compilation of instructions.
 
-use crate::{
-    machine_state::{
-        MachineCoreState, ProgramCounterUpdate,
-        instruction::Args,
-        memory::MemoryConfig,
-        registers::{NonZeroXRegister, XValue},
-    },
-    state_backend::ManagerReadWrite,
-    traps::Exception,
-};
+use crate::machine_state::MachineCoreState;
+use crate::machine_state::ProgramCounterUpdate;
+use crate::machine_state::instruction::Args;
+use crate::machine_state::memory::MemoryConfig;
+use crate::machine_state::registers::NonZeroXRegister;
+use crate::machine_state::registers::XValue;
+use crate::state_backend::ManagerReadWrite;
+use crate::traps::Exception;
 
 /// Type of function that may be used to lower [`Instructions`] to IR.
 ///

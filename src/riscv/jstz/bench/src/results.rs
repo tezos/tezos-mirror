@@ -2,14 +2,16 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::collections::HashSet;
+use std::fmt;
 use std::fs::read_to_string;
 use std::path::Path;
 use std::time::Duration;
-use std::{collections::HashSet, fmt};
 
 use regex::Regex;
 use serde::Deserialize;
-use tezos_smart_rollup::utils::inbox::file::{InboxFile, Message};
+use tezos_smart_rollup::utils::inbox::file::InboxFile;
+use tezos_smart_rollup::utils::inbox::file::Message;
 
 use crate::Result;
 

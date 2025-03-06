@@ -6,11 +6,11 @@
 
 use std::mem;
 
-use crate::{
-    machine_state::{MachineCoreState, memory, registers::XRegister},
-    state_backend as backend,
-    traps::Exception,
-};
+use crate::machine_state::MachineCoreState;
+use crate::machine_state::memory;
+use crate::machine_state::registers::XRegister;
+use crate::state_backend as backend;
+use crate::traps::Exception;
 
 pub const SC_SUCCESS: u64 = 0;
 pub const SC_FAILURE: u64 = 1;

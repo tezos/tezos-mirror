@@ -3,18 +3,27 @@
 // SPDX-License-Identifier: MIT
 
 use super::CSRRepr;
-use crate::{
-    bits::{Bits64, ConstantBits},
-    machine_state::csregisters::{
-        effects::{CSREffect, XieEffect},
-        xstatus::{ExtensionValue, MPPValue, MStatus, SPPValue, XLenValue},
-    },
-    state_backend::{
-        AllocatedOf, Atom, Cell, EffectCell, FnManager, ManagerBase, ManagerClone, ManagerRead,
-        ManagerReadWrite, ManagerWrite, Ref,
-    },
-    struct_layout,
-};
+use crate::bits::Bits64;
+use crate::bits::ConstantBits;
+use crate::machine_state::csregisters::effects::CSREffect;
+use crate::machine_state::csregisters::effects::XieEffect;
+use crate::machine_state::csregisters::xstatus::ExtensionValue;
+use crate::machine_state::csregisters::xstatus::MPPValue;
+use crate::machine_state::csregisters::xstatus::MStatus;
+use crate::machine_state::csregisters::xstatus::SPPValue;
+use crate::machine_state::csregisters::xstatus::XLenValue;
+use crate::state_backend::AllocatedOf;
+use crate::state_backend::Atom;
+use crate::state_backend::Cell;
+use crate::state_backend::EffectCell;
+use crate::state_backend::FnManager;
+use crate::state_backend::ManagerBase;
+use crate::state_backend::ManagerClone;
+use crate::state_backend::ManagerRead;
+use crate::state_backend::ManagerReadWrite;
+use crate::state_backend::ManagerWrite;
+use crate::state_backend::Ref;
+use crate::struct_layout;
 
 /// RISCV CSRegister.mstatus register state.
 /// Accounts for CSR rules like WPRI, WARL, WLRL.

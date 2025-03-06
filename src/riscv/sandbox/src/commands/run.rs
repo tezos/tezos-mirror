@@ -3,26 +3,30 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{error::Error, fs, io::Write, ops::Bound};
+use std::error::Error;
+use std::fs;
+use std::io::Write;
+use std::ops::Bound;
 
-use octez_riscv::{
-    machine_state::DefaultCacheLayouts,
-    machine_state::{
-        TestCacheLayouts,
-        block_cache::bcall::{self, Block},
-        memory::M1G,
-    },
-    pvm::PvmHooks,
-    state_backend::owned_backend::Owned,
-    stepper::{StepResult, Stepper, StepperStatus, pvm::PvmStepper, test::TestStepper},
-};
-use tezos_smart_rollup::utils::{console::Console, inbox::InboxBuilder};
+use octez_riscv::machine_state::DefaultCacheLayouts;
+use octez_riscv::machine_state::TestCacheLayouts;
+use octez_riscv::machine_state::block_cache::bcall;
+use octez_riscv::machine_state::block_cache::bcall::Block;
+use octez_riscv::machine_state::memory::M1G;
+use octez_riscv::pvm::PvmHooks;
+use octez_riscv::state_backend::owned_backend::Owned;
+use octez_riscv::stepper::StepResult;
+use octez_riscv::stepper::Stepper;
+use octez_riscv::stepper::StepperStatus;
+use octez_riscv::stepper::pvm::PvmStepper;
+use octez_riscv::stepper::test::TestStepper;
+use tezos_smart_rollup::utils::console::Console;
+use tezos_smart_rollup::utils::inbox::InboxBuilder;
 use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 
-use crate::{
-    cli::{CommonOptions, RunOptions},
-    posix_exit_mode,
-};
+use crate::cli::CommonOptions;
+use crate::cli::RunOptions;
+use crate::posix_exit_mode;
 /// Execution style of blocks
 #[cfg(not(feature = "inline-jit"))]
 pub type BlockImpl = bcall::Interpreted<M1G, Owned>;

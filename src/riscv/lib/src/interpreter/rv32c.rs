@@ -7,17 +7,16 @@
 //!
 //! U:C-16
 
-use crate::{
-    machine_state::{
-        MachineCoreState, ProgramCounterUpdate,
-        hart_state::HartState,
-        memory::{self, Address},
-        registers::{NonZeroXRegister, XRegister},
-    },
-    parser::instruction::InstrWidth,
-    state_backend as backend,
-    traps::Exception,
-};
+use crate::machine_state::MachineCoreState;
+use crate::machine_state::ProgramCounterUpdate;
+use crate::machine_state::hart_state::HartState;
+use crate::machine_state::memory;
+use crate::machine_state::memory::Address;
+use crate::machine_state::registers::NonZeroXRegister;
+use crate::machine_state::registers::XRegister;
+use crate::parser::instruction::InstrWidth;
+use crate::state_backend as backend;
+use crate::traps::Exception;
 
 impl<M> HartState<M>
 where
@@ -134,22 +133,23 @@ where
 
 #[cfg(test)]
 mod tests {
-    use proptest::{prelude::*, prop_assert_eq, proptest};
+    use proptest::prelude::*;
+    use proptest::prop_assert_eq;
+    use proptest::proptest;
 
-    use crate::{
-        backend_test, create_state,
-        interpreter::branching::run_j,
-        machine_state::{
-            MachineCoreState, MachineCoreStateLayout, ProgramCounterUpdate,
-            hart_state::{HartState, HartStateLayout},
-            memory::M4K,
-            registers::{
-                nz::{self, a0},
-                t1,
-            },
-        },
-        parser::instruction::InstrWidth,
-    };
+    use crate::backend_test;
+    use crate::create_state;
+    use crate::interpreter::branching::run_j;
+    use crate::machine_state::MachineCoreState;
+    use crate::machine_state::MachineCoreStateLayout;
+    use crate::machine_state::ProgramCounterUpdate;
+    use crate::machine_state::hart_state::HartState;
+    use crate::machine_state::hart_state::HartStateLayout;
+    use crate::machine_state::memory::M4K;
+    use crate::machine_state::registers::nz;
+    use crate::machine_state::registers::nz::a0;
+    use crate::machine_state::registers::t1;
+    use crate::parser::instruction::InstrWidth;
 
     backend_test!(test_run_j, F, {
         let test_case = [

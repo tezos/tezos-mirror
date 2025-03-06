@@ -4,10 +4,17 @@
 
 use std::marker::PhantomData;
 
-use super::{
-    AllocatedOf, Atom, Cell, FnManager, ManagerBase, ManagerClone, ManagerRead, ManagerReadWrite,
-    ManagerWrite, Ref, StaticCopy,
-};
+use super::AllocatedOf;
+use super::Atom;
+use super::Cell;
+use super::FnManager;
+use super::ManagerBase;
+use super::ManagerClone;
+use super::ManagerRead;
+use super::ManagerReadWrite;
+use super::ManagerWrite;
+use super::Ref;
+use super::StaticCopy;
 use crate::default::ConstDefault;
 
 /// XXX: Workaround trait for not having enum variants as const-generics

@@ -11,10 +11,18 @@ use tezos_smart_rollup_constants::riscv::SbiError;
 use thiserror::Error;
 
 use super::registers::XValue;
-use crate::state_backend::{
-    AllocatedOf, CommitmentLayout, Elem, FnManager, ManagerBase, ManagerClone, ManagerDeserialise,
-    ManagerRead, ManagerSerialise, ManagerWrite, ProofLayout, Ref,
-};
+use crate::state_backend::AllocatedOf;
+use crate::state_backend::CommitmentLayout;
+use crate::state_backend::Elem;
+use crate::state_backend::FnManager;
+use crate::state_backend::ManagerBase;
+use crate::state_backend::ManagerClone;
+use crate::state_backend::ManagerDeserialise;
+use crate::state_backend::ManagerRead;
+use crate::state_backend::ManagerSerialise;
+use crate::state_backend::ManagerWrite;
+use crate::state_backend::ProofLayout;
+use crate::state_backend::Ref;
 
 /// Number of bits needed so you can address every byte in a page
 pub const OFFSET_BITS: u64 = 12;
@@ -128,4 +136,9 @@ pub trait MemoryConfig: 'static {
 }
 
 // Re-export memory configurations
-pub use config::{M1G, M1M, M4G, M4K, M8K, M64M};
+pub use config::M1G;
+pub use config::M1M;
+pub use config::M4G;
+pub use config::M4K;
+pub use config::M8K;
+pub use config::M64M;

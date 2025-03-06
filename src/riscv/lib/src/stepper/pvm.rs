@@ -8,30 +8,42 @@ mod reveals;
 use std::ops::Bound;
 
 use reveals::RevealRequestResponseMap;
-use serde::{Serialize, de::DeserializeOwned};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use tezos_smart_rollup_utils::inbox::Inbox;
 
-use super::{Stepper, StepperStatus};
-use crate::machine_state::{
-    block_cache::bcall::{Block, Interpreted, InterpretedBlockBuilder},
-    memory::{M1G, MemoryConfig},
-};
-use crate::state_backend::{ManagerBase, ManagerReadWrite};
-use crate::{
-    kernel_loader,
-    machine_state::{CacheLayouts, DefaultCacheLayouts, MachineCoreState, MachineError},
-    program::Program,
-    pvm::{Pvm, PvmHooks, PvmLayout, PvmStatus},
-    range_utils::bound_saturating_sub,
-    state_backend::{
-        AllocatedOf, CommitmentLayout, FnManagerIdent, ProofLayout, ProofTree, Ref,
-        hash::Hash,
-        owned_backend::Owned,
-        proof_backend::{ProofGen, proof::Proof},
-        verify_backend::Verifier,
-    },
-    storage::binary,
-};
+use super::Stepper;
+use super::StepperStatus;
+use crate::kernel_loader;
+use crate::machine_state::CacheLayouts;
+use crate::machine_state::DefaultCacheLayouts;
+use crate::machine_state::MachineCoreState;
+use crate::machine_state::MachineError;
+use crate::machine_state::block_cache::bcall::Block;
+use crate::machine_state::block_cache::bcall::Interpreted;
+use crate::machine_state::block_cache::bcall::InterpretedBlockBuilder;
+use crate::machine_state::memory::M1G;
+use crate::machine_state::memory::MemoryConfig;
+use crate::program::Program;
+use crate::pvm::Pvm;
+use crate::pvm::PvmHooks;
+use crate::pvm::PvmLayout;
+use crate::pvm::PvmStatus;
+use crate::range_utils::bound_saturating_sub;
+use crate::state_backend::AllocatedOf;
+use crate::state_backend::CommitmentLayout;
+use crate::state_backend::FnManagerIdent;
+use crate::state_backend::ManagerBase;
+use crate::state_backend::ManagerReadWrite;
+use crate::state_backend::ProofLayout;
+use crate::state_backend::ProofTree;
+use crate::state_backend::Ref;
+use crate::state_backend::hash::Hash;
+use crate::state_backend::owned_backend::Owned;
+use crate::state_backend::proof_backend::ProofGen;
+use crate::state_backend::proof_backend::proof::Proof;
+use crate::state_backend::verify_backend::Verifier;
+use crate::storage::binary;
 
 /// Error during PVM stepping
 #[derive(Debug, derive_more::From, thiserror::Error, derive_more::Display)]

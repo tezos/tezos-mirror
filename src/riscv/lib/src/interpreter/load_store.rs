@@ -1,4 +1,5 @@
-use crate::{instruction_context::ICB, machine_state::registers::NonZeroXRegister};
+use crate::instruction_context::ICB;
+use crate::machine_state::registers::NonZeroXRegister;
 
 /// Loads the immediate `imm` into register `rd_rs1`.
 ///
@@ -28,16 +29,19 @@ pub fn run_li(icb: &mut impl ICB, imm: i64, rd_rs1: NonZeroXRegister) {
 
 #[cfg(test)]
 mod test {
-    use proptest::{arbitrary::any, prop_assert_eq, proptest};
+    use proptest::arbitrary::any;
+    use proptest::prop_assert_eq;
+    use proptest::proptest;
 
-    use crate::{
-        backend_test, create_state,
-        machine_state::{
-            MachineCoreState, MachineCoreStateLayout,
-            memory::M4K,
-            registers::{a2, a3, a4, nz},
-        },
-    };
+    use crate::backend_test;
+    use crate::create_state;
+    use crate::machine_state::MachineCoreState;
+    use crate::machine_state::MachineCoreStateLayout;
+    use crate::machine_state::memory::M4K;
+    use crate::machine_state::registers::a2;
+    use crate::machine_state::registers::a3;
+    use crate::machine_state::registers::a4;
+    use crate::machine_state::registers::nz;
 
     backend_test!(test_run_li, F, {
         let imm_rdrs1_res = [

@@ -4,10 +4,16 @@
 
 use tezos_smart_rollup_constants::riscv::REVEAL_REQUEST_MAX_SIZE;
 
-use crate::state_backend::{
-    AllocatedOf, Atom, Cell, DynArray, DynCells, FnManager, ManagerBase, ManagerClone, ManagerRead,
-    Ref,
-};
+use crate::state_backend::AllocatedOf;
+use crate::state_backend::Atom;
+use crate::state_backend::Cell;
+use crate::state_backend::DynArray;
+use crate::state_backend::DynCells;
+use crate::state_backend::FnManager;
+use crate::state_backend::ManagerBase;
+use crate::state_backend::ManagerClone;
+use crate::state_backend::ManagerRead;
+use crate::state_backend::Ref;
 
 /// Reveal request layout
 pub type RevealRequestLayout = (DynArray<REVEAL_REQUEST_MAX_SIZE>, Atom<u64>);

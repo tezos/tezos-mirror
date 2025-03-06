@@ -7,13 +7,15 @@
 //!
 //! Chapter 8 - Unprivileged spec
 
-use std::ops::{BitAnd, BitOr, BitXor};
+use std::ops::BitAnd;
+use std::ops::BitOr;
+use std::ops::BitXor;
 
-use crate::{
-    machine_state::{MachineCoreState, memory, registers::XRegister},
-    state_backend as backend,
-    traps::Exception,
-};
+use crate::machine_state::MachineCoreState;
+use crate::machine_state::memory;
+use crate::machine_state::registers::XRegister;
+use crate::state_backend as backend;
+use crate::traps::Exception;
 
 impl<MC, M> MachineCoreState<MC, M>
 where
@@ -219,18 +221,21 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::ops::{BitAnd, BitOr, BitXor};
+    use std::ops::BitAnd;
+    use std::ops::BitOr;
+    use std::ops::BitXor;
 
     use proptest::prelude::*;
 
-    use crate::{
-        backend_test, create_state,
-        interpreter::atomics::{SC_FAILURE, SC_SUCCESS},
-        machine_state::{
-            MachineCoreState, MachineCoreStateLayout,
-            registers::{a0, a1, a2},
-        },
-    };
+    use crate::backend_test;
+    use crate::create_state;
+    use crate::interpreter::atomics::SC_FAILURE;
+    use crate::interpreter::atomics::SC_SUCCESS;
+    use crate::machine_state::MachineCoreState;
+    use crate::machine_state::MachineCoreStateLayout;
+    use crate::machine_state::registers::a0;
+    use crate::machine_state::registers::a1;
+    use crate::machine_state::registers::a2;
 
     #[macro_export]
     macro_rules! test_lrsc {

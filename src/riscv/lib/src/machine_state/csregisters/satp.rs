@@ -8,10 +8,9 @@
 #![allow(non_snake_case)]
 
 use super::CSRRepr;
-use crate::{
-    bits::{Bits64, FixedWidthBits},
-    csr,
-};
+use crate::bits::Bits64;
+use crate::bits::FixedWidthBits;
+use crate::csr;
 
 // allowed `MODE` for `satp` register.
 // Section 4.1.11
@@ -112,10 +111,9 @@ impl Satp {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        bits::Bits64,
-        machine_state::csregisters::satp::{Satp, TranslationAlgorithm},
-    };
+    use crate::bits::Bits64;
+    use crate::machine_state::csregisters::satp::Satp;
+    use crate::machine_state::csregisters::satp::TranslationAlgorithm;
 
     #[test]
     fn test_satp_fields() {

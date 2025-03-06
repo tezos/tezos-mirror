@@ -2,9 +2,11 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::io::{Read, Write};
+use std::io::Read;
+use std::io::Write;
 
-use bincode::{DefaultOptions, Options};
+use bincode::DefaultOptions;
+use bincode::Options;
 
 /// Constructs the default options for bincode serialisation and deserialisation.
 #[inline(always)]

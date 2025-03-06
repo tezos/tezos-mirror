@@ -1,14 +1,13 @@
 mod sbi_crypto;
 
 use tezos_crypto_rs::blake2b::digest_256;
-use tezos_smart_rollup::{
-    entrypoint,
-    inbox::{InboxMessage, InternalInboxMessage},
-    michelson::MichelsonUnit,
-    prelude::*,
-    storage::path::OwnedPath,
-    types::SmartRollupAddress,
-};
+use tezos_smart_rollup::entrypoint;
+use tezos_smart_rollup::inbox::InboxMessage;
+use tezos_smart_rollup::inbox::InternalInboxMessage;
+use tezos_smart_rollup::michelson::MichelsonUnit;
+use tezos_smart_rollup::prelude::*;
+use tezos_smart_rollup::storage::path::OwnedPath;
+use tezos_smart_rollup::types::SmartRollupAddress;
 
 #[entrypoint::main]
 pub fn entry(host: &mut impl Runtime) {
