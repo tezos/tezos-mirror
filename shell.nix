@@ -13,7 +13,8 @@
       pkgs.wabt
 
       # Cross-compilation for RISC-V
-      sources.pkgs.pkgsCross.riscv64.pkgsStatic.stdenv.cc
+      pkgs.pkgsCross.riscv64.pkgsStatic.stdenv.cc
+      pkgs.autoconf
 
       # Formatter/LSP for Cargo manifests (and TOML in general)
       pkgs.taplo

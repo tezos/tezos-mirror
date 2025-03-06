@@ -37,6 +37,13 @@ autoconf || {
 
 git apply "$self/riscv-tests-entry-0.patch"
 
+# If this cross-compilation toolchain is in scope, use it.
+# This would be the case in the Nix shell for example.
+if which riscv64-unknown-linux-musl-gcc > /dev/null; then
+  export CC=riscv64-unknown-linux-musl-cc
+  export RISCV_PREFIX=riscv64-unknown-linux-musl-
+fi
+
 ./configure || {
   echo "configure failed" >&2
   clean_up 1
