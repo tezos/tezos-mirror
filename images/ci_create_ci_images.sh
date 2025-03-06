@@ -84,9 +84,6 @@ if [ "$exists" = "true" ]; then
   exit 0
 fi
 
-# Export npm registry token to build context
-echo -n "$(gcloud auth print-access-token)" > /tmp/npm_token.txt
-
 echo "Build CI images with image_tag_suffix $image_tag_suffix"
 
 ./images/create_ci_images.sh \
@@ -101,6 +98,7 @@ echo "Build CI images with image_tag_suffix $image_tag_suffix"
   --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
   --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
   --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
+  --secret "id=npm_token,src=/tmp/npm_token.txt" \
   --push
 
 ./images/ci/scripts/check_versions.sh \
