@@ -712,7 +712,7 @@ struct
     let* r = protect_result ~canceler:w.canceler (fun () -> loop ()) in
     match r with
     | Ok () -> Lwt.return_unit
-    | Error Lwt.Canceled | Error Lwt_pipe.Closed | Error Lwt_dropbox.Closed ->
+    | Error (Lwt.Canceled | Lwt_pipe.Closed | Lwt_dropbox.Closed) ->
         let* () = Worker_events.(emit terminated) () in
         close handlers w None
     | Error exn ->
