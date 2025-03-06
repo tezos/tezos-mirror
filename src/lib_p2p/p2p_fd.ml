@@ -163,9 +163,8 @@ let string_of_sockaddr addr =
 
 let id t = t.id
 
-let raw_socket () =
+let socket_setopt_user_timeout sock =
   let open Lwt_syntax in
-  let sock = Lwt_unix.socket ~cloexec:true PF_INET6 SOCK_STREAM 0 in
   (* By setting [TCP_USER_TIMEOUT], we ensure that a dead connection is reported
      after at most [ms] milliseconds. This option allows the connection timeout
      to be much shorter than the default behavior—which can last several minutes
@@ -186,23 +185,22 @@ let raw_socket () =
       | Some value -> Some (int_of_string value)
     with _ -> Some default
   in
-  let* sock =
-    match ms_opt with
-    | None -> (* The user opt-out from the socket option *) Lwt.return sock
-    | Some ms -> (
-        match
-          Socket.set_tcp_user_timeout (Lwt_unix.unix_file_descr sock) ~ms
-        with
-        | Ok () | Error `Unsupported -> Lwt.return sock
-        | Error (`Unix_error exn) ->
-            (* Socket option [TCP_USER_TIMEOUT] is not mandatory, this is why we only emit an
-               event at [Info] level. *)
-            let* () =
-              Events.(emit set_socket_option_tcp_user_timeout_failed)
-                [Error_monad.error_of_exn exn]
-            in
-            Lwt.return sock)
-  in
+  match ms_opt with
+  | None -> (* The user opt-out from the socket option *) Lwt.return sock
+  | Some ms -> (
+      match Socket.set_tcp_user_timeout (Lwt_unix.unix_file_descr sock) ~ms with
+      | Ok () | Error `Unsupported -> Lwt.return sock
+      | Error (`Unix_error exn) ->
+          (* Socket option [TCP_USER_TIMEOUT] is not mandatory, this is why we only emit an
+             event at [Info] level. *)
+          let* () =
+            Events.(emit set_socket_option_tcp_user_timeout_failed)
+              [Error_monad.error_of_exn exn]
+          in
+          Lwt.return sock)
+
+let socket_setopt_keepalive sock =
+  let open Lwt_syntax in
   (* By setting [TCP_KEEPALIVE], we ensure that the connection stays alive
      for NAT or firewalls between the node and the other peer. If no TCP
      packet is sent after [ms] milliseconds, an empty TCP message will be
@@ -241,6 +239,12 @@ let raw_socket () =
               [Error_monad.error_of_exn exn]
           in
           Lwt.return sock)
+
+let raw_socket () =
+  let open Lwt_syntax in
+  let sock = Lwt_unix.socket ~cloexec:true PF_INET6 SOCK_STREAM 0 in
+  let* sock = socket_setopt_user_timeout sock in
+  socket_setopt_keepalive sock
 
 let socket () =
   let open Lwt_syntax in
