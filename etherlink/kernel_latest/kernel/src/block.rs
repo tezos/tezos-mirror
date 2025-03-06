@@ -18,6 +18,7 @@ use crate::configuration::ConfigurationMode;
 use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
 use crate::event::Event;
+use crate::l2block::L2Block;
 use crate::storage;
 use crate::transaction::Transaction;
 use crate::upgrade;
@@ -33,7 +34,6 @@ use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::trace::TracerInput;
 use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockConstants;
-use tezos_ethereum::block::EthBlock;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::runtime::Runtime;
@@ -41,6 +41,7 @@ use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::Path;
+use tezos_tezlink::block::TezBlock;
 use tick_model::estimate_remaining_ticks_for_transaction_execution;
 
 pub const GENESIS_PARENT_HASH: H256 = H256([0xff; 32]);
@@ -77,7 +78,7 @@ pub enum BlockComputationResult {
     RebootNeeded,
     Finished {
         included_delayed_transactions: Vec<TransactionHash>,
-        block: Box<EthBlock>,
+        block: L2Block,
     },
 }
 
@@ -249,14 +250,14 @@ fn compute<Host: Runtime>(
 #[allow(clippy::large_enum_variant)]
 pub enum BlockInProgress {
     Etherlink(EthBlockInProgress),
-    Tezlink(U256),
+    Tezlink(U256, Timestamp),
 }
 
 impl BlockInProgress {
     pub fn number(&self) -> U256 {
         match self {
             Self::Etherlink(bip) => bip.number,
-            Self::Tezlink(n) => *n,
+            Self::Tezlink(n, _) => *n,
         }
     }
 }
@@ -350,7 +351,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
                     )))
                 }
                 ChainConfig::Michelson(_) => Ok(BlueprintParsing::Next(Box::new(
-                    BlockInProgress::Tezlink(next_bip_number),
+                    BlockInProgress::Tezlink(next_bip_number, blueprint.timestamp),
                 ))),
             }
         }
@@ -419,7 +420,7 @@ fn compute_bip<Host: Runtime>(
                 .context("Failed to finalize the block in progress")?;
             Ok(BlockComputationResult::Finished {
                 included_delayed_transactions,
-                block: Box::new(new_block),
+                block: L2Block::Etherlink(Box::new(new_block)),
             })
         }
     }
@@ -588,14 +589,22 @@ pub fn produce<Host: Runtime>(
                 &chain_config.evm_config,
             )
         }
-        (ChainConfig::Michelson(_), BlockInProgress::Tezlink(number)) => {
+        (ChainConfig::Michelson(_), BlockInProgress::Tezlink(number, timestamp)) => {
             log!(
                 safe_host,
                 Debug,
                 "Computing the BlockInProgress for Tezlink at level {}",
                 number
             );
-            return Ok(ComputationResult::Finished);
+            Ok(BlockComputationResult::Finished {
+                included_delayed_transactions: vec![],
+                block: L2Block::Tezlink(TezBlock {
+                    number,
+                    hash: TezBlock::genesis_block_hash(),
+                    timestamp,
+                    previous_hash: TezBlock::genesis_block_hash(),
+                }),
+            })
         }
         (_, _) => {
             // This case should be correctly handled by this MR https://gitlab.com/tezos/tezos/-/merge_requests/17259
@@ -612,12 +621,11 @@ pub fn produce<Host: Runtime>(
             included_delayed_transactions,
             block,
         }) => {
-            let block_header: BlockHeader<ChainHeader> = (*block).into();
             promote_block(
                 &mut safe_host,
                 &outbox_queue,
                 &block_in_progress_provenance,
-                block_header,
+                block.header(),
                 config,
                 included_delayed_transactions,
             )?;

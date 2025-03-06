@@ -31,6 +31,7 @@ use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_storage::{read_rlp, store_read_slice, store_rlp};
+use tezos_tezlink::block::TezBlock;
 
 pub const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/evm/blueprints");
 
@@ -142,6 +143,18 @@ impl From<EthBlock> for BlockHeader<ChainHeader> {
                 receipts_root: block.receipts_root,
                 transactions_root: block.transactions_root,
             }),
+        }
+    }
+}
+
+impl From<TezBlock> for BlockHeader<ChainHeader> {
+    fn from(block: TezBlock) -> Self {
+        Self {
+            blueprint_header: BlueprintHeader {
+                number: block.number,
+                timestamp: block.timestamp,
+            },
+            chain_header: ChainHeader::Tez(TezBlockHeader { hash: block.hash }),
         }
     }
 }
@@ -723,7 +736,6 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::public_key::PublicKey;
     use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime; // Used to put traits interface in the scope
-    use tezos_tezlink::block::TezBlock;
 
     fn test_invalid_sequencer_blueprint_is_removed(enable_dal: bool) {
         let mut host = MockKernelHost::default();
