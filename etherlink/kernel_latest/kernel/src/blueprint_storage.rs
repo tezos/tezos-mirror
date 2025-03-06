@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::block::GENESIS_PARENT_HASH;
 use crate::blueprint::Blueprint;
 use crate::chains::ChainFamily;
 use crate::configuration::{Configuration, ConfigurationMode};
@@ -129,6 +130,36 @@ pub struct TezBlockHeader {
 pub enum ChainHeader {
     Tez(TezBlockHeader),
     Eth(EVMBlockHeader),
+}
+
+impl ChainHeader {
+    fn evm_genesis() -> Self {
+        Self::Eth(EVMBlockHeader {
+            hash: GENESIS_PARENT_HASH,
+            receipts_root: vec![0; 32],
+            transactions_root: vec![0; 32],
+        })
+    }
+
+    fn tez_genesis() -> Self {
+        Self::Tez(TezBlockHeader {
+            hash: TezBlock::genesis_block_hash(),
+        })
+    }
+
+    pub fn genesis_header(chain_family: ChainFamily) -> ChainHeader {
+        match chain_family {
+            ChainFamily::Evm => Self::evm_genesis(),
+            ChainFamily::Michelson => Self::tez_genesis(),
+        }
+    }
+
+    pub fn hash(&self) -> H256 {
+        match self {
+            Self::Eth(header) => header.hash,
+            Self::Tez(header) => header.hash,
+        }
+    }
 }
 
 impl From<EthBlock> for BlockHeader<ChainHeader> {
@@ -487,7 +518,7 @@ fn parse_and_validate_blueprint<Host: Runtime>(
     current_blueprint_size: usize,
     evm_node_flag: bool,
     max_blueprint_lookahead_in_seconds: i64,
-    parent_hash: H256,
+    parent_chain_header: &ChainHeader,
     head_timestamp: Timestamp,
 ) -> anyhow::Result<(BlueprintValidity, usize)> {
     // Decode
@@ -496,7 +527,7 @@ fn parse_and_validate_blueprint<Host: Runtime>(
         Ok(blueprint_with_hashes) => {
             // Validate parent hash
             #[cfg(not(feature = "benchmark"))]
-            if parent_hash != blueprint_with_hashes.parent_hash {
+            if parent_chain_header.hash() != blueprint_with_hashes.parent_hash {
                 return Ok((BlueprintValidity::InvalidParentHash, bytes.len()));
             }
 
@@ -572,7 +603,7 @@ fn read_all_chunks_and_validate<Host: Runtime>(
     blueprint_path: &OwnedPath,
     nb_chunks: u16,
     config: &mut Configuration,
-    parent_hash: H256,
+    previous_chain_header: &ChainHeader,
     previous_timestamp: Timestamp,
 ) -> anyhow::Result<(Option<Blueprint>, usize)> {
     let mut chunks = vec![];
@@ -614,7 +645,7 @@ fn read_all_chunks_and_validate<Host: Runtime>(
                 size,
                 *evm_node_flag,
                 *max_blueprint_lookahead_in_seconds,
-                parent_hash,
+                previous_chain_header,
                 previous_timestamp,
             )?;
             if let (BlueprintValidity::Valid(blueprint), size_with_delayed_transactions) =
@@ -639,8 +670,8 @@ pub fn read_blueprint<Host: Runtime>(
     host: &mut Host,
     config: &mut Configuration,
     number: U256,
-    parent_hash: H256,
     previous_timestamp: Timestamp,
+    previous_chain_header: &ChainHeader,
 ) -> anyhow::Result<(Option<Blueprint>, usize)> {
     let blueprint_path = blueprint_path(number)?;
     let exists = host.store_has(&blueprint_path)?.is_some();
@@ -661,7 +692,7 @@ pub fn read_blueprint<Host: Runtime>(
                 &blueprint_path,
                 nb_chunks,
                 config,
-                parent_hash,
+                previous_chain_header,
                 previous_timestamp,
             )?;
             Ok((blueprint, size))
@@ -693,17 +724,24 @@ pub fn read_next_blueprint<Host: Runtime>(
     host: &mut Host,
     config: &mut Configuration,
 ) -> anyhow::Result<(Option<Blueprint>, usize)> {
-    use crate::block_storage;
-    let (number, parent_hash, previous_timestamp) =
-        match block_storage::read_current(host) {
-            Ok(block) => (block.number + 1, block.hash, block.timestamp),
+    let chain_family = config.chain_config.get_chain_family();
+    let (number, previous_timestamp, block_header) =
+        match read_current_block_header_for_family(host, &chain_family) {
+            Ok(BlockHeader {
+                blueprint_header,
+                chain_header,
+            }) => (
+                blueprint_header.number + 1,
+                blueprint_header.timestamp,
+                chain_header,
+            ),
             Err(_) => (
                 U256::zero(),
-                crate::block::GENESIS_PARENT_HASH,
                 Timestamp::from(0),
+                ChainHeader::genesis_header(chain_family),
             ),
         };
-    read_blueprint(host, config, number, parent_hash, previous_timestamp)
+    read_blueprint(host, config, number, previous_timestamp, &block_header)
 }
 
 pub fn drop_blueprint<Host: Runtime>(host: &mut Host, number: U256) -> Result<(), Error> {
@@ -809,7 +847,11 @@ mod tests {
             0,
             false,
             500,
-            GENESIS_PARENT_HASH,
+            &ChainHeader::Eth(EVMBlockHeader {
+                hash: GENESIS_PARENT_HASH,
+                receipts_root: vec![0; 32],
+                transactions_root: vec![0; 32],
+            }),
             Timestamp::from(0),
         )
         .expect("Should be able to parse blueprint");
@@ -871,7 +913,11 @@ mod tests {
             0,
             false,
             500,
-            GENESIS_PARENT_HASH,
+            &ChainHeader::Eth(EVMBlockHeader {
+                hash: GENESIS_PARENT_HASH,
+                receipts_root: vec![0; 32],
+                transactions_root: vec![0; 32],
+            }),
             Timestamp::from(0),
         )
         .expect("Should be able to parse blueprint");

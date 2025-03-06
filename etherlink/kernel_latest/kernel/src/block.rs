@@ -10,8 +10,7 @@ use crate::apply::{
 };
 use crate::blueprint_storage::{
     drop_blueprint, read_blueprint, read_current_block_header_for_family,
-    store_current_block_header, BlockHeader, BlueprintHeader, ChainHeader,
-    EVMBlockHeader,
+    store_current_block_header, BlockHeader, ChainHeader,
 };
 use crate::chains::{ChainConfig, EvmLimits};
 use crate::configuration::ConfigurationMode;
@@ -275,43 +274,24 @@ fn next_bip_from_blueprints<Host: Runtime>(
     kernel_upgrade: &Option<KernelUpgrade>,
 ) -> Result<BlueprintParsing, anyhow::Error> {
     let chain_family = config.chain_config.get_chain_family();
-    let (
-        next_bip_number,
-        next_bip_parent_hash,
-        previous_timestamp,
-        receipts_root,
-        transactions_root,
-    ) = match read_current_block_header_for_family(host, &chain_family) {
-        Ok(BlockHeader {
-            blueprint_header: BlueprintHeader { number, timestamp },
-            chain_header:
-                ChainHeader::Eth(EVMBlockHeader {
-                    hash,
-                    receipts_root,
-                    transactions_root,
-                }),
-        }) => (
-            number + 1,
-            hash,
-            timestamp,
-            receipts_root,
-            transactions_root,
-        ),
-        _ => (
-            U256::zero(),
-            GENESIS_PARENT_HASH,
-            Timestamp::from(0),
-            vec![0; 32],
-            vec![0; 32],
-        ),
-    };
-    let (blueprint, size) = read_blueprint(
-        host,
-        config,
-        next_bip_number,
-        next_bip_parent_hash,
-        previous_timestamp,
-    )?;
+    let (next_bip_number, timestamp, chain_header) =
+        match read_current_block_header_for_family(host, &chain_family) {
+            Err(_) => (
+                U256::zero(),
+                Timestamp::from(0),
+                ChainHeader::genesis_header(chain_family),
+            ),
+            Ok(BlockHeader {
+                blueprint_header,
+                chain_header,
+            }) => (
+                blueprint_header.number + 1,
+                blueprint_header.timestamp,
+                chain_header,
+            ),
+        };
+    let (blueprint, size) =
+        read_blueprint(host, config, next_bip_number, timestamp, &chain_header)?;
     log!(host, Benchmarking, "Size of blueprint: {}", size);
     match blueprint {
         Some(blueprint) => {
@@ -323,8 +303,8 @@ fn next_bip_from_blueprints<Host: Runtime>(
                     return Ok(BlueprintParsing::None);
                 }
             }
-            match &config.chain_config {
-                ChainConfig::Evm(chain_config) => {
+            match (&config.chain_config, chain_header) {
+                (ChainConfig::Evm(chain_config), ChainHeader::Eth(header)) => {
                     let gas_price = crate::gas_price::base_fee_per_gas(
                         host,
                         blueprint.timestamp,
@@ -334,11 +314,11 @@ fn next_bip_from_blueprints<Host: Runtime>(
                     let bip = block_in_progress::EthBlockInProgress::from_blueprint(
                         blueprint,
                         next_bip_number,
-                        next_bip_parent_hash,
+                        header.hash,
                         tick_counter.c,
                         gas_price,
-                        receipts_root,
-                        transactions_root,
+                        header.receipts_root,
+                        header.transactions_root,
                     );
 
                     tezos_evm_logging::log!(
@@ -350,9 +330,20 @@ fn next_bip_from_blueprints<Host: Runtime>(
                         BlockInProgress::Etherlink(bip),
                     )))
                 }
-                ChainConfig::Michelson(_) => Ok(BlueprintParsing::Next(Box::new(
-                    BlockInProgress::Tezlink(next_bip_number, blueprint.timestamp),
-                ))),
+                (ChainConfig::Michelson(_), ChainHeader::Tez(_)) => {
+                    Ok(BlueprintParsing::Next(Box::new(BlockInProgress::Tezlink(
+                        next_bip_number,
+                        blueprint.timestamp,
+                    ))))
+                }
+                (_, _) => {
+                    log!(
+                        host,
+                        Fatal,
+                        "Incoherent state between the configuration and the header read in the durable storage"
+                    );
+                    Ok(BlueprintParsing::None)
+                }
             }
         }
         None => Ok(BlueprintParsing::None),
