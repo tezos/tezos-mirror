@@ -272,6 +272,8 @@ impl<MC: MemoryConfig, M: JitStateAccess> Default for JIT<MC, M> {
 
 #[cfg(test)]
 mod tests {
+    use Instruction as I;
+
     use super::*;
     use crate::backend_test;
     use crate::create_state;
@@ -284,10 +286,10 @@ mod tests {
     use crate::machine_state::block_cache::bcall::InterpretedBlockBuilder;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::memory::MemoryConfig;
-    use crate::parser::instruction::InstrWidth;
     use crate::parser::instruction::InstrWidth::*;
     use crate::state_backend::FnManagerIdent;
     use crate::state_backend::ManagerRead;
+    use crate::state_backend::test_helpers::TestBackendFactory;
     use crate::state_backend::test_helpers::assert_eq_struct;
 
     fn instructions<MC: MemoryConfig, M>(block: &Interpreted<MC, M>) -> Vec<Instruction>
@@ -298,550 +300,404 @@ mod tests {
         instr.iter().map(|cell| cell.read_stored()).collect()
     }
 
-    // Simplified variant of the `Cached` structure in the block cache.
-    backend_test!(test_cnop, F, {
-        use Instruction as I;
+    type SetupHook<F> = dyn Fn(&mut MachineCoreState<M4K, <F as TestBackendFactory>::Manager>);
+    type AssertHook<F> = dyn Fn(&MachineCoreState<M4K, <F as TestBackendFactory>::Manager>);
 
-        // Arrange
-        let scenarios: &[&[I]] = &[
-            &[I::new_nop(Compressed)],
-            &[I::new_nop(Compressed), I::new_nop(Uncompressed)],
-            &[
+    struct Scenario<'a, F: TestBackendFactory> {
+        initial_pc: Option<u64>,
+        expected_steps: Option<usize>,
+        instructions: Vec<Instruction>,
+        setup_hook: &'a SetupHook<F>,
+        assert_hook: &'a AssertHook<F>,
+    }
+
+    impl<'a, F: TestBackendFactory> Scenario<'a, F> {
+        fn simple(instructions: &[Instruction]) -> Self {
+            Scenario {
+                initial_pc: None,
+                expected_steps: None,
+                instructions: instructions.to_vec(),
+                setup_hook: &|_| {},
+                assert_hook: &|_| {},
+            }
+        }
+
+        /// Run a test scenario over both the Interpreted & JIT modes of compilation,
+        /// to ensure they behave identically.
+        fn run(
+            &self,
+            jit: &mut JIT<M4K, F::Manager>,
+            interpreted_bb: &mut InterpretedBlockBuilder,
+        ) {
+            // Create the states for the interpreted and jitted runs.
+            let mut interpreted =
+                create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+
+            let hash = super::Hash::blake2b_hash(&self.instructions).unwrap();
+
+            // Create the block of instructions.
+            let mut block = create_state!(Interpreted, BlockLayout, F, M4K);
+            block.start_block();
+            for instr in self.instructions.iter() {
+                block.push_instr(*instr);
+            }
+
+            // Run the setup hooks.
+            (self.setup_hook)(&mut interpreted);
+            (self.setup_hook)(&mut jitted);
+
+            // initialise starting parameters: pc, steps
+            let initial_pc = self.initial_pc.unwrap_or_default();
+            let mut interpreted_steps = 0;
+            let mut jitted_steps = 0;
+            interpreted.hart.pc.write(initial_pc);
+            jitted.hart.pc.write(initial_pc);
+
+            // Create the JIT function.
+            let fun = jit
+                .compile(&hash, instructions(&block).as_slice())
+                .expect("Compilation of block should succeed.");
+
+            // Run the block in both interpreted and jitted mode.
+            let interpreted_res = unsafe {
+                // SAFETY: interpreted blocks are always callable
+                block.callable(interpreted_bb)
+            }
+            .unwrap()
+            .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
+            let jitted_res = unsafe {
+                // # Safety - the block builder is alive for at least
+                //            the duration of the `run` function.
+                fun.call(&mut jitted, initial_pc, &mut jitted_steps)
+            };
+
+            // Assert state equality.
+            assert_eq!(jitted_res, interpreted_res);
+            assert_eq!(
+                interpreted_steps, jitted_steps,
+                "Interpreted mode ran for {interpreted_steps}, compared to jit-mode of {jitted_steps}"
+            );
+            assert_eq_struct(
+                &interpreted.struct_ref::<FnManagerIdent>(),
+                &jitted.struct_ref::<FnManagerIdent>(),
+            );
+
+            // Only check steps against one state, as we know both interpreted/jit steps are equal.
+            let expected_steps = self.expected_steps.unwrap_or(self.instructions.len());
+            assert_eq!(
+                interpreted_steps, expected_steps,
+                "Scenario ran for {interpreted_steps} steps, but expected {expected_steps}"
+            );
+
+            // Run the assert hooks. Since we have already verified that the states are equal,
+            // we can run the assert hooks on just the interpreted state.
+            (self.assert_hook)(&interpreted);
+        }
+    }
+
+    /// A builder for creating scenarios.
+    struct ScenarioBuilder<'a, F: TestBackendFactory> {
+        initial_pc: Option<u64>,
+        expected_steps: Option<usize>,
+        instructions: Vec<Instruction>,
+        setup_hook: &'a SetupHook<F>,
+        assert_hook: &'a AssertHook<F>,
+    }
+
+    impl<'a, F: TestBackendFactory> Default for ScenarioBuilder<'a, F> {
+        fn default() -> Self {
+            ScenarioBuilder {
+                initial_pc: None,
+                expected_steps: None,
+                instructions: Vec::new(),
+                setup_hook: &|_| {},
+                assert_hook: &|_| {},
+            }
+        }
+    }
+
+    impl<'a, F: TestBackendFactory> ScenarioBuilder<'a, F> {
+        fn set_instructions(mut self, instructions: &[Instruction]) -> Self {
+            self.instructions = instructions.to_vec();
+            self
+        }
+
+        fn set_initial_pc(mut self, initial_pc: u64) -> Self {
+            self.initial_pc = Some(initial_pc);
+            self
+        }
+
+        fn set_expected_steps(mut self, expected_steps: usize) -> Self {
+            self.expected_steps = Some(expected_steps);
+            self
+        }
+
+        fn set_assert_hook(mut self, assert_hook: &'a AssertHook<F>) -> Self {
+            self.assert_hook = assert_hook;
+            self
+        }
+
+        fn build(self) -> Scenario<'a, F> {
+            Scenario {
+                initial_pc: self.initial_pc,
+                expected_steps: self.expected_steps,
+                instructions: self.instructions,
+                setup_hook: self.setup_hook,
+                assert_hook: self.assert_hook,
+            }
+        }
+    }
+
+    backend_test!(test_cnop, F, {
+        let scenarios: &[Scenario<'_, F>] = &[
+            Scenario::simple(&[I::new_nop(Compressed)]),
+            Scenario::simple(&[I::new_nop(Compressed), I::new_nop(Uncompressed)]),
+            Scenario::simple(&[
                 I::new_nop(Uncompressed),
                 I::new_nop(Compressed),
                 I::new_nop(Uncompressed),
-            ],
+            ]),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
         let mut interpreted_bb = InterpretedBlockBuilder;
 
         for scenario in scenarios {
-            let mut interpreted =
-                create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
-            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
-            let mut block = create_state!(Interpreted, BlockLayout, F, M4K);
-
-            let hash = super::Hash::blake2b_hash(scenario).unwrap();
-
-            block.start_block();
-            for instr in scenario.iter() {
-                block.push_instr(*instr);
-            }
-
-            let mut interpreted_steps = 0;
-            let mut jitted_steps = 0;
-
-            let initial_pc = 0;
-            interpreted.hart.pc.write(initial_pc);
-            jitted.hart.pc.write(initial_pc);
-
-            // Act
-            let fun = jit
-                .compile(&hash, instructions(&block).as_slice())
-                .expect("Compilation of CNop should succeed");
-
-            let interpreted_res = unsafe {
-                // SAFETY: interpreted blocks are always callable
-                block.callable(&mut interpreted_bb)
-            }
-            .unwrap()
-            .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
-            let jitted_res = unsafe {
-                // # Safety - the jit is not dropped until after we
-                //            exit the for loop
-                fun.call(&mut jitted, initial_pc, &mut jitted_steps)
-            };
-
-            // Assert
-            assert_eq!(jitted_res, interpreted_res);
-            assert_eq!(
-                interpreted_steps, jitted_steps,
-                "Interpreted mode ran for {interpreted_steps}, compared to jit-mode of {jitted_steps}"
-            );
-
-            assert_eq!(interpreted_steps, scenario.len());
-
-            assert_eq_struct(
-                &interpreted.struct_ref::<FnManagerIdent>(),
-                &jitted.struct_ref::<FnManagerIdent>(),
-            );
+            scenario.run(&mut jit, &mut interpreted_bb);
         }
     });
 
     backend_test!(test_cmv, F, {
-        use Instruction as I;
-
         use crate::machine_state::registers::NonZeroXRegister::*;
 
+        let assert_x2_is_one = |core: &MachineCoreState<M4K, F::Manager>| {
+            assert_eq!(core.hart.xregisters.read_nz(x2), 1);
+        };
+
         // Arrange
-        let scenarios: &[&[I]] = &[
-            &[I::new_li(x1, 1, Compressed), I::new_mv(x2, x1, Compressed)],
-            &[
-                I::new_li(x1, 1, Uncompressed),
-                I::new_mv(x2, x1, Uncompressed),
-            ],
-            &[
-                I::new_li(x1, 1, Uncompressed),
-                I::new_mv(x2, x1, Compressed),
-                I::new_mv(x3, x2, Uncompressed),
-            ],
+        let scenarios: &[Scenario<'_, F>] = &[
+            ScenarioBuilder::default()
+                .set_instructions(&[I::new_li(x1, 1, Compressed), I::new_mv(x2, x1, Compressed)])
+                .set_assert_hook(&assert_x2_is_one)
+                .build(),
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(x1, 1, Uncompressed),
+                    I::new_mv(x2, x1, Uncompressed),
+                ])
+                .set_assert_hook(&assert_x2_is_one)
+                .build(),
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(x1, 1, Compressed),
+                    I::new_mv(x2, x1, Compressed),
+                    I::new_mv(x3, x2, Compressed),
+                ])
+                .set_assert_hook(&assert_x2_is_one)
+                .build(),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
         let mut interpreted_bb = InterpretedBlockBuilder;
 
         for scenario in scenarios {
-            let mut interpreted =
-                create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
-            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
-            let mut block = create_state!(Interpreted, BlockLayout, F, M4K);
-
-            let hash = super::Hash::blake2b_hash(scenario).unwrap();
-
-            block.start_block();
-            for instr in scenario.iter() {
-                block.push_instr(*instr);
-            }
-
-            let mut interpreted_steps = 0;
-            let mut jitted_steps = 0;
-
-            let initial_pc = 0;
-            interpreted.hart.pc.write(initial_pc);
-            jitted.hart.pc.write(initial_pc);
-
-            // Act
-            let fun = jit
-                .compile(&hash, instructions(&block).as_slice())
-                .expect("Compilation should succeed");
-
-            let interpreted_res = unsafe {
-                // SAFETY: interpreted blocks are always callable
-                block.callable(&mut interpreted_bb)
-            }
-            .unwrap()
-            .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
-            let jitted_res = unsafe {
-                // # Safety - the jit is not dropped until after we
-                //            exit the for loop
-                fun.call(&mut jitted, initial_pc, &mut jitted_steps)
-            };
-
-            // Assert
-            assert_eq!(jitted_res, interpreted_res);
-            assert_eq!(
-                interpreted_steps, jitted_steps,
-                "Interpreted mode ran for {interpreted_steps}, compared to jit-mode of {jitted_steps}"
-            );
-
-            assert_eq!(interpreted_steps, scenario.len());
-
-            // every scenario expects x2 to be 1 after
-            assert_eq!(interpreted.hart.xregisters.read_nz(x2), 1);
-            assert_eq!(jitted.hart.xregisters.read_nz(x2), 1);
-
-            assert_eq_struct(
-                &interpreted.struct_ref::<FnManagerIdent>(),
-                &jitted.struct_ref::<FnManagerIdent>(),
-            );
+            scenario.run(&mut jit, &mut interpreted_bb);
         }
     });
 
     backend_test!(test_add, F, {
-        use Instruction as I;
-
         use crate::machine_state::registers::NonZeroXRegister::*;
 
-        // Arrange
+        let assert_x1_is_five = |core: &MachineCoreState<M4K, F::Manager>| {
+            assert_eq!(core.hart.xregisters.read_nz(x1), 5);
+        };
 
-        // calculate fibonacci(4) == 5
-        let scenario: &[I] = &[
-            I::new_li(x1, 1, Uncompressed),
-            I::new_add(x2, x2, x1, Compressed),
-            I::new_add(x1, x1, x2, Uncompressed),
-            I::new_add(x2, x2, x1, Uncompressed),
-            I::new_add(x1, x1, x2, Compressed),
-        ];
+        let scenario: Scenario<'_, F> = ScenarioBuilder::default()
+            .set_instructions(&[
+                I::new_li(x1, 1, Uncompressed),
+                I::new_add(x2, x2, x1, Compressed),
+                I::new_add(x1, x1, x2, Uncompressed),
+                I::new_add(x2, x2, x1, Uncompressed),
+                I::new_add(x1, x1, x2, Compressed),
+            ])
+            .set_assert_hook(&assert_x1_is_five)
+            .build();
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
         let mut interpreted_bb = InterpretedBlockBuilder;
 
-        let mut interpreted = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
-        let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
-        let mut block = create_state!(Interpreted, BlockLayout, F, M4K);
-
-        let hash = super::Hash::blake2b_hash(scenario).unwrap();
-
-        block.start_block();
-        for instr in scenario.iter() {
-            block.push_instr(*instr);
-        }
-
-        let mut interpreted_steps = 0;
-        let mut jitted_steps = 0;
-
-        let initial_pc = 0;
-        interpreted.hart.pc.write(initial_pc);
-        jitted.hart.pc.write(initial_pc);
-
-        // Act
-        let fun = jit
-            .compile(&hash, instructions(&block).as_slice())
-            .expect("Compilation should succeed");
-
-        let interpreted_res = unsafe {
-            // SAFETY: interpreted blocks are always callable
-            block.callable(&mut interpreted_bb)
-        }
-        .unwrap()
-        .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
-        let jitted_res = unsafe {
-            // # Safety - the jit is not dropped until after we
-            //            exit the block
-            fun.call(&mut jitted, initial_pc, &mut jitted_steps)
-        };
-
-        // Assert
-        assert_eq!(jitted_res, interpreted_res);
-        assert_eq!(
-            interpreted_steps, jitted_steps,
-            "Interpreted mode ran for {interpreted_steps}, compared to jit-mode of {jitted_steps}"
-        );
-
-        assert_eq!(interpreted_steps, scenario.len());
-
-        // have got to the fibonacci number 5
-        assert_eq!(interpreted.hart.xregisters.read_nz(x1), 5);
-        assert_eq!(jitted.hart.xregisters.read_nz(x1), 5);
-
-        assert_eq_struct(
-            &interpreted.struct_ref::<FnManagerIdent>(),
-            &jitted.struct_ref::<FnManagerIdent>(),
-        );
+        scenario.run(&mut jit, &mut interpreted_bb);
     });
 
     backend_test!(test_and, F, {
-        use Instruction as I;
-
         use crate::machine_state::registers::NonZeroXRegister::*;
 
-        // Arrange
-        let scenarios: &[&[I]] = &[
-            // Bitwise and with all ones is self.
-            &[
-                I::new_li(x1, 13872, Uncompressed),
-                I::new_li(x3, !0, Compressed),
-                I::new_and(x2, x1, x3, Compressed),
-            ],
-            // Bitwise and with itself is self.
-            &[
-                I::new_li(x1, 49666, Uncompressed),
-                I::new_and(x2, x1, x1, Compressed),
-            ],
-            // Bitwise and with 0 is 0.
-            &[
-                I::new_li(x1, 0, Uncompressed),
-                I::new_li(x3, 540921, Compressed),
-                I::new_and(x2, x1, x3, Compressed),
-            ],
+        let assert_x1_and_x2_equal = |core: &MachineCoreState<M4K, F::Manager>| {
+            assert_eq!(
+                core.hart.xregisters.read_nz(x1),
+                core.hart.xregisters.read_nz(x2)
+            );
+        };
+
+        let scenarios: &[Scenario<'_, F>] = &[
+            ScenarioBuilder::default()
+                // Bitwise and with all ones is self.
+                .set_instructions(&[
+                    I::new_li(x1, 13872, Uncompressed),
+                    I::new_li(x3, !0, Compressed),
+                    I::new_and(x2, x1, x3, Compressed),
+                ])
+                .set_assert_hook(&assert_x1_and_x2_equal)
+                .build(),
+            ScenarioBuilder::default()
+                // Bitwise and with itself is self.
+                .set_instructions(&[
+                    I::new_li(x1, 49666, Uncompressed),
+                    I::new_and(x2, x1, x1, Compressed),
+                ])
+                .set_assert_hook(&assert_x1_and_x2_equal)
+                .build(),
+            ScenarioBuilder::default()
+                // Bitwise and with 0 is 0.
+                .set_instructions(&[
+                    I::new_li(x1, 0, Uncompressed),
+                    I::new_li(x3, 540921, Compressed),
+                    I::new_and(x2, x1, x3, Compressed),
+                ])
+                .set_assert_hook(&assert_x1_and_x2_equal)
+                .build(),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
         let mut interpreted_bb = InterpretedBlockBuilder;
 
         for scenario in scenarios {
-            let mut interpreted =
-                create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
-            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
-            let mut block = create_state!(Interpreted, BlockLayout, F, M4K);
-            let hash = super::Hash::blake2b_hash(scenario).unwrap();
-
-            block.start_block();
-            for instr in scenario.iter() {
-                block.push_instr(*instr);
-            }
-
-            let mut interpreted_steps = 0;
-            let mut jitted_steps = 0;
-
-            let initial_pc = 0;
-            interpreted.hart.pc.write(initial_pc);
-            jitted.hart.pc.write(initial_pc);
-
-            // Act
-            let fun = jit
-                .compile(&hash, instructions(&block).as_slice())
-                .expect("Compilation should succeed");
-
-            let interpreted_res = unsafe {
-                // SAFETY: interpreted blocks are always callable
-                block.callable(&mut interpreted_bb)
-            }
-            .unwrap()
-            .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
-            let jitted_res = unsafe {
-                // # Safety - the jit is not dropped until after we
-                //            exit the for loop
-                fun.call(&mut jitted, initial_pc, &mut jitted_steps)
-            };
-
-            // Assert
-            assert_eq!(jitted_res, interpreted_res);
-            assert_eq!(
-                interpreted_steps, jitted_steps,
-                "Interpreted mode ran for {interpreted_steps}, compared to jit-mode of {jitted_steps}"
-            );
-
-            assert_eq!(interpreted_steps, scenario.len());
-
-            // every scenario expects x1 and x2 to be equal.
-            assert_eq!(
-                interpreted.hart.xregisters.read_nz(x1),
-                interpreted.hart.xregisters.read_nz(x2)
-            );
-            assert_eq!(
-                jitted.hart.xregisters.read_nz(x1),
-                jitted.hart.xregisters.read_nz(x2)
-            );
-
-            assert_eq_struct(
-                &interpreted.struct_ref::<FnManagerIdent>(),
-                &jitted.struct_ref::<FnManagerIdent>(),
-            );
+            scenario.run(&mut jit, &mut interpreted_bb);
         }
     });
 
     backend_test!(test_or, F, {
-        use Instruction as I;
-
         use crate::machine_state::registers::NonZeroXRegister::*;
 
-        // Arrange
-        let scenarios: &[&[I]] = &[
+        let assert_x1_and_x2_equal = |core: &MachineCoreState<M4K, F::Manager>| {
+            assert_eq!(
+                core.hart.xregisters.read_nz(x1),
+                core.hart.xregisters.read_nz(x2)
+            );
+        };
+
+        let scenarios: &[Scenario<'_, F>] = &[
             // Bitwise or with all ones is all-ones.
-            &[
-                I::new_li(x1, !0, Uncompressed),
-                I::new_li(x3, 13872, Compressed),
-                I::new_or(x2, x1, x3, Compressed),
-            ],
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(x1, !0, Uncompressed),
+                    I::new_li(x3, 13872, Compressed),
+                    I::new_or(x2, x1, x3, Compressed),
+                ])
+                .set_assert_hook(&assert_x1_and_x2_equal)
+                .build(),
             // Bitwise or with itself is self.
-            &[
-                I::new_li(x1, 49666, Uncompressed),
-                I::new_or(x2, x1, x1, Compressed),
-            ],
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(x1, 49666, Uncompressed),
+                    I::new_or(x2, x1, x1, Compressed),
+                ])
+                .set_assert_hook(&assert_x1_and_x2_equal)
+                .build(),
             // Bitwise or with 0 is self.
-            &[
-                I::new_li(x1, 540921, Uncompressed),
-                I::new_li(x3, 0, Compressed),
-                I::new_or(x2, x1, x3, Compressed),
-            ],
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(x1, 540921, Uncompressed),
+                    I::new_li(x3, 0, Compressed),
+                    I::new_or(x2, x1, x3, Compressed),
+                ])
+                .set_assert_hook(&assert_x1_and_x2_equal)
+                .build(),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
         let mut interpreted_bb = InterpretedBlockBuilder;
 
         for scenario in scenarios {
-            let mut interpreted =
-                create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
-            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
-            let mut block = create_state!(Interpreted, BlockLayout, F, M4K);
-            let hash = super::Hash::blake2b_hash(scenario).unwrap();
-
-            block.start_block();
-            for instr in scenario.iter() {
-                block.push_instr(*instr);
-            }
-
-            let mut interpreted_steps = 0;
-            let mut jitted_steps = 0;
-
-            let initial_pc = 0;
-            interpreted.hart.pc.write(initial_pc);
-            jitted.hart.pc.write(initial_pc);
-
-            // Act
-            let fun = jit
-                .compile(&hash, instructions(&block).as_slice())
-                .expect("Compilation should succeed");
-
-            let interpreted_res = unsafe {
-                // SAFETY: interpreted blocks are always callable
-                block.callable(&mut interpreted_bb)
-            }
-            .unwrap()
-            .run_block(&mut interpreted, initial_pc, &mut interpreted_steps);
-            let jitted_res = unsafe {
-                // # Safety - the jit is not dropped until after we
-                //            exit the for loop
-                fun.call(&mut jitted, initial_pc, &mut jitted_steps)
-            };
-
-            // Assert
-            assert_eq!(jitted_res, interpreted_res);
-            assert_eq!(
-                interpreted_steps, jitted_steps,
-                "Interpreted mode ran for {interpreted_steps}, compared to jit-mode of {jitted_steps}"
-            );
-
-            assert_eq!(interpreted_steps, scenario.len());
-
-            // every scenario expects x1 and x2 to be equal.
-            assert_eq!(
-                interpreted.hart.xregisters.read_nz(x1),
-                interpreted.hart.xregisters.read_nz(x2)
-            );
-            assert_eq!(
-                jitted.hart.xregisters.read_nz(x1),
-                jitted.hart.xregisters.read_nz(x2)
-            );
-
-            assert_eq_struct(
-                &interpreted.struct_ref::<FnManagerIdent>(),
-                &jitted.struct_ref::<FnManagerIdent>(),
-            );
+            scenario.run(&mut jit, &mut interpreted_bb);
         }
     });
 
-    struct Scenario {
-        initial_pc: u64,
-        expected_pc: u64,
-        instructions: Vec<Instruction>,
-    }
-
     backend_test!(test_j, F, {
-        use Instruction as I;
-
-        use crate::machine_state::registers::NonZeroXRegister::*;
-
-        // recreate scenarios array but as a vec of scenario structs
-        let scenarios: Vec<Scenario> = vec![
-            // Jumping to the next instruction should exit the block
-            Scenario {
-                initial_pc: 0,
-                expected_pc: 6,
-                instructions: vec![
-                    I::new_nop(InstrWidth::Compressed),
-                    I::new_nop(InstrWidth::Compressed),
-                    I::new_j(2, InstrWidth::Compressed),
-                ],
-            },
-            // Jump past 0 - in both worlds we should wrap around.
-            Scenario {
-                initial_pc: 0,
-                expected_pc: u64::MAX - 3,
-                instructions: vec![
-                    I::new_nop(InstrWidth::Compressed),
-                    I::new_nop(InstrWidth::Compressed),
-                    I::new_j(-8, InstrWidth::Compressed),
-                ],
-            },
-            // Jump past u64::MAX - in both worlds we should wrap around.
-            Scenario {
-                initial_pc: (i64::MAX - 5) as u64,
-                expected_pc: 1,
-                instructions: vec![
-                    I::new_nop(InstrWidth::Uncompressed),
-                    I::new_nop(InstrWidth::Uncompressed),
-                    I::new_j(i64::MAX, InstrWidth::Uncompressed),
-                ],
-            },
-            // jump by nothing
-            Scenario {
-                initial_pc: 0,
-                expected_pc: 4,
-                instructions: vec![
-                    I::new_nop(InstrWidth::Compressed),
-                    I::new_nop(InstrWidth::Compressed),
-                    I::new_j(0, InstrWidth::Compressed),
-                ],
-            },
-            // jumping to start of the block should exit the block in both interpreted and jitted world
-            Scenario {
-                initial_pc: 0,
-                expected_pc: 0,
-                instructions: vec![
-                    I::new_nop(InstrWidth::Compressed),
-                    I::new_nop(InstrWidth::Compressed),
-                    I::new_j(-4, InstrWidth::Compressed),
-                ],
-            },
+        let scenarios: &[Scenario<'_, F>] = &[
+            ScenarioBuilder::default()
+                // Jumping to the next instruction should exit the block
+                .set_instructions(&[
+                    I::new_nop(Compressed),
+                    I::new_nop(Compressed),
+                    I::new_j(2, Compressed),
+                ])
+                .set_assert_hook(&|core: &MachineCoreState<M4K, F::Manager>| {
+                    assert_eq!(core.hart.pc.read(), 6);
+                })
+                .set_expected_steps(3)
+                .build(),
+            ScenarioBuilder::default()
+                // Jump past 0 - in both worlds we should wrap around.
+                .set_instructions(&[I::new_j(-4, Compressed)])
+                .set_assert_hook(&|core: &MachineCoreState<M4K, F::Manager>| {
+                    assert_eq!(core.hart.pc.read(), u64::MAX - 3);
+                })
+                .set_expected_steps(1)
+                .build(),
+            ScenarioBuilder::default()
+                // Jump past u64::MAX - in both worlds we should wrap around but not
+                // execute functions past the end of the block (the jump).
+                .set_instructions(&[
+                    I::new_nop(Uncompressed),
+                    I::new_nop(Uncompressed),
+                    I::new_j(i64::MAX, Uncompressed),
+                    I::new_nop(Compressed),
+                    I::new_nop(Uncompressed),
+                ])
+                .set_initial_pc((i64::MAX - 5) as u64)
+                .set_assert_hook(&|core: &MachineCoreState<M4K, F::Manager>| {
+                    assert_eq!(core.hart.pc.read(), 1);
+                })
+                .set_expected_steps(3)
+                .build(),
+            ScenarioBuilder::default()
+                // jump by nothing
+                .set_instructions(&[
+                    I::new_nop(Compressed),
+                    I::new_j(0, Compressed),
+                    I::new_nop(Uncompressed),
+                ])
+                .set_assert_hook(&|core: &MachineCoreState<M4K, F::Manager>| {
+                    assert_eq!(core.hart.pc.read(), 2);
+                })
+                .set_expected_steps(2)
+                .build(),
+            ScenarioBuilder::default()
+                // jumping to start of the block should exit the block in both interpreted and jitted world
+                .set_instructions(&[
+                    I::new_nop(Compressed),
+                    I::new_nop(Compressed),
+                    I::new_j(-4, Compressed),
+                    I::new_nop(Uncompressed),
+                ])
+                .set_assert_hook(&|core: &MachineCoreState<M4K, F::Manager>| {
+                    assert_eq!(core.hart.pc.read(), 0);
+                })
+                .set_expected_steps(3)
+                .build(),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
         let mut interpreted_bb = InterpretedBlockBuilder;
 
         for scenario in scenarios {
-            let mut interpreted =
-                create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
-            let mut jitted = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
-            let mut block = create_state!(Interpreted, BlockLayout, F, M4K);
-            let hash = super::Hash::blake2b_hash(&scenario.instructions).unwrap();
-
-            block.start_block();
-            for instr in scenario.instructions.iter() {
-                block.push_instr(*instr);
-            }
-
-            let mut interpreted_steps = 0;
-            let mut jitted_steps = 0;
-
-            interpreted.hart.pc.write(scenario.initial_pc);
-            jitted.hart.pc.write(scenario.initial_pc);
-
-            // Act
-            let fun = jit
-                .compile(&hash, instructions(&block).as_slice())
-                .expect("Compilation should succeed");
-
-            let interpreted_res = unsafe {
-                // SAFETY: interpreted blocks are always callable
-                block.callable(&mut interpreted_bb)
-            }
-            .unwrap()
-            .run_block(
-                &mut interpreted,
-                scenario.initial_pc,
-                &mut interpreted_steps,
-            );
-            let jitted_res = unsafe {
-                // # Safety - the jit is not dropped until after we
-                //            exit the for loop
-                fun.call(&mut jitted, scenario.initial_pc, &mut jitted_steps)
-            };
-
-            // Assert
-            assert_eq!(jitted_res, interpreted_res);
-            assert_eq!(
-                interpreted_steps, jitted_steps,
-                "Interpreted mode ran for {interpreted_steps}, compared to jit-mode of {jitted_steps}"
-            );
-
-            assert_eq!(interpreted_steps, scenario.instructions.len());
-
-            // every scenario expects x1 and x2 to be equal.
-            assert_eq!(
-                interpreted.hart.xregisters.read_nz(x1),
-                interpreted.hart.xregisters.read_nz(x2)
-            );
-            assert_eq!(
-                jitted.hart.xregisters.read_nz(x1),
-                jitted.hart.xregisters.read_nz(x2)
-            );
-
-            assert_eq!(interpreted.hart.pc.read(), scenario.expected_pc);
-            assert_eq!(jitted.hart.pc.read(), scenario.expected_pc);
-
-            assert_eq_struct(
-                &interpreted.struct_ref::<FnManagerIdent>(),
-                &jitted.struct_ref::<FnManagerIdent>(),
-            );
+            scenario.run(&mut jit, &mut interpreted_bb);
         }
     });
 
     backend_test!(test_jit_recovers_from_compilation_failure, F, {
-        use Instruction as I;
-
         use crate::machine_state::registers::NonZeroXRegister::*;
 
         // Arrange
