@@ -365,6 +365,13 @@ mod tests {
     use super::*;
     use crate::backend_test;
     use crate::default::ConstDefault;
+    use crate::state_backend::CommitmentLayout;
+    use crate::state_backend::FnManagerIdent;
+    use crate::state_backend::ProofLayout;
+    use crate::state_backend::ProofPart;
+    use crate::state_backend::owned_backend::Owned;
+    use crate::state_backend::proof_backend::ProofWrapper;
+    use crate::state_backend::verify_backend::handle_not_found;
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     struct MyFoo(u64);
@@ -385,4 +392,73 @@ mod tests {
             [MyFoo::DEFAULT; 1337]
         );
     });
+
+    #[test]
+    fn test_struct_layout() {
+        struct_layout! {
+            pub struct Foo {
+                bar: Atom<u64>,
+                qux: Array<u8, 64>,
+            }
+        }
+
+        fn inner(bar: u64, qux: [u8; 64]) {
+            let mut foo = Owned::allocate::<Foo>();
+
+            foo.bar.write(bar);
+            foo.qux.write_all(&qux);
+
+            // Obtain the state hash
+            let refs = FooF {
+                bar: foo.bar.struct_ref::<FnManagerIdent>(),
+                qux: foo.qux.struct_ref::<FnManagerIdent>(),
+            };
+            let hash = Foo::state_hash(refs).unwrap();
+
+            // Obtain the Merkle tree
+            let mut proof_foo = FooF {
+                bar: foo.bar.struct_ref::<ProofWrapper>(),
+                qux: foo.qux.struct_ref::<ProofWrapper>(),
+            };
+            let proof_foo_refs = FooF {
+                bar: proof_foo.bar.struct_ref::<FnManagerIdent>(),
+                qux: proof_foo.qux.struct_ref::<FnManagerIdent>(),
+            };
+
+            let tree = Foo::to_merkle_tree(proof_foo_refs).unwrap();
+            let tree_root_hash = tree.root_hash();
+            assert_eq!(hash, tree_root_hash);
+
+            // Modify the values so they appear in the proof
+            proof_foo.bar.write(bar.wrapping_add(1));
+            proof_foo.qux.write_all(&qux.map(|x| x.wrapping_add(1)));
+
+            // Obtain the Merkle tree, again, to make sure nothing changed
+            let proof_foo_refs = FooF {
+                bar: proof_foo.bar.struct_ref::<FnManagerIdent>(),
+                qux: proof_foo.qux.struct_ref::<FnManagerIdent>(),
+            };
+
+            let tree = Foo::to_merkle_tree(proof_foo_refs).unwrap();
+            let tree_root_hash = tree.root_hash();
+            assert_eq!(hash, tree_root_hash);
+
+            // Produce a proof
+            let proof = tree.to_merkle_proof().unwrap();
+            let proof_hash = proof.root_hash().unwrap();
+            assert_eq!(hash, proof_hash);
+
+            // Verify the proof
+            handle_not_found(|| {
+                let verify_foo = Foo::from_proof(ProofPart::Present(&proof)).unwrap();
+                assert_eq!(bar, verify_foo.bar.read());
+                assert_eq!(qux, verify_foo.qux.read_all().as_slice());
+            })
+            .unwrap();
+        }
+
+        proptest::proptest!(|(bar: u64, qux: [u8; 64])| {
+            inner(bar, qux);
+        });
+    }
 }
