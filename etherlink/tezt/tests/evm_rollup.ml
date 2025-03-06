@@ -55,7 +55,6 @@ type l1_contracts = {
   kernel_governance : string;
   kernel_security_governance : string;
   sequencer_governance : string option;
-  fast_withdrawal_contract_address : string;
 }
 
 type full_evm_setup = {
@@ -275,16 +274,6 @@ let setup_l1_contracts ~admin ?sequencer_admin client =
         return (Some sequencer_admin)
     | None -> return None
   in
-  let* fast_withdrawal_contract_address =
-    Client.originate_contract
-      ~alias:"fast_withdrawal_contract_address"
-      ~amount:Tez.zero
-      ~src:Constant.bootstrap5.public_key_hash
-      ~init:(sf "Pair %S {}" exchanger)
-      ~prg:(fast_withdrawal_path ())
-      ~burn_cap:Tez.one
-      client
-  in
   return
     {
       exchanger;
@@ -293,7 +282,6 @@ let setup_l1_contracts ~admin ?sequencer_admin client =
       kernel_governance;
       sequencer_governance;
       kernel_security_governance;
-      fast_withdrawal_contract_address;
     }
 
 type setup_mode =
