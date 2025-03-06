@@ -518,7 +518,7 @@ let init_from_snapshot_arg =
        --network), %h by the history mode used by the node, and %% by %. Also \
        accepts a path to an existing snapshot."
     ~default:
-      "https://snapshotter-sandbox.nomadic-labs.eu/etherlink-%n/evm-snapshot-%r-latest.gz"
+      "https://snapshotter-sandbox.nomadic-labs.eu/local/etherlink-%n/%h/etherlink-%n-%h-latest.gz"
     ~placeholder:"snapshot url"
   @@ Params.string
 

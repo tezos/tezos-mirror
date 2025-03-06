@@ -23,9 +23,3 @@ let network_of_address addr =
   | "sr1Ghq66tYK9y3r8CC1Tf8i8m5nxh8nTvZEf" -> Some Configuration.Mainnet
   | "sr18wx6ezkeRjt1SZSeZ2UQzQN3Uc3YLMLqg" -> Some Testnet
   | _ -> None
-
-let latest_snapshot_url = function
-  | Configuration.Mainnet ->
-      "https://snapshotter-sandbox.nomadic-labs.eu/etherlink-mainnet/evm-snapshot-sr1Ghq66tYK9y-latest.gz"
-  | Testnet ->
-      "https://snapshotter-sandbox.nomadic-labs.eu/etherlink-ghostnet/evm-snapshot-sr18wx6ezkeRj-latest.gz"

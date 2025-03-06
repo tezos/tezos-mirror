@@ -31,6 +31,8 @@
   download a snapshot of the expected mode. (!16979)
 - Fixes experimental features being set by `init config`. (!17078)
 - Fixes `--private-rpc-port` being ignored by the `run observer` command. (!17078)
+- Observer `--init-from-snapshot` now defaults to our new snapshot services.
+  Snapshots are generated nightly (Europe time) for each history mode. (!17052)
 
 ### RPCs changes
 

@@ -17,5 +17,3 @@ val rollup_address :
 val network_of_address :
   Tezos_crypto.Hashed.Smart_rollup_address.t ->
   Configuration.supported_network option
-
-val latest_snapshot_url : Configuration.supported_network -> string
