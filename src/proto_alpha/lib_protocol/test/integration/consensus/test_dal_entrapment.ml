@@ -115,7 +115,9 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
     | Some result -> result
     | None ->
         Log.info "generate slot and compute commitments and shards" ;
-        let slot = Tezt_tezos.Dal_common.Helpers.generate_slot ~slot_size in
+        let slot =
+          Tezos_crypto_dal.Cryptobox.Internal_for_tests.generate_slot ~slot_size
+        in
         let result =
           Tezt_tezos.Dal_common.Helpers.get_commitment_and_shards_with_proofs
             cryptobox

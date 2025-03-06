@@ -1063,7 +1063,7 @@ let simple_slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node
   (* This is the account used to sign injected slot headers on L1. *)
   let source = Constant.bootstrap2 in
   let slot =
-    Helpers.generate_slot ~slot_size
+    Cryptobox.Internal_for_tests.generate_slot ~slot_size
     |> Bytes.to_string
     |> Helpers.make_slot ~slot_size
   in
@@ -7276,17 +7276,17 @@ let dal_crypto_benchmark () =
   Profiler.plug Profiler.main instance ;
   let ( let*? ) x f =
     match x with
-    | Error err ->
-        Test.fail
-          "Unexpected error:@.%a@."
-          Dal_common.Helpers.pp_cryptobox_error
-          err
+    | Error err -> Test.fail "Unexpected error:@.%a@." Cryptobox.pp_error err
     | Ok x -> f x
   in
+  (* the defaults are the Rio parameters *)
   let number_of_shards = Cli.get_int ~default:512 "nb_shards" in
   let slot_size = Cli.get_int ~default:126_944 "slot_size" in
   let redundancy_factor = Cli.get_int ~default:8 "redundancy" in
   let page_size = Cli.get_int ~default:3967 "page_size" in
+  let traps_fraction =
+    Cli.get_float ~default:0.0005 "traps_fraction" |> Q.of_float
+  in
   let* () =
     let parameters =
       {number_of_shards; redundancy_factor; page_size; slot_size}
@@ -7309,7 +7309,7 @@ let dal_crypto_benchmark () =
           ()
       in
       Log.info "SRS loaded." ;
-      let*? config =
+      let*? () =
         Result.map_error
           (fun x ->
             `Fail
@@ -7319,7 +7319,7 @@ let dal_crypto_benchmark () =
                  x))
           result
       in
-      Lwt.return config
+      unit
     in
     Profiler.record_f Profiler.main Debug (message, []) @@ fun () ->
     match make parameters with
@@ -7338,7 +7338,7 @@ let dal_crypto_benchmark () =
         in
         let slot =
           Profiler.record_f Profiler.main Debug ("slot generation", [])
-          @@ fun () -> Helpers.generate_slot ~slot_size
+          @@ fun () -> Cryptobox.Internal_for_tests.generate_slot ~slot_size
         in
         let*? polynomial =
           Profiler.record_f Profiler.main Debug ("polynomial from slot", [])
@@ -7362,7 +7362,7 @@ let dal_crypto_benchmark () =
           prove_shards dal ~precomputation ~polynomial |> Array.to_seq
         in
         let _polynomial =
-          Profiler.record_f Profiler.main Debug ("Reconstruct polynomial", [])
+          Profiler.record_f Profiler.main Debug ("reconstruct polynomial", [])
           @@ fun () -> polynomial_from_shards dal shards
         in
         let nb_pages = slot_size / page_size in
@@ -7434,7 +7434,27 @@ let dal_crypto_benchmark () =
                  in
                  ())
         in
-        () ;
+        let () =
+          let message =
+            sf "share_is_trap (number_of_shards:%d)" (Seq.length shards)
+          in
+          Profiler.record_f Profiler.main Debug (message, []) @@ fun () ->
+          shards
+          |> Seq.iter (fun {share; index = _} ->
+                 let res =
+                   Tezos_crypto_dal.Trap.share_is_trap
+                     Tezos_crypto.Signature.Public_key_hash.zero
+                     share
+                     ~traps_fraction
+                 in
+                 match res with
+                 | Ok _is_trap -> ()
+                 | Error err ->
+                     Test.fail
+                       "Unexpected error:@.%a@."
+                       Data_encoding.Binary.pp_write_error
+                       err)
+        in
         Lwt.return_unit
   in
   Profiler.close_and_unplug Profiler.main instance ;
@@ -8670,7 +8690,7 @@ let test_inject_accusation _protocol dal_parameters cryptobox node client
   let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
   let number_of_slots = dal_parameters.number_of_slots in
   let lag = dal_parameters.attestation_lag in
-  let slot = Helpers.generate_slot ~slot_size in
+  let slot = Cryptobox.Internal_for_tests.generate_slot ~slot_size in
   let commitment, proof, shards_with_proofs =
     Helpers.get_commitment_and_shards_with_proofs cryptobox ~slot
   in
@@ -9004,7 +9024,7 @@ let test_duplicate_denunciations _protocol dal_parameters cryptobox node client
   let* current_level = Node.get_level node in
   let* shards_with_proofs =
     let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
-    let slot = Helpers.generate_slot ~slot_size in
+    let slot = Cryptobox.Internal_for_tests.generate_slot ~slot_size in
     let commitment, proof, shards_with_proofs =
       Helpers.get_commitment_and_shards_with_proofs cryptobox ~slot
     in
@@ -9135,7 +9155,7 @@ let test_denunciation_next_cycle _protocol dal_parameters cryptobox node client
     let* current_level = Node.get_level node in
     Log.info "Publish first commitment at level %d" current_level ;
     let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
-    let slot = Helpers.generate_slot ~slot_size in
+    let slot = Cryptobox.Internal_for_tests.generate_slot ~slot_size in
     let commitment, proof, shards_with_proofs =
       Helpers.get_commitment_and_shards_with_proofs cryptobox ~slot
     in
@@ -9154,7 +9174,7 @@ let test_denunciation_next_cycle _protocol dal_parameters cryptobox node client
     let* current_level = Node.get_level node in
     Log.info "Publish second commitment at level %d" current_level ;
     let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
-    let slot = Helpers.generate_slot ~slot_size in
+    let slot = Cryptobox.Internal_for_tests.generate_slot ~slot_size in
     let commitment, proof, shards_with_proofs =
       Helpers.get_commitment_and_shards_with_proofs cryptobox ~slot
     in
