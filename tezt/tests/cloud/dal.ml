@@ -2274,6 +2274,368 @@ let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
       | [], [], [], None -> bootstrap.node_rpc_endpoint)
   | _ -> bootstrap.node_rpc_endpoint
 
+module Tasks = struct
+  module Network = struct
+    include Network
+
+    (** [to_image network] return an image for each monitored network. *)
+    let to_image_url : Network.t -> string = function
+      | `Rionet ->
+          "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/rionet.png"
+      | `Mainnet ->
+          "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/mainnet.png"
+      | `Ghostnet ->
+          "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/ghostnet.png"
+      | `Sandbox | `Weeklynet _ | `Nextnet _ -> "no_image_yet"
+  end
+
+  (* Helper for Slack App message format block-kit
+     See: https://api.slack.com/reference/block-kit/
+  *)
+
+  let image ~url ~alt =
+    let open Ezjsonm in
+    `O
+      [
+        ("type", string "image");
+        ("image_url", string url);
+        ("alt_text", string alt);
+      ]
+
+  let section content ?accessory () =
+    let open Ezjsonm in
+    if List.is_empty content then []
+    else
+      let text = String.concat "\n" content in
+      [
+        `O
+          (("type", string "section")
+          :: ("text", `O [("type", string "mrkdwn"); ("text", string text)])
+          :: Option.fold
+               ~none:[]
+               ~some:(fun data -> [("accessory", data)])
+               accessory);
+      ]
+
+  let endpoint_from_prometheus_query ~query =
+    let fail =
+      Test.fail
+        "Dal.Tasks.endpoint_from_prometheus_query: expecting a prometheus %s"
+    in
+    let uri =
+      match Prometheus.get_query_endpoint ~query with
+      | None -> fail "endpoint"
+      | Some endpoint -> endpoint
+    in
+    let scheme, host, port =
+      match Uri.(scheme uri, host uri, port uri) with
+      | Some scheme, Some host, Some port -> (scheme, host, port)
+      | None, _, _ -> fail "scheme"
+      | _, None, _ -> fail "host"
+      | _, _, None -> fail "port"
+    in
+    let query_string =
+      (* Fixme: warn about `k` being dropped in the second case. We
+         need to keep only list of size 1 because of the way RPC_core
+         is implemented. Should probably be fixed soon or later. *)
+      List.filter_map
+        (function k, [v] -> Some (k, v) | _k, _ -> None)
+        (Uri.query uri)
+    in
+    let path = String.split_on_char '/' (Uri.path uri) in
+    let endpoint = Endpoint.{host; scheme; port} in
+    (`endpoint endpoint, `query query_string, `path path)
+
+  let fetch ~origin ~query ~decoder =
+    let open RPC_core in
+    let `endpoint endpoint, `query query_string, `path path =
+      endpoint_from_prometheus_query ~query
+    in
+    let rpc = make ~query_string GET path decoder in
+    Lwt.catch
+      (fun () ->
+        let* response = call_raw endpoint rpc in
+        Lwt.return (decode_raw ~origin rpc response.body))
+      (fun exn ->
+        Log.warn
+          "Unexpected error while fetching prometheus query (origin : %s): '%s'"
+          origin
+          (Printexc.to_string exn) ;
+        Lwt.return_none)
+
+  let decoder_prometheus_float json =
+    let open JSON in
+    let status = json |-> "status" |> as_string in
+    if not (String.equal status "success") then (* fixme: warning *)
+      None
+    else
+      let opt =
+        json |-> "data" |-> "result" |> as_list |> Fun.flip List.nth_opt 0
+      in
+      match opt with
+      | None -> None
+      | Some x ->
+          x |-> "value" |> as_list |> Fun.flip List.nth_opt 1
+          |> Option.map as_float
+
+  let view_ratio_attested_over_published
+      (`attested attested, `published published) =
+    let open Format in
+    match (attested, published) with
+    | Some 0., Some 0. -> None
+    | Some attested, Some 0. ->
+        let s = sprintf "`unk` (`%d`/`0`)" (Int.of_float attested) in
+        Some s
+    | Some attested, None ->
+        let s = sprintf "`unk` (`%d`/`?`)" (Int.of_float attested) in
+        Some s
+    | None, Some published ->
+        let s = sprintf "`unk` (`?`/`%d`)" (Int.of_float published) in
+        Some s
+    | Some attested, Some published ->
+        let ratio = attested /. published *. 100. in
+        let s =
+          sprintf
+            "`%s` (`%d/%d`)"
+            (sprintf "%.2f%%" ratio)
+            (Int.of_float attested)
+            (Int.of_float published)
+        in
+        Some s
+    | None, None ->
+        let s = sprintf "`unk` (`?`/`?`)" in
+        Some s
+
+  let fetch_slot_info ~slot_index =
+    let query s =
+      Format.sprintf
+        "increase(tezt_total_%s_commitments_per_slot{slot_index=\"%d\"}[6h])"
+        s
+        slot_index
+    in
+    let decoder = decoder_prometheus_float in
+    let* attested =
+      fetch
+        ~origin:"fetch_slot_info.attested"
+        ~decoder
+        ~query:(query "attested")
+    in
+    let* published =
+      fetch
+        ~origin:"fetch_slot_info.published"
+        ~decoder
+        ~query:(query "published")
+    in
+    Lwt.return (`slot_index slot_index, `attested attested, `published published)
+
+  let view_slot_info slot_info =
+    let slots_info =
+      List.filter_map
+        (fun (`slot_index slot_index, attested, published) ->
+          view_ratio_attested_over_published (attested, published)
+          |> Option.map (Format.sprintf "▪ `%02d` : %s" slot_index))
+        slot_info
+    in
+    if List.is_empty slots_info then []
+    else
+      "• Percentage of attested over published DAL commitments per slot:"
+      :: slots_info
+
+  let fetch_dal_commitments_total_info () =
+    let query s =
+      Format.sprintf {|increase(tezt_dal_commitments_total{kind="%s"}[6h])|} s
+    in
+    let decoder = decoder_prometheus_float in
+    let* attested =
+      fetch
+        ~origin:"fetch_dal_commitments_total.attested"
+        ~decoder
+        ~query:(query "attested")
+    in
+    let* published =
+      fetch
+        ~origin:"fetch_dal_commitments_total.published"
+        ~decoder
+        ~query:(query "published")
+    in
+    let ratio =
+      view_ratio_attested_over_published
+        (`attested attested, `published published)
+    in
+    let view =
+      (Format.sprintf
+         "• Percentage of attested over published DAL commitments: %s")
+        (Option.value ~default:"unk" ratio)
+    in
+    Lwt.return view
+
+  let view_bakers bakers =
+    List.map
+      (fun (`address address, `alias alias, v) ->
+        Format.sprintf
+          "▪ `%s` - `%s` : `%s`"
+          (Option.fold ~none:"unk" ~some:(Format.sprintf "%.2f%%") v)
+          (String.sub address 0 7)
+          (Option.value ~default:"no alias" alias))
+      bakers
+
+  let fetch_baker_info ~tz1 =
+    let query =
+      Format.sprintf
+        "avg_over_time(tezt_dal_commitments_attested_ratio{attester=\"%s\"}[6h])"
+        tz1
+    in
+    fetch ~decoder:decoder_prometheus_float ~query
+
+  (* fixme: use the stdlib List.take once we use OCaml 5.3 *)
+  let take n l =
+    let rec loop acc = function
+      | 0, _ | _, [] -> List.rev acc
+      | n, x :: xs -> loop (x :: acc) (pred n, xs)
+    in
+    loop [] (n, l)
+
+  let fetch_bakers_info network =
+    let* bakers = Network.delegates network in
+    let* bakers_info =
+      match bakers with
+      | None -> Lwt.return_nil
+      | Some bakers ->
+          Lwt_list.filter_map_p
+            (fun (alias, address, _) ->
+              let* info =
+                fetch_baker_info
+                  ~origin:(Format.sprintf "fetch_baker_info.%s" address)
+                  ~tz1:address
+              in
+              Lwt.return_some (`address address, `alias alias, info))
+            bakers
+    in
+    let sorted_bakers =
+      List.sort
+        (fun (_, _, x) (_, _, y) -> Option.compare Float.compare x y)
+        bakers_info
+    in
+    if network = `Mainnet then
+      Lwt.return ["• Baker performance not displayed for the mainnet network"]
+      (* fixme: remove the clause above when we start producing slots
+         on Mainnet. Before, it does not make sense to report baker
+         performances for this network. *)
+    else
+      let worst_bakers = take 5 sorted_bakers in
+      let best_bakers = List.rev (take 5 (List.rev sorted_bakers)) in
+      Lwt.return
+        ("• Baker performance ranked from worst to best (truncated to 10 \
+          bakers):" :: view_bakers worst_bakers
+        @ ("..." :: view_bakers best_bakers))
+
+  let fetch_slots_info network =
+    if network = `Mainnet then
+      (* fixme: remove the clause above when we start producing slots
+         on Mainnet. Before, it does not make sense to report slots
+         info for this network. *)
+      Lwt.return ["• Slots info not displayed for the mainnet network"]
+    else
+      let* data =
+        (* fixme: should use protocol parameterized number of slots *)
+        Lwt_list.map_p
+          (fun slot_index -> fetch_slot_info ~slot_index)
+          (List.init 32 Fun.id)
+      in
+      Lwt.return (view_slot_info data)
+
+  let endpoint_of_webhook webhook =
+    Endpoint.
+      {
+        host =
+          (* Default to slack hooks host *)
+          Option.value ~default:"hooks.slack.com" (Uri.host webhook);
+        scheme =
+          (* Default to https scheme *)
+          Option.value ~default:"https" (Uri.scheme webhook);
+        port =
+          (* Default to https default post port 443 *)
+          Option.value ~default:443 (Uri.port webhook);
+      }
+
+  let action ~webhook ~configuration () =
+    let network = configuration.network in
+    let title_info =
+      Format.sprintf
+        "*DAL report* for the *%s* network over the last 6 hours."
+        (String.capitalize_ascii (Network.to_string network))
+    in
+    let network_info =
+      Format.sprintf
+        "• Network: %s"
+        (String.capitalize_ascii (Network.to_string network))
+    in
+    let* ratio_dal_commitments_total_info =
+      fetch_dal_commitments_total_info ()
+    in
+    let* slots_info = fetch_slots_info configuration.network in
+    let network_overview_info =
+      network_info :: ratio_dal_commitments_total_info :: slots_info
+    in
+    let* bakers_info = fetch_bakers_info network in
+    let data =
+      let open Ezjsonm in
+      `O
+        [
+          ("text", string "DAL reporting");
+          ( "blocks",
+            `A
+              (section [title_info] ()
+              @ section ["*Network overview*"] ()
+              @ section
+                  network_overview_info
+                  ~accessory:
+                    (image
+                       ~url:(Network.to_image_url network)
+                       ~alt:(Network.to_string network))
+                  ()
+              @ section ["*Baker performance overview*"] ()
+              @ section bakers_info ()) );
+        ]
+    in
+    let rpc =
+      RPC_core.make
+        ~data:(Data data)
+        POST
+        (String.split_on_char '/' (Uri.path webhook))
+        (fun _json -> ())
+    in
+    let endpoint = endpoint_of_webhook webhook in
+    let* _response = RPC_core.call_raw endpoint rpc in
+    Lwt.return_unit
+
+  (* Relies on GMT for time.
+
+     /!\ Remember Paris is (UTC+1).
+
+     - Fixme: implement multiple values in Chronos taks creation.
+       Such that the following becomes `0 0,6,12,18 * * *`.
+
+       https://gitlab.com/tezos/tezos/-/issues/7790
+  *)
+  let task_name n = Format.asprintf "report-%d" n
+
+  let tms =
+    [
+      (task_name 0, "0 0 * * *");
+      (task_name 6, "0 6 * * *");
+      (task_name 12, "0 12 * * *");
+      (task_name 18, "0 18 * * *");
+    ]
+
+  let tasks ~dal_slack_webhook ~configuration =
+    match dal_slack_webhook with
+    | None -> []
+    | Some webhook ->
+        let action () = action ~webhook ~configuration () in
+        List.map (fun (name, tm) -> Chronos.task ~name ~tm ~action) tms
+end
+
 let init ~(configuration : configuration) etherlink_configuration cloud
     next_agent =
   let () = toplog "Init" in
