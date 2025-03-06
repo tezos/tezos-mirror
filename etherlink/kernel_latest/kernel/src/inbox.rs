@@ -624,7 +624,7 @@ mod tests {
     use super::*;
     use crate::blueprint_storage::{
         blueprint_path, store_current_block_header, BlockHeader, BlueprintHeader,
-        EVMBlockHeader,
+        ChainHeader, EVMBlockHeader,
     };
     use crate::chains::test_chain_config;
     use crate::configuration::TezosContracts;
@@ -1252,6 +1252,11 @@ mod tests {
         // Prepare the host.
         let mut host = MockKernelHost::default();
         let address = smart_rollup_address();
+        let evm_block_header = EVMBlockHeader {
+            hash: crate::block::GENESIS_PARENT_HASH,
+            receipts_root: vec![],
+            transactions_root: vec![],
+        };
         store_current_block_header(
             &mut host,
             &BlockHeader {
@@ -1259,11 +1264,7 @@ mod tests {
                     number: head_level,
                     timestamp: 0.into(),
                 },
-                evm_block_header: EVMBlockHeader {
-                    hash: crate::block::GENESIS_PARENT_HASH,
-                    receipts_root: vec![],
-                    transactions_root: vec![],
-                },
+                chain_header: ChainHeader::Eth(evm_block_header),
             },
         )
         .unwrap();

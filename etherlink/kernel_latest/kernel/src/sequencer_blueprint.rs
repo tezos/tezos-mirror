@@ -243,11 +243,19 @@ impl Decodable for SequencerBlueprint {
 }
 
 #[cfg(test)]
-pub fn rlp_roundtrip<S: Encodable + Decodable + PartialEq + std::fmt::Debug>(v: S) {
+pub fn rlp_roundtrip_f<S: Encodable + PartialEq + std::fmt::Debug, T: Decodable>(
+    v: S,
+    f: impl FnOnce(T) -> S,
+) {
     let bytes = v.rlp_bytes();
-    let v2: S =
+    let v2: T =
         rlp_helpers::FromRlpBytes::from_rlp_bytes(&bytes).expect("Should be decodable");
-    assert_eq!(v, v2, "Roundtrip failed on {:?}", v)
+    assert_eq!(v, f(v2), "Roundtrip failed on {:?}", v)
+}
+
+#[cfg(test)]
+pub fn rlp_roundtrip<S: Encodable + Decodable + PartialEq + std::fmt::Debug>(v: S) {
+    rlp_roundtrip_f::<S, S>(v, |s| s)
 }
 
 #[cfg(test)]

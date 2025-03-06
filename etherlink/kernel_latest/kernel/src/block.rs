@@ -9,8 +9,9 @@ use crate::apply::{
     apply_transaction, ExecutionInfo, ExecutionResult, Validity, WITHDRAWAL_OUTBOX_QUEUE,
 };
 use crate::blueprint_storage::{
-    drop_blueprint, read_blueprint, read_current_block_header,
-    store_current_block_header, BlockHeader, BlueprintHeader, EVMBlockHeader,
+    drop_blueprint, read_blueprint, read_current_block_header_for_family,
+    store_current_block_header, BlockHeader, BlueprintHeader, ChainHeader,
+    EVMBlockHeader,
 };
 use crate::chains::{ChainConfig, EvmLimits};
 use crate::configuration::ConfigurationMode;
@@ -272,21 +273,22 @@ fn next_bip_from_blueprints<Host: Runtime>(
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
 ) -> Result<BlueprintParsing, anyhow::Error> {
+    let chain_family = config.chain_config.get_chain_family();
     let (
         next_bip_number,
         next_bip_parent_hash,
         previous_timestamp,
         receipts_root,
         transactions_root,
-    ) = match read_current_block_header(host) {
+    ) = match read_current_block_header_for_family(host, &chain_family) {
         Ok(BlockHeader {
             blueprint_header: BlueprintHeader { number, timestamp },
-            evm_block_header:
-                EVMBlockHeader {
+            chain_header:
+                ChainHeader::Eth(EVMBlockHeader {
                     hash,
                     receipts_root,
                     transactions_root,
-                },
+                }),
         }) => (
             number + 1,
             hash,
@@ -294,7 +296,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
             receipts_root,
             transactions_root,
         ),
-        Err(_) => (
+        _ => (
             U256::zero(),
             GENESIS_PARENT_HASH,
             Timestamp::from(0),
@@ -477,11 +479,9 @@ fn promote_block<Host: Runtime>(
     drop_blueprint(safe_host.host, block_header.blueprint_header.number)?;
     store_current_block_header(safe_host.host, &block_header)?;
 
-    Event::BlueprintApplied {
-        number: block_header.blueprint_header.number,
-        hash: block_header.evm_block_header.hash,
-    }
-    .store(safe_host.host)?;
+    let event = Event::blueprint_applied(block_header);
+
+    event.store(safe_host.host)?;
 
     let written = outbox_queue.flush_queue(safe_host.host);
     // Log to Info only if we flushed messages.

@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint::Blueprint;
+use crate::chains::ChainFamily;
 use crate::configuration::{Configuration, ConfigurationMode};
 use crate::error::{Error, StorageError};
 use crate::sequencer_blueprint::{
@@ -19,7 +20,8 @@ use std::fmt::Debug;
 use tezos_ethereum::block::EthBlock;
 use tezos_ethereum::eth_gen::OwnedHash;
 use tezos_ethereum::rlp_helpers::{
-    self, append_timestamp, append_u256_le, decode_field_u256_le, decode_timestamp,
+    self, append_timestamp, append_u256_le, decode_field, decode_field_u256_le,
+    decode_timestamp,
 };
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
@@ -113,21 +115,33 @@ pub struct EVMBlockHeader {
 #[derive(PartialEq, Debug, Clone)]
 pub struct BlockHeader<H> {
     pub blueprint_header: BlueprintHeader,
-    pub evm_block_header: H,
+    pub chain_header: H,
+}
+// Part of the block header which is specific of the Michelson chain. All
+// fields are needed to build the next block
+#[derive(PartialEq, Debug, Clone)]
+pub struct TezBlockHeader {
+    pub hash: H256,
 }
 
-impl From<EthBlock> for BlockHeader<EVMBlockHeader> {
+#[derive(PartialEq, Debug, Clone)]
+pub enum ChainHeader {
+    Tez(TezBlockHeader),
+    Eth(EVMBlockHeader),
+}
+
+impl From<EthBlock> for BlockHeader<ChainHeader> {
     fn from(block: EthBlock) -> Self {
         Self {
             blueprint_header: BlueprintHeader {
                 number: block.number,
                 timestamp: block.timestamp,
             },
-            evm_block_header: EVMBlockHeader {
+            chain_header: ChainHeader::Eth(EVMBlockHeader {
                 hash: block.hash,
                 receipts_root: block.receipts_root,
                 transactions_root: block.transactions_root,
-            },
+            }),
         }
     }
 }
@@ -262,42 +276,71 @@ impl Decodable for EVMBlockHeader {
     }
 }
 
-impl Encodable for BlockHeader<EVMBlockHeader> {
+impl Encodable for TezBlockHeader {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        let Self { hash } = self;
+        stream.begin_list(1);
+        stream.append(hash);
+    }
+}
+
+impl Decodable for TezBlockHeader {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
+        rlp_helpers::check_list(decoder, 1)?;
+        let mut it = decoder.iter();
+        let hash = decode_field(&rlp_helpers::next(&mut it)?, "hash")?;
+        Ok(Self { hash })
+    }
+}
+
+impl Encodable for ChainHeader {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        match self {
+            Self::Eth(evm_block_header) => {
+                stream.append(evm_block_header);
+            }
+            Self::Tez(tez_block_header) => {
+                stream.append(tez_block_header);
+            }
+        }
+    }
+}
+
+impl Encodable for BlockHeader<ChainHeader> {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         let Self {
             blueprint_header: BlueprintHeader { number, timestamp },
-            evm_block_header,
+            chain_header,
         } = self;
         stream.begin_list(3);
         append_u256_le(stream, number);
         append_timestamp(stream, *timestamp);
         stream.begin_list(1); // Nesting added for forward-compatibility with multichain
-        stream.append(evm_block_header);
+        stream.append(chain_header);
     }
 }
 
 impl<H: Decodable> Decodable for BlockHeader<H> {
     fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
         rlp_helpers::check_list(decoder, 3)?;
-
         let mut it = decoder.iter();
         let number = decode_field_u256_le(&rlp_helpers::next(&mut it)?, "number")?;
         let timestamp = decode_timestamp(&rlp_helpers::next(&mut it)?)?;
-        let decoder = &rlp_helpers::next(&mut it)?;
-        rlp_helpers::check_list(decoder, 1)?; // Nesting added for forward-compatibility with multichain
+        let decoder = rlp_helpers::next(&mut it)?;
+        rlp_helpers::check_list(&decoder, 1)?; // Nesting added for forward-compatibility with multichain
         let mut it = decoder.iter();
-        let evm_block_header =
-            rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "evm_block_header")?;
+        let chain_header =
+            rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "block_header")?;
         Ok(Self {
             blueprint_header: BlueprintHeader { number, timestamp },
-            evm_block_header,
+            chain_header,
         })
     }
 }
 
 pub fn store_current_block_header<Host: Runtime>(
     host: &mut Host,
-    current_block_header: &BlockHeader<EVMBlockHeader>,
+    current_block_header: &BlockHeader<ChainHeader>,
 ) -> Result<(), Error> {
     store_rlp(current_block_header, host, &EVM_CURRENT_BLOCK_HEADER).map_err(Error::from)
 }
@@ -313,6 +356,34 @@ pub fn read_current_blueprint_header<Host: Runtime>(
 ) -> Result<BlueprintHeader, Error> {
     let block_header = read_current_block_header::<_, rlp_helpers::IgnoredField>(host)?;
     Ok(block_header.blueprint_header)
+}
+
+pub fn read_current_block_header_for_family<Host: Runtime>(
+    host: &Host,
+    chain_family: &ChainFamily,
+) -> Result<BlockHeader<ChainHeader>, Error> {
+    match chain_family {
+        ChainFamily::Evm => {
+            let BlockHeader {
+                blueprint_header,
+                chain_header,
+            } = read_current_block_header::<Host, EVMBlockHeader>(host)?;
+            Ok(BlockHeader {
+                blueprint_header,
+                chain_header: ChainHeader::Eth(chain_header),
+            })
+        }
+        ChainFamily::Michelson => {
+            let BlockHeader {
+                blueprint_header,
+                chain_header,
+            } = read_current_block_header::<Host, TezBlockHeader>(host)?;
+            Ok(BlockHeader {
+                blueprint_header,
+                chain_header: ChainHeader::Tez(chain_header),
+            })
+        }
+    }
 }
 
 /// For the tick model we only accept blueprints where cumulative size of chunks
@@ -643,7 +714,7 @@ mod tests {
     use crate::chains::ChainConfig;
     use crate::configuration::{DalConfiguration, TezosContracts};
     use crate::delayed_inbox::Hash;
-    use crate::sequencer_blueprint::rlp_roundtrip;
+    use crate::sequencer_blueprint::{rlp_roundtrip, rlp_roundtrip_f};
     use crate::storage::store_last_info_per_level_timestamp;
     use crate::tick_model::constants::MAX_ALLOWED_TICKS;
     use primitive_types::H256;
@@ -652,6 +723,7 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::public_key::PublicKey;
     use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime; // Used to put traits interface in the scope
+    use tezos_tezlink::block::TezBlock;
 
     fn test_invalid_sequencer_blueprint_is_removed(enable_dal: bool) {
         let mut host = MockKernelHost::default();
@@ -822,7 +894,7 @@ mod tests {
     }
 
     #[test]
-    fn test_block_header_roundtrip() {
+    fn test_evm_block_header_roundtrip() {
         let blueprint_header = BlueprintHeader {
             number: 42.into(),
             timestamp: Timestamp::from(10),
@@ -837,9 +909,44 @@ mod tests {
 
         let block_header = BlockHeader {
             blueprint_header,
-            evm_block_header,
+            chain_header: ChainHeader::Eth(evm_block_header),
         };
 
-        rlp_roundtrip(block_header);
+        rlp_roundtrip_f(
+            block_header,
+            |BlockHeader {
+                 blueprint_header,
+                 chain_header,
+             }| BlockHeader {
+                blueprint_header,
+                chain_header: ChainHeader::Eth(chain_header),
+            },
+        );
+    }
+
+    #[test]
+    fn test_tez_block_header_roundtrip() {
+        let blueprint_header = BlueprintHeader {
+            number: 42.into(),
+            timestamp: Timestamp::from(10),
+        };
+        let tez_block_header = TezBlockHeader {
+            hash: TezBlock::genesis_block_hash(),
+        };
+        let block_header = BlockHeader {
+            blueprint_header,
+            chain_header: ChainHeader::Tez(tez_block_header),
+        };
+
+        rlp_roundtrip_f(
+            block_header,
+            |BlockHeader {
+                 blueprint_header,
+                 chain_header,
+             }| BlockHeader {
+                blueprint_header,
+                chain_header: ChainHeader::Tez(chain_header),
+            },
+        );
     }
 }
