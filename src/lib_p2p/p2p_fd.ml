@@ -175,7 +175,13 @@ let socket_setopt_user_timeout sock =
      temporarily busy. The higher it is, the longer it is to detect a
      dead connection. We believe 45 seconds is reasonable in practice
      (especially this acknowledgement is done at the OS level and so
-     is quite independent of the Lwt scheduler). *)
+     is quite independent of the Lwt scheduler).
+
+     This value is intimatly linked to the keepalive value (see below).
+     Following Cloudflare article recommendation,
+      https://blog.cloudflare.com/when-tcp-sockets-refuse-to-die/
+     We set the value to 45s, ie "should be set to a value slightly lower than
+         TCP_KEEPIDLE + TCP_KEEPINTVL * TCP_KEEPCNT." *)
   let ms_opt =
     let default = 45000 (* 45s *) in
     try
@@ -204,9 +210,15 @@ let socket_setopt_keepalive sock =
   (* By setting [TCP_KEEPALIVE], we ensure that the connection stays alive
      for NAT or firewalls between the node and the other peer. If no TCP
      packet is sent after [ms] milliseconds, an empty TCP message will be
-     sent. If not acknowledged before intv, some retries will be made (number
+     sent.
+
+     If not acknowledged before intv, some retries will be made (number
      depending on OS, default 9 for linux) after [intv] seconds. The connection
-     will be dropped if no ACK is received. *)
+     will be dropped if no ACK is received.
+
+     See also the comment of the [socket_setopt_user_timeout] about the cloudflare
+     article, to understand the rationale for the 10s and 5s interval default
+     value, in conjunction with the user_timeout value. *)
   let keepalive_opts =
     let default =
       (* after 10s of inactivity, and every 5s if no ACK *)
