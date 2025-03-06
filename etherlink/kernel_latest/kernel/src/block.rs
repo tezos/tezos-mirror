@@ -24,7 +24,7 @@ use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
 use crate::{block_in_progress, tick_model};
 use anyhow::Context;
-use block_in_progress::BlockInProgress;
+use block_in_progress::EthBlockInProgress;
 use evm::Config;
 use evm_execution::account_storage::{init_account_storage, EthereumAccountStorage};
 use evm_execution::precompiles;
@@ -95,7 +95,7 @@ enum BlockInProgressProvenance {
 fn on_invalid_transaction<Host: Runtime>(
     host: &mut Host,
     transaction: &Transaction,
-    block_in_progress: &mut BlockInProgress,
+    block_in_progress: &mut EthBlockInProgress,
     data_size: u64,
 ) {
     if transaction.is_delayed() {
@@ -115,7 +115,7 @@ fn on_invalid_transaction<Host: Runtime>(
 fn compute<Host: Runtime>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
-    block_in_progress: &mut BlockInProgress,
+    block_in_progress: &mut EthBlockInProgress,
     block_constants: &BlockConstants,
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
@@ -245,6 +245,21 @@ fn compute<Host: Runtime>(
     })
 }
 
+#[allow(clippy::large_enum_variant)]
+pub enum BlockInProgress {
+    Etherlink(EthBlockInProgress),
+    Tezlink(U256),
+}
+
+impl BlockInProgress {
+    pub fn number(&self) -> U256 {
+        match self {
+            Self::Etherlink(bip) => bip.number,
+            Self::Tezlink(n) => *n,
+        }
+    }
+}
+
 enum BlueprintParsing {
     Next(Box<BlockInProgress>),
     None,
@@ -313,7 +328,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
                         chain_config.limits.minimum_base_fee_per_gas,
                     );
 
-                    let bip = block_in_progress::BlockInProgress::from_blueprint(
+                    let bip = block_in_progress::EthBlockInProgress::from_blueprint(
                         blueprint,
                         next_bip_number,
                         next_bip_parent_hash,
@@ -328,9 +343,13 @@ fn next_bip_from_blueprints<Host: Runtime>(
                         tezos_evm_logging::Level::Debug,
                         "bip: {bip:?}"
                     );
-                    Ok(BlueprintParsing::Next(Box::new(bip)))
+                    Ok(BlueprintParsing::Next(Box::new(
+                        BlockInProgress::Etherlink(bip),
+                    )))
                 }
-                ChainConfig::Michelson(_) => panic!("Implement Tezlink"),
+                ChainConfig::Michelson(_) => Ok(BlueprintParsing::Next(Box::new(
+                    BlockInProgress::Tezlink(next_bip_number),
+                ))),
             }
         }
         None => Ok(BlueprintParsing::None),
@@ -341,7 +360,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
 fn compute_bip<Host: Runtime>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
-    mut block_in_progress: BlockInProgress,
+    mut block_in_progress: EthBlockInProgress,
     precompiles: &PrecompileBTreeMap<Host>,
     tick_counter: &mut TickCounter,
     sequencer_pool_address: Option<H160>,
@@ -507,7 +526,11 @@ pub fn produce<Host: Runtime>(
     let (block_in_progress_provenance, block_in_progress) =
         match storage::read_block_in_progress(&safe_host)? {
             Some(block_in_progress) => {
-                (BlockInProgressProvenance::Storage, block_in_progress)
+                // We don't yet support saving Tez block in progress in the durable storage and restoring them.
+                (
+                    BlockInProgressProvenance::Storage,
+                    BlockInProgress::Etherlink(block_in_progress),
+                )
             }
             None => {
                 // Using `safe_host.host` allows to escape from the failsafe storage, which is necessary
@@ -539,24 +562,51 @@ pub fn produce<Host: Runtime>(
             }
         };
 
-    let processed_blueprint = block_in_progress.number;
-    let computation_result = match &config.chain_config {
-        ChainConfig::Evm(chain_config) => compute_bip(
-            &mut safe_host,
-            &outbox_queue,
-            block_in_progress,
-            &precompiles,
-            &mut tick_counter,
-            sequencer_pool_address,
-            &chain_config.limits,
-            config.maximum_allowed_ticks,
-            tracer_input,
-            chain_id,
-            da_fee_per_byte,
-            coinbase,
-            &chain_config.evm_config,
-        ),
-        ChainConfig::Michelson(_) => panic!("Implement Tezlink"),
+    let processed_blueprint = block_in_progress.number();
+    let computation_result = match (&config.chain_config, block_in_progress) {
+        (
+            ChainConfig::Evm(chain_config),
+            BlockInProgress::Etherlink(block_in_progress),
+        ) => {
+            log!(
+                safe_host,
+                Debug,
+                "Computing the BlockInProgress for Etherlink"
+            );
+            compute_bip(
+                &mut safe_host,
+                &outbox_queue,
+                block_in_progress,
+                &precompiles,
+                &mut tick_counter,
+                sequencer_pool_address,
+                &chain_config.limits,
+                config.maximum_allowed_ticks,
+                tracer_input,
+                chain_id,
+                da_fee_per_byte,
+                coinbase,
+                &chain_config.evm_config,
+            )
+        }
+        (ChainConfig::Michelson(_), BlockInProgress::Tezlink(number)) => {
+            log!(
+                safe_host,
+                Debug,
+                "Computing the BlockInProgress for Tezlink at level {}",
+                number
+            );
+            return Ok(ComputationResult::Finished);
+        }
+        (_, _) => {
+            // This case should be correctly handled by this MR https://gitlab.com/tezos/tezos/-/merge_requests/17259
+            log!(
+                safe_host,
+                Fatal,
+                "Incoherent BlockInProgress found with the Chain running in the kernel"
+            );
+            return Ok(ComputationResult::Finished);
+        }
     };
     match computation_result {
         Ok(BlockComputationResult::Finished {
@@ -1327,7 +1377,7 @@ mod tests {
         let transactions = vec![valid_tx].into();
 
         // init block in progress
-        let mut block_in_progress = BlockInProgress::new(
+        let mut block_in_progress = EthBlockInProgress::new(
             U256::from(1),
             transactions,
             block_constants.block_fees.base_fee_per_gas(),

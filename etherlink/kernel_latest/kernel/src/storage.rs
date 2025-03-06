@@ -5,7 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::block_in_progress::BlockInProgress;
+use crate::block_in_progress::EthBlockInProgress;
 use crate::event::Event;
 use crate::simulation::SimulationResult;
 use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
@@ -701,7 +701,7 @@ pub fn store_kernel_version<Host: Runtime>(
 #[cfg_attr(feature = "benchmark", inline(never))]
 pub fn store_block_in_progress<Host: Runtime>(
     host: &mut Host,
-    bip: &BlockInProgress,
+    bip: &EthBlockInProgress,
 ) -> anyhow::Result<()> {
     let path = OwnedPath::from(EVM_BLOCK_IN_PROGRESS);
     let bytes = &bip.rlp_bytes();
@@ -721,7 +721,7 @@ pub fn store_block_in_progress<Host: Runtime>(
 #[cfg_attr(feature = "benchmark", inline(never))]
 pub fn read_block_in_progress<Host: Runtime>(
     host: &Host,
-) -> anyhow::Result<Option<BlockInProgress>> {
+) -> anyhow::Result<Option<EthBlockInProgress>> {
     let path = OwnedPath::from(EVM_BLOCK_IN_PROGRESS);
     if let Some(ValueType::Value) = host.store_has(&path)? {
         let bytes = host
@@ -734,7 +734,7 @@ pub fn read_block_in_progress<Host: Runtime>(
             bytes.len()
         );
         let decoder = Rlp::new(bytes.as_slice());
-        let bip = BlockInProgress::decode(&decoder)
+        let bip = EthBlockInProgress::decode(&decoder)
             .context("Failed to decode current block in progress")?;
         Ok(Some(bip))
     } else {

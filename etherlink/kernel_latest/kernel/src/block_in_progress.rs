@@ -33,7 +33,7 @@ use tezos_smart_rollup_host::path::{concat, RefPath};
 
 #[derive(Debug, PartialEq, Clone)]
 /// Container for all data needed during block computation
-pub struct BlockInProgress {
+pub struct EthBlockInProgress {
     /// block number
     pub number: U256,
     /// queue containing the transactions to execute
@@ -66,9 +66,9 @@ pub struct BlockInProgress {
     pub previous_transactions_root: OwnedHash,
 }
 
-impl Encodable for BlockInProgress {
+impl Encodable for EthBlockInProgress {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        let BlockInProgress {
+        let EthBlockInProgress {
             number,
             tx_queue,
             valid_txs,
@@ -117,8 +117,8 @@ fn append_txs(stream: &mut rlp::RlpStream, valid_txs: &[[u8; TRANSACTION_HASH_SI
     })
 }
 
-impl Decodable for BlockInProgress {
-    fn decode(decoder: &rlp::Rlp<'_>) -> Result<BlockInProgress, rlp::DecoderError> {
+impl Decodable for EthBlockInProgress {
+    fn decode(decoder: &rlp::Rlp<'_>) -> Result<EthBlockInProgress, rlp::DecoderError> {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
         }
@@ -192,7 +192,7 @@ fn decode_queue(decoder: &rlp::Rlp<'_>) -> Result<VecDeque<Transaction>, Decoder
     Ok(queue)
 }
 
-impl BlockInProgress {
+impl EthBlockInProgress {
     pub fn queue_length(&self) -> usize {
         self.tx_queue.len()
     }
@@ -235,7 +235,7 @@ impl BlockInProgress {
         base_fee_per_gas: U256,
         receipts_root: OwnedHash,
         transactions_root: OwnedHash,
-    ) -> BlockInProgress {
+    ) -> EthBlockInProgress {
         Self::new_with_ticks(
             number,
             H256::zero(),
@@ -283,7 +283,7 @@ impl BlockInProgress {
         base_fee_per_gas: U256,
         receipts_root: OwnedHash,
         transactions_root: OwnedHash,
-    ) -> BlockInProgress {
+    ) -> EthBlockInProgress {
         // blueprint is turn into a ring to allow popping from the front
         let ring = match blueprint.transactions {
             EthTxs(transactions) => transactions.into(),
@@ -293,7 +293,7 @@ impl BlockInProgress {
                 VecDeque::new()
             }
         };
-        BlockInProgress::new_with_ticks(
+        EthBlockInProgress::new_with_ticks(
             number,
             parent_hash,
             ring,
@@ -582,7 +582,7 @@ impl BlockInProgress {
 #[cfg(test)]
 mod tests {
 
-    use super::BlockInProgress;
+    use super::EthBlockInProgress;
     use crate::bridge::Deposit;
     use crate::transaction::{Transaction, TransactionContent};
     use primitive_types::{H160, H256, U256};
@@ -641,7 +641,7 @@ mod tests {
 
     #[test]
     fn test_encode_bip_ethereum() {
-        let bip = BlockInProgress {
+        let bip = EthBlockInProgress {
             number: U256::from(42),
             tx_queue: vec![dummy_tx_eth(1), dummy_tx_eth(8)].into(),
             valid_txs: vec![[2; TRANSACTION_HASH_SIZE], [9; TRANSACTION_HASH_SIZE]],
@@ -667,10 +667,10 @@ mod tests {
         let bytes = hex::decode(expected).expect("Should be valid hex string");
         let decoder = Rlp::new(&bytes);
         let decoded =
-            BlockInProgress::decode(&decoder).expect("Should have decoded data");
+            EthBlockInProgress::decode(&decoder).expect("Should have decoded data");
 
         // the estimated ticks in the current run are not stored
-        let fresh_bip = BlockInProgress {
+        let fresh_bip = EthBlockInProgress {
             estimated_ticks_in_run: 0,
             ..bip
         };
@@ -679,7 +679,7 @@ mod tests {
 
     #[test]
     fn test_encode_bip_deposit() {
-        let bip = BlockInProgress {
+        let bip = EthBlockInProgress {
             number: U256::from(42),
             tx_queue: vec![dummy_tx_deposit(1), dummy_tx_deposit(8)].into(),
             valid_txs: vec![[2; TRANSACTION_HASH_SIZE], [9; TRANSACTION_HASH_SIZE]],
@@ -705,10 +705,10 @@ mod tests {
         let bytes = hex::decode(expected).expect("Should be valid hex string");
         let decoder = Rlp::new(&bytes);
         let decoded =
-            BlockInProgress::decode(&decoder).expect("Should have decoded data");
+            EthBlockInProgress::decode(&decoder).expect("Should have decoded data");
 
         // the estimated ticks in the current run are not stored
-        let fresh_bip = BlockInProgress {
+        let fresh_bip = EthBlockInProgress {
             estimated_ticks_in_run: 0,
             ..bip
         };
@@ -717,7 +717,7 @@ mod tests {
 
     #[test]
     fn test_encode_bip_mixed() {
-        let bip = BlockInProgress {
+        let bip = EthBlockInProgress {
             number: U256::from(42),
             tx_queue: vec![dummy_tx_eth(1), dummy_tx_deposit(8)].into(),
             valid_txs: vec![[2; TRANSACTION_HASH_SIZE], [9; TRANSACTION_HASH_SIZE]],
@@ -743,10 +743,10 @@ mod tests {
         let bytes = hex::decode(expected).expect("Should be valid hex string");
         let decoder = Rlp::new(&bytes);
         let decoded =
-            BlockInProgress::decode(&decoder).expect("Should have decoded data");
+            EthBlockInProgress::decode(&decoder).expect("Should have decoded data");
 
         // the estimated ticks in the run are not stored
-        let fresh_bip = BlockInProgress {
+        let fresh_bip = EthBlockInProgress {
             estimated_ticks_in_run: 0,
             ..bip
         };
