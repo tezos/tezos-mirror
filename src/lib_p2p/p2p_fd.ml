@@ -171,14 +171,14 @@ let raw_socket () =
      to be much shorter than the default behavior—which can last several minutes
      (typically between 5 and 15 minutes) due to TCP retransmission timeouts (RTO).
 
-     Below, we set this value to 15 seconds. This value should not be
+     Below, we set this value to 45 seconds. This value should not be
      too low otherwise we may drop valid connection that were
      temporarily busy. The higher it is, the longer it is to detect a
-     dead connection. We believe 15 seconds is reasonable in practice
+     dead connection. We believe 45 seconds is reasonable in practice
      (especially this acknowledgement is done at the OS level and so
      is quite independent of the Lwt scheduler). *)
   let ms_opt =
-    let default = 15000 (* 15s *) in
+    let default = 45000 (* 45s *) in
     try
       match Sys.getenv_opt "OCTEZ_P2P_TCP_USER_TIMEOUT" with
       | None -> Some default
