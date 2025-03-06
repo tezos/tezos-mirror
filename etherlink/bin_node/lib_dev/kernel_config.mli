@@ -12,6 +12,7 @@
 val make :
   mainnet_compat:bool ->
   boostrap_balance:Ethereum_types.NonceMap.key ->
+  ?l2_chain_ids:Ethereum_types.chain_id list ->
   ?bootstrap_accounts:string list ->
   ?kernel_root_hash:string * string ->
   ?chain_id:string * string ->

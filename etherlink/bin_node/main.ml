@@ -1877,6 +1877,15 @@ let make_l2_kernel_config_command =
         ~output
         ())
 
+let l2_chain_ids_arg =
+  let open Evm_node_lib_dev_encoding in
+  Tezos_clic.multiple_arg
+    ~long:"l2-chain-id"
+    ~doc:"specify one of the chain ids in the kernel, can be used several times"
+    ~placeholder:"1"
+  @@ Tezos_clic.parameter (fun _ chain_id ->
+         Lwt.return_ok @@ Ethereum_types.Chain_id.of_string_exn chain_id)
+
 let make_kernel_config_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
@@ -1924,8 +1933,9 @@ let make_kernel_config_command =
           (config_key_flag ~name:"enable_fa_bridge")
           (config_key_flag ~name:"enable_dal")
           (config_key_arg ~name:"dal_slots" ~placeholder:"0,1,4,6,..."))
-       (args3
+       (args4
           (config_key_flag ~name:"enable_multichain")
+          l2_chain_ids_arg
           (config_key_arg
              ~name:"max_delayed_inbox_blueprint_length"
              ~placeholder:"1000")
@@ -1962,12 +1972,14 @@ let make_kernel_config_command =
              enable_dal,
              dal_slots ),
            ( enable_multichain,
+             l2_chain_ids,
              max_delayed_inbox_blueprint_length,
              enable_fast_withdrawal ) )
          output
          () ->
       Evm_node_lib_dev.Kernel_config.make
         ~mainnet_compat
+        ?l2_chain_ids
         ?kernel_root_hash
         ?chain_id
         ?sequencer

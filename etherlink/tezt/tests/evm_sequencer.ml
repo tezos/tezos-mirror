@@ -372,10 +372,12 @@ let test_make_l2_kernel_installer_config chain_family =
   let* node, client = setup_l1 protocol in
 
   (* Random chain id, let's not take one that could have been set by default (1, 42, 1337) *)
-  let chain_id = 2988 in
+  let chain_id_1 = 2988 in
+  let chain_id_2 = 4571 in
 
-  (* Configuration files for an l2 chain and for the rollup *)
-  let l2_config = Temp.file "l2-chain-config.yaml" in
+  (* Configuration files for the two l2 chains and for the rollup *)
+  let l2_config_1 = Temp.file "l2-chain-1-config.yaml" in
+  let l2_config_2 = Temp.file "l2-chain-2-config.yaml" in
   let rollup_config = Temp.file "rollup-chain-config.yaml" in
 
   (* Argument for the l2 chain, a bootstrap account and a new world_state_path *)
@@ -383,17 +385,26 @@ let test_make_l2_kernel_installer_config chain_family =
   let address = Eth_account.bootstrap_accounts.(0).address in
   let*! () =
     Evm_node.make_l2_kernel_installer_config
-      ~chain_id
+      ~chain_id:chain_id_1
       ~chain_family
       ~world_state_path
       ~bootstrap_accounts:[address]
-      ~output:l2_config
+      ~output:l2_config_1
+      ()
+  in
+  let*! () =
+    Evm_node.make_l2_kernel_installer_config
+      ~chain_id:chain_id_2
+      ~chain_family
+      ~bootstrap_accounts:[address]
+      ~output:l2_config_2
       ()
   in
   let*! () =
     Evm_node.make_kernel_installer_config
     (* No need for a real sequencer governance *)
       ~sequencer_governance:"KT1"
+      ~l2_chain_ids:[chain_id_1; chain_id_2]
       ~output:rollup_config
       ()
   in
@@ -413,7 +424,7 @@ let test_make_l2_kernel_installer_config chain_family =
     prepare_installer_kernel_with_multiple_setup_file
       ~output:(Temp.file "kernel.hex")
       ~preimages_dir
-      ~configs:[rollup_config; l2_config]
+      ~configs:[rollup_config; l2_config_1; l2_config_2]
       (Uses.path kernel)
   in
   let* sc_rollup_address =
@@ -455,7 +466,12 @@ let test_make_l2_kernel_installer_config chain_family =
   in
 
   (* Verify the chain_family is properly set *)
-  let*@ family_value = Rpc.get_chain_family sequencer chain_id in
+  let*@ family_value = Rpc.get_chain_family sequencer chain_id_1 in
+  Check.((family_value = chain_family) string)
+    ~error_msg:"Expected chain_family to be %R, got %L" ;
+
+  (* Verify the chain_family is properly set *)
+  let*@ family_value = Rpc.get_chain_family sequencer chain_id_2 in
   Check.((family_value = chain_family) string)
     ~error_msg:"Expected chain_family to be %R, got %L" ;
 
@@ -465,15 +481,51 @@ let test_make_l2_kernel_installer_config chain_family =
   let address_balance =
     world_state_path ^ "eth_accounts/" ^ address_in_durable ^ "/balance"
   in
-  let*@ rpc = Rpc.state_value sequencer address_balance in
-  match rpc with
-  | None ->
+  let*@ rpc_balance = Rpc.state_value sequencer address_balance in
+  let* _balance =
+    match rpc_balance with
+    | None ->
+        Test.fail
+          ~__LOC__
+          "There should be a value at %s setup by the \
+           make_l2_kernel_installer_config"
+          address_balance
+    | Some balance -> return balance
+  in
+  let chain_ids = "/evm/chain_ids" in
+  let*@ rpc_chain_ids = Rpc.state_value sequencer chain_ids in
+  let* chain_ids =
+    match rpc_chain_ids with
+    | None ->
+        Test.fail
+          ~__LOC__
+          "There should be a value at %s setup by the \
+           make_kernel_installer_config"
+          chain_ids
+    | Some chain_ids -> return chain_ids
+  in
+  let chain_ids_bytes = Hex.to_bytes (`Hex chain_ids) in
+
+  match Evm_node_lib_dev_encoding.Rlp.decode chain_ids_bytes with
+  | Ok
+      Evm_node_lib_dev_encoding.Rlp.(
+        List [Value rlp_chain_id_1; Value rlp_chain_id_2]) ->
+      let str_chain_1 = Bytes.to_string rlp_chain_id_1 in
+      Check.(string_of_int chain_id_1 = str_chain_1)
+        Check.string
+        ~error_msg:
+          "Unexpected chain id from durable storage, expected: %L, got %R." ;
+      let str_chain_2 = Bytes.to_string rlp_chain_id_2 in
+      Check.(string_of_int chain_id_2 = str_chain_2)
+        Check.string
+        ~error_msg:
+          "Unexpected chain id from durable storage, expected: %L, got %R." ;
+      return ()
+  | _ ->
       Test.fail
         ~__LOC__
-        "There should be a value at %s setup by the \
-         make_l2_kernel_installer_config"
-        address_balance
-  | Some _bootstrap_value -> return ()
+        "Unexpected value decoded at path %s in durable storage"
+        chain_ids
 
 (* The test uses a very specific setup, so it doesn't use general helpers. *)
 let test_observer_reset =

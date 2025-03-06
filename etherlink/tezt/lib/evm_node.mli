@@ -604,6 +604,7 @@ val make_l2_kernel_installer_config :
 (** [make_kernel_installer_config ~output ()] create the config needed for the
     evm kernel used by the installer *)
 val make_kernel_installer_config :
+  ?l2_chain_ids:int list ->
   ?max_delayed_inbox_blueprint_length:int ->
   ?mainnet_compat:bool ->
   ?remove_whitelist:bool ->
