@@ -103,9 +103,24 @@ val unlock_transactions : unit -> unit tzresult Lwt.t
 (** [is_locked] checks if the queue is locked. *)
 val is_locked : unit -> bool tzresult Lwt.t
 
-(** [content ()] returns the queued and pending transactions of the tx_queue
-    mapped into a tx_pool to mimic {!Tx_pool.get_tx_pool_content}. Semantics of pending and queued are not equal to {!Tx_pool.get_tx_pool_content} *)
+(** [content ()] returns the queued and pending transactions of the
+    tx_queue mapped into a tx_pool to mimic
+    {!Tx_pool.get_tx_pool_content}. Semantics of pending and queued
+    are not equal to {!Tx_pool.get_tx_pool_content} *)
 val content : unit -> Ethereum_types.txpool tzresult Lwt.t
+
+(** [pop_transactions ~maximum_cumulative_size] pops as much valid
+    transactions as possible from the pool, until their cumulative
+    size exceeds [maximum_cumulative_size].
+
+    If the tx_queue is locked (c.f. {!lock_transactions} then returns
+    the empty list.
+
+    All returned transaction are considered as accepted and all
+    associated callbacks are called with [`Accepted]. *)
+val pop_transactions :
+  maximum_cumulative_size:int ->
+  (string * Ethereum_types.legacy_transaction_object) list tzresult Lwt.t
 
 (**/*)
 

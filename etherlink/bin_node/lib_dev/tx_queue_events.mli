@@ -35,5 +35,9 @@ val transaction_confirmed : Ethereum_types.hash -> unit Lwt.t
 (** [rpc_error error] advertises an RPC produced the error [error]. *)
 val rpc_error : Rpc_encodings.JSONRPC.error -> unit Lwt.t
 
+(** [missing_tx_object hash] Advertises that it fails to find the
+    tx_object associated to [hash]. *)
+val missing_tx_object : Ethereum_types.hash -> unit Lwt.t
+
 (** [callback_error error] advertises an RPC produced the error [error]. *)
 val callback_error : tztrace -> unit Lwt.t

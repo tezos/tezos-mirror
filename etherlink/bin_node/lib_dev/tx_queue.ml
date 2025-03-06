@@ -381,6 +381,10 @@ module Request = struct
     | Unlock_transactions : (unit, tztrace) t
     | Is_locked : (bool, tztrace) t
     | Content : (Ethereum_types.txpool, tztrace) t
+    | Pop_transactions : {
+        maximum_cumulative_size : int;
+      }
+        -> ((string * Ethereum_types.legacy_transaction_object) list, tztrace) t
 
   type view = View : _ t -> view
 
@@ -470,6 +474,17 @@ module Request = struct
           (obj1 (req "request" (constant "content")))
           (function View Content -> Some () | _ -> None)
           (fun _ -> assert false);
+        case
+          Json_only
+          ~title:"Pop_transactions"
+          (obj2
+             (req "request" (constant "pop_transactions"))
+             (req "maximum_cumulatize_size" int31))
+          (function
+            | View (Pop_transactions {maximum_cumulative_size}) ->
+                Some ((), maximum_cumulative_size)
+            | _ -> None)
+          (fun _ -> assert false);
       ]
 
   let pp fmt (View r) =
@@ -487,6 +502,11 @@ module Request = struct
     | Unlock_transactions -> Format.fprintf fmt "Unlocking the transactions"
     | Is_locked -> Format.fprintf fmt "Checking if the tx queue is locked"
     | Content -> fprintf fmt "Content"
+    | Pop_transactions {maximum_cumulative_size} ->
+        fprintf
+          fmt
+          "Popping transactions of maximum cumulative size %d bytes"
+          maximum_cumulative_size
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -588,6 +608,35 @@ let lock_transactions state = state.locked <- true
 let unlock_transactions state = state.locked <- false
 
 let is_locked state = state.locked
+
+let pop_queue_until state ~maximum_cumulative_size =
+  let open Lwt_result_syntax in
+  let rec aux (current_size, rev_selected) =
+    match Queue.peek_opt state.queue with
+    | None -> return rev_selected
+    | Some {hash; payload; queue_callback} ->
+        let raw_tx = Ethereum_types.hex_to_bytes payload in
+        let new_size = current_size + String.length raw_tx in
+        if new_size <= maximum_cumulative_size then
+          (* Drop the tx because it's selected. *)
+          let _ = Queue.take state.queue in
+          let tx_object = Tx_object.find state.tx_object hash in
+          match tx_object with
+          | None ->
+              (* Drop that tx because no tx_object associated. this is
+                 an inpossible case, we log it to investigate. *)
+              let*! () = Tx_queue_events.missing_tx_object hash in
+              let*! () = queue_callback `Refused in
+              aux (current_size, rev_selected)
+          | Some tx_object ->
+              let rev_selected =
+                ((raw_tx, tx_object), queue_callback) :: rev_selected
+              in
+              aux (new_size, rev_selected)
+        else return rev_selected
+  in
+  let* rev_selected = aux (0, []) in
+  return @@ List.rev rev_selected
 
 module Handlers = struct
   open Request
@@ -799,6 +848,26 @@ module Handlers = struct
         in
 
         return {pending; queued}
+    | Pop_transactions {maximum_cumulative_size} ->
+        let open Lwt_result_syntax in
+        if is_locked state then return []
+        else
+          let* selected = pop_queue_until state ~maximum_cumulative_size in
+          let*! selected =
+            List.map_s
+              (fun (tx, callback) ->
+                let open Lwt_syntax in
+                let* () = callback `Accepted in
+                return tx)
+              selected
+          in
+          (* All transactions popped are considered `Accepted, and are
+             added to the pending state. The only consumer of that
+             request is the block producer, a local worker that will
+             process all popped transaction, and confirm only
+             transactions that were included in a block with
+             [Confirm_transactions] *)
+          return selected
 
   type launch_error = tztrace
 
@@ -953,6 +1022,14 @@ let is_locked () =
   let open Lwt_result_syntax in
   let*? worker = Lazy.force worker in
   Worker.Queue.push_request_and_wait worker Is_locked |> handle_request_error
+
+let pop_transactions ~maximum_cumulative_size =
+  let open Lwt_result_syntax in
+  let*? w = Lazy.force worker in
+  Worker.Queue.push_request_and_wait
+    w
+    (Pop_transactions {maximum_cumulative_size})
+  |> handle_request_error
 
 module Internal_for_tests = struct
   module Nonce_bitset = Nonce_bitset
