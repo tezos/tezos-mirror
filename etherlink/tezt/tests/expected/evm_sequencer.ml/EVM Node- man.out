@@ -62,6 +62,8 @@ Miscellaneous commands:
                      [--initial-kernel <evm_installer.wasm>]
                      [-d --wallet-dir <path>]
                      [-f --password-filename <filename>]
+                     [--network <network>]
+                     [--init-from-snapshot [snapshot url]]
     Start the EVM node in sandbox mode. The sandbox mode is a sequencer-like mode that produces blocks with a fake key and no rollup node connection.
     --data-dir <data-dir>: The path to the EVM node data directory
     --rpc-addr <ADDR>: The EVM node server rpc address.
@@ -92,6 +94,8 @@ Miscellaneous commands:
     --initial-kernel <evm_installer.wasm>: Path to the EVM kernel used to launch the PVM, it will be loaded from storage afterward
     -d --wallet-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR env)
     -f --password-filename <filename>: path to the password filename
+    --network <network>: The network the EVM node will be connecting to. Can be `mainnet` or `testnet`.
+    --init-from-snapshot [snapshot url]: Automatically download and import a recent snapshot for supported networks on fresh data directories. If no snapshot provider is given e.g. `--init-from-snapshot` with no argument, then it uses the default built-in provider `https://snapshotter-sandbox.nomadic-labs.eu`. %r is replaced by the short form of the Smart Rollup address, %R by the complete Smart Rollup address, %n by the network (given by the argument --network), %h by the history mode used by the node, and %% by %. Also accepts a path to an existing snapshot.
   
   octez-evm-node run proxy [--data-dir <data-dir>] [--rpc-addr <ADDR>]
                      [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]

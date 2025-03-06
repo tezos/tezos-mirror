@@ -56,9 +56,15 @@
 ### Execution changes
 
 - **experimental feature** The `tx_queue` respect the configuration
-field `keep_alive` for it's RPC. (!16894)
+  field `keep_alive` for it's RPC. (!16894)
 - **experimental feature** `tx_queue` clears itself when a delayed
-inbox flush has happened. (!17091)
+  inbox flush has happened. (!17091)
+- Adds `--network` and `--init-from-snapshot` to `run sandbox` to simplify
+  starting a sandbox for a supported network. For instance, `run sandbox
+  --network mainnet` will start a new sandbox using Mainnet’s initial kernel,
+  while `run sandbox --network testnet --init-from-snapshot` will start a new
+  sandbox from a `rolling:1` snapshot downloaded from the default snapshots
+  provider. (!17098)
 
 ### Storage changes
 

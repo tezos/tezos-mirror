@@ -15,6 +15,7 @@ type error +=
   | Invalid_snapshot_file of string
   | History_mode_mismatch of
       Configuration.history_mode * Configuration.history_mode
+  | Invalid_snapshot_provider of string
 
 let () =
   register_error_kind
@@ -108,7 +109,22 @@ let () =
         (req "config_history_mode" Configuration.history_mode_encoding)
         (req "snapshot_history_mode" Configuration.history_mode_encoding))
     (function History_mode_mismatch (a1, a2) -> Some (a1, a2) | _ -> None)
-    (fun (a1, a2) -> History_mode_mismatch (a1, a2))
+    (fun (a1, a2) -> History_mode_mismatch (a1, a2)) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_invalid_snapshot_provider"
+    ~title:"Invalid snapshot provider"
+    ~description:"The snapshot provider is invalid."
+    ~pp:(fun ppf name ->
+      Format.fprintf
+        ppf
+        "%s is not a valid snapshot provider name. It is likely because you \
+         are using an invalid string interpolation variable or have a trailing \
+         percent"
+        name)
+    Data_encoding.(obj1 (req "snapshot_provider" string))
+    (function Invalid_snapshot_provider name -> Some name | _ -> None)
+    (fun name -> Invalid_snapshot_provider name)
 
 type compression = No | On_the_fly | After
 
@@ -460,3 +476,44 @@ let import_from ~force ~keep_alive ?history_mode ~data_dir ~download_path
   let* () = import ~force ~data_dir ~snapshot_file in
   let*! () = Events.import_finished () in
   return store_history_mode
+
+let interpolate_snapshot_provider ?rollup_address ?network history_mode provider
+    =
+  let open Result_syntax in
+  let inferred_rollup_address = Option.map Constants.rollup_address network in
+  let rollup_address_short, rollup_address_long =
+    match (rollup_address, inferred_rollup_address) with
+    | Some rollup_address, _ | None, Some rollup_address ->
+        ( ( 'r',
+            `Available
+              (Tezos_crypto.Hashed.Smart_rollup_address.to_short_b58check
+                 rollup_address) ),
+          ( 'R',
+            `Available
+              (Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
+                 rollup_address) ) )
+    | None, None -> (('r', `Disabled), ('R', `Disabled))
+  in
+  let history_mode =
+    ( 'h',
+      `Available
+        (Configuration.string_of_history_mode_info history_mode
+        |> String.lowercase_ascii) )
+  in
+  let network =
+    match
+      (network, Option.bind rollup_address Constants.network_of_address)
+    with
+    | Some n, _ | None, Some n ->
+        ( 'n',
+          `Available (Format.asprintf "%a" Configuration.pp_supported_network n)
+        )
+    | None, None -> ('n', `Disabled)
+  in
+
+  try
+    return
+      (Misc.interpolate
+         provider
+         [rollup_address_short; rollup_address_long; history_mode; network])
+  with _ -> tzfail (Invalid_snapshot_provider provider)

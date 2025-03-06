@@ -70,3 +70,10 @@ val import_from :
 (** [info ~snapshot_file] returns information that can be used to inspect the
     snapshot file. *)
 val info : snapshot_file:string -> Header.t * [`Compressed | `Uncompressed]
+
+val interpolate_snapshot_provider :
+  ?rollup_address:Address.t ->
+  ?network:Configuration.supported_network ->
+  Configuration.history_mode ->
+  string ->
+  string tzresult
