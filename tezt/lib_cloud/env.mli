@@ -148,6 +148,7 @@ val wait_process :
   ?sleep:int ->
   is_ready:(string -> bool) ->
   run:(unit -> Process.t) ->
+  ?propagate_error:bool ->
   unit ->
   string Lwt.t
 
@@ -163,3 +164,5 @@ val dns_domains : unit -> string list Lwt.t
 (** [process_monitoring] enable the monitoring of process through prometheus-process-exporter
     needs to enable prometheus too *)
 val process_monitoring : bool
+
+exception Process_failed of Unix.process_status

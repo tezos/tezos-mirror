@@ -11,7 +11,7 @@ module Remote = struct
 
   type t = {agents : Agent.t list}
 
-  let wait_docker_running ~vm_name () =
+  let rec wait_docker_running ~vm_name () =
     let ssh_private_key_filename = Env.ssh_private_key_filename () in
     let* zone = Env.zone () in
     let is_ready _output = true in
@@ -38,13 +38,23 @@ module Remote = struct
         "docker"
         ["inspect"; "--format"; "{{.State.Running}}"; image_name]
     in
-    let* _ =
-      images_name
-      |> List.map (fun image_name ->
-             Env.wait_process ~is_ready ~run:(run image_name) ())
-      |> Lwt.all
-    in
-    Lwt.return_unit
+    Lwt.catch
+      (fun () ->
+        let* (_ : string list) =
+          images_name
+          |> Lwt_list.map_p (fun image_name ->
+                 Env.wait_process
+                   ~is_ready
+                   ~run:(run image_name)
+                   ~propagate_error:true
+                   ())
+        in
+        unit)
+      (fun _ ->
+        (* If [Env.wait_process] failed, this is presumably because the docker image
+           we are trying to inspect does not exist anymore.
+           Hence, we relaunch the function from the start to perform [docker ps] again. *)
+        wait_docker_running ~vm_name ())
 
   let workspace_deploy ~workspace_name ~number_of_vms ~vm_configuration
       ~configurations =
