@@ -1783,6 +1783,7 @@ trigger:homebrew:
   stage: test
   rules:
   - when: always
+  needs: []
   trigger:
     include: .gitlab/ci/pipelines/homebrew.yml
     strategy: depend
