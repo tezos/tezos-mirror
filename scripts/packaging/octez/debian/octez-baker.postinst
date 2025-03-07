@@ -18,14 +18,13 @@ for file in /usr/bin/octez-baker-*; do
   if [ -z "$PROTO_CHOICES" ]; then
     PROTO_CHOICES="$suffix"
   else
-    PROTO_CHOICES="$PROTO_CHOICES, $suffix"
+    PROTO_CHOICES="$PROTO_CHOICES $suffix"
   fi
 done
 
 # we guess the active protocol
-ACTIVE_PROTOCOL=$(echo "$PROTO_CHOICES" | tr ' ' '\n' | grep -v '^alpha$' | sort | head -n 1)
-db_subst octez-baker/baker-active-protocol choices "$PROTO_CHOICES"
-db_subst octez-baker/baker-next-protocol choices "none, $PROTO_CHOICES"
+ACTIVE_PROTOCOL=$(echo "$PROTO_CHOICES" | tr ' ' '\n' | grep -v '^(alpha|next)$' | sort | head -n 1)
+NEXT_PROTOCOL=$(echo "$PROTO_CHOICES" | tr ' ' '\n' | grep -v '^(alpha|next)$' | sort | head -n 2 | tail -n 1)
 
 case "${1}" in
 configure)
@@ -39,27 +38,12 @@ configure)
     echo "LQVOTE=${RET}" > /etc/default/octez-baker-active
     echo "LQVOTE=${RET}" > /etc/default/octez-baker-next
 
-    db_input medium octez-baker/baker-active-protocol || true
-    # shellcheck disable=SC2119
-    db_go || true
-
-    db_input medium octez-baker/baker-next-protocol || true
-    # shellcheck disable=SC2119
-    db_go || true
-
     db_get octez-baker/baker-key
     echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-active
     echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-next
 
-    db_get octez-baker/baker-active-protocol
-    echo "PROTOCOL=${RET}" >> /etc/default/octez-baker-active
-
-    db_get octez-baker/baker-next-protocol
-    if [ -n "${RET:-}" ]; then
-      echo "PROTOCOL=${RET}" >> /etc/default/octez-baker-next
-    else
-      echo "#PROTOCOL=${RET}" >> /etc/default/octez-baker-next
-    fi
+    echo "PROTOCOL=${ACTIVE_PROTOCOL}" >> /etc/default/octez-baker-active
+    echo "PROTOCOL=${NEXT_PROTOCOL}" >> /etc/default/octez-baker-next
 
     db_get octez-baker/dal-node
     DAL=${RET}
@@ -91,26 +75,10 @@ configure)
       echoerr "Setting defaults in /etc/default/octez-baker-*"
       echoerr "Migrating values when possible"
 
-      db_set octez-baker/baker-active-protocol "$ACTIVE_PROTOCOL"
-
-      db_input medium octez-baker/baker-active-protocol || true
-      # shellcheck disable=SC2119
-      db_go || true
-
-      db_input medium octez-baker/baker-next-protocol || true
-      # shellcheck disable=SC2119
-      db_go || true
-
-      db_get octez-baker/baker-active-protocol
-      echo "PROTOCOL=${RET}" >> /etc/default/octez-baker-active
-
-      db_get octez-baker/baker-next-protocol
-      if [ -n "${RET:-}" ]; then
-        echo "PROTOCOL=${RET}" >> /etc/default/octez-baker-next
-      else
-        echo "#PROTOCOL=${RET}" >> /etc/default/octez-baker-next
-      fi
-      echoerr "PROTOCOL=${RET}"
+      echo "PROTOCOL=${ACTIVE_PROTOCOL}" >> /etc/default/octez-baker-active
+      echoerr "ACTIVE PROTO=${ACTIVE_PROTOCOL}"
+      echo "PROTOCOL=${NEXT_PROTOCOL}" >> /etc/default/octez-baker-next
+      echoerr "NEXT PROTO=${NEXT_PROTOCOL}"
 
       db_get octez-baker/liquidity-vote
       echo "LQVOTE=${RET}" >> /etc/default/octez-baker-active
@@ -150,5 +118,7 @@ configure)
   : nop
   ;;
 esac
+
+systemctl daemon-reload || true
 
 #DEBHELPER#
