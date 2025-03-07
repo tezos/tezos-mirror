@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024-2025 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -106,6 +106,15 @@ impl<MC: MemoryConfig, B: Block<MC, Owned>> TestStepper<MC, TestCacheLayouts, B>
         block_builder: B::BlockBuilder,
     ) -> Result<Self, TestStepperError> {
         Ok(Self::new_with_parsed_program(program, initrd, mode, block_builder)?.0)
+    }
+
+    /// Consumes the stepper, returning the [`BlockBuilder`] used internally.
+    ///
+    /// This allows the block builder to be re-used with a second stepper.
+    ///
+    /// [`BlockBuilder`]: Block::BlockBuilder
+    pub fn recover_builder(self) -> B::BlockBuilder {
+        self.machine_state.block_cache.block_builder
     }
 
     /// Initialise an interpreter with a given `program`, starting execution in [mode::Mode].

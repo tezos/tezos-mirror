@@ -48,15 +48,14 @@ fn run_test_with_check<B: Block<M1M, Owned>>(
     path: &str,
     exit_mode: Mode,
     check_xregs: &[(XRegister, u64)],
-) {
+    block_builder: B::BlockBuilder,
+) -> B::BlockBuilder {
     // Create a Mint instance: when it goes out of scope (at the end of interpret_test_with_check),
     // all golden files will be compared to the checked-in versions.
     let mut mint = Mint::new(GOLDEN_DIR);
     let mut golden = mint.new_goldenfile(format!("{path}.out")).unwrap();
 
     let contents = fs::read(format!("{TESTS_DIR}/{path}")).expect("Failed to read binary");
-
-    let block_builder = B::BlockBuilder::default();
 
     let mut interpreter: TestStepper<M1M, _, B> =
         TestStepper::new(&contents, None, exit_mode, block_builder).expect("Boot failed");
@@ -81,7 +80,26 @@ fn run_test_with_check<B: Block<M1M, Owned>>(
             ),
             None => panic!("Unexpected exception after {steps} steps: {:?}", cause),
         },
-    }
+    };
+
+    interpreter.recover_builder()
+}
+
+fn interpret_test_with_check(path: &str, exit_mode: Mode, check_xregs: &[(XRegister, u64)]) {
+    let block_builder = Default::default();
+    run_test_with_check::<Interpreted<M1M, Owned>>(path, exit_mode, check_xregs, block_builder);
+}
+
+/// For the JIT, we run it twice - the first run to build up the blocks, and the
+/// second to run with these blocks already compiled (so that we actually use them).
+fn inline_jit_test_with_check(path: &str, exit_mode: Mode, check_xregs: &[(XRegister, u64)]) {
+    type BlockImpl = InlineJit<M1M, Owned>;
+
+    let block_builder = Default::default();
+    let block_builder =
+        run_test_with_check::<BlockImpl>(path, exit_mode, check_xregs, block_builder);
+
+    run_test_with_check::<BlockImpl>(path, exit_mode, check_xregs, block_builder);
 }
 
 macro_rules! test_case {
@@ -112,13 +130,13 @@ macro_rules! test_case {
             #[test]
             $(#[$m])*
             fn [< $name _interpreted >]() {
-                run_test_with_check::<Interpreted<M1M, Owned>>($path, $mode, $xchecks)
+                interpret_test_with_check($path, $mode, $xchecks)
             }
 
             #[test]
             $(#[$m])*
             fn [< $name _inline_jit >]() {
-                run_test_with_check::<InlineJit<M1M, Owned>>($path, $mode, $xchecks)
+                inline_jit_test_with_check($path, $mode, $xchecks)
             }
         }
     };
