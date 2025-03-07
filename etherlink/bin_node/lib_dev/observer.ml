@@ -154,11 +154,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
   let* () =
     match config.experimental_features.enable_tx_queue with
     | Some tx_queue_config ->
-        Tx_queue.start
-          ~evm_node_endpoint
-          ~config:tx_queue_config
-          ~keep_alive:config.keep_alive
-          ()
+        Tx_queue.start ~config:tx_queue_config ~keep_alive:config.keep_alive ()
     | None ->
         let mode =
           if config.finalized_view then
@@ -289,7 +285,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       Drift_monitor.run ~evm_node_endpoint Evm_context.next_blueprint_number
     and* () =
       if Configuration.is_tx_queue_enabled config then
-        Tx_queue.beacon ~tick_interval:0.05
+        Tx_queue.beacon ~evm_node_endpoint ~tick_interval:0.05
       else return_unit
     in
     return_unit

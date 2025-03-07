@@ -8,11 +8,7 @@
 
 open Tezos_workers
 
-type parameters = {
-  evm_node_endpoint : Uri.t;
-  config : Configuration.tx_queue;
-  keep_alive : bool;
-}
+type parameters = {config : Configuration.tx_queue; keep_alive : bool}
 
 type queue_variant = [`Accepted | `Refused]
 
@@ -337,7 +333,6 @@ module Transactions_per_addr = struct
 end
 
 type state = {
-  evm_node_endpoint : Uri.t;
   mutable queue : queue_request Queue.t;
   pending : Pending_transactions.t;
   tx_object : Tx_object.t;
@@ -378,7 +373,7 @@ module Request = struct
         address : Ethereum_types.address;
       }
         -> (Ethereum_types.quantity, tztrace) t
-    | Tick : (unit, tztrace) t
+    | Tick : {evm_node_endpoint : Uri.t} -> (unit, tztrace) t
     | Clear : (unit, tztrace) t
 
   type view = View : _ t -> view
@@ -411,8 +406,13 @@ module Request = struct
         case
           Json_only
           ~title:"Tick"
-          (obj1 (req "request" (constant "tick")))
-          (function View Tick -> Some () | _ -> None)
+          (obj2
+             (req "request" (constant "tick"))
+             (req "evm_node_endpoint" string))
+          (function
+            | View (Tick {evm_node_endpoint}) ->
+                Some ((), Uri.to_string evm_node_endpoint)
+            | _ -> None)
           (fun _ -> assert false);
         case
           Json_only
@@ -449,7 +449,7 @@ module Request = struct
     | Confirm {txn_hash = Hash (Hex txn_hash)} ->
         fprintf fmt "Confirm %s" txn_hash
     | Find {txn_hash = Hash (Hex txn_hash)} -> fprintf fmt "Find %s" txn_hash
-    | Tick -> fprintf fmt "Tick"
+    | Tick _ -> fprintf fmt "Tick"
     | Clear -> fprintf fmt "Clear"
     | Nonce {next_nonce = _; address = Address (Hex address)} ->
         fprintf fmt "Nonce %s" address
@@ -535,7 +535,6 @@ let clear
        tx_object;
        tx_per_address;
        address_nonce;
-       evm_node_endpoint = _;
        config = _;
        keep_alive = _;
      } :
@@ -657,7 +656,7 @@ module Handlers = struct
             return_unit
         | None -> return_unit)
     | Find {txn_hash} -> return @@ Tx_object.find state.tx_object txn_hash
-    | Tick ->
+    | Tick {evm_node_endpoint} ->
         let all_transactions = Queue.to_seq state.queue in
         let* transactions_to_inject, remaining_transactions =
           match state.config.max_transaction_batch_length with
@@ -686,7 +685,7 @@ module Handlers = struct
         let+ () =
           send_transactions_batch
             ~keep_alive:state.keep_alive
-            ~evm_node_endpoint:state.evm_node_endpoint
+            ~evm_node_endpoint
             transactions_to_inject
         in
 
@@ -712,12 +711,10 @@ module Handlers = struct
 
   type launch_error = tztrace
 
-  let on_launch _self () ({evm_node_endpoint; config; keep_alive} : parameters)
-      =
+  let on_launch _self () ({config; keep_alive} : parameters) =
     let open Lwt_result_syntax in
     return
       {
-        evm_node_endpoint;
         queue = Queue.create ();
         pending = Pending_transactions.empty ~start_size:(config.max_size / 4);
         (* start with /4 and let it grow if necessary to not allocate
@@ -795,13 +792,17 @@ let push_request worker request =
   let*! (pushed : bool) = Worker.Queue.push_request worker request in
   if not pushed then tzfail Tx_queue_is_closed else return_unit
 
-let tick () = bind_worker @@ fun w -> push_request w Tick
+let tick ~evm_node_endpoint =
+  bind_worker @@ fun w -> push_request w (Tick {evm_node_endpoint})
 
-let rec beacon ~tick_interval =
+let beacon ~evm_node_endpoint ~tick_interval =
   let open Lwt_result_syntax in
-  let* () = tick () in
-  let*! () = Lwt_unix.sleep tick_interval in
-  beacon ~tick_interval
+  let rec loop () =
+    let* () = tick ~evm_node_endpoint in
+    let*! () = Lwt_unix.sleep tick_interval in
+    loop ()
+  in
+  loop ()
 
 let inject ?(callback = fun _ -> Lwt_syntax.return_unit) ~next_nonce
     (tx_object : Ethereum_types.legacy_transaction_object) txn =
@@ -816,15 +817,9 @@ let inject ?(callback = fun _ -> Lwt_syntax.return_unit) ~next_nonce
 let confirm txn_hash =
   bind_worker @@ fun w -> push_request w (Confirm {txn_hash})
 
-let start ~config ~evm_node_endpoint ~keep_alive () =
+let start ~config ~keep_alive () =
   let open Lwt_result_syntax in
-  let* worker =
-    Worker.launch
-      table
-      ()
-      {evm_node_endpoint; config; keep_alive}
-      (module Handlers)
-  in
+  let* worker = Worker.launch table () {config; keep_alive} (module Handlers) in
   Lwt.wakeup worker_waker worker ;
   let*! () = Tx_queue_events.is_ready () in
   return_unit
