@@ -36,11 +36,17 @@ let raw_sign (type kind) ctxt ?(watermark = Signature.Generic_operation)
     (sk : Signature.secret_key) branch (contents : kind contents_list) =
   let open Lwt_result_syntax in
   let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let encoding =
+    if Constants.aggregate_attestation alpha_ctxt then
+      (* Under the [aggregate_attestation] feature flag, attestations signed
+         with BLS keys must use a dedicated serialization encoding *)
+      match (contents, sk) with
+      | Single (Attestation _), Bls _ -> Operation.bls_mode_unsigned_encoding
+      | _ -> Operation.unsigned_encoding
+    else Operation.unsigned_encoding
+  in
   let bytes =
-    Operation.Internal_for_tests.serialize_unsigned_operation
-      alpha_ctxt
-      branch
-      contents
+    Data_encoding.Binary.to_bytes_exn encoding ({branch}, Contents_list contents)
   in
   return (Signature.sign ~watermark sk bytes)
 
