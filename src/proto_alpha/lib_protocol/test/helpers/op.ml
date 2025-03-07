@@ -143,10 +143,7 @@ let raw_attestation ?delegate ?slot ?level ?round ?block_payload_hash
 let aggregate attestations =
   let aggregate_content =
     List.fold_left
-      (fun acc op ->
-        let {shell; protocol_data = {contents; signature}} : _ Operation.t =
-          op
-        in
+      (fun acc ({shell; protocol_data = {contents; signature}} : _ Operation.t) ->
         match (contents, signature) with
         | Single (Attestation {consensus_content; _}), Some (Bls bls_sig) -> (
             let {slot; _} = consensus_content in
