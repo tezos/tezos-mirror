@@ -144,10 +144,14 @@ let start_public_server ~(rpc_server_family : Rpc_types.rpc_server_family)
           impl.smart_rollup_address
           impl.time_between_blocks
   in
-  let register_tezos_services =
+  let* register_tezos_services =
     match tezlink_services with
-    | None -> Evm_directory.empty config.experimental_features.rpc_server
-    | Some impl -> Tezos_services.register_tezlink_services impl
+    | None ->
+        return (Evm_directory.empty config.experimental_features.rpc_server)
+    | Some impl -> (
+        match config.experimental_features.rpc_server with
+        | Resto -> return (Tezos_services.register_tezlink_services impl)
+        | Dream -> tzfail Node_error.Dream_rpc_tezlink)
   in
   (* If spawn_rpc is defined, use it as intermediate *)
   let rpc =
