@@ -778,7 +778,7 @@ module Helpers = struct
     return commitment_string
 
   let wait_for_gossipsub_worker_event ~name dal_node lambda =
-    Dal_node.wait_for dal_node (sf "gossipsub_worker_event-%s.v0" name) lambda
+    Dal_node.wait_for dal_node (sf "dal_gs_%s.v0" name) lambda
 
   let check_expected expected found =
     if expected <> found then None else Some ()
