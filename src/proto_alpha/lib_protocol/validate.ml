@@ -744,11 +744,9 @@ module Consensus = struct
 
   (** Attestation checks for all modes that involve a block:
       Application, Partial_validation, and Construction.
-      Checks regarding the DAL content are done separately.
-
-      Return the slot owner's consensus key and voting power. *)
+      Checks regarding the DAL content are done separately. *)
   let check_block_attestation vi consensus_info
-      {level; round; block_payload_hash = bph; slot} =
+      {level; round; block_payload_hash = bph; slot = _} =
     let open Lwt_result_syntax in
     let*? expected_payload_hash =
       match Consensus.attestation_branch vi.ctxt with
@@ -765,10 +763,7 @@ module Consensus = struct
     let*? () = check_level kind consensus_info.predecessor_level level in
     let*? () = check_round kind consensus_info.predecessor_round round in
     let*? () = check_payload_hash kind expected_payload_hash bph in
-    let*? consensus_key, voting_power, _dal_power =
-      get_delegate_details consensus_info.attestation_slot_map kind slot
-    in
-    return (consensus_key, voting_power)
+    return_unit
 
   let check_attestation vi ~check_signature
       (operation : Kind.attestation operation) =
@@ -784,7 +779,16 @@ module Consensus = struct
     let* consensus_key, voting_power =
       match vi.mode with
       | Application _ | Partial_validation _ | Construction _ ->
-          check_block_attestation vi consensus_info consensus_content
+          let* () =
+            check_block_attestation vi consensus_info consensus_content
+          in
+          let*? consensus_key, voting_power, _dal_power =
+            get_delegate_details
+              consensus_info.attestation_slot_map
+              Attestation
+              consensus_content.slot
+          in
+          return (consensus_key, voting_power)
       | Mempool ->
           check_mempool_consensus
             vi
