@@ -143,13 +143,13 @@ let check_skip_list_store dal_node ~number_of_slots ~expected_levels =
 (* Wait for 'new_head' event. Note that the DAL node processes a new head with a
    delay of one level. Also, this event is emitted before block processing. *)
 let wait_for_layer1_head dal_node level =
-  Dal_node.wait_for dal_node "dal_node_layer_1_new_head.v0" (fun e ->
+  Dal_node.wait_for dal_node "dal_new_L1_head_block.v0" (fun e ->
       if JSON.(e |-> "level" |> as_int) = level then Some () else None)
 
 (* Wait for 'new_final_block' event. This event is emitted after processing a
    final block. *)
 let wait_for_layer1_final_block dal_node level =
-  Dal_node.wait_for dal_node "dal_node_layer_1_new_final_block.v0" (fun e ->
+  Dal_node.wait_for dal_node "dal_new_L1_final_block.v0" (fun e ->
       if JSON.(e |-> "level" |> as_int) = level then Some () else None)
 
 (* We use a custom [bake_for], which by default bakes with all delegates, unlike
@@ -231,7 +231,7 @@ let wait_for_stored_slot ?shard_index dal_node ~published_level ~slot_index =
     | None -> true
     | Some shard_index -> JSON.(e |-> "shard_index" |> as_int) = shard_index
   in
-  Dal_node.wait_for dal_node "stored_slot_shard.v0" (fun e ->
+  Dal_node.wait_for dal_node "dal_stored_slot_shard.v0" (fun e ->
       if check_slot_id e && check_shard_index e then Some () else None)
 
 (* Wait until the given [dal_node] receives all the shards whose
@@ -2279,8 +2279,7 @@ let test_dal_node_startup =
   let* () =
     Lwt.join
       [
-        Dal_node.wait_for dal_node "dal_node_plugin_resolved.v0" (fun _ ->
-            Some ());
+        Dal_node.wait_for dal_node "dal_plugin_resolved.v0" (fun _ -> Some ());
         bake_for client;
       ]
   in
@@ -3823,10 +3822,7 @@ let check_message_notified_to_app_event dal_node ~number_of_shards
     seen |> Array.to_seqi
     |> Seq.for_all (fun (i, b) -> if List.mem i shard_indexes then b else true)
   in
-  Dal_node.wait_for
-    dal_node
-    "gossipsub_transport_event-message_notified_to_app.v0"
-    (fun event ->
+  Dal_node.wait_for dal_node "dal_gs_message_notified_to_app.v0" (fun event ->
       let*?? shard_index = get_shard_index_opt event in
       Check.(
         (seen.(shard_index) = false)
@@ -4558,7 +4554,7 @@ let test_migration_plugin ~migrate_from ~migrate_to =
     let blocks_till_migration = migration_level - current_level in
 
     let wait_for_plugin =
-      Dal_node.wait_for dal_node "dal_node_plugin_resolved.v0" (fun json ->
+      Dal_node.wait_for dal_node "dal_plugin_resolved.v0" (fun json ->
           let proto_hash = JSON.(json |> as_string) in
           if String.equal proto_hash (Protocol.hash migrate_to) then Some ()
           else None)
@@ -4698,7 +4694,7 @@ let test_producer_profile _protocol _dal_parameters _cryptobox _node _client
 let monitor_finalized_levels_events ~__LOC__ ~last_notified_level ~target_level
     dal_node =
   let next_finalized_level = ref (last_notified_level + 1) in
-  Dal_node.wait_for dal_node "dal_node_layer_1_new_final_block.v0" (fun e ->
+  Dal_node.wait_for dal_node "dal_new_L1_final_block.v0" (fun e ->
       let finalized_level = JSON.(e |-> "level" |> as_int) in
       Check.(
         (finalized_level = !next_finalized_level)
@@ -5995,7 +5991,10 @@ module Amplification = struct
     let wait_slot ~published_level:_ ~slot_index:_ =
       Log.info "Waiting for first reconstruction event" ;
       let* () =
-        Dal_node.wait_for observer "reconstruct_starting_in.v0" (fun event ->
+        Dal_node.wait_for
+          observer
+          "dal_reconstruct_starting_in.v0"
+          (fun event ->
             if
               JSON.(
                 event |-> "level" |> as_int = publication_level
@@ -6009,7 +6008,7 @@ module Amplification = struct
       let promise_reconstruction_cancelled =
         Dal_node.wait_for
           observer
-          "reconstruct_no_missing_shard.v0"
+          "dal_reconstruct_no_missing_shard.v0"
           (fun event ->
             if
               JSON.(
@@ -6019,7 +6018,7 @@ module Amplification = struct
             else None)
       in
       let promise_reconstruction_finished =
-        Dal_node.wait_for observer "reconstruct_finished.v0" (fun event ->
+        Dal_node.wait_for observer "dal_reconstruct_finished.v0" (fun event ->
             if
               JSON.(
                 event |-> "level" |> as_int = publication_level
@@ -6058,7 +6057,7 @@ module Garbage_collection = struct
      receiving the shards, each node deletes them from its storage. *)
 
   let wait_remove_shards ~published_level ~slot_index node =
-    Dal_node.wait_for node "removed_slot_shards.v0" (fun event ->
+    Dal_node.wait_for node "dal_removed_slot_shards.v0" (fun event ->
         if
           (published_level = JSON.(event |-> "published_level" |> as_int))
           && slot_index = JSON.(event |-> "slot_index" |> as_int)
@@ -6066,7 +6065,7 @@ module Garbage_collection = struct
         else None)
 
   let wait_for_first_shard ~published_level ~slot_index node =
-    Dal_node.wait_for node "stored_slot_shard.v0" (fun event ->
+    Dal_node.wait_for node "dal_stored_slot_shard.v0" (fun event ->
         let actual_published_level =
           JSON.(event |-> "published_level" |> as_int)
         in
@@ -7583,8 +7582,7 @@ let scenario_tutorial_dal_baker =
           ~error_msg:"Expecting a empty list of topics") ;
 
       let wait_join_event_promise =
-        Dal_node.wait_for dal_node "gossipsub_worker_event-join.v0" (fun _ ->
-            Some ())
+        Dal_node.wait_for dal_node "dal_gs_join.v0" (fun _ -> Some ())
       in
 
       let all_delegates =
@@ -8857,7 +8855,7 @@ let test_attester_did_not_attest (_protocol : Protocol.t)
     "We promise the attester_did_not_attest_slot will be emitted by the \
      [attester node]" ;
   let not_attested_by_bootstrap2_promise =
-    Dal_node.wait_for attester_node "attester_did_not_attest.v0" (fun _ ->
+    Dal_node.wait_for attester_node "dal_attester_did_not_attest.v0" (fun _ ->
         Some ())
   in
   log_step "The producer crafts a commitment and publish it" ;
@@ -9423,7 +9421,7 @@ let test_e2e_trap_faulty_dal_node _protocol dal_parameters _cryptobox node
     ~__LOC__
     ~error_msg:"Expected the faulty delegate to not be denounced" ;
   let wait_for_trap_injection =
-    Dal_node.wait_for dal_node "trap_injection.v0" (fun e ->
+    Dal_node.wait_for dal_node "dal_trap_injection.v0" (fun e ->
         let open JSON in
         let delegate = e |-> "delegate" |> as_string in
         let attested_level = e |-> "attested_level" |> as_int in
