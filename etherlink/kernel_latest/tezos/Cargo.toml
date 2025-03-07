@@ -10,7 +10,9 @@ license = "MIT"
 
 [dependencies]
 
+tezos_crypto_rs.workspace = true
 rlp.workspace = true
+hex.workspace = true
 
 tezos_ethereum.workspace = true
 primitive-types.workspace = true
