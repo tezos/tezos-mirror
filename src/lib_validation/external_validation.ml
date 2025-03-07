@@ -503,5 +503,7 @@ let reconfigure_event_logging_request config = Reconfigure_event_logging config
 
 let terminate_request = Erequest Terminate
 
-let command_line_args _parameters ~socket_dir =
-  (Some "octez-validator", ["--socket-dir"; socket_dir])
+let command_line_args ~socket_dir =
+  ("octez-validator", ["--socket-dir"; socket_dir])
+
+let hypervisor_name = "octez-validator-hypervisor"

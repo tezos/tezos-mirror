@@ -447,3 +447,5 @@ end
 
 include
   Tezos_base_unix.External_process_main.Make (External_validation) (Processing)
+module Hypervisor =
+  Tezos_base_unix.Hypervisor_process_main.Make (External_validation)

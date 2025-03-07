@@ -10,21 +10,50 @@
 open Error_monad
 
 module Make (P : External_process_parameters.S) = struct
+  module Hypervisor_params = Hypervisor_process_main.Make_process_parameters (P)
+
   type error +=
-    | Inconsistent_handshake of string
+    | Inconsistent_hypervisor_handshake of string
+    | Inconsistent_hypervisee_handshake of string
     | Cannot_process_while_shutting_down
 
   let () =
     Error_monad.register_error_kind
       `Temporary
-      ~id:(P.name ^ "_process.inconsistent_handshake")
+      ~id:(P.name ^ "_hypervisor_process.inconsistent_handshake")
       ~title:"Inconsistent handshake"
-      ~description:(Format.sprintf "Inconsistent handshake with %s." P.name)
+      ~description:
+        (Format.sprintf
+           "Inconsistent handshake with %s_hypervisor_process."
+           P.name)
       ~pp:(fun ppf msg ->
-        Format.fprintf ppf "Inconsistent handshake with %s: %s." P.name msg)
+        Format.fprintf
+          ppf
+          "Inconsistent handshake with %s_hypervisor_process: %s."
+          P.name
+          msg)
       Data_encoding.(obj1 (req "msg" string))
-      (function Inconsistent_handshake msg -> Some msg | _ -> None)
-      (fun msg -> Inconsistent_handshake msg)
+      (function Inconsistent_hypervisor_handshake msg -> Some msg | _ -> None)
+      (fun msg -> Inconsistent_hypervisor_handshake msg)
+
+  let () =
+    Error_monad.register_error_kind
+      `Temporary
+      ~id:(P.name ^ "_hypervisee_process.inconsistent_handshake")
+      ~title:"Inconsistent handshake"
+      ~description:
+        (Format.sprintf
+           "Inconsistent handshake with %s_hypervisee_process."
+           P.name)
+      ~pp:(fun ppf msg ->
+        Format.fprintf
+          ppf
+          "Inconsistent handshake with %s_hypervisee_process: %s."
+          P.name
+          msg)
+      Data_encoding.(obj1 (req "msg" string))
+      (function Inconsistent_hypervisee_handshake msg -> Some msg | _ -> None)
+      (fun msg -> Inconsistent_hypervisee_handshake msg)
 
   let () =
     Error_monad.register_error_kind
@@ -147,14 +176,6 @@ module Make (P : External_process_parameters.S) = struct
         ~msg:"process terminated normally"
         ()
 
-    let process_started =
-      declare_1
-        ~level:Notice
-        ~name:"proc_started"
-        ~msg:(Format.sprintf "%s process started with pid {pid}" P.name)
-        ~pp1:Format.pp_print_int
-        ("pid", Data_encoding.int31)
-
     let cannot_close =
       declare_0
         ~level:Info
@@ -172,16 +193,6 @@ module Make (P : External_process_parameters.S) = struct
         ~msg:
           (Format.sprintf
              "force quitting the %s process as it seems to be unresponsive"
-             P.name)
-        ()
-
-    let cannot_start_process =
-      declare_0
-        ~level:Info
-        ~name:"cannot_start_process"
-        ~msg:
-          (Format.sprintf
-             "cannot start %s process: the node is shutting down"
              P.name)
         ()
 
@@ -203,6 +214,14 @@ module Make (P : External_process_parameters.S) = struct
         ~pp2:Time.System.Span.pp_hum
         ("timespan", Time.System.Span.encoding)
 
+    let hypervisee_initialized =
+      declare_1
+        ~level:Info
+        ~name:"hypervisee_initialized"
+        ~msg:"Hypervisee initialized with pid {pid}"
+        ~pp1:Format.pp_print_int
+        ("pid", Data_encoding.int31)
+
     let emit = Internal_event.Simple.emit
   end
 
@@ -215,12 +234,16 @@ module Make (P : External_process_parameters.S) = struct
     clean_up_callback_id : Lwt_exit.clean_up_callback_id;
   }
 
-  type process_status = Uninitialized | Running of external_process | Exiting
+  type hypervisee = {
+    input : Lwt_io.output_channel;
+    output : Lwt_io.input_channel;
+  }
 
   type t = {
     parameters : P.parameters;
     process_path : string;
-    mutable process : process_status;
+    external_process : external_process;
+    mutable hypervisee : hypervisee;
     lock : Lwt_mutex.t;
   }
 
@@ -231,54 +254,47 @@ module Make (P : External_process_parameters.S) = struct
      user. *)
   let shutdown_timeout = 5.
 
-  (* Returns a temporary path for the socket to be
-     spawned. $XDG_RUNTIME_DIR is returned if the environment variable
-     is defined. Otherwise, the default temporary directory is used. *)
-  let get_temporary_socket_dir () =
-    match Sys.getenv_opt "XDG_RUNTIME_DIR" with
-    | Some xdg_runtime_dir when xdg_runtime_dir <> "" -> xdg_runtime_dir
-    | Some _ | None -> Filename.get_temp_dir_name ()
+  (** [handshake input output magic] handshakes, the scenario is the following:
+      - simultaneously, the node and the external process send some magic bytes
+        to each others,
+      - simultaneously, the node and the external process wait for each others
+        magic bytes and check their validity,
+      - handshake is finished.
+  *)
+  let handshake input output magic err =
+    let open Lwt_result_syntax in
+    let*! () = Lwt_unix_socket.send input Data_encoding.Variable.bytes magic in
+    let*! recv_magic =
+      Lwt_unix_socket.recv output Data_encoding.Variable.bytes
+    in
+    fail_when (not (Bytes.equal recv_magic magic)) err
 
   (* Ad-hoc request to make the handshake with the external process.
-     This is expected to be used each time the external process
-     process is (re)started.
-     The scenario of the handshake is the following:
-     - simultaneously, the node and the external process send some magic bytes
-       to each others,
-     - simultaneously, the node and the external process wait for each others
-       magic bytes and check their validity,
-     - handshake is finished. *)
-  let process_handshake process_input process_output =
-    let open Lwt_result_syntax in
-    let*! () =
-      Lwt_unix_socket.send process_input Data_encoding.Variable.bytes P.magic
-    in
-    let*! magic =
-      Lwt_unix_socket.recv process_output Data_encoding.Variable.bytes
-    in
-    fail_when
-      (not (Bytes.equal magic P.magic))
-      (Inconsistent_handshake "bad magic")
+     This is expected to be used each time the hypervisee process is
+     (re)started. *)
+  let process_hypervisee_handshake process_input process_output =
+    handshake
+      process_input
+      process_output
+      P.magic
+      (Inconsistent_hypervisee_handshake "bad magic")
 
-  (* Ad-hoc request to pass startup arguments to the external
-     process. This is expected to be run after the
-     [process_handshake].
-     This is expected to be used each time the external
-     process is (re)started.
-     The scenario of the init is the following:
-     - execute the handshake,
-     - the node sends some parameters and waits for an ack,
-     - the external process initializes it's state thanks to the
-       given parameters,
-     - the external process returns a ack to confirm a successful
-       initialization,
-     - the node receives the ack and continues,
-     - initialization is finished.
-  *)
-  let process_init p process_input process_output =
+  (* Similar to {!process_hypervisee_handshake} but it is not expected
+     to be used more than once. *)
+  let process_hypervisor_handshake process_input process_output =
+    handshake
+      process_input
+      process_output
+      Hypervisor_process_main.magic
+      (Inconsistent_hypervisor_handshake "bad magic")
+
+  let init_hypervisor process_input process_output internal_events =
     let open Lwt_result_syntax in
     let*! () =
-      Lwt_unix_socket.send process_input P.parameters_encoding p.parameters
+      Lwt_unix_socket.send
+        process_input
+        Internal_event_config.encoding
+        internal_events
     in
     let* () =
       Lwt_unix_socket.recv
@@ -287,52 +303,23 @@ module Make (P : External_process_parameters.S) = struct
     in
     return_unit
 
-  (* Proceeds to a full initialization of the external
-     process by opening the communication channels, spawning the
-     external process and calling the handshake and initialization
-     functions.
-     TODO: Add critical section for external process launch, see
-     https://gitlab.com/tezos/tezos/-/issues/5175
-  *)
-  let start_process p =
+  let process_hypervisee_init input output parameters =
     let open Lwt_result_syntax in
-    let canceler = Lwt_canceler.create () in
-    (* We assume that there is only one external process per socket *)
-    let socket_dir = get_temporary_socket_dir () in
-    let proc_name, args = P.command_line_args p.parameters ~socket_dir in
-    let arg0 =
-      match proc_name with
-      | Some p -> p
-      | None -> Filename.basename p.process_path
+    let*! () = Lwt_unix_socket.send input P.parameters_encoding parameters in
+    let* () =
+      Lwt_unix_socket.recv
+        output
+        (Error_monad.result_encoding Data_encoding.empty)
     in
-    let args = arg0 :: args in
-    let env = Unix.environment () in
-    (* FIXME https://gitlab.com/tezos/tezos/-/issues/4837
+    return_unit
 
-       We unset the [env_var_name] environment variable environment
-       variable so that events emitted by the external
-       process are not mixed up with the events that could be printed
-       by the external process. This is a temporary fix and a better
-       solution would be welcome! *)
-    let env =
-      Array.to_seq env
-      |> Seq.filter (fun binding ->
-             match String.split_on_char '=' binding with
-             | env_var_name :: _
-               when env_var_name = Internal_event_unix.env_var_name ->
-                 false
-             | _ -> true)
-      |> Array.of_seq
-    in
-    let process =
-      Lwt_process.open_process_none ~env (p.process_path, Array.of_list args)
-    in
-    let socket_path = P.socket_path ~socket_dir ~pid:process#pid in
+  let process_socket ~canceler ~socket_path process =
+    let open Lwt_result_syntax in
     (* Make sure that the mimicked anonymous file descriptor is
-        removed if the spawn of the process is interrupted. Thus, we
-        avoid generating potential garbage in the [socket_dir].
-        No interruption can occur since the resource was created
-        because there are no yield points. *)
+       removed if the spawn of the process is interrupted. Thus, we
+       avoid generating potential garbage in the [socket_dir].
+       No interruption can occur since the resource was created
+       because there are no yield points. *)
     let clean_process_fd socket_path =
       Lwt.catch
         (fun () -> Lwt_unix.unlink socket_path)
@@ -349,7 +336,7 @@ module Make (P : External_process_parameters.S) = struct
       Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
           clean_process_fd socket_path)
     in
-    let* process_socket =
+    let* r =
       protect
         ~on_error:(function
           | [Exn Lwt_unix.Timeout] as err ->
@@ -383,6 +370,44 @@ module Make (P : External_process_parameters.S) = struct
               clean_process_fd socket_path))
     in
     Lwt_exit.unregister_clean_up_callback process_fd_cleaner ;
+    return r
+
+  (* Proceeds to a full initialization of the external
+     process by opening the communication channels, spawning the
+     external process and calling the handshake and initialization
+     functions.
+     TODO: Add critical section for external process launch, see
+     https://gitlab.com/tezos/tezos/-/issues/5175
+  *)
+  let start_process ~process_path parameters =
+    let open Lwt_result_syntax in
+    let canceler = Lwt_canceler.create () in
+    (* We assume that there is only one external process per socket *)
+    let socket_dir = Hypervisor_process_main.get_temporary_socket_dir () in
+    let args = [P.hypervisor_name; "--socket-dir"; socket_dir] in
+    let env = Unix.environment () in
+    (* FIXME https://gitlab.com/tezos/tezos/-/issues/4837
+
+       We unset the [env_var_name] environment variable environment
+       variable so that events emitted by the external
+       process are not mixed up with the events that could be printed
+       by the external process. This is a temporary fix and a better
+       solution would be welcome! *)
+    let env =
+      Array.to_seq env
+      |> Seq.filter (fun binding ->
+             match String.split_on_char '=' binding with
+             | env_var_name :: _
+               when env_var_name = Internal_event_unix.env_var_name ->
+                 false
+             | _ -> true)
+      |> Array.of_seq
+    in
+    let process =
+      Lwt_process.open_process_none ~env (process_path, Array.of_list args)
+    in
+    let socket_path = P.socket_path ~socket_dir ~pid:process#pid in
+    let* process_socket = process_socket ~canceler ~socket_path process in
     (* Register clean up callback to ensure that the process
        will be terminated even if the node is brutally stopped. *)
     let clean_up_callback_id =
@@ -391,81 +416,146 @@ module Make (P : External_process_parameters.S) = struct
     in
     let process_input = Lwt_io.of_fd ~mode:Output process_socket in
     let process_output = Lwt_io.of_fd ~mode:Input process_socket in
-    let*! () = Events.(emit process_started process#pid) in
-    p.process <-
-      Running
-        {
-          process;
-          process_socket;
-          input = process_input;
-          output = process_output;
-          canceler;
-          clean_up_callback_id;
-        } ;
-    let* () = process_handshake process_input process_output in
-    let* () = process_init p process_input process_output in
-    return (process, process_input, process_output)
+    let external_process =
+      {
+        process;
+        process_socket;
+        input = process_input;
+        output = process_output;
+        canceler;
+        clean_up_callback_id;
+      }
+    in
+    let* () = process_hypervisor_handshake process_input process_output in
+    let* () =
+      init_hypervisor
+        process_input
+        process_output
+        (P.internal_events parameters)
+    in
+    return external_process
 
-  (* Inspects the process's state and return it. If the process is
-     in an inconsistent state, it will be restarted automatically --
-     by running [start_process]. *)
-  let process_state p =
+  let start_hypervisee (external_process : external_process) parameters :
+      hypervisee tzresult Lwt.t =
     let open Lwt_result_syntax in
-    match p.process with
-    | Running
-        {
-          process;
-          process_socket;
-          input = process_input;
-          output = process_output;
-          canceler;
-          clean_up_callback_id;
-        } -> (
-        match process#state with
-        | Running -> return (process, process_input, process_output)
-        | Exited status ->
-            (* When the process is in an inconsistent state, we restart
-               it automatically. *)
-            let*! () = Error_monad.cancel_with_exceptions canceler in
-            Lwt_exit.unregister_clean_up_callback clean_up_callback_id ;
-            let*! () =
-              Lwt.catch
-                (fun () -> Lwt_unix.close process_socket)
-                (fun _ -> Lwt.return_unit)
-            in
-            p.process <- Uninitialized ;
-            let*! () = Events.(emit process_exited_abnormally status) in
-            start_process p)
-    | Uninitialized -> start_process p
-    | Exiting ->
-        let*! () = Events.(emit cannot_start_process ()) in
-        tzfail Cannot_process_while_shutting_down
+    Lwt.catch
+      (fun () ->
+        (* Ask the hypervisor to start an hypervisee. *)
+        let request = Hypervisor_params.Params.(Start_hypervisee) in
+        let*! () =
+          Lwt_unix_socket.send
+            external_process.input
+            Hypervisor_params.Params.request_encoding
+            (Erequest request)
+        in
+        (* Hypervisor answers the socket path the hypervisee will connect. *)
+        let* (hypervisee_socket_path, hypervisee_pid), _profiler =
+          Lwt_unix_socket.recv_result
+            external_process.output
+            Data_encoding.(
+              tup2
+                (Hypervisor_params.Params.result_encoding request)
+                (option
+                   (tup2
+                      (option Profiler.report_encoding)
+                      (option Profiler.report_encoding))))
+        in
+        let* socket_process =
+          process_socket
+            ~canceler:external_process.canceler
+            ~socket_path:hypervisee_socket_path
+            external_process.process
+        in
+        let hypervisee_output = Lwt_io.of_fd ~mode:Input socket_process in
+        let hypervisee_input = Lwt_io.of_fd ~mode:Output socket_process in
+        (* Handshake with the hypervisee. *)
+        let* () =
+          process_hypervisee_handshake hypervisee_input hypervisee_output
+        in
+        (* Initialize the hypervisee. *)
+        let* () =
+          process_hypervisee_init hypervisee_input hypervisee_output parameters
+        in
+        let*! () = Events.(emit hypervisee_initialized hypervisee_pid) in
+        return {input = hypervisee_input; output = hypervisee_output})
+      (fun exn ->
+        let*! () =
+          match external_process.process#state with
+          | Running -> Lwt.return_unit
+          | Exited status ->
+              let*! () = Events.(emit process_exited_abnormally status) in
+              Lwt_exit.exit_and_raise 1
+        in
+        fail_with_exn exn)
+
+  let restart_hypervisee ~stop_hypervisee p =
+    let open Lwt_result_syntax in
+    Lwt.catch
+      (fun () ->
+        (* Terminate the hypervisee. *)
+        let*! () =
+          if stop_hypervisee then
+            Lwt_unix_socket.send
+              p.hypervisee.input
+              P.request_encoding
+              P.terminate_request
+          else Lwt.return_unit
+        in
+        (* Ask the hypervisor to make sure the hypervisee is terminated. *)
+        let hypervisor_request = Hypervisor_params.Params.Stop_hypervisee in
+        let*! () =
+          Lwt_unix_socket.send
+            p.external_process.input
+            Hypervisor_params.Params.request_encoding
+            (Erequest hypervisor_request)
+        in
+        let* (), _profiler =
+          Lwt_unix_socket.recv_result
+            p.external_process.output
+            Data_encoding.(
+              tup2
+                (Hypervisor_params.Params.result_encoding hypervisor_request)
+                (option
+                   (tup2
+                      (option Profiler.report_encoding)
+                      (option Profiler.report_encoding))))
+        in
+        (* Restart the hypervisee. *)
+        let* hypervisee = start_hypervisee p.external_process p.parameters in
+        p.hypervisee <- hypervisee ;
+        return_unit)
+      (fun exn ->
+        let*! () =
+          match p.external_process.process#state with
+          | Running -> Lwt.return_unit
+          | Exited status -> Events.(emit process_exited_abnormally status)
+        in
+        fail_with_exn exn)
 
   (* Sends the given request to the external process. If the request
      failed to be fulfilled, the status of the external process is
      set to Uninitialized and the associated error is propagated. *)
   let send_request p request =
     let open Lwt_result_syntax in
-    let prequest = P.Erequest request in
-    let* process, process_input, process_output = process_state p in
-    Lwt.catch
-      (fun () ->
-        (* Make sure that the promise is not cancelled between a send
-           and recv *)
-        let* res =
+    let rec send_request_aux ~retried =
+      let prequest = P.Erequest request in
+      Lwt.catch
+        (fun () ->
+          (* Make sure that the promise is not cancelled between a send
+             and recv *)
           Lwt.protected
             (Lwt_mutex.with_lock p.lock (fun () ->
                  let now = Time.System.now () in
                  let*! () = Events.(emit request_for prequest) in
                  let*! () =
                    Lwt_unix_socket.send
-                     process_input
+                     p.hypervisee.input
                      P.request_encoding
                      prequest
                  in
                  let*! res =
                    Lwt_unix_socket.recv_result
-                     process_output
+                     p.hypervisee.output
                      Data_encoding.(
                        tup2
                          (P.result_encoding request)
@@ -479,49 +569,28 @@ module Make (P : External_process_parameters.S) = struct
                    Ptime.diff then_ now
                  in
                  let*! () = Events.(emit request_result (prequest, timespan)) in
-                 Lwt.return res))
-        in
-        match process#state with
-        | Running -> return res
-        | Exited status ->
-            p.process <- Uninitialized ;
-            let*! () = Events.(emit process_exited_abnormally status) in
-            return res)
-      (fun exn ->
-        let*! () =
-          match process#state with
-          | Running -> Lwt.return_unit
-          | Exited status ->
-              let*! () = Events.(emit process_exited_abnormally status) in
-              p.process <- Uninitialized ;
-              Lwt.return_unit
-        in
-        fail_with_exn exn)
+                 Lwt.return res)))
+        (fun exn ->
+          if retried then fail_with_exn exn
+          else
+            (* The hypervisee appears to be down, we restart it. *)
+            let* () = restart_hypervisee ~stop_hypervisee:false p in
+            send_request_aux ~retried:true)
+    in
+    send_request_aux ~retried:false
+
+  let restart_hypervisee = restart_hypervisee ~stop_hypervisee:true
 
   (* The initialization phase aims to configure the external process
-     and start it's associated process. This will result in the call
-     of [process_handshake] and [process_init].
-     Note that it is important to have [init] as a blocking promise as
-     the external process must initialize the context (in RW) before
-     the node tries to open it (in RO).*)
+     and start its associated process. This will result in the call
+     of [process_handshake] and [process_init]. *)
   let init parameters ~process_path =
     let open Lwt_result_syntax in
-    let process =
-      {
-        parameters;
-        process_path;
-        process = Uninitialized;
-        lock = Lwt_mutex.create ();
-      }
-    in
-    let* (_ :
-           Lwt_process.process_none
-           * Lwt_io.output Lwt_io.channel
-           * Lwt_io.input Lwt_io.channel) =
-      start_process process
-    in
+    let lock = Lwt_mutex.create () in
+    let* external_process = start_process ~process_path parameters in
+    let* hypervisee = start_hypervisee external_process parameters in
     let*! () = Events.(emit init ()) in
-    return process
+    return {parameters; process_path; external_process; hypervisee; lock}
 
   let reconfigure_event_logging process config =
     let open Lwt_result_syntax in
@@ -533,48 +602,58 @@ module Make (P : External_process_parameters.S) = struct
   let close p =
     let open Lwt_syntax in
     let* () = Events.(emit close ()) in
-    match p.process with
-    | Running {process; input = process_input; canceler; _} ->
-        let request = P.terminate_request in
-        let* () = Events.(emit request_for request) in
-        let* () =
-          Lwt.catch
-            (fun () ->
-              p.process <- Exiting ;
-              (* Try to trigger the clean shutdown of the external process. *)
-              Lwt_unix_socket.send process_input P.request_encoding request)
-            (function
-              | Unix.Unix_error (ECONNREFUSED, _, _)
-              | Unix.Unix_error (EPIPE, _, _)
-              | Unix.Unix_error (ENOTCONN, _, _) ->
-                  (* It may fail if the external process is not
-                     responding (connection already closed) and is
-                     killed afterwards. No need to propagate the error. *)
-                  let* () = Events.(emit cannot_close ()) in
-                  Lwt.return_unit
-              | e -> Lwt.reraise e)
-        in
-        let* () =
-          Lwt.catch
-            (fun () ->
-              Lwt_unix.with_timeout shutdown_timeout (fun () ->
-                  let* s = process#status in
-                  match s with
-                  | Unix.WEXITED 0 -> Events.(emit process_exited_normally ())
-                  | status ->
-                      let* () =
-                        Events.(emit process_exited_abnormally status)
-                      in
-                      process#terminate ;
-                      Lwt.return_unit))
-            (function
-              | Lwt_unix.Timeout -> Events.(emit unresponsive_process) ()
-              | err -> Lwt.reraise err)
-        in
-        let* () = Error_monad.cancel_with_exceptions canceler in
-        (* Set the process status as uninitialized so that the process can be
-           restarted and avoid raising [Cannot_process_while_shutting_down]. *)
-        p.process <- Uninitialized ;
-        Lwt.return_unit
-    | Uninitialized | Exiting -> Lwt.return_unit
+    let {process; input = process_input; canceler; _} = p.external_process in
+    let request = P.terminate_request in
+    let* () = Events.(emit request_for request) in
+    (* Terminates the hypervisee. *)
+    let* () =
+      Lwt.catch
+        (fun () ->
+          (* Try to trigger the clean shutdown of the external process. *)
+          Lwt_unix_socket.send p.hypervisee.input P.request_encoding request)
+        (function
+          | Unix.Unix_error (ECONNREFUSED, _, _)
+          | Unix.Unix_error (EPIPE, _, _)
+          | Unix.Unix_error (ENOTCONN, _, _) ->
+              (* It may fail if the external process is not
+                 responding (connection already closed) and is
+                 killed afterwards. No need to propagate the error. *)
+              let* () = Events.(emit cannot_close ()) in
+              Lwt.return_unit
+          | e -> Lwt.reraise e)
+    in
+    (* Terminates the hypervisor. *)
+    let* () =
+      Lwt.catch
+        (fun () ->
+          (* Try to trigger the clean shutdown of the external process. *)
+          Lwt_unix_socket.send process_input P.request_encoding request)
+        (function
+          | Unix.Unix_error (ECONNREFUSED, _, _)
+          | Unix.Unix_error (EPIPE, _, _)
+          | Unix.Unix_error (ENOTCONN, _, _) ->
+              (* It may fail if the external process is not
+                 responding (connection already closed) and is
+                 killed afterwards. No need to propagate the error. *)
+              let* () = Events.(emit cannot_close ()) in
+              Lwt.return_unit
+          | e -> Lwt.reraise e)
+    in
+    let* () =
+      Lwt.catch
+        (fun () ->
+          Lwt_unix.with_timeout shutdown_timeout (fun () ->
+              let* s = process#status in
+              match s with
+              | Unix.WEXITED 0 -> Events.(emit process_exited_normally ())
+              | status ->
+                  let* () = Events.(emit process_exited_abnormally status) in
+                  process#terminate ;
+                  Lwt.return_unit))
+        (function
+          | Lwt_unix.Timeout -> Events.(emit unresponsive_process) ()
+          | err -> Lwt.reraise err)
+    in
+    let* () = Error_monad.cancel_with_exceptions canceler in
+    Lwt.return_unit
 end

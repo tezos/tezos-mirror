@@ -67,6 +67,11 @@ val kind : t -> simple_kind
    registered Lwt_exit.clean_up_callback). *)
 val close : t -> unit Lwt.t
 
+(** [restart vp] restarts the [vp]. This works only if the validator is
+    external. This is a bad UX, but restarting the validator is not necessary if
+    the validator is internal. *)
+val restart : t -> unit tzresult Lwt.t
+
 val reconfigure_event_logging :
   t -> Internal_event_unix.Configuration.t -> unit tzresult Lwt.t
 

@@ -57,6 +57,8 @@ module type S = sig
 
   val close : t -> unit Lwt.t
 
+  val restart : t -> unit tzresult Lwt.t
+
   val apply_block :
     simulate:bool ->
     ?should_validate:bool ->
@@ -267,6 +269,12 @@ module Internal_validator_process = struct
   let kind = Single_process
 
   let close _ = Events.(emit close ())
+
+  let restart _ =
+    (* The single process validator cannot restarted. This is fine because the
+       restart is necessary to mitigate Irmin/Brassia errors, errors that occur
+       only when the validator is external. *)
+    Lwt_result_syntax.return_unit
 
   let get_context_index chain_store =
     Store.context_index (Store.Chain.global_store chain_store)
@@ -500,6 +508,8 @@ end
 module External_validator_process = struct
   include External_process.Make (External_validation)
 
+  let restart = restart_hypervisee
+
   let kind = External_process
 
   let apply_block ~simulate ?(should_validate = true) validator chain_store
@@ -654,6 +664,9 @@ let kind (E {validator_process; _}) =
   M.kind
 
 let close (E {validator_process = (module VP); validator}) = VP.close validator
+
+let restart (E {validator_process = (module VP); validator}) =
+  VP.restart validator
 
 let reconfigure_event_logging (E {validator_process = (module VP); validator})
     config =
