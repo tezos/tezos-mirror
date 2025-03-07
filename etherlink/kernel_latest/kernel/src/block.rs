@@ -249,14 +249,18 @@ fn compute<Host: Runtime>(
 #[allow(clippy::large_enum_variant)]
 pub enum BlockInProgress {
     Etherlink(EthBlockInProgress),
-    Tezlink(U256, Timestamp),
+    Tezlink {
+        number: U256,
+        timestamp: Timestamp,
+        previous_hash: H256,
+    },
 }
 
 impl BlockInProgress {
     pub fn number(&self) -> U256 {
         match self {
             Self::Etherlink(bip) => bip.number,
-            Self::Tezlink(n, _) => *n,
+            Self::Tezlink { number, .. } => *number,
         }
     }
 }
@@ -330,11 +334,12 @@ fn next_bip_from_blueprints<Host: Runtime>(
                         BlockInProgress::Etherlink(bip),
                     )))
                 }
-                (ChainConfig::Michelson(_), ChainHeader::Tez(_)) => {
-                    Ok(BlueprintParsing::Next(Box::new(BlockInProgress::Tezlink(
-                        next_bip_number,
-                        blueprint.timestamp,
-                    ))))
+                (ChainConfig::Michelson(_), ChainHeader::Tez(header)) => {
+                    Ok(BlueprintParsing::Next(Box::new(BlockInProgress::Tezlink {
+                        number: next_bip_number,
+                        timestamp: blueprint.timestamp,
+                        previous_hash: header.hash,
+                    })))
                 }
                 (_, _) => {
                     log!(
@@ -580,21 +585,25 @@ pub fn produce<Host: Runtime>(
                 &chain_config.evm_config,
             )
         }
-        (ChainConfig::Michelson(_), BlockInProgress::Tezlink(number, timestamp)) => {
+        (
+            ChainConfig::Michelson(_),
+            BlockInProgress::Tezlink {
+                number,
+                timestamp,
+                previous_hash,
+            },
+        ) => {
             log!(
                 safe_host,
                 Debug,
                 "Computing the BlockInProgress for Tezlink at level {}",
                 number
             );
+
+            let tezblock = TezBlock::new(number, timestamp, previous_hash);
             Ok(BlockComputationResult::Finished {
                 included_delayed_transactions: vec![],
-                block: L2Block::Tezlink(TezBlock {
-                    number,
-                    hash: TezBlock::genesis_block_hash(),
-                    timestamp,
-                    previous_hash: TezBlock::genesis_block_hash(),
-                }),
+                block: L2Block::Tezlink(tezblock),
             })
         }
         (_, _) => {
