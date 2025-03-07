@@ -2620,7 +2620,7 @@ module Tasks = struct
     | Some webhook ->
         let webhook = Uri.of_string webhook in
         let action () = action ~webhook ~configuration () in
-        [Chronos.task ~name:"network-overview" ~tm:"* 0-23/6 * * *" ~action]
+        [Chronos.task ~name:"network-overview" ~tm:"0 0-23/6 * * *" ~action]
 end
 
 let init ~(configuration : configuration) etherlink_configuration cloud
