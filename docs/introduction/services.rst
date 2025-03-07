@@ -5,43 +5,45 @@ The Octez suite consists of :ref:`several executables <tezos_binaries>`, some to
 
 Previous tutorials in this section showed how to :doc:`get started with the different executables <./howtouse>`, and different :doc:`options for participating to Tezos <./howtorun>` such as delegating, staking, and baking.
 However, in these tutorials, daemons are just run in background or left in another terminal.
+
 This page shows how Octez daemons can be safely run from the official binary packages, as Unix services, which can ensure that they are started automatically and restarted in case of failures.
 
-Why Use Binary Packages?
-------------------------
+Why Use Deb or Rpm Binary Packages?
+-----------------------------------
 
 When it comes to installing software, especially for critical
 applications like Tezos/Octez, it’s crucial to ensure a secure and
 stable environment. While compiling from source can provide
 customization options, it often introduces complexities and risks.
-Instead, opting for binary packages from a trusted source simplifies
+Instead, opting for deb or rpm packages from a trusted source simplifies
 installation and enhances security.
 
-Binary packages compiled for a specific platform should be always
-preferred over source or statically compiled packages. These packages
-can be used to simplify the creation of OCI images or deployed on bare
-metal.
+Deb or Rpm packages compiled for a specific platform should be always preferred
+over statically compiled binaries. Deb or Rpm packages can also be used to
+simplify the creation of [OCI](https://opencontainers.org/) images or simply
+deployed on bare metal using provisioning tools such as
+[Ansible](https://docs.ansible.com/).
 
-Using the official binary packages offers several advantages:
+Using the official deb or rpm packages offers several advantages:
 
--  **Security**: Binary packages are pre-compiled and thoroughly tested,
+-  **Security**: Packages are pre-compiled and thoroughly tested,
    reducing the risk of vulnerabilities introduced during compilation.
    All our packages are signed and our supply chain is strictly
    monitored to make sure the packages that we deliver only use
    components that were vetted by our engineering team.
 
--  **Stability**: Binaries from a trusted repository undergo rigorous
-   testing, ensuring stability and compatibility with the target system.
-   We make sure to compile our binaries in a clean environment and
-   using an up-to-date software distribution. We use LTS (long-term service) distributions to
-   enhance stability and reduce the attack surface.
+-  **Stability**: Packages from a trusted repository undergo rigorous testing,
+   ensuring stability and compatibility with the target system. We make sure to
+   compile our binaries in a clean environment and using an up-to-date software
+   distribution. We use LTS (long-term service) distributions to enhance
+   stability and reduce the attack surface.
 
--  **Ease of Installation**: Binary packages can be installed using
-   standard package management tools, streamlining the process. For instance, ``apt`` is
+-  **Ease of Installation**: Packages can be installed using standard package
+   management tools, streamlining the process. For instance, ``apt`` is
    ubiquitous in the Debian world. These tools allow us to sign our packages
    that can be automatically verified by the end user during installation. We
-   provide packages that allow the end user to easily tailor their
-   installation for different use cases.
+   provide packages that allow the end user to easily tailor their installation
+   for different use cases.
 
 -  **Reduced Downtime**: With reliable binaries and straightforward
    installation, system downtime due to installation errors or
@@ -67,21 +69,8 @@ After installation, verify that Octez components are installed correctly:
    octez-client --version
 
 These binaries can be used by any user. However, to run Octez in
-production our package setup a special user named ``tezos`` to run all
+production our packages set up a special user named ``tezos`` to run all
 daemons via ``systemd`` and without direct user intervention.
-
-Enabling Daemons
-----------------
-
-To ensure that Octez services start automatically on system boot and can
-be managed using ``systemd``, we need to enable the services.
-Indeed, these services are installed by ``apt`` but left disabled by default.
-
-For example, to enable the Octez node ``systemd`` service:
-
-.. code:: shell
-
-   sudo systemctl enable octez-node
 
 Configuring the node
 --------------------
@@ -99,10 +88,9 @@ configure each daemon using commands such as:
    sudo su tezos -c "octez-node config ..."
 
 For more details on configuring the Octez node, see :doc:`../user/setup-node`.
-In particular:
 
-- to accelerate the node's bootstrap, you usually :ref:`import a snapshot file <importing_a_snapshot>` before starting the node;
-- you may want to connect to a test network if your goal is learning, developing, or testing.
+The default for the octez-node is to connect to ``mainnet``. You may want to
+connect to a test network if your goal is learning, developing, or testing.
 
 Running the Octez node
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -113,25 +101,32 @@ Once the node is configured, we can use ``systemd`` to start the daemon:
 
    sudo systemctl start octez-node
 
-We can also check the status of the daemon in the logs of the node that
+If configured to do so during package installation, this will automatically download a snapshot
+and import it before starting the ``octez-node`` service.
+
+We can check the status of the daemon in the logs of the node that
 are stored by default in ``/var/log/tezos/node.log``. Logs are
 automatically rotated using ``logrotate``.
 
-The Octez baker can be configured in a similar way. However, because of
-the sensitive nature of the private keys needed by the baker to
-function, we suggest hereafter a slightly more involved configuration procedure
-using the Octez signer.
+If you need to relocate the datadir of the octez-node, you would first need to change the home
+directory of the ``tezos`` user with the command ``usermod -m -d /custom tezos``
+and then configure the ``DATADIR`` variable in ``/etc/default/octez-node``
+accordingly.
 
 Configuring the signer
 ----------------------
 
-First, logged as the user chosen to run the signer, we must create a set of
-keys. These are the private keys that will be entrusted to the signer to
-actually sign operations on behalf of the baker. The signer will run in a
-different process (possibly on a separate host), and ideally using a hardware
-enclave such as a :ref:`hardware ledger <ledger>`. For the sake of brevity, in
-this example, the keys will be simply stored on the disk, but this is not a
-recomended setting for a production baker.
+Because of the sensitive nature of the private keys needed by the baker to
+function, we suggest a slightly involved configuration procedure using the
+Octez signer.
+
+To configure the octez-signer, first, logged as the user chosen to run the
+signer, we must create a set of keys. These are the private keys that will be
+entrusted to the signer to actually sign operations on behalf of the baker. The
+signer will run in a different process (possibly on a separate host), and
+ideally using a hardware enclave such as a :ref:`hardware ledger <ledger>`. For
+the sake of brevity, in this example, the keys will be simply stored on the
+disk, but this is not a recommended setting for a production baker.
 
 We create an authentication key that is going to be used to authenticate
 the baker with the signer, and a signing key to sign the operations.
@@ -156,22 +151,22 @@ the auth key.
    Public Key: edpk123456789....
 
    # add the auth key to the octez-signer. This is the default
-   # options set in the octez-signer.service file
+   # options set in the octez-signer service file
    $ octez-signer add authorized key edpk123456789... --name auth
 
 Now we need to configure the ``octez-signer`` service. We use again ``systemd``
-and we run it as a user service. The ``octez-signer.service`` file can be
+and we run it as a user service. The ``octez-signer`` service file can be
 customized by the user if needed to allow for more complex and secure
 scenarios.
 
 .. code:: shell
 
-   # customize the signer service if needed
+   # customize the octez-signer service if needed
    $ mkdir -p ~/.config/systemd/user/
    $ cp /usr/share/doc/octez-signer/octez-signer.service \
         ~/.config/systemd/user/
 
-   # start the service
+   # start the octez-signer service
    $ systemctl --user start octez-signer
 
    # examine the logs
@@ -179,11 +174,22 @@ scenarios.
 
 For more advanced configurations, see the :ref:`signer guide <signer>`.
 
+Configuring and using the octez-signer is recommended but not essential to
+configure the baker. For testing, you can also simple create a key with the
+following command:
+
+.. code:: shell
+
+    $ sudo su tezos -c "octez-client gen keys alice"
+
+and the baker will use it automatically.
+
 Configuring the baker
 ---------------------
 
 Now that the signer is running, we need to configure the baker.
-Since the baker runs as the user ``tezos``, we use ``sudo su tezos -c`` to wrap the configuration command below:
+Since the baker runs as the user ``tezos``, we use ``sudo su tezos -c`` to wrap
+the configuration command below:
 
 .. code:: shell
 
@@ -196,24 +202,16 @@ Since the baker runs as the user ``tezos``, we use ``sudo su tezos -c`` to wrap 
    sudo su tezos -c "octez-client -R tcp://localhost:7732 \
       import secret key alice remote:tz1V7TgBR52wAjjqsh24w8y9CymFGdegt9qs"
 
-Now that everything is in place, as for the node, we can first enable,
-then start the Octez baker.
+Now that everything is in place, we can start the Octez baker.
 
 .. code:: shell
 
-   sudo systemctl enable octez-baker-active.service
-   sudo systemctl start octez-baker-active.service
+   sudo systemctl start octez-baker
 
-The logs of the baker are available in ``/var/log/tezos/baker-active.log``.
+This service will automatically start all accusers and bakers for all protocols
+shipped with the package.
 
-Notice that the Octez baker package defines two services,
-``octez-baker-active`` and ``octez-baker-next`` respectively associated
-with the active protocol and the next proposed protocol upgrade. The
-names of the protocols associated with these daemons are specified in
-``/etc/default/octez-baker-*`` files. ``octez-baker-next``
-should be used for testing and during a protocol upgrade. Running
-``octez-baker-next`` together with ``octez-baker-active`` is
-possible and recommended to avoid downtime.
+The logs of the baker are available in ``/var/log/tezos/baker-<protocol name>.log``.
 
 Upgrading Octez
 ---------------
@@ -232,4 +230,5 @@ When necessary, the upgrade scripts will make the user aware of breaking
 changes and required actions such as new configuration parameters or
 changes in governance.
 
-Mind restarting the running services using ``systemctl restart <service>``.
+Mind reloading the new services using ``sudo systemctl daemon-reload`` and then
+restarting the running services using ``sudo systemctl restart <service>``.
