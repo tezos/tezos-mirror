@@ -412,6 +412,6 @@ let get_ongoing_games cctxt rollup staker =
   List.map
     (fun (game, staker1, staker2) ->
       ( Sc_rollup_proto_types.Game.to_octez game,
-        Tezos_crypto.Signature.Of_V1.public_key_hash staker1,
-        Tezos_crypto.Signature.Of_V1.public_key_hash staker2 ))
+        Tezos_crypto.Signature.Of_V2.public_key_hash staker1,
+        Tezos_crypto.Signature.Of_V2.public_key_hash staker2 ))
     games

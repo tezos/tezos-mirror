@@ -44,3 +44,7 @@ module Primitive : sig
 
   val pairing_check : (G1.t * G2.t) list -> bool
 end
+
+val sign_aug : ?watermark:watermark -> Bls12_381_signature.sk -> watermark -> t
+
+val check_aug : ?watermark:watermark -> Public_key.t -> t -> watermark -> bool

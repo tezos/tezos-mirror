@@ -804,7 +804,7 @@ let sources_from_operation ctxt
     ({shell = _; protocol_data = Operation_data {contents; _}} : Main.operation)
     =
   let open Lwt_syntax in
-  let map_pkh_env = List.map Tezos_crypto.Signature.Of_V1.public_key_hash in
+  let map_pkh_env = List.map Tezos_crypto.Signature.Of_V2.public_key_hash in
   match contents with
   | Single (Failing_noop _) -> return_nil
   | Single (Preattestation consensus_content)

@@ -786,7 +786,7 @@ let sign ?watermark secret_key message =
   | Secret_key.Ed25519 sk -> of_ed25519 (Ed25519.sign ?watermark sk message)
   | Secp256k1 sk -> of_secp256k1 (Secp256k1.sign ?watermark sk message)
   | P256 sk -> of_p256 (P256.sign ?watermark sk message)
-  | Bls sk -> of_bls (Bls.sign ?watermark sk message)
+  | Bls sk -> of_bls (Bls.sign_aug ?watermark sk message)
 
 let check ?watermark public_key signature message =
   let watermark = Option.map bytes_of_watermark watermark in
@@ -805,7 +805,7 @@ let check ?watermark public_key signature message =
       | None -> false)
   | Public_key.Bls pk, Unknown signature -> (
       match Bls.of_bytes_opt signature with
-      | Some s -> Bls.check ?watermark pk s message
+      | Some s -> Bls.check_aug ?watermark pk s message
       | None -> false)
   | Public_key.Ed25519 pk, Ed25519 signature ->
       Ed25519.check ?watermark pk signature message
@@ -814,7 +814,7 @@ let check ?watermark public_key signature message =
   | Public_key.P256 pk, P256 signature ->
       P256.check ?watermark pk signature message
   | Public_key.Bls pk, Bls signature ->
-      Bls.check ?watermark pk signature message
+      Bls.check_aug ?watermark pk signature message
   | _ -> false
 
 let fake_sign_from_pk pk msg =

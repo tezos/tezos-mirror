@@ -77,6 +77,10 @@ end
 module type AGGREGATE_SIGNATURE = sig
   include Intfs.AGGREGATE_SIGNATURE
 
+  val sign_aug : ?watermark:watermark -> Secret_key.t -> bytes -> t
+
+  val check_aug : ?watermark:watermark -> Public_key.t -> t -> bytes -> bool
+
   val watermark_of_bytes : bytes -> watermark
 end
 
@@ -101,9 +105,9 @@ struct
     let watermark1 = Option.map X.watermark_of_bytes watermark1 in
     let watermark2 = Option.map X.watermark_of_bytes watermark2 in
     let watermark3 = Option.map X.watermark_of_bytes watermark3 in
-    let signed1 = X.sign ?watermark:watermark1 sk1 msg1 in
-    let signed2 = X.sign ?watermark:watermark2 sk2 msg2 in
-    let signed3 = X.sign ?watermark:watermark3 sk3 msg3 in
+    let signed1 = X.sign_aug ?watermark:watermark1 sk1 msg1 in
+    let signed2 = X.sign_aug ?watermark:watermark2 sk2 msg2 in
+    let signed3 = X.sign_aug ?watermark:watermark3 sk3 msg3 in
     let is_valid_aggregated_sign =
       X.aggregate_signature_opt [signed1; signed2; signed3] |> function
       | None -> false
@@ -116,9 +120,9 @@ struct
             ]
             s
     in
-    X.check ?watermark:watermark1 pk1 signed1 msg1
-    && X.check ?watermark:watermark2 pk2 signed2 msg2
-    && X.check ?watermark:watermark3 pk3 signed3 msg3
+    X.check_aug ?watermark:watermark1 pk1 signed1 msg1
+    && X.check_aug ?watermark:watermark2 pk2 signed2 msg2
+    && X.check_aug ?watermark:watermark3 pk3 signed3 msg3
     && is_valid_aggregated_sign
 
   let test_prop_sign_check =
