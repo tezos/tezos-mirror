@@ -358,6 +358,7 @@ let fund_stresstest_accounts ~source client =
     ~batches_per_block:50
     ~env:yes_crypto_env
     ~source_key_pkh:source
+    ~initial_amount:(Tez.of_mutez_int64 1_000_000_000L)
     client
 
 let init_stresstest_i i configuration ~pkh ~pk ~peers (agent, node, name) tps :
