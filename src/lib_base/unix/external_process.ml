@@ -394,14 +394,16 @@ module Make (P : External_process_parameters.S) = struct
        by the external process. This is a temporary fix and a better
        solution would be welcome! *)
     let env =
-      Array.to_seq env
-      |> Seq.filter (fun binding ->
-             match String.split_on_char '=' binding with
-             | env_var_name :: _
-               when env_var_name = Internal_event_unix.env_var_name ->
-                 false
-             | _ -> true)
-      |> Array.of_seq
+      if P.share_sink then env
+      else
+        Array.to_seq env
+        |> Seq.filter (fun binding ->
+               match String.split_on_char '=' binding with
+               | env_var_name :: _
+                 when env_var_name = Internal_event_unix.env_var_name ->
+                   false
+               | _ -> true)
+        |> Array.of_seq
     in
     let process =
       Lwt_process.open_process_none ~env (process_path, Array.of_list args)

@@ -57,8 +57,7 @@ val request_encoding : packed_request Data_encoding.t
 
 val result_encoding : 'response request -> 'response Data_encoding.t
 
-val reconfigure_event_logging_request :
-  Internal_event_config.t -> unit request
+val reconfigure_event_logging_request : Internal_event_config.t -> unit request
 
 val terminate_request : packed_request
 
@@ -69,3 +68,10 @@ val socket_path : socket_dir:string -> pid:int -> string
 val command_line_args : socket_dir:string -> string * string list
 
 val hypervisor_name : string
+
+(**
+ * When true, indicates that the sink should be shared between
+ * the parent process and child processes. This affects how
+ * environment variables are handled when starting external processes.
+ *)
+val share_sink : bool

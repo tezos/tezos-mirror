@@ -69,8 +69,7 @@ let request_encoding =
               (Start_server
                 {config; internal_events; rpc_comm_socket_path; node_version})
             ->
-              Some
-                (config, internal_events, rpc_comm_socket_path, node_version)
+              Some (config, internal_events, rpc_comm_socket_path, node_version)
           | _ -> None)
         (fun (config, internal_events, rpc_comm_socket_path, node_version) ->
           Erequest
@@ -110,8 +109,7 @@ let internal_events {internal_events; _} = internal_events
 let socket_path ~socket_dir ~pid =
   Filename.concat socket_dir (socket_path_prefix ^ string_of_int pid)
 
-let reconfigure_event_logging_request config =
-  Reconfigure_event_logging config
+let reconfigure_event_logging_request config = Reconfigure_event_logging config
 
 let terminate_request = Erequest Terminate
 
@@ -120,3 +118,4 @@ let command_line_args ~socket_dir =
 
 let hypervisor_name = "octez-rpc-process-watchdog-hypervisor"
 
+let share_sink = true

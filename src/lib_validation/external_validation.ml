@@ -507,3 +507,5 @@ let command_line_args ~socket_dir =
   ("octez-validator", ["--socket-dir"; socket_dir])
 
 let hypervisor_name = "octez-validator-hypervisor"
+
+let share_sink = false

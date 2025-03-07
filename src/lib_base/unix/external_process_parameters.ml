@@ -73,4 +73,6 @@ module type S = sig
   val command_line_args : socket_dir:string -> string * string list
 
   val hypervisor_name : string
+
+  val share_sink : bool
 end

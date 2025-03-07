@@ -166,13 +166,13 @@ module Processing :
           Lwt.return `Stop
       | Reconfigure_event_logging config ->
           let*! res =
-            Internal_event_unix.Configuration.reapply config
+            Tezos_base_unix.Internal_event_unix.Configuration.reapply config
           in
           continue res state None
 end
 
 module Process = struct
-  include External_process.Make (Watchdog_parameters)
+  include Tezos_base_unix.External_process.Make (Watchdog_parameters)
 
   let init config ~process_path =
     let open Lwt_syntax in
@@ -200,6 +200,6 @@ module Process = struct
 end
 
 include
-  External_process_main.Make (Watchdog_parameters) (Processing)
+  Tezos_base_unix.External_process_main.Make (Watchdog_parameters) (Processing)
 module Hypervisor =
-  Hypervisor_process_main.Make (Watchdog_parameters)
+  Tezos_base_unix.Hypervisor_process_main.Make (Watchdog_parameters)
