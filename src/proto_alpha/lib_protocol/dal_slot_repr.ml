@@ -387,48 +387,6 @@ module History = struct
         | _ -> None)
       (fun () -> Add_element_in_slots_skip_list_violates_ordering)
 
-  module Content_v1 = struct
-    (* ADAL/TODO: https://gitlab.com/tezos/tezos/-/issues/7554
-
-       Legacy code used for migration to Content_v2. The whole [Content_v1] (and
-       its dependencies) should be removed 3 months after the activation of this
-       protocol. See issue above for more details. *)
-
-    (** Each cell of the skip list is either a slot header that has been
-        attested, or a published level and a slot index for which no slot header
-        is attested (so, no associated commitment). *)
-    type t = Unattested of Header.id | Attested of Header.t
-
-    let encoding =
-      let open Data_encoding in
-      union
-        ~tag_size:`Uint8
-        [
-          case
-            ~title:"unattested"
-            (Tag 0)
-            (merge_objs
-               (obj1 (req "kind" (constant "unattested")))
-               Header.id_encoding)
-            (function
-              | Unattested slot_id -> Some ((), slot_id) | Attested _ -> None)
-            (fun ((), slot_id) -> Unattested slot_id);
-          case
-            ~title:"attested"
-            (Tag 1)
-            (merge_objs
-               (obj1 (req "kind" (constant "attested")))
-               Header.encoding)
-            (function
-              | Unattested _ -> None
-              | Attested slot_header -> Some ((), slot_header))
-            (fun ((), slot_header) -> Attested slot_header);
-        ]
-
-    let to_bytes current_slot =
-      Data_encoding.Binary.to_bytes_exn encoding current_slot
-  end
-
   module Content_v2 = struct
     (** Each cell of the skip list is either a slot id (i.e. a published level
         and a slot index) for which no slot header is published or a published
@@ -459,54 +417,9 @@ module History = struct
 
     let encoding =
       let open Data_encoding in
-      (* ADAL/TODO: https://gitlab.com/tezos/tezos/-/issues/7554
-
-         The two legacy cases below can be removed once migration from Quebec to
-         R is done, assuming no legacy cells could be used in refutation anymore
-         (i.e. ~3 months after migrating to Content_v2). If so, the code in
-         protocol S can be simplfied.
-
-         However, make sure to not modify the tags (2) and (3) of the regular
-         cases below, as this would break the ability to read normal Content_v2
-         cells. *)
       union
         ~tag_size:`Uint8
         [
-          (* Legacy cases: we should be able to decode the content of the old
-             cells from the previous protocol in case of refutation. But, we
-             don't construct cells of that protocol anymore. *)
-          case
-            ~title:"unattested"
-            (Tag 0)
-            (merge_objs
-               (obj1 (req "kind" (constant "unattested")))
-               Header.id_encoding)
-            (fun _x -> None)
-            (fun ((), slot_id) ->
-              (* The old [Unattested] case is translated to [Unpublished]. When
-                 a slot was not attested, we act as if it was not published at
-                 all. *)
-              Unpublished slot_id);
-          case
-            ~title:"attested"
-            (Tag 1)
-            (merge_objs
-               (obj1 (req "kind" (constant "attested")))
-               Header.encoding)
-            (fun _x -> None)
-            (fun ((), slot_header) ->
-              (* The old [Attested] case is translated to [Published], with some
-                 extra placeholder fields. In this case, we act as if it were
-                 attested by all the bakers (i.e., a 100% attestation rate). *)
-              Published
-                {
-                  header = slot_header;
-                  publisher = Contract_repr.zero;
-                  is_proto_attested = true;
-                  attested_shards = 1;
-                  total_shards = 1;
-                });
-          (* New/normal cases *)
           case
             ~title:"unpublished"
             (Tag 2)
@@ -603,55 +516,8 @@ module History = struct
             attested_shards
             total_shards
 
-    (* ADAL/TODO: https://gitlab.com/tezos/tezos/-/issues/7554
-
-       The implementation of [to_bytes] can be simplified after migration. See the
-       similar TODO in the encoding above for more details.
-    *)
-    let to_bytes =
-      let to_new_bytes current_slot =
-        Data_encoding.Binary.to_bytes_exn encoding current_slot
-      in
-      (* This function, and the [hash] function when {!Content_v2} are now
-         parameterized by an optional value [with_migration] for the following
-         reason:
-
-         Outside of refutation games, [with_migration] is set to
-         [None]. However, when verifying a proof (for proofs production, the
-         hashes are provided, not computed), we need to hash the cells along the
-         path from the snapshot cell to the target cell.
-
-         Hashing the cells of the previous protocol should be done using the
-         previous representation/encoding. To be able to do so, the proof
-         validation function should take a parameter [with_migration], which
-         includes the attestation lag and the level at which the migration
-         occurred. This way, we'll able to determine in which protocol we hashed
-         the content the first time (and computed a backpointer from the hash)
-         to continue using the same hash function on the same representation. *)
-      fun ?with_migration current_slot ->
-        match with_migration with
-        | None -> to_new_bytes current_slot
-        | Some (migration_level, attestation_lag) -> (
-            let Header.{published_level; _} = content_id current_slot in
-            let attested_level =
-              Raw_level_repr.add published_level attestation_lag
-            in
-            if Raw_level_repr.(attested_level > migration_level) then
-              (* If attested_level is higher than the migration_level, this
-                 means that the content has always been hashed using the new
-                 encoding. So, we continue doing so. *)
-              to_new_bytes current_slot
-            else
-              (* if attested_level <= migration_level, this means that this
-                 content has already been hashed with the representation of
-                 cells' content in the previous protocol. To keep getting the
-                 same hash used as a backpointer, we rehash using the same
-                 (legacy) function. *)
-              Content_v1.to_bytes
-              @@
-              match current_slot with
-              | Unpublished id -> Content_v1.Unattested id
-              | Published {header; _} -> Content_v1.Attested header)
+    let to_bytes current_slot =
+      Data_encoding.Binary.to_bytes_exn encoding current_slot
   end
 
   module Mk_skip_list (Content : sig
@@ -777,10 +643,10 @@ module History = struct
 
     let equal : t -> t -> bool = equal_history
 
-    let hash ?with_migration cell =
+    let hash cell =
       let current_slot = Skip_list.content cell in
       let back_pointers_hashes = Skip_list.back_pointers cell in
-      Content.to_bytes ?with_migration current_slot
+      Content.to_bytes current_slot
       :: List.map Pointer_hash.to_bytes back_pointers_hashes
       |> Pointer_hash.hash_bytes
 
@@ -811,9 +677,9 @@ module History = struct
        Note that if the given skip list contains the genesis cell, its content is
        reset with the given content. This ensures the invariant that
        there are no gaps in the successive cells of the list. *)
-    let add_cell ?with_migration (t, cache) next_cell_content ~number_of_slots =
+    let add_cell (t, cache) next_cell_content ~number_of_slots =
       let open Result_syntax in
-      let prev_cell_ptr = hash ?with_migration t in
+      let prev_cell_ptr = hash t in
       let Header.{published_level; _} =
         Skip_list.content t |> Content.content_id
       in
@@ -828,7 +694,7 @@ module History = struct
             next_cell_content
             ~number_of_slots
       in
-      let new_head_hash = hash ?with_migration new_head in
+      let new_head_hash = hash new_head in
       let* cache = History_cache.remember new_head_hash new_head cache in
       return (new_head, cache)
 
@@ -890,8 +756,8 @@ module History = struct
        insert exactly [number_of_slots] cells in the skip list per level. This
        will simplify the shape of proofs and help bounding the history cache
        required for their generation. *)
-    let update_skip_list (t : t) cache ?with_migration ~published_level
-        ~number_of_slots slot_headers_with_statuses =
+    let update_skip_list (t : t) cache ~published_level ~number_of_slots
+        slot_headers_with_statuses =
       let open Result_syntax in
       let* () =
         List.iter_e
@@ -908,22 +774,14 @@ module History = struct
           ~published_level
           slot_headers_with_statuses
       in
-      List.fold_left_e
-        (add_cell ?with_migration ~number_of_slots)
-        (t, cache)
-        slot_headers
+      List.fold_left_e (add_cell ~number_of_slots) (t, cache) slot_headers
 
     let update_skip_list_no_cache =
       let empty_cache = History_cache.empty ~capacity:0L in
-      fun t
-          ?with_migration
-          ~published_level
-          ~number_of_slots
-          slot_headers_with_statuses ->
+      fun t ~published_level ~number_of_slots slot_headers_with_statuses ->
         let open Result_syntax in
         let+ cell, (_ : History_cache.t) =
           update_skip_list
-            ?with_migration
             t
             empty_cache
             ~published_level
@@ -1465,17 +1323,16 @@ module History = struct
     (* Given a starting cell [snapshot] and a (final) [target], this function
        checks that the provided [inc_proof] encodes a minimal path from
        [snapshot] to [target]. *)
-    let verify_inclusion_proof ?with_migration inc_proof ~src:snapshot
-        ~dest:target =
-      let assoc = List.map (fun c -> (hash ?with_migration c, c)) inc_proof in
+    let verify_inclusion_proof inc_proof ~src:snapshot ~dest:target =
+      let assoc = List.map (fun c -> (hash c, c)) inc_proof in
       let path = List.split assoc |> fst in
       let deref =
         let open Map.Make (Pointer_hash) in
         let map = of_seq (List.to_seq assoc) in
         fun ptr -> find_opt ptr map
       in
-      let snapshot_ptr = hash ?with_migration snapshot in
-      let target_ptr = hash ?with_migration target in
+      let snapshot_ptr = hash snapshot in
+      let target_ptr = hash target in
       error_unless
         (Skip_list.valid_back_path
            ~equal_ptr:Pointer_hash.equal
@@ -1485,7 +1342,7 @@ module History = struct
            path)
         (dal_proof_error "verify_proof_repr: invalid inclusion Dal proof.")
 
-    let verify_proof_repr ?with_migration dal_params page_id snapshot proof =
+    let verify_proof_repr dal_params page_id snapshot proof =
       let open Result_syntax in
       let Page.{slot_id = Header.{published_level; index}; page_index = _} =
         page_id
@@ -1540,11 +1397,7 @@ module History = struct
       (* We check that the given inclusion proof indeed links our L1 snapshot to
          the target cell. *)
       let* () =
-        verify_inclusion_proof
-          ?with_migration
-          inc_proof
-          ~src:snapshot
-          ~dest:target_cell
+        verify_inclusion_proof inc_proof ~src:snapshot ~dest:target_cell
       in
       let is_commitment_attested =
         is_commitment_attested
@@ -1572,11 +1425,10 @@ module History = struct
           in
           return_some page_data
 
-    let verify_proof ?with_migration dal_params page_id snapshot
-        serialized_proof =
+    let verify_proof dal_params page_id snapshot serialized_proof =
       let open Result_syntax in
       let* proof_repr = deserialize_proof serialized_proof in
-      verify_proof_repr ?with_migration dal_params page_id snapshot proof_repr
+      verify_proof_repr dal_params page_id snapshot proof_repr
 
     let adal_parameters_of_proof serialized_proof =
       let open Result_syntax in
@@ -1588,8 +1440,6 @@ module History = struct
           {attestation_threshold_percent; restricted_commitments_publishers; _}
         ->
           (attestation_threshold_percent, restricted_commitments_publishers)
-
-    let hash = hash ?with_migration:None
 
     type cell_content = Content_v2.t =
       | Unpublished of Header.id

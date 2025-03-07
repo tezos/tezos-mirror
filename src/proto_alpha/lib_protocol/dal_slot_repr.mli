@@ -341,7 +341,7 @@ module History : sig
   module History_cache :
     Bounded_history_repr.S with type key = hash and type value = t
 
-  (** [update_skip_list hist cache ?with_migration ~published_level
+  (** [update_skip_list hist cache ~published_level
       ~number_of_slots slot_headers_with_statuses] updates the given structure
       [hist] with the list of [slot_headers_with_statuses]. The given [cache] is
       also updated to add successive values of [cell] to it.
@@ -356,15 +356,10 @@ module History : sig
       - [published_level] is the successor the last inserted cell's level.
 
       - [slot_headers_with_statuses] is sorted in increasing order w.r.t. slots
-      indices.
-
-      - [with_migration] is used to choose whether to use this protocol's hashing
-      function or the previous protocol to compute backpointers, based on which
-      protocol constructed the cell to be hashed the first time. *)
+      indices. *)
   val update_skip_list :
     t ->
     History_cache.t ->
-    ?with_migration:Raw_level_repr.t * int ->
     published_level:Raw_level_repr.t ->
     number_of_slots:int ->
     (Header.t
@@ -377,7 +372,6 @@ module History : sig
       updated. *)
   val update_skip_list_no_cache :
     t ->
-    ?with_migration:Raw_level_repr.t * int ->
     published_level:Raw_level_repr.t ->
     number_of_slots:int ->
     (Header.t
@@ -477,7 +471,7 @@ module History : sig
     t ->
     (proof * Page.content option) tzresult Lwt.t
 
-  (** [verify_proof ?with_migration dal_params page_id snapshot proof] verifies
+  (** [verify_proof dal_params page_id snapshot proof] verifies
       that the given [proof] is a valid proof to show that either:
 
       - the page identified by [page_id] belongs to a confirmed slot stored in
@@ -487,18 +481,8 @@ module History : sig
       that could contain the page identified by [page_id].
 
       [dal_parameters] is used when verifying that/if the page is part of
-      the candidate slot (if any).
-
-      [with_migration] is used to choose whether to use this protocol's hashing
-      function or the previous protocol to compute backpointers, based on which
-      protocol constructed the cell to be hashed the first time. *)
-  val verify_proof :
-    ?with_migration:Raw_level_repr.t * int ->
-    parameters ->
-    Page.t ->
-    t ->
-    proof ->
-    bytes option tzresult
+      the candidate slot (if any). *)
+  val verify_proof : parameters -> Page.t -> t -> proof -> bytes option tzresult
 
   (** Given a DAL proof, this function returns the values of the fields
       [attestation_threshold_percent] [restricted_commitments_publishers] stored

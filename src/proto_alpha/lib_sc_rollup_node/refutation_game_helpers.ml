@@ -290,15 +290,8 @@ let generate_proof (node_ctxt : _ Node_context.t)
     |> Environment.wrap_tzresult
   in
   let unserialized_proof = {proof with pvm_step} in
-  let Node_context.{cctxt; _} = node_ctxt in
-  let* protocol_activation_level =
-    Plugin.RPC.Protocol.first_level
-      (new Protocol_client_context.wrap_full cctxt)
-      (cctxt#chain, `Head 0)
-  in
   let*! result =
     Sc_rollup.Proof.valid
-      ~protocol_activation_level
       ~metadata
       snapshot
       (Raw_level.of_int32_exn game.inbox_level)

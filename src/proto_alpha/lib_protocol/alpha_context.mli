@@ -3031,7 +3031,6 @@ module Dal : sig
 
     val update_skip_list_no_cache :
       t ->
-      ?with_migration:Raw_level.t * int ->
       published_level:Raw_level.t ->
       number_of_slots:int ->
       (Slot.Header.t * Contract.t * Attestation.attestation_status) list ->
@@ -3040,7 +3039,6 @@ module Dal : sig
     val update_skip_list :
       t ->
       History_cache.t ->
-      ?with_migration:Raw_level.t * int ->
       published_level:Raw_level.t ->
       number_of_slots:int ->
       (Slot.Header.t * Contract.t * Attestation.attestation_status) list ->
@@ -4033,7 +4031,6 @@ module Sc_rollup : sig
     val valid :
       pvm:('state, 'proof, 'output) PVM.implementation ->
       metadata:Metadata.t ->
-      ?protocol_activation_level:Raw_level.t ->
       Inbox.history_proof ->
       Raw_level.t ->
       Dal.Slots_history.t ->
@@ -4160,7 +4157,6 @@ module Sc_rollup : sig
     val play :
       Kind.t ->
       Dal.parameters ->
-      protocol_activation_level:Raw_level.t ->
       dal_activation_level:Raw_level.t option ->
       dal_attestation_lag:int ->
       dal_number_of_slots:int ->
