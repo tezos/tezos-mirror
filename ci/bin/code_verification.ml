@@ -931,7 +931,7 @@ let jobs pipeline_type =
         ~__POS__
         ~rules:(make_rules ~manual:No ~changes:changeset_homebrew ())
         ~stage:Stages.test
-        ~dependencies:dependencies_needs_start
+        ~dependencies:(Dependent [])
         Homebrew.child_pipeline_full
     in
     (* check that ksy files are still up-to-date with octez *)
