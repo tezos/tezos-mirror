@@ -304,6 +304,10 @@ module Pending_transactions = struct
         else Some pending)
       htbl ;
     !dropped
+
+  let to_seq = S.to_seq_values
+
+  let clear = S.clear
 end
 
 module Transactions_per_addr = struct
@@ -385,6 +389,11 @@ module Request = struct
         maximum_cumulative_size : int;
       }
         -> ((string * Ethereum_types.legacy_transaction_object) list, tztrace) t
+    | Confirm_transactions : {
+        confirmed_txs : Ethereum_types.hash Seq.t;
+        clear_pending_queue_after : bool;
+      }
+        -> (unit, tztrace) t
 
   type view = View : _ t -> view
 
@@ -485,6 +494,20 @@ module Request = struct
                 Some ((), maximum_cumulative_size)
             | _ -> None)
           (fun _ -> assert false);
+        case
+          Json_only
+          ~title:"Confirm_transactions"
+          (obj3
+             (req "request" (constant "confirm_transactions"))
+             (req "confirmed_txs" (list Ethereum_types.hash_encoding))
+             (req "clear_pending_queue_after" bool))
+          (function
+            | View
+                (Confirm_transactions
+                  {confirmed_txs; clear_pending_queue_after}) ->
+                Some ((), List.of_seq confirmed_txs, clear_pending_queue_after)
+            | _ -> None)
+          (fun _ -> assert false);
       ]
 
   let pp fmt (View r) =
@@ -507,6 +530,7 @@ module Request = struct
           fmt
           "Popping transactions of maximum cumulative size %d bytes"
           maximum_cumulative_size
+    | Confirm_transactions _ -> fprintf fmt "Confirming transactions"
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -868,6 +892,30 @@ module Handlers = struct
              transactions that were included in a block with
              [Confirm_transactions] *)
           return selected
+    | Confirm_transactions {confirmed_txs; clear_pending_queue_after} ->
+        let*! () =
+          Seq.S.iter
+            (fun hash ->
+              let callback = Pending_transactions.pop state.pending hash in
+              match callback with
+              | Some {pending_callback; _} -> pending_callback `Confirmed
+              | None ->
+                  (* delayed transactions hashes are part of confirmed
+                     txs *)
+                  Lwt.return_unit)
+            confirmed_txs
+        in
+        if clear_pending_queue_after then (
+          let dropped = Pending_transactions.to_seq state.pending in
+          let*! () =
+            Seq.S.iter
+              (fun {pending_callback; _} -> pending_callback `Dropped)
+              dropped
+          in
+          (* Emptying the pending the dropped transactions *)
+          Pending_transactions.clear state.pending ;
+          return_unit)
+        else return_unit
 
   type launch_error = tztrace
 
@@ -1029,6 +1077,14 @@ let pop_transactions ~maximum_cumulative_size =
   Worker.Queue.push_request_and_wait
     w
     (Pop_transactions {maximum_cumulative_size})
+  |> handle_request_error
+
+let confirm_transactions ~clear_pending_queue_after ~confirmed_txs =
+  let open Lwt_result_syntax in
+  let*? w = Lazy.force worker in
+  Worker.Queue.push_request_and_wait
+    w
+    (Confirm_transactions {confirmed_txs; clear_pending_queue_after})
   |> handle_request_error
 
 module Internal_for_tests = struct

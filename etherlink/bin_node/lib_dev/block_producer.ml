@@ -169,7 +169,7 @@ let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
         Evm_state.get_delayed_inbox_item head_info.evm_state delayed_hash)
       delayed_hashes
   in
-  let* _hashes =
+  let* confirmed_txs =
     Evm_context.apply_blueprint timestamp blueprint_payload delayed_transactions
   in
   let (Qty number) = head_info.next_blueprint_number in
@@ -184,7 +184,7 @@ let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
       (fun hash -> Block_producer_events.transaction_selected ~hash)
       (tx_hashes @ delayed_hashes)
   in
-  return_unit
+  return confirmed_txs
 
 (** Produces a block if we find at least one valid transaction in the transaction
     pool or if [force] is true. *)
@@ -211,7 +211,7 @@ let produce_block_if_needed ~cctxt ~smart_rollup_address ~sequencer_key ~force
   in
   let n = List.length transactions_and_objects + List.length delayed_hashes in
   if force || n > 0 then
-    let* () =
+    let* confirmed_txs =
       produce_block_with_transactions
         ~sequencer_key
         ~cctxt
@@ -223,8 +223,9 @@ let produce_block_if_needed ~cctxt ~smart_rollup_address ~sequencer_key ~force
     in
     let* () =
       if uses_tx_queue then
-        (*TODO: in next commit here we confirm all TXs that have been
-          included *) return_unit
+        Tx_queue.confirm_transactions
+          ~clear_pending_queue_after:true
+          ~confirmed_txs
       else Tx_pool.clear_popped_transactions ()
     in
     return n
@@ -270,7 +271,7 @@ let produce_block ~uses_tx_queue ~cctxt ~smart_rollup_address ~sequencer_key
       | None -> false
     in
     if is_going_to_upgrade then
-      let* () =
+      let* _hashes (* empty because no txs given *) =
         produce_block_with_transactions
           ~sequencer_key
           ~cctxt

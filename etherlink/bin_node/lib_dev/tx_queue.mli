@@ -122,6 +122,14 @@ val pop_transactions :
   maximum_cumulative_size:int ->
   (string * Ethereum_types.legacy_transaction_object) list tzresult Lwt.t
 
+(** [confirm_transactions ~clear_pending_queue_after ~confirmed_txs]
+    confirms [confirmed_txs] hash. If [drop_unconfirmed] then any
+    other pending transactions in the tx_queue are dropped. *)
+val confirm_transactions :
+  clear_pending_queue_after:bool ->
+  confirmed_txs:Ethereum_types.hash Seq.t ->
+  unit tzresult Lwt.t
+
 (**/*)
 
 module Internal_for_tests : sig
