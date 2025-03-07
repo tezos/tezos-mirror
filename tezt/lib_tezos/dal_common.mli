@@ -164,6 +164,10 @@ module Helpers : sig
     | `Invalid_shard ] ->
     unit
 
+  (* A helper function to wait for an event emitted by gs_logging.ml *)
+  val wait_for_gossipsub_worker_event :
+    name:string -> Dal_node.t -> (JSON.t -> 'a option) -> 'a Lwt.t
+
   (** Wait for a connection event between [main_node] and
     [other_node]. The optional argument [other_peer_id] can be used to
     ignore the connection events which are not between these two
