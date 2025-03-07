@@ -667,6 +667,7 @@ mod tests {
     use crate::blueprint_storage::read_next_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
+    use crate::chains::MichelsonChainConfig;
     use crate::fees::DA_FEE_PER_BYTE;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
     use crate::storage::read_block_in_progress;
@@ -677,7 +678,7 @@ mod tests {
     use crate::transaction::TransactionContent;
     use crate::transaction::TransactionContent::Ethereum;
     use crate::transaction::TransactionContent::EthereumDelayed;
-    use crate::transaction::Transactions::EthTxs;
+    use crate::transaction::Transactions;
     use crate::{retrieve_block_fees, retrieve_chain_id};
     use evm_execution::account_storage::{
         account_path, init_account_storage, EthereumAccountStorage,
@@ -697,7 +698,14 @@ mod tests {
 
     fn blueprint(transactions: Vec<Transaction>) -> Blueprint {
         Blueprint {
-            transactions: EthTxs(transactions),
+            transactions: Transactions::EthTxs(transactions),
+            timestamp: Timestamp::from(0i64),
+        }
+    }
+
+    fn tezlink_blueprint() -> Blueprint {
+        Blueprint {
+            transactions: Transactions::TezTxs,
             timestamp: Timestamp::from(0i64),
         }
     }
@@ -750,6 +758,15 @@ mod tests {
                 EvmLimits::default(),
                 evm_configuration,
             ),
+            ..Configuration::default()
+        }
+    }
+
+    fn dummy_tez_configuration() -> Configuration {
+        Configuration {
+            chain_config: ChainConfig::Michelson(MichelsonChainConfig::create_config(
+                DUMMY_CHAIN_ID,
+            )),
             ..Configuration::default()
         }
     }
@@ -938,6 +955,21 @@ mod tests {
                 panic!("Block reading failed: {:?}\n", e)
             }
         }
+    }
+
+    #[test]
+    // Test if tezlink block production doesn't panic
+    fn test_produce_tezlink_block() {
+        let mut host = MockKernelHost::default();
+
+        let mut config = dummy_tez_configuration();
+
+        store_blueprints(&mut host, vec![tezlink_blueprint()]);
+
+        let computation = produce(&mut host, &mut config, None, None)
+            .expect("The block production failed.");
+
+        assert_eq!(computation, ComputationResult::RebootNeeded)
     }
 
     #[test]
