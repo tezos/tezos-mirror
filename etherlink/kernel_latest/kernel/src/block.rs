@@ -675,6 +675,7 @@ pub fn produce<Host: Runtime>(
 mod tests {
     use super::*;
     use crate::block_storage;
+    use crate::block_storage::read_current_number;
     use crate::blueprint::Blueprint;
     use crate::blueprint_storage::read_next_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
@@ -971,18 +972,31 @@ mod tests {
     }
 
     #[test]
-    // Test if tezlink block production doesn't panic
+    // Test if tezlink block production works
     fn test_produce_tezlink_block() {
         let mut host = MockKernelHost::default();
 
         let mut config = dummy_tez_configuration();
 
-        store_blueprints(&mut host, vec![tezlink_blueprint()]);
+        store_blueprints(
+            &mut host,
+            vec![
+                tezlink_blueprint(),
+                tezlink_blueprint(),
+                tezlink_blueprint(),
+            ],
+        );
 
+        produce(&mut host, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        produce(&mut host, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        produce(&mut host, &mut config, None, None)
+            .expect("The block production should have succeeded.");
         let computation = produce(&mut host, &mut config, None, None)
-            .expect("The block production failed.");
-
-        assert_eq!(computation, ComputationResult::RebootNeeded)
+            .expect("The block production should have succeeded.");
+        assert_eq!(ComputationResult::Finished, computation);
+        assert_eq!(U256::from(2), read_current_number(&host).unwrap());
     }
 
     #[test]
