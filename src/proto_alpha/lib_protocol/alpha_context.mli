@@ -4968,11 +4968,6 @@ module Operation : sig
 
   val equal : 'a operation -> 'b operation -> ('a, 'b) eq option
 
-  module Internal_for_tests : sig
-    val serialize_unsigned_operation :
-      context -> Block_hash.t -> _ contents_list -> bytes
-  end
-
   module Encoding : sig
     type 'b case =
       | Case : {

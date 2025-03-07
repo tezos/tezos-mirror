@@ -229,14 +229,6 @@ module Operation = struct
       else unsigned_encoding
     in
     check_signature encoding key chain_id op
-
-  module Internal_for_tests = struct
-    let serialize_unsigned_operation _ctxt branch contents =
-      let op : _ operation =
-        {shell = {branch}; protocol_data = {contents; signature = None}}
-      in
-      serialize_unsigned_operation unsigned_encoding op
-  end
 end
 
 module Block_header = Block_header_repr
