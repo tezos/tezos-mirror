@@ -3588,9 +3588,6 @@ let register_end_to_end_tests ~protocols =
         protocols)
     e2e_tests
 
-let wait_for_gossipsub_worker_event ~name dal_node lambda =
-  Dal_node.wait_for dal_node (sf "gossipsub_worker_event-%s.v0" name) lambda
-
 let check_expected expected found = if expected <> found then None else Some ()
 
 let ( let*?? ) a b = Option.bind a b
@@ -3656,7 +3653,7 @@ let check_events_with_topic ~event_with_topic dal_node ~num_slots
     in
     Some JSON.(topic |-> "slot_index" |> as_int)
   in
-  wait_for_gossipsub_worker_event
+  Dal_common.Helpers.wait_for_gossipsub_worker_event
     dal_node
     ~name:(event_with_topic_to_string event_with_topic)
     (fun event ->
@@ -3719,7 +3716,7 @@ let check_events_with_message ~event_with_message dal_node ~number_of_shards
     seen |> Array.to_seqi
     |> Seq.for_all (fun (i, b) -> if List.mem i shard_indexes then b else true)
   in
-  wait_for_gossipsub_worker_event
+  Dal_common.Helpers.wait_for_gossipsub_worker_event
     dal_node
     ~name:(event_with_message_to_string event_with_message)
     (fun event ->
@@ -3780,7 +3777,7 @@ let check_events_with_message_id ~event_with_message_id dal_node
     seen |> Array.to_seqi
     |> Seq.for_all (fun (i, b) -> if List.mem i shard_indexes then b else true)
   in
-  wait_for_gossipsub_worker_event
+  Dal_common.Helpers.wait_for_gossipsub_worker_event
     ~name:(event_with_message_id_to_string event_with_message_id)
     dal_node
     (fun event ->
