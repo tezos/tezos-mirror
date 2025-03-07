@@ -122,6 +122,17 @@ let deploy_erc20 =
     ~level:Notice
     ("address", Data_encoding.string)
 
+let measured_tps =
+  declare_2
+    ~alternative_color:Green
+    ~section
+    ~name:"measured_tps"
+    ~msg:"measured {tps} transactions per second over the past {duration}"
+    ~level:Notice
+    ~pp2:Ptime.Span.pp
+    ("tps", Data_encoding.float)
+    ("duration", Time.System.Span.encoding)
+
 let rpc_error =
   declare_2
     ~section
@@ -162,3 +173,7 @@ let deploy_erc20 address = emit deploy_erc20 address
 
 let rpc_error (error : Rpc_encodings.JSONRPC.error) =
   emit rpc_error (Int32.of_int error.code, error.message)
+
+let measured_tps transactions_count duration =
+  let tps = Float.of_int transactions_count /. Ptime.Span.to_float_s duration in
+  emit measured_tps (tps, duration)

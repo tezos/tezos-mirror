@@ -58,3 +58,8 @@ val deploy_erc20 : string -> unit Lwt.t
 
 (** [rpc_error error] advertises an RPC produced the error [error]. *)
 val rpc_error : Rpc_encodings.JSONRPC.error -> unit Lwt.t
+
+(** [measured_tps transactions_count duration] advertises that Floodgate has
+    been able to inject [transaction_counts] transactions over the given
+    [duration]. *)
+val measured_tps : int -> Ptime.span -> unit Lwt.t
