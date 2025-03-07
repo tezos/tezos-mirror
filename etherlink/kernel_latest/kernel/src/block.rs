@@ -416,7 +416,7 @@ fn compute_bip<Host: Runtime>(
                 .context("Failed to finalize the block in progress")?;
             Ok(BlockComputationResult::Finished {
                 included_delayed_transactions,
-                block: L2Block::Etherlink(Box::new(new_block)),
+                block: new_block,
             })
         }
     }
@@ -676,6 +676,7 @@ mod tests {
     use crate::blueprint_storage::read_next_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
+    use crate::chains::ChainFamily;
     use crate::chains::MichelsonChainConfig;
     use crate::fees::DA_FEE_PER_BYTE;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
@@ -958,7 +959,7 @@ mod tests {
     }
 
     fn assert_current_block_reading_validity<Host: Runtime>(host: &mut Host) {
-        match block_storage::read_current(host) {
+        match block_storage::read_current(host, &ChainFamily::Evm) {
             Ok(_) => (),
             Err(e) => {
                 panic!("Block reading failed: {:?}\n", e)
@@ -1360,11 +1361,12 @@ mod tests {
 
         let new_number_of_blocks_indexed = blocks_index.length(&host).unwrap();
 
-        let current_block_hash = block_storage::read_current(&mut host)
-            .unwrap()
-            .hash
-            .as_bytes()
-            .to_vec();
+        let current_block_hash =
+            block_storage::read_current(&mut host, &ChainFamily::Evm)
+                .unwrap()
+                .hash()
+                .as_bytes()
+                .to_vec();
 
         assert_eq!(number_of_blocks_indexed + 1, new_number_of_blocks_indexed);
 
@@ -1963,12 +1965,10 @@ mod tests {
 
         produce(&mut host, &mut configuration, None, None).expect("Should have produced");
 
-        let block =
-            block_storage::read_current(&mut host).expect("Should have found a block");
-        let failed_loop_hash = block
-            .transactions
-            .first()
-            .expect("There should have been a transaction");
+        let block = block_storage::read_current(&mut host, &ChainFamily::Evm)
+            .expect("Should have found a block");
+        let transaction = block.first_transaction_hash();
+        let failed_loop_hash = transaction.expect("There should have been a transaction");
         let failed_loop_status =
             storage::read_transaction_receipt_status(&mut host, failed_loop_hash)
                 .expect("There should have been a receipt");

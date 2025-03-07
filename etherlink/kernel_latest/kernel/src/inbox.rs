@@ -379,6 +379,7 @@ pub fn handle_input<Mode: Parsable + InputHandler>(
     host: &mut impl Runtime,
     input: Input<Mode>,
     inbox_content: &mut Mode::Inbox,
+    chain_family: &ChainFamily,
     garbage_collect_blocks: bool,
 ) -> anyhow::Result<()> {
     match input {
@@ -392,7 +393,7 @@ pub fn handle_input<Mode: Parsable + InputHandler>(
             // New inbox level detected, remove all previous events.
             clear_events(host)?;
             if garbage_collect_blocks {
-                crate::block_storage::garbage_collect_blocks(host)?;
+                crate::block_storage::garbage_collect_blocks(host, chain_family)?;
             }
             store_last_info_per_level_timestamp(host, info.info.predecessor_timestamp)?;
             store_l1_level(host, info.level)?
@@ -463,7 +464,13 @@ fn read_and_dispatch_input<Host: Runtime, Mode: Parsable + InputHandler>(
             Ok(ReadStatus::FinishedIgnore)
         }
         InputResult::Input(input) => {
-            handle_input(host, input, res, garbage_collect_blocks)?;
+            handle_input(
+                host,
+                input,
+                res,
+                &chain_configuration.get_chain_family(),
+                garbage_collect_blocks,
+            )?;
             Ok(ReadStatus::Ongoing)
         }
     }

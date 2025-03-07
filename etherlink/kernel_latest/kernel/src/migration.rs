@@ -271,7 +271,7 @@ fn migrate_to<Host: Runtime>(
         }
         StorageVersion::V27 => {
             // Initialize the next_blueprint_info field
-            match block_storage::read_current(host) {
+            match block_storage::read_current(host, &crate::chains::ChainFamily::Evm) {
                 Ok(block) => {
                     store_current_block_header(host, &block.into())?;
                     Ok(MigrationStatus::Done)

@@ -10,6 +10,7 @@ use crate::block_storage;
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
 use crate::gas_price::base_fee_per_gas;
+use crate::l2block::L2Block;
 use crate::storage::{self, object_path, receipt_path};
 use crate::tick_model;
 use crate::transaction::{Transaction, Transactions::EthTxs, Transactions::TezTxs};
@@ -449,7 +450,7 @@ impl EthBlockInProgress {
         self,
         host: &mut Host,
         block_constants: &BlockConstants,
-    ) -> Result<EthBlock, anyhow::Error> {
+    ) -> Result<L2Block, anyhow::Error> {
         let state_root = Self::safe_store_get_hash(host, &EVM_ACCOUNTS_PATH)?;
         let receipts_root = self.receipts_root(host, &self.previous_receipts_root)?;
         let transactions_root =
@@ -472,6 +473,7 @@ impl EthBlockInProgress {
             block_constants,
             base_fee_per_gas,
         );
+        let new_block = L2Block::Etherlink(Box::new(new_block));
         block_storage::store_current(host, &new_block)
             .context("Failed to store the current block")?;
         Ok(new_block)
