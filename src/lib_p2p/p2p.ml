@@ -121,7 +121,7 @@ let may_create_discovery_worker _limits config pool =
 
 let create_maintenance_worker limits connect_handler config triggers log =
   let open P2p_limits in
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   match limits.maintenance_idle_time with
   | None -> return_none
   | Some maintenance_idle_time ->
@@ -143,13 +143,15 @@ let create_maintenance_worker limits connect_handler config triggers log =
       in
       let pool = P2p_connect_handler.get_pool connect_handler in
       let discovery = may_create_discovery_worker limits config pool in
-      return_some
-        (P2p_maintenance.create
-           ?discovery
-           maintenance_config
-           connect_handler
-           triggers
-           ~log)
+      let* p2p_maintenance =
+        P2p_maintenance.create
+          ?discovery
+          maintenance_config
+          connect_handler
+          triggers
+          ~log
+      in
+      return_some p2p_maintenance
 
 let may_create_welcome_worker config limits connect_handler =
   config.listening_port
@@ -230,7 +232,7 @@ module Real = struct
            answerer)
     in
     let connect_handler = Lazy.force connect_handler in
-    let*! maintenance =
+    let* maintenance =
       create_maintenance_worker limits connect_handler config triggers log
     in
     let* welcome = may_create_welcome_worker config limits connect_handler in
