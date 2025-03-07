@@ -615,7 +615,8 @@ module Handler = struct
       in
       return_unit
 
-  let process_block ctxt cctxt proto_parameters finalized_shell_header =
+  let process_block ctxt cctxt proto_parameters finalized_shell_header
+      finalized_block_hash =
     let open Lwt_result_syntax in
     let store = Node_context.get_store ctxt in
     let block_level = finalized_shell_header.Block_header.level in
@@ -715,17 +716,25 @@ module Handler = struct
     Dal_metrics.layer1_block_finalized ~block_level ;
     Dal_metrics.layer1_block_finalized_round ~block_round ;
     let*! () =
-      Event.emit_layer1_node_final_block ~level:block_level ~round:block_round
+      Event.emit_layer1_node_final_block
+        ~hash:finalized_block_hash
+        ~level:block_level
+        ~round:block_round
     in
     (* This should be done at the end of the function. *)
     let last_processed_level_store = Store.last_processed_level store in
     Store.Last_processed_level.save last_processed_level_store block_level
 
   let rec try_process_block ~retries ctxt cctxt proto_parameters
-      finalized_shell_header =
+      finalized_shell_header finalized_block_hash =
     let open Lwt_syntax in
     let* res =
-      process_block ctxt cctxt proto_parameters finalized_shell_header
+      process_block
+        ctxt
+        cctxt
+        proto_parameters
+        finalized_shell_header
+        finalized_block_hash
     in
     match res with
     | Error e when Layer_1.is_connection_error e && retries > 0 ->
@@ -736,6 +745,7 @@ module Handler = struct
           cctxt
           proto_parameters
           finalized_shell_header
+          finalized_block_hash
     | _ -> return res
 
   (* Monitor finalized heads and store *finalized* published slot headers
@@ -752,7 +762,7 @@ module Handler = struct
       let*! next_final_head = Lwt_stream.get stream in
       match next_final_head with
       | None -> Lwt.fail_with "L1 crawler lib shut down"
-      | Some (_finalized_hash, finalized_shell_header) ->
+      | Some (finalized_block_hash, finalized_shell_header) ->
           let level = finalized_shell_header.level in
           let () = Node_context.set_last_finalized_level ctxt level in
           let* () =
@@ -803,6 +813,7 @@ module Handler = struct
                 cctxt
                 proto_parameters
                 finalized_shell_header
+                finalized_block_hash
           in
           loop ()
     in
