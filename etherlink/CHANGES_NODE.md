@@ -68,6 +68,7 @@
 - Adds `--fund ADDRESS` to `run sandbox`, where `ADDRESS` is a wallet address
   in hexadecimal form that will be provisioned with 10,000 native tokens inside
   the sandbox. The parameter can be used multiple times. (!17104)
+- Fixes `run sandbox` trying to publish its blueprints. (!17128)
 
 ### Storage changes
 
