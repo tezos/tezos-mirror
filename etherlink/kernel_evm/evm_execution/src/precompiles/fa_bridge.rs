@@ -158,7 +158,7 @@ mod tests {
     use std::{borrow::Cow, str::FromStr};
 
     use alloy_sol_types::SolCall;
-    use evm::{Config, ExitError};
+    use evm::ExitError;
     use primitive_types::{H160, U256};
     use tezos_data_encoding::enc::BinWriter;
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -170,7 +170,7 @@ mod tests {
             test_utils::{
                 convert_h160, convert_u256, deploy_reentrancy_tester,
                 dummy_fa_withdrawal, dummy_first_block, dummy_ticket, kernel_wrapper,
-                set_balance, ticket_balance_add, ticket_id,
+                set_balance, ticket_balance_add, ticket_id, CONFIG,
             },
         },
         handler::{EvmHandler, ExecutionOutcome, ExecutionResult},
@@ -192,7 +192,7 @@ mod tests {
         disable_reentrancy_guard: bool,
     ) -> ExecutionOutcome {
         let block = dummy_first_block();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let callee = FA_BRIDGE_PRECOMPILE_ADDRESS;
 
         let precompiles = precompiles::precompile_set::<MockKernelHost>(true);
@@ -321,7 +321,7 @@ mod tests {
         let caller = H160::from_low_u64_be(1);
         let callee = H160::from_low_u64_be(2);
         let block = dummy_first_block();
-        let config = Config::shanghai();
+        let config = CONFIG;
 
         let precompiles = precompiles::precompile_set::<MockKernelHost>(true);
 
