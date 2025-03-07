@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Imported_protocol = Tezos_protocol_021_PsQuebec
+
 type level = {
   level : int32;
       (** The level of the block relative to genesis. This
