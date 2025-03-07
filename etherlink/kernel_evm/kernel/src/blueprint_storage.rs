@@ -16,7 +16,11 @@ use crate::{delayed_inbox, DelayedInbox};
 use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
-use tezos_ethereum::rlp_helpers;
+use tezos_ethereum::block::L2Block;
+use tezos_ethereum::eth_gen::OwnedHash;
+use tezos_ethereum::rlp_helpers::{
+    self, append_timestamp, append_u256_le, decode_field_u256_le, decode_timestamp,
+};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
@@ -82,6 +86,47 @@ impl Decodable for StoreBlueprint {
                 Ok(Self::InboxBlueprint(blueprint))
             }
             _ => Err(DecoderError::Custom("Unknown store blueprint tag.")),
+        }
+    }
+}
+
+// Part of the block header which is generic information because it is
+// about the blueprint from which the block was build. This part is
+// useful to validate the next blueprint.
+#[derive(PartialEq, Debug, Clone)]
+pub struct BlueprintHeader {
+    pub number: U256,
+    pub timestamp: Timestamp,
+}
+
+// Part of the block header which is specific of the EVM chain. All
+// fields are needed to build the next block. The hash is also needed
+// to validate the next blueprint (which commits on this hash).
+#[derive(PartialEq, Debug, Clone)]
+pub struct EVMBlockHeader {
+    pub hash: H256,
+    pub receipts_root: OwnedHash,
+    pub transactions_root: OwnedHash,
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct BlockHeader {
+    pub blueprint_header: BlueprintHeader,
+    pub evm_block_header: EVMBlockHeader,
+}
+
+impl From<L2Block> for BlockHeader {
+    fn from(block: L2Block) -> Self {
+        Self {
+            blueprint_header: BlueprintHeader {
+                number: block.number,
+                timestamp: block.timestamp,
+            },
+            evm_block_header: EVMBlockHeader {
+                hash: block.hash,
+                receipts_root: block.receipts_root,
+                transactions_root: block.transactions_root,
+            },
         }
     }
 }
@@ -185,6 +230,70 @@ pub fn store_forced_blueprint<Host: Runtime>(
     let chunk_path = blueprint_chunk_path(&blueprint_path, 0)?;
     let store_blueprint = StoreBlueprint::InboxBlueprint(blueprint);
     store_rlp(&store_blueprint, host, &chunk_path).map_err(Error::from)
+}
+
+impl Encodable for EVMBlockHeader {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        let Self {
+            hash,
+            receipts_root,
+            transactions_root,
+        } = self;
+        stream.begin_list(3);
+        stream.append(hash);
+        stream.append(receipts_root);
+        stream.append(transactions_root);
+    }
+}
+
+impl Decodable for EVMBlockHeader {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
+        rlp_helpers::check_list(decoder, 3)?;
+        let mut it = decoder.iter();
+        let hash = rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "hash")?;
+        let receipts_root =
+            rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "receipts_root")?;
+        let transactions_root =
+            rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "transactions_root")?;
+        Ok(Self {
+            hash,
+            receipts_root,
+            transactions_root,
+        })
+    }
+}
+
+impl Encodable for BlockHeader {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        let Self {
+            blueprint_header: BlueprintHeader { number, timestamp },
+            evm_block_header,
+        } = self;
+        stream.begin_list(3);
+        append_u256_le(stream, number);
+        append_timestamp(stream, *timestamp);
+        stream.begin_list(1); // Nesting added for forward-compatibility with multichain
+        stream.append(evm_block_header);
+    }
+}
+
+impl Decodable for BlockHeader {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
+        rlp_helpers::check_list(decoder, 3)?;
+
+        let mut it = decoder.iter();
+        let number = decode_field_u256_le(&rlp_helpers::next(&mut it)?, "number")?;
+        let timestamp = decode_timestamp(&rlp_helpers::next(&mut it)?)?;
+        let decoder = &rlp_helpers::next(&mut it)?;
+        rlp_helpers::check_list(decoder, 1)?; // Nesting added for forward-compatibility with multichain
+        let mut it = decoder.iter();
+        let evm_block_header =
+            rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "evm_block_header")?;
+        Ok(Self {
+            blueprint_header: BlueprintHeader { number, timestamp },
+            evm_block_header,
+        })
+    }
 }
 
 /// For the tick model we only accept blueprints where cumulative size of chunks
@@ -513,6 +622,7 @@ mod tests {
     use crate::block::GENESIS_PARENT_HASH;
     use crate::configuration::{DalConfiguration, Limits, TezosContracts};
     use crate::delayed_inbox::Hash;
+    use crate::sequencer_blueprint::rlp_roundtrip;
     use crate::storage::store_last_info_per_level_timestamp;
     use primitive_types::H256;
     use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -686,5 +796,27 @@ mod tests {
     #[test]
     fn test_invalid_sequencer_blueprint_is_removed_with_dal() {
         test_invalid_sequencer_blueprint_is_removed(true)
+    }
+
+    #[test]
+    fn test_block_header_roundtrip() {
+        let blueprint_header = BlueprintHeader {
+            number: 42.into(),
+            timestamp: Timestamp::from(10),
+        };
+        let evm_block_header = EVMBlockHeader {
+            hash: H256::from([42u8; 32]),
+            receipts_root: vec![23; 5],
+            transactions_root: vec![18; 5],
+        };
+
+        rlp_roundtrip(evm_block_header.clone());
+
+        let block_header = BlockHeader {
+            blueprint_header,
+            evm_block_header,
+        };
+
+        rlp_roundtrip(block_header);
     }
 }

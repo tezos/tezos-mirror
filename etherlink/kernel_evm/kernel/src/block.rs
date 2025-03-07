@@ -9,7 +9,9 @@ use crate::apply::{
     apply_transaction, ExecutionInfo, ExecutionResult, Validity, WITHDRAWAL_OUTBOX_QUEUE,
 };
 use crate::block_storage;
-use crate::blueprint_storage::{drop_blueprint, read_blueprint};
+use crate::blueprint_storage::{
+    drop_blueprint, read_blueprint, BlockHeader, BlueprintHeader, EVMBlockHeader,
+};
 use crate::configuration::ConfigurationMode;
 use crate::configuration::Limits;
 use crate::delayed_inbox::DelayedInbox;
@@ -28,6 +30,7 @@ use evm_execution::precompiles;
 use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::trace::TracerInput;
 use primitive_types::{H160, H256, U256};
+use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::block::L2Block;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{log, Level::*, Verbosity};
@@ -37,8 +40,6 @@ use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::Path;
 use tick_model::estimate_remaining_ticks_for_transaction_execution;
-
-use tezos_ethereum::block::BlockConstants;
 
 pub const GENESIS_PARENT_HASH: H256 = H256([0xff; 32]);
 
@@ -259,13 +260,21 @@ fn next_bip_from_blueprints<Host: Runtime>(
         previous_timestamp,
         receipts_root,
         transactions_root,
-    ) = match block_storage::read_current(host) {
-        Ok(block) => (
-            block.number + 1,
-            block.hash,
-            block.timestamp,
-            block.receipts_root,
-            block.transactions_root,
+    ) = match block_storage::read_current(host).map(|block| block.into()) {
+        Ok(BlockHeader {
+            blueprint_header: BlueprintHeader { number, timestamp },
+            evm_block_header:
+                EVMBlockHeader {
+                    hash,
+                    receipts_root,
+                    transactions_root,
+                },
+        }) => (
+            number + 1,
+            hash,
+            timestamp,
+            receipts_root,
+            transactions_root,
         ),
         Err(_) => (
             U256::zero(),

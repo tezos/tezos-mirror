@@ -243,25 +243,25 @@ impl Decodable for SequencerBlueprint {
 }
 
 #[cfg(test)]
+pub fn rlp_roundtrip<S: Encodable + Decodable + PartialEq + std::fmt::Debug>(v: S) {
+    let bytes = v.rlp_bytes();
+    let v2: S =
+        rlp_helpers::FromRlpBytes::from_rlp_bytes(&bytes).expect("Should be decodable");
+    assert_eq!(v, v2, "Roundtrip failed on {:?}", v)
+}
+
+#[cfg(test)]
 mod tests {
-    use super::{SequencerBlueprint, UnsignedSequencerBlueprint};
+    use super::{rlp_roundtrip, SequencerBlueprint, UnsignedSequencerBlueprint};
     use crate::blueprint::Blueprint;
     use crate::inbox::Transaction;
     use crate::inbox::TransactionContent::Ethereum;
     use primitive_types::{H160, U256};
-    use rlp::{Decodable, Encodable};
     use tezos_crypto_rs::hash::UnknownSignature;
-    use tezos_ethereum::rlp_helpers::FromRlpBytes;
     use tezos_ethereum::{
         transaction::TRANSACTION_HASH_SIZE, tx_common::EthereumTransactionCommon,
     };
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
-
-    fn rlp_roundtrip<S: Encodable + Decodable + PartialEq + std::fmt::Debug>(v: S) {
-        let bytes = v.rlp_bytes();
-        let v2: S = FromRlpBytes::from_rlp_bytes(&bytes).expect("Should be decodable");
-        assert_eq!(v, v2, "Roundtrip failed on {:?}", v)
-    }
 
     fn address_from_str(s: &str) -> Option<H160> {
         let data = &hex::decode(s).unwrap();
