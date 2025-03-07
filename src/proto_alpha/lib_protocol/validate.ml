@@ -947,18 +947,141 @@ module Consensus = struct
     let operation_state = add_attestation operation_state oph operation in
     return {info; operation_state; block_state}
 
-  let validate_attestations_aggregate info _operation_state _block_state _oph
-      (_operation : Kind.attestations_aggregate operation) =
+  let check_attestation_aggregate_signature info public_keys
+      ({shell; protocol_data = {contents = Single content; signature}} :
+        Kind.attestations_aggregate Operation.t) =
+    let open Lwt_result_syntax in
+    let (Attestations_aggregate {consensus_content; _}) = content in
+    let {level; round; block_payload_hash} : consensus_aggregate_content =
+      consensus_content
+    in
+    (* We disable subgroup check (for better performances) since public keys are
+       retreived from the context and assumed valid. *)
+    match Bls.aggregate_public_key_opt ~subgroup_check:false public_keys with
+    | None ->
+        (* This is never supposed to happen since keys are assumed valid. *)
+        tzfail Validate_errors.Consensus.Public_key_aggregation_failure
+    | Some public_keys_aggregate ->
+        (* Reconstructing an attestation to match the content signed by each
+           delegate. Fields slot and dal_content are filled with dummy values as
+           they are not part of the signed payload *)
+        let consensus_content =
+          {slot = Slot.zero; level; round; block_payload_hash}
+        in
+        let contents =
+          Single (Attestation {consensus_content; dal_content = None})
+        in
+        let attestation : Kind.attestation operation =
+          {shell; protocol_data = {contents; signature}}
+        in
+        let*? () =
+          Operation.check_signature
+            info.ctxt
+            (Bls public_keys_aggregate)
+            info.chain_id
+            attestation
+        in
+        return_unit
+
+  (* Check conflicts and register each attestations in the conflict map *)
+  let handle_attestation_aggregate_conflicts validation_state oph
+      ({shell; protocol_data = {contents = Single content; _}} :
+        Kind.attestations_aggregate operation) =
+    let open Lwt_result_syntax in
+    let (Attestations_aggregate {consensus_content; committee}) = content in
+    let {level; round; block_payload_hash} : consensus_aggregate_content =
+      consensus_content
+    in
+    List.fold_left_es
+      (fun {info; operation_state; block_state} slot ->
+        let attestation : Kind.attestation operation =
+          let consensus_content = {slot; level; round; block_payload_hash} in
+          let contents =
+            Single (Attestation {consensus_content; dal_content = None})
+          in
+          {shell; protocol_data = {contents; signature = None}}
+        in
+        let*? () =
+          check_attestation_conflict operation_state oph attestation
+          |> wrap_attestation_conflict
+        in
+        let operation_state = add_attestation operation_state oph attestation in
+        return {info; operation_state; block_state})
+      validation_state
+      committee
+
+  let validate_attestations_aggregate ~check_signature info operation_state
+      block_state oph
+      ({protocol_data = {contents = Single content; _}; _} as op :
+        Kind.attestations_aggregate operation) =
+    let open Lwt_result_syntax in
     match info.mode with
     | Mempool ->
-        (* Aggregate operations are built at baking time and shouldn't be
-           broadcasted between mempools. *)
+        (* Attestations_aggregate operations are built at baking time and
+           should not be propagated between mempools. *)
         tzfail Validate_errors.Consensus.Aggregate_in_mempool
     | Application _ | Partial_validation _ | Construction _ ->
-        (* Feature flag check *)
-        if Constants.aggregate_attestation info.ctxt then
-          tzfail Validate_errors.Consensus.Aggregate_not_implemented
-        else tzfail Validate_errors.Consensus.Aggregate_disabled
+        let*? () =
+          (* Attestations_aggregates are currently under feature flag *)
+          error_unless
+            (Constants.aggregate_attestation info.ctxt)
+            Validate_errors.Consensus.Aggregate_disabled
+        in
+        let*? consensus_info =
+          Option.value_e
+            ~error:(trace_of_error Consensus_operation_not_allowed)
+            info.consensus_info
+        in
+        let (Attestations_aggregate {consensus_content; committee}) = content in
+        let {level; round; block_payload_hash} : consensus_aggregate_content =
+          consensus_content
+        in
+        (* Check level, round and block_payload_hash
+           (uses a dummy slot value) *)
+        let* () =
+          check_block_attestation
+            info
+            consensus_info
+            {level; round; block_payload_hash; slot = Slot.zero}
+        in
+        (* Retreive public keys and compute total voting power *)
+        let* public_keys, total_voting_power =
+          List.fold_left_es
+            (fun (public_keys, total_voting_power) slot ->
+              (* Lookup the slot owner *)
+              let*? consensus_key, power, _ =
+                get_delegate_details
+                  consensus_info.attestation_slot_map
+                  Attestation
+                  slot
+              in
+              let* () =
+                check_delegate_is_not_forbidden info.ctxt consensus_key.delegate
+              in
+              match consensus_key.consensus_pk with
+              | Bls pk -> return (pk :: public_keys, power + total_voting_power)
+              | _ -> tzfail Validate_errors.Consensus.Non_bls_key_in_aggregate)
+            ([], 0)
+            committee
+        in
+        (* Check signature *)
+        let* () =
+          if check_signature then
+            check_attestation_aggregate_signature info public_keys op
+          else return_unit
+        in
+        (* Check conflicts and register each attestation in the conflict map *)
+        let* validation_state =
+          handle_attestation_aggregate_conflicts
+            {info; operation_state; block_state}
+            oph
+            op
+        in
+        (* Increment block voting power *)
+        let block_state =
+          may_update_attestation_power info block_state total_voting_power
+        in
+        return {validation_state with block_state}
 end
 
 (** {2 Validation of voting operations}
@@ -3158,6 +3281,7 @@ let validate_operation ?(check_signature = true)
             operation
       | Single (Attestations_aggregate _) ->
           Consensus.validate_attestations_aggregate
+            ~check_signature
             info
             operation_state
             block_state
