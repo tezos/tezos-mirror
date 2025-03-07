@@ -117,6 +117,15 @@ module MinPk : sig
       Return [None] if [INVALID] is expected in the specification *)
   val aggregate_signature_opt : signature list -> signature option
 
+  (** [aggregate_public_key_opt ?subgroup_check pks] aggregates the public keys
+      [pks]. If [subgroup_check] is set, the function also checks if the
+      points are in G1. *)
+  val aggregate_public_key_opt : ?subgroup_check:bool -> pk list -> pk option
+
+  (** [aggregate_public_key_lc_opt [(w_1, pk_1);(w_2, pk_2);...]] aggregates the public
+      keys [w_i] * [pk_i]. *)
+  val aggregate_public_key_lc_opt : (Z.t * pk) list -> pk option
+
   (** Basic scheme described in
       {{:https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-04#section-3.1}
       section 3.1}
@@ -298,6 +307,15 @@ module MinSig : sig
       } section 2.8 }.
       Return [None] if [INVALID] is expected in the specification *)
   val aggregate_signature_opt : signature list -> signature option
+
+  (** [aggregate_public_key_opt ?subgroup_check pks] aggregates the public keys
+      [pks]. If [subgroup_check] is set, the function also checks if the
+      points are in G2. *)
+  val aggregate_public_key_opt : ?subgroup_check:bool -> pk list -> pk option
+
+  (** [aggregate_public_key_lc_opt [(w_1, pk_1);(w_2, pk_2);...]] aggregates the public
+      keys [w_i] * [pk_i]. *)
+  val aggregate_public_key_lc_opt : (Z.t * pk) list -> pk option
 
   (** Basic scheme described in
       {{:https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-04#section-3.1}

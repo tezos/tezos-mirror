@@ -440,16 +440,28 @@ end
 module type AGGREGATE_SIGNATURE = sig
   include SIGNATURE
 
-  (** [agregate_check pk_msg_list signature] returns [true] if the [signature]
+  (** [aggregate_check pk_msg_list signature] returns [true] if the [signature]
       is a valid aggregate signature of the signatures produced by signing
       message [msg] (with optional [watermark]) with the secret key of [pk] for
       each element [(pk, watermark, msg)] of the list [pk_msg_list]. *)
   val aggregate_check :
     (Public_key.t * watermark option * bytes) list -> t -> bool
 
-  (** [agregate_signature_opt sig_list] creates an aggregated signature using
+  (** [aggregate_signature_opt sig_list] creates an aggregated signature using
       the list of signatures [sig_list]. *)
   val aggregate_signature_opt : t list -> t option
+
+  (** [aggregate_public_key_opt pk_list] creates an aggregated public key using
+      the list of public_keys [pk_list]. If [subgroup_check] is set, the function
+      also checks if the points are in the prime subgroup. *)
+  val aggregate_public_key_opt :
+    ?subgroup_check:bool -> Public_key.t list -> Public_key.t option
+
+  (** [aggregate_public_key_lc_opt pk_with_weights_list] creates an aggregated public
+      key as a linear combination from the list of public_keys and their weights in
+      [pk_with_weights_list]. *)
+  val aggregate_public_key_lc_opt :
+    (Z.t * Public_key.t) list -> Public_key.t option
 end
 
 module type SPLIT_SIGNATURE = sig
