@@ -804,8 +804,9 @@ module Simple = struct
 
   let may_prefix_name ~prefix_name_with_section ~name ~section =
     match (prefix_name_with_section, section) with
-    | true, Some sections -> Format.asprintf "%a.%s" Section.pp sections name
     | false, _ | true, None -> name
+    | true, Some sections ->
+        String.concat "_" (Section.to_string_list sections @ [name])
 
   let declare_0 ?alternative_color ?section ?(prefix_name_with_section = false)
       ~name ~msg ?(level = Info) () =
