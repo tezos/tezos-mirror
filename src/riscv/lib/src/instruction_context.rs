@@ -62,6 +62,24 @@ pub trait ICB {
     /// Perform a read of the program counter.
     fn pc_read(&mut self) -> Self::XValue;
 
+    /// Type for boolean operations.
+    type Bool;
+
+    /// Compare two values, given the operation to compare them with.
+    fn xvalue_compare(
+        &mut self,
+        comparison: Predicate,
+        lhs: Self::XValue,
+        rhs: Self::XValue,
+    ) -> Self::Bool;
+
+    /// Convert a boolean value to an xvalue.
+    ///
+    /// Coerces to the following:
+    /// - `true -> 1`
+    /// - `false -> 0`
+    fn xvalue_from_bool(&mut self, value: Self::Bool) -> Self::XValue;
+
     /// Representation for the manipulation of fallible operations.
     type IResult<Value>;
 
@@ -151,6 +169,23 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
         self.hart.pc.read()
     }
 
+    type Bool = bool;
+
+    #[inline(always)]
+    fn xvalue_compare(
+        &mut self,
+        comparison: Predicate,
+        lhs: Self::XValue,
+        rhs: Self::XValue,
+    ) -> Self::Bool {
+        comparison.eval(lhs, rhs)
+    }
+
+    #[inline(always)]
+    fn xvalue_from_bool(&mut self, value: Self::Bool) -> Self::XValue {
+        value as XValue
+    }
+
     type IResult<In> = Result<In, Exception>;
 
     #[inline(always)]
@@ -172,5 +207,22 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
         F: FnOnce(In) -> Self::IResult<Out>,
     {
         res.and_then(f)
+    }
+}
+
+/// Operators for producing a boolean from two values.
+pub enum Predicate {
+    LessThanSigned,
+    LessThanUnsigned,
+}
+
+impl Predicate {
+    /// Run the given comparison operation over the given values.
+    #[inline(always)]
+    fn eval(self, lhs: XValue, rhs: XValue) -> bool {
+        match self {
+            Self::LessThanSigned => (lhs as i64) < (rhs as i64),
+            Self::LessThanUnsigned => lhs < rhs,
+        }
     }
 }

@@ -10,12 +10,14 @@ use cranelift::codegen::ir::InstBuilder;
 use cranelift::codegen::ir::MemFlags;
 use cranelift::codegen::ir::Type;
 use cranelift::codegen::ir::Value;
+use cranelift::codegen::ir::condcodes::IntCC;
 use cranelift::codegen::ir::types::I64;
 use cranelift::frontend::FunctionBuilder;
 
 use super::state_access::JitStateAccess;
 use super::state_access::JsaCalls;
 use crate::instruction_context::ICB;
+use crate::instruction_context::Predicate;
 use crate::machine_state::memory::Address;
 use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::registers::NonZeroXRegister;
@@ -96,6 +98,9 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
     type XValue = Value;
     type IResult<Value> = Value;
 
+    /// An `I8` width value.
+    type Bool = Value;
+
     fn xregister_read_nz(&mut self, reg: NonZeroXRegister) -> Self::XValue {
         self.jsa_call
             .xreg_read(&mut self.builder, self.core_ptr_val, reg)
@@ -108,6 +113,11 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
 
     fn xvalue_of_imm(&mut self, imm: i64) -> Self::XValue {
         self.builder.ins().iconst(I64, imm)
+    }
+
+    fn xvalue_from_bool(&mut self, value: Self::Bool) -> Self::XValue {
+        // unsigned extension works as boolean can never be negative (only 0 or 1)
+        self.builder.ins().uextend(I64, value)
     }
 
     fn xvalue_wrapping_add(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
@@ -132,6 +142,23 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
             .iadd_imm(self.pc_val, self.pc_offset as i64)
     }
 
+    fn xvalue_compare(
+        &mut self,
+        comparison: crate::instruction_context::Predicate,
+        lhs: Self::XValue,
+        rhs: Self::XValue,
+    ) -> Self::Bool {
+        // icmp returns 1 if the condition holds, 0 if it does not.
+        //
+        // This matches the required semantics of bool - namely that it coerces to XValue with
+        // - true => 1
+        // - false => 0
+        //
+        // See
+        // <https://docs.rs/cranelift-codegen/0.117.2/cranelift_codegen/ir/trait.InstBuilder.html#method.icmp>
+        self.builder.ins().icmp(comparison, lhs, rhs)
+    }
+
     fn ok<Value>(&mut self, val: Value) -> Self::IResult<Value> {
         val
     }
@@ -148,5 +175,14 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
         F: FnOnce(Value) -> Self::IResult<Next>,
     {
         todo!("RV-415: support fallible pathways in JIT")
+    }
+}
+
+impl From<Predicate> for IntCC {
+    fn from(value: Predicate) -> Self {
+        match value {
+            Predicate::LessThanSigned => IntCC::SignedLessThan,
+            Predicate::LessThanUnsigned => IntCC::UnsignedLessThan,
+        }
     }
 }
