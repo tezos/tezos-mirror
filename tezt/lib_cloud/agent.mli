@@ -61,7 +61,7 @@ val make :
   ?point:string * int ->
   configuration:Configuration.t ->
   next_available_port:(unit -> int) ->
-  vm_name:string ->
+  vm_name:string option ->
   process_monitor:Process_monitor.t option ->
   unit ->
   t
@@ -73,7 +73,7 @@ val encoding : t Data_encoding.t
 val name : t -> string
 
 (** [vm_name agent] returns the name of the VM. *)
-val vm_name : t -> string
+val vm_name : t -> string option
 
 (** [point agent] returns the point asociated with the agent. *)
 val point : t -> (string * int) option

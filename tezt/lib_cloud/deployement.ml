@@ -121,7 +121,7 @@ module Remote = struct
         ~point
         ~configuration
         ~next_available_port
-        ~vm_name
+        ~vm_name:(Some vm_name)
         ~process_monitor
         ()
       |> Lwt.return
@@ -244,7 +244,10 @@ module Remote = struct
                     Hashtbl.add
                       agents_info
                       address
-                      {workspace_name; gcp_name = Agent.vm_name agent}) ;
+                      {
+                        workspace_name;
+                        gcp_name = Option.get (Agent.vm_name agent);
+                      }) ;
              Lwt.return agents)
     in
     let agents =
@@ -407,7 +410,7 @@ module Localhost = struct
                ~point
                ~configuration
                ~next_available_port:(fun () -> next_port point)
-               ~vm_name:"localhost"
+               ~vm_name:None
                ~process_monitor
                ())
     in

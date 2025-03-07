@@ -106,10 +106,11 @@ let monitoring_jingo_template agents agent =
       | Some (host, _port) -> host
       | None -> domain agents
   in
+  let vm_name = Option.value ~default:"None" (Agent.vm_name agent) in
   Tobj
     [
       ("name", Tstr (Agent.name agent));
-      ("vm_name", Tstr (Agent.vm_name agent));
+      ("vm_name", Tstr vm_name);
       ("uri", Tstr (sf "http://%s:19999" host));
     ]
 

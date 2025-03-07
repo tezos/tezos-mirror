@@ -57,7 +57,7 @@ module Configuration = struct
 end
 
 type t = {
-  vm_name : string;
+  vm_name : string option;
   zone : string option;
   point : (string * int) option;
   runner : Runner.t option;
@@ -118,7 +118,7 @@ let encoding =
         process_monitor;
       })
     (obj6
-       (req "name" string)
+       (req "vm_name" (option string))
        (req "zone" (option string))
        (req "point" (option (tup2 string int31)))
        (req "next_available_port" int31)
@@ -161,15 +161,19 @@ let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~vm_name
   }
 
 let cmd_wrapper {zone; vm_name; _} =
-  match zone with
-  | None -> None
-  | Some zone ->
+  match (zone, vm_name) with
+  | None, None -> None
+  | Some zone, Some vm_name ->
       let ssh_private_key_filename =
         if Env.mode = `Orchestrator then
           Env.ssh_private_key_filename ~home:"$HOME" ()
         else Env.ssh_private_key_filename ()
       in
       Some (Gcloud.cmd_wrapper ~zone ~vm_name ~ssh_private_key_filename)
+  | _ ->
+      Test.fail
+        "Inconsistent agent setup, only one of zone and vm_name has been \
+         declared."
 
 let path_of agent binary = agent.configuration.vm.binaries_path // binary
 
