@@ -1553,8 +1553,15 @@ module Target = struct
     let kind = make_kind names in
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
-    let deps, link_deps =
-      TargetLinkDeps.compute_deps ~target_kind:kind ~target_deps:deps ~link_deps
+    let TargetLinkDeps.
+          {deps; link_deps; inline_tests_libraries; inline_tests_link_flags} =
+      TargetLinkDeps.compute_opts
+        ~kind
+        ~deps
+        ~link_deps
+        ~inline_tests
+        ~inline_tests_libraries
+        ~inline_tests_link_flags
     in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
     let ppx_runtime_libraries = List.filter_map Fun.id ppx_runtime_libraries in
@@ -1945,9 +1952,10 @@ module Target = struct
         enabled_if;
       }
 
-  let rust_archive link_deps target =
+  let rust_archive link_deps ?inline_tests_link_flags target =
     target
-    |> Option.map @@ TargetLinkDeps.register_target link_deps
+    |> Option.map
+       @@ TargetLinkDeps.register_archive link_deps ?inline_tests_link_flags
     |> Option.to_list |> List.flatten
 
   let public_lib ?internal_name =

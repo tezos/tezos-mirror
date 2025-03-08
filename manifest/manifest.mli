@@ -1197,7 +1197,10 @@ module Product (M : sig
 end) : sig
   (** Register a Rust archive *)
   val rust_archive :
-    Manifest_link_deps.t list -> target -> Manifest_link_deps.t list
+    Manifest_link_deps.t list ->
+    ?inline_tests_link_flags:string list ->
+    target ->
+    Manifest_link_deps.t list
 
   (** Register and return an internal public library.
 
