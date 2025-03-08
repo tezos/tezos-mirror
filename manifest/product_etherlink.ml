@@ -59,6 +59,7 @@ let lib_etherlink_wasm_runtime =
         RustDep Wasmer;
         RustDep Etherlink_wasm_runtime;
       ]
+    ~inline_tests_link_flags:["-cclib"; "-levm_node_rust_deps.a"]
     (octez_evm_node_lib
        "evm_node_rust_deps"
        ~path:"etherlink/lib_wasm_runtime"

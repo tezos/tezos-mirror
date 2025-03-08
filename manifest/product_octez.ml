@@ -498,6 +498,7 @@ let octez_rpc =
 let lib_rustzcash =
   rust_archive
     Manifest_link_deps.LinkTypes.[RustDep Rustzcash]
+    ~inline_tests_link_flags:["-cclib"; "-loctez_rustzcash_deps"]
     (public_lib
        "octez-rustzcash-deps"
        ~path:"src/rustzcash_deps"
@@ -583,6 +584,7 @@ let octez_rust_deps, lib_wasmer_riscv =
     rust_archive
       Manifest_link_deps.LinkTypes.
         [RustDep Rustzcash; RustDep Wasmer; RustDep Riscv_pvm]
+      ~inline_tests_link_flags:["-cclib"; "-loctez_rust_deps"]
       octez_rust_deps )
 
 let bls12_381_archive =
@@ -4359,8 +4361,8 @@ let octez_shell =
       Dune.
         [[S "package"; S "octez-shell-libs"]; [S "mld_files"; S "octez_shell"]]
     ~inline_tests:ppx_expect
-    ~inline_tests_libraries:[octez_rust_deps; bls12_381_archive]
-    ~inline_tests_link_flags:["-cclib"; "-lblst"; "-cclib"; "-loctez_rust_deps"]
+    ~inline_tests_libraries:[bls12_381_archive]
+    ~inline_tests_link_flags:["-cclib"; "-lblst"]
     ~preprocess
     ~preprocessor_deps
     ~deps:
@@ -6932,9 +6934,8 @@ let hash = Protocol.hash
           "Protocol specific library of helpers for `tezos-smart-rollup`"
         ~deps:[octez_base |> open_ ~m:"TzPervasives"; main |> open_]
         ~inline_tests:ppx_expect
-        ~inline_tests_libraries:[bls12_381_archive; octez_rust_deps]
-        ~inline_tests_link_flags:
-          ["-cclib"; "-lblst"; "-cclib"; "-loctez_rust_deps"]
+        ~inline_tests_libraries:[bls12_381_archive]
+        ~inline_tests_link_flags:["-cclib"; "-lblst"]
         ~linkall:true
     in
     let plugin =
@@ -7010,11 +7011,9 @@ let hash = Protocol.hash
         ~bisect_ppx:(if N.(number >= 008) then Yes else No)
         ?inline_tests:(if N.(number >= 009) then Some ppx_expect else None)
         ?inline_tests_libraries:
-          ( only_if N.(number >= 009) @@ fun () ->
-            [bls12_381_archive; octez_rust_deps] )
+          (only_if N.(number >= 009) @@ fun () -> [bls12_381_archive])
         ?inline_tests_link_flags:
-          ( only_if N.(number >= 009) @@ fun () ->
-            ["-cclib"; "-lblst"; "-cclib"; "-loctez_rust_deps"] )
+          (only_if N.(number >= 009) @@ fun () -> ["-cclib"; "-lblst"])
         ~linkall:true
         ~dune:
           (if N.(number >= 016) then
@@ -7441,9 +7440,8 @@ let hash = Protocol.hash
             client |> if_some |> open_;
           ]
         ~inline_tests:ppx_expect
-        ~inline_tests_libraries:[bls12_381_archive; octez_rust_deps]
-        ~inline_tests_link_flags:
-          ["-cclib"; "-lblst"; "-cclib"; "-loctez_rust_deps"]
+        ~inline_tests_libraries:[bls12_381_archive]
+        ~inline_tests_link_flags:["-cclib"; "-lblst"]
         ~linkall:true
     in
     let dal =
@@ -7468,9 +7466,8 @@ let hash = Protocol.hash
             main |> open_;
           ]
         ~inline_tests:ppx_expect
-        ~inline_tests_libraries:[bls12_381_archive; octez_rust_deps]
-        ~inline_tests_link_flags:
-          ["-cclib"; "-lblst"; "-cclib"; "-loctez_rust_deps"]
+        ~inline_tests_libraries:[bls12_381_archive]
+        ~inline_tests_link_flags:["-cclib"; "-lblst"]
         ~linkall:true
         ~dune:[dune_signatures_version_rule]
     in
@@ -7545,9 +7542,8 @@ let hash = Protocol.hash
             octez_smart_rollup_lib |> open_;
           ]
         ~inline_tests:ppx_expect
-        ~inline_tests_libraries:[bls12_381_archive; octez_rust_deps]
-        ~inline_tests_link_flags:
-          ["-cclib"; "-lblst"; "-cclib"; "-loctez_rust_deps"]
+        ~inline_tests_libraries:[bls12_381_archive]
+        ~inline_tests_link_flags:["-cclib"; "-lblst"]
         ~linkall:true
     in
     let octez_sc_rollup_node =
