@@ -12,7 +12,6 @@
   bls12-381.archive
   bls12-381
   tezt-tezos
-  tezt_riscv_sandbox
   tezt_tx_kernel
   octez-libs.data-encoding
   octez-libs.base

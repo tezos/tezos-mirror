@@ -163,7 +163,6 @@
 (package (name tezos_internal_irmin_tests)(allow_empty))
 (package (name tezt-cloud))
 (package (name tezt-etherlink)(allow_empty))
-(package (name tezt-riscv-sandbox)(allow_empty))
 (package (name tezt-tests-cloud)(allow_empty))
 (package (name tezt-tezos))
 (package (name tezt-tx-kernel)(allow_empty))
