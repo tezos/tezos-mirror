@@ -1122,7 +1122,6 @@ oc.build_kernels:
   - make -f etherlink.mk evm_kernel.wasm
   - make -C src/riscv riscv-dummy.elf
   - make -C src/riscv riscv-dummy-sdk.elf
-  - make -C src/riscv/tests build
   after_script:
   - ./scripts/ci/sccache-stop.sh
   variables:
@@ -1143,7 +1142,6 @@ oc.build_kernels:
     - dal_echo_kernel.wasm
     - src/riscv/riscv-dummy.elf
     - src/riscv/riscv-dummy-sdk.elf
-    - src/riscv/tests/inline_asm/rv64-inline-asm-tests
     when: on_success
 
 oc.build_dsn_node:

@@ -1,4 +1,0 @@
-[package]
-name = "rv64-inline-asm-tests"
-version = "0.1.0"
-edition = "2021"
