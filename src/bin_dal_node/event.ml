@@ -35,12 +35,13 @@ let pp_int_list fmt l =
 (* DAL node event definitions *)
 
 open struct
-  let section = ["dal"; "node"]
+  let section = ["dal"]
 
   let starting_node =
     declare_0
       ~section
-      ~name:"starting_dal_node"
+      ~prefix_name_with_section:true
+      ~name:"starting"
       ~msg:"starting the DAL node"
       ~level:Notice
       ()
@@ -48,7 +49,8 @@ open struct
   let waiting_l1_node_bootstrapped =
     declare_0
       ~section
-      ~name:"waiting_l1_node_to_be_bootstrapped"
+      ~prefix_name_with_section:true
+      ~name:"waiting_l1_node_to_bootstrap"
       ~msg:"waiting for the L1 node to be bootstrapped"
       ~level:Notice
       ()
@@ -56,7 +58,8 @@ open struct
   let l1_node_bootstrapped =
     declare_0
       ~section
-      ~name:"l1_node_is_bootstrapped"
+      ~prefix_name_with_section:true
+      ~name:"l1_node_bootstrapped"
       ~msg:"the L1 node is bootstrapped"
       ~level:Notice
       ()
@@ -64,6 +67,7 @@ open struct
   let waiting_known_plugin =
     declare_0
       ~section
+      ~prefix_name_with_section:true
       ~name:"waiting_l1_node_known_plugin"
       ~msg:"waiting for a block with a known protocol plugin"
       ~level:Notice
@@ -72,7 +76,8 @@ open struct
   let shutdown_node =
     declare_1
       ~section
-      ~name:"stopping_dal_node"
+      ~prefix_name_with_section:true
+      ~name:"stopping"
       ~msg:"stopping DAL node"
       ~level:Notice
       ("exit_status", Data_encoding.int8)
@@ -80,7 +85,8 @@ open struct
   let dal_node_sqlite3_store_init =
     declare_0
       ~section
-      ~name:"dal_node_sqlite3_store_init"
+      ~prefix_name_with_section:true
+      ~name:"sqlite3_store_init"
       ~msg:"initializing the SQLite3 store"
       ~level:Info
       ()
@@ -88,7 +94,8 @@ open struct
   let store_is_ready =
     declare_0
       ~section
-      ~name:"dal_node_store_is_ready"
+      ~prefix_name_with_section:true
+      ~name:"store_is_ready"
       ~msg:"the DAL node store is ready"
       ~level:Notice
       ()
@@ -96,7 +103,8 @@ open struct
   let node_is_ready =
     declare_0
       ~section
-      ~name:"dal_node_is_ready"
+      ~prefix_name_with_section:true
+      ~name:"is_ready"
       ~msg:"the DAL node is ready"
       ~level:Notice
       ()
@@ -104,7 +112,8 @@ open struct
   let data_dir_not_found =
     declare_1
       ~section
-      ~name:"dal_node_no_data_dir"
+      ~prefix_name_with_section:true
+      ~name:"no_data_dir"
       ~msg:
         "the DAL node configuration file does not exist in {path}, creating one"
       ~level:Warning
@@ -113,6 +122,7 @@ open struct
   let retry_fetching_node_config level prefix =
     declare_2
       ~section
+      ~prefix_name_with_section:true
       ~name:(prefix ^ "retry_fetching_config")
       ~msg:
         "cannot fetch config from l1 node at {endpoint}, retrying in {delay}s"
@@ -129,6 +139,7 @@ open struct
   let config_error_no_bootstrap =
     declare_0
       ~section
+      ~prefix_name_with_section:true
       ~name:"config_error_no_bootstrap"
       ~msg:
         "no bootstrap peers found in the configuration file or network settings"
@@ -138,6 +149,7 @@ open struct
   let resolved_bootstrap_points =
     declare_2
       ~section
+      ~prefix_name_with_section:true
       ~name:"resolved_bootstrap_points"
       ~msg:
         "DNS resolution of {domainname} returned {number} bootstrap IP \
@@ -149,6 +161,7 @@ open struct
   let resolved_bootstrap_no_points =
     declare_0
       ~section
+      ~prefix_name_with_section:true
       ~name:"resolved_bootstrap_no_points"
       ~msg:"DNS resolution returned no bootstrap IP address"
       ~level:Error
@@ -157,6 +170,7 @@ open struct
   let resolved_bootstrap_points_total =
     declare_1
       ~section
+      ~prefix_name_with_section:true
       ~name:"resolved_bootstrap_points_total"
       ~msg:"DNS resolution returned a total of {number} bootstrap IP addresses"
       ~level:Notice
@@ -165,6 +179,7 @@ open struct
   let fetched_config_success =
     declare_1
       ~section
+      ~prefix_name_with_section:true
       ~name:"fetched_config_success"
       ~msg:"success fetching config from l1 node at {endpoint}"
       ~level:Notice
@@ -173,6 +188,7 @@ open struct
   let failed_to_persist_profiles =
     declare_2
       ~section
+      ~prefix_name_with_section:true
       ~name:"failed_to_persist_profiles"
       ~msg:"failed to persist the profiles to the config file"
       ~level:Error
@@ -182,6 +198,7 @@ open struct
   let fetched_slot =
     declare_2
       ~section
+      ~prefix_name_with_section:true
       ~name:"reconstructed_slot"
       ~msg:"reconstructed slot: size {size}, shards {shards}"
       ~level:Info
@@ -191,28 +208,33 @@ open struct
   let layer1_node_new_head =
     declare_3
       ~section
-      ~name:"dal_node_layer_1_new_head"
-      ~msg:
-        "head of Layer 1 node updated to {hash} at level {level}, fitness \
-         {fitness}"
+      ~prefix_name_with_section:true
+      ~name:"new_L1_head_block"
+      ~msg:"L1 head updated to {hash} at level {level}, fitness {fitness}"
       ~level:Info
+      ~pp1:Block_hash.pp_short
+      ~pp3:Fitness.pp
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
       ("fitness", Fitness.encoding)
 
   let layer1_node_final_block =
-    declare_2
+    declare_3
       ~section
-      ~name:"dal_node_layer_1_new_final_block"
-      ~msg:"layer 1 node's block at level {level}, round {round} is final"
+      ~prefix_name_with_section:true
+      ~name:"new_L1_final_block"
+      ~msg:"Finalized block {hash} at level {level}, round {round}"
       ~level:Notice
+      ~pp1:Block_hash.pp
+      ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
       ("round", Data_encoding.int32)
 
   let layer1_node_tracking_started =
     declare_0
       ~section
-      ~name:"dal_node_layer_1_start_tracking"
+      ~prefix_name_with_section:true
+      ~name:"start_tracking_L1"
       ~msg:"started tracking layer 1's node"
       ~level:Notice
       ()
@@ -220,7 +242,8 @@ open struct
   let protocol_plugin_resolved =
     declare_1
       ~section
-      ~name:"dal_node_plugin_resolved"
+      ~prefix_name_with_section:true
+      ~name:"plugin_resolved"
       ~msg:"resolved plugin on protocol {proto_hash}"
       ~level:Notice
       ~pp1:Protocol_hash.pp_short
@@ -229,7 +252,8 @@ open struct
   let no_protocol_plugin =
     declare_1
       ~section
-      ~name:"dal_node_no_plugin"
+      ~prefix_name_with_section:true
+      ~name:"no_plugin"
       ~msg:"could not resolve plugin for protocol {proto_hash}"
       ~level:Error
       ~pp1:Protocol_hash.pp_short
@@ -238,7 +262,8 @@ open struct
   let unexpected_protocol_plugin =
     declare_0
       ~section
-      ~name:"dal_node_unexpected_plugin"
+      ~prefix_name_with_section:true
+      ~name:"unexpected_plugin"
       ~msg:
         "found plugin for the current protocol, expected one for the next \
          protocol."
@@ -248,7 +273,8 @@ open struct
   let daemon_error =
     declare_1
       ~section
-      ~name:"dal_node_daemon_error"
+      ~prefix_name_with_section:true
+      ~name:"daemon_error"
       ~msg:"daemon thrown an error: {error}"
       ~level:Notice
       ~pp1:Error_monad.pp_print_trace
@@ -257,7 +283,8 @@ open struct
   let failed_to_fetch_block =
     declare_4
       ~section
-      ~name:"dal_node_crawler_failed_to_fetch_header"
+      ~prefix_name_with_section:true
+      ~name:"crawler_failed_to_fetch_header"
       ~msg:
         "the crawler failed to fetch the block {type} at level {level} (for \
          last_notified_level {last_notified}): {error}\n\
@@ -274,7 +301,8 @@ open struct
   let history_mode_warning =
     declare_2
       ~section
-      ~name:"dal_node_history_mode_warning"
+      ~prefix_name_with_section:true
+      ~name:"history_mode_warning"
       ~msg:
         "The node will only store data related to the last {stored_levels} \
          levels, but it should store data for {storage_period} levels in order \
@@ -286,6 +314,7 @@ open struct
   let configuration_loaded =
     declare_0
       ~section
+      ~prefix_name_with_section:true
       ~name:"configuration_loaded"
       ~msg:"configuration loaded successfully"
       ~level:Notice
@@ -294,6 +323,7 @@ open struct
   let stored_slot_content =
     declare_2
       ~section
+      ~prefix_name_with_section:true
       ~name:"stored_slot_content"
       ~msg:"stored slot for level {published_level} and index {slot_index}"
       ~level:Info
@@ -303,6 +333,7 @@ open struct
   let stored_slot_shard =
     declare_3
       ~section
+      ~prefix_name_with_section:true
       ~name:"stored_slot_shard"
       ~msg:
         "stored shard {shard_index} for level {published_level} and index \
@@ -315,6 +346,7 @@ open struct
   let stored_slot_status =
     declare_3
       ~section
+      ~prefix_name_with_section:true
       ~name:"stored_slot_status"
       ~msg:
         "stored slot status for level {published_level} and index \
@@ -327,6 +359,7 @@ open struct
   let removed_slot_shards =
     declare_2
       ~section
+      ~prefix_name_with_section:true
       ~name:"removed_slot_shards"
       ~msg:"removed shards for level {published_level} and index {slot_index}"
       ~level:Debug
@@ -336,6 +369,7 @@ open struct
   let removed_slot =
     declare_2
       ~section
+      ~prefix_name_with_section:true
       ~name:"removed_slot"
       ~msg:"removed slot for level {published_level} and index {slot_index}"
       ~level:Debug
@@ -345,6 +379,7 @@ open struct
   let removed_status =
     declare_1
       ~section
+      ~prefix_name_with_section:true
       ~name:"removed_status"
       ~msg:"removed statuses for level {level}"
       ~level:Debug
@@ -353,6 +388,7 @@ open struct
   let slot_header_status_storage_error =
     declare_3
       ~section
+      ~prefix_name_with_section:true
       ~name:"slot_header_status_storage_error"
       ~msg:
         "slot header status storage error for level {published_level}, slot \
@@ -365,6 +401,7 @@ open struct
   let unexpected_slot_header_status =
     declare_4
       ~section
+      ~prefix_name_with_section:true
       ~name:"unexpected_slot_header_status"
       ~msg:
         "Internal error: unexpected slot header status {got_status}, expected \
@@ -381,6 +418,7 @@ open struct
   let removed_skip_list_cells =
     declare_1
       ~section
+      ~prefix_name_with_section:true
       ~name:"removed_skip_list_cells"
       ~msg:"removed skip list cells for level {level}"
       ~level:Debug
@@ -389,6 +427,7 @@ open struct
   let removing_shards_failed =
     declare_3
       ~section
+      ~prefix_name_with_section:true
       ~name:"removing_shards_failed"
       ~level:Warning
       ~msg:
@@ -401,6 +440,7 @@ open struct
   let removing_slot_failed =
     declare_3
       ~section
+      ~prefix_name_with_section:true
       ~name:"removing_slot_failed"
       ~level:Warning
       ~msg:
@@ -413,6 +453,7 @@ open struct
   let removing_status_failed =
     declare_2
       ~section
+      ~prefix_name_with_section:true
       ~name:"removing_status_failed"
       ~level:Warning
       ~msg:"removing status file for level {level} failed: {error}"
@@ -422,6 +463,7 @@ open struct
   let removing_skip_list_cells_failed =
     declare_2
       ~section
+      ~prefix_name_with_section:true
       ~name:"removing_skip_list_cells_failed"
       ~level:Warning
       ~msg:"removing skip list cells for level {level} failed: {error}"
@@ -431,6 +473,7 @@ open struct
   let decoding_data_failed =
     declare_1
       ~section
+      ~prefix_name_with_section:true
       ~name:"decoding_failed"
       ~msg:"error while decoding a {data_kind} value"
       ~level:Warning
@@ -439,6 +482,7 @@ open struct
   let message_validation_error =
     declare_2
       ~section
+      ~prefix_name_with_section:true
       ~name:"message_validation_failed"
       ~msg:
         "validating message with id {message_id} failed with error \
@@ -451,7 +495,8 @@ open struct
   let p2p_server_is_ready =
     declare_1
       ~section
-      ~name:"dal_node_p2p_server_is_ready"
+      ~prefix_name_with_section:true
+      ~name:"p2p_server_is_ready"
       ~msg:"P2P server is listening on {point}"
       ~level:Notice
       ("point", P2p_point.Id.encoding)
@@ -459,7 +504,8 @@ open struct
   let rpc_server_is_ready =
     declare_1
       ~section
-      ~name:"dal_node_rpc_server_is_ready"
+      ~prefix_name_with_section:true
+      ~name:"rpc_server_is_ready"
       ~msg:"RPC server is listening on {point}"
       ~level:Notice
       ("point", P2p_point.Id.encoding)
@@ -467,6 +513,7 @@ open struct
   let metrics_server_starting =
     declare_1
       ~section:(section @ ["metrics"])
+      ~prefix_name_with_section:true
       ~name:"metrics_service_start"
       ~msg:"Starting metrics service at {endpoint}"
       ~level:Notice
@@ -475,6 +522,7 @@ open struct
   let metrics_server_not_starting =
     declare_0
       ~section:(section @ ["metrics"])
+      ~prefix_name_with_section:true
       ~name:"metrics_service_no_start"
       ~msg:"metrics service not enabled"
       ~level:Notice
@@ -484,6 +532,7 @@ open struct
     let open Internal_event.Simple in
     declare_2
       ~section
+      ~prefix_name_with_section:true
       ~name:"starting_metrics_server"
       ~msg:"metrics server is listening on {host}:{port}"
       ~level:Notice
@@ -493,6 +542,7 @@ open struct
   let loading_profiles_failed =
     declare_1
       ~section
+      ~prefix_name_with_section:true
       ~name:"loading_profiles_failed"
       ~msg:"loading profiles failed: {error}"
       ~level:Info
@@ -501,6 +551,7 @@ open struct
   let saving_profiles_failed =
     declare_1
       ~section
+      ~prefix_name_with_section:true
       ~name:"saving_profiles_failed"
       ~msg:"saving profiles failed: {error}"
       ~level:Error
@@ -509,6 +560,7 @@ open struct
   let reconstruct_starting_in =
     declare_3
       ~section
+      ~prefix_name_with_section:true
       ~name:"reconstruct_starting_in"
       ~msg:
         "For the level {level} and slot index {slot_index}, enough shards have \
@@ -525,6 +577,7 @@ open struct
   let reconstruct_started =
     declare_4
       ~section
+      ~prefix_name_with_section:true
       ~name:"reconstruct_started"
       ~msg:
         "For the level {level} and slot index {slot_index}, \
@@ -543,6 +596,7 @@ open struct
   let reconstruct_finished =
     declare_2
       ~section
+      ~prefix_name_with_section:true
       ~name:"reconstruct_finished"
       ~msg:
         "For the level {level} and slot index {slot_index}, missing shards \
@@ -556,6 +610,7 @@ open struct
   let reconstruct_no_missing_shard =
     declare_2
       ~section
+      ~prefix_name_with_section:true
       ~name:"reconstruct_no_missing_shard"
       ~msg:
         "For the level {level}, all shards for slot index {slot_index} were \
@@ -569,6 +624,7 @@ open struct
   let reconstruct_error =
     declare_3
       ~section
+      ~prefix_name_with_section:true
       ~name:"reconstruct_error"
       ~msg:
         "For the level {level} and slot index {slot_index}, unexpected error \
@@ -583,6 +639,7 @@ open struct
   let store_upgrade_error_moving_directory =
     declare_3
       ~section
+      ~prefix_name_with_section:true
       ~name:"store_upgrade_error_moving_directory"
       ~msg:"There was an error trying to move {src} to {dst}: {exn}"
       ~level:Warning
@@ -593,6 +650,7 @@ open struct
   let store_upgrade_error_creating_directory =
     declare_2
       ~section
+      ~prefix_name_with_section:true
       ~name:"store_upgrade_error_creating_directory"
       ~msg:"There was an error trying to create directory {path}: {exn}"
       ~level:Warning
@@ -602,6 +660,7 @@ open struct
   let store_upgrade_start =
     declare_2
       ~section
+      ~prefix_name_with_section:true
       ~name:"store_upgrading"
       ~msg:
         "starting to upgrade the store from version {old_version} to \
@@ -613,6 +672,7 @@ open struct
   let store_upgraded =
     declare_2
       ~section
+      ~prefix_name_with_section:true
       ~name:"store_upgraded"
       ~msg:
         "the store has been upgraded from version {old_version} to \
@@ -624,6 +684,7 @@ open struct
   let store_upgrade_error =
     declare_0
       ~section
+      ~prefix_name_with_section:true
       ~name:"store_upgrade_error"
       ~msg:"Failed to upgrade the store."
       ~level:Error
@@ -632,6 +693,7 @@ open struct
   let crypto_process_started =
     declare_1
       ~section:(section @ ["crypto"])
+      ~prefix_name_with_section:true
       ~name:"crypto_process_started"
       ~msg:"cryptographic child process started (pid: {pid})"
       ~level:Notice
@@ -640,6 +702,7 @@ open struct
   let amplificator_uninitialized =
     declare_0
       ~section:(section @ ["crypto"])
+      ~prefix_name_with_section:true
       ~name:"amplificator_uninitialized"
       ~msg:"the amplificator process worker is not initialized"
       ~level:Warning
@@ -648,6 +711,7 @@ open struct
   let crypto_process_received_query =
     declare_1
       ~section:(section @ ["crypto"])
+      ~prefix_name_with_section:true
       ~name:"crypto_process_received_query"
       ~msg:"cryptographic child process: received query #{query_id}."
       ~level:Notice
@@ -656,6 +720,7 @@ open struct
   let crypto_process_sending_reply =
     declare_1
       ~section:(section @ ["crypto"])
+      ~prefix_name_with_section:true
       ~name:"crypto_process_sending_reply"
       ~msg:"cryptographic child process: sending reply #{query_id}."
       ~level:Info
@@ -664,6 +729,7 @@ open struct
   let main_process_sending_query =
     declare_1
       ~section:(section @ ["crypto"])
+      ~prefix_name_with_section:true
       ~name:"main_process_sending_query"
       ~msg:
         "main process: sending query #{query_id} to cryptographic child \
@@ -674,6 +740,7 @@ open struct
   let main_process_received_reply =
     declare_1
       ~section:(section @ ["crypto"])
+      ~prefix_name_with_section:true
       ~name:"main_process_received_reply"
       ~msg:"main process: received reply #{query_id}."
       ~level:Info
@@ -682,6 +749,7 @@ open struct
   let main_process_enqueue_query =
     declare_1
       ~section:(section @ ["crypto"])
+      ~prefix_name_with_section:true
       ~name:"main_process_enqueue_query"
       ~msg:"main process: enqueue query #{query_id}."
       ~level:Info
@@ -690,6 +758,7 @@ open struct
   let get_attestable_slots_ok_notice =
     declare_3
       ~section
+      ~prefix_name_with_section:true
       ~name:"get_attestable_slots_ok_notice"
       ~msg:
         "For slots {slots_indices} published at level {published_level}, \
@@ -704,6 +773,7 @@ open struct
   let get_attestable_slots_not_ok_warning =
     declare_4
       ~section
+      ~prefix_name_with_section:true
       ~name:"get_attestable_slots_missing_shards_warning"
       ~msg:
         "For slots {slots_indices} published at level {published_level}, \
@@ -731,6 +801,7 @@ open struct
   let get_attestable_slots_future_level_warning =
     declare_2
       ~section
+      ~prefix_name_with_section:true
       ~name:"get_attestable_slots_future_level_warning"
       ~msg:
         "It looks like the DAL node is lagging (its current level is \
@@ -743,6 +814,7 @@ open struct
   let warn_no_attestation =
     declare_2
       ~section
+      ~prefix_name_with_section:true
       ~name:"no_attestation"
       ~msg:
         "An attestation operation was not included for {attester} at attested \
@@ -755,6 +827,7 @@ open struct
   let attester_attested =
     declare_3
       ~section
+      ~prefix_name_with_section:true
       ~name:"attester_attested"
       ~msg:
         "{attester} attested slot(s) {slot_indexes} at attested level \
@@ -769,6 +842,7 @@ open struct
   let warn_attester_not_dal_attesting =
     declare_2
       ~section
+      ~prefix_name_with_section:true
       ~name:"attester_not_dal_attesting"
       ~msg:
         "No DAL content was included by {attester} for attested level \
@@ -781,6 +855,7 @@ open struct
   let warn_attester_did_not_attest =
     declare_3
       ~section
+      ~prefix_name_with_section:true
       ~name:"attester_did_not_attest"
       ~msg:
         "At level {attested_level}, slot index(es) {slot_indexes} were \
@@ -796,6 +871,7 @@ open struct
   let attester_did_not_attest_because_of_traps =
     declare_3
       ~section
+      ~prefix_name_with_section:true
       ~name:"attester_did_not_attest_traps"
       ~msg:
         "At level {attested_level}, slot index(es) {slot_indexes} were \
@@ -811,6 +887,7 @@ open struct
   let trap_injection =
     declare_5
       ~section
+      ~prefix_name_with_section:true
       ~name:"trap_injection"
       ~msg:
         "Injecting entrapment evidence for delegate {delegate}, published \
@@ -826,6 +903,7 @@ open struct
   let trap_injection_failure =
     declare_6
       ~section
+      ~prefix_name_with_section:true
       ~name:"trap_injection_failure"
       ~msg:
         "Failed to inject an entrapment evidence for delegate {delegate}, \
@@ -843,6 +921,7 @@ open struct
   let trap_check_failure =
     declare_3
       ~section
+      ~prefix_name_with_section:true
       ~name:"trap_check_failure"
       ~msg:
         "An error occurred when checking the trap for published level \
@@ -855,6 +934,7 @@ open struct
   let trap_registration_fail =
     declare_3
       ~section
+      ~prefix_name_with_section:true
       ~name:"trap_registration_fail"
       ~msg:
         "An error occurred when checking if the shard for delegate {delegate}, \
@@ -867,6 +947,7 @@ open struct
   let trap_delegate_attestation_not_found =
     declare_5
       ~section
+      ~prefix_name_with_section:true
       ~name:"trap_delegate_attestation_not_found"
       ~msg:
         "Unable to associate an attestation with delegate {delegate} for \
@@ -883,6 +964,7 @@ open struct
   let registered_pkh_not_a_delegate =
     declare_1
       ~section
+      ~prefix_name_with_section:true
       ~name:"register_pkh_not_a_delegate"
       ~msg:
         "The public key hash {pkh} registered by PATCH /profiles is not a \
@@ -893,6 +975,7 @@ open struct
   let cannot_attest_slot_because_of_trap =
     declare_4
       ~section
+      ~prefix_name_with_section:true
       ~name:"slot_contains_trap"
       ~msg:
         "{delegate} cannot attest slot {slot_index} at published level \
@@ -906,6 +989,7 @@ open struct
   let register_trap =
     declare_4
       ~section
+      ~prefix_name_with_section:true
       ~name:"register_trap"
       ~msg:
         "The shard {shard_index} for slot {slot_index} and published level \
@@ -919,6 +1003,7 @@ open struct
   let start_catchup =
     declare_3
       ~section
+      ~prefix_name_with_section:true
       ~name:"start_catchup"
       ~msg:
         "catching up to level {end_level}, from last processed level \
@@ -931,6 +1016,7 @@ open struct
   let catching_up =
     declare_1
       ~section
+      ~prefix_name_with_section:true
       ~name:"catching_up"
       ~msg:"caught up the store up to level {current_level}"
       ~level:Notice
@@ -939,8 +1025,9 @@ open struct
   let end_catchup =
     declare_0
       ~section
+      ~prefix_name_with_section:true
       ~name:"end_catchup"
-      ~msg:"done catching up"
+      ~msg:"catching up done"
       ~level:Notice
       ()
 end
@@ -991,8 +1078,8 @@ let emit_fetched_slot ~size ~shards = emit fetched_slot (size, shards)
 let emit_layer1_node_new_head ~hash ~level ~fitness =
   emit layer1_node_new_head (hash, level, fitness)
 
-let emit_layer1_node_final_block ~level ~round =
-  emit layer1_node_final_block (level, round)
+let emit_layer1_node_final_block ~hash ~level ~round =
+  emit layer1_node_final_block (hash, level, round)
 
 let emit_layer1_node_tracking_started () = emit layer1_node_tracking_started ()
 

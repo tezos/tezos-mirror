@@ -32,16 +32,13 @@ module Events = struct
   include Internal_event.Simple
   open Data_encoding
 
-  let section = ["gossipsub"; "worker"; "event"]
-
-  let prefix =
-    let prefix = String.concat "_" section in
-    fun s -> prefix ^ "-" ^ s
+  let section = ["dal"; "gs"]
 
   let heartbeat =
     declare_0
       ~section
-      ~name:(prefix "heartbeat")
+      ~prefix_name_with_section:true
+      ~name:"heartbeat"
       ~msg:"Process Heartbeat"
       ~level:Debug
       ()
@@ -49,7 +46,8 @@ module Events = struct
   let check_unknown_messages =
     declare_0
       ~section
-      ~name:(prefix "check_unknown_messages")
+      ~prefix_name_with_section:true
+      ~name:"check_unknown_messages"
       ~msg:"Process unknown messages"
       ~level:Debug
       ()
@@ -57,7 +55,8 @@ module Events = struct
   let publish_message =
     declare_2
       ~section
-      ~name:(prefix "publish_message")
+      ~prefix_name_with_section:true
+      ~name:"publish_message"
       ~msg:"Process Publish_message id {message_id} with topic {topic}"
       ~level:Debug
       ~pp1:GS.Topic.pp
@@ -68,7 +67,8 @@ module Events = struct
   let join =
     declare_1
       ~section
-      ~name:(prefix "join")
+      ~prefix_name_with_section:true
+      ~name:"join"
       ~msg:"Process Join {topic}"
       ~level:Info
       ~pp1:GS.Topic.pp
@@ -77,7 +77,8 @@ module Events = struct
   let leave =
     declare_1
       ~section
-      ~name:(prefix "leave")
+      ~prefix_name_with_section:true
+      ~name:"leave"
       ~msg:"Process Leave {topic}"
       ~level:Info
       ~pp1:GS.Topic.pp
@@ -86,7 +87,8 @@ module Events = struct
   let new_connection =
     declare_4
       ~section
-      ~name:(prefix "new_connection")
+      ~prefix_name_with_section:true
+      ~name:"new_connection"
       ~msg:
         "Process New_connection from/to {peer} (direct={direct}, \
          trusted={trusted}, bootstrap={bootstrap})"
@@ -100,7 +102,8 @@ module Events = struct
   let disconnection =
     declare_1
       ~section
-      ~name:(prefix "disconnection")
+      ~prefix_name_with_section:true
+      ~name:"disconnection"
       ~msg:"Process Disconnection of {peer}"
       ~level:Notice
       ~pp1:Types.Peer.pp
@@ -109,7 +112,8 @@ module Events = struct
   let message_with_header =
     declare_3
       ~section
-      ~name:(prefix "message_with_header")
+      ~prefix_name_with_section:true
+      ~name:"message_with_header"
       ~msg:
         "Process Message_with_header from {peer} with id {message_id} and \
          topic {topic}"
@@ -124,7 +128,8 @@ module Events = struct
   let subscribe =
     declare_2
       ~section
-      ~name:(prefix "subscribe")
+      ~prefix_name_with_section:true
+      ~name:"subscribe"
       ~msg:"Process Subscribe {peer} to {topic}"
       ~level:Info
       ~pp1:P2p_peer.Id.pp
@@ -135,7 +140,8 @@ module Events = struct
   let ping =
     declare_1
       ~section
-      ~name:(prefix "ping")
+      ~prefix_name_with_section:true
+      ~name:"ping"
       ~msg:"Process Ping from {peer}"
       ~level:Info
       ~pp1:P2p_peer.Id.pp
@@ -144,7 +150,8 @@ module Events = struct
   let unsubscribe =
     declare_2
       ~section
-      ~name:(prefix "unsubscribe")
+      ~prefix_name_with_section:true
+      ~name:"unsubscribe"
       ~msg:"Process Unsubscribe {peer} from {topic}"
       ~level:Info
       ~pp1:P2p_peer.Id.pp
@@ -155,7 +162,8 @@ module Events = struct
   let graft =
     declare_2
       ~section
-      ~name:(prefix "graft")
+      ~prefix_name_with_section:true
+      ~name:"graft"
       ~msg:"Process Graft {peer} for {topic}"
       ~level:Info
       ~pp1:P2p_peer.Id.pp
@@ -166,7 +174,8 @@ module Events = struct
   let prune =
     declare_4
       ~section
-      ~name:(prefix "prune")
+      ~prefix_name_with_section:true
+      ~name:"prune"
       ~msg:"Process Prune {peer} for {topic} with backoff {backoff} and px {px}"
       ~level:Info
       ~pp1:P2p_peer.Id.pp
@@ -181,7 +190,8 @@ module Events = struct
   let ihave =
     declare_3
       ~section
-      ~name:(prefix "ihave")
+      ~prefix_name_with_section:true
+      ~name:"ihave"
       ~msg:
         "Process IHave from {peer} for {topic} with message_ids {message_ids}"
       ~level:Info
@@ -195,7 +205,8 @@ module Events = struct
   let iwant =
     declare_2
       ~section
-      ~name:(prefix "iwant")
+      ~prefix_name_with_section:true
+      ~name:"iwant"
       ~msg:"Process IWant from {peer} with message_ids {message_ids}"
       ~level:Info
       ~pp1:P2p_peer.Id.pp
