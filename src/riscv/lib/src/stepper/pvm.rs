@@ -211,8 +211,8 @@ impl<'hooks, MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerRead
                         steps: 0,
                         cause: "PVM was waiting for reveal response".to_owned(),
                         message: format!(
-                            "Unable to handle reveal request {:02X?}",
-                            reveal_request.as_slice()
+                            "Unable to handle reveal request {}",
+                            hex::encode(reveal_request.as_slice())
                         ),
                     };
                 };
