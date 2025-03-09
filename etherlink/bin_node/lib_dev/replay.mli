@@ -9,7 +9,7 @@
     replays the [level]th blueprint on top of the expected context. *)
 val main :
   ?profile:bool ->
-  ?kernel_path:string ->
+  ?kernel:Wasm_debugger.kernel ->
   ?kernel_verbosity:Events.kernel_log_level ->
   data_dir:string ->
   Configuration.t ->

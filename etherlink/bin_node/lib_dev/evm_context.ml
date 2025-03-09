@@ -2044,9 +2044,9 @@ let last_known_l1_level () = worker_wait_for_request Last_known_L1_level
 
 let delayed_inbox_hashes () = worker_wait_for_request Delayed_inbox_hashes
 
-let patch_kernel ?block_number path =
+let patch_kernel ?block_number kernel =
   let open Lwt_result_syntax in
-  let* kernel, is_binary = Wasm_debugger.read_kernel_from_file path in
+  let* kernel, is_binary = Wasm_debugger.read_kernel kernel in
   let* version = worker_wait_for_request Wasm_pvm_version in
   let* () =
     Wasm_debugger.check_kernel

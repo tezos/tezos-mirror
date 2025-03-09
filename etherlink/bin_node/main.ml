@@ -78,6 +78,15 @@ module Params = struct
     Tezos_clic.parameter (fun _ value ->
         Lwt.return_ok (Internal_event.Level.of_string_exn value))
 
+  let kernel_path =
+    Tezos_clic.parameter (fun _ s ->
+        let open Lwt_result_syntax in
+        let*! file_exists = Lwt_unix.file_exists s in
+        let* () =
+          when_ (not file_exists) @@ fun () -> failwith "%s is not a file" s
+        in
+        return (Evm_node_lib_dev.Wasm_debugger.On_disk s))
+
   let native_execution_policy =
     Tezos_clic.parameter (fun _ policy ->
         match policy with
@@ -417,29 +426,17 @@ let rollup_address_arg =
        ~default:Tezos_crypto.Hashed.Smart_rollup_address.(to_b58check zero)
        ~placeholder:"sr1..."
 
-let kernel_arg =
+let kernel_arg ?(long = "kernel") ?(placeholder = "evm_kernel.wasm") () =
   Tezos_clic.arg
-    ~long:"kernel"
-    ~placeholder:"evm_kernel.wasm"
+    ~long
+    ~placeholder
     ~doc:
       "Path to the EVM kernel used to launch the PVM, it will be loaded from \
        storage afterward"
-    Params.string
+    Params.kernel_path
 
 let initial_kernel_arg =
-  let open Tezos_clic in
-  map_arg ~f:(fun () str ->
-      Lwt_result.return
-      @@ Option.map
-           (fun path -> Evm_node_lib_dev.Wasm_debugger.On_disk path)
-           str)
-  @@ arg
-       ~long:"initial-kernel"
-       ~placeholder:"evm_installer.wasm"
-       ~doc:
-         "Path to the EVM kernel used to launch the PVM, it will be loaded \
-          from storage afterward"
-       Params.string
+  kernel_arg ~long:"initial-kernel" ~placeholder:"evm_installer.wasm" ()
 
 let force_arg ~doc = Tezos_clic.switch ~long:"force" ~short:'f' ~doc ()
 
@@ -1504,7 +1501,7 @@ let replay_command =
        preimages_arg
        preimages_endpoint_arg
        native_execution_policy_arg
-       kernel_arg
+       (kernel_arg ())
        kernel_verbosity_arg
        profile_arg)
     (prefixes ["replay"; "blueprint"]
@@ -1519,7 +1516,7 @@ let replay_command =
            preimages,
            preimages_endpoint,
            native_execution_policy,
-           kernel_path,
+           kernel,
            kernel_verbosity,
            profile )
          l2_level
@@ -1536,7 +1533,7 @@ let replay_command =
       let*! () = init_logs ~daily_logs:false ~data_dir configuration in
       Evm_node_lib_dev.Replay.main
         ~profile
-        ?kernel_path
+        ?kernel
         ?kernel_verbosity
         ~data_dir
         configuration
@@ -1574,7 +1571,7 @@ let patch_kernel_command =
         let* _status =
           Evm_context.start ~configuration ~data_dir ~store_perm:`Read_write ()
         in
-        Evm_context.patch_kernel ?block_number kernel_path
+        Evm_context.patch_kernel ?block_number (On_disk kernel_path)
       else
         failwith
           "You must add --force to your command-line to execute this command. \
@@ -2119,7 +2116,7 @@ let sandbox_config_args =
     max_number_of_chunks_arg
     private_rpc_port_arg
     genesis_timestamp_arg
-    initial_kernel_arg
+    (kernel_arg ())
     wallet_dir_arg
     (Client_config.password_filename_arg ())
     (supported_network_arg ())
