@@ -14,13 +14,13 @@
 
 open Protocol
 
-(* Init genesis with 5 accounts including at least 2 BLS *)
+(* Init genesis with 8 accounts including at least 5 BLS *)
 let init_genesis_with_some_bls_accounts ?policy ?dal_enable
     ?aggregate_attestation () =
   let open Lwt_result_syntax in
   let*? random_accounts = Account.generate_accounts 3 in
   let*? bls_accounts =
-    List.init ~when_negative_length:[] 2 (fun _ ->
+    List.init ~when_negative_length:[] 5 (fun _ ->
         Account.new_account ~algo:Signature.Bls ())
   in
   let bootstrap_accounts =
@@ -182,6 +182,40 @@ let test_aggregate_attestation_with_a_single_bls_attestation () =
   let result = find_aggregate_result receipt in
   check_attestations_aggregate_result ~committee:[attester] result
 
+let test_aggregate_attestation_with_multiple_bls_attestations () =
+  let open Lwt_result_syntax in
+  let* _genesis, block =
+    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+  in
+  let* attesters = Context.get_attesters (B block) in
+  (* Filter delegates with BLS keys that have at least one slot *)
+  let* bls_delegates_with_slots =
+    List.filter_map_es
+      (fun (attester : RPC.Validators.t) ->
+        match (attester.consensus_key, attester.slots) with
+        | Bls _, slot :: _ -> return_some (attester, slot)
+        | _ -> return_none)
+      attesters
+  in
+  let* attestations =
+    List.map_es
+      (fun (delegate, slot) ->
+        Op.raw_attestation
+          ~delegate:delegate.RPC.Validators.delegate
+          ~slot
+          block)
+      bls_delegates_with_slots
+  in
+  let aggregation =
+    WithExceptions.Option.get ~loc:__LOC__ (Op.aggregate attestations)
+  in
+  let* _, (_, receipt) =
+    Block.bake_with_metadata ~operation:aggregation block
+  in
+  let result = find_aggregate_result receipt in
+  let delegates = List.map fst bls_delegates_with_slots in
+  check_attestations_aggregate_result ~committee:delegates result
+
 let tests =
   [
     Tztest.tztest
@@ -196,6 +230,10 @@ let tests =
       "test_aggregate_attestation_with_a_single_bls_attestation"
       `Quick
       test_aggregate_attestation_with_a_single_bls_attestation;
+    Tztest.tztest
+      "test_aggregate_attestation_with_multiple_bls_attestations"
+      `Quick
+      test_aggregate_attestation_with_multiple_bls_attestations;
   ]
 
 let () =
