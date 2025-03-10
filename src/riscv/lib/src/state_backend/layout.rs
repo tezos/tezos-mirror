@@ -77,69 +77,77 @@ impl<const LEN: usize> Layout for DynArray<LEN> {
 /// use octez_riscv::machine_state::csregisters::CSRRepr;
 /// use octez_riscv::struct_layout;
 ///
-/// struct_layout!(
+/// struct_layout! {
 ///     pub struct ExampleLayout {
 ///         satp_ppn: Atom<CSRRepr>,
 ///         mode: Atom<u8>,
 ///         cached: Atom<bool>,
 ///     }
-/// );
+/// }
 /// ```
 #[macro_export]
 macro_rules! struct_layout {
-    ($vis:vis struct $layout_t:ident {
-        $($field_vis:vis $field_name:ident: $cell_repr:ty),+
-        $( , )?
-    }) => {
+    (
+        $vis:vis struct $layout_t:ident $(< $($param:ident),+ >)? {
+            $($field_vis:vis $field_name:ident: $cell_repr:ty),+
+            $(,)?
+        }
+    ) => {
         paste::paste! {
             #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq, Eq)]
             $vis struct [<$layout_t F>]<
                 $(
-                    [<$field_name:upper>]
+                    [<$field_name:camel>]
                 ),+
             > {
                 $(
-                    $field_vis $field_name: [<$field_name:upper>]
+                    $field_vis $field_name: [<$field_name:camel>]
                 ),+
             }
 
-            $vis type $layout_t = [<$layout_t F>]<
+            $vis type $layout_t $(< $($param),+ >)? = [<$layout_t F>]<
                 $(
                     $cell_repr
                 ),+
             >;
 
-            impl $crate::state_backend::Layout for $layout_t {
+            impl <
+                $(
+                    [<$field_name:camel>]: $crate::state_backend::Layout
+                ),+
+            > $crate::state_backend::Layout for [<$layout_t F>]<
+                $(
+                    [<$field_name:camel>]
+                ),+
+            > {
                 type Allocated<M: $crate::state_backend::ManagerBase> = [<$layout_t F>]<
                     $(
-                        AllocatedOf<$cell_repr, M>
+                        <[<$field_name:camel>] as $crate::state_backend::Layout>::Allocated<M>
                     ),+
                 >;
 
+                #[inline]
                 fn allocate<M: $crate::state_backend::ManagerAlloc>(
                     backend: &mut M,
                 ) -> Self::Allocated<M> {
                     Self::Allocated {
-                        $($field_name: <$cell_repr as $crate::state_backend::Layout>::allocate(
+                        $($field_name: <[<$field_name:camel>] as $crate::state_backend::Layout>::allocate(
                             backend
                         )),+
                     }
                 }
             }
 
-            use $crate::state_backend::proof_backend::merkle::{
-                AccessInfoAggregatable, MerkleTree,
-            };
-
             impl <
                 $(
-                    [<$field_name:upper>]: AccessInfoAggregatable + serde::Serialize
+                    [<$field_name:camel>]: $crate::state_backend::proof_backend::merkle::AccessInfoAggregatable + serde::Serialize
                 ),+
-            > AccessInfoAggregatable for [<$layout_t F>]<
+            > $crate::state_backend::proof_backend::merkle::AccessInfoAggregatable for [<$layout_t F>]<
                 $(
-                    [<$field_name:upper>]
+                    [<$field_name:camel>]
                 ),+
             > {
+                #[inline]
                 fn aggregate_access_info(&self) -> bool {
                     let children = [
                         $(
@@ -150,73 +158,59 @@ macro_rules! struct_layout {
                 }
             }
 
-            impl $crate::state_backend::CommitmentLayout for $layout_t {
-                fn state_hash<M: $crate::state_backend::ManagerRead + $crate::state_backend::ManagerSerialise>(state: AllocatedOf<Self, M>
+            impl <
+                $(
+                    [<$field_name:camel>]: $crate::state_backend::CommitmentLayout
+                ),+
+            > $crate::state_backend::CommitmentLayout for [<$layout_t F>]<
+                $(
+                    [<$field_name:camel>]
+                ),+
+            > {
+                #[inline]
+                fn state_hash<M: $crate::state_backend::ManagerRead + $crate::state_backend::ManagerSerialise>(
+                    state: AllocatedOf<Self, M>
                 ) -> Result<$crate::storage::Hash, $crate::storage::HashError> {
-                    $crate::storage::Hash::blake2b_hash(state)
+                    $crate::storage::Hash::combine(&[
+                        $(
+                            [<$field_name:camel>]::state_hash(state.$field_name)?
+                        ),+
+                    ])
                 }
             }
 
-            impl $crate::state_backend::ProofLayout for $layout_t {
+            impl <
+                $(
+                    [<$field_name:camel>]: $crate::state_backend::ProofLayout
+                ),+
+            > $crate::state_backend::ProofLayout for [<$layout_t F>]<
+                $(
+                    [<$field_name:camel>]
+                ),+
+            > {
+                #[inline]
                 fn to_merkle_tree(
                     state: $crate::state_backend::RefProofGenOwnedAlloc<Self>,
                 ) -> Result<$crate::state_backend::proof_backend::merkle::MerkleTree, $crate::storage::HashError> {
-                    let serialised = $crate::storage::binary::serialise(&state)?;
-                    MerkleTree::make_merkle_leaf(serialised, state.aggregate_access_info())
+                    $crate::state_backend::proof_backend::merkle::MerkleTree::make_merkle_node(
+                        vec![
+                            $(
+                                [<$field_name:camel>]::to_merkle_tree(state.$field_name)?
+                            ),+
+                        ]
+                    )
                 }
 
+                #[inline]
                 fn from_proof(
                     proof: $crate::state_backend::ProofTree,
                 ) -> Result<Self::Allocated<$crate::state_backend::verify_backend::Verifier>, $crate::state_backend::FromProofError> {
-                    if let $crate::state_backend::ProofTree::Present(proof) = proof {
-                        match proof {
-                            $crate::state_backend::proof_backend::tree::Tree::Leaf(_) => {
-                                Err($crate::state_backend::FromProofError::UnexpectedLeaf)
-                            }
-
-                            $crate::state_backend::proof_backend::tree::Tree::Node(branches) => {
-                                let mut branches = branches.iter();
-
-                                let expected_branches = 0 $(
-                                    + { let $field_name = 1; $field_name }
-                                )+;
-                                let successful_branches = 0;
-
-                                $(
-                                    let $field_name = branches.next().ok_or($crate::state_backend::FromProofError::BadNumberOfBranches {
-                                        got: successful_branches,
-                                        expected: expected_branches,
-                                    })?;
-                                    let $field_name = <$cell_repr as $crate::state_backend::ProofLayout>::from_proof($crate::state_backend::ProofTree::Present($field_name))?;
-                                    let successful_branches = successful_branches + 1;
-                                )+
-
-                                if branches.last().is_some() {
-                                    // There were more branches, this is bad.
-                                    return Err($crate::state_backend::FromProofError::BadNumberOfBranches {
-                                        got: successful_branches + 1,
-                                        expected: expected_branches,
-                                    });
-                                }
-
-                                Ok(
-                                    Self::Allocated {
-                                        $(
-                                            $field_name
-                                        ),+
-                                    }
-                                )
-                            }
-                        }
-                    } else {
-                        Ok(
-                            Self::Allocated {
-                                $(
-                                    $field_name: <$cell_repr as $crate::state_backend::ProofLayout>::from_proof($crate::state_backend::ProofTree::Absent)?
-                                ),+
-                            }
-                        )
-                    }
+                    let [ $($field_name),+ ] = *proof.into_branches()?;
+                    Ok(Self::Allocated {
+                        $(
+                            $field_name: [<$field_name:camel>]::from_proof($field_name)?
+                        ),+
+                    })
                 }
             }
         }
@@ -365,6 +359,13 @@ mod tests {
     use super::*;
     use crate::backend_test;
     use crate::default::ConstDefault;
+    use crate::state_backend::CommitmentLayout;
+    use crate::state_backend::FnManagerIdent;
+    use crate::state_backend::ProofLayout;
+    use crate::state_backend::ProofPart;
+    use crate::state_backend::owned_backend::Owned;
+    use crate::state_backend::proof_backend::ProofWrapper;
+    use crate::state_backend::verify_backend::handle_not_found;
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     struct MyFoo(u64);
@@ -385,4 +386,73 @@ mod tests {
             [MyFoo::DEFAULT; 1337]
         );
     });
+
+    #[test]
+    fn test_struct_layout() {
+        struct_layout! {
+            pub struct Foo {
+                bar: Atom<u64>,
+                qux: Array<u8, 64>,
+            }
+        }
+
+        fn inner(bar: u64, qux: [u8; 64]) {
+            let mut foo = Owned::allocate::<Foo>();
+
+            foo.bar.write(bar);
+            foo.qux.write_all(&qux);
+
+            // Obtain the state hash
+            let refs = FooF {
+                bar: foo.bar.struct_ref::<FnManagerIdent>(),
+                qux: foo.qux.struct_ref::<FnManagerIdent>(),
+            };
+            let hash = Foo::state_hash(refs).unwrap();
+
+            // Obtain the Merkle tree
+            let mut proof_foo = FooF {
+                bar: foo.bar.struct_ref::<ProofWrapper>(),
+                qux: foo.qux.struct_ref::<ProofWrapper>(),
+            };
+            let proof_foo_refs = FooF {
+                bar: proof_foo.bar.struct_ref::<FnManagerIdent>(),
+                qux: proof_foo.qux.struct_ref::<FnManagerIdent>(),
+            };
+
+            let tree = Foo::to_merkle_tree(proof_foo_refs).unwrap();
+            let tree_root_hash = tree.root_hash();
+            assert_eq!(hash, tree_root_hash);
+
+            // Modify the values so they appear in the proof
+            proof_foo.bar.write(bar.wrapping_add(1));
+            proof_foo.qux.write_all(&qux.map(|x| x.wrapping_add(1)));
+
+            // Obtain the Merkle tree, again, to make sure nothing changed
+            let proof_foo_refs = FooF {
+                bar: proof_foo.bar.struct_ref::<FnManagerIdent>(),
+                qux: proof_foo.qux.struct_ref::<FnManagerIdent>(),
+            };
+
+            let tree = Foo::to_merkle_tree(proof_foo_refs).unwrap();
+            let tree_root_hash = tree.root_hash();
+            assert_eq!(hash, tree_root_hash);
+
+            // Produce a proof
+            let proof = tree.to_merkle_proof().unwrap();
+            let proof_hash = proof.root_hash().unwrap();
+            assert_eq!(hash, proof_hash);
+
+            // Verify the proof
+            handle_not_found(|| {
+                let verify_foo = Foo::from_proof(ProofPart::Present(&proof)).unwrap();
+                assert_eq!(bar, verify_foo.bar.read());
+                assert_eq!(qux, verify_foo.qux.read_all().as_slice());
+            })
+            .unwrap();
+        }
+
+        proptest::proptest!(|(bar: u64, qux: [u8; 64])| {
+            inner(bar, qux);
+        });
+    }
 }
