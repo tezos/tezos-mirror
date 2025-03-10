@@ -33,9 +33,13 @@ val load :
   Configuration.t ->
   t tzresult Lwt.t
 
+(** [read_chain_family chain_id] returns the chain_family associated to the
+    chain_id passed on parameter. *)
 val read_chain_family :
   t -> Ethereum_types.chain_id -> Ethereum_types.chain_family tzresult Lwt.t
 
+(** [read_enable_multichain_flag] reads the value of the `enable_multichain`
+    feature_flag that enables multichain and tezos compatibility on the l2_node. *)
 val read_enable_multichain_flag : t -> bool tzresult Lwt.t
 
 (** [preload_known_kernels ctxt] uses [ctxt] to preload every kernel known to
