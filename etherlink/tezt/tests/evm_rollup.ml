@@ -5327,6 +5327,73 @@ let test_l2_call_selfdetruct_contract_in_same_transaction_and_separate_transacti
          is called in a separate transaction from the contract creation") ;
   unit
 
+let test_mcopy_opcode =
+  register_both
+    ~kernels:[Kernel.Latest]
+    ~tags:["evm"; "mcopy"; "cancun"]
+    ~title:"Check MCOPY's behavior as stated by Cancun's EIP-5656"
+  @@ fun ~protocol:_ ~evm_setup:({endpoint; produce_block; _} as evm_setup) ->
+  let*@ _ = evm_setup.produce_block () in
+  let* mcopy_resolved = mcopy () in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* address, _tx = deploy ~contract:mcopy_resolved ~sender evm_setup in
+  let* source =
+    Eth_cli.contract_call
+      ()
+      ~endpoint
+      ~abi_label:mcopy_resolved.label
+      ~address
+      ~method_call:"getSource()"
+  in
+  let* dst =
+    Eth_cli.contract_call
+      ()
+      ~endpoint
+      ~abi_label:mcopy_resolved.label
+      ~address
+      ~method_call:"getDestination()"
+  in
+  Check.(
+    (source <> dst)
+      string
+      ~error_msg:
+        "The source and destination should not be the same before the MCOPY \
+         operation") ;
+  let mcopy () =
+    Eth_cli.contract_send
+      ~endpoint
+      ~abi_label:mcopy_resolved.label
+      ~address
+      ~method_call:"mcopy()"
+      ~source_private_key:sender.private_key
+      ()
+  in
+  let* tx = wait_for_application ~produce_block mcopy in
+  let* () = check_tx_succeeded ~endpoint ~tx in
+  let* source =
+    Eth_cli.contract_call
+      ()
+      ~endpoint
+      ~abi_label:mcopy_resolved.label
+      ~address
+      ~method_call:"getSource()"
+  in
+  let* dst =
+    Eth_cli.contract_call
+      ()
+      ~endpoint
+      ~abi_label:mcopy_resolved.label
+      ~address
+      ~method_call:"getDestination()"
+  in
+  Check.(
+    (source = dst)
+      string
+      ~error_msg:
+        "The source and destination should be the same after the MCOPY \
+         operation") ;
+  unit
+
 let test_call_recursive_contract_estimate_gas =
   Protocol.register_test
     ~__FILE__
@@ -6489,6 +6556,7 @@ let register_evm_node ~protocols =
   test_l2_call_selfdetruct_contract_in_same_transaction protocols ;
   test_l2_call_selfdetruct_contract_in_same_transaction_and_separate_transaction
     protocols ;
+  test_mcopy_opcode protocols ;
   test_reveal_storage protocols ;
   test_call_recursive_contract_estimate_gas protocols ;
   test_limited_stack_depth protocols ;

@@ -260,6 +260,14 @@ let call_selfdestruct_behavior () =
     ~contract:"Parent"
     ~evm_version:"cancun"
 
+(** The info for the "mcopy.sol" contract. *)
+let mcopy () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/mcopy.sol")
+    ~label:"mcopy"
+    ~contract:"MCOPY"
+    ~evm_version:"cancun"
+
 (** The info for the "recursive.sol" contract. *)
 let recursive () =
   compile_contract
