@@ -131,6 +131,22 @@ let check_attestations_aggregate_result ~committee
           pp
           resulting_committee_pkhs
 
+(* [find_attester_with_bls_key attesters] returns the first attester with a BLS
+   key, if any. *)
+let find_attester_with_bls_key =
+  List.find_map (fun (attester : RPC.Validators.t) ->
+      match (attester.consensus_key, attester.slots) with
+      | Bls _, slot :: _ -> Some (attester, slot)
+      | _ -> None)
+
+(* [find_attester_with_non_bls_key attesters] returns the first attester
+   with a non-BLS key, if any. *)
+let find_attester_with_non_bls_key =
+  List.find_map (fun (attester : RPC.Validators.t) ->
+      match (attester.consensus_key, attester.slots) with
+      | (Ed25519 _ | Secp256k1 _ | P256 _), slot :: _ -> Some (attester, slot)
+      | _ -> None)
+
 let test_aggregate_feature_flag_enabled () =
   let open Lwt_result_syntax in
   let* _genesis, attested_block =
@@ -161,16 +177,11 @@ let test_aggregate_attestation_with_a_single_bls_attestation () =
     init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
   in
   let* attesters = Context.get_attesters (B block) in
+  (* Find an attester with a BLS consensus key. *)
   let attester, slot =
-    (* Find an attester with a BLS consensus key. *)
     WithExceptions.Option.get
       ~loc:__LOC__
-      (List.find_map
-         (fun (attester : RPC.Validators.t) ->
-           match (attester.consensus_key, attester.slots) with
-           | Bls _, slot :: _ -> Some (attester, slot)
-           | _ -> None)
-         attesters)
+      (find_attester_with_bls_key attesters)
   in
   let* attestation =
     Op.raw_attestation ~delegate:attester.RPC.Validators.delegate ~slot block
