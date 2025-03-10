@@ -252,6 +252,14 @@ let call_selfdestruct () =
     ~contract:"C1"
     ~evm_version:"london"
 
+(** The info for the "call_selfdestruct_behavior.sol" contract. *)
+let call_selfdestruct_behavior () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/call_selfdestruct_behavior.sol")
+    ~label:"call_selfdestruct"
+    ~contract:"Parent"
+    ~evm_version:"cancun"
+
 (** The info for the "recursive.sol" contract. *)
 let recursive () =
   compile_contract
