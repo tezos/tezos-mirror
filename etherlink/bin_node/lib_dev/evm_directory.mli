@@ -29,6 +29,10 @@ type t = private
 (** An empty directory depending on the RPC server backend. *)
 val empty : Configuration.rpc_server -> t
 
+(** A directory initialised with a resto directory. Will produce a [Resto]
+    value, so not compatible with Dream. *)
+val init_from_resto_directory : unit Tezos_rpc.Directory.t -> t
+
 (** {1 Registering services} *)
 
 (** {2 Generic functions} *)
