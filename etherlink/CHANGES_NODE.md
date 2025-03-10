@@ -4,6 +4,39 @@
 
 ### Breaking changes
 
+### Configuration changes
+
+### RPCs changes
+
+### Metrics changes
+
+### Execution changes
+
+### Storage changes
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.19 (2025-03-10)
+
+This release contains a number of quality of life improvements, notably related
+to snapshots. The integration between the Octez EVM node and our [snapshot
+service] is deepened, and it is now possible to initialize a new data directory
+for arbitrary history mode using `run observer --network NETWORK --history
+HISTORY --init-from-snapshot`. To a large extent, this release fully concludes
+the stabilization of the new block storage feature initiated in version 0.16.
+
+[snapshot service]: https://snapshotter-sandbox.nomadic-labs.eu/
+
+This release will not apply any migration to the node’s store (version 19),
+meaning it is possible to downgrade to the previous version.
+
+### Breaking changes
+
 - The default snapshot filename has been changed from
   `evm-snapshot-<rollup_address>-<head>` to
   `evm-<history_mode>-snapshot-<rollup_address>-<head>`. (!16946)
@@ -21,27 +54,14 @@
 
 ### Configuration changes
 
-- Observer `--init-from-snapshot` now also accepts a path to an existing
-  snapshot. (!16963)
-- **experimental feature** Adds a configuration for the `tx_queue`.
-  (!16903)
 - Commands emitting logs now systematically comply with the `verbosity`
   configuration option. (!16975)
-- Supports specifying an expected history mode in `run observer` with the
-  `--history` argument. The node will refuse to start if its context is using a
-  different history mode, but it can be used with `--init-from-snapshot` to
-  download a snapshot of the expected mode. (!16979)
 - Fixes experimental features being set by `init config`. (!17078)
-- Fixes `--private-rpc-port` being ignored by the `run observer` command. (!17078)
-- Observer `--init-from-snapshot` now defaults to our new snapshot services.
-  Snapshots are generated nightly (Europe time) for each history mode. (!17052)
+- Fixes `--private-rpc-port` being ignored by the `run observer` command.
+  (!17078)
 
 ### RPCs changes
 
-- **experimental feature** With the `tx_queue` feature enable in an
-  observer node, the RPC `eth_getTransactionByhash` returns the
-  transaction found in the `tx_queue`, it also works for transaction
-  that have been already forwarded to the upstream node. (!16829)
 - `GET /health_check` now returns an error if the node does not keep up with
   its remote EVM node. More precisely, the node will fetch the current head of
   the upstream node every 60 seconds, and compare it with its own. If the
@@ -57,10 +77,6 @@
 
 ### Execution changes
 
-- **experimental feature** The `tx_queue` respect the configuration
-  field `keep_alive` for it's RPC. (!16894)
-- **experimental feature** `tx_queue` clears itself when a delayed
-  inbox flush has happened. (!17091)
 - Adds `--network` and `--init-from-snapshot` to `run sandbox` to simplify
   starting a sandbox for a supported network. For instance, `run sandbox
   --network mainnet` will start a new sandbox using Mainnet’s initial kernel,
@@ -79,6 +95,30 @@
   of the node. (!16946)
 - Ensures `snapshot export` does not leave temporary files behind when
   interrupted. (!16985)
+- Observer `--init-from-snapshot` now also accepts a path to an existing
+  snapshot. (!16963)
+- Supports specifying an expected history mode in `run observer` with the
+  `--history` argument. The node will refuse to start if its context is using a
+  different history mode, but it can be used with `--init-from-snapshot` to
+  download a snapshot of the expected mode. (!16979)
+- Observer `--init-from-snapshot` now defaults to our new snapshot services.
+  Snapshots are generated nightly (Europe time) for each history mode. (!17052)
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- Adds a configuration for the `tx_queue`. (!16903)
+- With the `tx_queue` feature enable in an observer node, the RPC
+  `eth_getTransactionByhash` returns the transaction found in the `tx_queue`,
+  it also works for transaction that have been already forwarded to the
+  upstream node. (!16829)
+- The `tx_queue` respect the configuration field `keep_alive` for it's RPC.
+  (!16894)
+- `tx_queue` clears itself when a delayed inbox flush has happened. (!17091)
 
 ## Version 0.18 (2025-02-24)
 
