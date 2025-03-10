@@ -105,19 +105,22 @@ let create_connect_handler config limits pool msg_cfg conn_meta_cfg io_sched
     ~answerer
 
 let may_create_discovery_worker _limits config pool =
+  let open Lwt_result_syntax in
   match
     (config.listening_port, config.discovery_port, config.discovery_addr)
   with
   | Some listening_port, Some discovery_port, Some discovery_addr ->
-      Some
-        (P2p_discovery.create
-           pool
-           config.identity.peer_id
-           ~listening_port
-           ~discovery_port
-           ~discovery_addr
-           ~trust_discovered_peers:config.trust_discovered_peers)
-  | _, _, _ -> None
+      let* discovery =
+        P2p_discovery.create
+          pool
+          config.identity.peer_id
+          ~listening_port
+          ~discovery_port
+          ~discovery_addr
+          ~trust_discovered_peers:config.trust_discovered_peers
+      in
+      return_some discovery
+  | _, _, _ -> return_none
 
 let create_maintenance_worker limits connect_handler config triggers log =
   let open P2p_limits in
@@ -142,7 +145,7 @@ let create_maintenance_worker limits connect_handler config triggers log =
         }
       in
       let pool = P2p_connect_handler.get_pool connect_handler in
-      let discovery = may_create_discovery_worker limits config pool in
+      let* discovery = may_create_discovery_worker limits config pool in
       let* p2p_maintenance =
         P2p_maintenance.create
           ?discovery
