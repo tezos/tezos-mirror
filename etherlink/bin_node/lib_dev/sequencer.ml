@@ -112,7 +112,21 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
             funded_addresses
         in
         let* () =
-          Option.iter_es (fun kernel -> Evm_context.patch_kernel kernel) kernel
+          Option.iter_es
+            (fun kernel ->
+              match kernel with
+              | Wasm_debugger.On_disk _ when status = Loaded ->
+                  (* [kernel] being [On_disk] means it was provided by the
+                     user. [status] being [Loaded] means the data-dir was
+                     already populated or a snapshot was imported.
+
+                     This is the only case where we patch the kernel. If
+                     [kernel] is [In_memory], then it was inferred from
+                     [network]. If [status] is [Created], then [kernel] was
+                     already used as initial kernel. *)
+                  Evm_context.patch_kernel kernel
+              | _ -> return_unit)
+            kernel
         in
         return_unit
     | None -> return_unit
