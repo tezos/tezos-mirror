@@ -2092,8 +2092,26 @@ let sequencer_config_args =
     (Client_config.password_filename_arg ())
     dal_slots_arg
 
+let fund_arg =
+  let long = "fund" in
+  let doc =
+    "The address of an account to provide with funds in the sandbox (can be \
+     repeated to fund multiple accounts)"
+  in
+  Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x..."
+  @@ Tezos_clic.parameter (fun _ address ->
+         let open Lwt_result_syntax in
+         let hex = Evm_node_lib_dev.Misc.normalize_addr address in
+         let* () =
+           when_
+             (Option.is_none (Hex.to_string (`Hex hex))
+             || String.length hex <> 40)
+             (fun () -> failwith "%s is not a valid address" address)
+         in
+         return (Evm_node_lib_dev_encoding.Ethereum_types.Address (Hex hex)))
+
 let sandbox_config_args =
-  Tezos_clic.args12
+  Tezos_clic.args13
     preimages_arg
     preimages_endpoint_arg
     native_execution_policy_arg
@@ -2106,6 +2124,7 @@ let sandbox_config_args =
     (Client_config.password_filename_arg ())
     (supported_network_arg ())
     init_from_snapshot_arg
+    fund_arg
 
 let sequencer_command =
   let open Tezos_clic in
@@ -2226,7 +2245,8 @@ let sandbox_command =
              wallet_dir,
              password_filename,
              network,
-             init_from_snapshot ) )
+             init_from_snapshot,
+             funded_addresses ) )
          () ->
       let open Lwt_result_syntax in
       let* restricted_rpcs =
@@ -2241,7 +2261,13 @@ let sandbox_command =
       let kernel = kernel_from_args network kernel in
       let sandbox_config =
         Evm_node_lib_dev.Sequencer.
-          {public_key = pk; secret_key = sk; init_from_snapshot; network}
+          {
+            public_key = pk;
+            secret_key = sk;
+            init_from_snapshot;
+            network;
+            funded_addresses = Option.value ~default:[] funded_addresses;
+          }
       in
       start_sequencer
         ?password_filename

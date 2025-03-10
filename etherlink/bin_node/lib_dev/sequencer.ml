@@ -11,6 +11,7 @@ type sandbox_config = {
   secret_key : Signature.secret_key;
   init_from_snapshot : string option;
   network : Configuration.supported_network option;
+  funded_addresses : Ethereum_types.address list;
 }
 
 let install_finalizer_seq server_public_finalizer server_private_finalizer
@@ -99,7 +100,17 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   let smart_rollup_address_b58 = Address.to_string smart_rollup_address_typed in
   let* () =
     match sandbox_config with
-    | Some {public_key = pk; _} -> Evm_context.patch_sequencer_key pk
+    | Some {public_key = pk; funded_addresses; _} ->
+        let* () = Evm_context.patch_sequencer_key pk in
+        let new_balance =
+          Ethereum_types.quantity_of_z Z.(of_int 10_000 * pow (of_int 10) 18)
+        in
+        let* () =
+          List.iter_es
+            (fun address -> Evm_context.provision_balance address new_balance)
+            funded_addresses
+        in
+        return_unit
     | None -> return_unit
   in
 
