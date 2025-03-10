@@ -615,98 +615,105 @@ module Handler = struct
       in
       return_unit
 
+  let process_block_data ctxt cctxt store proto_parameters block_level
+      (module Plugin : Dal_plugin.T) =
+    let open Lwt_result_syntax in
+    let* block_info =
+      Plugin.block_info cctxt ~block:(`Level block_level) ~metadata:`Always
+    in
+    let* () =
+      if supports_refutations ctxt then
+        store_skip_list_cells
+          ctxt
+          cctxt
+          proto_parameters
+          block_info
+          block_level
+          (module Plugin : Dal_plugin.T with type block_info = Plugin.block_info)
+      else return_unit
+    in
+    let* slot_headers = Plugin.get_published_slot_headers block_info in
+    let* () =
+      Slot_manager.store_slot_headers
+        ~number_of_slots:proto_parameters.Types.number_of_slots
+        ~block_level
+        slot_headers
+        store
+    in
+    let* () =
+      (* If a slot header was posted to the L1 and we have the corresponding
+         data, post it to gossipsub.  Note that this is done independently
+         of the profile. *)
+      List.iter_es
+        (fun (slot_header, status) ->
+          match status with
+          | Dal_plugin.Succeeded ->
+              let Dal_plugin.{slot_index; commitment; published_level} =
+                slot_header
+              in
+              let slot_id : Types.slot_id =
+                {slot_level = published_level; slot_index}
+              in
+              Slot_manager.publish_slot_data
+                ctxt
+                ~level_committee:(Node_context.fetch_committee ctxt)
+                ~slot_size:proto_parameters.cryptobox_parameters.slot_size
+                (Node_context.get_gs_worker ctxt)
+                proto_parameters
+                commitment
+                slot_id
+          | Dal_plugin.Failed -> return_unit)
+        slot_headers
+    in
+    let*? dal_attestation = Plugin.dal_attestation block_info in
+    let* () =
+      Slot_manager.update_selected_slot_headers_statuses
+        ~block_level
+        ~attestation_lag:proto_parameters.attestation_lag
+        ~number_of_slots:proto_parameters.number_of_slots
+        (Plugin.is_attested dal_attestation)
+        store
+    in
+    let*! () =
+      remove_unattested_slots_and_shards
+        proto_parameters
+        ctxt
+        ~published_level:
+          Int32.(sub block_level (of_int proto_parameters.attestation_lag))
+        (Plugin.is_attested dal_attestation)
+    in
+    let* () =
+      let get_attestations () = Plugin.get_attestations block_info in
+      check_attesters_attested
+        ctxt
+        proto_parameters
+        ~block_level
+        get_attestations
+        Plugin.is_attested
+    in
+    Accuser.inject_entrapment_evidences (module Plugin) ctxt cctxt block_info
+
   let process_block ctxt cctxt proto_parameters finalized_shell_header
       finalized_block_hash =
     let open Lwt_result_syntax in
     let store = Node_context.get_store ctxt in
     let block_level = finalized_shell_header.Block_header.level in
-    let block = `Level block_level in
     let pred_level = Int32.pred block_level in
     let*? (module Plugin) =
       Node_context.get_plugin_for_level ctxt ~level:pred_level
     in
-    let* block_info = Plugin.block_info cctxt ~block ~metadata:`Always in
     let* () =
       if proto_parameters.Types.feature_enable then
-        let* slot_headers = Plugin.get_published_slot_headers block_info in
-        let* () =
-          if supports_refutations ctxt then
-            store_skip_list_cells
-              ctxt
-              cctxt
-              proto_parameters
-              block_info
-              block_level
-              (module Plugin : Dal_plugin.T
-                with type block_info = Plugin.block_info)
-          else return_unit
-        in
-        let* () =
-          if not (is_bootstrap_node ctxt) then
-            Slot_manager.store_slot_headers
-              ~number_of_slots:proto_parameters.Types.number_of_slots
-              ~block_level
-              slot_headers
-              store
-          else return_unit
-        in
-        let* () =
-          (* If a slot header was posted to the L1 and we have the corresponding
-             data, post it to gossipsub.  Note that this is done independently
-             of the profile. *)
-          List.iter_es
-            (fun (slot_header, status) ->
-              match status with
-              | Dal_plugin.Succeeded ->
-                  let Dal_plugin.{slot_index; commitment; published_level} =
-                    slot_header
-                  in
-                  let slot_id : Types.slot_id =
-                    {slot_level = published_level; slot_index}
-                  in
-                  Slot_manager.publish_slot_data
-                    ctxt
-                    ~level_committee:(Node_context.fetch_committee ctxt)
-                    ~slot_size:proto_parameters.cryptobox_parameters.slot_size
-                    (Node_context.get_gs_worker ctxt)
-                    proto_parameters
-                    commitment
-                    slot_id
-              | Dal_plugin.Failed -> return_unit)
-            slot_headers
-        in
-        let*? dal_attestation = Plugin.dal_attestation block_info in
-        let* () =
-          Slot_manager.update_selected_slot_headers_statuses
-            ~block_level
-            ~attestation_lag:proto_parameters.attestation_lag
-            ~number_of_slots:proto_parameters.number_of_slots
-            (Plugin.is_attested dal_attestation)
-            store
-        in
-        let*! () =
-          remove_unattested_slots_and_shards
-            proto_parameters
-            ctxt
-            ~published_level:
-              Int32.(sub block_level (of_int proto_parameters.attestation_lag))
-            (Plugin.is_attested dal_attestation)
-        in
         let* () = may_update_topics ctxt proto_parameters ~block_level in
-        let* () =
-          let get_attestations () = Plugin.get_attestations block_info in
-          check_attesters_attested
+        if is_bootstrap_node ctxt then return_unit
+        else
+          process_block_data
             ctxt
+            cctxt
+            store
             proto_parameters
-            ~block_level
-            get_attestations
-            Plugin.is_attested
-        in
-        Accuser.inject_entrapment_evidences
-          (module Plugin)
-          ctxt
-          cctxt
-          block_info
+            block_level
+            (module Plugin)
       else return_unit
     in
     let*? block_round = Plugin.get_round finalized_shell_header.fitness in
