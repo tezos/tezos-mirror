@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 mod config;
+#[cfg(feature = "supervisor")]
+mod protection;
 mod state;
 
 use std::num::NonZeroU64;
@@ -19,6 +21,7 @@ use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerClone;
 use crate::state_backend::ManagerDeserialise;
 use crate::state_backend::ManagerRead;
+use crate::state_backend::ManagerReadWrite;
 use crate::state_backend::ManagerSerialise;
 use crate::state_backend::ManagerWrite;
 use crate::state_backend::ProofLayout;
@@ -53,6 +56,42 @@ pub type Address = XValue;
 /// Lowest address
 pub const FIRST_ADDRESS: Address = 0;
 
+/// Memory access permissions
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Permissions {
+    None,
+    Read,
+    Write,
+    ReadWrite,
+    ReadExec,
+}
+
+impl Permissions {
+    /// Do the permissions allow reading?
+    pub const fn can_read(&self) -> bool {
+        match self {
+            Self::None | Self::Write => false,
+            Self::Read | Self::ReadWrite | Self::ReadExec => true,
+        }
+    }
+
+    /// Do the permissions allow writing?
+    pub const fn can_write(&self) -> bool {
+        match self {
+            Self::None | Self::Read | Self::ReadExec => false,
+            Self::ReadWrite | Self::Write => true,
+        }
+    }
+
+    /// Do the permissions allow execution?
+    pub const fn can_exec(&self) -> bool {
+        match self {
+            Self::None | Self::Read | Self::ReadWrite | Self::Write => false,
+            Self::ReadExec => true,
+        }
+    }
+}
+
 /// Address out of bounds error
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Error, derive_more::Display)]
 pub struct OutOfBounds;
@@ -71,6 +110,12 @@ pub trait Memory<M: ManagerBase>: Sized {
         E: Elem,
         M: ManagerRead;
 
+    /// Read an element in the region that will be used in execution. `address` is in bytes.
+    fn read_exec<E>(&self, address: Address) -> Result<E, OutOfBounds>
+    where
+        E: Elem,
+        M: ManagerRead;
+
     /// Read elements from the region. `address` is in bytes.
     fn read_all<E>(&self, address: Address, values: &mut [E]) -> Result<(), OutOfBounds>
     where
@@ -81,13 +126,13 @@ pub trait Memory<M: ManagerBase>: Sized {
     fn write<E>(&mut self, address: Address, value: E) -> Result<(), OutOfBounds>
     where
         E: Elem,
-        M: ManagerWrite;
+        M: ManagerReadWrite;
 
     /// Update multiple elements in the region. `address` is in bytes.
     fn write_all<E>(&mut self, address: Address, values: &[E]) -> Result<(), OutOfBounds>
     where
         E: Elem,
-        M: ManagerWrite;
+        M: ManagerReadWrite;
 
     /// Serialise memory.
     fn serialise<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -108,6 +153,17 @@ pub trait Memory<M: ManagerBase>: Sized {
 
     /// Zero-out all memory.
     fn reset(&mut self)
+    where
+        M: ManagerWrite;
+
+    /// Protect the pages that belong to the given address range.
+    #[cfg(feature = "supervisor")]
+    fn protect_pages(
+        &mut self,
+        address: Address,
+        length: usize,
+        perms: Permissions,
+    ) -> Result<(), OutOfBounds>
     where
         M: ManagerWrite;
 }

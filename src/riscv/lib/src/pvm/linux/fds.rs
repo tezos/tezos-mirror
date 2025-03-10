@@ -38,7 +38,7 @@ impl<M: ManagerBase> SupervisorState<M> {
         M: ManagerRead,
     {
         // Limit how much data we can write to prevent proof-size explosion
-        let length = length.min(PAGE_SIZE);
+        let length = length.min(PAGE_SIZE.get());
 
         // Check if the file desciprtor is valid and can be written to.
         // In our case, it's just standard output (1) and standard error (2).
@@ -129,7 +129,7 @@ impl<M: ManagerBase> SupervisorState<M> {
 
         let (addr, length) = 'search: {
             // Limit the number of entries through which we iterate to prevent proof-size explosion
-            let max_entries = len.min(PAGE_SIZE / SIZE_IOVEC);
+            let max_entries = len.min(PAGE_SIZE.get() / SIZE_IOVEC);
 
             for item in 0..max_entries {
                 let struct_addr = SIZE_IOVEC.wrapping_mul(item).wrapping_add(iovec);

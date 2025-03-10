@@ -12,6 +12,8 @@ use goblin::elf::header::ET_EXEC;
 use goblin::elf::program_header::PT_LOAD;
 use goblin::elf::program_header::ProgramHeader;
 
+use crate::machine_state::memory::Permissions;
+
 #[derive(Debug, From, Error, derive_more::Display)]
 pub enum Error {
     #[display(fmt = "At address {:#x}: {:?}", addr, "msg.clone()")]
@@ -20,6 +22,46 @@ pub enum Error {
         addr: u64,
     },
     Goblin(goblin::error::Error),
+}
+
+/// Permissions for program regions in memory
+pub struct MemoryPermissions {
+    /// Starting address of the memory region
+    pub start_address: u64,
+
+    /// Length of the memory region
+    pub length: u64,
+
+    /// Permissions for the memory region
+    pub permissions: Permissions,
+}
+
+impl MemoryPermissions {
+    /// Extract the memory permissions from a load segment. `reloc` can be used to offset the
+    /// memory region.
+    pub fn from_load_segment(reloc: Option<u64>, segment: &ProgramHeader) -> Self {
+        let start_address = match reloc {
+            Some(offset) => offset.wrapping_add(segment.p_vaddr),
+            None => segment.p_paddr,
+        };
+
+        MemoryPermissions {
+            start_address,
+            length: segment.p_memsz,
+
+            // This is a simplified version of the permissions. It is aligned with what to
+            // expect in an ELF file.
+            permissions: if segment.is_executable() {
+                Permissions::ReadExec
+            } else if segment.is_write() {
+                Permissions::ReadWrite
+            } else if segment.is_read() {
+                Permissions::Read
+            } else {
+                Permissions::None
+            },
+        }
+    }
 }
 
 /// Program headers extracted from the ELF file
@@ -32,6 +74,9 @@ pub struct ProgramHeaders<'a> {
 
     /// Raw contents
     pub contents: &'a [u8],
+
+    /// Memory permissions for each segment
+    pub permissions: Vec<MemoryPermissions>,
 }
 
 /// [LoadResult] is the outcome of loading an ELF file
@@ -71,22 +116,31 @@ pub fn load_elf_nonreloc<'a>(
 
     let mut last_written = 0;
 
+    // Capacity of 4 should cover most cases:
+    //  .text => rx
+    //  .rodata => r
+    //  .data => rw
+    //  .bss => rw
+    let mut permissions = Vec::with_capacity(4);
+
     for segment in loadable_segments {
+        permissions.push(MemoryPermissions::from_load_segment(None, segment));
+
         // Copy the region from the file to memory.
         mem.write_bytes(segment.p_paddr, &contents[segment.file_range()])?;
 
         // If the target memory region is larger than the source region,
         // we must fill the gap with 0s.
         if segment.p_memsz > segment.p_filesz {
-            let first_zero = segment.p_paddr + segment.p_filesz;
-            let num_zeroes = segment.p_memsz - segment.p_filesz;
+            let first_zero = segment.p_paddr.wrapping_add(segment.p_filesz);
+            let num_zeroes = segment.p_memsz.saturating_sub(segment.p_filesz);
             mem.set_zero(first_zero, num_zeroes)?;
         }
 
         last_written = segment.p_paddr + segment.p_memsz;
     }
 
-    let program_headers = extract_program_headers(&elf.header, contents);
+    let program_headers = extract_program_headers(&elf.header, contents, permissions);
 
     Ok(LoadResult {
         entry: elf.entry,
@@ -120,15 +174,25 @@ pub fn load_elf_reloc<'a>(
 
     let mut last_written = start;
 
+    // Capacity of 4 should cover most cases:
+    //  .text => rx
+    //  .rodata => r
+    //  .data => rw
+    //  .bss => rw
+    let mut permissions = Vec::with_capacity(4);
+
     for segment in loadable_segments {
+        permissions.push(MemoryPermissions::from_load_segment(Some(start), segment));
+
         // Copy the region from the file to memory.
-        mem.write_bytes(start + segment.p_vaddr, &contents[segment.file_range()])?;
+        let start_addr = start.wrapping_add(segment.p_vaddr);
+        mem.write_bytes(start_addr, &contents[segment.file_range()])?;
 
         // If the target memory region is larger than the source region,
         // we must fill the gap with 0s.
         if segment.p_memsz > segment.p_filesz {
-            let first_zero = start + segment.p_vaddr + segment.p_filesz;
-            let num_zeroes = segment.p_memsz - segment.p_filesz;
+            let first_zero = start_addr.wrapping_add(segment.p_filesz);
+            let num_zeroes = segment.p_memsz.saturating_sub(segment.p_filesz);
             mem.set_zero(first_zero, num_zeroes)?;
         }
 
@@ -152,7 +216,7 @@ pub fn load_elf_reloc<'a>(
         }
     }
 
-    let program_headers = extract_program_headers(&elf.header, contents);
+    let program_headers = extract_program_headers(&elf.header, contents, permissions);
 
     Ok(LoadResult {
         entry: elf.header.e_entry + start,
@@ -195,7 +259,11 @@ where
 }
 
 /// Extract the raw program headers from the ELF file.
-pub fn extract_program_headers<'a>(header: &Header, contents: &'a [u8]) -> ProgramHeaders<'a> {
+fn extract_program_headers<'a>(
+    header: &Header,
+    contents: &'a [u8],
+    permissions: Vec<MemoryPermissions>,
+) -> ProgramHeaders<'a> {
     let start = header.e_phoff as usize;
     let length = header.e_phentsize as usize * header.e_phnum as usize;
     let contents = &contents[start..][..length];
@@ -204,5 +272,6 @@ pub fn extract_program_headers<'a>(header: &Header, contents: &'a [u8]) -> Progr
         entry_size: header.e_phentsize as u64,
         num_entries: header.e_phnum as u64,
         contents,
+        permissions,
     }
 }

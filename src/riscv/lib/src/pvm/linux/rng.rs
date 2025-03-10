@@ -9,8 +9,7 @@ use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::registers;
 use crate::pvm::linux::error::Error;
 use crate::state_backend::ManagerBase;
-use crate::state_backend::ManagerRead;
-use crate::state_backend::ManagerWrite;
+use crate::state_backend::ManagerReadWrite;
 
 impl<M: ManagerBase> SupervisorState<M> {
     /// Handle `getrandom` system call. We don't support non-determinism, so we return a fixed
@@ -24,7 +23,7 @@ impl<M: ManagerBase> SupervisorState<M> {
         core: &mut MachineCoreState<impl MemoryConfig, M>,
     ) -> bool
     where
-        M: ManagerRead + ManagerWrite,
+        M: ManagerReadWrite,
     {
         let buffer = core.hart.xregisters.read(registers::a0);
         let length = core.hart.xregisters.read(registers::a1);

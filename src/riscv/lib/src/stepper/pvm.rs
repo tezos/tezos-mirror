@@ -91,7 +91,7 @@ impl<'hooks, MC: MemoryConfig, B: Block<MC, Owned>, CL: CacheLayouts>
 
         #[cfg(feature = "supervisor")]
         {
-            pvm.machine_state.setup_linux_process(&program)?;
+            pvm.setup_linux_process(&program)?;
             assert!(initrd.is_none(), "initrd is not supported");
         }
 

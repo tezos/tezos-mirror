@@ -2,17 +2,21 @@
 //
 // SPDX-License-Identifier: MIT
 
+mod addr;
 mod error;
 mod fds;
 mod fs;
+mod memory;
 mod rng;
 
 use std::ffi::CStr;
 use std::num::NonZeroU64;
 
-use error::Error;
 use tezos_smart_rollup_constants::riscv::SBI_FIRMWARE_TEZOS;
 
+use self::addr::VirtAddr;
+use self::error::Error;
+use self::memory::STACK_SIZE;
 use super::Pvm;
 use super::PvmHooks;
 use crate::machine_state::CacheLayouts;
@@ -23,6 +27,8 @@ use crate::machine_state::block_cache::bcall::Block;
 use crate::machine_state::memory::Address;
 use crate::machine_state::memory::Memory;
 use crate::machine_state::memory::MemoryConfig;
+use crate::machine_state::memory::PAGE_SIZE;
+use crate::machine_state::memory::Permissions;
 use crate::machine_state::mode::Mode;
 use crate::machine_state::registers;
 use crate::program::Program;
@@ -36,9 +42,6 @@ use crate::state_backend::ManagerRead;
 use crate::state_backend::ManagerReadWrite;
 use crate::state_backend::ManagerWrite;
 use crate::state_backend::Ref;
-
-/// Size of a memory page in bytes
-pub const PAGE_SIZE: u64 = 4096;
 
 /// Thread identifier for the main thread
 const MAIN_THREAD_ID: u64 = 1;
@@ -113,7 +116,7 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase>
     /// Add data to the stack, returning the updated stack pointer.
     fn push_stack(&mut self, align: u64, data: impl AsRef<[u8]>) -> Result<Address, MachineError>
     where
-        M: ManagerRead + ManagerWrite,
+        M: ManagerReadWrite,
     {
         let data = data.as_ref();
 
@@ -128,19 +131,6 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase>
         Ok(stack_ptr)
     }
 
-    /// Configure the stack for a new process.
-    fn prepare_stack(&mut self)
-    where
-        M: ManagerWrite,
-    {
-        let mem_size = MC::TOTAL_BYTES as u64;
-        let init_stack_ptr = mem_size.saturating_sub(mem_size % PAGE_SIZE);
-        self.core
-            .hart
-            .xregisters
-            .write(registers::sp, init_stack_ptr);
-    }
-
     /// Initialise the stack for a Linux program. Preparing the stack is a major part of Linux's
     /// process initialisation. Musl programs extract valuable information from the stack such as
     /// the program name, command-line arguments, environment variables and other auxiliary
@@ -152,7 +142,7 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase>
         auxv: &[(AuxVectorKey, u64)],
     ) -> Result<(), MachineError>
     where
-        M: ManagerRead + ManagerWrite,
+        M: ManagerReadWrite,
     {
         // First we push all constants so that they are at the top of the stack
         let arg_ptrs = args
@@ -195,19 +185,118 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase>
 
         Ok(())
     }
+}
 
+impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase> Pvm<MC, CL, B, M> {
     /// Load the program into memory and set the PC to its entrypoint.
     fn load_program(&mut self, program: &Program<MC>) -> Result<(), MachineError>
     where
-        M: ManagerWrite,
+        M: ManagerReadWrite,
     {
         // Reset hart state & set pc to entrypoint
-        self.core.hart.reset(program.entrypoint);
+        self.machine_state.core.hart.reset(program.entrypoint);
+
+        let program_start = program.segments.keys().min().copied().unwrap_or(0);
+        let program_end = program
+            .segments
+            .iter()
+            .map(|(addr, data)| addr.saturating_add(data.len() as u64))
+            .max()
+            .unwrap_or(0);
+        let program_length = program_end.saturating_sub(program_start) as usize;
+
+        // Allow the program to be written to main memory
+        self.machine_state.core.main_memory.protect_pages(
+            program_start,
+            program_length,
+            Permissions::Write,
+        )?;
 
         // Write program to main memory
-        for (addr, data) in program.segments.iter() {
-            self.core.main_memory.write_all(*addr, data)?;
+        for (&addr, data) in program.segments.iter() {
+            self.machine_state.core.main_memory.write_all(addr, data)?;
         }
+
+        // Remove access to the program that has just been placed into memory
+        self.machine_state.core.main_memory.protect_pages(
+            program_start,
+            program_length,
+            Permissions::None,
+        )?;
+
+        // Configure memory permissions using the ELF program headers, if present
+        if let Some(program_headers) = &program.program_headers {
+            for mem_perms in program_headers.permissions.iter() {
+                self.machine_state.core.main_memory.protect_pages(
+                    mem_perms.start_address,
+                    mem_perms.length as usize,
+                    mem_perms.permissions,
+                )?;
+            }
+        }
+
+        // Other parts of the supervisor make use of program start and end to properly divide the
+        // memory. These addresses need to be properly aligned.
+        let program_start = VirtAddr::new(program_start).align_down(PAGE_SIZE);
+        self.system_state.program_start.write(program_start);
+
+        let program_end = VirtAddr::new(program_end)
+            .align_up(PAGE_SIZE)
+            .ok_or(MachineError::MemoryTooSmall)?;
+        self.system_state.program_end.write(program_end);
+
+        Ok(())
+    }
+
+    /// Configure the stack for a new process.
+    fn prepare_stack(&mut self) -> Result<(), MachineError>
+    where
+        M: ManagerReadWrite,
+    {
+        let stack_top = VirtAddr::new(MC::TOTAL_BYTES as u64);
+        let program_break = self.system_state.program_end.read();
+
+        // We must fit at least one guard page between the program break and the stack
+        let guarded_stack_space = stack_top - program_break;
+        if guarded_stack_space < PAGE_SIZE.get() as i64 {
+            return Err(MachineError::MemoryTooSmall);
+        }
+
+        let unaligned_stack_space = STACK_SIZE.min(guarded_stack_space as u64 - PAGE_SIZE.get());
+        let stack_bottom = (stack_top - unaligned_stack_space)
+            .align_up(PAGE_SIZE)
+            .ok_or(MachineError::MemoryTooSmall)?;
+
+        // If the stack top wasn't aligned, the stack bottom may be higher than the stack top after
+        // aligning it upwards
+        if stack_top < stack_bottom {
+            return Err(MachineError::MemoryTooSmall);
+        }
+
+        // At this point we know that `stack_top` >= `stack_bottom`
+        let stack_space = (stack_top - stack_bottom) as usize;
+
+        // Guard the stack with a guard page. This prevents stack overflows spilling into the heap
+        // or even worse, the program's .bss or .data area.
+        let stack_guard = stack_bottom - PAGE_SIZE.get();
+        self.machine_state.core.main_memory.protect_pages(
+            stack_guard.to_machine_address(),
+            PAGE_SIZE.get() as usize,
+            Permissions::None,
+        )?;
+
+        // Make sure the stack region is readable and writable
+        self.machine_state.core.main_memory.protect_pages(
+            stack_bottom.to_machine_address(),
+            stack_space,
+            Permissions::ReadWrite,
+        )?;
+
+        self.machine_state
+            .core
+            .hart
+            .xregisters
+            .write(registers::sp, stack_top.to_machine_address());
 
         Ok(())
     }
@@ -220,32 +309,31 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase>
         self.load_program(program)?;
 
         // The stack needs to be prepared before we can push anything to it
-        self.prepare_stack();
+        self.prepare_stack()?;
 
         // Auxiliary values vector
-        let mut auxv = vec![(AuxVectorKey::PageSize, PAGE_SIZE)];
+        let mut auxv = vec![(AuxVectorKey::PageSize, PAGE_SIZE.get())];
 
         // If program headers are available, then we should inform the supervised process of them
         if let Some(prog_headers) = &program.program_headers {
             // Program headers are an array of a C struct. The struct for 64-bit ELF requires 8
             // byte alignment.
-            let prog_headers_ptr = self.push_stack(8, prog_headers.contents)?;
+            let prog_headers_ptr = self.machine_state.push_stack(8, prog_headers.contents)?;
 
             auxv.push((AuxVectorKey::NumProgramHeaders, prog_headers.num_entries));
             auxv.push((AuxVectorKey::ProgramHeaderSize, prog_headers.entry_size));
             auxv.push((AuxVectorKey::ProgramHeadersPtr, prog_headers_ptr));
         }
 
-        self.init_linux_stack(&[c"tezos-smart-rollup"], &[], &auxv)?;
+        self.machine_state
+            .init_linux_stack(&[c"tezos-smart-rollup"], &[], &auxv)?;
 
         // The user program may not access the M or S privilege level
-        self.core.hart.mode.write(Mode::User);
+        self.machine_state.core.hart.mode.write(Mode::User);
 
         Ok(())
     }
-}
 
-impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase> Pvm<MC, CL, B, M> {
     /// Check if the supervised process has requested an exit.
     pub fn has_exited(&self) -> Option<u64>
     where
@@ -261,13 +349,21 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase> Pvm<MC
 }
 
 /// Layout for the Linux supervisor state
-pub type SupervisorStateLayout = (Atom<u64>, Atom<bool>, Atom<u64>);
+pub type SupervisorStateLayout = (
+    Atom<u64>,
+    Atom<bool>,
+    Atom<u64>,
+    Atom<VirtAddr>,
+    Atom<VirtAddr>,
+);
 
 /// Linux supervisor state
 pub struct SupervisorState<M: ManagerBase> {
     tid_address: Cell<u64, M>,
     exited: Cell<bool, M>,
     exit_code: Cell<u64, M>,
+    program_start: Cell<VirtAddr, M>,
+    program_end: Cell<VirtAddr, M>,
 }
 
 impl<M: ManagerBase> SupervisorState<M> {
@@ -277,6 +373,8 @@ impl<M: ManagerBase> SupervisorState<M> {
             tid_address: space.0,
             exited: space.1,
             exit_code: space.2,
+            program_start: space.3,
+            program_end: space.4,
         }
     }
 
@@ -289,6 +387,8 @@ impl<M: ManagerBase> SupervisorState<M> {
             self.tid_address.struct_ref::<F>(),
             self.exited.struct_ref::<F>(),
             self.exit_code.struct_ref::<F>(),
+            self.program_start.struct_ref::<F>(),
+            self.program_end.struct_ref::<F>(),
         )
     }
 
@@ -385,7 +485,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// old signal stack configuration is requested, it will be zeroed out.
     fn handle_sigaltstack(&mut self, core: &mut MachineCoreState<impl MemoryConfig, M>) -> bool
     where
-        M: ManagerRead + ManagerWrite,
+        M: ManagerReadWrite,
     {
         let old = core.hart.xregisters.read(registers::a1);
 
@@ -411,7 +511,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// See: <https://www.man7.org/linux/man-pages/man2/rt_sigaction.2.html>
     fn handle_rt_sigaction(&mut self, core: &mut MachineCoreState<impl MemoryConfig, M>) -> bool
     where
-        M: ManagerRead + ManagerWrite,
+        M: ManagerReadWrite,
     {
         let old_action = core.hart.xregisters.read(registers::a2);
         let sigset_t_size = core.hart.xregisters.read(registers::a3);
@@ -449,7 +549,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// requested, it will simply be zeroed out.
     fn handle_rt_sigprocmask(&mut self, core: &mut MachineCoreState<impl MemoryConfig, M>) -> bool
     where
-        M: ManagerRead + ManagerWrite,
+        M: ManagerReadWrite,
     {
         let old = core.hart.xregisters.read(registers::a2);
         let sigset_t_size = core.hart.xregisters.read(registers::a3);
@@ -520,6 +620,8 @@ impl<M: ManagerClone> Clone for SupervisorState<M> {
             tid_address: self.tid_address.clone(),
             exited: self.exited.clone(),
             exit_code: self.exit_code.clone(),
+            program_start: self.program_start.clone(),
+            program_end: self.program_end.clone(),
         }
     }
 }

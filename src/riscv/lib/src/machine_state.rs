@@ -336,9 +336,12 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::Ma
     where
         M: backend::ManagerRead,
     {
+        // TODO: RV-527: Enforce that `Instruction` came from executable part of memory.
+        // The link to an `Instruction` is too weak. We want statically-typed guarantees that these
+        // bytes are only used for instructions.
         self.core
             .main_memory
-            .read(phys_addr)
+            .read_exec(phys_addr)
             .map_err(|_: OutOfBounds| Exception::InstructionAccessFault(phys_addr))
     }
 
@@ -674,6 +677,9 @@ pub enum MachineError {
 
     #[error("Device tree error: {0}")]
     DeviceTreeError(vm_fdt::Error),
+
+    #[error("Memory too small to properly configure the machine")]
+    MemoryTooSmall,
 }
 
 #[cfg(test)]

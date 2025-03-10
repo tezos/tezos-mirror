@@ -10,18 +10,36 @@ use serde::Serialize;
 use super::Address;
 use super::Memory;
 use super::OutOfBounds;
+#[cfg(feature = "supervisor")]
+use super::Permissions;
+#[cfg(feature = "supervisor")]
+use super::protection::PagePermissions;
 use crate::state_backend::DynCells;
 use crate::state_backend::Elem;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerClone;
 use crate::state_backend::ManagerDeserialise;
 use crate::state_backend::ManagerRead;
+use crate::state_backend::ManagerReadWrite;
 use crate::state_backend::ManagerSerialise;
 use crate::state_backend::ManagerWrite;
 
 /// Machine's memory
 pub struct MemoryImpl<const PAGES: usize, const TOTAL_BYTES: usize, M: ManagerBase> {
+    /// Memory contents
     pub(super) data: DynCells<TOTAL_BYTES, M>,
+
+    /// Read permissions per page
+    #[cfg(feature = "supervisor")]
+    pub(super) readable_pages: PagePermissions<PAGES, M>,
+
+    /// Write permissions per page
+    #[cfg(feature = "supervisor")]
+    pub(super) writable_pages: PagePermissions<PAGES, M>,
+
+    /// Execute permissions per page
+    #[cfg(feature = "supervisor")]
+    pub(super) executable_pages: PagePermissions<PAGES, M>,
 }
 
 impl<const PAGES: usize, const TOTAL_BYTES: usize, M: ManagerBase>
@@ -50,6 +68,38 @@ where
         M: ManagerRead,
     {
         Self::check_bounds(address, mem::size_of::<E>())?;
+
+        // SAFETY: The bounds check above ensures the access check below is safe
+        #[cfg(feature = "supervisor")]
+        unsafe {
+            if !self.readable_pages.can_access(address, mem::size_of::<E>()) {
+                return Err(OutOfBounds);
+            }
+        }
+
+        Ok(self.data.read(address as usize))
+    }
+
+    #[inline]
+    fn read_exec<E>(&self, address: Address) -> Result<E, OutOfBounds>
+    where
+        E: Elem,
+        M: ManagerRead,
+    {
+        Self::check_bounds(address, mem::size_of::<E>())?;
+
+        // SAFETY: The bounds check above ensures the access check below is safe
+        #[cfg(feature = "supervisor")]
+        unsafe {
+            // Checking for executable access is sufficient as that implies read access
+            if !self
+                .executable_pages
+                .can_access(address, mem::size_of::<E>())
+            {
+                return Err(OutOfBounds);
+            }
+        }
+
         Ok(self.data.read(address as usize))
     }
 
@@ -59,6 +109,18 @@ where
         M: ManagerRead,
     {
         Self::check_bounds(address, mem::size_of_val(values))?;
+
+        // SAFETY: The bounds check above ensures the access check below is safe
+        #[cfg(feature = "supervisor")]
+        unsafe {
+            if !self
+                .readable_pages
+                .can_access(address, mem::size_of_val(values))
+            {
+                return Err(OutOfBounds);
+            }
+        }
+
         self.data.read_all(address as usize, values);
         Ok(())
     }
@@ -67,9 +129,18 @@ where
     fn write<E>(&mut self, address: Address, value: E) -> Result<(), OutOfBounds>
     where
         E: Elem,
-        M: ManagerWrite,
+        M: ManagerReadWrite,
     {
         Self::check_bounds(address, mem::size_of::<E>())?;
+
+        // SAFETY: The bounds check above ensures the access check below is safe
+        #[cfg(feature = "supervisor")]
+        unsafe {
+            if !self.writable_pages.can_access(address, mem::size_of::<E>()) {
+                return Err(OutOfBounds);
+            }
+        }
+
         self.data.write(address as usize, value);
         Ok(())
     }
@@ -77,9 +148,21 @@ where
     fn write_all<E>(&mut self, address: Address, values: &[E]) -> Result<(), OutOfBounds>
     where
         E: Elem,
-        M: ManagerWrite,
+        M: ManagerReadWrite,
     {
         Self::check_bounds(address, mem::size_of_val(values))?;
+
+        // SAFETY: The bounds check above ensures the access check below is safe
+        #[cfg(feature = "supervisor")]
+        unsafe {
+            if !self
+                .writable_pages
+                .can_access(address, mem::size_of_val(values))
+            {
+                return Err(OutOfBounds);
+            }
+        }
+
         self.data.write_all(address as usize, values);
         Ok(())
     }
@@ -97,8 +180,22 @@ where
         M: ManagerDeserialise,
         D: serde::Deserializer<'de>,
     {
+        #[cfg(not(feature = "supervisor"))]
         let data = DynCells::deserialize(deserializer)?;
-        Ok(Self { data })
+
+        #[cfg(feature = "supervisor")]
+        let (data, readable_pages, writable_pages, executable_pages) =
+            Deserialize::deserialize(deserializer)?;
+
+        Ok(Self {
+            data,
+            #[cfg(feature = "supervisor")]
+            readable_pages,
+            #[cfg(feature = "supervisor")]
+            writable_pages,
+            #[cfg(feature = "supervisor")]
+            executable_pages,
+        })
     }
 
     fn clone(&self) -> Self
@@ -107,6 +204,12 @@ where
     {
         Self {
             data: self.data.clone(),
+            #[cfg(feature = "supervisor")]
+            readable_pages: self.readable_pages.clone(),
+            #[cfg(feature = "supervisor")]
+            writable_pages: self.writable_pages.clone(),
+            #[cfg(feature = "supervisor")]
+            executable_pages: self.executable_pages.clone(),
         }
     }
 
@@ -131,6 +234,28 @@ where
             self.data.write(address.saturating_add(i), 0u8);
         }
     }
+
+    #[cfg(feature = "supervisor")]
+    fn protect_pages(
+        &mut self,
+        address: Address,
+        length: usize,
+        perms: Permissions,
+    ) -> Result<(), OutOfBounds>
+    where
+        M: ManagerWrite,
+    {
+        Self::check_bounds(address, length)?;
+
+        self.readable_pages
+            .modify_access(address, length, perms.can_read());
+        self.writable_pages
+            .modify_access(address, length, perms.can_write());
+        self.executable_pages
+            .modify_access(address, length, perms.can_exec());
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -138,7 +263,6 @@ pub mod tests {
     use super::*;
     use crate::backend_test;
     use crate::machine_state::memory::M4K;
-    use crate::machine_state::memory::Memory;
     use crate::machine_state::memory::MemoryConfig;
     use crate::state_backend::owned_backend::Owned;
 
