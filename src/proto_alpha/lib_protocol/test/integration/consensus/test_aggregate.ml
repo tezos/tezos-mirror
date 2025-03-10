@@ -48,6 +48,10 @@ let aggregate_unimplemented_error = function
   | Validate_errors.Consensus.Aggregate_not_implemented -> true
   | _ -> false
 
+let signature_invalid_error = function
+  | Operation_repr.Invalid_signature -> true
+  | _ -> false
+
 let find_aggregate_result receipt =
   let result_opt =
     List.find_map
@@ -227,6 +231,38 @@ let test_aggregate_attestation_with_multiple_bls_attestations () =
   let delegates = List.map fst bls_delegates_with_slots in
   check_attestations_aggregate_result ~committee:delegates result
 
+let test_aggregate_attestation_invalid_signature () =
+  let open Lwt_result_syntax in
+  let* _genesis, block =
+    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+  in
+  let* attesters = Context.get_attesters (B block) in
+  (* Find an attester with a BLS consensus key. *)
+  let attester, _ =
+    WithExceptions.Option.get
+      ~loc:__LOC__
+      (find_attester_with_bls_key attesters)
+  in
+  (* Craft an aggregate with a single attestation signed by this delegate *)
+  let* aggregate =
+    Op.attestations_aggregate ~committee:[attester.consensus_key] block
+  in
+  (* Swap the signature for Signature.Bls.zero *)
+  match aggregate.protocol_data with
+  | Operation_data {contents; _} ->
+      let aggregate_with_incorrect_signature =
+        {
+          aggregate with
+          protocol_data =
+            Operation_data {contents; signature = Some (Bls Signature.Bls.zero)};
+        }
+      in
+      (* Bake a block containing this operation and expect an error *)
+      let*! res =
+        Block.bake ~operation:aggregate_with_incorrect_signature block
+      in
+      Assert.proto_error ~loc:__LOC__ res signature_invalid_error
+
 let tests =
   [
     Tztest.tztest
@@ -245,6 +281,10 @@ let tests =
       "test_aggregate_attestation_with_multiple_bls_attestations"
       `Quick
       test_aggregate_attestation_with_multiple_bls_attestations;
+    Tztest.tztest
+      "test_aggregate_attestation_invalid_signature"
+      `Quick
+      test_aggregate_attestation_invalid_signature;
   ]
 
 let () =
