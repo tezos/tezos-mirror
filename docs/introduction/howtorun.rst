@@ -166,7 +166,7 @@ your user account::
 
    octez-client register key bob as delegate
 
-Once registered, you need to wait ``consensus_rights_delay + 2 = 7`` cycles
+Once registered, you need to wait the end of the current cycle plus ``consensus_rights_delay = 2`` cycles,
 for your rights to be considered.
 
 There is a simple rpc that can be used to check your rights for every
