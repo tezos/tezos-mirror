@@ -96,6 +96,14 @@ let main
       ~rollup_node_endpoint
       ()
   in
+  let* (_chain_family : Ethereum_types.chain_family) =
+    if finalized_view then return Ethereum_types.EVM
+    else
+      match config.experimental_features.l2_chains with
+      | None -> return Ethereum_types.EVM
+      | Some [l2_chain] -> Rollup_node_rpc.chain_family l2_chain.chain_id
+      | _ -> tzfail Node_error.Unexpected_multichain
+  in
   let* server_finalizer =
     Rpc_server.start_public_server
       validation_mode
