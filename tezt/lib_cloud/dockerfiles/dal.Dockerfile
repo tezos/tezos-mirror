@@ -21,6 +21,8 @@ RUN apt-get update && apt-get install -y \
     iproute2 \
     # Can be used to monitor process individually
     prometheus-process-exporter \
+    # rotation for logs
+    logrotate \
     # emacs can be useful for debugging
     emacs \
     # wget can be used to import snapshots
