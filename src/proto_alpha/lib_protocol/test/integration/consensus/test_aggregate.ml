@@ -52,6 +52,10 @@ let signature_invalid_error = function
   | Operation_repr.Invalid_signature -> true
   | _ -> false
 
+let non_bls_in_aggregate = function
+  | Validate_errors.Consensus.Non_bls_key_in_aggregate -> true
+  | _ -> false
+
 let find_aggregate_result receipt =
   let result_opt =
     List.find_map
@@ -263,6 +267,43 @@ let test_aggregate_attestation_invalid_signature () =
       in
       Assert.proto_error ~loc:__LOC__ res signature_invalid_error
 
+let test_aggregate_attestation_non_bls_delegate () =
+  let open Lwt_result_syntax in
+  let* _genesis, block =
+    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+  in
+  let* attesters = Context.get_attesters (B block) in
+  (* Find an attester with a non-BLS consensus key. *)
+  let attester, slot =
+    WithExceptions.Option.get
+      ~loc:__LOC__
+      (find_attester_with_non_bls_key attesters)
+  in
+  (* Craft an attestation for this attester to retreive a signature and a
+     triplet {level, round, block_payload_hash} *)
+  let* {shell; protocol_data = {contents; signature}} =
+    Op.raw_attestation ~delegate:attester.RPC.Validators.delegate ~slot block
+  in
+  match contents with
+  | Single (Attestation {consensus_content; _}) ->
+      let {level; round; block_payload_hash; _} :
+          Alpha_context.consensus_content =
+        consensus_content
+      in
+      (* Craft an aggregate including the attester slot and signature *)
+      let consensus_content : Alpha_context.consensus_aggregate_content =
+        {level; round; block_payload_hash}
+      in
+      let contents : _ Alpha_context.contents_list =
+        Single (Attestations_aggregate {consensus_content; committee = [slot]})
+      in
+      let aggregate : operation =
+        {shell; protocol_data = Operation_data {contents; signature}}
+      in
+      (* Bake a block containing this aggregate and expect an error *)
+      let*! res = Block.bake ~operation:aggregate block in
+      Assert.proto_error ~loc:__LOC__ res non_bls_in_aggregate
+
 let tests =
   [
     Tztest.tztest
@@ -285,6 +326,10 @@ let tests =
       "test_aggregate_attestation_invalid_signature"
       `Quick
       test_aggregate_attestation_invalid_signature;
+    Tztest.tztest
+      "test_aggregate_attestation_non_bls_delegate"
+      `Quick
+      test_aggregate_attestation_non_bls_delegate;
   ]
 
 let () =
