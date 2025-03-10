@@ -264,8 +264,7 @@ let raw_accept sched main_socket =
   let open Lwt_syntax in
   let* r = P2p_fd.accept main_socket in
   match r with
-  | Error (`Socket_error ex | `System_error ex | `Unexpected_error ex) ->
-      Lwt.fail ex
+  | Error e -> Lwt_result_syntax.tzfail (P2p_fd.accept_error_to_tzerror e)
   | Ok (fd, sockaddr) ->
       let fd = P2p_io_scheduler.register sched fd in
       let point =
@@ -285,8 +284,7 @@ let accept ?(id = id1) ?(proof_of_work_target = proof_of_work_target) sched
   let* r = raw_accept sched main_socket in
   let* id1 = id in
   match r with
-  | Error (`Socket_error ex | `System_error ex | `Unexpected_error ex) ->
-      Lwt.fail ex
+  | Error e -> Lwt_result.fail e
   | Ok (fd, point) ->
       P2p_socket.authenticate
         ~canceler
@@ -300,11 +298,11 @@ let accept ?(id = id1) ?(proof_of_work_target = proof_of_work_target) sched
 
 let raw_connect sched addr port =
   let open Lwt_result_syntax in
-  let*! fd = P2p_fd.socket () in
+  let* fd = Lwt_result.map_error Either.right (P2p_fd.socket ()) in
   let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
-  let* () = P2p_fd.connect fd uaddr in
+  let* () = Lwt_result.map_error Either.left (P2p_fd.connect fd uaddr) in
   let fd = P2p_io_scheduler.register sched fd in
-  Lwt.return_ok fd
+  return fd
 
 exception Cant_connect
 
@@ -316,9 +314,11 @@ let connect ?(proof_of_work_target = proof_of_work_target) sched addr port id =
   let*! r = raw_connect sched addr port in
   match r with
   | Error
-      ( `Network_unreachable | `Connection_unreachable | `Connection_refused
-      | `Connection_canceled | `Unexpected_error _ ) ->
+      (Left
+        ( `Network_unreachable | `Connection_unreachable | `Connection_refused
+        | `Connection_canceled | `Unexpected_error _ )) ->
       Lwt.fail Cant_connect
+  | Error (Right e) -> Lwt_result.fail e
   | Ok fd ->
       P2p_socket.authenticate
         ~canceler

@@ -221,7 +221,9 @@ module Self_identification = struct
       in
       let*! conn = P2p_test_utils.raw_connect sched addr port in
       match conn with
-      | Error e -> Test.fail "First connection failed: %a" pp_connect_error e
+      | Error (Left e) ->
+          Test.fail "First connection failed: %a" pp_connect_error e
+      | Error (Right _) -> Test.fail "First connection failed unexpectedly"
       | Ok conn -> (
           let canceler = Lwt_canceler.create () in
           (* During the first connection, the client get the connection message
@@ -240,8 +242,10 @@ module Self_identification = struct
              connection message instead of its own. *)
           let*! conn = P2p_test_utils.raw_connect sched addr port in
           match conn with
-          | Error e ->
+          | Error (Left e) ->
               Test.fail "Second connection failed: %a" pp_connect_error e
+          | Error (Right _) ->
+              Test.fail "Second connection failed: unexpectedly"
           | Ok conn ->
               let canceler = Lwt_canceler.create () in
               let* sent_msg =

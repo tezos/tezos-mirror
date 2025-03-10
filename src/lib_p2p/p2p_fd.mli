@@ -32,7 +32,9 @@ type listening_socket_open_failure = {
 
 (** Type of an error in case of the listening
     socket fails to open. *)
-type error += Failed_to_open_listening_socket of listening_socket_open_failure
+type error +=
+  | Failed_to_open_listening_socket of listening_socket_open_failure
+  | Full_waiting_queue
 
 (** This module defines a type [t] which wraps a file descriptor. Most
     functions simply call the underlying file descriptor function and generate
@@ -66,7 +68,7 @@ type read_write_error =
   | `Connection_locally_closed
   | unexpected_error ]
 
-(** 
+(**
 
    - Unreachable can be issued when we don't know how to reach to this address
 
@@ -77,7 +79,7 @@ type read_write_error =
    the behaviour of the firewall: If the firewall drops packets, it
    will be canceled because of a timeout, otherwise it can refuse the
    connection and we get this error.
-   
+
 *)
 
 type connect_error =
@@ -101,7 +103,12 @@ type connect_error =
     For most socket-errors you can just log them and call accept again to be
     ready for the next connection. *)
 type accept_error =
-  [`System_error of exn | `Socket_error of exn | unexpected_error]
+  [ `System_error of exn
+  | `Socket_error of exn
+  | `Full_waiting_queue
+  | unexpected_error ]
+
+val accept_error_to_tzerror : accept_error -> error
 
 (** Pretty printer for read_write_error. *)
 val pp_read_write_error : Format.formatter -> read_write_error -> unit
@@ -136,8 +143,19 @@ val read : t -> Bytes.t -> int -> int -> (int, read_write_error) result Lwt.t
     underlying socket has been closed. *)
 val write : t -> Bytes.t -> (unit, read_write_error) result Lwt.t
 
-(** Returns a fresh fd. This call always succeed. *)
-val socket : unit -> t Lwt.t
+(** [fd_pool] is the type of file descriptors pool used to control the number
+    of connections opened simultaneously. *)
+type fd_pool
+
+(** [create_fd_pool capacity] creates a file descriptors pool accepting at most
+    [capacity] connections. *)
+val create_fd_pool : capacity:int -> fd_pool
+
+(** [socket ?fd_pool ()] returns a fresh fd.
+    If [fd_pool] is [None], this call succeeds immediatly.
+    If [fd_pool] is [Some p], it waits until [p] has a free element which
+    can be taken, and succeds. *)
+val socket : ?fd_pool:fd_pool -> unit -> t tzresult Lwt.t
 
 (** [create_listening_socket ?reuse_port ~backlog ?addr port] creates
     a socket that listens on [addr] or [Ipaddr.V6.unspecified] if
@@ -159,8 +177,13 @@ val create_listening_socket :
     closed. *)
 val connect : t -> Lwt_unix.sockaddr -> (unit, connect_error) result Lwt.t
 
-(** [accept sock] accepts connections on socket [sock]. *)
+(** [accept ?fd_pool sock] accepts connections on socket [sock].
+    If [fd_pool] is [None], it does not perform more checks.
+    If [fd_pool] is [Some p], it waits until [p] has a free element which
+    can be taken, and succeeds. *)
 val accept :
-  Lwt_unix.file_descr -> (t * Lwt_unix.sockaddr, accept_error) result Lwt.t
+  ?fd_pool:fd_pool ->
+  Lwt_unix.file_descr ->
+  (t * Lwt_unix.sockaddr, accept_error) result Lwt.t
 
 module Table : Hashtbl.S with type key = t

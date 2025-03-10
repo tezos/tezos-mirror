@@ -47,7 +47,10 @@ let accept st =
   let* () = Lwt_mutex.lock accept_lock in
   let* res =
     protect @@ fun () ->
-    let* r = P2p_fd.accept st.socket in
+    let fd_pool =
+      P2p_pool.get_fd_pool @@ P2p_connect_handler.get_pool connect_handler
+    in
+    let* r = P2p_fd.accept ?fd_pool st.socket in
     Result.fold
       ~ok:(fun (fd, addr) ->
         let point =
@@ -77,10 +80,7 @@ let accept st =
                 (TzTrace.make (error_of_exn ex), "socket")
             in
             Lwt.return (Ok ())
-        | `Unexpected_error ex ->
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/5632
-               Losing some information here... *)
-            Lwt.return_error (TzTrace.make (error_of_exn ex)))
+        | ex -> Lwt_result_syntax.tzfail (P2p_fd.accept_error_to_tzerror ex))
       r
   in
   Lwt_mutex.unlock accept_lock ;

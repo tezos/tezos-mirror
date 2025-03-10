@@ -50,15 +50,14 @@ let rec listen ?port addr =
   | Error err -> Lwt.return_error err
 
 let accept main_socket =
-  let open Lwt_syntax in
-  let* r = P2p_fd.accept main_socket in
+  let open Lwt_result_syntax in
+  let*! r = P2p_fd.accept main_socket in
   match r with
-  | Error (`Socket_error ex | `System_error ex | `Unexpected_error ex) ->
-      Lwt.fail ex
-  | Ok (fd, _) -> Lwt.return fd
+  | Error e -> tzfail (P2p_fd.accept_error_to_tzerror e)
+  | Ok (fd, _) -> return fd
 
 let rec accept_n main_socket n =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   if n <= 0 then return_nil
   else
     let* acc = accept_n main_socket (n - 1) in
@@ -68,6 +67,13 @@ let rec accept_n main_socket n =
 let connect addr port =
   let open Lwt_syntax in
   let* fd = P2p_fd.socket () in
+  let fd =
+    match fd with
+    | Ok fd -> fd
+    | Error _ ->
+        assert
+          false (* [P2p_fd.socket] cannot fail when not given a fd_semaphore. *)
+  in
   let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
   let* r = P2p_fd.connect fd uaddr in
   match r with
@@ -107,7 +113,7 @@ let receive conn =
 
 let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
     ~read_buffer_size main_socket n =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let sched =
     P2p_io_scheduler.create
       ?max_download_speed
@@ -127,8 +133,10 @@ let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
   (* Accept and read message until the connection is closed. *)
   let* conns = accept_n main_socket n in
   let conns = List.map (P2p_io_scheduler.register sched) conns in
-  let* () = List.iter_p receive (List.map P2p_io_scheduler.to_readable conns) in
-  let* r =
+  let*! () =
+    List.iter_p receive (List.map P2p_io_scheduler.to_readable conns)
+  in
+  let*! r =
     List.iter_ep
       (P2p_io_scheduler.close ~reason:(User "shutdown from server"))
       conns
@@ -136,7 +144,7 @@ let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
   match r with
   | Ok () ->
       Tezt.Log.debug "OK %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
-      return_ok ()
+      return ()
   | Error _ -> Lwt.fail Alcotest.Test_error
 
 let max_size ?max_upload_speed () =

@@ -36,7 +36,9 @@ type listening_socket_open_failure = {
   port : int;
 }
 
-type error += Failed_to_open_listening_socket of listening_socket_open_failure
+type error +=
+  | Failed_to_open_listening_socket of listening_socket_open_failure
+  | Full_waiting_queue
 
 let () =
   register_error_kind
@@ -76,7 +78,20 @@ let () =
           Some (reason, address, port)
       | _ -> None)
     (fun (reason, address, port) ->
-      Failed_to_open_listening_socket {reason; address; port})
+      Failed_to_open_listening_socket {reason; address; port}) ;
+  let description =
+    "Not only the maximum number of connection has been reached, but the \
+     waiting queue for connections is already full."
+  in
+  register_error_kind
+    `Permanent
+    ~id:"p2p.fd.Full_waiting_queue"
+    ~title:"Connection rejected since waiting queue is full"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    Data_encoding.empty
+    (function Full_waiting_queue -> Some () | _ -> None)
+    (fun () -> Full_waiting_queue)
 
 let is_not_windows = Sys.os_type <> "Win32"
 
@@ -103,17 +118,31 @@ type connect_error =
   | unexpected_error ]
 
 type accept_error =
-  [`System_error of exn | `Socket_error of exn | unexpected_error]
+  [ `System_error of exn
+  | `Socket_error of exn
+  | `Full_waiting_queue
+  | unexpected_error ]
+
+let accept_error_to_tzerror = function
+  | `System_error exn | `Socket_error exn | `Unexpected_error exn ->
+      error_of_exn exn
+  | `Full_waiting_queue -> Full_waiting_queue
 
 type t = {
   fd : Lwt_unix.file_descr;
   id : int;
+  wakener : unit Lwt.u option;
+      (** Used to put the token back in the fd_pool after closing the file descriptor. *)
   mutable point : P2p_point.Id.t option;
   mutable peer_id : P2p_peer.Id.t option;
   mutable nread : int;
   mutable nwrit : int;
   mutable closing_reasons : P2p_disconnection_reason.t list;
 }
+
+type fd_pool = unit Lwt_pool.t
+
+let create_fd_pool ~capacity = Lwt_pool.create capacity Lwt.return
 
 let set_point ~point t = t.point <- Some point
 
@@ -138,8 +167,26 @@ let pp_read_write_error fmt = function
 
 let create =
   let counter = ref 0 in
-  fun fd ->
-    let open Lwt_syntax in
+  fun ?fd_pool fd ->
+    let open Lwt_result_syntax in
+    let* wakener =
+      match fd_pool with
+      | None -> return None
+      | Some fd_pool ->
+          (* [1000] is quite arbitrary. It is chosen to be in the same range as
+             the typical pools. The pools are expected to be around 1000
+             as the number of opened file descriptors on Linux is limited to 1024. *)
+          if Lwt_pool.wait_queue_length fd_pool > 1000 then
+            Lwt_result.fail `Full_waiting_queue
+          else
+            let p, u = Lwt.task () in
+            (* We grab an element of the pool, which will be freed only when
+               [u] will be waken up. *)
+            let _ : unit Lwt.t = Lwt_pool.use fd_pool (fun () -> p) in
+            (* We wait until the pool is not full. *)
+            let* () = Lwt_pool.use fd_pool return in
+            return (Some u)
+    in
     incr counter ;
     let t =
       {
@@ -150,9 +197,10 @@ let create =
         nread = 0;
         nwrit = 0;
         closing_reasons = [];
+        wakener;
       }
     in
-    let* () = Events.(emit create_fd) t.id in
+    let*! () = Events.(emit create_fd) t.id in
     return t
 
 let string_of_sockaddr addr =
@@ -258,10 +306,12 @@ let raw_socket () =
   let* sock = socket_setopt_user_timeout sock in
   socket_setopt_keepalive sock
 
-let socket () =
+let socket ?fd_pool () =
   let open Lwt_syntax in
   let* socket = raw_socket () in
-  create socket
+  Lwt_result.map_error
+    (fun `Full_waiting_queue -> [Full_waiting_queue])
+    (create ?fd_pool socket)
 
 let create_listening_socket ?(reuse_port = false) ~backlog
     ?(addr = Ipaddr.V6.unspecified) port =
@@ -326,7 +376,12 @@ let close ?reason t =
   Lwt.catch
     (fun () ->
       (* Guarantee idempotency. *)
-      if Lwt_unix.state t.fd = Closed then return_unit else close_socket t.fd)
+      if Lwt_unix.state t.fd = Closed then return_unit
+      else
+        let open Lwt_syntax in
+        let* () = close_socket t.fd in
+        Option.iter (fun wakener -> Lwt.wakeup wakener ()) t.wakener ;
+        return_unit)
     (function
       (* From [man 2 close] [close] can fail with [EBADF, EINTR, EIO, ENOSPC,
          EDQUOT] Unix errors.
@@ -439,7 +494,7 @@ let connect t saddr =
           in
           Lwt.return_error (`Unexpected_error ex))
 
-let accept listening_socket =
+let accept ?fd_pool listening_socket =
   let open Lwt_result_syntax in
   let* fd, saddr =
     Lwt.catch
@@ -482,7 +537,7 @@ let accept listening_socket =
             Lwt.return_error @@ `Socket_error e
         | ex -> Lwt.return_error @@ `Unexpected_error ex)
   in
-  let*! t = create fd in
+  let* t = create ?fd_pool fd in
   let*! () = Events.(emit accept_fd) (t.id, string_of_sockaddr saddr) in
   return (t, saddr)
 

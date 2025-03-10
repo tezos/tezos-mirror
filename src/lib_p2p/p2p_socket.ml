@@ -908,7 +908,11 @@ module Internal_for_tests = struct
         }
     in
     let scheduled_conn =
-      let f2d_t = Tezos_base_unix.Event_loop.main_run P2p_fd.socket in
+      let socket = Tezos_base_unix.Event_loop.main_run P2p_fd.socket in
+      let f2d_t =
+        match socket with Ok socket -> socket | Error _ -> assert false
+        (* [P2p_fd.socket] cannot fail when not given a fd_pool. *)
+      in
       P2p_io_scheduler.register
         (P2p_io_scheduler.create ~read_buffer_size:0 ())
         f2d_t
