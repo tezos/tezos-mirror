@@ -90,6 +90,26 @@ oc.docker:rust-toolchain:amd64:
     reports:
       dotenv: rust_toolchain_image_tag.env
 
+oc.docker:rust-sdk-bindings:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/docker_rust_sdk_bindings_build.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+  artifacts:
+    reports:
+      dotenv: rust_sdk_bindings_image_tag.env
+
 oc.docker:ci:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: images
@@ -3288,7 +3308,7 @@ test_sdk_rust:
     SCCACHE_CACHE_SIZE: 5G
 
 test_sdk_bindings:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
   stage: test
   tags:
   - gcp
@@ -3300,7 +3320,7 @@ test_sdk_bindings:
     - images/**/*
     when: on_success
   needs:
-  - job: oc.docker:rust-toolchain:amd64
+  - job: oc.docker:rust-sdk-bindings:amd64
   - job: trigger
   - job: sanity_ci
     optional: true
@@ -3323,7 +3343,7 @@ test_sdk_bindings:
   - job: commit_titles
     optional: true
   dependencies:
-  - oc.docker:rust-toolchain:amd64
+  - oc.docker:rust-sdk-bindings:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG

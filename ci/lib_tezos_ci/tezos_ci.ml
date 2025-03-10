@@ -1506,6 +1506,35 @@ module Images = struct
       ~image_path
       ()
 
+  (** The image containing all dependencies required for Rust SDK bindings *)
+  let rust_sdk_bindings =
+    (* The job that builds the rust-sdk-bindings image.
+       This job is automatically included in any pipeline that uses this image. *)
+    let image_builder arch =
+      job_docker_authenticated
+        ~__POS__
+        ~arch
+        ~stage
+        ~name:("oc.docker:rust-sdk-bindings:" ^ arch_to_string_alt arch)
+        ~description:
+          ("Build internal rust-sdk-bindings images for "
+         ^ arch_to_string_alt arch)
+        ~ci_docker_hub:false
+        ~artifacts:
+          (artifacts
+             ~reports:(reports ~dotenv:"rust_sdk_bindings_image_tag.env" ())
+             [])
+        ["./scripts/ci/docker_rust_sdk_bindings_build.sh"]
+    in
+    let image_path =
+      "${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}"
+    in
+    Image.mk_internal
+      ~image_builder_amd64:(image_builder Amd64)
+      ~image_builder_arm64:(image_builder Arm64)
+      ~image_path
+      ()
+
   (** The jsonnet image *)
   let jsonnet =
     let image_builder arch =

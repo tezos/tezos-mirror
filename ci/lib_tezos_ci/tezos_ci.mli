@@ -616,6 +616,8 @@ module Images : sig
 
   val rust_toolchain : Image.t
 
+  val rust_sdk_bindings : Image.t
+
   val jsonnet : Image.t
 
   module CI : sig
