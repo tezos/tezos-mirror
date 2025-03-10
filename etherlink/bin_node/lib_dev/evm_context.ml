@@ -1431,7 +1431,7 @@ module State = struct
 
   let perform_commit = commit
 
-  let patch_state (ctxt : t) ?block_number ~commit ~key ~value () =
+  let patch_state (ctxt : t) ?block_number ~commit ~key patch () =
     let open Lwt_result_syntax in
     let block_number = canonical_block_number ctxt block_number in
     let* evm_state =
@@ -1451,7 +1451,15 @@ module State = struct
                 Ethereum_types.pp_quantity
                 block_number)
     in
-    let*! evm_state = Evm_state.modify ~key ~value evm_state in
+    let*! previous_value = Evm_state.inspect evm_state key in
+    let new_value = patch (Option.map Bytes.to_string previous_value) in
+    let*! evm_state =
+      match new_value with
+      | Some value -> Evm_state.modify ~key ~value evm_state
+      | None when Option.is_some previous_value ->
+          Evm_state.delete ~kind:Value evm_state key
+      | None -> Lwt.return evm_state
+    in
     let* (Qty number) =
       match block_number with
       | None ->
@@ -1702,10 +1710,10 @@ module Handlers = struct
         let ctxt = Worker.state self in
         let*! hashes = State.delayed_inbox_hashes ctxt.session.evm_state in
         return hashes
-    | Patch_state {commit; key; value; block_number} ->
+    | Patch_state {commit; key; patch; block_number} ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
-        State.patch_state ?block_number ctxt ~commit ~key ~value ()
+        State.patch_state ?block_number ctxt ~commit ~key patch ()
     | Wasm_pvm_version ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
@@ -2053,7 +2061,7 @@ let patch_kernel ?block_number path =
          {
            commit = true;
            key = "/kernel/boot.wasm";
-           value = kernel;
+           patch = Fun.const (Some kernel);
            block_number;
          })
   in
@@ -2065,13 +2073,33 @@ let patch_sequencer_key ?block_number pk =
        {
          commit = false;
          key = Durable_storage_path.sequencer_key;
-         value = Signature.Public_key.to_b58check pk;
+         patch = Fun.const (Some (Signature.Public_key.to_b58check pk));
+         block_number;
+       })
+
+let provision_balance ?block_number address value =
+  worker_wait_for_request
+    (Patch_state
+       {
+         commit = false;
+         key = Durable_storage_path.Accounts.balance address;
+         patch =
+           (let open Ethereum_types in
+            function
+            | Some old_balance ->
+                let (Qty v) =
+                  decode_number_le (Bytes.unsafe_of_string old_balance)
+                in
+                let (Qty u) = value in
+                Some (String.of_bytes (encode_u256_le (Qty Z.(u + v))))
+            | None -> Some (String.of_bytes (encode_u256_le value)));
          block_number;
        })
 
 let patch_state ?block_number ~key ~value () =
   worker_wait_for_request
-    (Patch_state {commit = true; key; value; block_number})
+    (Patch_state
+       {commit = true; key; patch = Fun.const (Some value); block_number})
 
 let potential_observer_reorg evm_node_endpoint blueprint_with_events =
   worker_wait_for_request

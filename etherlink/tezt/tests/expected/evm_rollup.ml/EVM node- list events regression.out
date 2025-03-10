@@ -687,7 +687,6 @@ evm_context_request_failed:
                  "request": "patch_state",
                  "commit": boolean,
                  "key": $unistring,
-                 "value": /^([a-zA-Z0-9][a-zA-Z0-9])*$/,
                  "block_number"?: $unistring }
             || { /* Wasm_pvm_version */
                  "request": "wasm_pvm_version" }
@@ -2213,7 +2212,6 @@ evm_context_request_failed:
                  "request": "patch_state",
                  "commit": boolean,
                  "key": $unistring,
-                 "value": /^([a-zA-Z0-9][a-zA-Z0-9])*$/,
                  "block_number"?: $unistring }
             || { /* Wasm_pvm_version */
                  "request": "wasm_pvm_version" }

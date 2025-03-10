@@ -26,7 +26,7 @@ module Request = struct
     | Patch_state : {
         commit : bool;
         key : string;
-        value : string;
+        patch : string option -> string option;
         block_number : Ethereum_types.quantity option;
       }
         -> (unit, tztrace) t
@@ -94,18 +94,19 @@ module Request = struct
         case
           (Tag 4)
           ~title:"Patch_state"
-          (obj5
+          (obj4
              (req "request" (constant "patch_state"))
              (req "commit" bool)
              (req "key" string)
-             (req "value" (string' Hex))
              (opt "block_number" Ethereum_types.quantity_encoding))
           (function
-            | View (Patch_state {commit; key; value; block_number}) ->
-                Some ((), commit, key, value, block_number)
+            | View (Patch_state {commit; key; patch = _; block_number}) ->
+                Some ((), commit, key, block_number)
             | _ -> None)
-          (fun ((), commit, key, value, block_number) ->
-            View (Patch_state {commit; key; value; block_number}));
+          (fun ((), commit, key, block_number) ->
+            (* This is dead code, the encoding is only used for logging (i.e.,
+               encoding) *)
+            View (Patch_state {commit; key; patch = Fun.id; block_number}));
         case
           (Tag 5)
           ~title:"Wasm_pvm_version"

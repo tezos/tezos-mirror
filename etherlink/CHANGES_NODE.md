@@ -65,6 +65,9 @@
   while `run sandbox --network testnet --init-from-snapshot` will start a new
   sandbox from a `rolling:1` snapshot downloaded from the default snapshots
   provider. (!17098)
+- Adds `--fund ADDRESS` to `run sandbox`, where `ADDRESS` is a wallet address
+  in hexadecimal form that will be provisioned with 10,000 native tokens inside
+  the sandbox. The parameter can be used multiple times. (!17104)
 
 ### Storage changes
 
