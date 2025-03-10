@@ -443,6 +443,8 @@ type etherlink_configuration = {
   chain_id : int option;
 }
 
+type monitor_app_configuration = {dal_slack_webhook : Uri.t}
+
 type configuration = {
   with_dal : bool;
   stake : int list;
@@ -468,6 +470,7 @@ type configuration = {
   bootstrap_dal_node_identity_file : string option;
   external_rpc : bool;
   dal_incentives : bool;
+  monitor_app_configuration : monitor_app_configuration option;
 }
 
 type bootstrap = {
@@ -3069,6 +3072,12 @@ let register (module Cli : Scenarios_cli.Dal) =
     let bakers = Cli.bakers in
     let external_rpc = Cli.node_external_rpc_server in
     let dal_incentives = Cli.dal_incentives in
+    let monitor_app_configuration =
+      Option.map
+        (fun dal_slack_webhook ->
+          {dal_slack_webhook = Uri.of_string dal_slack_webhook})
+        Cli.Alerts.dal_slack_webhook
+    in
     let t =
       {
         with_dal;
@@ -3093,6 +3102,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         bootstrap_dal_node_identity_file;
         external_rpc;
         dal_incentives;
+        monitor_app_configuration;
       }
     in
     (t, etherlink)
