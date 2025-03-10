@@ -1274,7 +1274,7 @@ build_octez_source:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_very_high_cpu
   rules:
   - when: manual
     allow_failure: true

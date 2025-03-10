@@ -784,6 +784,7 @@ let jobs pipeline_type =
         ~__POS__
         ~stage
         ~image:Images.CI.build
+        ~cpu:Very_high
         ~rules:(make_rules ~manual:Yes ())
         ~before_script:
           (before_script
