@@ -75,7 +75,7 @@ let jobs =
       ~name:"tezt-memory-3k"
       ~tezt_tests:(Tezt.tests_tag_selector ~memory_3k:true [])
       ~tezt_variant:"-memory_3k"
-      ~parallel:(Vector 6)
+      ~parallel:(Vector 12)
       ~dependencies
       ()
   in
