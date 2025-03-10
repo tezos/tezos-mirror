@@ -1508,14 +1508,8 @@ impl From<&InstrCacheable> for Instruction {
             InstrCacheable::Sll(args) => Instruction::from_ic_sll(args),
             InstrCacheable::Srl(args) => Instruction::from_ic_srl(args),
             InstrCacheable::Sra(args) => Instruction::from_ic_sra(args),
-            InstrCacheable::Slt(args) => Instruction {
-                opcode: OpCode::Slt,
-                args: args.into(),
-            },
-            InstrCacheable::Sltu(args) => Instruction {
-                opcode: OpCode::Sltu,
-                args: args.into(),
-            },
+            InstrCacheable::Slt(args) => Instruction::new_slt(args.rd, args.rs1, args.rs2),
+            InstrCacheable::Sltu(args) => Instruction::new_sltu(args.rd, args.rs1, args.rs2),
             InstrCacheable::Addw(args) => Instruction {
                 opcode: OpCode::Addw,
                 args: args.into(),
@@ -1561,14 +1555,8 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Sraiw,
                 args: args.to_args(InstrWidth::Uncompressed),
             },
-            InstrCacheable::Slti(args) => Instruction {
-                opcode: OpCode::Slti,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
-            InstrCacheable::Sltiu(args) => Instruction {
-                opcode: OpCode::Sltiu,
-                args: args.to_args(InstrWidth::Uncompressed),
-            },
+            InstrCacheable::Slti(args) => Instruction::new_slti(args.rd, args.rs1, args.imm),
+            InstrCacheable::Sltiu(args) => Instruction::new_sltiu(args.rd, args.rs1, args.imm),
             InstrCacheable::Lb(args) => Instruction::from_ic_lb(args),
             InstrCacheable::Lh(args) => Instruction::from_ic_lh(args),
             InstrCacheable::Lw(args) => Instruction::from_ic_lw(args),

@@ -246,6 +246,62 @@ impl Instruction {
         }
     }
 
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Slt`].
+    pub(crate) fn new_slt(rd: NonZeroXRegister, rs1: XRegister, rs2: XRegister) -> Self {
+        Self {
+            opcode: OpCode::Slt,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width: InstrWidth::Uncompressed,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sltu`].
+    pub(crate) fn new_sltu(rd: NonZeroXRegister, rs1: XRegister, rs2: XRegister) -> Self {
+        Self {
+            opcode: OpCode::Sltu,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width: InstrWidth::Uncompressed,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Slti`].
+    pub(crate) fn new_slti(rd: NonZeroXRegister, rs1: XRegister, imm: i64) -> Self {
+        Self {
+            opcode: OpCode::Slti,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                imm,
+                width: InstrWidth::Uncompressed,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sltiu`].
+    pub(crate) fn new_sltiu(rd: NonZeroXRegister, rs1: XRegister, imm: i64) -> Self {
+        Self {
+            opcode: OpCode::Sltiu,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                imm,
+                width: InstrWidth::Uncompressed,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
     /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::And`].
     pub(crate) fn new_and(
         rd: NonZeroXRegister,
