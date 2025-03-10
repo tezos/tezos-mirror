@@ -4707,11 +4707,8 @@ let test_migration_accuser_issue ~migrate_from ~migrate_to =
                ~block:(string_of_int (last_level - 1))
                delegate.Account.public_key_hash
         in
-        let is_denounced =
-          JSON.(dal_participation |-> "denounced" |> as_bool)
-        in
         Check.is_false
-          is_denounced
+          dal_participation.denounced
           ~__LOC__
           ~error_msg:"Expected the delegate to not be denounced" ;
         unit)
@@ -8489,52 +8486,36 @@ let extract_dal_balance_updates balance_updates =
 let check_participation_and_rewards participation ~expected_assigned_shards
     ~expected_attestable_slots ~attesting_reward_per_shard dal_balance_updates
     delegate ~sufficient_participation =
-  let json = participation in
-  let denounced = JSON.(json |-> "denounced" |> as_bool) in
+  Check.is_false
+    participation.RPC.denounced
+    ~__LOC__
+    ~error_msg:"The delegate was unexpectedly denounced" ;
   Check.(
-    (denounced = false)
-      ~__LOC__
-      bool
-      ~error_msg:"The delegate was unexpectedly denounced") ;
-  let expected_assigned_shards_per_slot =
-    JSON.(json |-> "expected_assigned_shards_per_slot" |> as_int)
-  in
-  Check.(
-    (expected_assigned_shards_per_slot = expected_assigned_shards)
+    (participation.expected_assigned_shards_per_slot = expected_assigned_shards)
       ~__LOC__
       int
       ~error_msg:"Unexpected number of assigned shards. Expected %R, got %L") ;
-  let delegate_attested_dal_slots =
-    JSON.(json |-> "delegate_attested_dal_slots" |> as_int)
-  in
   let expected_attested_slots =
     if sufficient_participation then expected_attestable_slots else 0
   in
   Check.(
-    (delegate_attested_dal_slots = expected_attested_slots)
+    (participation.delegate_attested_dal_slots = expected_attested_slots)
       ~__LOC__
       int
       ~error_msg:"Expected that the delegate has attested %L slots, got %R") ;
-  let delegate_attestable_dal_slots =
-    JSON.(json |-> "delegate_attestable_dal_slots" |> as_int)
-  in
   Check.(
-    (delegate_attestable_dal_slots = expected_attestable_slots)
+    (participation.delegate_attestable_dal_slots = expected_attestable_slots)
       ~__LOC__
       int
       ~error_msg:"Expected that there are %L attestable slots, got %R") ;
-  let sufficient_dal_participation =
-    JSON.(json |-> "sufficient_dal_participation" |> as_bool)
-  in
   Check.(
-    (sufficient_dal_participation = sufficient_participation)
+    (participation.sufficient_dal_participation = sufficient_participation)
       ~__LOC__
       bool
       ~error_msg:"Expected sufficient_dal_participation to be %R, got %L") ;
-  let expected_dal_rewards = JSON.(json |-> "expected_dal_rewards" |> as_int) in
   let dal_rewards = expected_assigned_shards * attesting_reward_per_shard in
   Check.(
-    (expected_dal_rewards = dal_rewards)
+    (Tez.to_mutez participation.expected_dal_rewards = dal_rewards)
       ~__LOC__
       int
       ~error_msg:
@@ -8580,7 +8561,7 @@ let check_participation_and_rewards participation ~expected_assigned_shards
             (get_json_list dal_rewards)
   in
   Check.(
-    (expected_dal_rewards = rewards)
+    (Tez.to_mutez participation.expected_dal_rewards = rewards)
       ~__LOC__
       int
       ~error_msg:
@@ -9478,11 +9459,8 @@ let test_e2e_trap_faulty_dal_node _protocol dal_parameters _cryptobox node
          ~block:"head~1"
          faulty_delegate
   in
-  let is_denounced =
-    JSON.(faulty_delegate_dal_participation |-> "denounced" |> as_bool)
-  in
   Check.is_false
-    is_denounced
+    faulty_delegate_dal_participation.denounced
     ~__LOC__
     ~error_msg:"Expected the faulty delegate to not be denounced" ;
   let wait_for_trap_injection =
@@ -9542,75 +9520,22 @@ let test_e2e_trap_faulty_dal_node _protocol dal_parameters _cryptobox node
          ~block:"head~1"
          faulty_delegate
   in
-  let is_denounced =
-    JSON.(faulty_delegate_dal_participation |-> "denounced" |> as_bool)
-  in
   Check.is_true
-    is_denounced
+    faulty_delegate_dal_participation.denounced
     ~__LOC__
     ~error_msg:"Expected the faulty delegate to be denounced" ;
-  let sufficient_dal_participation =
-    JSON.(
-      faulty_delegate_dal_participation |-> "sufficient_dal_participation"
-      |> as_bool)
-  in
   Check.is_true
-    sufficient_dal_participation
+    faulty_delegate_dal_participation.sufficient_dal_participation
     ~__LOC__
     ~error_msg:"Expected sufficiant participation for the faulty delegate" ;
-  let expected_dal_rewards =
-    JSON.(
-      faulty_delegate_dal_participation |-> "expected_dal_rewards" |> as_int)
-  in
-  Check.(expected_dal_rewards = 0)
+  Check.(
+    Tez.to_mutez faulty_delegate_dal_participation.expected_dal_rewards = 0)
     ~__LOC__
     Check.int
     ~error_msg:
       "Expected DAL rewards for for the faulty delegate expected to be %R, but \
        got %L" ;
   unit
-
-type dal_participation = {
-  expected_assigned_shards_per_slot : int;
-  delegate_attested_dal_slots : int;
-  delegate_attestable_dal_slots : int;
-  expected_dal_rewards : Tez.t;
-  sufficient_dal_participation : bool;
-  denounced : bool;
-}
-
-let get_dal_participation l1_node public_key_hash =
-  let open JSON in
-  let* json =
-    Node.RPC.(
-      call l1_node
-      @@ get_chain_block_context_delegate_dal_participation public_key_hash)
-  in
-  let expected_assigned_shards_per_slot =
-    json |-> "expected_assigned_shards_per_slot" |> as_int
-  in
-  let delegate_attested_dal_slots =
-    json |-> "delegate_attested_dal_slots" |> as_int
-  in
-  let delegate_attestable_dal_slots =
-    json |-> "delegate_attestable_dal_slots" |> as_int
-  in
-  let expected_dal_rewards =
-    json |-> "expected_dal_rewards" |> as_int64 |> Tez.of_mutez_int64
-  in
-  let sufficient_dal_participation =
-    json |-> "sufficient_dal_participation" |> as_bool
-  in
-  let denounced = json |-> "denounced" |> as_bool in
-  return
-    {
-      expected_assigned_shards_per_slot;
-      delegate_attested_dal_slots;
-      delegate_attestable_dal_slots;
-      expected_dal_rewards;
-      sufficient_dal_participation;
-      denounced;
-    }
 
 let get_tb_expected_attesting_rewards l1_node public_key_hash =
   let* participation =
@@ -9900,7 +9825,9 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
     Lwt_list.map_s
       (fun (account, _account_role) ->
         let* dal_participation =
-          get_dal_participation node account.Account.public_key_hash
+          Node.RPC.call node
+          @@ RPC.get_chain_block_context_delegate_dal_participation
+               account.Account.public_key_hash
         in
         return (account, dal_participation))
       accounts_list
@@ -9968,7 +9895,7 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
           (fun (_account, dal_participation) ->
             Check.(
               dal_part.expected_assigned_shards_per_slot
-              = dal_participation.expected_assigned_shards_per_slot)
+              = dal_participation.RPC.expected_assigned_shards_per_slot)
               ~__LOC__
               Check.int
               ~error_msg:"expected_assigned_shards_per_slot mismatch" ;
@@ -10071,7 +9998,7 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
   List.iter
     (fun (account, dal_participation) ->
       Check.is_false
-        dal_participation.denounced
+        dal_participation.RPC.denounced
         ~__LOC__
         ~error_msg:
           ("account " ^ account.Account.public_key_hash

@@ -1524,7 +1524,7 @@ let get_chain_block_context_delegate_participation ?(chain = "main")
     expected_attesting_rewards : Tez.t;
   }
 
-let get_chain_block_context_delegate_dal_participation ?(chain = "main")
+let get_chain_block_context_delegate_dal_participation_raw ?(chain = "main")
     ?(block = "head") pkh =
   make
     GET
@@ -1539,6 +1539,56 @@ let get_chain_block_context_delegate_dal_participation ?(chain = "main")
       "dal_participation";
     ]
     Fun.id
+
+type dal_participation = {
+  expected_assigned_shards_per_slot : int;
+  delegate_attested_dal_slots : int;
+  delegate_attestable_dal_slots : int;
+  expected_dal_rewards : Tez.t;
+  sufficient_dal_participation : bool;
+  denounced : bool;
+}
+
+let get_chain_block_context_delegate_dal_participation ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "dal_participation";
+    ]
+  @@ fun json ->
+  let open JSON in
+  let expected_assigned_shards_per_slot =
+    json |-> "expected_assigned_shards_per_slot" |> as_int
+  in
+  let delegate_attested_dal_slots =
+    json |-> "delegate_attested_dal_slots" |> as_int
+  in
+  let delegate_attestable_dal_slots =
+    json |-> "delegate_attestable_dal_slots" |> as_int
+  in
+  let expected_dal_rewards =
+    json |-> "expected_dal_rewards" |> as_int64 |> Tez.of_mutez_int64
+  in
+  let sufficient_dal_participation =
+    json |-> "sufficient_dal_participation" |> as_bool
+  in
+  let denounced = json |-> "denounced" |> as_bool in
+  {
+    expected_assigned_shards_per_slot;
+    delegate_attested_dal_slots;
+    delegate_attestable_dal_slots;
+    expected_dal_rewards;
+    sufficient_dal_participation;
+    denounced;
+  }
 
 let get_chain_block_context_delegate_frozen_balance ?(chain = "main")
     ?(block = "head") pkh =
