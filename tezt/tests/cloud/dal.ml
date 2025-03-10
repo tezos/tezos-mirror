@@ -1085,7 +1085,14 @@ let get_metrics t infos_per_level metrics =
       infos_per_level.etherlink_operator_balance_sum;
   }
 
-let get_infos_per_level ~client ~endpoint ~level ~etherlink_operators =
+let get_infos_per_level t ~level =
+  let client = t.bootstrap.client in
+  let endpoint = t.bootstrap.node_rpc_endpoint in
+  let etherlink_operators =
+    match t.etherlink with
+    | None -> []
+    | Some setup -> setup.operator.account :: setup.operator.batching_operators
+  in
   let block = string_of_int level in
   let* header =
     RPC_core.call endpoint @@ RPC.get_chain_block_header_shell ~block ()
@@ -2885,17 +2892,7 @@ let on_new_level t level =
   let* () =
     if level mod 1_000 = 0 then update_bakers_infos t else Lwt.return_unit
   in
-  let* infos_per_level =
-    get_infos_per_level
-      ~client:t.bootstrap.client
-      ~endpoint:t.bootstrap.node_rpc_endpoint
-      ~level
-      ~etherlink_operators:
-        (match t.etherlink with
-        | None -> []
-        | Some setup ->
-            setup.operator.account :: setup.operator.batching_operators)
-  in
+  let* infos_per_level = get_infos_per_level t ~level in
   toplog "Level info processed" ;
   Hashtbl.replace t.infos level infos_per_level ;
   let metrics =
