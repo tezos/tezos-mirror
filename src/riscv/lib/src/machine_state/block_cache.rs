@@ -499,7 +499,9 @@ pub struct BlockCache<BCL: BlockCacheLayout, B: Block<MC, M>, MC: MemoryConfig, 
     fence_counter: Cell<FenceCounter, M>,
     partial_block: PartialBlock<M>,
     entries: BCL::Entries<MC, B, M>,
-    block_builder: B::BlockBuilder,
+    /// The block builder is the mechanism used to construct blocks for calling in a
+    /// (potentially) more efficient manner. For example - by JIT compiling them.
+    pub block_builder: B::BlockBuilder,
 }
 
 impl<BCL: BlockCacheLayout, B: Block<MC, M>, MC: MemoryConfig, M: ManagerBase>
