@@ -18,12 +18,12 @@ use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
 use crate::event::Event;
 use crate::l2block::L2Block;
-use crate::storage;
 use crate::transaction::Transaction;
 use crate::upgrade;
 use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
 use crate::{block_in_progress, tick_model};
+use crate::{block_storage, storage};
 use anyhow::Context;
 use block_in_progress::EthBlockInProgress;
 use evm::Config;
@@ -601,9 +601,12 @@ pub fn produce<Host: Runtime>(
             );
 
             let tezblock = TezBlock::new(number, timestamp, previous_hash);
+            let new_block = L2Block::Tezlink(tezblock);
+            block_storage::store_current(&mut safe_host, &new_block)
+                .context("Failed to store the current block")?;
             Ok(BlockComputationResult::Finished {
                 included_delayed_transactions: vec![],
-                block: L2Block::Tezlink(tezblock),
+                block: new_block,
             })
         }
         (_, _) => {
