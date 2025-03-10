@@ -792,6 +792,40 @@ mod tests {
         }
     });
 
+    backend_test!(test_jr, F, {
+        use crate::machine_state::registers::NonZeroXRegister::*;
+
+        let scenarios: &[Scenario<'_, F>] = &[
+            ScenarioBuilder::default()
+                // Jumping should exit the block
+                .set_instructions(&[
+                    I::new_li(x2, 10, Compressed),
+                    I::new_jr(x2, Compressed),
+                    I::new_nop(Compressed),
+                ])
+                .set_assert_hook(&|core: &MachineCoreState<M4K, F::Manager>| {
+                    assert_eq!(core.hart.pc.read(), 10);
+                })
+                .set_expected_steps(2)
+                .build(),
+            ScenarioBuilder::default()
+                // Jumping to start of the block should still exit.
+                .set_instructions(&[I::new_li(x6, 0, Compressed), I::new_jr(x6, Compressed)])
+                .set_assert_hook(&|core: &MachineCoreState<M4K, F::Manager>| {
+                    assert_eq!(core.hart.pc.read(), 0);
+                })
+                .set_expected_steps(2)
+                .build(),
+        ];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
+
     backend_test!(test_addi, F, {
         use Instruction as I;
 

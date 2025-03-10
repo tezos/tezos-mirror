@@ -95,6 +95,19 @@ pub fn run_j<I: ICB>(icb: &mut I, imm: i64) -> <I as ICB>::XValue {
     icb.xvalue_wrapping_add(current_pc, imm)
 }
 
+/// Performs an unconditional control transfer to the address in register `rs1`.
+///
+/// Relevant RISC-V opcodes:
+/// - JALR
+/// - C.JR
+pub fn run_jr<I: ICB>(icb: &mut I, rs1: NonZeroXRegister) -> <I as ICB>::XValue {
+    // The target address is obtained by setting the
+    // least-significant bit of the address in rs1 to zero
+    let lhs = icb.xregister_read_nz(rs1);
+    let rhs = icb.xvalue_of_imm(!1);
+    icb.xvalue_bitwise_and(lhs, rhs)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::backend_test;

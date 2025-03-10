@@ -652,6 +652,7 @@ impl OpCode {
             Self::Or => Some(Args::run_or),
             Self::Li => Some(Args::run_li),
             Self::J => Some(Args::run_j),
+            Self::Jr => Some(Args::run_jr),
             Self::Addi => Some(Args::run_addi),
             Self::Andi => Some(Args::run_andi),
             _ => None,
@@ -1450,11 +1451,10 @@ impl Args {
 
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
-    unsafe fn run_jr<MC: MemoryConfig, M: ManagerReadWrite>(
-        &self,
-        core: &mut MachineCoreState<MC, M>,
-    ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-        Ok(Set(core.hart.run_jr(self.rs1.nzx)))
+    unsafe fn run_jr<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+        let addr = branching::run_jr(icb, self.rs1.nzx);
+        let pcu = ProgramCounterUpdate::Set(addr);
+        icb.ok(pcu)
     }
 
     /// SAFETY: This function must only be called on an `Args` belonging
