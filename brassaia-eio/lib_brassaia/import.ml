@@ -15,7 +15,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-(* Extensions to the default namespace, opened throughout the Irmin codebase. *)
+(* Extensions to the default namespace, opened throughout the Brassaia codebase. *)
 
 type read = Perms.read
 type write = Perms.write

@@ -25,7 +25,7 @@ module type Clock = sig
 end
 
 module type Sigs = sig
-  (** {!Logs} tags attached to the log entries emitted by Irmin: *)
+  (** {!Logs} tags attached to the log entries emitted by Brassaia: *)
 
   module Source_code_position : sig
     type t = string * int * int * int

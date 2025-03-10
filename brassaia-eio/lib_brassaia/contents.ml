@@ -73,10 +73,10 @@ type json =
   | `Float of float
   | `O of (string * json) list
   | `A of json list ]
-[@@deriving irmin]
+[@@deriving brassaia]
 
 module Json_value = struct
-  type t = json [@@deriving irmin]
+  type t = json [@@deriving brassaia]
 
   let pp fmt x =
     let buffer = Buffer.create 32 in
@@ -166,7 +166,7 @@ module Json_value = struct
 end
 
 module Json = struct
-  type t = (string * json) list [@@deriving irmin]
+  type t = (string * json) list [@@deriving brassaia]
 
   let pp fmt x =
     let buffer = Buffer.create 32 in
@@ -180,7 +180,7 @@ module Json = struct
     let decoder = Jsonm.decoder (`String s) in
     match decode_json decoder with
     | Ok (`O obj) -> Ok obj
-    | Ok _ -> Error (`Msg "Irmin JSON values must be objects")
+    | Ok _ -> Error (`Msg "Brassaia JSON values must be objects")
     | Error _ as err -> err
 
   let equal a b = Json_value.equal (`O a) (`O b)
@@ -191,19 +191,19 @@ module Json = struct
 end
 
 module String_v2 = struct
-  type t = string [@@deriving irmin]
+  type t = string [@@deriving brassaia]
 
   let merge = Merge.idempotent Type.(option string)
 end
 
 module String = struct
-  type t = string [@@deriving irmin]
+  type t = string [@@deriving brassaia]
 
   let pre_hash = Type.(unstage (pre_hash t))
 
   (* Manually add a prefix to default contents, in order to prevent hash
      collision between contents and nodes or commits (see
-     https://github.com/mirage/irmin/issues/1304). *)
+     https://github.com/mirage/brassaia/issues/1304). *)
   let pre_hash_prefixed x f =
     f "B";
     pre_hash x f
@@ -240,7 +240,7 @@ module V1 = struct
 
     let t = Type.(boxed (string_of `Int64))
 
-    type nonrec t = t [@@deriving irmin ~encode_bin ~decode_bin ~pre_hash]
+    type nonrec t = t [@@deriving brassaia ~encode_bin ~decode_bin ~pre_hash]
 
     let size_of = Type.Size.t t
     let t = Type.like t ~bin:(encode_bin, decode_bin, size_of) ~pre_hash

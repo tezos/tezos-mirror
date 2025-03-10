@@ -38,10 +38,10 @@ module type S = sig
     (** Internal implementation utilities exposed for use in other integrity
         checks. *)
 
-    type size = Bytes of int [@@deriving irmin]
+    type size = Bytes of int [@@deriving brassaia]
 
     type objects = { nb_commits : int; nb_nodes : int; nb_contents : int }
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     val traverse_index : root:string -> int -> objects
   end
@@ -115,7 +115,7 @@ module type S = sig
 end
 
 module type Store = sig
-  include Irmin.S
+  include Brassaia.S
   include Store_intf.S with type repo := repo and type commit := commit
 end
 
@@ -136,7 +136,7 @@ module type Sigs = sig
   module Integrity_checks
       (Io : Io_intf.S)
       (XKey : Pack_key.S)
-      (X : Irmin.Backend.S
+      (X : Brassaia.Backend.S
              with type Commit.key = XKey.t
               and type Node.key = XKey.t
               and type Schema.Hash.t = XKey.hash)
@@ -201,9 +201,9 @@ module type Sigs = sig
   module Stats (S : sig
     type step
 
-    val step_t : step Irmin.Type.t
+    val step_t : step Brassaia.Type.t
 
-    module Hash : Irmin.Hash.S
+    module Hash : Brassaia.Hash.S
   end) : sig
     type t
 

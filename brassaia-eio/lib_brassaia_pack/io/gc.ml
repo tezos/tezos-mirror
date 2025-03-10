@@ -90,7 +90,7 @@ module Make (Args : Gc_args.S) = struct
         ~after_suffix_start_offset:new_suffix_start_offset
     in
     let unlink_result_file () =
-      let result_file = Irmin_pack.Layout.V4.gc_result ~root ~generation in
+      let result_file = Brassaia_pack.Layout.V4.gc_result ~root ~generation in
       match Io.classify_path result_file with
       | `File ->
           Io.unlink_dont_wait
@@ -158,7 +158,7 @@ module Make (Args : Gc_args.S) = struct
     let () =
       removable_chunk_idxs
       |> List.iter (fun chunk_idx ->
-             let path = Irmin_pack.Layout.V4.suffix_chunk ~root ~chunk_idx in
+             let path = Brassaia_pack.Layout.V4.suffix_chunk ~root ~chunk_idx in
              Io.unlink_dont_wait
                ~on_exn:(fun exn ->
                  [%log.warn
@@ -169,7 +169,7 @@ module Make (Args : Gc_args.S) = struct
     if generation >= 2 then (
       (* Unlink previous prefix. *)
       let prefix =
-        Irmin_pack.Layout.V4.prefix ~root ~generation:(generation - 1)
+        Brassaia_pack.Layout.V4.prefix ~root ~generation:(generation - 1)
       in
       Io.unlink_dont_wait
         ~on_exn:(fun exn ->
@@ -180,7 +180,7 @@ module Make (Args : Gc_args.S) = struct
 
       (* Unlink previous mapping. *)
       let mapping =
-        Irmin_pack.Layout.V4.mapping ~root ~generation:(generation - 1)
+        Brassaia_pack.Layout.V4.mapping ~root ~generation:(generation - 1)
       in
       Io.unlink_dont_wait
         ~on_exn:(fun exn ->
@@ -190,7 +190,7 @@ module Make (Args : Gc_args.S) = struct
         mapping);
 
     (* Unlink current gc's result.*)
-    let result = Irmin_pack.Layout.V4.gc_result ~root ~generation in
+    let result = Brassaia_pack.Layout.V4.gc_result ~root ~generation in
     Io.unlink_dont_wait
       ~on_exn:(fun exn ->
         [%log.warn
@@ -215,7 +215,7 @@ module Make (Args : Gc_args.S) = struct
   let read_gc_output ~root ~generation =
     let open Result_syntax in
     let read_file () =
-      let path = Irmin_pack.Layout.V4.gc_result ~root ~generation in
+      let path = Brassaia_pack.Layout.V4.gc_result ~root ~generation in
       let* io = Io.open_ ~path ~readonly:true in
       let* len = Io.read_size io in
       let len = Int63.to_int len in
@@ -224,11 +224,11 @@ module Make (Args : Gc_args.S) = struct
       Ok string
     in
     let read_error err =
-      `Corrupted_gc_result_file (Irmin.Type.to_string Errs.t err)
+      `Corrupted_gc_result_file (Brassaia.Type.to_string Errs.t err)
     in
-    let gc_error err = `Gc_process_error (Irmin.Type.to_string Errs.t err) in
+    let gc_error err = `Gc_process_error (Brassaia.Type.to_string Errs.t err) in
     let* s = read_file () |> Result.map_error read_error in
-    match Irmin.Type.of_json_string Worker.gc_output_t s with
+    match Brassaia.Type.of_json_string Worker.gc_output_t s with
     | Error (`Msg error) -> Error (`Corrupted_gc_result_file error)
     | Ok ok -> ok |> Result.map_error gc_error
 
@@ -278,7 +278,7 @@ module Make (Args : Gc_args.S) = struct
 
                 [%log.debug
                   "Gc ended successfully. %a"
-                    (Irmin.Type.pp Stats.Latest_gc.stats_t)
+                    (Brassaia.Type.pp Stats.Latest_gc.stats_t)
                     stats];
                 let () = t.on_finalise (Ok stats) in
                 Ok (`Finalised stats)

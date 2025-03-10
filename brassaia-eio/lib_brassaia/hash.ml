@@ -71,13 +71,13 @@ module BLAKE2S = Make (Digestif.BLAKE2S)
 module Typed (K : S) (V : Type.S) = struct
   include K
 
-  type value = V.t [@@deriving irmin ~pre_hash]
+  type value = V.t [@@deriving brassaia ~pre_hash]
 
   let hash v = K.hash (pre_hash_value v)
 end
 
 module V1 (K : S) : S with type t = K.t = struct
-  type t = K.t [@@deriving irmin ~encode_bin ~decode_bin]
+  type t = K.t [@@deriving brassaia ~encode_bin ~decode_bin]
 
   let hash = K.hash
   let short_hash = K.short_hash
@@ -102,7 +102,7 @@ end
 
 module Set = struct
   module Make (Hash : S) = struct
-    include Irmin_data.Fixed_size_string_set
+    include Brassaia_data.Fixed_size_string_set
 
     let create ?(initial_slots = 0) () =
       let elt_length = Hash.hash_size

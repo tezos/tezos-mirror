@@ -1,6 +1,6 @@
-open Irmin_pack_unix
+open Brassaia_pack_unix
 
-type leq = [ `All_gt_key | `Some of int ] [@@deriving irmin ~pp ~equal]
+type leq = [ `All_gt_key | `Some of int ] [@@deriving brassaia ~pp ~equal]
 
 let leq = Alcotest.testable pp_leq equal_leq
 

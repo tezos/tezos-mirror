@@ -17,10 +17,10 @@
 (** {1 Commit Info} *)
 
 module type S = sig
-  type author = string [@@deriving irmin]
-  type message = string [@@deriving irmin]
+  type author = string [@@deriving brassaia]
+  type message = string [@@deriving brassaia]
 
-  type t [@@deriving irmin]
+  type t [@@deriving brassaia]
   (** The type for commit info. *)
 
   val v : ?author:author -> ?message:message -> int64 -> t

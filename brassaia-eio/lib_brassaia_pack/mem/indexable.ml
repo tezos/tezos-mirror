@@ -53,21 +53,21 @@ end = struct
     | Some elt -> elt.refcount <- pred elt.refcount
 end
 
-module Maker (K : Irmin.Hash.S) = struct
+module Maker (K : Brassaia.Hash.S) = struct
   type key = K.t
 
   module Make
-      (Val : Irmin_pack.Pack_value.S with type hash := K.t and type key := K.t) =
+      (Val : Brassaia_pack.Pack_value.S with type hash := K.t and type key := K.t) =
   struct
     (* TODO(craigfe): We could use the keys to skip traversal of the map on
        lookup. This wasn't done originally due to complications with implementing
        the [clear] function, but this has since been removed. (See #1794.) *)
-    module Key = Irmin.Key.Of_hash (K)
+    module Key = Brassaia.Key.Of_hash (K)
 
     module KMap = Map.Make (struct
       type t = K.t
 
-      let compare = Irmin.Type.(unstage (compare K.t))
+      let compare = Brassaia.Type.(unstage (compare K.t))
     end)
 
     type hash = K.t
@@ -79,7 +79,7 @@ module Maker (K : Irmin.Hash.S) = struct
     let index t h = index_direct t h
     let instances = Pool.create ~alloc:(fun name -> { name; t = KMap.empty })
     let v name = Pool.take instances name
-    let equal_key = Irmin.Type.(unstage (equal K.t))
+    let equal_key = Brassaia.Type.(unstage (equal K.t))
 
     let close t =
       [%log.debug "close"];
@@ -87,7 +87,7 @@ module Maker (K : Irmin.Hash.S) = struct
 
     let cast t = (t :> read_write t)
     let batch t f = f (cast t)
-    let pp_hash = Irmin.Type.pp K.t
+    let pp_hash = Brassaia.Type.pp K.t
 
     let check_key k v =
       let k' = Val.hash v in

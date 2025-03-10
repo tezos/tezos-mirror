@@ -18,7 +18,7 @@
 open! Import
 include Node_intf
 
-let src = Logs.Src.create "irmin.node" ~doc:"Irmin trees/nodes"
+let src = Logs.Src.create "brassaia.node" ~doc:"Brassaia trees/nodes"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
@@ -73,14 +73,14 @@ module Of_core (S : Core) = struct
     Merge.like S.t merge explode implode
 end
 
-module Irmin_hash = Hash
+module Brassaia_hash = Hash
 
 (* A [Make] implementation providing the subset of [S] that can be implemented
    over abstract [key] types. *)
 module Make_core
     (Hash : Hash.S)
     (Path : sig
-      type step [@@deriving irmin]
+      type step [@@deriving brassaia]
     end)
     (Metadata : Metadata.S)
     (Contents_key : Key.S with type hash = Hash.t)
@@ -88,27 +88,27 @@ module Make_core
 struct
   module Metadata = Metadata
 
-  type contents_key = Contents_key.t [@@deriving irmin]
-  type node_key = Node_key.t [@@deriving irmin]
-  type step = Path.step [@@deriving irmin]
-  type metadata = Metadata.t [@@deriving irmin ~equal]
-  type hash = Hash.t [@@deriving irmin]
+  type contents_key = Contents_key.t [@@deriving brassaia]
+  type node_key = Node_key.t [@@deriving brassaia]
+  type step = Path.step [@@deriving brassaia]
+  type metadata = Metadata.t [@@deriving brassaia ~equal]
+  type hash = Hash.t [@@deriving brassaia]
 
   type 'key contents_entry = { name : Path.step; contents : 'key }
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   type 'key contents_m_entry = {
     metadata : Metadata.t;
     name : Path.step;
     contents : 'key;
   }
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   module StepMap = Map.Make (struct
-    type t = Path.step [@@deriving irmin ~compare]
+    type t = Path.step [@@deriving brassaia ~compare]
   end)
 
-  type 'h node_entry = { name : Path.step; node : 'h } [@@deriving irmin]
+  type 'h node_entry = { name : Path.step; node : 'h } [@@deriving brassaia]
 
   type entry =
     | Node of node_key node_entry
@@ -119,13 +119,13 @@ struct
     | Node_hash of Hash.t node_entry
     | Contents_hash of Hash.t contents_entry
     | Contents_m_hash of Hash.t contents_m_entry
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   type t = entry StepMap.t
   type value = [ `Contents of contents_key * metadata | `Node of node_key ]
 
   type weak_value = [ `Contents of hash * metadata | `Node of hash ]
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   (* FIXME:  special-case the default metadata in the default signature? *)
   let value_t =
@@ -226,16 +226,16 @@ struct
       | Node_hash of Hash.t node_entry
       | Contents_hash of Hash.t contents_entry
       | Contents_m_hash of Hash.t contents_m_entry
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
-    type t = entry list [@@deriving irmin ~pre_hash]
-    type t_not_prefixed = t [@@deriving irmin ~pre_hash]
+    type t = entry list [@@deriving brassaia ~pre_hash]
+    type t_not_prefixed = t [@@deriving brassaia ~pre_hash]
 
     let pre_hash = Type.(unstage (pre_hash t))
 
     (* Manually add a prefix to default nodes, in order to prevent hash
        collision between contents and nodes (see
-       https://github.com/mirage/irmin/issues/1304).
+       https://github.com/mirage/brassaia/issues/1304).
 
        Prefixing the contents is not enough to prevent the collision: the
        prehash of a node starts with the number of its children, which can
@@ -288,10 +288,10 @@ struct
     `Node l
 
   module Ht =
-    Irmin_hash.Typed
+    Brassaia_hash.Typed
       (Hash)
       (struct
-        type nonrec t = t [@@deriving irmin]
+        type nonrec t = t [@@deriving brassaia]
       end)
 
   let hash_exn ?force:_ = Ht.hash
@@ -316,7 +316,7 @@ module Portable = struct
       [ `Blinded of hash
       | `Values of (step * value) list
       | `Inode of int * (int * proof) list ]
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     let to_proof (t : t) : proof = `Values (seq t |> List.of_seq)
 
@@ -338,7 +338,7 @@ end
 module Make_generic_key
     (Hash : Hash.S)
     (Path : sig
-      type step [@@deriving irmin]
+      type step [@@deriving brassaia]
     end)
     (Metadata : Metadata.S)
     (Contents_key : Key.S with type hash = Hash.t)
@@ -352,9 +352,9 @@ struct
     module Core = struct
       include Core
 
-      type contents_key = hash [@@deriving irmin]
-      type node_key = hash [@@deriving irmin]
-      type value = weak_value [@@deriving irmin]
+      type contents_key = hash [@@deriving brassaia]
+      type node_key = hash [@@deriving brassaia]
+      type value = weak_value [@@deriving brassaia]
 
       let to_entry name = function
         | `Node node -> Node_hash { name; node }
@@ -395,7 +395,7 @@ struct
 
   exception Dangling_hash of { context : string; hash : hash }
 
-  type nonrec hash = hash [@@deriving irmin ~pp]
+  type nonrec hash = hash [@@deriving brassaia ~pp]
 
   let () =
     Printexc.register_printer (function
@@ -407,7 +407,7 @@ end
 module Make_generic_key_v2
     (Hash : Hash.S)
     (Path : sig
-      type step [@@deriving irmin]
+      type step [@@deriving brassaia]
     end)
     (Metadata : Metadata.S)
     (Contents_key : Key.S with type hash = Hash.t)
@@ -427,7 +427,7 @@ end
 module Make
     (Hash : Hash.S)
     (Path : sig
-      type step [@@deriving irmin]
+      type step [@@deriving brassaia]
     end)
     (Metadata : Metadata.S) =
 struct
@@ -515,11 +515,11 @@ module Graph (S : Store) = struct
   module Contents_key = S.Contents.Key
   module Metadata = S.Metadata
 
-  type step = Path.step [@@deriving irmin]
-  type metadata = Metadata.t [@@deriving irmin]
-  type contents_key = Contents_key.t [@@deriving irmin]
-  type node_key = S.Key.t [@@deriving irmin]
-  type path = Path.t [@@deriving irmin]
+  type step = Path.step [@@deriving brassaia]
+  type metadata = Metadata.t [@@deriving brassaia]
+  type contents_key = Contents_key.t [@@deriving brassaia]
+  type node_key = S.Key.t [@@deriving brassaia]
+  type path = Path.t [@@deriving brassaia]
   type 'a t = 'a S.t
   type value = [ `Contents of contents_key * metadata | `Node of node_key ]
 
@@ -530,7 +530,7 @@ module Graph (S : Store) = struct
     match S.find t n with None -> [] | Some n -> S.Val.list n
 
   module U = struct
-    type t = unit [@@deriving irmin]
+    type t = unit [@@deriving brassaia]
   end
 
   module Graph = Object_graph.Make (Contents_key) (S.Key) (U) (U)
@@ -599,7 +599,7 @@ module Graph (S : Store) = struct
     in
     aux node path
 
-  let err_empty_path () = invalid_arg "Irmin.node: empty path"
+  let err_empty_path () = invalid_arg "Brassaia.node: empty path"
 
   let map_one t node f label =
     [%log.debug "map_one %a" Type.(pp Path.step_t) label];
@@ -654,7 +654,7 @@ module V1 (N : Generic_key.S with type step = string) = struct
   module K (H : Type.S) = struct
     let h = Type.string_of `Int64
 
-    type t = H.t [@@deriving irmin ~to_bin_string ~of_bin_string]
+    type t = H.t [@@deriving brassaia ~to_bin_string ~of_bin_string]
 
     let size_of = Type.Size.using to_bin_string (Type.Size.t h)
 
@@ -688,10 +688,10 @@ module V1 (N : Generic_key.S with type step = string) = struct
   module Metadata = N.Metadata
 
   type step = N.step
-  type node_key = Node_key.t [@@deriving irmin]
-  type contents_key = Contents_key.t [@@deriving irmin]
-  type metadata = N.metadata [@@deriving irmin]
-  type hash = N.hash [@@deriving irmin]
+  type node_key = Node_key.t [@@deriving brassaia]
+  type contents_key = Contents_key.t [@@deriving brassaia]
+  type metadata = N.metadata [@@deriving brassaia]
+  type hash = N.hash [@@deriving brassaia]
   type value = N.value
   type t = { n : N.t; entries : (step * value) list }
 

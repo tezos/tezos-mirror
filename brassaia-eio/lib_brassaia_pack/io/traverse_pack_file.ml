@@ -61,7 +61,7 @@ end
 module type Args = sig
   module File_manager : File_manager.S
   module Dispatcher : Dispatcher.S with module Fm = File_manager
-  module Hash : Irmin.Hash.S
+  module Hash : Brassaia.Hash.S
   module Index : Pack_index.S with type key := Hash.t
   module Inode : Inode.S with type hash := Hash.t
   module Contents : Pack_value.S
@@ -73,14 +73,14 @@ module Make (Args : Args) : sig
     [ `Reconstruct_index of [ `In_place | `Output of string ]
     | `Check_index
     | `Check_and_fix_index ] ->
-    Irmin.config ->
+    Brassaia.config ->
     unit
 
   val test :
     [ `Reconstruct_index of [ `In_place | `Output of string ]
     | `Check_index
     | `Check_and_fix_index ] ->
-    Irmin.config ->
+    Brassaia.config ->
     unit
 end = struct
   open Args
@@ -88,9 +88,9 @@ end = struct
   module Errs = Io_errors.Make (Io)
   module Progress = Io.Progress
 
-  let pp_key = Irmin.Type.pp Hash.t
-  let decode_key = Irmin.Type.(unstage (decode_bin Hash.t))
-  let decode_kind = Irmin.Type.(unstage (decode_bin Pack_value.Kind.t))
+  let pp_key = Brassaia.Type.pp Hash.t
+  let decode_key = Brassaia.Type.(unstage (decode_bin Hash.t))
+  let decode_kind = Brassaia.Type.(unstage (decode_bin Pack_value.Kind.t))
 
   (* [Repr] doesn't yet support buffered binary decoders, so we hack one
      together by re-interpreting [Invalid_argument _] exceptions from [Repr]
@@ -98,7 +98,7 @@ end = struct
   exception Not_enough_buffer
 
   type index_value = int63 * int * Pack_value.Kind.t
-  [@@deriving irmin ~equal ~pp]
+  [@@deriving brassaia ~equal ~pp]
 
   type index_binding = { key : Hash.t; data : index_value }
   type missing_hash = { idx_pack : int; binding : index_binding }
@@ -123,7 +123,7 @@ end = struct
               Fmt.invalid_arg "Can't reconstruct index. File already exits.";
             path
         | `In_place ->
-            if Conf.readonly config then raise Irmin_pack.RO_not_allowed;
+            if Conf.readonly config then raise Brassaia_pack.RO_not_allowed;
             Conf.root config
       in
       let log_size = Conf.index_log_size config in
@@ -226,7 +226,7 @@ end = struct
     | Invalid_argument msg when msg = "String.blit / Bytes.blit_string" ->
         raise Not_enough_buffer
 
-  (* duplicated code with irmin-tezos-utils *)
+  (* duplicated code with brassaia-tezos-utils *)
   let decode_entry_len buffer =
     let buffer = Bytes.unsafe_to_string buffer in
     let i0 = 0 in
@@ -367,7 +367,7 @@ end = struct
   let run_or_test ~initial_buffer_size mode config =
     let always =
       Conf.indexing_strategy config
-      |> Irmin_pack.Indexing_strategy.is_minimal
+      |> Brassaia_pack.Indexing_strategy.is_minimal
       |> not
     in
     let iter_pack_entry, finalise, message =

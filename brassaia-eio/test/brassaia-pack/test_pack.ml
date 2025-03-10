@@ -19,62 +19,62 @@ open Common
 
 let test_dir = Filename.concat "_build" "test-db-pack"
 
-module Irmin_pack_store (Config : Irmin_pack.Conf.S) : Irmin_test.Generic_key =
+module Brassaia_pack_store (Config : Brassaia_pack.Conf.S) : Brassaia_test.Generic_key =
 struct
-  open Irmin_pack_unix.Maker (Config)
+  open Brassaia_pack_unix.Maker (Config)
 
   include Make (struct
-    include Irmin_test.Schema
-    module Node = Irmin.Node.Generic_key.Make (Hash) (Path) (Metadata)
-    module Commit_maker = Irmin.Commit.Generic_key.Maker (Info)
+    include Brassaia_test.Schema
+    module Node = Brassaia.Node.Generic_key.Make (Hash) (Path) (Metadata)
+    module Commit_maker = Brassaia.Commit.Generic_key.Maker (Info)
     module Commit = Commit_maker.Make (Hash)
   end)
 end
 
-let suite_pack name_suffix indexing_strategy (module Config : Irmin_pack.Conf.S)
+let suite_pack name_suffix indexing_strategy (module Config : Brassaia_pack.Conf.S)
     =
-  let store = (module Irmin_pack_store (Config) : Irmin_test.Generic_key) in
+  let store = (module Brassaia_pack_store (Config) : Brassaia_test.Generic_key) in
   let config =
-    Irmin_pack.config ~fresh:false ~lru_size:0 ~indexing_strategy test_dir
+    Brassaia_pack.config ~fresh:false ~lru_size:0 ~indexing_strategy test_dir
   in
   let init ~config =
     let test_dir =
-      Irmin.Backend.Conf.find_root config |> Option.value ~default:test_dir
+      Brassaia.Backend.Conf.find_root config |> Option.value ~default:test_dir
     in
     rm_dir test_dir
   in
   let clean = init in
-  Irmin_test.Suite.create_generic_key ~name:("PACK" ^ name_suffix)
+  Brassaia_test.Suite.create_generic_key ~name:("PACK" ^ name_suffix)
     ~import_supported:false ~init ~store ~config ~clean ()
 
-module Irmin_tezos_conf = struct
-  include Irmin_tezos.Conf
+module Brassaia_tezos_conf = struct
+  include Brassaia_tezos.Conf
 
   (* The generic test suite relies a lot on the empty tree. Let's allow it. *)
   let forbid_empty_dir_persistence = false
 end
 
-module Irmin_pack_mem_maker : Irmin_test.Generic_key = struct
-  open Irmin_pack_mem.Maker (Irmin_tezos_conf)
+module Brassaia_pack_mem_maker : Brassaia_test.Generic_key = struct
+  open Brassaia_pack_mem.Maker (Brassaia_tezos_conf)
 
   include Make (struct
-    include Irmin_test.Schema
-    module Node = Irmin.Node.Generic_key.Make (Hash) (Path) (Metadata)
-    module Commit_maker = Irmin.Commit.Generic_key.Maker (Info)
+    include Brassaia_test.Schema
+    module Node = Brassaia.Node.Generic_key.Make (Hash) (Path) (Metadata)
+    module Commit_maker = Brassaia.Commit.Generic_key.Maker (Info)
     module Commit = Commit_maker.Make (Hash)
   end)
 end
 
 let suite_mem =
-  let store = (module Irmin_pack_mem_maker : Irmin_test.Generic_key) in
-  let config = Irmin_pack.config ~fresh:false ~lru_size:0 test_dir in
-  Irmin_test.Suite.create_generic_key ~import_supported:false ~name:"PACK MEM"
+  let store = (module Brassaia_pack_mem_maker : Brassaia_test.Generic_key) in
+  let config = Brassaia_pack.config ~fresh:false ~lru_size:0 test_dir in
+  Brassaia_test.Suite.create_generic_key ~import_supported:false ~name:"PACK MEM"
     ~store ~config ()
 
 let suite =
-  let module Index = Irmin_pack.Indexing_strategy in
+  let module Index = Brassaia_pack.Indexing_strategy in
   let module Conf_small_nodes = struct
-    (* Parameters chosen to be different from those in [Irmin_tezos.Conf]: *)
+    (* Parameters chosen to be different from those in [Brassaia_tezos.Conf]: *)
     let entries = 2
     let stable_hash = 3
     let contents_length_header = None
@@ -82,7 +82,7 @@ let suite =
     let forbid_empty_dir_persistence = false
   end in
   [
-    suite_pack " { Tezos }" Index.minimal (module Irmin_tezos_conf);
+    suite_pack " { Tezos }" Index.minimal (module Brassaia_tezos_conf);
     suite_pack " { Small_nodes }" Index.always (module Conf_small_nodes);
     suite_mem;
   ]
@@ -150,7 +150,7 @@ module Dict = struct
       try
         ignore_int (Dict.index d2.dict k);
         Alcotest.fail "RO dict should not be writable"
-      with Irmin_pack.RO_not_allowed -> ()
+      with Brassaia_pack.RO_not_allowed -> ()
     in
     ignore_int (Dict.index d.dict "foo");
     ignore_int (Dict.index d.dict "foo");
@@ -413,12 +413,12 @@ end
 
 module Branch = struct
   module Branch =
-    Irmin_pack_unix.Atomic_write.Make_persistent
-      (Irmin_pack_unix.Io.Unix)
-      (Irmin.Branch.String)
-      (Irmin_pack.Atomic_write.Value.Of_hash (Irmin.Hash.SHA1))
+    Brassaia_pack_unix.Atomic_write.Make_persistent
+      (Brassaia_pack_unix.Io.Unix)
+      (Brassaia.Branch.String)
+      (Brassaia_pack.Atomic_write.Value.Of_hash (Brassaia.Hash.SHA1))
 
-  let pp_hash = Irmin.Type.pp Irmin.Hash.SHA1.t
+  let pp_hash = Brassaia.Type.pp Brassaia.Hash.SHA1.t
 
   let test_branch () =
     let branches = [ "foo"; "bar/toto"; "titi" ] in
@@ -493,9 +493,9 @@ end
 
 module Layout = struct
   let test_classify_upper_filename () =
-    let module V1_and_v2 = Irmin_pack.Layout.V1_and_v2 in
-    let module V4 = Irmin_pack.Layout.V4 in
-    let module Classification = Irmin_pack.Layout.Classification.Upper in
+    let module V1_and_v2 = Brassaia_pack.Layout.V1_and_v2 in
+    let module V4 = Brassaia_pack.Layout.V4 in
+    let module Classification = Brassaia_pack.Layout.Classification.Upper in
     let c = Alcotest.(check (testable_repr Classification.t)) "" in
     let classif = Classification.v in
     c `V1_or_v2_pack (V1_and_v2.pack ~root:"" |> classif);
@@ -519,9 +519,9 @@ module Layout = struct
     ()
 
   let test_classify_volume_filename () =
-    let module V1_and_v2 = Irmin_pack.Layout.V1_and_v2 in
-    let module V5 = Irmin_pack.Layout.V5.Volume in
-    let module Classification = Irmin_pack.Layout.Classification.Volume in
+    let module V1_and_v2 = Brassaia_pack.Layout.V1_and_v2 in
+    let module V5 = Brassaia_pack.Layout.V5.Volume in
+    let module Classification = Brassaia_pack.Layout.Classification.Volume in
     let c = Alcotest.(check (testable_repr Classification.t)) "" in
     let classif = Classification.v in
     c `Control (V5.control ~root:"" |> classif);

@@ -24,14 +24,14 @@ let src = Logs.Src.create "tests.snapshot" ~doc:"Tests"
 module Log = (val Logs.src_log src : Logs.LOG)
 
 module S = struct
-  module Maker = Irmin_pack_unix.Maker (Conf)
+  module Maker = Brassaia_pack_unix.Maker (Conf)
   include Maker.Make (Schema)
 end
 
 let check_key = Alcotest.check_repr Key.t
 
 let config ?(readonly = false) ?(fresh = true) ~indexing_strategy root =
-  Irmin_pack.config ~readonly ?index_log_size ~fresh ~indexing_strategy root
+  Brassaia_pack.config ~readonly ?index_log_size ~fresh ~indexing_strategy root
 
 let info = S.Info.empty
 
@@ -56,8 +56,8 @@ let read_mbytes rbuf b =
   let string = read_string rbuf ~len:(Bytes.length b) in
   Bytes.blit_string string 0 b 0 (Bytes.length b)
 
-let encode_bin_snapshot = Irmin.Type.(unstage (encode_bin S.Snapshot.t))
-let decode_bin_snapshot = Irmin.Type.(unstage (decode_bin S.Snapshot.t))
+let encode_bin_snapshot = Brassaia.Type.(unstage (encode_bin S.Snapshot.t))
+let decode_bin_snapshot = Brassaia.Type.(unstage (decode_bin S.Snapshot.t))
 
 let encode_with_size buf snapshot_inode =
   let size = ref 0 in
@@ -141,10 +141,10 @@ let test_in_memory ~indexing_strategy () =
   S.Repo.close repo_import
 
 let test_in_memory_minimal =
-  test_in_memory ~indexing_strategy:Irmin_pack.Indexing_strategy.minimal
+  test_in_memory ~indexing_strategy:Brassaia_pack.Indexing_strategy.minimal
 
 let test_in_memory_always =
-  test_in_memory ~indexing_strategy:Irmin_pack.Indexing_strategy.always
+  test_in_memory ~indexing_strategy:Brassaia_pack.Indexing_strategy.always
 
 let test_on_disk ~indexing_strategy () =
   rm_dir root_export;
@@ -163,10 +163,10 @@ let test_on_disk ~indexing_strategy () =
   S.Repo.close repo_import
 
 let test_on_disk_minimal =
-  test_on_disk ~indexing_strategy:Irmin_pack.Indexing_strategy.minimal
+  test_on_disk ~indexing_strategy:Brassaia_pack.Indexing_strategy.minimal
 
 let test_on_disk_always =
-  test_on_disk ~indexing_strategy:Irmin_pack.Indexing_strategy.always
+  test_on_disk ~indexing_strategy:Brassaia_pack.Indexing_strategy.always
 
 let start_gc repo commit =
   let commit_key = S.Commit.key commit in
@@ -215,7 +215,7 @@ let test_gc ~repo_export ~repo_import ?on_disk expected_visited =
   | `Node key, Some key' -> check_key "snapshot key" key key'
   | `Contents _, _ -> Alcotest.fail "Root key should not be contents"
 
-let indexing_strategy = Irmin_pack.Indexing_strategy.minimal
+let indexing_strategy = Brassaia_pack.Indexing_strategy.minimal
 
 let test_gced_store_in_memory () =
   rm_dir root_export;
@@ -254,7 +254,7 @@ let test_export_import_reexport () =
   let tree = S.Tree.singleton [ "a" ] "y" in
   let parent_commit = S.Commit.v repo_export ~parents:[] ~info tree in
   let parent_key =
-    Irmin_pack_unix.Pack_key.v_indexed (S.Commit.hash parent_commit)
+    Brassaia_pack_unix.Pack_key.v_indexed (S.Commit.hash parent_commit)
   in
   let tree = S.Tree.singleton [ "a" ] "x" in
   let _ = S.Commit.v repo_export ~parents:[ parent_key ] ~info tree in

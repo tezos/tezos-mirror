@@ -29,24 +29,24 @@ module type Snapshot = sig
   type metadata
 
   type kinded_hash = Contents of hash * metadata | Node of hash
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
-  type entry = { step : string; hash : kinded_hash } [@@deriving irmin]
+  type entry = { step : string; hash : kinded_hash } [@@deriving brassaia]
 
   type inode_tree = { depth : int; length : int; pointers : (int * hash) list }
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   type v = Inode_tree of inode_tree | Inode_value of entry list
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
-  type inode = { v : v; root : bool } [@@deriving irmin]
+  type inode = { v : v; root : bool } [@@deriving brassaia]
 end
 
 module type Value = sig
   type key
 
   include
-    Irmin.Node.Generic_key.S
+    Brassaia.Node.Generic_key.S
       with type node_key = key
        and type contents_key = key
 
@@ -57,7 +57,7 @@ module type Value = sig
     list
 
   module Portable :
-    Irmin.Node.Portable.S
+    Brassaia.Node.Portable.S
       with type node := t
        and type hash = hash
        and type step := step
@@ -85,8 +85,8 @@ module type Raw = sig
 end
 
 module type S = sig
-  include Irmin.Indexable.S
-  module Hash : Irmin.Hash.S with type t = hash
+  include Brassaia.Indexable.S
+  module Hash : Brassaia.Hash.S with type t = hash
 
   val unsafe_find : check_integrity:bool -> [< read ] t -> key -> value option
 
@@ -122,7 +122,7 @@ module type Compress = sig
     | V2_root of v1
     | V2_nonroot of v1
 
-  type t = { hash : hash; tv : tagged_v } [@@deriving irmin]
+  type t = { hash : hash; tv : tagged_v } [@@deriving brassaia]
 end
 
 (** Unstable internal API agnostic about the underlying storage. Use it only to
@@ -169,22 +169,22 @@ module type Internal = sig
         | Contents of contents_key
         | Contents_x of metadata * contents_key
         | Node of node_key
-      [@@deriving irmin]
+      [@@deriving brassaia]
 
-      type entry = { name : step; key : kinded_key } [@@deriving irmin]
+      type entry = { name : step; key : kinded_key } [@@deriving brassaia]
       (** The type of entries. *)
 
       type 'a pointer = { index : int; pointer : hash; tree : 'a }
-      [@@deriving irmin]
+      [@@deriving brassaia]
       (** The type for internal pointers between concrete {!tree}s. *)
 
       type 'a tree = { depth : int; length : int; pointers : 'a pointer list }
-      [@@deriving irmin]
+      [@@deriving brassaia]
       (** The type for trees. *)
 
       (** The type for concrete trees. *)
       type t = Tree of t tree | Values of entry list | Blinded
-      [@@deriving irmin]
+      [@@deriving brassaia]
 
       type len := [ `Eq of int | `Ge of int ]
 
@@ -199,7 +199,7 @@ module type Internal = sig
         | `Blinded_root
         | `Too_large_values of t
         | `Empty ]
-      [@@deriving irmin]
+      [@@deriving brassaia]
       (** The type for errors. *)
 
       val pp_error : error Fmt.t
@@ -256,13 +256,13 @@ module type Sigs = sig
 
   module Make_internal
       (Conf : Conf.S)
-      (H : Irmin.Hash.S)
+      (H : Brassaia.Hash.S)
       (Key : sig
-        include Irmin.Key.S with type hash = H.t
+        include Brassaia.Key.S with type hash = H.t
 
         val unfindable_of_hash : hash -> t
       end)
-      (Node : Irmin.Node.Generic_key.S
+      (Node : Brassaia.Node.Generic_key.S
                 with type hash = H.t
                  and type contents_key = Key.t
                  and type node_key = Key.t) :
@@ -273,9 +273,9 @@ module type Sigs = sig
        and type Val.step = Node.step
 
   module Make
-      (H : Irmin.Hash.S)
-      (Key : Irmin.Key.S with type hash = H.t)
-      (Node : Irmin.Node.Generic_key.S
+      (H : Brassaia.Hash.S)
+      (Key : Brassaia.Key.S with type hash = H.t)
+      (Node : Brassaia.Node.Generic_key.S
                 with type hash = H.t
                  and type contents_key = Key.t
                  and type node_key = Key.t)

@@ -1,5 +1,5 @@
 open! Import
-module String_set = Irmin_data.Fixed_size_string_set
+module String_set = Brassaia_data.Fixed_size_string_set
 
 let hash : string -> int = Hashtbl.hash
 

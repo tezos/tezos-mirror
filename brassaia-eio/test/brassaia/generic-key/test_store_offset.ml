@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-open Irmin
+open Brassaia
 
 (** A store abstraction over an append-only sequence of values. The key of a
     value is the slot at which it's stored in this sequence. There is no index
@@ -42,7 +42,7 @@ module Slot_keyed_vector : Indexable.Maker_concrete_key1 = struct
          ~pre_hash:(fun t f -> hash_pre_hash t.hash f)
 
   module Key (Hash : Hash.S) = struct
-    type t = Hash.t key [@@deriving irmin]
+    type t = Hash.t key [@@deriving brassaia]
     type hash = Hash.t
 
     let to_hash t = t.hash
@@ -53,26 +53,26 @@ module Slot_keyed_vector : Indexable.Maker_concrete_key1 = struct
     type _ t = { instance : instance option ref }
 
     let v =
-      (* NOTE: at time of writing, [irmin-test] relies on the fact that the
+      (* NOTE: at time of writing, [brassaia-test] relies on the fact that the
          store constructor is memoised (modulo [close] semantics, which must be
          non-memoised), so we must use a singleton here. *)
       let singleton = { data = Vector.create ~dummy:None; id = object end } in
       fun _ -> { instance = ref (Some singleton) }
 
-    type nonrec key = Hash.t key [@@deriving irmin]
+    type nonrec key = Hash.t key [@@deriving brassaia]
     type value = Value.t
-    type hash = Hash.t [@@deriving irmin ~equal]
+    type hash = Hash.t [@@deriving brassaia ~equal]
 
     let index _ _ = None
 
     module Key = struct
-      type t = key [@@deriving irmin]
+      type t = key [@@deriving brassaia]
       type hash = Hash.t
 
       let to_hash t = t.hash
     end
 
-    module Hash = Irmin.Hash.Typed (Hash) (Value)
+    module Hash = Brassaia.Hash.Typed (Hash) (Value)
 
     let check_not_closed t =
       match !(t.instance) with None -> raise Closed | Some t -> t
@@ -88,7 +88,7 @@ module Slot_keyed_vector : Indexable.Maker_concrete_key1 = struct
     let check_hash_is_consistent pos k recovered_hash =
       let r = equal_hash k.hash recovered_hash in
       if not r then
-        Alcotest.(check ~pos (Irmin_test.testable Hash.t))
+        Alcotest.(check ~pos (Brassaia_test.testable Hash.t))
           "Recovered hash is consistent with the key" k.hash recovered_hash
 
     let unsafe_add t hash v =
@@ -128,13 +128,13 @@ module Store_maker = Generic_key.Maker (struct
   module Contents_store = Indexable.Maker_concrete_key2_of_1 (Slot_keyed_vector)
   module Node_store = Slot_keyed_vector
   module Commit_store = Slot_keyed_vector
-  module Branch_store = Atomic_write.Check_closed (Irmin_mem.Atomic_write)
+  module Branch_store = Atomic_write.Check_closed (Brassaia_mem.Atomic_write)
 end)
 
 module Store = Store_maker.Make (Schema.KV (Contents.String))
 
 let suite =
-  let store = (module Store : Irmin_test.Generic_key) in
-  let config = Irmin_mem.config () in
-  Irmin_test.Suite.create_generic_key ~name:"store_offset" ~store ~config
+  let store = (module Store : Brassaia_test.Generic_key) in
+  let config = Brassaia_mem.config () in
+  Brassaia_test.Suite.create_generic_key ~name:"store_offset" ~store ~config
     ~import_supported:false ()

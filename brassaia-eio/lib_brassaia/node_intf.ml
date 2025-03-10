@@ -20,27 +20,27 @@ open! Import
 module type Core = sig
   (** {1 Node values} *)
 
-  type t [@@deriving irmin]
+  type t [@@deriving brassaia]
   (** The type for node values. *)
 
-  type metadata [@@deriving irmin]
+  type metadata [@@deriving brassaia]
   (** The type for node metadata. *)
 
-  type contents_key [@@deriving irmin]
+  type contents_key [@@deriving brassaia]
   (** The type for contents keys. *)
 
-  type node_key [@@deriving irmin]
+  type node_key [@@deriving brassaia]
   (** The type for node keys. *)
 
-  type step [@@deriving irmin]
+  type step [@@deriving brassaia]
   (** The type for steps between nodes. *)
 
   type value = [ `Node of node_key | `Contents of contents_key * metadata ]
-  [@@deriving irmin]
+  [@@deriving brassaia]
   (** The type for either (node) keys or (contents) keys combined with their
       metadata. *)
 
-  type hash [@@deriving irmin]
+  type hash [@@deriving brassaia]
   (** The type of hashes of values. *)
 
   val of_list : (step * value) list -> t
@@ -117,7 +117,7 @@ module type Core = sig
 
   (** {1 Recursive Nodes} *)
 
-  (** Some [Node] implementations (like [irmin-pack]'s inodes) can represent a
+  (** Some [Node] implementations (like [brassaia-pack]'s inodes) can represent a
       node as a set of nodes. One operation on such "high-level" node
       corresponds to a sequence of recursive calls to the underlying
       "lower-level" nodes. Note: theses [effects] are not in the Lwt monad on
@@ -134,7 +134,7 @@ module type Core = sig
 
   type head :=
     [ `Node of (step * value) list | `Inode of int * (int * hash) list ]
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   val head : t -> head
   (** Reveal the shallow internal structure of the node.
@@ -197,7 +197,7 @@ module type Portable = sig
     [ `Blinded of hash
     | `Values of (step * value) list
     | `Inode of int * (int * proof) list ]
-  [@@deriving irmin]
+  [@@deriving brassaia]
   (** The type for proof trees. *)
 
   val to_proof : t -> proof
@@ -216,7 +216,7 @@ end
 module type Maker_generic_key = functor
   (Hash : Hash.S)
   (Path : sig
-     type step [@@deriving irmin]
+     type step [@@deriving brassaia]
    end)
   (Metadata : Metadata.S)
   (Contents_key : Key.S with type hash = Hash.t)
@@ -271,23 +271,23 @@ module type Graph = sig
   type 'a t
   (** The type for store handles. *)
 
-  type metadata [@@deriving irmin]
+  type metadata [@@deriving brassaia]
   (** The type for node metadata. *)
 
-  type contents_key [@@deriving irmin]
+  type contents_key [@@deriving brassaia]
   (** The type of user-defined contents. *)
 
-  type node_key [@@deriving irmin]
+  type node_key [@@deriving brassaia]
   (** The type for node values. *)
 
-  type step [@@deriving irmin]
+  type step [@@deriving brassaia]
   (** The type of steps. A step is used to pass from one node to another. *)
 
-  type path [@@deriving irmin]
+  type path [@@deriving brassaia]
   (** The type of store paths. A path is composed of {{!step} steps}. *)
 
   type value = [ `Node of node_key | `Contents of contents_key * metadata ]
-  [@@deriving irmin]
+  [@@deriving brassaia]
   (** The type for store values. *)
 
   val empty : [> write ] t -> node_key
@@ -353,7 +353,7 @@ module type Sigs = sig
   module Make
       (Hash : Hash.S)
       (Path : sig
-        type step [@@deriving irmin]
+        type step [@@deriving brassaia]
       end)
       (Metadata : Metadata.S) :
     S
@@ -372,7 +372,7 @@ module type Sigs = sig
 
     module Make_v2 : Maker
     (** [Make_v2] provides a similar implementation as [Make] but the hash
-        computation is compatible with versions older than irmin.3.0 *)
+        computation is compatible with versions older than brassaia.3.0 *)
 
     module Store
         (C : Contents.Store)

@@ -15,7 +15,7 @@
  *)
 
 type t = value_length:int -> Pack_value.Kind.t -> bool
-(** The type of configurations for [irmin-pack]'s indexing strategy, which
+(** The type of configurations for [brassaia-pack]'s indexing strategy, which
     dictates whether or not newly-appended pack entries should also be added to
     the index. Strategies are parameterised over:
 
@@ -39,8 +39,8 @@ val minimal_with_contents : t
     contents objects. *)
 
 val default : t
-(** [default] is the indexing strategy used by [irmin-pack] instances that do
-    not explicitly set an indexing strategy in {!Irmin_pack.config}. Currently
+(** [default] is the indexing strategy used by [brassaia-pack] instances that do
+    not explicitly set an indexing strategy in {!Brassaia_pack.config}. Currently
     set to {!always}. *)
 
 val is_minimal : t -> bool

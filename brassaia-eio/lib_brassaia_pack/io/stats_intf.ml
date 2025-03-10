@@ -28,7 +28,7 @@ module Pack_store = struct
         (** Binding recovered from the pack file after first checking the index
             for its offset and length (via an indexed key). *)
     | Not_found  (** Find returned [None]. *)
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   type t = {
     appended_hashes : int;
@@ -39,7 +39,7 @@ module Pack_store = struct
     from_pack_direct : int;
     from_pack_indexed : int;
   }
-  [@@deriving irmin]
+  [@@deriving brassaia]
 end
 
 module Index = struct
@@ -59,7 +59,7 @@ module Index = struct
     mutable lru_hits : int;
     mutable lru_misses : int;
   }
-  [@@deriving irmin]
+  [@@deriving brassaia]
 end
 
 module File_manager = struct
@@ -81,7 +81,7 @@ module File_manager = struct
     mutable auto_index : int;
     mutable flush : int;
   }
-  [@@deriving irmin]
+  [@@deriving brassaia]
 end
 
 module Latest_gc = struct
@@ -94,7 +94,7 @@ module Latest_gc = struct
     nvcsw : int64;
     nivcsw : int64;
   }
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   type ocaml_gc = {
     minor_words : float;
@@ -107,9 +107,9 @@ module Latest_gc = struct
     top_heap_words : int;
     stack_size : int;
   }
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
-  type duration = { wall : float; sys : float; user : float } [@@deriving irmin]
+  type duration = { wall : float; sys : float; user : float } [@@deriving brassaia]
   (** Timings in seconds *)
 
   type step = {
@@ -118,9 +118,9 @@ module Latest_gc = struct
     ocaml_gc : ocaml_gc;
     index : Index.t;
     pack_store : Pack_store.t;
-    inode : Irmin_pack.Stats.Inode.t;
+    inode : Brassaia_pack.Stats.Inode.t;
   }
-  [@@deriving irmin]
+  [@@deriving brassaia]
   (** Stats gathered for one worker step *)
 
   type worker = {
@@ -133,7 +133,7 @@ module Latest_gc = struct
     objects_traversed : int63;
     suffix_transfers : int63 list;
   }
-  [@@deriving irmin]
+  [@@deriving brassaia]
   (** Stats produced by the worker. They are meant to be transmited to the
       parent process through the gc result JSON file.
 
@@ -167,10 +167,10 @@ module Latest_gc = struct
     steps : (string * duration) list;
     worker : worker;
   }
-  [@@deriving irmin]
+  [@@deriving brassaia]
   (** All the stats for a single successful GC run.
 
-      [commit_offset] is the offset of the commit provided by the irmin user.
+      [commit_offset] is the offset of the commit provided by the brassaia user.
 
       The [before_*] (and [after_*]) offsets track the state of the suffix
       before (and after) the GC.
@@ -178,7 +178,7 @@ module Latest_gc = struct
       [steps] has a similar meaning as [steps] in [worker] but for the main
       process. *)
 
-  type t = stats option [@@deriving irmin]
+  type t = stats option [@@deriving brassaia]
   (** [Latest_gc.t] is an [option] type because before the first gc end, there
       are no gc stats to expose. *)
 end

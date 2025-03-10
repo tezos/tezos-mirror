@@ -16,14 +16,14 @@
 
 open Import
 
-module Internal = Irmin.Backend.Lru.Make (struct
+module Internal = Brassaia.Backend.Lru.Make (struct
   include Int63
 
   let hash = Hashtbl.hash
 end)
 
 type key = int63
-type value = Irmin_pack.Pack_value.kinded
+type value = Brassaia_pack.Pack_value.kinded
 type weighted_value = { v : value; weight : int }
 
 type t = {
@@ -33,10 +33,10 @@ type t = {
 }
 
 let create config =
-  let lru_max_memory = Irmin_pack.Conf.lru_max_memory config in
+  let lru_max_memory = Brassaia_pack.Conf.lru_max_memory config in
   let lru_size, weight_limit =
     match lru_max_memory with
-    | None -> (Irmin_pack.Conf.lru_size config, None)
+    | None -> (Brassaia_pack.Conf.lru_size config, None)
     | Some b -> (-42, Some b)
   in
   let lru = Internal.create lru_size in
@@ -49,16 +49,16 @@ let lru_enabled t = match t.weight_limit with None -> true | Some x -> x > 0
 
     Since we do not necessarily want to incur a cost for calculating the weight
     for every entry when [lru_max_memory] is not configured, the control for
-    this is in the caller of [add]. Only [Irmin_pack.Pack_value.Immediate]
+    this is in the caller of [add]. Only [Brassaia_pack.Pack_value.Immediate]
     weight's are checked.
 
     The current entry weight limit is hard-coded to 20kB. *)
 let exceeds_entry_weight_limit = function
-  | Irmin_pack.Pack_value.Immediate w -> w > 20_000
+  | Brassaia_pack.Pack_value.Immediate w -> w > 20_000
   | Deferred _ -> false
 
 let resolve_weight = function
-  | Irmin_pack.Pack_value.Immediate w -> w
+  | Brassaia_pack.Pack_value.Immediate w -> w
   | Deferred w -> w ()
 
 let add t k w v =

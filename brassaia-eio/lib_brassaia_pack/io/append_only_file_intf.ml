@@ -17,7 +17,7 @@
 open Import
 
 module type S = sig
-  (** Abstraction for irmin-pack's append only files (i.e. suffix and dict).
+  (** Abstraction for brassaia-pack's append only files (i.e. suffix and dict).
 
       It is parameterized with [Io], a file system abstraction (e.g. unix,
       mirage, eio_linux).

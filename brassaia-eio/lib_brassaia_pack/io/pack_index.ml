@@ -18,11 +18,11 @@
 open! Import
 include Pack_index_intf
 
-module Make_io (Io : Io_intf.S) (Io_index : Index.Platform.S) (K : Irmin.Hash.S) =
+module Make_io (Io : Io_intf.S) (Io_index : Index.Platform.S) (K : Brassaia.Hash.S) =
 struct
   module Key = struct
     type t = K.t
-    [@@deriving irmin ~short_hash ~equal ~to_bin_string ~decode_bin]
+    [@@deriving brassaia ~short_hash ~equal ~to_bin_string ~decode_bin]
 
     let hash = short_hash ?seed:None
     let hash_size = 30
@@ -32,7 +32,7 @@ struct
   end
 
   module Val = struct
-    type t = int63 * int * Pack_value.Kind.t [@@deriving irmin]
+    type t = int63 * int * Pack_value.Kind.t [@@deriving brassaia]
 
     let encoded_size = (64 / 8) + (32 / 8) + 1
 

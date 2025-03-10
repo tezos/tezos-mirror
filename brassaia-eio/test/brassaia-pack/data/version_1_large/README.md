@@ -1,4 +1,4 @@
-This database has been generated with `irmin-pack.2.10.2` and the following
+This database has been generated with `brassaia-pack.2.10.2` and the following
 program:
 
 ```ocaml
@@ -13,19 +13,19 @@ let rm_dir () =
     let _ = Sys.command cmd in
     ())
 
-module Conf = Irmin_tezos.Conf
+module Conf = Brassaia_tezos.Conf
 
 module Store =
-  Irmin_pack.V1 (Conf) (Irmin.Metadata.None) (Irmin.Contents.String)
-    (Irmin.Path.String_list)
-    (Irmin.Branch.String)
-    (Irmin.Hash.SHA1)
+  Brassaia_pack.V1 (Conf) (Brassaia.Metadata.None) (Brassaia.Contents.String)
+    (Brassaia.Path.String_list)
+    (Brassaia.Branch.String)
+    (Brassaia.Hash.SHA1)
 
 let config root =
-  let conf = Irmin_pack.config ~readonly:false ~fresh:true root in
-  Irmin_pack_layered.config ~conf ~with_lower:true ()
+  let conf = Brassaia_pack.config ~readonly:false ~fresh:true root in
+  Brassaia_pack_layered.config ~conf ~with_lower:true ()
 
-let info = Irmin.Info.empty
+let info = Brassaia.Info.empty
 
 (* random numeric string of length 4 *)
 let random_content () =

@@ -14,19 +14,19 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Irmin.Export_for_backends
+include Brassaia.Export_for_backends
 
-let src = Logs.Src.create "irmin.pack" ~doc:"irmin-pack backend"
+let src = Logs.Src.create "brassaia.pack" ~doc:"brassaia-pack backend"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
 module Int63 = struct
   include Optint.Int63
 
-  let t = Irmin.Type.int63
+  let t = Brassaia.Type.int63
 end
 
-type int63 = Int63.t [@@deriving irmin]
+type int63 = Int63.t [@@deriving brassaia]
 
 module Mem = struct
   let bytes_per_word = Sys.word_size / 8
@@ -36,7 +36,7 @@ module Mem = struct
 
   let repr_size : type a. a Repr.t -> a -> int =
    fun ty ->
-    match Irmin.Type.Size.of_value ty with
+    match Brassaia.Type.Size.of_value ty with
     | Unknown -> Fun.const max_int
     | Dynamic f -> fun v -> f v
     | Static n -> Fun.const n

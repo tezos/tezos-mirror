@@ -1,4 +1,4 @@
-open Irmin
+open Brassaia
 
 (** A store in which all values are stored as immediates inside their respective
     keys. The store itself keeps no information, except for the bookkeeping
@@ -8,8 +8,8 @@ module Keyed_by_value = struct
 
   module Key (Hash : Hash.S) (Value : Type.S) = struct
     type t = (Hash.t, Value.t) key
-    type hash = Hash.t [@@deriving irmin ~pre_hash]
-    type value = Value.t [@@deriving irmin ~pre_hash]
+    type hash = Hash.t [@@deriving brassaia ~pre_hash]
+    type value = Value.t [@@deriving brassaia ~pre_hash]
 
     let value_to_hash t = Hash.hash (fun f -> pre_hash_value t f)
     let to_hash t = value_to_hash t.value
@@ -67,7 +67,7 @@ module Plain = struct
 
   module Make (H : Hash.S) (V : Type.S) = struct
     module CA =
-      Content_addressable.Check_closed (Irmin_mem.Content_addressable) (H) (V)
+      Content_addressable.Check_closed (Brassaia_mem.Content_addressable) (H) (V)
 
     include Indexable.Of_content_addressable (H) (CA)
 
@@ -79,13 +79,13 @@ module Store_maker = Generic_key.Maker (struct
   module Contents_store = Keyed_by_value
   module Node_store = Plain
   module Commit_store = Plain
-  module Branch_store = Atomic_write.Check_closed (Irmin_mem.Atomic_write)
+  module Branch_store = Atomic_write.Check_closed (Brassaia_mem.Atomic_write)
 end)
 
 module Store = Store_maker.Make (Schema.KV (Contents.String))
 
 let suite =
-  let store = (module Store : Irmin_test.Generic_key) in
-  let config = Irmin_mem.config () in
-  Irmin_test.Suite.create_generic_key ~name:"inlined_contents" ~store ~config
+  let store = (module Store : Brassaia_test.Generic_key) in
+  let config = Brassaia_mem.config () in
+  Brassaia_test.Suite.create_generic_key ~name:"inlined_contents" ~store ~config
     ~import_supported:false ()

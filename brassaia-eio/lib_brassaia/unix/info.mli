@@ -14,8 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-module Make (I : Irmin.Info.S) : sig
-  include Irmin.Info.S with type t = I.t
+module Make (I : Brassaia.Info.S) : sig
+  include Brassaia.Info.S with type t = I.t
 
   val v : ?author:string -> ('b, Format.formatter, unit, f) format4 -> 'b
 end

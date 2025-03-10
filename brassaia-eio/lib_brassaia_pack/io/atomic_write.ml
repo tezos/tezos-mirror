@@ -1,14 +1,14 @@
 open Import
-include Irmin_pack.Atomic_write
+include Brassaia_pack.Atomic_write
 
-module UnsafeTbl (K : Irmin.Type.S) = Hashtbl.Make (struct
-  type t = K.t [@@deriving irmin ~short_hash ~equal]
+module UnsafeTbl (K : Brassaia.Type.S) = Hashtbl.Make (struct
+  type t = K.t [@@deriving brassaia ~short_hash ~equal]
 
   let hash = short_hash ?seed:None
 end)
 
 (** Safe but might be incredibly slow. *)
-module Table (K : Irmin.Type.S) = struct
+module Table (K : Brassaia.Type.S) = struct
   module Unsafe = UnsafeTbl (K)
 
   type 'a t = { lock : Eio.Mutex.t; data : 'a Unsafe.t }
@@ -42,14 +42,14 @@ module Table (K : Irmin.Type.S) = struct
     Eio.Mutex.use_rw ~protect:true lock @@ fun () -> Unsafe.fold f data init
 end
 
-module Make_persistent (Io : Io_intf.S) (K : Irmin.Type.S) (V : Value.S) =
+module Make_persistent (Io : Io_intf.S) (K : Brassaia.Type.S) (V : Value.S) =
 struct
   module Tbl = Table (K)
-  module W = Irmin.Backend.Watch.Make (K) (V)
+  module W = Brassaia.Backend.Watch.Make (K) (V)
   module Io_errors = Io_errors.Make (Io)
 
-  type key = K.t [@@deriving irmin ~pp ~to_bin_string ~of_bin_string]
-  type value = V.t [@@deriving irmin ~equal ~decode_bin ~of_bin_string]
+  type key = K.t [@@deriving brassaia ~pp ~to_bin_string ~of_bin_string]
+  type value = V.t [@@deriving brassaia ~equal ~decode_bin ~of_bin_string]
   type watch = W.watch
 
   type t = {
@@ -61,7 +61,7 @@ struct
   }
 
   let dead_header_size = 16
-  let decode_bin = Irmin.Type.(unstage (decode_bin int32))
+  let decode_bin = Brassaia.Type.(unstage (decode_bin int32))
 
   let read_length32 ~file_pos block =
     let len = 4 in
@@ -73,8 +73,8 @@ struct
     assert (!pos_ref = len);
     Int32.to_int v
 
-  let entry = Irmin.Type.(pair (string_of `Int32) V.t)
-  let entry_to_bin_string = Irmin.Type.(unstage (to_bin_string entry))
+  let entry = Brassaia.Type.(pair (string_of `Int32) V.t)
+  let entry_to_bin_string = Brassaia.Type.(unstage (to_bin_string entry))
   let block_size block = Io_errors.raise_if_error (Io.read_size block)
 
   let set_entry t ?off k v =
@@ -85,11 +85,11 @@ struct
     Io.write_exn t.block ~off ~len buf
 
   let value_encoded_size =
-    match Irmin.Type.Size.of_value V.t with
+    match Brassaia.Type.Size.of_value V.t with
     | Repr.Size.Static n -> n
     | Dynamic _ | Unknown ->
         failwith
-          "Irmin_pack.Atomic_write: supplied value type must have a \
+          "Brassaia_pack.Atomic_write: supplied value type must have a \
            fixed-width binary encoding"
 
   let refill t ~to_ ~from =
@@ -196,7 +196,7 @@ struct
     unsafe_set t k v;
     W.notify t.w k (Some v)
 
-  let equal_v_opt = Irmin.Type.(unstage (equal (option V.t)))
+  let equal_v_opt = Brassaia.Type.(unstage (equal (option V.t)))
 
   let unsafe_test_and_set t k ~test ~set =
     let v = try Some (Tbl.find t.cache k) with Not_found -> None in

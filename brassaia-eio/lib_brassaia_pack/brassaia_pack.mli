@@ -14,12 +14,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-(** A fully in-memory implementation of the [Irmin_pack] flavour of Irmin
-    backend, intended for users that must be interoperable with the
-    idiosyncrasies of the persistent implementation. *)
-
-module Maker (_ : Irmin_pack.Conf.S) :
-  Irmin_pack.Maker
-    with type ('h, _) contents_key = 'h
-     and type 'h node_key = 'h
-     and type 'h commit_key = 'h
+include Brassaia_pack_intf.Sigs
+(** @inline *)

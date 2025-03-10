@@ -33,7 +33,7 @@ module type S = sig
   val set : t -> key -> value -> unit
   (** [set t k v] replaces the contents of [k] by [v] in [t]. If [k] is not
       already defined in [t], create a fresh binding. Raise [Invalid_argument]
-      if [k] is the {{!Irmin.Path.S.empty} empty path}. *)
+      if [k] is the {{!Brassaia.Path.S.empty} empty path}. *)
 
   val test_and_set : t -> key -> test:value option -> set:value option -> bool
   (** [test_and_set t key ~test ~set] sets [key] to [set] only if the current
@@ -93,12 +93,12 @@ module type Sigs = sig
          and type watch = AW.watch
 
     val make_closeable : AW.t -> t
-    (** [make_closeable t] returns a version of [t] that raises {!Irmin.Closed}
+    (** [make_closeable t] returns a version of [t] that raises {!Brassaia.Closed}
         if an operation is performed when it is already closed. *)
 
     val get_if_open_exn : t -> AW.t
     (** [get_if_open_exn t] returns the store (without close checks) if it is
-        open; otherwise raises {!Irmin.Closed} *)
+        open; otherwise raises {!Brassaia.Closed} *)
   end
 
   module Check_closed (M : Maker) : Maker

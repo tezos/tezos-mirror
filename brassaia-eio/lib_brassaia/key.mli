@@ -20,7 +20,7 @@
 
     {3 Hash-like keys}
 
-    Most Irmin stores are keyed directly by a {i hash} of the values that they
+    Most Brassaia stores are keyed directly by a {i hash} of the values that they
     store. This results in a so-called "content-addressable" store, in which all
     possible contents values have exactly one key. The key is derived from the
     value via [hash] and, given a key, the corresponding value can be retrieved
@@ -55,7 +55,7 @@
 
     {3 Non-hash-like keys}
 
-    For this reason, Irmin allows backends to supply custom key representations
+    For this reason, Brassaia allows backends to supply custom key representations
     that do not satisfy the above properties (i.e. not irredundant, and not
     reproducible). This leads to the following more complex set of relationships
     between the values:
@@ -77,7 +77,7 @@
     In general, the key of a value isn't known until it has been added to a
     particular store, and keys need not be portable between different stores.
     It's still required that keys be convertible to hashes, as this ensures the
-    consistency of Irmin's Merkle tree structure.
+    consistency of Brassaia's Merkle tree structure.
 
     Stores that use non-hash-like keys are not content-addressable, since the
     user can't compute the key of a value given the value itself (and perhaps a
@@ -85,8 +85,8 @@
 
     Implementer's note: all key implementations must have a pre-hash
     implementation derived in terms of [Key.to_hash]. That is, for all keys [k],
-    given [h = Key.to_hash k] then [Irmin.Type.pre_hash key_t k] must equal
-    [Irmin.Type.pre_hash hash_t h]. *)
+    given [h = Key.to_hash k] then [Brassaia.Type.pre_hash key_t k] must equal
+    [Brassaia.Type.pre_hash hash_t h]. *)
 
 include Key_intf.Sigs
 (** @inline *)

@@ -16,7 +16,7 @@
 
 (** Merge operators. *)
 
-type conflict = [ `Conflict of string ] [@@deriving irmin]
+type conflict = [ `Conflict of string ] [@@deriving brassaia]
 (** The type for merge errors. *)
 
 val ok : 'a -> ('a, conflict) result
@@ -198,7 +198,7 @@ end
 
 (** Infix operators for manipulating merge results and {!promise}s.
 
-    [open Irmin.Merge.Infix] at the top of your file to use them. *)
+    [open Brassaia.Merge.Infix] at the top of your file to use them. *)
 module Infix : sig
   (** {1 Merge Result Combinators} *)
 

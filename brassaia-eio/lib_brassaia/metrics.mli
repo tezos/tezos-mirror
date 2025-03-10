@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-(** [Metrics] defines primitives to handle metrics inside of Irmin. Its purpose
+(** [Metrics] defines primitives to handle metrics inside of Brassaia. Its purpose
     is to decouple the metrics type definition from the data manipulation.
 
     A {!t} can be modified in different ways, depending on the {!update_mode}. *)

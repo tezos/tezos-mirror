@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-(** Offline stats for Irmin stores. *)
+(** Offline stats for Brassaia stores. *)
 
 include Checks_intf.Sigs
 (** @inline *)

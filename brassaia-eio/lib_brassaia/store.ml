@@ -18,7 +18,7 @@ open! Import
 include Store_intf
 open Merge.Infix
 
-let src = Logs.Src.create "irmin" ~doc:"Irmin branch-consistent store"
+let src = Logs.Src.create "brassaia" ~doc:"Brassaia branch-consistent store"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
@@ -103,22 +103,22 @@ module Make (B : Backend.S) = struct
     let pp = Type.pp t
   end
 
-  type branch = Branch_store.Key.t [@@deriving irmin ~equal ~pp]
-  type contents_key = B.Contents.Key.t [@@deriving irmin ~pp ~equal]
-  type node_key = B.Node.Key.t [@@deriving irmin ~pp ~equal]
-  type commit_key = B.Commit.Key.t [@@deriving irmin ~pp ~equal]
+  type branch = Branch_store.Key.t [@@deriving brassaia ~equal ~pp]
+  type contents_key = B.Contents.Key.t [@@deriving brassaia ~pp ~equal]
+  type node_key = B.Node.Key.t [@@deriving brassaia ~pp ~equal]
+  type commit_key = B.Commit.Key.t [@@deriving brassaia ~pp ~equal]
   type repo = B.Repo.t
   type commit = { r : repo; key : commit_key; v : B.Commit.value }
-  type hash = Hash.t [@@deriving irmin ~equal ~pp ~compare]
-  type node = Tree.node [@@deriving irmin]
-  type contents = Contents.t [@@deriving irmin ~equal]
-  type metadata = Metadata.t [@@deriving irmin]
-  type tree = Tree.t [@@deriving irmin ~pp]
-  type path = Path.t [@@deriving irmin ~pp]
-  type step = Path.step [@@deriving irmin]
-  type info = Info.t [@@deriving irmin]
+  type hash = Hash.t [@@deriving brassaia ~equal ~pp ~compare]
+  type node = Tree.node [@@deriving brassaia]
+  type contents = Contents.t [@@deriving brassaia ~equal]
+  type metadata = Metadata.t [@@deriving brassaia]
+  type tree = Tree.t [@@deriving brassaia ~pp]
+  type path = Path.t [@@deriving brassaia ~pp]
+  type step = Path.step [@@deriving brassaia]
+  type info = Info.t [@@deriving brassaia]
   type Remote.t += E of B.Remote.endpoint
-  type lca_error = [ `Max_depth_reached | `Too_many_lcas ] [@@deriving irmin]
+  type lca_error = [ `Max_depth_reached | `Too_many_lcas ] [@@deriving brassaia]
   type ff_error = [ `Rejected | `No_change | lca_error ]
 
   type write_error =
@@ -160,7 +160,7 @@ module Make (B : Backend.S) = struct
         `Node k
 
   module Contents_keys = Set.Make (struct
-    type t = Contents_key.t [@@deriving irmin ~compare]
+    type t = Contents_key.t [@@deriving brassaia ~compare]
   end)
 
   module Commit = struct
@@ -234,7 +234,7 @@ module Make (B : Backend.S) = struct
     Object_graph.Make (B.Contents.Key) (B.Node.Key) (B.Commit.Key)
       (Branch_store.Key)
 
-  type slice = B.Slice.t [@@deriving irmin]
+  type slice = B.Slice.t [@@deriving brassaia]
   type watch = unit -> unit
 
   let unwatch w = w ()
@@ -361,7 +361,7 @@ module Make (B : Backend.S) = struct
       | `Node of node_key
       | `Contents of contents_key
       | `Branch of B.Branch.Key.t ]
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     let return_false _ = false
     let default_pred_contents _ _ = []
@@ -463,7 +463,7 @@ module Make (B : Backend.S) = struct
   let branch t =
     match head_ref t with `Branch t -> Some t | `Empty | `Head _ -> None
 
-  let err_no_head s = Fmt.kstr invalid_arg "Irmin.%s: no head" s
+  let err_no_head s = Fmt.kstr invalid_arg "Brassaia.%s: no head" s
 
   let retry_merge name fn =
     let rec aux i =
@@ -471,7 +471,7 @@ module Make (B : Backend.S) = struct
       | Error _ as c -> c
       | Ok true -> Merge.ok ()
       | Ok false ->
-          [%log.debug "Irmin.%s: conflict, retrying (%d)." name i];
+          [%log.debug "Brassaia.%s: conflict, retrying (%d)." name i];
           aux (i + 1)
     in
     aux 1

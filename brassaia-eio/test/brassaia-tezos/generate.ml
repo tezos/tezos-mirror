@@ -22,21 +22,21 @@ let rm_dir data_dir =
 
 module Generator = struct
   module Conf = struct
-    include Irmin_tezos.Conf
+    include Brassaia_tezos.Conf
 
     let entries = 2
     let stable_hash = 3
   end
 
-  module Schema = Irmin.Schema.KV (Irmin.Contents.String)
+  module Schema = Brassaia.Schema.KV (Brassaia.Contents.String)
 
   module Store = struct
-    open Irmin_pack_unix.Maker (Conf)
+    open Brassaia_pack_unix.Maker (Conf)
     include Make (Schema)
   end
 
   let config ~indexing_strategy root =
-    Irmin_pack.config ~indexing_strategy ~readonly:false ~fresh:true root
+    Brassaia_pack.config ~indexing_strategy ~readonly:false ~fresh:true root
 
   let info = Store.Info.empty
 
@@ -69,14 +69,14 @@ module Generator = struct
       let _ = Store.Gc.wait repo in
       ()
     in
-    create_store ~before_closing Irmin_pack.Indexing_strategy.minimal path
+    create_store ~before_closing Brassaia_pack.Indexing_strategy.minimal path
 
   let create_snapshot_store ~src ~dest =
     let before_closing repo head =
       rm_dir dest;
       Store.create_one_commit_store repo head dest
     in
-    create_store ~before_closing Irmin_pack.Indexing_strategy.minimal src
+    create_store ~before_closing Brassaia_pack.Indexing_strategy.minimal src
 end
 
 let ensure_data_dir () =
@@ -85,10 +85,10 @@ let ensure_data_dir () =
 let generate () =
   ensure_data_dir ();
   let _ =
-    Generator.create_store Irmin_pack.Indexing_strategy.minimal "data/minimal"
+    Generator.create_store Brassaia_pack.Indexing_strategy.minimal "data/minimal"
   in
   let _ =
-    Generator.create_store Irmin_pack.Indexing_strategy.always "data/always"
+    Generator.create_store Brassaia_pack.Indexing_strategy.always "data/always"
   in
   let _ = Generator.create_gced_store "data/gced" in
   let _ =

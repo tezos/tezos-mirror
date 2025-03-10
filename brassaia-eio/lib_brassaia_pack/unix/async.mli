@@ -14,4 +14,4 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-module Unix : Irmin_pack_io.Async_intf.S
+module Unix : Brassaia_pack_io.Async_intf.S

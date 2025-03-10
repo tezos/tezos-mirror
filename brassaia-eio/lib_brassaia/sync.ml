@@ -20,7 +20,7 @@ include Sync_intf
 module type REMOTE = Remote.S
 
 let invalid_argf fmt = Fmt.kstr invalid_arg fmt
-let src = Logs.Src.create "irmin.sync" ~doc:"Irmin remote sync"
+let src = Logs.Src.create "brassaia.sync" ~doc:"Brassaia remote sync"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
@@ -31,7 +31,7 @@ module Make (S : Store.Generic_key.S) = struct
 
   type db = S.t
   type commit = S.commit
-  type commit_key = S.commit_key [@@deriving irmin ~pp]
+  type commit_key = S.commit_key [@@deriving brassaia ~pp]
   type info = S.info
 
   let conv dx dy =

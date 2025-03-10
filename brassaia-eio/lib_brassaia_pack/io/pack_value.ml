@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Irmin_pack.Pack_value
+include Brassaia_pack.Pack_value
 
 module type Persistent = sig
   type hash

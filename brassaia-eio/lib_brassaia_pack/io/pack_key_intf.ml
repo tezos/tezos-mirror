@@ -18,7 +18,7 @@ open! Import
 
 module type Sigs = sig
   type 'hash t
-  (** The type of {i keys} referencing values stored in the [irmin-pack]
+  (** The type of {i keys} referencing values stored in the [brassaia-pack]
       backend. *)
 
   type safe = SAFE
@@ -66,7 +66,7 @@ module type Sigs = sig
 
       A key [k] is "undereferencable" with respect to some store handle [t] if
       [find t k <> Some _]. Such keys should not arise during regular operation
-      of a single Irmin repository, but are still technically constructible in
+      of a single Brassaia repository, but are still technically constructible in
       the following ways:
 
       - {b storage corruption}. When decoding a key from disk, we may not
@@ -80,7 +80,7 @@ module type Sigs = sig
         read-only instance will be undereferencable until that reader has
         reloaded.
 
-      - {b passing keys between repositories}. Keys created for one Irmin
+      - {b passing keys between repositories}. Keys created for one Brassaia
         repository may not be dereferenced with respect to another by design. *)
 
   val inspect : 'hash t -> 'hash state
@@ -113,10 +113,10 @@ module type Sigs = sig
     type hash
 
     (** @inline *)
-    include Irmin_pack.Pack_key.S with type t = hash t and type hash := hash
+    include Brassaia_pack.Pack_key.S with type t = hash t and type hash := hash
   end
 
-  module Make (Hash : Irmin.Hash.S) : S with type hash = Hash.t
+  module Make (Hash : Brassaia.Hash.S) : S with type hash = Hash.t
 
   module type Store_spec = sig
     type ('h, _) contents_key = 'h t

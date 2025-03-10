@@ -167,7 +167,7 @@ let equal t1 t2 =
 (* ~root *)
 let root spec =
   key ~allow_duplicate:true ~spec ~docv:"ROOT"
-    ~doc:"The location of the Irmin store on disk." ~docs:"COMMON OPTIONS"
+    ~doc:"The location of the Brassaia store on disk." ~docs:"COMMON OPTIONS"
     "root"
     Type.(string)
     "."

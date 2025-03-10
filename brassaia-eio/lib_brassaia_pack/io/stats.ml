@@ -15,7 +15,7 @@
  *)
 
 open Import
-module Metrics = Irmin.Metrics
+module Metrics = Brassaia.Metrics
 
 module Pack_store = struct
   include Stats_intf.Pack_store

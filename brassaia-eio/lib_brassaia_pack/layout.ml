@@ -118,7 +118,7 @@ module Classification = struct
       | `Suffix of int
       | `V1_or_v2_pack
       | `Unknown ]
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     let v s : t =
       match String.split_on_char '.' s with
@@ -139,7 +139,7 @@ module Classification = struct
 
   module Volume = struct
     type t = [ `Mapping | `Data | `Control | `Control_tmp of int | `Unknown ]
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     let v s : t =
       match String.split_on_char '.' s with

@@ -27,7 +27,7 @@ struct
 
   include Pack_key.Store_spec
 
-  module Make (Schema : Irmin.Schema.Extended) = struct
+  module Make (Schema : Brassaia.Schema.Extended) = struct
     open struct
       module P = Schema.Path
       module M = Schema.Metadata
@@ -47,7 +47,7 @@ struct
       module Hash = H
 
       type 'a value = { hash : H.t; kind : Pack_value.Kind.t; v : 'a }
-      [@@deriving irmin]
+      [@@deriving brassaia]
 
       module Contents = struct
         module Pack_value = Pack_value.Of_contents (Config) (H) (XKey) (C)
@@ -55,7 +55,7 @@ struct
         module CA =
           Pack_store.Make (File_manager) (Dispatcher) (H) (Pack_value) (Errs)
 
-        include Irmin.Contents.Store_indexable (CA) (H) (C)
+        include Brassaia.Contents.Store_indexable (CA) (H) (C)
       end
 
       module Node = struct
@@ -63,7 +63,7 @@ struct
 
         module CA = struct
           module Inter =
-            Irmin_pack.Inode.Make_internal (Config) (H) (XKey) (Value)
+            Brassaia_pack.Inode.Make_internal (Config) (H) (XKey) (Value)
 
           module Pack' =
             Pack_store.Make (File_manager) (Dispatcher) (H) (Inter.Raw) (Errs)
@@ -72,7 +72,7 @@ struct
         end
 
         include
-          Irmin.Node.Generic_key.Store (Contents) (CA) (H) (CA.Val) (M) (P)
+          Brassaia.Node.Generic_key.Store (Contents) (CA) (H) (CA.Val) (M) (P)
       end
 
       module Node_portable = Node.CA.Val.Portable
@@ -87,7 +87,7 @@ struct
           include Schema.Commit (Node.Key) (XKey)
           module Info = Schema.Info
 
-          type hash = Hash.t [@@deriving irmin]
+          type hash = Hash.t [@@deriving brassaia]
         end
 
         module Pack_value = Pack_value.Of_commit (H) (XKey) (Value)
@@ -96,11 +96,11 @@ struct
           Pack_store.Make (File_manager) (Dispatcher) (H) (Pack_value) (Errs)
 
         include
-          Irmin.Commit.Generic_key.Store (Schema.Info) (Node) (CA) (H) (Value)
+          Brassaia.Commit.Generic_key.Store (Schema.Info) (Node) (CA) (H) (Value)
       end
 
       module Commit_portable = struct
-        module Hash_key = Irmin.Key.Of_hash (Hash)
+        module Hash_key = Brassaia.Key.Of_hash (Hash)
         include Schema.Commit (Hash_key) (Hash_key)
 
         let of_commit : Commit.Value.t -> t =
@@ -112,7 +112,7 @@ struct
 
         module Info = Schema.Info
 
-        type hash = Hash.t [@@deriving irmin]
+        type hash = Hash.t [@@deriving brassaia]
       end
 
       module Branch = struct
@@ -125,8 +125,8 @@ struct
           AW.v ?fresh ?readonly path |> make_closeable
       end
 
-      module Slice = Irmin.Backend.Slice.Make (Contents) (Node) (Commit)
-      module Remote = Irmin.Backend.Remote.None (Commit.Key) (B)
+      module Slice = Brassaia.Backend.Slice.Make (Contents) (Node) (Commit)
+      module Remote = Brassaia.Backend.Remote.None (Commit.Key) (B)
 
       module Gc = Gc.Make (struct
         module Async = Async
@@ -142,14 +142,14 @@ struct
         module Commit_store = Commit.CA
 
         type hash = Node_value.hash
-        type key = Node_value.node_key [@@deriving irmin]
+        type key = Node_value.node_key [@@deriving brassaia]
       end)
 
       module Repo = struct
         type running_gc = { gc : Gc.t; use_auto_finalisation : bool }
 
         type t = {
-          config : Irmin.Backend.Conf.t;
+          config : Brassaia.Backend.Conf.t;
           contents : read Contents.CA.t;
           node : read Node.CA.t;
           commit : read Commit.CA.t;
@@ -162,7 +162,7 @@ struct
           lock : Eio.Mutex.t;
         }
 
-        let pp_key = Irmin.Type.pp XKey.t
+        let pp_key = Brassaia.Type.pp XKey.t
         let contents_t t : 'a Contents.t = t.contents
         let node_t t : 'a Node.t = (contents_t t, t.node)
         let commit_t t : 'a Commit.t = (node_t t, t.commit)
@@ -170,10 +170,10 @@ struct
         let config t = t.config
 
         let v config =
-          let root = Irmin_pack.Conf.root config in
-          let fresh = Irmin_pack.Conf.fresh config in
+          let root = Brassaia_pack.Conf.root config in
+          let fresh = Brassaia_pack.Conf.fresh config in
           let fm =
-            let readonly = Irmin_pack.Conf.readonly config in
+            let readonly = Brassaia_pack.Conf.readonly config in
             if readonly then File_manager.open_ro config |> Errs.raise_if_error
             else
               match (Io.classify_path root, fresh) with
@@ -197,7 +197,7 @@ struct
             let root = Conf.root config in
             let fresh = Conf.fresh config in
             let readonly = Conf.readonly config in
-            let path = Irmin_pack.Layout.V4.branch ~root in
+            let path = Brassaia_pack.Layout.V4.branch ~root in
             Branch.v ~fresh ~readonly path
           in
           let during_batch = Atomic.make false in
@@ -245,7 +245,7 @@ struct
                 | None ->
                     Error
                       (`Commit_key_is_dangling
-                        (Irmin.Type.to_string XKey.t key))
+                        (Brassaia.Type.to_string XKey.t key))
                 | Some (k, _kind) -> Ok k)
 
           let start ~unlink ~use_auto_finalisation ~output t commit_key =
@@ -373,12 +373,12 @@ struct
                   Eio.Mutex.use_rw ~protect:false t.lock @@ fun () ->
                   Gc.finalise_without_swap gc
             in
-            let config = Irmin.Backend.Conf.add t.config Conf.Key.root path in
+            let config = Brassaia.Backend.Conf.add t.config Conf.Key.root path in
             let () =
               File_manager.create_one_commit_store t.fm config gced commit_key
               |> Errs.raise_if_error
             in
-            let branch_path = Irmin_pack.Layout.V4.branch ~root:path in
+            let branch_path = Brassaia_pack.Layout.V4.branch ~root:path in
             let branch_store =
               Branch.v ~fresh:true ~readonly:false branch_path
             in
@@ -389,7 +389,7 @@ struct
 
         let split t =
           let open Result_syntax in
-          let readonly = Irmin_pack.Conf.readonly t.config in
+          let readonly = Brassaia_pack.Conf.readonly t.config in
           let* () =
             if not (is_split_allowed t) then Error `Split_disallowed else Ok ()
           in
@@ -406,7 +406,7 @@ struct
 
         let add_volume_exn t =
           let () =
-            if Irmin_pack.Conf.readonly t.config then
+            if Brassaia_pack.Conf.readonly t.config then
               Errs.raise_error `Ro_not_allowed;
             if Gc.is_finished t = false then
               Errs.raise_error `Add_volume_forbidden_during_gc
@@ -415,7 +415,7 @@ struct
 
         let unsafe_batch t f =
           [%log.debug "[pack] batch start"];
-          let readonly = Irmin_pack.Conf.readonly t.config in
+          let readonly = Brassaia_pack.Conf.readonly t.config in
           if readonly then Errs.raise_error `Ro_not_allowed
           else
             let c0 = Io.Clock.counter () in
@@ -448,7 +448,7 @@ struct
                     [%log.err
                       "[pack] batch failed and flush failed. Silencing flush \
                        fail. (%a)"
-                      (Irmin.Type.pp Errs.t) err]
+                      (Brassaia.Type.pp Errs.t) err]
               in
               (* Kill gc process in at_exit. *)
               raise exn
@@ -476,7 +476,7 @@ struct
       end
     end
 
-    include Irmin.Of_backend (X)
+    include Brassaia.Of_backend (X)
     module Integrity_checks = Checks.Integrity_checks (Io) (XKey) (X) (Index)
 
     let integrity_check_inodes ?heads t =
@@ -523,13 +523,13 @@ struct
       let is_minimal =
         t.X.Repo.config
         |> Conf.indexing_strategy
-        |> Irmin_pack.Indexing_strategy.is_minimal
+        |> Brassaia_pack.Indexing_strategy.is_minimal
       in
       if is_minimal then integrity_check_minimal ?ppf ?heads t
       else integrity_check_always ?ppf ~auto_repair t
 
     module Stats_computation = struct
-      let pp_key = Irmin.Type.pp XKey.t
+      let pp_key = Brassaia.Type.pp XKey.t
 
       let traverse_inodes ~dump_blob_paths_to commit repo =
         let module Stats = Checks.Stats (struct
@@ -611,10 +611,10 @@ struct
           match error with
           | Errors.Pack_error error ->
               Fmt.str "Pack_error: %a" Errors.pp_base_error error
-          | Irmin.Closed -> "Irmin.Closed"
-          | Irmin_pack.RO_not_allowed -> "Irmin_pack.RO_not_allowed"
+          | Brassaia.Closed -> "Brassaia.Closed"
+          | Brassaia_pack.RO_not_allowed -> "Brassaia_pack.RO_not_allowed"
           (* | Unix.Unix_error (err, s1, s2) -> *)
-          (*     let pp = Irmin.Type.pp Io.misc_error_t in *)
+          (*     let pp = Brassaia.Type.pp Io.misc_error_t in *)
           (*     Fmt.str "Unix_error: %a" pp (err, s1, s2) *)
           | exn -> raise exn
         in
@@ -623,7 +623,7 @@ struct
 
       let map_errors context (error : Errs.t) =
         let err_msg =
-          Fmt.str "[%s] resulted in error: %a" context (Irmin.Type.pp Errs.t)
+          Fmt.str "[%s] resulted in error: %a" context (Brassaia.Type.pp Errs.t)
             error
         in
         `Msg err_msg
@@ -692,7 +692,7 @@ struct
       include X.Node.CA.Snapshot
 
       type t = Inode of inode | Blob of Backend.Contents.Val.t
-      [@@deriving irmin]
+      [@@deriving brassaia]
 
       module S = Snapshot.Make (struct
         module Hash = H

@@ -17,7 +17,7 @@
 open! Import
 open Printf
 
-let src = Logs.Src.create "irmin.merge" ~doc:"Irmin merging"
+let src = Logs.Src.create "brassaia.merge" ~doc:"Brassaia merging"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
@@ -412,4 +412,4 @@ let with_conflict rewrite (d, f) =
 let conflict_t =
   Type.(map string) (fun x -> `Conflict x) (function `Conflict x -> x)
 
-type nonrec 'a result = ('a, conflict) result [@@deriving irmin]
+type nonrec 'a result = ('a, conflict) result [@@deriving brassaia]

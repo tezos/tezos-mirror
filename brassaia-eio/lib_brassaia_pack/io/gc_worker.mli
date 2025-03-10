@@ -37,7 +37,7 @@ module Make
     chunk_start_idx : int;
     dead_bytes : int63;
   }
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   type gc_results = {
     suffix_params : suffix_params;
@@ -46,8 +46,8 @@ module Make
     modified_volume : Lower.volume_identifier option;
     stats : Stats.Latest_gc.worker;
   }
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
-  type gc_output = (gc_results, Args.Errs.t) result [@@deriving irmin]
+  type gc_output = (gc_results, Args.Errs.t) result [@@deriving brassaia]
 end
 with module Args := Args

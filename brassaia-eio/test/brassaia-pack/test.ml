@@ -16,7 +16,7 @@
 
 let () =
   Eio_main.run @@ fun env ->
-  Irmin_test.Store.run "irmin-pack"
+  Brassaia_test.Store.run "brassaia-pack"
     ~misc:(Test_pack.misc @@ Eio.Stdenv.domain_mgr env)
     ~sleep:Eio_unix.sleep
     (List.map (fun s -> (`Quick, s)) Test_pack.suite)

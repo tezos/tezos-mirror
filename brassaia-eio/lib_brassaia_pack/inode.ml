@@ -21,13 +21,13 @@ exception Max_depth of int
 
 module Make_internal
     (Conf : Conf.S)
-    (H : Irmin.Hash.S)
+    (H : Brassaia.Hash.S)
     (Key : sig
-      include Irmin.Key.S with type hash = H.t
+      include Brassaia.Key.S with type hash = H.t
 
       val unfindable_of_hash : hash -> t
     end)
-    (Node : Irmin.Node.Generic_key.S
+    (Node : Brassaia.Node.Generic_key.S
               with type hash = H.t
                and type contents_key = Key.t
                and type node_key = Key.t) =
@@ -42,7 +42,7 @@ struct
 
   module Node = struct
     include Node
-    module H = Irmin.Hash.Typed (H) (Node)
+    module H = Brassaia.Hash.Typed (H) (Node)
 
     let hash = H.hash
   end
@@ -51,23 +51,23 @@ struct
   let max_depth = int_of_float (log (2. ** 50.) /. log (float Conf.entries))
 
   module T = struct
-    type hash = H.t [@@deriving irmin ~pp ~to_bin_string ~equal]
-    type key = Key.t [@@deriving irmin ~pp ~equal]
-    type node_key = Node.node_key [@@deriving irmin]
-    type contents_key = Node.contents_key [@@deriving irmin]
+    type hash = H.t [@@deriving brassaia ~pp ~to_bin_string ~equal]
+    type key = Key.t [@@deriving brassaia ~pp ~equal]
+    type node_key = Node.node_key [@@deriving brassaia]
+    type contents_key = Node.contents_key [@@deriving brassaia]
 
     type step = Node.step
-    [@@deriving irmin ~compare ~to_bin_string ~of_bin_string ~short_hash]
+    [@@deriving brassaia ~compare ~to_bin_string ~of_bin_string ~short_hash]
 
-    type metadata = Node.metadata [@@deriving irmin ~equal]
-    type value = Node.value [@@deriving irmin ~equal]
+    type metadata = Node.metadata [@@deriving brassaia ~equal]
+    type value = Node.value [@@deriving brassaia ~equal]
 
     module Metadata = Node.Metadata
 
     exception Dangling_hash = Node.Dangling_hash
 
     let raise_dangling_hash c hash =
-      let context = "Irmin_pack.Inode." ^ c in
+      let context = "Brassaia_pack.Inode." ^ c in
       raise (Dangling_hash { context; hash })
 
     let unsafe_keyvalue_of_hashvalue = function
@@ -80,7 +80,7 @@ struct
   end
 
   module Step =
-    Irmin.Hash.Typed
+    Brassaia.Hash.Typed
       (H)
       (struct
         type t = T.step
@@ -151,7 +151,7 @@ struct
         let r1 = i1 lsr (byte - rest) in
         r0 + r1
 
-    let short_hash = Irmin.Type.(unstage (short_hash bytes))
+    let short_hash = Brassaia.Type.(unstage (short_hash bytes))
     let seeded_hash ~depth k = abs (short_hash ~seed:depth k) mod Conf.entries
 
     let index =
@@ -174,7 +174,7 @@ struct
   module Val_ref : sig
     open T
 
-    type t [@@deriving irmin]
+    type t [@@deriving brassaia]
     type v = private Key of Key.t | Hash of hash Lazy.t
 
     val inspect : t -> v
@@ -198,7 +198,7 @@ struct
         parameter and refactor the [layout] types below to get static guarantees
         that [Portable] nodes (with hashes for internal pointers) are not saved
         without first saving their children. *)
-    type v = Key of Key.t | Hash of hash Lazy.t [@@deriving irmin ~pp_dump]
+    type v = Key of Key.t | Hash of hash Lazy.t [@@deriving brassaia ~pp_dump]
 
     type t = v ref
 
@@ -238,13 +238,13 @@ struct
             (Lazy.force h)
 
     let t =
-      let pre_hash_hash = Irmin.Type.(unstage (pre_hash hash_t)) in
+      let pre_hash_hash = Brassaia.Type.(unstage (pre_hash hash_t)) in
       let pre_hash x f =
         match !x with
         | Key k -> pre_hash_hash (Key.to_hash k) f
         | Hash h -> pre_hash_hash (Lazy.force h) f
       in
-      Irmin.Type.map ~pre_hash v_t (fun x -> ref x) (fun x -> !x)
+      Brassaia.Type.map ~pre_hash v_t (fun x -> ref x) (fun x -> !x)
   end
 
   (* Binary representation. Used in two modes:
@@ -262,30 +262,30 @@ struct
     (** Distinguishes between the two possible modes of binary value. *)
     type _ mode = Ptr_key : key mode | Ptr_any : Val_ref.t mode
 
-    type 'vref with_index = { index : int; vref : 'vref } [@@deriving irmin]
+    type 'vref with_index = { index : int; vref : 'vref } [@@deriving brassaia]
 
     type 'vref tree = {
       depth : int;
       length : int;
       entries : 'vref with_index list;
     }
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     type 'vref v = Values of (step * value) list | Tree of 'vref tree
-    [@@deriving irmin ~pre_hash]
+    [@@deriving brassaia ~pre_hash]
 
     module V =
-      Irmin.Hash.Typed
+      Brassaia.Hash.Typed
         (H)
         (struct
-          type t = Val_ref.t v [@@deriving irmin]
+          type t = Val_ref.t v [@@deriving brassaia]
         end)
 
     type 'vref t = { hash : H.t Lazy.t; root : bool; v : 'vref v }
 
-    let t : type vref. vref Irmin.Type.t -> vref t Irmin.Type.t =
+    let t : type vref. vref Brassaia.Type.t -> vref t Brassaia.Type.t =
      fun vref_t ->
-      let open Irmin.Type in
+      let open Brassaia.Type in
       let v_t = v_t vref_t in
       let pre_hash_v = pre_hash_v vref_t in
       let pre_hash x = pre_hash_v x.v in
@@ -309,14 +309,14 @@ struct
   module Compress = struct
     open T
 
-    type dict_key = int [@@deriving irmin]
-    type pack_offset = int63 [@@deriving irmin]
+    type dict_key = int [@@deriving brassaia]
+    type pack_offset = int63 [@@deriving brassaia]
     type name = Indirect of dict_key | Direct of step
-    type address = Offset of pack_offset | Hash of H.t [@@deriving irmin]
-    type ptr = { index : int; hash : address } [@@deriving irmin]
+    type address = Offset of pack_offset | Hash of H.t [@@deriving brassaia]
+    type ptr = { index : int; hash : address } [@@deriving brassaia]
 
     type tree = { depth : int; length : int; entries : ptr list }
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     type value =
       | Contents of name * address * metadata
@@ -339,7 +339,7 @@ struct
 
        - whether the [address] of the entry is a pack offset or a hash to be
          indexed *)
-    let[@ocamlformat "disable"] value_t : value Irmin.Type.t =
+    let[@ocamlformat "disable"] value_t : value Brassaia.Type.t =
       let module Payload = struct
           (* Different payload types that can appear after packed tags: *)
           let io  = [%typ: dict_key * pack_offset]
@@ -352,7 +352,7 @@ struct
           let x_do = [%typ: step * pack_offset * metadata]
           let x_dh = [%typ: step * H.t * metadata]
       end in
-      let open Irmin.Type in
+      let open Brassaia.Type in
       variant "Compress.value"
         (fun
           (* The ordering of these arguments determines which tags are assigned
@@ -383,22 +383,22 @@ struct
       |> sealv
 
     type v = Values of value list | Tree of tree
-    [@@deriving irmin ~encode_bin ~decode_bin ~size_of]
+    [@@deriving brassaia ~encode_bin ~decode_bin ~size_of]
 
     let dynamic_size_of_v_encoding =
-      match Irmin.Type.Size.of_encoding v_t with
-      | Irmin.Type.Size.Dynamic f -> f
+      match Brassaia.Type.Size.of_encoding v_t with
+      | Brassaia.Type.Size.Dynamic f -> f
       | _ -> assert false
 
     type kind = Pack_value.Kind.t
-    [@@deriving irmin ~encode_bin ~decode_bin ~size_of]
+    [@@deriving brassaia ~encode_bin ~decode_bin ~size_of]
 
-    type nonrec int = int [@@deriving irmin ~encode_bin ~decode_bin]
+    type nonrec int = int [@@deriving brassaia ~encode_bin ~decode_bin]
 
     let no_length = 0
     let is_real_length length = not (length = 0)
 
-    type v1 = { mutable length : int; v : v } [@@deriving irmin]
+    type v1 = { mutable length : int; v : v } [@@deriving brassaia]
     (** [length] is the length of the binary encoding of [v]. It is not known
         right away. [length] is [no_length] when it isn't known. Calling
         [encode_bin] or [size_of] will make [length] known. *)
@@ -410,7 +410,7 @@ struct
       | V1_unstable of v
       | V2_root of v1
       | V2_nonroot of v1
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     let encode_bin_tv_staggered ({ v; _ } as tv) kind f =
       match size_of_v v with
@@ -485,12 +485,12 @@ struct
         | Commit_v1 | Commit_v2 | Contents -> assert false
         | Dangling_parent_commit -> assert false
       in
-      Irmin.Type.Size.custom_dynamic ~of_encoding ()
+      Brassaia.Type.Size.custom_dynamic ~of_encoding ()
 
     let tagged_v_t =
-      Irmin.Type.like ~bin:(encode_bin_tv, decode_bin_tv, size_of_tv) tagged_v_t
+      Brassaia.Type.like ~bin:(encode_bin_tv, decode_bin_tv, size_of_tv) tagged_v_t
 
-    type t = { hash : H.t; tv : tagged_v } [@@deriving irmin]
+    type t = { hash : H.t; tv : tagged_v } [@@deriving brassaia]
 
     let v ~root ~hash v =
       let length = no_length in
@@ -553,7 +553,7 @@ struct
       - When [Total], it originates from [Val.v] or [Val.empty].
       - When [Partial], it originates from [Val.of_bin], which is only used by
         [Inode.find].
-      - When [Truncated], it either originates from an [Irmin.Type]
+      - When [Truncated], it either originates from an [Brassaia.Type]
         deserialisation or from a proof.
 
       Almost all other functions in [Val_impl] are polymorphic regarding the
@@ -573,8 +573,8 @@ struct
 
       A tree of inode only made of [Intact] tags is similar to a [Total] layout.
 
-      As of Irmin 2.4 (February 2022), inode deserialisation using Repr happens
-      in [irmin/slice.ml] and [irmin/sync_ext.ml], and maybe some other places.
+      As of Brassaia 2.4 (February 2022), inode deserialisation using Repr happens
+      in [brassaia/slice.ml] and [brassaia/sync_ext.ml], and maybe some other places.
 
       At some point we might want to forbid such deserialisations and instead
       use something in the flavour of [Val.of_bin] to create [Partial] inodes.
@@ -684,7 +684,7 @@ struct
               match Atomic.get target with
               | Dirty entry | Lazy_loaded entry ->
                   (* [target] is already cached. [cache] is only concerned with
-                     new cache entries, not the older ones for which the irmin
+                     new cache entries, not the older ones for which the brassaia
                      users can discard using [clear]. *)
                   entry
               | Lazy key -> (
@@ -955,25 +955,25 @@ struct
       let v = to_bin_v layout mode t.v in
       Bin.v ~root:(is_root t) ~hash:(Val_ref.to_lazy_hash t.v_ref) v
 
-    type len = [ `Eq of int | `Ge of int ] [@@deriving irmin]
+    type len = [ `Eq of int | `Ge of int ] [@@deriving brassaia]
 
     module Concrete = struct
       type kinded_key =
         | Contents of contents_key
         | Contents_x of metadata * contents_key
         | Node of node_key
-      [@@deriving irmin]
+      [@@deriving brassaia]
 
-      type entry = { name : step; key : kinded_key } [@@deriving irmin]
+      type entry = { name : step; key : kinded_key } [@@deriving brassaia]
 
       type 'a pointer = { index : int; pointer : hash; tree : 'a }
-      [@@deriving irmin]
+      [@@deriving brassaia]
 
       type 'a tree = { depth : int; length : int; pointers : 'a pointer list }
-      [@@deriving irmin]
+      [@@deriving brassaia]
 
       type t = Tree of t tree | Values of entry list | Blinded
-      [@@deriving irmin]
+      [@@deriving brassaia]
 
       let to_entry (name, v) =
         match v with
@@ -1001,7 +1001,7 @@ struct
         | `Blinded_root
         | `Too_large_values of t
         | `Empty ]
-      [@@deriving irmin]
+      [@@deriving brassaia]
 
       let rec length = function
         | Values l -> `Eq (List.length l)
@@ -1014,7 +1014,7 @@ struct
               (`Eq 0) t.pointers
         | Blinded -> `Ge 0
 
-      let pp = Irmin.Type.pp_json t
+      let pp = Brassaia.Type.pp_json t
 
       let pp_len ppf = function
         | `Eq e -> Fmt.pf ppf "%d" e
@@ -1090,7 +1090,7 @@ struct
     exception Blinded_root
     exception Too_large_values of Concrete.t
 
-    let hash_equal = Irmin.Type.(unstage (equal hash_t))
+    let hash_equal = Brassaia.Type.(unstage (equal hash_t))
 
     let of_concrete_exn : type a. depth:int -> a layout -> _ -> a t =
      fun ~depth la t ->
@@ -1455,7 +1455,7 @@ struct
           | None ->
               Fmt.failwith
                 "You are trying to save to the backend an inode deserialized \
-                 using [Irmin.Type] that used to contain pointer(s) to inodes \
+                 using [Brassaia.Type] that used to contain pointer(s) to inodes \
                  which are unknown to the backend. Hash: %a"
                 pp_hash h
           | Some key ->
@@ -1502,7 +1502,7 @@ struct
                           (* In this case, [index] has returned a key that is
                              not present in the underlying store. This is
                              permitted by the contract on index functions (and
-                             required by [irmin-pack.mem]), but never happens
+                             required by [brassaia-pack.mem]), but never happens
                              with the persistent {!Pack_store} backend (provided
                              the store is not corrupted). *)
                           aux ~depth:(depth + 1) t
@@ -1567,13 +1567,13 @@ struct
 
     module Proof = struct
       type value = [ `Contents of hash * metadata | `Node of hash ]
-      [@@deriving irmin]
+      [@@deriving brassaia]
 
       type t =
         [ `Blinded of hash
         | `Values of (step * value) list
         | `Inode of int * (int * t) list ]
-      [@@deriving irmin]
+      [@@deriving brassaia]
 
       let weaken_step_value (step, v) = (step, hashvalue_of_keyvalue v)
 
@@ -1724,21 +1724,21 @@ struct
       include T
 
       type kinded_hash = Contents of hash * metadata | Node of hash
-      [@@deriving irmin]
+      [@@deriving brassaia]
 
-      type entry = { step : string; hash : kinded_hash } [@@deriving irmin]
+      type entry = { step : string; hash : kinded_hash } [@@deriving brassaia]
 
       type inode_tree = {
         depth : int;
         length : int;
         pointers : (int * hash) list;
       }
-      [@@deriving irmin]
+      [@@deriving brassaia]
 
       type v = Inode_tree of inode_tree | Inode_value of entry list
-      [@@deriving irmin]
+      [@@deriving brassaia]
 
-      type inode = { v : v; root : bool } [@@deriving irmin]
+      type inode = { v : v; root : bool } [@@deriving brassaia]
     end
 
     let of_entry ~index e : step * Node.value =
@@ -1778,10 +1778,10 @@ struct
   end
 
   module Raw = struct
-    type hash = H.t [@@deriving irmin]
+    type hash = H.t [@@deriving brassaia]
     type key = Key.t
-    type t = T.key Bin.t [@@deriving irmin]
-    type metadata = T.metadata [@@deriving irmin]
+    type t = T.key Bin.t [@@deriving brassaia]
+    type metadata = T.metadata [@@deriving brassaia]
     type Pack_value.kinded += Node of t
 
     let to_kinded t = Node t
@@ -1812,8 +1812,8 @@ struct
     let hash t = Bin.hash t
     let step_to_bin = T.step_to_bin_string
     let step_of_bin = T.step_of_bin_string
-    let encode_compress = Irmin.Type.(unstage (encode_bin Compress.t))
-    let decode_compress = Irmin.Type.(unstage (decode_bin Compress.t))
+    let encode_compress = Brassaia.Type.(unstage (encode_bin Compress.t))
+    let decode_compress = Brassaia.Type.(unstage (decode_bin Compress.t))
 
     let length_header = function
       | Pack_value.Kind.Contents ->
@@ -1825,7 +1825,7 @@ struct
       | k -> Pack_value.Kind.length_header_exn k
 
     let decode_compress_length =
-      match Irmin.Type.Size.of_encoding Compress.t with
+      match Brassaia.Type.Size.of_encoding Compress.t with
       | Unknown | Static _ -> assert false
       | Dynamic f -> f
 
@@ -1833,7 +1833,7 @@ struct
         dict:(string -> int option) ->
         offset_of_key:(Key.t -> int63 option) ->
         hash ->
-        t Irmin.Type.encode_bin =
+        t Brassaia.Type.encode_bin =
      fun ~dict ~offset_of_key hash t ->
       Stats.incr_inode_encode_bin ();
       let step s : Compress.name =
@@ -1880,7 +1880,7 @@ struct
         dict:(int -> string option) ->
         key_of_offset:(int63 -> key) ->
         key_of_hash:(hash -> key) ->
-        t Irmin.Type.decode_bin =
+        t Brassaia.Type.decode_bin =
      fun ~dict ~key_of_offset ~key_of_hash t pos_ref ->
       Stats.incr_inode_decode_bin ();
       let i = decode_compress t pos_ref in
@@ -2074,9 +2074,9 @@ struct
       in
       map t { f }
 
-    let t : t Irmin.Type.t =
-      let pre_hash_binv = Irmin.Type.(unstage (pre_hash (Bin.v_t Val_ref.t))) in
-      let pre_hash_node = Irmin.Type.(unstage (pre_hash Node.t)) in
+    let t : t Brassaia.Type.t =
+      let pre_hash_binv = Brassaia.Type.(unstage (pre_hash (Bin.v_t Val_ref.t))) in
+      let pre_hash_node = Brassaia.Type.(unstage (pre_hash Node.t)) in
       let pre_hash x =
         let stable = apply x { f = (fun _ v -> I.is_stable v) } in
         if not stable then
@@ -2093,19 +2093,19 @@ struct
       in
       let module Ptr_any = struct
         let t =
-          Irmin.Type.map (Bin.t Val_ref.t)
+          Brassaia.Type.map (Bin.t Val_ref.t)
             (fun _ -> assert false)
             (fun x ->
               apply x { f = (fun layout v -> I.to_bin layout Bin.Ptr_any v) })
 
-        type nonrec t = t [@@deriving irmin ~equal ~compare ~pp]
+        type nonrec t = t [@@deriving brassaia ~equal ~compare ~pp]
 
         (* TODO(repr): add these to [ppx_repr] meta-deriving *)
         (* TODO(repr): why is there no easy way to get a decoder value to pass to [map ~json]? *)
-        let encode_json = Irmin.Type.encode_json t
+        let encode_json = Brassaia.Type.encode_json t
         let decode_json _ = failwith "TODO"
       end in
-      Irmin.Type.map ~pre_hash ~pp:Ptr_any.pp
+      Brassaia.Type.map ~pre_hash ~pp:Ptr_any.pp
         ~json:(Ptr_any.encode_json, Ptr_any.decode_json)
         ~equal:Ptr_any.equal ~compare:Ptr_any.compare (Bin.t T.key_t)
         (fun bin -> Truncated (I.of_bin I.Truncated bin))
@@ -2118,7 +2118,7 @@ struct
       if Conf.forbid_empty_dir_persistence && is_empty t then
         failwith
           "Persisting an empty node is forbidden by the configuration of the \
-           irmin-pack store";
+           brassaia-pack store";
       let f layout v =
         if not allow_non_root then I.check_write_op_supported v;
         I.save layout ~add ~index ~mem v
@@ -2161,11 +2161,11 @@ struct
       in
       apply t { f }
 
-    let merge ~contents ~node : t Irmin.Merge.t =
+    let merge ~contents ~node : t Brassaia.Merge.t =
       let merge = Node.merge ~contents ~node in
       let to_node t = of_seq (Node.seq t) in
       let of_node n = Node.of_seq (seq n) in
-      Irmin.Merge.like t merge of_node to_node
+      Brassaia.Merge.like t merge of_node to_node
 
     let with_handler f_env t =
       match t with
@@ -2223,11 +2223,11 @@ struct
     module Portable = struct
       include Val_portable
 
-      type node_key = hash [@@deriving irmin]
-      type contents_key = hash [@@deriving irmin]
+      type node_key = hash [@@deriving brassaia]
+      type contents_key = hash [@@deriving brassaia]
 
       type value = [ `Contents of hash * metadata | `Node of hash ]
-      [@@deriving irmin]
+      [@@deriving brassaia]
 
       let of_node t = t
 
@@ -2256,9 +2256,9 @@ struct
 
       let merge =
         let promote_merge :
-            hash option Irmin.Merge.t -> key option Irmin.Merge.t =
+            hash option Brassaia.Merge.t -> key option Brassaia.Merge.t =
          fun t ->
-          Irmin.Merge.like [%typ: key option] t (Option.map Key.to_hash)
+          Brassaia.Merge.like [%typ: key option] t (Option.map Key.to_hash)
             (Option.map Key.unfindable_of_hash)
         in
         fun ~contents ~node ->
@@ -2266,7 +2266,7 @@ struct
 
       module Proof = I.Proof
 
-      type proof = I.Proof.t [@@deriving irmin]
+      type proof = I.Proof.t [@@deriving brassaia]
 
       let to_proof (t : t) : proof =
         apply t { f = (fun la v -> I.Proof.to_proof la v) }
@@ -2322,9 +2322,9 @@ struct
 end
 
 module Make
-    (H : Irmin.Hash.S)
-    (Key : Irmin.Key.S with type hash = H.t)
-    (Node : Irmin.Node.Generic_key.S
+    (H : Brassaia.Hash.S)
+    (Key : Brassaia.Key.S with type hash = H.t)
+    (Node : Brassaia.Node.Generic_key.S
               with type hash = H.t
                and type contents_key = Key.t
                and type node_key = Key.t)
@@ -2343,7 +2343,7 @@ struct
   module Val = Inter.Val
 
   type 'a t = 'a Pack.t
-  type key = Key.t [@@deriving irmin ~equal]
+  type key = Key.t [@@deriving brassaia ~equal]
   type hash = Hash.t
   type value = Inter.Val.t
 
@@ -2352,7 +2352,7 @@ struct
 
   exception Invalid_depth = Inter.Raw.Invalid_depth
 
-  let pp_value = Irmin.Type.pp Inter.Raw.t
+  let pp_value = Brassaia.Type.pp Inter.Raw.t
 
   let pp_invalid_depth ppf (expected, got, v) =
     Fmt.pf ppf "Invalid depth: got %d, expecting %d (%a)" got expected pp_value
@@ -2389,7 +2389,7 @@ struct
 
   let hash_exn = Val.hash_exn
   let add t v = save t v
-  let equal_hash = Irmin.Type.(unstage (equal H.t))
+  let equal_hash = Brassaia.Type.(unstage (equal H.t))
 
   let check_hash expected got =
     if equal_hash expected got then ()
@@ -2422,7 +2422,7 @@ struct
         if Inter.Val.integrity_check v then Ok ()
         else
           let msg =
-            Fmt.str "Problematic inode %a" (Irmin.Type.pp Inter.Val.t) v
+            Fmt.str "Problematic inode %a" (Brassaia.Type.pp Inter.Val.t) v
           in
           Error msg
 end

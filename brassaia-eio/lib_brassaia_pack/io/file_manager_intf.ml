@@ -27,12 +27,12 @@ module type S = sig
 
       {2 Two types of guarantees}
 
-      Irmin_pack_unix supports the SWMR access scheme. It means that it is
+      Brassaia_pack_unix supports the SWMR access scheme. It means that it is
       undefined for the files to be opened twice in RW mode by 2 FMs. It also
       means that it is undefined for a FM in RW mode to be used simultaneously
       from 2 different fibers.
 
-      Irmin_pack_unix aims to be (crash) consistent (in the ACID sense). In case
+      Brassaia_pack_unix aims to be (crash) consistent (in the ACID sense). In case
       of a system failure (e.g. power outage), the files should be left in a
       consistent state for later uses.
 
@@ -95,7 +95,7 @@ module type S = sig
     | `No_tmp_path_provided ]
 
   val create_rw :
-    overwrite:bool -> Irmin.Backend.Conf.t -> (t, [> create_error ]) result
+    overwrite:bool -> Brassaia.Backend.Conf.t -> (t, [> create_error ]) result
   (** Create a rw instance of [t] by creating the files.
 
       Note on SWMR consistency: It is undefined for a reader to attempt an
@@ -137,7 +137,7 @@ module type S = sig
     | `Invalid_parent_directory
     | `Pending_flush ]
 
-  val open_rw : Irmin.Backend.Conf.t -> (t, [> open_rw_error ]) result
+  val open_rw : Brassaia.Backend.Conf.t -> (t, [> open_rw_error ]) result
   (** Create a rw instance of [t] by opening existing files.
 
       If the pack store has already been garbage collected, opening with a
@@ -175,7 +175,7 @@ module type S = sig
     | `Invalid_layout
     | `Volume_missing of string ]
 
-  val open_ro : Irmin.Backend.Conf.t -> (t, [> open_ro_error ]) result
+  val open_ro : Brassaia.Backend.Conf.t -> (t, [> open_ro_error ]) result
   (** Create a ro instance of [t] by opening existing files.
 
       Note on SWMR consistency: [open_ro] is supposed to work whichever the
@@ -226,7 +226,7 @@ module type S = sig
   (** [fsync] executes an fsync for all files of the file manager.
 
       Note: This function exists primarily for operations like snapshot imports.
-      If fsync is enabled for the store (see {!Irmin_pack.Config.use_fsync}),
+      If fsync is enabled for the store (see {!Brassaia_pack.Config.use_fsync}),
       calls to {!flush} will also call fsync and therefore there is little need
       to call this function directly. *)
 
@@ -289,7 +289,7 @@ module type S = sig
 
   val create_one_commit_store :
     t ->
-    Irmin.Backend.Conf.t ->
+    Brassaia.Backend.Conf.t ->
     Control_file.Payload.Upper.Latest.gced ->
     Index.key Pack_key.t ->
     (unit, [> open_rw_error | close_error ]) result

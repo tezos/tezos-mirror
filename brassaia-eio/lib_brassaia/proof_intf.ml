@@ -39,9 +39,9 @@ module type S = sig
   type metadata
 
   type kinded_hash = [ `Contents of hash * metadata | `Node of hash ]
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
-  type 'a inode = { length : int; proofs : (int * 'a) list } [@@deriving irmin]
+  type 'a inode = { length : int; proofs : (int * 'a) list } [@@deriving brassaia]
   (** The type for (internal) inode proofs.
 
       These proofs encode large directories into a tree-like structure.
@@ -58,12 +58,12 @@ module type S = sig
       kept sorted in increasing order of indices. ['a] can be a concrete proof
       or a hash of that proof.
 
-      {e For [irmin-pack]}: [proofs] have a length of at most [Conf.entries]
+      {e For [brassaia-pack]}: [proofs] have a length of at most [Conf.entries]
       entries. For binary trees, this boolean index is a step of the left-right
       sequence / decision proof corresponding to the path in that binary tree. *)
 
   type 'a inode_extender = { length : int; segments : int list; proof : 'a }
-  [@@deriving irmin]
+  [@@deriving brassaia]
   (** The type for inode extenders.
 
       An extender is a compact representation of a sequence of [inode] which
@@ -87,7 +87,7 @@ module type S = sig
       [Blinded_value h] proves a value with hash [h] exists in the store.
 
       [Node ls] proves that a a "flat" node containing the list of files [ls]
-      exists in the store. {e For [irmin-pack]}: the length of [ls] is at most
+      exists in the store. {e For [brassaia-pack]}: the length of [ls] is at most
       [Conf.stable_hash];
 
       [Blinded_node h] proves that a node with hash [h] exists in the store.
@@ -102,7 +102,7 @@ module type S = sig
     | Blinded_node of hash
     | Inode of inode_tree inode
     | Extender of inode_tree inode_extender
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   (** The type for inode trees. It is a subset of [tree], limited to nodes.
 
@@ -118,9 +118,9 @@ module type S = sig
     | Inode_values of (step * tree) list
     | Inode_tree of inode_tree inode
     | Inode_extender of inode_tree inode_extender
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
-  type t [@@deriving irmin]
+  type t [@@deriving brassaia]
   (** The type for Merkle proofs.
 
       A proof [p] proves that the state advanced from [before p] to [after p].
@@ -151,12 +151,12 @@ end
     This description stands for [Set] proofs and assumes that the large nodes
     are represented by the backend as a tree structure (i.e. inodes).
 
-    There are 4 distinct phases when working with Irmin's merkle proofs:
+    There are 4 distinct phases when working with Brassaia's merkle proofs:
     [Produce | Serialise | Deserialise | Consume].
 
     {2 [Produce]}
 
-    This phase runs the [f] function provided by the Irmin user. It builds an
+    This phase runs the [f] function provided by the Brassaia user. It builds an
     [after] tree from a [before] tree that has been setup with an [Env] that
     records every backend reads into two hash tables.
 
@@ -206,7 +206,7 @@ end
     [Backend.Node_portable.t]. *)
 module type Env = sig
   type mode = Produce | Serialise | Deserialise | Consume
-  type t [@@deriving irmin]
+  type t [@@deriving brassaia]
   type hash
   type node
   type pnode
@@ -249,7 +249,7 @@ module type Proof = sig
       (C : Type.S)
       (H : Hash.S)
       (P : sig
-        type step [@@deriving irmin]
+        type step [@@deriving brassaia]
       end)
       (M : Type.S) : sig
     include

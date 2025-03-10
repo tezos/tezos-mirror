@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-module Make (I : Irmin.Info.S) = struct
+module Make (I : Brassaia.Info.S) = struct
   include I
 
   let v ?author fmt =
@@ -25,7 +25,7 @@ module Make (I : Irmin.Info.S) = struct
           match author with
           | Some a -> a
           | None ->
-              Printf.sprintf "Irmin %s.[%d]" (Unix.gethostname ())
+              Printf.sprintf "Brassaia %s.[%d]" (Unix.gethostname ())
                 (Unix.getpid ())
         in
         v ~author ~message date)

@@ -81,7 +81,7 @@ module type S = sig
       [t].
 
       {b Note:} {e Git} semantics is to update [b] only if the new head if more
-      recent. This is not the case in {e Irmin}. *)
+      recent. This is not the case in {e Brassaia}. *)
 
   val push_exn : db -> ?depth:int -> Remote.t -> status
   (** Same as {!push} but raise [Invalid_argument] if an error happens. *)

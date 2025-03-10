@@ -16,7 +16,7 @@
 
 open Ppxlib
 
-let rewriter_name = "ppx_irmin.internal"
+let rewriter_name = "ppx_brassaia.internal"
 
 (* Provides a PPX wrapper around the Logs library that attaches source code
    postitions to log lines via Logs' tags system.
@@ -50,7 +50,7 @@ let log_function ~loc (source : Source.t) (level : Logs.level) =
 
 let tags ~loc =
   [%expr
-    Logs.Tag.add Ppx_irmin_internal_lib.Source_code_position.tag __POS__
+    Logs.Tag.add Ppx_brassaia_internal_lib.Source_code_position.tag __POS__
       Logs.Tag.empty]
 
 let expansion_function source level ~loc ~path:_ payload =
@@ -90,7 +90,7 @@ let rules =
   let* source = [ Source.Logs; Log ] in
   let* level = [ Logs.App; Error; Warning; Info; Debug ] in
   let extension_name =
-    Format.sprintf "irmin.%s.%s" (Source.to_string source)
+    Format.sprintf "brassaia.%s.%s" (Source.to_string source)
       (level_to_function_name level)
   in
   [

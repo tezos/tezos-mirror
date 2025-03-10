@@ -17,7 +17,7 @@
 open! Import
 include Watch_intf
 
-let src = Logs.Src.create "irmin.watch" ~doc:"Irmin watch notifications"
+let src = Logs.Src.create "brassaia.watch" ~doc:"Brassaia watch notifications"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 

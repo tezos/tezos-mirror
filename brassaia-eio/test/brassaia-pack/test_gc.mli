@@ -35,12 +35,12 @@ module Snapshot : sig
 end
 
 module Store : sig
-  module S : Irmin_pack.S
+  module S : Brassaia_pack.S
 
   type t
 
-  val config : string -> Irmin.config
-  val init_with_config : Irmin.config -> t
+  val config : string -> Brassaia.config
+  val init_with_config : Brassaia.config -> t
   val close : t -> unit
   val start_gc : ?unlink:bool -> t -> S.commit -> unit
   val finalise_gc : t -> unit

@@ -18,13 +18,13 @@
 open! Import
 
 module type S = sig
-  type path [@@deriving irmin]
-  type step [@@deriving irmin]
-  type metadata [@@deriving irmin]
-  type contents [@@deriving irmin]
-  type contents_key [@@deriving irmin]
-  type node [@@deriving irmin]
-  type hash [@@deriving irmin]
+  type path [@@deriving brassaia]
+  type step [@@deriving brassaia]
+  type metadata [@@deriving brassaia]
+  type contents [@@deriving brassaia]
+  type contents_key [@@deriving brassaia]
+  type node [@@deriving brassaia]
+  type hash [@@deriving brassaia]
 
   (** [Tree] provides immutable, in-memory partial mirror of the store, with
       lazy reads and delayed writes.
@@ -35,7 +35,7 @@ module type S = sig
       needed on commit: if you modify a key twice, only the last change will be
       written to the store when you commit. *)
 
-  type t [@@deriving irmin]
+  type t [@@deriving brassaia]
   (** The type of trees. *)
 
   (** {1 Constructors} *)
@@ -62,7 +62,7 @@ module type S = sig
   (** General-purpose constructor for trees. *)
 
   type kinded_hash = [ `Contents of hash * metadata | `Node of hash ]
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   val pruned : kinded_hash -> t
   (** [pruned h] is a purely in-memory tree with the hash [h]. Such trees can be
@@ -155,7 +155,7 @@ module type S = sig
       [t].
 
       It is equivalent to [List.length (list t k)] but backends might optimise
-      this call: for instance it's a constant time operation in [irmin-pack].
+      this call: for instance it's a constant time operation in [brassaia-pack].
 
       [cache] defaults to [true], see {!caching} for an explanation of the
       parameter.*)
@@ -256,7 +256,7 @@ module type S = sig
       [tree], where ['a] is the accumulator and ['b] is the item folded. *)
 
   type depth = [ `Eq of int | `Le of int | `Lt of int | `Ge of int | `Gt of int ]
-  [@@deriving irmin]
+  [@@deriving brassaia]
   (** The type for fold depths.
 
       - [Eq d] folds over nodes and contents of depth exactly [d].
@@ -294,7 +294,7 @@ module type S = sig
       - If [n] is any kind, call [tree path t'] where [t'] is the tree of [n].
 
       See
-      {{:https://github.com/mirage/irmin/blob/main/examples/fold.ml}
+      {{:https://github.com/mirage/brassaia/blob/main/examples/fold.ml}
         examples/fold.ml} for a demo of the different {!folder}s.
 
       See {!force} for details about the [force] parameters. By default it is
@@ -322,7 +322,7 @@ module type S = sig
     depth : int;  (** Maximal depth. *)
     width : int;  (** Maximal width. *)
   }
-  [@@deriving irmin]
+  [@@deriving brassaia]
   (** The type for tree stats. *)
 
   val stats : ?force:bool -> t -> stats
@@ -333,7 +333,7 @@ module type S = sig
 
   type concrete =
     [ `Tree of (step * concrete) list | `Contents of contents * metadata ]
-  [@@deriving irmin]
+  [@@deriving brassaia]
   (** The type for concrete trees. *)
 
   val of_concrete : concrete -> t
@@ -355,13 +355,13 @@ module type S = sig
          and type step := step
          and type metadata := metadata
 
-    type irmin_tree
+    type brassaia_tree
 
-    val to_tree : t -> irmin_tree
+    val to_tree : t -> brassaia_tree
     (** [to_tree p] is the tree [t] representing the tree proof [p]. Blinded
         parts of the proof will raise [Dangling_hash] when traversed. *)
   end
-  with type irmin_tree := t
+  with type brassaia_tree := t
 
   (** {1 Caches} *)
 
@@ -412,7 +412,7 @@ module type S = sig
 
   module Private : sig
     module Env : sig
-      type t [@@deriving irmin]
+      type t [@@deriving brassaia]
 
       val is_empty : t -> bool
     end
@@ -439,7 +439,7 @@ module type Sigs = sig
 
     type kinded_key =
       [ `Contents of B.Contents.Key.t * metadata | `Node of B.Node.Key.t ]
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     val import : B.Repo.t -> kinded_key -> t option
     val import_no_check : B.Repo.t -> kinded_key -> t
@@ -463,7 +463,7 @@ module type Sigs = sig
     type 'result producer :=
       B.Repo.t -> kinded_key -> (t -> t * 'result) -> Proof.t * 'result
 
-    type verifier_error = [ `Proof_mismatch of string ] [@@deriving irmin]
+    type verifier_error = [ `Proof_mismatch of string ] [@@deriving brassaia]
 
     type 'result verifier :=
       Proof.t -> (t -> t * 'result) -> (t * 'result, verifier_error) result

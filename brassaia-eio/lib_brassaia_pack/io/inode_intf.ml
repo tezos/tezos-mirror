@@ -15,7 +15,7 @@
  *)
 
 open Import
-open Irmin_pack.Inode
+open Brassaia_pack.Inode
 
 module type Persistent = sig
   include S
@@ -25,14 +25,14 @@ module type Persistent = sig
   type dispatcher
 
   val v :
-    config:Irmin.Backend.Conf.t ->
+    config:Brassaia.Backend.Conf.t ->
     fm:file_manager ->
     dict:dict ->
     dispatcher:dispatcher ->
     lru:Lru.t ->
     read t
 
-  include Irmin_pack.Checkable with type 'a t := 'a t and type hash := hash
+  include Brassaia_pack.Checkable with type 'a t := 'a t and type hash := hash
 
   (* val reload : 'a t -> unit *)
   val integrity_check_inodes : [ `Read ] t -> key -> (unit, string) result
@@ -69,8 +69,8 @@ module type Sigs = sig
   module type Persistent = Persistent
 
   module Make_persistent
-      (H : Irmin.Hash.S)
-      (Node : Irmin.Node.Generic_key.S
+      (H : Brassaia.Hash.S)
+      (Node : Brassaia.Node.Generic_key.S
                 with type hash = H.t
                  and type contents_key = H.t Pack_key.t
                  and type node_key = H.t Pack_key.t)

@@ -17,7 +17,7 @@
 include Key_intf
 
 module Of_hash (Hash : Type.S) = struct
-  type t = Hash.t [@@deriving irmin]
+  type t = Hash.t [@@deriving brassaia]
   type hash = Hash.t
 
   let to_hash x = x [@@inline]

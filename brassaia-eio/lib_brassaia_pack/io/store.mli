@@ -21,4 +21,4 @@ module Maker
     (Io : Io_intf.S)
     (Io_index : Index.Platform.S)
     (Async : Async_intf.S)
-    (Config : Irmin_pack.Conf.S) : Maker
+    (Config : Brassaia_pack.Conf.S) : Maker

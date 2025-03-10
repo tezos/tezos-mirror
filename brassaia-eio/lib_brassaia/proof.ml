@@ -21,22 +21,22 @@ module Make
     (C : Type.S)
     (H : Type.S)
     (S : sig
-      type step [@@deriving irmin]
+      type step [@@deriving brassaia]
     end)
     (M : Type.S) =
 struct
-  type contents = C.t [@@deriving irmin]
-  type hash = H.t [@@deriving irmin]
-  type step = S.step [@@deriving irmin]
-  type metadata = M.t [@@deriving irmin]
+  type contents = C.t [@@deriving brassaia]
+  type hash = H.t [@@deriving brassaia]
+  type step = S.step [@@deriving brassaia]
+  type metadata = M.t [@@deriving brassaia]
 
   type kinded_hash = [ `Contents of hash * metadata | `Node of hash ]
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
-  type 'a inode = { length : int; proofs : (int * 'a) list } [@@deriving irmin]
+  type 'a inode = { length : int; proofs : (int * 'a) list } [@@deriving brassaia]
 
   type 'a inode_extender = { length : int; segments : int list; proof : 'a }
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   type tree =
     | Contents of contents * metadata
@@ -45,26 +45,26 @@ struct
     | Blinded_node of hash
     | Inode of inode_tree inode
     | Extender of inode_tree inode_extender
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   and inode_tree =
     | Blinded_inode of hash
     | Inode_values of (step * tree) list
     | Inode_tree of inode_tree inode
     | Inode_extender of inode_tree inode_extender
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   type elt =
     | Contents of contents
     | Node of (step * kinded_hash) list
     | Inode of hash inode
     | Inode_extender of hash inode_extender
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
-  type stream = elt Seq.t [@@deriving irmin]
+  type stream = elt Seq.t [@@deriving brassaia]
 
   type t = { before : kinded_hash; after : kinded_hash; state : tree }
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   let before t = t.before
   let after t = t.after
@@ -120,27 +120,27 @@ struct
     let t elt_t = Type.map [%typ: (H.t * elt) list] of_list to_list
   end
 
-  type mode = Produce | Serialise | Deserialise | Consume [@@deriving irmin]
+  type mode = Produce | Serialise | Deserialise | Consume [@@deriving brassaia]
 
   module Set = struct
     type produce = {
       nodes : B.Node.Val.t Hashes.t;
       contents : B.Contents.Val.t Hashes.t;
     }
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     type deserialise = {
       nodes : B.Node_portable.t Hashes.t;
       contents : B.Contents.Val.t Hashes.t;
     }
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     type t =
       | Produce of produce
       | Serialise of produce
       | Deserialise of deserialise
       | Consume of deserialise
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     let producer () =
       Produce { contents = Hashes.create 13; nodes = Hashes.create 13 }
@@ -149,7 +149,7 @@ struct
       Deserialise { contents = Hashes.create 13; nodes = Hashes.create 13 }
   end
 
-  type v = Empty | Set of Set.t [@@deriving irmin]
+  type v = Empty | Set of Set.t [@@deriving brassaia]
   type t = v Atomic.t
 
   let t = Type.map v_t Atomic.make Atomic.get
@@ -157,7 +157,7 @@ struct
   let is_empty t = Atomic.get t = Empty
   let copy ~into t = Atomic.set into (Atomic.get t)
 
-  type hash = H.t [@@deriving irmin ~equal ~pp]
+  type hash = H.t [@@deriving brassaia ~equal ~pp]
 
   let set_mode t mode =
     Atomic.set t

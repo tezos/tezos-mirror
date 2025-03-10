@@ -14,8 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-open! Irmin_pack_io.Import
-module Errors = Irmin_pack_io.Errors
+open! Brassaia_pack_io.Import
+module Errors = Brassaia_pack_io.Errors
 module Syscalls = Index_unix.Syscalls
 
 (* File utils, taken from index.unix package.
@@ -52,9 +52,9 @@ module Unix = struct
   type misc_error = Unix.error * string * string
 
   let unix_error_t =
-    Irmin.Type.(map string (fun _str -> assert false) Unix.error_message)
+    Brassaia.Type.(map string (fun _str -> assert false) Unix.error_message)
 
-  let misc_error_t = Irmin.Type.(triple unix_error_t string string)
+  let misc_error_t = Brassaia.Type.(triple unix_error_t string string)
 
   type create_error = [ `Io_misc of misc_error | `File_exists of string ]
 
@@ -324,7 +324,7 @@ module Unix = struct
       let maxrss =
         if Lazy.force is_darwin then Int64.div maxrss 1000L else maxrss
       in
-      Irmin_pack_io.Stats_intf.Latest_gc.
+      Brassaia_pack_io.Stats_intf.Latest_gc.
         { maxrss; minflt; majflt; inblock; oublock; nvcsw; nivcsw }
   end
 

@@ -18,7 +18,7 @@
 open! Import
 include Tree_intf
 
-let src = Logs.Src.create "irmin.tree" ~doc:"Persistent lazy trees for Irmin"
+let src = Logs.Src.create "brassaia.tree" ~doc:"Persistent lazy trees for Brassaia"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
@@ -126,7 +126,7 @@ module Make (P : Backend.S) = struct
       node_val_find : int;
       node_val_list : int;
     }
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     let counters () =
       {
@@ -159,7 +159,7 @@ module Make (P : Backend.S) = struct
   end
 
   module Metadata = P.Node.Metadata
-  module Irmin_proof = Proof
+  module Brassaia_proof = Proof
   module Tree_proof = Proof.Make (P.Contents.Val) (P.Hash) (Path) (Metadata)
   module Env = Proof.Env (P) (Tree_proof)
 
@@ -173,7 +173,7 @@ module Make (P : Backend.S) = struct
 
   module StepMap = struct
     module X = struct
-      type t = Path.step [@@deriving irmin ~compare]
+      type t = Path.step [@@deriving brassaia ~compare]
     end
 
     include Map.Make (X)
@@ -197,11 +197,11 @@ module Make (P : Backend.S) = struct
         arr
   end
 
-  type metadata = Metadata.t [@@deriving irmin ~equal]
-  type path = Path.t [@@deriving irmin ~pp]
-  type hash = P.Hash.t [@@deriving irmin ~pp ~equal ~compare]
-  type step = Path.step [@@deriving irmin ~pp ~compare]
-  type contents = P.Contents.Val.t [@@deriving irmin ~equal ~pp]
+  type metadata = Metadata.t [@@deriving brassaia ~equal]
+  type path = Path.t [@@deriving brassaia ~pp]
+  type hash = P.Hash.t [@@deriving brassaia ~pp ~equal ~compare]
+  type step = Path.step [@@deriving brassaia ~pp ~compare]
+  type contents = P.Contents.Val.t [@@deriving brassaia ~equal ~pp]
   type repo = P.Repo.t
   type marks = Hashes.t
 
@@ -214,7 +214,7 @@ module Make (P : Backend.S) = struct
   type ('a, 'b) folder = path -> 'b -> 'a -> 'a
 
   type depth = [ `Eq of int | `Le of int | `Lt of int | `Ge of int | `Gt of int ]
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   let dummy_marks = Hashes.create ~initial_slots:0 ()
   let empty_marks () = Hashes.create ~initial_slots:39 ()
@@ -227,15 +227,15 @@ module Make (P : Backend.S) = struct
     Printexc.register_printer (function
       | Dangling_hash { context; hash } ->
           Some
-            (Fmt.str "Irmin.Tree.%s: encountered dangling hash %a" context
+            (Fmt.str "Brassaia.Tree.%s: encountered dangling hash %a" context
                pp_hash hash)
       | Pruned_hash { context; hash } ->
           Some
-            (Fmt.str "Irmin.Tree.%s: encountered pruned hash %a" context pp_hash
+            (Fmt.str "Brassaia.Tree.%s: encountered pruned hash %a" context pp_hash
                hash)
       | Portable_value { context } ->
           Some
-            (Fmt.str "Irmin.Tree.%s: unsupported operation on portable tree."
+            (Fmt.str "Brassaia.Tree.%s: unsupported operation on portable tree."
                context)
       | _ -> None)
 
@@ -257,7 +257,7 @@ module Make (P : Backend.S) = struct
      be used to avoid storing duplicate contents values on export. *)
 
   module Contents = struct
-    type key = P.Contents.Key.t [@@deriving irmin]
+    type key = P.Contents.Key.t [@@deriving brassaia]
     type v = Key of repo * key | Value of contents | Pruned of hash
     type nonrec ptr_option = key ptr_option
 
@@ -479,15 +479,15 @@ module Make (P : Backend.S) = struct
   end
 
   module Node = struct
-    type value = P.Node.Val.t [@@deriving irmin ~equal ~pp]
-    type key = P.Node.Key.t [@@deriving irmin]
+    type value = P.Node.Val.t [@@deriving brassaia ~equal ~pp]
+    type key = P.Node.Key.t [@@deriving brassaia]
     type nonrec ptr_option = key ptr_option
 
     open struct
       module Portable = P.Node_portable
     end
 
-    type portable = Portable.t [@@deriving irmin ~equal ~pp]
+    type portable = Portable.t [@@deriving brassaia ~equal ~pp]
 
     (* [elt] is a tree *)
     type elt = [ `Node of t | `Contents of Contents.t * Metadata.t ]
@@ -1751,18 +1751,18 @@ module Make (P : Backend.S) = struct
     let merge_elt = merge_elt (fun x -> x)
   end
 
-  type node = Node.t [@@deriving irmin ~pp]
-  type node_key = Node.key [@@deriving irmin ~pp]
-  type contents_key = Contents.key [@@deriving irmin ~pp]
+  type node = Node.t [@@deriving brassaia ~pp]
+  type node_key = Node.key [@@deriving brassaia ~pp]
+  type contents_key = Contents.key [@@deriving brassaia ~pp]
 
   type kinded_key = [ `Contents of Contents.key * metadata | `Node of Node.key ]
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   type kinded_hash = [ `Contents of hash * metadata | `Node of hash ]
-  [@@deriving irmin ~equal]
+  [@@deriving brassaia ~equal]
 
   type t = [ `Node of node | `Contents of Contents.t * Metadata.t ]
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   let to_backend_node n =
     Node.to_value ~cache:true n |> get_ok "to_backend_node"
@@ -1863,7 +1863,7 @@ module Make (P : Backend.S) = struct
     depth : int;
     width : int;
   }
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   let empty_stats = { nodes = 0; leafs = 0; skips = 0; depth = 0; width = 0 }
   let incr_nodes s = { s with nodes = s.nodes + 1 }
@@ -1880,7 +1880,7 @@ module Make (P : Backend.S) = struct
     { s with width }
 
   let err_not_found n k =
-    Fmt.kstr invalid_arg "Irmin.Tree.%s: %a not found" n pp_path k
+    Fmt.kstr invalid_arg "Brassaia.Tree.%s: %a not found" n pp_path k
 
   let get_tree (t : t) path =
     find_tree t path |> function
@@ -2505,7 +2505,7 @@ module Make (P : Backend.S) = struct
   type concrete =
     [ `Tree of (Path.step * concrete) list
     | `Contents of P.Contents.Val.t * Metadata.t ]
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   type 'a or_empty = Empty | Non_empty of 'a
 
@@ -2619,7 +2619,7 @@ module Make (P : Backend.S) = struct
           | Pruned _ -> `Pruned)
 
   module Proof = struct
-    type irmin_tree = t
+    type brassaia_tree = t
 
     include Tree_proof
 
@@ -2633,7 +2633,7 @@ module Make (P : Backend.S) = struct
       | Inode_tree i -> Inode i
       | Inode_extender ext -> Extender ext
 
-    let rec proof_of_tree : type a. irmin_tree -> (proof_tree -> a) -> a =
+    let rec proof_of_tree : type a. brassaia_tree -> (proof_tree -> a) -> a =
      fun tree k ->
       match tree with
       | `Contents (c, h) -> proof_of_contents c h k
@@ -2888,7 +2888,7 @@ module Make (P : Backend.S) = struct
     let h = Proof.(load_proof ~env (state p) Fun.id) in
     (* Then check that the consistency of the proof *)
     if not (equal_kinded_hash before h) then
-      Irmin_proof.bad_proof_exn "verify_proof: invalid before hash";
+      Brassaia_proof.bad_proof_exn "verify_proof: invalid before hash";
     let tree = pruned_with_env ~env h in
     try
       stop_deserialise ();
@@ -2897,25 +2897,25 @@ module Make (P : Backend.S) = struct
       let tree_after, result = f tree in
       (* then check that [after] corresponds to [tree_after]'s hash. *)
       if not (equal_kinded_hash after (hash tree_after)) then
-        Irmin_proof.bad_proof_exn "verify_proof: invalid after hash";
+        Brassaia_proof.bad_proof_exn "verify_proof: invalid after hash";
       (tree_after, result)
     with
     | Pruned_hash h ->
         (* finaly check that [f] only access valid parts of the proof. *)
-        Fmt.kstr Irmin_proof.bad_proof_exn
+        Fmt.kstr Brassaia_proof.bad_proof_exn
           "verify_proof: %s is trying to read through a blinded node or object \
            (%a)"
           h.context pp_hash h.hash
     | e -> raise e
 
-  type verifier_error = [ `Proof_mismatch of string ] [@@deriving irmin]
+  type verifier_error = [ `Proof_mismatch of string ] [@@deriving brassaia]
 
   let verify_proof p f =
     try
       let r = verify_proof_exn p f in
       Ok r
     with
-    | Irmin_proof.Bad_proof e -> Error (`Proof_mismatch e.context)
+    | Brassaia_proof.Bad_proof e -> Error (`Proof_mismatch e.context)
     | e -> raise e
 
   let hash_of_proof_state state =

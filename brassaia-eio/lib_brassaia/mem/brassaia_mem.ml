@@ -16,22 +16,22 @@
 
 open! Import
 
-let src = Logs.Src.create "irmin.mem" ~doc:"Irmin in-memory store"
+let src = Logs.Src.create "brassaia.mem" ~doc:"Brassaia in-memory store"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
 module Conf = struct
-  include Irmin.Backend.Conf
+  include Brassaia.Backend.Conf
 
   let spec = Spec.v "mem"
   let root config = find_root config |> Option.value ~default:"."
 end
 
-module Read_only (K : Irmin.Type.S) (V : Irmin.Type.S) = struct
+module Read_only (K : Brassaia.Type.S) (V : Brassaia.Type.S) = struct
   module KMap = Map.Make (struct
     type t = K.t
 
-    let compare = Irmin.Type.(unstage (compare K.t))
+    let compare = Brassaia.Type.(unstage (compare K.t))
   end)
 
   type key = K.t
@@ -64,7 +64,7 @@ module Read_only (K : Irmin.Type.S) (V : Irmin.Type.S) = struct
 
   let cast t = (t :> read_write t)
   let batch t f = f (cast t)
-  let pp_key = Irmin.Type.pp K.t
+  let pp_key = Brassaia.Type.pp K.t
 
   let find { t; _ } key =
     [%log.debug "find %a" pp_key key];
@@ -75,7 +75,7 @@ module Read_only (K : Irmin.Type.S) (V : Irmin.Type.S) = struct
     KMap.mem key t
 end
 
-module Append_only (K : Irmin.Type.S) (V : Irmin.Type.S) = struct
+module Append_only (K : Brassaia.Type.S) (V : Brassaia.Type.S) = struct
   include Read_only (K) (V)
 
   let add t key value =
@@ -83,10 +83,10 @@ module Append_only (K : Irmin.Type.S) (V : Irmin.Type.S) = struct
     t.t <- KMap.add key value t.t
 end
 
-module Atomic_write (K : Irmin.Type.S) (V : Irmin.Type.S) = struct
+module Atomic_write (K : Brassaia.Type.S) (V : Brassaia.Type.S) = struct
   module RO = Read_only (K) (V)
-  module W = Irmin.Backend.Watch.Make (K) (V)
-  module L = Irmin.Backend.Lock.Make (K)
+  module W = Brassaia.Backend.Watch.Make (K) (V)
+  module L = Brassaia.Backend.Lock.Make (K)
 
   type t = { t : unit RO.t; w : W.t; lock : L.t }
   type key = RO.key
@@ -125,7 +125,7 @@ module Atomic_write (K : Irmin.Type.S) (V : Irmin.Type.S) = struct
     L.with_lock t.lock key (fun () -> t.t.RO.t <- RO.KMap.remove key t.t.RO.t);
     W.notify t.w key None
 
-  let equal_v_opt = Irmin.Type.(unstage (equal (option V.t)))
+  let equal_v_opt = Brassaia.Type.(unstage (equal (option V.t)))
 
   let test_and_set t key ~test ~set =
     [%log.debug "test_and_set"];
@@ -151,13 +151,13 @@ end
 
 let config () = Conf.empty Conf.spec
 
-module Content_addressable = Irmin.Content_addressable.Make (Append_only)
-module S = Irmin.Maker (Content_addressable) (Atomic_write)
-module KV = Irmin.KV_maker (Content_addressable) (Atomic_write)
+module Content_addressable = Brassaia.Content_addressable.Make (Append_only)
+module S = Brassaia.Maker (Content_addressable) (Atomic_write)
+module KV = Brassaia.KV_maker (Content_addressable) (Atomic_write)
 include S
 
-(* Enforce that {!S} is a sub-type of {!Irmin.Maker}. *)
-module Maker_is_a_maker : Irmin.Maker = S
+(* Enforce that {!S} is a sub-type of {!Brassaia.Maker}. *)
+module Maker_is_a_maker : Brassaia.Maker = S
 
-(* Enforce that {!KV} is a sub-type of {!Irmin.KV_maker}. *)
-module KV_is_a_KV : Irmin.KV_maker = KV
+(* Enforce that {!KV} is a sub-type of {!Brassaia.KV_maker}. *)
+module KV_is_a_KV : Brassaia.KV_maker = KV

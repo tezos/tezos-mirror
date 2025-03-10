@@ -14,10 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-let config ~root:_ = Irmin_mem.config ()
+let config ~root:_ = Brassaia_mem.config ()
 
-module KV = Irmin_mem.KV.Make (Irmin.Contents.String)
-module Bench = Irmin_bench.Make (KV)
+module KV = Brassaia_mem.KV.Make (Brassaia.Contents.String)
+module Bench = Brassaia_bench.Make (KV)
 
 let size ~root:_ = 0
 let () = Bench.run ~config ~size

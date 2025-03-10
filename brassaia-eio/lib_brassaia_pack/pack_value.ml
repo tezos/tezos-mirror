@@ -92,31 +92,31 @@ module Kind = struct
         Fmt.failwith
           "Can't determine length header for user-defined codec Contents"
 
-  let t = Irmin.Type.map ~pp Irmin.Type.char of_magic_exn to_magic
+  let t = Brassaia.Type.map ~pp Brassaia.Type.char of_magic_exn to_magic
 end
 
-type ('h, 'a) value = { hash : 'h; kind : Kind.t; v : 'a } [@@deriving irmin]
+type ('h, 'a) value = { hash : 'h; kind : Kind.t; v : 'a } [@@deriving brassaia]
 
 module type S = S with type kind := Kind.t
 
-let get_dynamic_sizer_exn : type a. a Irmin.Type.t -> string -> int -> int =
+let get_dynamic_sizer_exn : type a. a Brassaia.Type.t -> string -> int -> int =
  fun typ ->
-  match Irmin.Type.(Size.of_encoding typ) with
+  match Brassaia.Type.(Size.of_encoding typ) with
   | Unknown ->
       Fmt.failwith "Type must have a recoverable encoded length: %a"
-        Irmin.Type.pp_ty typ
+        Brassaia.Type.pp_ty typ
   | Static n -> fun _ _ -> n
   | Dynamic f -> f
 
 module Of_contents
     (Conf : Config)
-    (Hash : Irmin.Hash.S)
+    (Hash : Brassaia.Hash.S)
     (Key : T)
-    (Data : Irmin.Type.S) =
+    (Data : Brassaia.Type.S) =
 struct
-  module Hash = Irmin.Hash.Typed (Hash) (Data)
+  module Hash = Brassaia.Hash.Typed (Hash) (Data)
 
-  type t = Data.t [@@deriving irmin ~size_of]
+  type t = Data.t [@@deriving brassaia ~size_of]
   type key = Key.t
   type hash = Hash.t
   type kinded += Contents of t
@@ -127,8 +127,8 @@ struct
   let kind = Kind.Contents
   let length_header = Fun.const Conf.contents_length_header
   let value = [%typ: (Hash.t, Data.t) value]
-  let encode_value = Irmin.Type.(unstage (encode_bin value))
-  let decode_value = Irmin.Type.(unstage (decode_bin value))
+  let encode_value = Brassaia.Type.(unstage (encode_bin value))
+  let decode_value = Brassaia.Type.(unstage (decode_bin value))
 
   let encode_bin ~dict:_ ~offset_of_key:_ hash v f =
     encode_value { kind; hash; v } f
@@ -146,17 +146,17 @@ struct
 end
 
 module Of_commit
-    (Hash : Irmin.Hash.S)
-    (Key : Irmin.Key.S with type hash = Hash.t)
-    (Commit : Irmin.Commit.Generic_key.S
+    (Hash : Brassaia.Hash.S)
+    (Key : Brassaia.Key.S with type hash = Hash.t)
+    (Commit : Brassaia.Commit.Generic_key.S
                 with type node_key = Key.t
                  and type commit_key = Key.t) =
 struct
-  module Hash = Irmin.Hash.Typed (Hash) (Commit)
+  module Hash = Brassaia.Hash.Typed (Hash) (Commit)
 
-  type t = Commit.t [@@deriving irmin]
+  type t = Commit.t [@@deriving brassaia]
   type key = Key.t
-  type hash = Hash.t [@@deriving irmin ~encode_bin ~decode_bin]
+  type hash = Hash.t [@@deriving brassaia ~encode_bin ~decode_bin]
   type kinded += Commit of t
 
   let to_kinded t = Commit t
@@ -170,29 +170,29 @@ struct
 
   (* A commit implementation that uses integer offsets for addresses where possible. *)
   module Commit_direct = struct
-    type address = Offset of int63 | Hash of Hash.t [@@deriving irmin]
+    type address = Offset of int63 | Hash of Hash.t [@@deriving brassaia]
 
     type t = {
       node_offset : address;
       parent_offsets : address list;
       info : Commit.Info.t;
     }
-    [@@deriving irmin ~encode_bin ~to_bin_string ~decode_bin]
+    [@@deriving brassaia ~encode_bin ~to_bin_string ~decode_bin]
 
     let size_of =
-      match Irmin.Type.Size.of_value t with
+      match Brassaia.Type.Size.of_value t with
       | Dynamic f -> f
       | Static _ | Unknown -> assert false
   end
 
   module Entry = struct
     module V1 = struct
-      type t = (hash, Commit.t) value [@@deriving irmin ~decode_bin]
+      type t = (hash, Commit.t) value [@@deriving brassaia ~decode_bin]
     end
 
     module V2 = struct
-      type data = { length : int; v : Commit_direct.t } [@@deriving irmin]
-      type t = (hash, data) value [@@deriving irmin ~encode_bin ~decode_bin]
+      type data = { length : int; v : Commit_direct.t } [@@deriving brassaia]
+      type t = (hash, data) value [@@deriving brassaia ~encode_bin ~decode_bin]
     end
   end
 

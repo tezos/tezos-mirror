@@ -19,13 +19,13 @@ open! Import
 module type S_generic_key = sig
   (** {1 Commit values} *)
 
-  type t [@@deriving irmin]
+  type t [@@deriving brassaia]
   (** The type for commit values. *)
 
-  type node_key [@@deriving irmin]
+  type node_key [@@deriving brassaia]
   (** Type for node keys. *)
 
-  type commit_key [@@deriving irmin]
+  type commit_key [@@deriving brassaia]
   (** Type for commit keys. *)
 
   module Info : Info.S
@@ -45,7 +45,7 @@ module type S_generic_key = sig
 end
 
 module type S = sig
-  type hash [@@deriving irmin]
+  type hash [@@deriving brassaia]
 
   (** @inline *)
   include S_generic_key with type node_key = hash and type commit_key = hash
@@ -130,16 +130,16 @@ module type History = sig
   type 'a t
   (** The type for store handles. *)
 
-  type node_key [@@deriving irmin]
+  type node_key [@@deriving brassaia]
   (** The type for node keys. *)
 
-  type commit_key [@@deriving irmin]
+  type commit_key [@@deriving brassaia]
   (** The type for commit keys. *)
 
-  type v [@@deriving irmin]
+  type v [@@deriving brassaia]
   (** The type for commit objects. *)
 
-  type info [@@deriving irmin]
+  type info [@@deriving brassaia]
   (** The type for commit info. *)
 
   val v :

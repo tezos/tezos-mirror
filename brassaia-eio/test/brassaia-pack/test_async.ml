@@ -16,7 +16,7 @@
 
 open! Import
 open Common
-module Async = Irmin_pack_unix.Async.Unix
+module Async = Brassaia_pack_unix.Async.Unix
 
 let check_outcome = Alcotest.check_repr Async.outcome_t
 

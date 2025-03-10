@@ -17,7 +17,7 @@
 (* For every new version, update the [version] type and [versions]
    headers. *)
 
-type t = [ `V1 | `V2 | `V3 | `V4 | `V5 ] [@@deriving irmin]
+type t = [ `V1 | `V2 | `V3 | `V4 | `V5 ] [@@deriving brassaia]
 
 let latest = `V5
 
@@ -57,9 +57,9 @@ let decode_bin s offref =
   offref := !offref + 8;
   res
 
-let size_of = Irmin.Type.Size.custom_static 8
+let size_of = Brassaia.Type.Size.custom_static 8
 let bin = (encode_bin, decode_bin, size_of)
-let t = Irmin.Type.like ~bin ~unboxed_bin:bin ~compare ~pp t
+let t = Brassaia.Type.like ~bin ~unboxed_bin:bin ~compare ~pp t
 
 let invalid_arg v =
   let pp_full_version ppf v = Fmt.pf ppf "%a (%S)" pp v (to_bin v) in

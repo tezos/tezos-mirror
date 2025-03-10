@@ -18,15 +18,15 @@ open! Import
 open Store_properties
 
 module type S_generic_key = sig
-  (** {1 Irmin stores}
+  (** {1 Brassaia stores}
 
-      Irmin stores are tree-like read-write stores with extended capabilities.
+      Brassaia stores are tree-like read-write stores with extended capabilities.
       They allow an application (or a collection of applications) to work with
       multiple local states, which can be forked and merged programmatically,
       without having to rely on a global state. In a way very similar to version
-      control systems, Irmin local states are called {i branches}.
+      control systems, Brassaia local states are called {i branches}.
 
-      There are two kinds of store in Irmin: the ones based on {{!of_branch}
+      There are two kinds of store in Brassaia: the ones based on {{!of_branch}
       persistent} named branches and the ones based {{!of_commit} temporary}
       detached heads. These exist relative to a local, larger (and shared)
       store, and have some (shared) contents. This is exactly the same as usual
@@ -36,30 +36,30 @@ module type S_generic_key = sig
   module Schema : Schema.S
 
   type repo
-  (** The type for Irmin repositories. *)
+  (** The type for Brassaia repositories. *)
 
   type t
-  (** The type for Irmin stores. *)
+  (** The type for Brassaia stores. *)
 
-  type step = Schema.Path.step [@@deriving irmin]
+  type step = Schema.Path.step [@@deriving brassaia]
   (** The type for {!type-key} steps. *)
 
-  type path = Schema.Path.t [@@deriving irmin]
+  type path = Schema.Path.t [@@deriving brassaia]
   (** The type for store keys. A key is a sequence of {!step}s. *)
 
-  type metadata = Schema.Metadata.t [@@deriving irmin]
+  type metadata = Schema.Metadata.t [@@deriving brassaia]
   (** The type for store metadata. *)
 
-  type contents = Schema.Contents.t [@@deriving irmin]
+  type contents = Schema.Contents.t [@@deriving brassaia]
   (** The type for store contents. *)
 
-  type node [@@deriving irmin]
+  type node [@@deriving brassaia]
   (** The type for store nodes. *)
 
-  type tree [@@deriving irmin]
+  type tree [@@deriving brassaia]
   (** The type for store trees. *)
 
-  type hash = Schema.Hash.t [@@deriving irmin]
+  type hash = Schema.Hash.t [@@deriving brassaia]
   (** The type for object hashes. *)
 
   type commit
@@ -68,21 +68,21 @@ module type S_generic_key = sig
   val commit_t : repo -> commit Type.t
   (** [commit_t r] is the value type for {!commit}. *)
 
-  type branch = Schema.Branch.t [@@deriving irmin]
+  type branch = Schema.Branch.t [@@deriving brassaia]
   (** Type for persistent branch names. Branches usually share a common global
       namespace and it's the user's responsibility to avoid name clashes. *)
 
-  type slice [@@deriving irmin]
+  type slice [@@deriving brassaia]
   (** Type for store slices. *)
 
-  type info = Schema.Info.t [@@deriving irmin]
+  type info = Schema.Info.t [@@deriving brassaia]
   (** The type for commit info. *)
 
-  type lca_error = [ `Max_depth_reached | `Too_many_lcas ] [@@deriving irmin]
+  type lca_error = [ `Max_depth_reached | `Too_many_lcas ] [@@deriving brassaia]
   (** The type for errors associated with functions computing least common
       ancestors *)
 
-  type ff_error = [ `No_change | `Rejected | lca_error ] [@@deriving irmin]
+  type ff_error = [ `No_change | `Rejected | lca_error ] [@@deriving brassaia]
   (** The type for errors for {!Head.fast_forward}. *)
 
   module Info : sig
@@ -94,9 +94,9 @@ module type S_generic_key = sig
     (** [pp] is a pretty-printer for info. *)
   end
 
-  type contents_key [@@deriving irmin]
-  type node_key [@@deriving irmin]
-  type commit_key [@@deriving irmin]
+  type contents_key [@@deriving brassaia]
+  type node_key [@@deriving brassaia]
+  type commit_key [@@deriving brassaia]
 
   (** Repositories. *)
   module Repo : sig
@@ -152,7 +152,7 @@ module type S_generic_key = sig
       | `Node of node_key
       | `Contents of contents_key
       | `Branch of branch ]
-    [@@deriving irmin]
+    [@@deriving brassaia]
     (** The type for elements iterated over by {!iter}. *)
 
     val default_pred_commit : t -> commit_key -> elt list
@@ -241,7 +241,7 @@ module type S_generic_key = sig
 
   val of_branch : repo -> branch -> t
   (** [of_branch r name] is a persistent store based on the branch [name].
-      Similar to {!main}, but use [name] instead of {!Irmin.Branch.S.main}. *)
+      Similar to {!main}, but use [name] instead of {!Brassaia.Branch.S.main}. *)
 
   val of_commit : commit -> t
   (** [of_commit c] is a temporary store, based on the commit [c].
@@ -437,8 +437,8 @@ module type S_generic_key = sig
 
     type kinded_key =
       [ `Contents of contents_key * metadata | `Node of node_key ]
-    [@@deriving irmin]
-    (** Keys in the Irmin store are tagged with the type of the value they
+    [@@deriving brassaia]
+    (** Keys in the Brassaia store are tagged with the type of the value they
         reference (either {!contents} or {!node}). In the [contents] case, the
         key is paired with corresponding {!metadata}. *)
 
@@ -490,7 +490,7 @@ module type S_generic_key = sig
 
         Calling [produce_proof] recursively has an undefined behaviour. *)
 
-    type verifier_error = [ `Proof_mismatch of string ] [@@deriving irmin]
+    type verifier_error = [ `Proof_mismatch of string ] [@@deriving brassaia]
     (** The type for errors associated with functions that verify proofs. *)
 
     type 'result verifier :=
@@ -581,7 +581,7 @@ module type S_generic_key = sig
 
   type write_error =
     [ Merge.conflict | `Too_many_retries of int | `Test_was of tree option ]
-  [@@deriving irmin]
+  [@@deriving brassaia]
   (** The type for write errors.
 
       - Merge conflict.
@@ -892,7 +892,7 @@ module type S_generic_key = sig
         updates and merged with the values present at the beginning of the
         transaction.
 
-      {b Note:} Irmin transactions provides
+      {b Note:} Brassaia transactions provides
       {{:https://en.wikipedia.org/wiki/Snapshot_isolation} snapshot isolation}
       guarantees: reads and writes are isolated in every transaction, but only
       write conflicts are visible on commit. *)

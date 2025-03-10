@@ -17,11 +17,11 @@
 include Info_intf
 
 module Default = struct
-  type author = string [@@deriving irmin]
-  type message = string [@@deriving irmin]
+  type author = string [@@deriving brassaia]
+  type message = string [@@deriving brassaia]
 
   type t = { date : int64; author : author; message : message }
-  [@@deriving irmin ~equal]
+  [@@deriving brassaia ~equal]
 
   type f = unit -> t
 

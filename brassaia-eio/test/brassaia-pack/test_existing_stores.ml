@@ -22,8 +22,8 @@ let src = Logs.Src.create "tests.integrity_checks" ~doc:"Test integrity checks"
 module Log = (val Logs.src_log src : Logs.LOG)
 
 let config ?(readonly = false) ?(fresh = true)
-    ?(indexing_strategy = Irmin_pack.Indexing_strategy.always) root =
-  Irmin_pack.config ~readonly ~index_log_size:1000 ~indexing_strategy ~fresh
+    ?(indexing_strategy = Brassaia_pack.Indexing_strategy.always) root =
+  Brassaia_pack.config ~readonly ~index_log_size:1000 ~indexing_strategy ~fresh
     root
 
 let archive =
@@ -34,11 +34,11 @@ let archive =
 
 let root_v1_archive, root_v1, tmp =
   let open Fpath in
-  ( v "test" / "irmin-pack" / "data" / "version_1" |> to_string,
+  ( v "test" / "brassaia-pack" / "data" / "version_1" |> to_string,
     v "_build" / "test_pack_version_1" |> to_string,
     v "_build" / "test_index_reconstruct" |> to_string )
 
-module Test (S : Irmin.Generic_key.KV with type Schema.Contents.t = string) =
+module Test (S : Brassaia.Generic_key.KV with type Schema.Contents.t = string) =
 struct
   let check_commit repo commit bindings =
     match commit |> S.Commit.key |> S.Commit.of_key repo with
@@ -63,7 +63,7 @@ struct
        | Some commit -> check_commit repo commit bindings
 
   let commit_of_string repo c =
-    match Irmin.Type.of_string S.Hash.t c with
+    match Brassaia.Type.of_string S.Hash.t c with
     | Ok x -> (
         let commit = S.Commit.of_hash repo x in
         match commit with
@@ -75,8 +75,8 @@ struct
     let s = ref "" in
     let f x = s := !s ^ x in
     let () =
-      match Irmin.Type.of_string S.Hash.t c with
-      | Ok x -> Irmin.Type.(unstage (encode_bin S.Hash.t)) x f
+      match Brassaia.Type.of_string S.Hash.t c with
+      | Ok x -> Brassaia.Type.(unstage (encode_bin S.Hash.t)) x f
       | _ -> Alcotest.fail "could not read hash"
     in
     !s
@@ -90,11 +90,11 @@ module Small_conf = struct
   let forbid_empty_dir_persistence = false
 end
 
-module V1_maker = Irmin_pack_unix.Maker (Small_conf)
-module V2_maker = Irmin_pack_unix.Maker (Conf)
+module V1_maker = Brassaia_pack_unix.Maker (Small_conf)
+module V2_maker = Brassaia_pack_unix.Maker (Conf)
 
 module Schema_v2 = struct
-  open Irmin
+  open Brassaia
   module Metadata = Metadata.None
   module Contents = Contents.String_v2
   module Path = Path.String_list
@@ -122,7 +122,7 @@ module Test_reconstruct = struct
     setup_test_env ~root_archive:root_v1_archive ~root_local_build:tmp
 
   let test_reconstruct () =
-    let module Kind = Irmin_pack.Pack_value.Kind in
+    let module Kind = Brassaia_pack.Pack_value.Kind in
     setup_test_env ();
     let conf = config ~readonly:false ~fresh:false root_v1 in
     (* Open store in RW to migrate it to V3. *)
@@ -140,14 +140,14 @@ module Test_reconstruct = struct
       (fun k (offset, length, kind) ->
         [%log.debug
           "index find k = %a (off, len, kind) = (%a, %d, %a)"
-            (Irmin.Type.pp S.Hash.t) k Int63.pp offset length Kind.pp kind];
+            (Brassaia.Type.pp S.Hash.t) k Int63.pp offset length Kind.pp kind];
         match Index.find index_new k with
         | Some (offset', length', kind') ->
             Alcotest.(check int63) "check offset" offset offset';
             Alcotest.(check int) "check length" length length';
             Alcotest.(check_repr Kind.t) "check kind" kind kind'
         | None ->
-            Alcotest.failf "expected to find hash %a" (Irmin.Type.pp S.Hash.t) k)
+            Alcotest.failf "expected to find hash %a" (Brassaia.Type.pp S.Hash.t) k)
       index_old;
     Index.close_exn index_old;
     Index.close_exn index_new;
@@ -170,7 +170,7 @@ end
 module Test_corrupted_stores = struct
   let root_archive, root =
     let open Fpath in
-    ( v "test" / "irmin-pack" / "data" / "corrupted" |> to_string,
+    ( v "test" / "brassaia-pack" / "data" / "corrupted" |> to_string,
       v "_build" / "test_integrity" |> to_string )
 
   let setup_env () = setup_test_env ~root_archive ~root_local_build:root
@@ -200,12 +200,12 @@ module Test_corrupted_stores = struct
 
   let root_archive, root_local_build =
     let open Fpath in
-    ( v "test" / "irmin-pack" / "data" / "version_3_minimal" |> to_string,
+    ( v "test" / "brassaia-pack" / "data" / "version_3_minimal" |> to_string,
       v "_build" / "test_corrupt_minimal" |> to_string )
 
   let setup_env () = setup_test_env ~root_archive ~root_local_build
 
-  module IO = Irmin_pack_unix.Io.Unix
+  module IO = Brassaia_pack_unix.Io.Unix
 
   let write_corrupted_data_to_suffix () =
     let path = Filename.concat root_local_build "store.0.suffix" in
@@ -226,7 +226,7 @@ module Test_corrupted_stores = struct
     [%log.app "integrity check on a good minimal store"];
     let config =
       config ~fresh:false
-        ~indexing_strategy:Irmin_pack.Indexing_strategy.minimal root_local_build
+        ~indexing_strategy:Brassaia_pack.Indexing_strategy.minimal root_local_build
     in
     let rw = S.Repo.v config in
 
@@ -261,7 +261,7 @@ end
 module Test_corrupted_inode = struct
   let root_archive, root =
     let open Fpath in
-    ( v "test" / "irmin-pack" / "data" / "corrupted_inode" |> to_string,
+    ( v "test" / "brassaia-pack" / "data" / "corrupted_inode" |> to_string,
       v "_build" / "test_integrity_inode" |> to_string )
 
   let setup_test_env () = setup_test_env ~root_archive ~root_local_build:root
@@ -295,7 +295,7 @@ end
 module Test_traverse_gced = struct
   let root_archive, root_local_build =
     let open Fpath in
-    ( v "test" / "irmin-pack" / "data" / "version_3_minimal" |> to_string,
+    ( v "test" / "brassaia-pack" / "data" / "version_3_minimal" |> to_string,
       v "_build" / "test_reconstruct" |> to_string )
 
   let setup_test_env () = setup_test_env ~root_archive ~root_local_build
@@ -323,11 +323,11 @@ module Test_traverse_gced = struct
     S.Repo.close repo
 
   let test_traverse_pack () =
-    let module Kind = Irmin_pack.Pack_value.Kind in
+    let module Kind = Brassaia_pack.Pack_value.Kind in
     setup_test_env ();
     let conf =
       config ~readonly:false ~fresh:false
-        ~indexing_strategy:Irmin_pack.Indexing_strategy.minimal root_local_build
+        ~indexing_strategy:Brassaia_pack.Indexing_strategy.minimal root_local_build
     in
     let () = commit_and_gc conf in
     S.test_traverse_pack_file `Check_index conf

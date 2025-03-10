@@ -81,9 +81,9 @@ let rec set_volume_identifier_exn ~volume_identifier (State t) =
       if not (Atomic.compare_and_set t.state old direct) then
         set_volume_identifier_exn ~volume_identifier (State t)
 
-let t : type h. h Irmin.Type.t -> h t Irmin.Type.t =
+let t : type h. h Brassaia.Type.t -> h t Brassaia.Type.t =
  fun hash_t ->
-  let open Irmin.Type in
+  let open Brassaia.Type in
   variant "t" (fun direct indexed t ->
       match inspect t with
       | Direct { hash; offset; length; _ } -> direct (hash, offset, length)
@@ -99,16 +99,16 @@ let t : type h. h Irmin.Type.t -> h t Irmin.Type.t =
          State { state = Atomic.make (Indexed x1) })
   |> sealv
 
-let t (type hash) (hash_t : hash Irmin.Type.t) =
+let t (type hash) (hash_t : hash Brassaia.Type.t) =
   let module Hash = struct
     type t = hash
-    [@@deriving irmin ~equal ~compare ~pre_hash ~encode_bin ~decode_bin]
+    [@@deriving brassaia ~equal ~compare ~pre_hash ~encode_bin ~decode_bin]
 
-    let unboxed_encode_bin = Irmin.Type.(unstage (Unboxed.encode_bin t))
-    let unboxed_decode_bin = Irmin.Type.(unstage (Unboxed.decode_bin t))
+    let unboxed_encode_bin = Brassaia.Type.(unstage (Unboxed.encode_bin t))
+    let unboxed_decode_bin = Brassaia.Type.(unstage (Unboxed.decode_bin t))
 
     let encoded_size =
-      match Irmin.Type.Size.of_value t with
+      match Brassaia.Type.Size.of_value t with
       | Static n -> n
       | Dynamic _ | Unknown ->
           failwith "Hash must have a fixed-width binary encoding"
@@ -136,8 +136,8 @@ let t (type hash) (hash_t : hash Irmin.Type.t) =
     State
       { state = Atomic.make (Indexed (Hash.unboxed_decode_bin buf pos_ref)) }
   in
-  let size_of = Irmin.Type.Size.custom_static Hash.encoded_size in
-  Irmin.Type.like (t hash_t) ~pre_hash ~equal ~compare
+  let size_of = Brassaia.Type.Size.custom_static Hash.encoded_size in
+  Brassaia.Type.like (t hash_t) ~pre_hash ~equal ~compare
     ~bin:(encode_bin, decode_bin, size_of)
     ~unboxed_bin:(unboxed_encode_bin, unboxed_decode_bin, size_of)
 
@@ -151,12 +151,12 @@ let v_offset offset = State { state = Atomic.make (Offset offset) }
 module type S = sig
   type hash
 
-  include Irmin_pack.Pack_key.S with type t = hash t and type hash := hash
+  include Brassaia_pack.Pack_key.S with type t = hash t and type hash := hash
 end
 
-module Make (Hash : Irmin.Hash.S) = struct
-  type nonrec t = Hash.t t [@@deriving irmin]
-  type hash = Hash.t [@@deriving irmin ~of_bin_string]
+module Make (Hash : Brassaia.Hash.S) = struct
+  type nonrec t = Hash.t t [@@deriving brassaia]
+  type hash = Hash.t [@@deriving brassaia ~of_bin_string]
 
   let to_hash = to_hash
   let null_offset = Int63.minus_one

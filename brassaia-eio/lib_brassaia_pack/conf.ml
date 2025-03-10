@@ -40,33 +40,33 @@ module Default = struct
   let lower_root = None
 end
 
-open Irmin.Backend.Conf
+open Brassaia.Backend.Conf
 
 let spec = Spec.v "pack"
 
-type merge_throttle = [ `Block_writes | `Overcommit_memory ] [@@deriving irmin]
+type merge_throttle = [ `Block_writes | `Overcommit_memory ] [@@deriving brassaia]
 
 module Key = struct
   let fresh =
-    key ~spec ~doc:"Start with a fresh disk." "fresh" Irmin.Type.bool
+    key ~spec ~doc:"Start with a fresh disk." "fresh" Brassaia.Type.bool
       Default.fresh
 
   let lru_size =
     key ~spec ~doc:"Maximum size of the LRU cache for pack entries." "lru-size"
-      Irmin.Type.int Default.lru_size
+      Brassaia.Type.int Default.lru_size
 
   let lru_max_memory =
     key ~spec ~doc:"Maximum memory in bytes of the LRU cache for pack entries."
       "lru-max-memory"
-      Irmin.Type.(option int)
+      Brassaia.Type.(option int)
       Default.lru_max_memory
 
   let index_log_size =
-    key ~spec ~doc:"Size of index logs." "index-log-size" Irmin.Type.int
+    key ~spec ~doc:"Size of index logs." "index-log-size" Brassaia.Type.int
       Default.index_log_size
 
   let readonly =
-    key ~spec ~doc:"Start with a read-only disk." "readonly" Irmin.Type.bool
+    key ~spec ~doc:"Start with a read-only disk." "readonly" Brassaia.Type.bool
       Default.readonly
 
   let merge_throttle =
@@ -78,14 +78,14 @@ module Key = struct
 
   let lower_root =
     key ~spec ~doc:"Optional path for lower layer directory." "lower-root"
-      Irmin.Type.(option string)
+      Brassaia.Type.(option string)
       Default.lower_root
 
   let indexing_strategy =
     let serialisable_t = [%typ: [ `Always | `Minimal ]] in
     key ~spec ~doc:"Strategy to use for adding objects to the index"
       "indexing-strategy"
-      (Irmin.Type.map serialisable_t
+      (Brassaia.Type.map serialisable_t
          (function
            | `Always -> Indexing_strategy.always
            | `Minimal -> Indexing_strategy.minimal)
@@ -95,11 +95,11 @@ module Key = struct
   let use_fsync =
     key ~spec
       ~doc:"Whether fsync should be used to ensure persistence order of files"
-      "use-fsync" Irmin.Type.bool Default.use_fsync
+      "use-fsync" Brassaia.Type.bool Default.use_fsync
 
   let no_migrate =
     key ~spec ~doc:"Prevent migration of V1 and V2 stores" "no-migrate"
-      Irmin.Type.bool Default.no_migrate
+      Brassaia.Type.bool Default.no_migrate
 end
 
 let fresh config = get config Key.fresh
@@ -113,7 +113,7 @@ let root config =
   match find_root config with
   | None ->
       failwith
-        "unintialised root, call [Irmin_pack.Conf.init root] before opening \
+        "unintialised root, call [Brassaia_pack.Conf.init root] before opening \
          the store"
   | Some root -> root
 

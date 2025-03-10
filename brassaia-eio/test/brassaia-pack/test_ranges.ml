@@ -16,7 +16,7 @@
 
 open! Import
 module Int63 = Optint.Int63
-module Ranges = Irmin_pack_unix.Ranges
+module Ranges = Brassaia_pack_unix.Ranges
 
 let test () =
   let input =

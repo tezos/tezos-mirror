@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-let store = Irmin_test.store (module Irmin_mem) (module Irmin.Metadata.None)
-let config = Irmin_mem.config ()
+let store = Brassaia_test.store (module Brassaia_mem) (module Brassaia.Metadata.None)
+let config = Brassaia_mem.config ()
 let init ~config:_ = ()
-let suite = Irmin_test.Suite.create ~name:"MEM" ~init ~store ~config ()
+let suite = Brassaia_test.Suite.create ~name:"MEM" ~init ~store ~config ()

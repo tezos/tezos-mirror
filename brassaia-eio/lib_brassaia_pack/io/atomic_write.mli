@@ -15,7 +15,7 @@
  *)
 
 open! Import
-include module type of Irmin_pack.Atomic_write
+include module type of Brassaia_pack.Atomic_write
 
-module Make_persistent (Io : Io_intf.S) (K : Irmin.Type.S) (V : Value.S) :
+module Make_persistent (Io : Io_intf.S) (K : Brassaia.Type.S) (V : Value.S) :
   Persistent with type key = K.t and type value = V.t

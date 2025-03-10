@@ -137,12 +137,12 @@ module type Sigs = sig
       S with type key = CA.key and type hash = CA.hash and type value = CA.value
 
     val make_closeable : 'a CA.t -> 'a t
-    (** [make_closeable t] returns a version of [t] that raises {!Irmin.Closed}
+    (** [make_closeable t] returns a version of [t] that raises {!Brassaia.Closed}
         if an operation is performed when it is already closed. *)
 
     val get_if_open_exn : 'a t -> 'a CA.t
     (** [get_if_open_exn t] returns the store (without close checks) if it is
-        open; otherwise raises {!Irmin.Closed} *)
+        open; otherwise raises {!Brassaia.Closed} *)
   end
 
   module Check_closed (M : Maker) : Maker

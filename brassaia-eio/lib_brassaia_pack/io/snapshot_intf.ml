@@ -17,7 +17,7 @@
 open! Import
 
 module type Args = sig
-  module Hash : Irmin.Hash.S
+  module Hash : Brassaia.Hash.S
   module Fm : File_manager.S with type Index.key = Hash.t
   module Dispatcher : Dispatcher.S with module Fm = Fm
 
@@ -44,7 +44,7 @@ module type Sigs = sig
     module Export : sig
       type t
 
-      val v : Irmin.config -> read Contents_pack.t -> read Inode.Pack.t -> t
+      val v : Brassaia.config -> read Contents_pack.t -> read Inode.Pack.t -> t
 
       val run :
         ?on_disk:[ `Path of string ] ->

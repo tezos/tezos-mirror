@@ -47,7 +47,7 @@ struct
     index : Index.t;
     mutable prefix_consumers : after_reload_consumer list;
     mutable suffix_consumers : after_flush_consumer list;
-    indexing_strategy : Irmin_pack.Indexing_strategy.t;
+    indexing_strategy : Brassaia_pack.Indexing_strategy.t;
     use_fsync : bool;
     root : string;
   }
@@ -90,7 +90,7 @@ struct
 
   (** Flush stages *************************************************************
 
-      The irmin-pack files are only mutated during calls to one of the 3
+      The brassaia-pack files are only mutated during calls to one of the 3
       following functions. Exceptions:
 
       - During [create] and [open_rw].
@@ -125,13 +125,13 @@ struct
       | From_v1_v2_post_upgrade _ -> pl.status
       | Gced _ -> pl.status
       | No_gc_yet ->
-          if Irmin_pack.Indexing_strategy.is_minimal t.indexing_strategy then
+          if Brassaia_pack.Indexing_strategy.is_minimal t.indexing_strategy then
             pl.status
           else (
             [%log.warn
               "Updating the control file to \
                [Used_non_minimal_indexing_strategy]. It won't be possible to \
-               GC this irmin-pack store anymore."];
+               GC this brassaia-pack store anymore."];
             Payload.Used_non_minimal_indexing_strategy)
       | Used_non_minimal_indexing_strategy -> pl.status
       | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8 | T9 | T10 | T11 | T12 | T13 | T14
@@ -199,7 +199,7 @@ struct
 
   (* Constructors *********************************************************** *)
 
-  module Layout = Irmin_pack.Layout.V5
+  module Layout = Brassaia_pack.Layout.V5
 
   let open_prefix ~root ~generation ~mapping_size =
     let open Result_syntax in
@@ -261,7 +261,7 @@ struct
     let () =
       Io.readdir root
       |> List.filter (fun filename ->
-             match Irmin_pack.Layout.Classification.Upper.v filename with
+             match Brassaia_pack.Layout.Classification.Upper.v filename with
              | `Unknown | `Branch | `Control | `Dict | `V1_or_v2_pack -> false
              | `Prefix g | `Mapping g -> g <> generation
              | `Suffix idx ->
@@ -291,8 +291,8 @@ struct
   let finish_constructing_rw config control ~make_dict ~make_suffix ~make_index
       ~make_lower =
     let open Result_syntax in
-    let root = Irmin_pack.Conf.root config in
-    let use_fsync = Irmin_pack.Conf.use_fsync config in
+    let root = Brassaia_pack.Conf.root config in
+    let use_fsync = Brassaia_pack.Conf.use_fsync config in
     let indexing_strategy = Conf.indexing_strategy config in
     let pl : Payload.t = Control.payload control in
     let generation, mapping_size =
@@ -337,7 +337,7 @@ struct
       let throttle = Conf.merge_throttle config in
       let cb () =
         (* when creating the index, the index may call flush_callback, see
-           https://github.com/mirage/irmin/issues/1963; so we can't assume that instance
+           https://github.com/mirage/brassaia/issues/1963; so we can't assume that instance
            is set to Some _ in get_instance(); instead, we check instance, and just ignore
            the callback if the instance is None *)
         match !instance with
@@ -371,7 +371,7 @@ struct
     Ok t
 
   let create_control_file ~overwrite config pl =
-    let root = Irmin_pack.Conf.root config in
+    let root = Brassaia_pack.Conf.root config in
     let path = Layout.control ~root in
     let tmp_path = Layout.control_tmp ~root in
     Control.create_rw ~path ~tmp_path:(Some tmp_path) ~overwrite pl
@@ -446,8 +446,8 @@ struct
 
   let create_rw ~overwrite config =
     let open Result_syntax in
-    let root = Irmin_pack.Conf.root config in
-    let lower_root = Irmin_pack.Conf.lower_root config in
+    let root = Brassaia_pack.Conf.root config in
+    let lower_root = Brassaia_pack.Conf.lower_root config in
     let* () =
       match (overwrite, Io.classify_path root) with
       | _, (`File | `Other) -> Error (`Not_a_directory root)
@@ -586,7 +586,7 @@ struct
     let payload = Control.payload control in
     match lower_root with
     | Some lower_root when payload.volume_num = 0 ->
-        if Irmin_pack.Conf.no_migrate config then Error `Migration_needed
+        if Brassaia_pack.Conf.no_migrate config then Error `Migration_needed
         else if not (can_migrate_to_lower payload) then
           Error `Migration_to_lower_not_allowed
         else migrate_to_lower ~root ~lower_root ~control payload
@@ -594,8 +594,8 @@ struct
 
   let open_rw_with_control_file config =
     let open Result_syntax in
-    let root = Irmin_pack.Conf.root config in
-    let lower_root = Irmin_pack.Conf.lower_root config in
+    let root = Brassaia_pack.Conf.root config in
+    let lower_root = Brassaia_pack.Conf.lower_root config in
     let* () = create_lower_if_needed ~lower_root ~overwrite:false in
     let* control =
       let path = Layout.control ~root in
@@ -619,7 +619,7 @@ struct
       | From_v1_v2_post_upgrade _ -> Ok legacy_io_header_size
       | Gced _ ->
           let indexing_strategy = Conf.indexing_strategy config in
-          if Irmin_pack.Indexing_strategy.is_minimal indexing_strategy then Ok 0
+          if Brassaia_pack.Indexing_strategy.is_minimal indexing_strategy then Ok 0
           else Error `Only_minimal_indexing_strategy_allowed
       | No_gc_yet | Used_non_minimal_indexing_strategy -> Ok 0
       | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8 | T9 | T10 | T11 | T12 | T13 | T14
@@ -673,8 +673,8 @@ struct
 
   let open_rw_migrate_from_v1_v2 config =
     let open Result_syntax in
-    let root = Irmin_pack.Conf.root config in
-    let src = Irmin_pack.Layout.V1_and_v2.pack ~root in
+    let root = Brassaia_pack.Conf.root config in
+    let src = Brassaia_pack.Layout.V1_and_v2.pack ~root in
     let chunk_start_idx = 0 in
     let dst = Layout.suffix_chunk ~root ~chunk_idx:chunk_start_idx in
     let* suffix_end_poff = read_offset_from_legacy_file src in
@@ -707,15 +707,15 @@ struct
     open_rw_with_control_file config
 
   let open_rw_no_control_file config =
-    let root = Irmin_pack.Conf.root config in
-    let suffix_path = Irmin_pack.Layout.V1_and_v2.pack ~root in
+    let root = Brassaia_pack.Conf.root config in
+    let suffix_path = Brassaia_pack.Layout.V1_and_v2.pack ~root in
     match Io.classify_path suffix_path with
     | `Directory | `No_such_file_or_directory | `Other -> Error `Invalid_layout
     | `File -> open_rw_migrate_from_v1_v2 config
 
   let open_rw config =
-    let root = Irmin_pack.Conf.root config in
-    let no_migrate = Irmin_pack.Conf.no_migrate config in
+    let root = Brassaia_pack.Conf.root config in
+    let no_migrate = Brassaia_pack.Conf.no_migrate config in
     match Io.classify_path root with
     | `File | `Other -> Error (`Not_a_directory root)
     | `No_such_file_or_directory -> Error (`No_such_file_or_directory root)
@@ -733,9 +733,9 @@ struct
   let open_ro config =
     let open Result_syntax in
     let indexing_strategy = Conf.indexing_strategy config in
-    let root = Irmin_pack.Conf.root config in
-    let lower_root = Irmin_pack.Conf.lower_root config in
-    let use_fsync = Irmin_pack.Conf.use_fsync config in
+    let root = Brassaia_pack.Conf.root config in
+    let lower_root = Brassaia_pack.Conf.lower_root config in
+    let use_fsync = Brassaia_pack.Conf.use_fsync config in
     (* 1. Open the control file *)
     let* control =
       let path = Layout.control ~root in
@@ -743,7 +743,7 @@ struct
       (* If no control file, then check whether the store is in v1 or v2. *)
       |> Result.map_error (function
            | `No_such_file_or_directory _ -> (
-               let pack = Irmin_pack.Layout.V1_and_v2.pack ~root in
+               let pack = Brassaia_pack.Layout.V1_and_v2.pack ~root in
                match Io.classify_path pack with
                | `File -> `Migration_needed
                | `No_such_file_or_directory -> `No_such_file_or_directory pack
@@ -809,7 +809,7 @@ struct
 
   let version ~root =
     let v2_or_v1 () =
-      let path = Irmin_pack.Layout.V1_and_v2.pack ~root in
+      let path = Brassaia_pack.Layout.V1_and_v2.pack ~root in
       match read_version_from_legacy_file path with
       | Ok v -> Ok v
       | Error `Double_close | Error `Invalid_argument | Error `Closed ->
@@ -973,7 +973,7 @@ struct
   let create_one_commit_store t config gced commit_key =
     let open Result_syntax in
     let src_root = t.root in
-    let dst_root = Irmin_pack.Conf.root config in
+    let dst_root = Brassaia_pack.Conf.root config in
     (* Step 1. Copy the dict *)
     let src_dict = Layout.dict ~root:src_root in
     let dst_dict = Layout.dict ~root:dst_root in

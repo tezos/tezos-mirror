@@ -23,7 +23,7 @@ module type S = sig
   module Dispatcher : Dispatcher.S with module Fm = Fm
 
   type hash
-  type key = hash Pack_key.t [@@deriving irmin]
+  type key = hash Pack_key.t [@@deriving brassaia]
 
   module Hash : sig
     val hash_size : int
@@ -48,7 +48,7 @@ module type S = sig
     type 'a t
 
     val v :
-      config:Irmin.Backend.Conf.t ->
+      config:Brassaia.Backend.Conf.t ->
       fm:Fm.t ->
       dict:Fm.Dict.t ->
       dispatcher:Dispatcher.t ->

@@ -16,13 +16,13 @@
 
 open! Import
 
-(** [Irmin-pack-unix]-specific extensions to the [Store] module type. *)
+(** [Brassaia-pack-unix]-specific extensions to the [Store] module type. *)
 
 module type S = sig
-  (** An [irmin-pack-unix] store. This provides the common {!Irmin} interface
-      with [irmin-pack-unix] specific extensions. *)
+  (** An [brassaia-pack-unix] store. This provides the common {!Brassaia} interface
+      with [brassaia-pack-unix] specific extensions. *)
 
-  include Irmin.Generic_key.S
+  include Brassaia.Generic_key.S
   (** @inline *)
 
   (** {1 Integrity Check} *)
@@ -49,14 +49,14 @@ module type S = sig
     [ `Reconstruct_index of [ `In_place | `Output of string ]
     | `Check_index
     | `Check_and_fix_index ] ->
-    Irmin.config ->
+    Brassaia.config ->
     unit
 
   val test_traverse_pack_file :
     [ `Reconstruct_index of [ `In_place | `Output of string ]
     | `Check_index
     | `Check_and_fix_index ] ->
-    Irmin.config ->
+    Brassaia.config ->
     unit
 
   (** {1 Chunking} *)
@@ -176,7 +176,7 @@ module type S = sig
 
         Returns whether a GC process successfully started or not.
 
-        All exceptions that [Irmin_pack] knows how to handle are caught and
+        All exceptions that [Brassaia_pack] knows how to handle are caught and
         returned as pretty-print error messages; others are re-raised. The error
         messages should be used only for informational purposes, like logging. *)
 
@@ -185,7 +185,7 @@ module type S = sig
 
         If a GC finalises, its stats are returned.
 
-        All exceptions that [Irmin_pack] knows how to handle are caught and
+        All exceptions that [Brassaia_pack] knows how to handle are caught and
         returned as pretty-print error messages; others are re-raised. The error
         messages should be used only for informational purposes, like logging. *)
 
@@ -217,24 +217,24 @@ module type S = sig
 
   module Snapshot : sig
     type kinded_hash = Contents of hash * metadata | Node of hash
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
-    type entry = { step : string; hash : kinded_hash } [@@deriving irmin]
+    type entry = { step : string; hash : kinded_hash } [@@deriving brassaia]
 
     type inode_tree = {
       depth : int;
       length : int;
       pointers : (int * hash) list;
     }
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     type v = Inode_tree of inode_tree | Inode_value of entry list
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
-    type inode = { v : v; root : bool } [@@deriving irmin]
+    type inode = { v : v; root : bool } [@@deriving brassaia]
 
     type t = Inode of inode | Blob of Backend.Contents.Val.t
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     val export :
       ?on_disk:[ `Path of string ] ->
@@ -322,18 +322,18 @@ module type S = sig
   end
 end
 
-module S_is_a_store (X : S) : Irmin.Generic_key.S = X
+module S_is_a_store (X : S) : Brassaia.Generic_key.S = X
 
 module type Maker = sig
   type endpoint = unit
 
-  include Irmin.Key.Store_spec.S
+  include Brassaia.Key.Store_spec.S
 
-  module Make (Schema : Irmin.Schema.Extended) :
+  module Make (Schema : Brassaia.Schema.Extended) :
     S
     (* We can't have `with module Schema = Schema` here, since the Schema
        on the RHS contains more information than the one on the LHS. We _want_
-       to do something like `with module Schema = (Schema : Irmin.Schema.S)`,
+       to do something like `with module Schema = (Schema : Brassaia.Schema.S)`,
        but this isn't supported.
 
        TODO: extract these extensions as a separate functor argument instead. *)
@@ -355,13 +355,13 @@ with type ('h, _) contents_key = 'h Pack_key.t
 
 module type KV = sig
   type endpoint = unit
-  type hash = Irmin.Schema.default_hash
+  type hash = Brassaia.Schema.default_hash
 
   include Pack_key.Store_spec
 
-  type metadata = Irmin.Metadata.None.t
+  type metadata = Brassaia.Metadata.None.t
 
-  module Make (C : Irmin.Contents.S) :
+  module Make (C : Brassaia.Contents.S) :
     S
       with module Schema.Contents = C
        and type Schema.Metadata.t = metadata

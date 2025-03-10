@@ -54,9 +54,9 @@ module type Make = functor (Key : Type.S) (Value : Type.S) ->
 
 module type Sigs = sig
   module type S = S
-  (** [S] is a storage layer that can be used to build Irmin stores. *)
+  (** [S] is a storage layer that can be used to build Brassaia stores. *)
 
   module type Make = Make
   (** [Make] parameterizes a storage layer over a key [Key] and a value [Value].
-      This is the signature to implement when building custom storage for Irmin. *)
+      This is the signature to implement when building custom storage for Brassaia. *)
 end

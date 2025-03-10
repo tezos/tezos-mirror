@@ -15,5 +15,5 @@
  *)
 
 type 'a t = [ `Updated of 'a * 'a | `Removed of 'a | `Added of 'a ]
-[@@deriving irmin]
+[@@deriving brassaia]
 (** The type for representing differences betwen values. *)

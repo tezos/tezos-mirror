@@ -16,16 +16,16 @@
 
 (** {1 Store} *)
 
-module type S = Irmin_pack_io.Store_intf.S
+module type S = Brassaia_pack_io.Store_intf.S
 
-module Maker (Config : Irmin_pack.Conf.S) =
-  Irmin_pack_io.Maker_io (Io.Unix) (Index_unix.Private.Platform) (Async.Unix)
+module Maker (Config : Brassaia_pack.Conf.S) =
+  Brassaia_pack_io.Maker_io (Io.Unix) (Index_unix.Private.Platform) (Async.Unix)
     (Config)
 
-module KV (Config : Irmin_pack.Conf.S) =
-  Irmin_pack_io.KV (Io.Unix) (Index_unix.Private.Platform) (Async.Unix) (Config)
+module KV (Config : Brassaia_pack.Conf.S) =
+  Brassaia_pack_io.KV (Io.Unix) (Index_unix.Private.Platform) (Async.Unix) (Config)
 
-open Irmin_pack_io
+open Brassaia_pack_io
 
 (** {1 Key and Values} *)
 
@@ -39,7 +39,7 @@ module Stats = Stats
 module Index = struct
   module type S = Index.S
 
-  module Make (K : Irmin.Hash.S) =
+  module Make (K : Brassaia.Hash.S) =
     Index.Make_io (Io.Unix) (Index_unix.Private.Platform) (K)
 end
 

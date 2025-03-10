@@ -22,14 +22,14 @@ open! Import
     Certain values in the data file are indexed by hash via a {!Pack_index.S}
     implementation, but not all of them need be. *)
 module type S = sig
-  include Irmin_pack.Indexable.S
+  include Brassaia_pack.Indexable.S
 
   type file_manager
   type dict
   type dispatcher
 
   val v :
-    config:Irmin.Backend.Conf.t ->
+    config:Brassaia.Backend.Conf.t ->
     fm:file_manager ->
     dict:dict ->
     dispatcher:dispatcher ->
@@ -39,7 +39,7 @@ module type S = sig
   val cast : read t -> read_write t
 
   (** @inline *)
-  include Irmin_pack.Checkable with type 'a t := 'a t and type hash := hash
+  include Brassaia_pack.Checkable with type 'a t := 'a t and type hash := hash
 
   module Entry_prefix : sig
     type t = {
@@ -92,7 +92,7 @@ module type Sigs = sig
   module Make
       (Fm : File_manager.S)
       (Dispatcher : Dispatcher.S with module Fm = Fm)
-      (Hash : Irmin.Hash.S with type t = Fm.Index.key)
+      (Hash : Brassaia.Hash.S with type t = Fm.Index.key)
       (Val : Pack_value.Persistent
                with type hash := Hash.t
                 and type key := Hash.t Pack_key.t)

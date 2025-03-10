@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-(** The {!Irmin} module provides a common interface and types used by all
+(** The {!Brassaia} module provides a common interface and types used by all
     backends.
 
     The prinicipal concept is the {i store} (see {!S}), which provides access to
@@ -25,13 +25,13 @@ val version : string
 
 (** {1:stores Stores}
 
-    An Irmin store is a branch-consistent store where keys are lists of steps.
+    An Brassaia store is a branch-consistent store where keys are lists of steps.
 
     An example is a Git repository where keys are filenames, {e i.e.} lists of
     ['/']-separated strings. More complex examples are structured values, where
     steps might contain first-class field accessors and array offsets.
 
-    Irmin provides the following features:
+    Brassaia provides the following features:
 
     - Support for fast clones, branches and merges, in a fashion very similar to
       Git.
@@ -43,7 +43,7 @@ exception Closed
 (** The exception raised when any operation is attempted on a closed store,
     except for {!S.close}, which is idempotent. *)
 
-(** Irmin stores. *)
+(** Brassaia stores. *)
 module type S = sig
   include Store.S
   (** @inline *)
@@ -52,11 +52,11 @@ end
 (** {2 Schema} *)
 
 module Type = Repr
-(** Dynamic types for Irmin values, supplied by
+(** Dynamic types for Brassaia values, supplied by
     {{:https://github.com/mirage/repr} [Repr]}. These values can be derived from
-    type definitions via [[@@deriving irmin]] (see the
-    {{:https://github.com/mirage/irmin/blob/main/README_PPX.md} documentation
-      for [ppx_irmin]})*)
+    type definitions via [[@@deriving brassaia]] (see the
+    {{:https://github.com/mirage/brassaia/blob/main/README_PPX.md} documentation
+      for [ppx_brassaia]})*)
 
 module Hash = Hash
 (** Hashing functions.
@@ -85,7 +85,7 @@ module Metadata = Metadata
 module Path = Path
 (** Store paths.
 
-    An Irmin {{!Irmin.S} store} binds {{!Path.S.t} paths} to user-defined
+    An Brassaia {{!Brassaia.S} store} binds {{!Path.S.t} paths} to user-defined
     {{!Contents.S} contents}. Paths are composed by basic elements, that we call
     {{!Path.S.step} steps}. The following [Path] module provides functions to
     manipulate steps and paths. *)
@@ -97,7 +97,7 @@ module Contents = Contents
     The user needs to provide:
 
     - a type [t] to be used as store contents.
-    - a value type for [t] (built using the {{!Irmin.Type} Irmin.Type}
+    - a value type for [t] (built using the {{!Brassaia.Type} Brassaia.Type}
       combinators).
     - a 3-way [merge] function, to handle conflicts between multiple versions of
       the same contents.
@@ -141,7 +141,7 @@ end
 
 module Key = Key
 
-(** "Generic key" stores are Irmin stores in which the backend may not be keyed
+(** "Generic key" stores are Brassaia stores in which the backend may not be keyed
     directly by the hashes of stored values. See {!Key} for more details. *)
 module Generic_key : sig
   include module type of Store.Generic_key
@@ -174,7 +174,7 @@ type config = Conf.t
 
 (** {2 Low-level Stores} *)
 
-(** An Irmin backend is built from a number of lower-level stores, each
+(** An Brassaia backend is built from a number of lower-level stores, each
     implementing fewer operations, such as {{!Content_addressable.Store}
     content-addressable} and {{!Atomic_write.Store} atomic-write} stores. *)
 
@@ -225,8 +225,8 @@ module Backend : sig
   module Remote = Remote
 
   module type S = Backend.S
-  (** The modules that define a complete Irmin backend. Apply an implementation
-      to {!Of_backend} to create an Irmin store. *)
+  (** The modules that define a complete Brassaia backend. Apply an implementation
+      to {!Of_backend} to create an Brassaia store. *)
 end
 
 (** [Of_backend] gives full control over store creation through definining a
@@ -245,11 +245,11 @@ module Of_backend (B : Backend.S) :
 
 module Storage = Storage
 (** [Storage] provides {!Storage.Make} for defining a custom storage layer that
-    can be used to create Irmin stores. Unlike {!Backend.S}, an implementation
+    can be used to create Brassaia stores. Unlike {!Backend.S}, an implementation
     of {!Storage.Make} is only concerned with storing and retrieving keys and
     values. It can be used to create stores for {!Backend.S} through something
     like {!Storage.Content_addressable} or, primarily, with {!Of_storage} to
-    automatically construct an Irmin store. *)
+    automatically construct an Brassaia store. *)
 
 (** [Of_storage] uses a custom storage layer and chosen hash and contents type
     to create a key-value store. *)
@@ -261,7 +261,7 @@ module Of_storage (M : Storage.Make) (H : Hash.S) (V : Contents.S) :
 module Perms = Perms
 
 module Export_for_backends = Export_for_backends
-(** Helper module containing useful top-level types for defining Irmin backends.
+(** Helper module containing useful top-level types for defining Brassaia backends.
     This module is relatively unstable. *)
 
 (** {1 Advanced} *)
@@ -285,7 +285,7 @@ type 'a diff = 'a Diff.t
 
     We will demonstrate the use of custom merge operators by defining mergeable
     debug log files. We first define a log entry as a pair of a timestamp and a
-    message, using the combinator exposed by {!Irmin.Type}:
+    message, using the combinator exposed by {!Brassaia.Type}:
 
     {[
       open Lwt.Infix
@@ -296,12 +296,12 @@ type 'a diff = 'a Diff.t
 
       (* A log entry *)
       module Entry : sig
-        include Irmin.Type.S
+        include Brassaia.Type.S
 
         val v : string -> t
         val timestamp : t -> int64
       end = struct
-        type t = { timestamp : int64; message : string } [@@deriving irmin]
+        type t = { timestamp : int64; message : string } [@@deriving brassaia]
 
         let compare x y = Int64.compare x.timestamp y.timestamp
 
@@ -321,7 +321,7 @@ type 'a diff = 'a Diff.t
               try Ok { timestamp = Int64.of_string x; message }
               with Failure e -> Error (`Msg e))
 
-        let t = Irmin.Type.like ~pp ~of_string ~compare t
+        let t = Brassaia.Type.like ~pp ~of_string ~compare t
       end
     ]}
 
@@ -332,15 +332,15 @@ type 'a diff = 'a Diff.t
     {[
       (* A log file *)
       module Log : sig
-        include Irmin.Contents.S
+        include Brassaia.Contents.S
 
         val add : t -> Entry.t -> t
         val empty : t
       end = struct
-        type t = Entry.t list [@@deriving irmin]
+        type t = Entry.t list [@@deriving brassaia]
 
         let empty = []
-        let pp_entry = Irmin.Type.pp Entry.t
+        let pp_entry = Brassaia.Type.pp Entry.t
         let lines ppf l = List.iter (Fmt.pf ppf "%a\n" pp_entry) (List.rev l)
 
         let of_string str =
@@ -348,14 +348,14 @@ type 'a diff = 'a Diff.t
           try
             List.fold_left
               (fun acc l ->
-                match Irmin.Type.of_string Entry.t l with
+                match Brassaia.Type.of_string Entry.t l with
                 | Ok x -> x :: acc
                 | Error (`Msg e) -> failwith e)
               [] lines
             |> fun l -> Ok l
           with Failure e -> Error (`Msg e)
 
-        let t = Irmin.Type.like ~pp:lines ~of_string t
+        let t = Brassaia.Type.like ~pp:lines ~of_string t
         let timestamp = function [] -> 0L | e :: _ -> Entry.timestamp e
 
         let newer_than timestamp file =
@@ -367,18 +367,18 @@ type 'a diff = 'a Diff.t
           aux [] file
 
         let merge ~old t1 t2 =
-          let open Irmin.Merge.Infix in
+          let open Brassaia.Merge.Infix in
           old () >>=* fun old ->
           let old = match old with None -> [] | Some o -> o in
           let ts = timestamp old in
           let t1 = newer_than ts t1 in
           let t2 = newer_than ts t2 in
           let t3 =
-            List.sort (Irmin.Type.compare Entry.t) (List.rev_append t1 t2)
+            List.sort (Brassaia.Type.compare Entry.t) (List.rev_append t1 t2)
           in
-          Irmin.Merge.ok (List.rev_append t3 old)
+          Brassaia.Merge.ok (List.rev_append t3 old)
 
-        let merge = Irmin.Merge.(option (v t merge))
+        let merge = Brassaia.Merge.(option (v t merge))
         let add t e = e :: t
       end
     ]}
@@ -391,14 +391,14 @@ type 'a diff = 'a Diff.t
     how to use the on-disk [Git] backend on Unix.
 
     {[
-      (* Build an Irmin store containing log files. *)
-      module Store = Irmin_unix.Git.FS.KV (Log)
+      (* Build an Brassaia store containing log files. *)
+      module Store = Brassaia_unix.Git.FS.KV (Log)
 
       (* Set-up the local configuration of the Git repository. *)
-      let config = Irmin_git.config ~bare:true Config.root
+      let config = Brassaia_git.config ~bare:true Config.root
 
       (* Convenient alias for the info function for commit messages *)
-      let info = Irmin_unix.info
+      let info = Brassaia_unix.info
     ]}
 
     We can now define a toy example to use our mergeable log files.
@@ -421,7 +421,7 @@ type 'a diff = 'a Diff.t
 
       let print_logs name t =
         all_logs t >|= fun logs ->
-        Fmt.pr "-----------\n%s:\n-----------\n%a%!" name (Irmin.Type.pp Log.t)
+        Fmt.pr "-----------\n%s:\n-----------\n%a%!" name (Brassaia.Type.pp Log.t)
           logs
 
       let main () =
@@ -466,7 +466,7 @@ module Sync = Sync
 
 (** {3 Example} *)
 
-(** A simple synchronization example, using the {{!Irmin_unix.Git} Git} backend
+(** A simple synchronization example, using the {{!Brassaia_unix.Git} Git} backend
     and the {!Sync} helpers. The code clones a fresh repository if the
     repository does not exist locally, otherwise it performs a fetch: in this
     case, only the missing contents are downloaded.
@@ -475,10 +475,10 @@ module Sync = Sync
 
     {[
       open Lwt.Infix
-      module S = Irmin_unix.Git.FS.KV (Irmin.Contents.String)
-      module Sync = Irmin.Sync (S)
+      module S = Brassaia_unix.Git.FS.KV (Brassaia.Contents.String)
+      module Sync = Brassaia.Sync (S)
 
-      let config = Irmin_git.config "/tmp/test"
+      let config = Brassaia_git.config "/tmp/test"
 
       let upstream =
         if Array.length Sys.argv = 2 then

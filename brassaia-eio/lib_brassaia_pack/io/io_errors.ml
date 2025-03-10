@@ -22,7 +22,7 @@ open Errors
 module type S = sig
   module Io : Io_intf.S
 
-  type t = [ Base.t | `Io_misc of Io.misc_error ] [@@deriving irmin]
+  type t = [ Base.t | `Io_misc of Io.misc_error ] [@@deriving brassaia]
 
   val raise_error : [< t ] -> 'a
   val log_error : string -> [< t ] -> unit
@@ -86,14 +86,14 @@ module Make (Io : Io_intf.S) : S with module Io = Io = struct
     | `Add_volume_requires_lower
     | `Volume_not_found of string
     | `No_tmp_path_provided ]
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   let raise_error = function
     | `Io_misc e -> Io.raise_misc_error e
     | #error as e -> Base.raise_error e
 
   let log_error context e =
-    [%log.err "%s failed: %a" context (Irmin.Type.pp t) (e :> t)]
+    [%log.err "%s failed: %a" context (Brassaia.Type.pp t) (e :> t)]
 
   let catch f =
     match Base.catch (fun () -> Io.catch_misc_error f) with

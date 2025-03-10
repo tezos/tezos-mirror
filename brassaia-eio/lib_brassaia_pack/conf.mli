@@ -39,7 +39,7 @@ module type S = sig
         very beginning of the encoded value.
 
       - [None]: there is no length header, and values have unknown size. NOTE:
-        when using [irmin-pack] in this mode, the selected indexing strategy
+        when using [brassaia-pack] in this mode, the selected indexing strategy
         {i must} index all contents values (as recovering contents values from
         the store will require referring to the index for their length
         information). *)
@@ -50,17 +50,17 @@ module type S = sig
       keys. *)
 
   val forbid_empty_dir_persistence : bool
-  (** If [true], irmin-pack raises [Failure] if it is asked to save the empty
+  (** If [true], brassaia-pack raises [Failure] if it is asked to save the empty
       inode. This default is [false]. It should be set to [true] if the [Schema]
       of the store allows a hash collision between the empty inode and this
       string of length 1: ["\000"].
 
-      See https://github.com/mirage/irmin/issues/1304 *)
+      See https://github.com/mirage/brassaia/issues/1304 *)
 end
 
-val spec : Irmin.Backend.Conf.Spec.t
+val spec : Brassaia.Backend.Conf.Spec.t
 
-type merge_throttle = [ `Block_writes | `Overcommit_memory ] [@@deriving irmin]
+type merge_throttle = [ `Block_writes | `Overcommit_memory ] [@@deriving brassaia]
 (** Strategy for when attempting to write when the index log is full and waiting
     for an in-progress merge to complete.
 
@@ -69,63 +69,63 @@ type merge_throttle = [ `Block_writes | `Overcommit_memory ] [@@deriving irmin]
       indefinitely *)
 
 module Key : sig
-  val fresh : bool Irmin.Backend.Conf.key
-  val lru_size : int Irmin.Backend.Conf.key
-  val lru_max_memory : int option Irmin.Backend.Conf.key
-  val index_log_size : int Irmin.Backend.Conf.key
-  val readonly : bool Irmin.Backend.Conf.key
-  val root : string Irmin.Backend.Conf.key
-  val lower_root : string option Irmin.Backend.Conf.key
-  val merge_throttle : merge_throttle Irmin.Backend.Conf.key
-  val indexing_strategy : Indexing_strategy.t Irmin.Backend.Conf.key
-  val use_fsync : bool Irmin.Backend.Conf.key
-  val no_migrate : bool Irmin.Backend.Conf.key
+  val fresh : bool Brassaia.Backend.Conf.key
+  val lru_size : int Brassaia.Backend.Conf.key
+  val lru_max_memory : int option Brassaia.Backend.Conf.key
+  val index_log_size : int Brassaia.Backend.Conf.key
+  val readonly : bool Brassaia.Backend.Conf.key
+  val root : string Brassaia.Backend.Conf.key
+  val lower_root : string option Brassaia.Backend.Conf.key
+  val merge_throttle : merge_throttle Brassaia.Backend.Conf.key
+  val indexing_strategy : Indexing_strategy.t Brassaia.Backend.Conf.key
+  val use_fsync : bool Brassaia.Backend.Conf.key
+  val no_migrate : bool Brassaia.Backend.Conf.key
 end
 
-val fresh : Irmin.Backend.Conf.t -> bool
+val fresh : Brassaia.Backend.Conf.t -> bool
 (** Flag to indicate that the store will start with fresh data on disk. Warning:
     setting this to [true] will delete existing data. Default is [false]. *)
 
-val lru_size : Irmin.Backend.Conf.t -> int
+val lru_size : Brassaia.Backend.Conf.t -> int
 (** Maximum size, in number of entries, of LRU cache. Default [100_000]. Unused
     if {!lru_max_memory} is set. *)
 
-val lru_max_memory : Irmin.Backend.Conf.t -> int option
+val lru_max_memory : Brassaia.Backend.Conf.t -> int option
 (** Maximum memory, in bytes, for the LRU cache to use. Default [None], which
     falls back to {!lru_size} for LRU limit. *)
 
-val index_log_size : Irmin.Backend.Conf.t -> int
+val index_log_size : Brassaia.Backend.Conf.t -> int
 (** Size, in number of entries, of index log. Default [2_500_000]. *)
 
-val readonly : Irmin.Backend.Conf.t -> bool
+val readonly : Brassaia.Backend.Conf.t -> bool
 (** Flag for opening data in read-only mode. Default [false]. *)
 
-val merge_throttle : Irmin.Backend.Conf.t -> merge_throttle
+val merge_throttle : Brassaia.Backend.Conf.t -> merge_throttle
 (** Strategy for how to handle writes when index log is full and a merge is
     in-progress. Default [`Block_writes]. *)
 
-val root : Irmin.Backend.Conf.t -> string
+val root : Brassaia.Backend.Conf.t -> string
 (** Location of directory for saving data on disk.
 
     Note: The path before the root directory must exist. Only the final
     directory in the path will be created if it is missing. *)
 
-val lower_root : Irmin.Backend.Conf.t -> string option
+val lower_root : Brassaia.Backend.Conf.t -> string option
 (** Optional path for lower layer directory. Default [None].
 
     The presence or not of a lower layer has implications on the behaviour of
     the GC: if a lower layer is present, the GC will archive data instead of
     deleting it.*)
 
-val indexing_strategy : Irmin.Backend.Conf.t -> Indexing_strategy.t
+val indexing_strategy : Brassaia.Backend.Conf.t -> Indexing_strategy.t
 (** Strategy for choosing which objects to index. See {!Indexing_strategy.t} for
     more discussion. Default {!Indexing_strategy.default} *)
 
-val use_fsync : Irmin.Backend.Conf.t -> bool
+val use_fsync : Brassaia.Backend.Conf.t -> bool
 (** Flag to indicate that fsync should be used to enforce durability when
     flushing data to disk. Default [false]. *)
 
-val no_migrate : Irmin.Backend.Conf.t -> bool
+val no_migrate : Brassaia.Backend.Conf.t -> bool
 (** Flag to prevent migration of data. Default [false]. *)
 
 val init :
@@ -140,6 +140,6 @@ val init :
   ?no_migrate:bool ->
   ?lower_root:string option ->
   string ->
-  Irmin.config
+  Brassaia.config
 (** [init root] creates a backend configuration for storing data with default
     configuration parameters and stored at [root]. Flags are documented above. *)

@@ -25,12 +25,12 @@ module Log = (val Logs.src_log src : Logs.LOG)
 let index_log_size = Some 1_000
 
 module S = struct
-  module Maker = Irmin_pack_unix.Maker (Conf)
+  module Maker = Brassaia_pack_unix.Maker (Conf)
   include Maker.Make (Schema)
 end
 
 let config ?(readonly = false) ?(fresh = true) root =
-  Irmin_pack.config ~readonly ?index_log_size ~fresh root
+  Brassaia_pack.config ~readonly ?index_log_size ~fresh root
 
 let info () = S.Info.empty
 
@@ -111,7 +111,7 @@ let ro_batch () =
   let rw = S.Repo.v (config ~readonly:false ~fresh:true root) in
   let ro = S.Repo.v (config ~readonly:true ~fresh:false root) in
   Alcotest.check_raises "Read-only store throws RO_not_allowed exception"
-    Irmin_pack_unix.Errors.RO_not_allowed (fun () ->
+    Brassaia_pack_unix.Errors.RO_not_allowed (fun () ->
       S.Backend.Repo.batch ro (fun _ _ _ -> ()));
   S.Repo.close ro;
   S.Repo.close rw

@@ -21,19 +21,19 @@ module Make
     (Node : Node.Store)
     (Commit : Commit.Store) =
 struct
-  type contents = Contents.Hash.t * Contents.Val.t [@@deriving irmin]
-  type node = Node.Hash.t * Node.Val.t [@@deriving irmin]
-  type commit = Commit.Hash.t * Commit.Val.t [@@deriving irmin]
+  type contents = Contents.Hash.t * Contents.Val.t [@@deriving brassaia]
+  type node = Node.Hash.t * Node.Val.t [@@deriving brassaia]
+  type commit = Commit.Hash.t * Commit.Val.t [@@deriving brassaia]
 
   type value = [ `Contents of contents | `Node of node | `Commit of commit ]
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   type t = {
     mutable contents : contents list;
     mutable nodes : node list;
     mutable commits : commit list;
   }
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   let empty () = { contents = []; nodes = []; commits = [] }
 

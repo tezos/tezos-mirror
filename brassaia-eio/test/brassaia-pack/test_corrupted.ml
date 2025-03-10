@@ -19,15 +19,15 @@ open Common
 
 let root = Filename.concat "_build" "test-corrupted"
 
-module Conf = Irmin_tezos.Conf
+module Conf = Brassaia_tezos.Conf
 
 module Store = struct
-  module Maker = Irmin_pack_unix.Maker (Conf)
+  module Maker = Brassaia_pack_unix.Maker (Conf)
   include Maker.Make (Schema)
 end
 
 let config ?(readonly = false) ?(fresh = true) root =
-  Irmin_pack.config ~readonly ?index_log_size ~fresh root
+  Brassaia_pack.config ~readonly ?index_log_size ~fresh root
 
 let info () = Store.Info.empty
 
@@ -72,7 +72,7 @@ let test_corrupted_control_file () =
     try Ok (Store.Repo.v (config ~fresh:false root)) with exn -> Error exn
   in
   match error with
-  | Error (Irmin_pack_unix.Errors.Pack_error (`Corrupted_control_file s)) ->
+  | Error (Brassaia_pack_unix.Errors.Pack_error (`Corrupted_control_file s)) ->
       Alcotest.(check string)
         "path is corrupted" s "_build/test-corrupted/store.control"
   | _ -> Alcotest.fail "unexpected error"

@@ -20,6 +20,6 @@
     This is helpful when building up a list in reverse in order to force
     reversal at the end of the accumulation process. *)
 
-type 'a t = [] | ( :: ) of 'a * 'a t [@@deriving irmin]
+type 'a t = [] | ( :: ) of 'a * 'a t [@@deriving brassaia]
 
 val rev : 'a t -> 'a list

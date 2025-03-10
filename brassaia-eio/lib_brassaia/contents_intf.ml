@@ -19,7 +19,7 @@ open! Import
 module type S = sig
   (** {1 Signature for store contents} *)
 
-  type t [@@deriving irmin]
+  type t [@@deriving brassaia]
   (** The type for user-defined contents. *)
 
   val merge : t option Merge.t
@@ -50,13 +50,13 @@ module type Sigs = sig
   module type S = S
 
   module String : S with type t = string
-  (** Contents of type [string], with the {{!Irmin.Merge.default} default} 3-way
+  (** Contents of type [string], with the {{!Brassaia.Merge.default} default} 3-way
       merge strategy: assume that update operations are idempotent and conflict
       iff values are modified concurrently. *)
 
   module String_v2 : S with type t = string
   (** Similar to [String] above, but the hash computation is compatible with
-      versions older than irmin.3.0 *)
+      versions older than brassaia.3.0 *)
 
   type json =
     [ `Null

@@ -20,8 +20,8 @@ include Atomic_write_intf
 module Value = struct
   module type S = Value
 
-  module Of_hash (X : Irmin.Hash.S) = struct
-    type t = X.t [@@deriving irmin ~of_bin_string]
+  module Of_hash (X : Brassaia.Hash.S) = struct
+    type t = X.t [@@deriving brassaia ~of_bin_string]
 
     let null =
       match of_bin_string (String.make X.hash_size '\000') with
@@ -31,7 +31,7 @@ module Value = struct
 end
 
 module Closeable (AW : S) = struct
-  include Irmin.Atomic_write.Check_closed_store (AW)
+  include Brassaia.Atomic_write.Check_closed_store (AW)
 
   let flush t = get_if_open_exn t |> AW.flush
 end

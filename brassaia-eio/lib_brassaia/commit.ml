@@ -18,7 +18,7 @@ open! Import
 include Commit_intf
 open Merge.Infix
 
-let src = Logs.Src.create "irmin.commit" ~doc:"Irmin commits"
+let src = Logs.Src.create "brassaia.commit" ~doc:"Brassaia commits"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
@@ -32,20 +32,20 @@ module Maker_generic_key (I : Info.S) = struct
   struct
     module Info = I
 
-    type hash = H.t [@@deriving irmin ~compare]
-    type node_key = N.t [@@deriving irmin ~compare]
-    type commit_key = C.t [@@deriving irmin]
+    type hash = H.t [@@deriving brassaia ~compare]
+    type node_key = N.t [@@deriving brassaia ~compare]
+    type commit_key = C.t [@@deriving brassaia]
 
     type t = { node : node_key; parents : commit_key list; info : Info.t }
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
-    type t_not_prefixed = t [@@deriving irmin]
+    type t_not_prefixed = t [@@deriving brassaia]
 
     let pre_hash = Type.(unstage (pre_hash t))
 
     (* Manually add a prefix to default commits, in order to prevent hash
        collision between contents and commits (see
-       https://github.com/mirage/irmin/issues/1304).
+       https://github.com/mirage/brassaia/issues/1304).
        If we only prefix the prehash of contents, (suppose the prefix is "B"),
        then we can have a collision with the prehash of a commit (the prehash of
        a commit starts with the hash of the root and can start with a "B" - the
@@ -70,9 +70,9 @@ module Maker_generic_key (I : Info.S) = struct
       type commit = t
 
       type t = { node : hash; parents : hash list; info : Info.t }
-      [@@deriving irmin]
+      [@@deriving brassaia]
 
-      type t_not_prefixed = t [@@deriving irmin]
+      type t_not_prefixed = t [@@deriving brassaia]
 
       let pre_hash = Type.(unstage (pre_hash t))
 
@@ -82,9 +82,9 @@ module Maker_generic_key (I : Info.S) = struct
 
       let t = Type.(like t ~pre_hash:pre_hash_prefixed)
 
-      type commit_key = H.t [@@deriving irmin]
-      type node_key = H.t [@@deriving irmin]
-      type hash = H.t [@@deriving irmin]
+      type commit_key = H.t [@@deriving brassaia]
+      type node_key = H.t [@@deriving brassaia]
+      type hash = H.t [@@deriving brassaia]
 
       let parents t = t.parents
       let node t = t.node
@@ -146,7 +146,7 @@ struct
   module Info = I
 
   type 'a t = 'a N.t * 'a S.t
-  type key = Key.t [@@deriving irmin ~equal]
+  type key = Key.t [@@deriving brassaia ~equal]
   type value = S.value
   type hash = S.hash
 
@@ -246,15 +246,15 @@ struct
   module Val = struct
     include Val
 
-    type hash = H.t [@@deriving irmin]
+    type hash = H.t [@@deriving brassaia]
   end
 end
 
 module History (S : Store) = struct
-  type commit_key = S.Key.t [@@deriving irmin]
-  type node_key = S.Val.node_key [@@deriving irmin]
-  type v = S.Val.t [@@deriving irmin]
-  type info = S.Info.t [@@deriving irmin]
+  type commit_key = S.Key.t [@@deriving brassaia]
+  type node_key = S.Val.node_key [@@deriving brassaia]
+  type v = S.Val.t [@@deriving brassaia]
+  type info = S.Info.t [@@deriving brassaia]
   type 'a t = 'a S.t
 
   let merge t ~info =
@@ -279,7 +279,7 @@ module History (S : Store) = struct
     match S.find t c with None -> [] | Some c -> S.Val.parents c
 
   module U = struct
-    type t = unit [@@deriving irmin]
+    type t = unit [@@deriving brassaia]
   end
 
   module Graph = Object_graph.Make (U) (S.Node.Key) (S.Key) (U)
@@ -630,7 +630,7 @@ module V1 = struct
     module K (K : Type.S) = struct
       let h = Type.string_of `Int64
 
-      type t = K.t [@@deriving irmin ~pre_hash ~to_bin_string ~of_bin_string]
+      type t = K.t [@@deriving brassaia ~pre_hash ~to_bin_string ~of_bin_string]
 
       let size_of = Type.Size.using to_bin_string (Type.Size.t h)
 
@@ -661,15 +661,15 @@ module V1 = struct
     end
 
     module Node_key = K (struct
-      type t = C.node_key [@@deriving irmin]
+      type t = C.node_key [@@deriving brassaia]
     end)
 
     module Commit_key = K (struct
-      type t = C.commit_key [@@deriving irmin]
+      type t = C.commit_key [@@deriving brassaia]
     end)
 
-    type node_key = Node_key.t [@@deriving irmin]
-    type commit_key = Commit_key.t [@@deriving irmin]
+    type node_key = Node_key.t [@@deriving brassaia]
+    type commit_key = Commit_key.t [@@deriving brassaia]
     type t = { parents : commit_key list; c : C.t }
 
     module Info = Info

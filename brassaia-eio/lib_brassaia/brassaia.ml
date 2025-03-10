@@ -35,7 +35,7 @@ module Hash = Hash
 module Path = Path
 module Perms = Perms
 module Key = Key
-module Irmin_node = Node
+module Brassaia_node = Node
 
 exception Closed = Store_properties.Closed
 

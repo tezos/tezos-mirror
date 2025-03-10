@@ -19,14 +19,14 @@ module Payload = struct
   module Upper = struct
     module V3 = struct
       type from_v1_v2_post_upgrade = { entry_offset_at_upgrade_to_v3 : int63 }
-      [@@deriving irmin]
+      [@@deriving brassaia]
       (** [entry_offset_at_upgrade_to_v3] is the offset of the first entry that
-          is known to have been created using [irmin_pack_version = `V2] or
+          is known to have been created using [brassaia_pack_version = `V2] or
           more. The entries before that point may be v1 entries. V1 entries need
           an entry in index because it is the only place their lenght is stored. *)
 
       type from_v3_gced = { suffix_start_offset : int63; generation : int }
-      [@@deriving irmin]
+      [@@deriving brassaia]
       (** [suffix_start_offset] is 0 if the suffix file was never garbage
           collected. Otherwise it is the offset of the very first entry of the
           suffix file. Note that offsets in the suffix file are virtual. The
@@ -72,25 +72,25 @@ module Payload = struct
         | T13
         | T14
         | T15
-      [@@deriving irmin]
+      [@@deriving brassaia]
 
       type t = {
         dict_end_poff : int63;
         suffix_end_poff : int63;
         status : status; (* must be last to allow extensions *)
       }
-      [@@deriving irmin]
-      (** The [`V3] payload of the irmin-pack control file. [`V3] is a major
+      [@@deriving brassaia]
+      (** The [`V3] payload of the brassaia-pack control file. [`V3] is a major
           version. If [`V4] ever exists, it will have its own dedicated payload,
           but the [`V3] definition will still have to stick in the codebase for
           backward compatibilty of old pack stores.
 
           A store may only change its major version during an [open_rw] in
           [File_manager]. Note that upgrading a major version is the only reason
-          why [open_rw] would modify files in an irmin-pack directory.
+          why [open_rw] would modify files in an brassaia-pack directory.
 
           For a given major version, the format of a payload may change, but
-          only in a backward compatible way. I.e., all versions of irmin-pack
+          only in a backward compatible way. I.e., all versions of brassaia-pack
           should forever be able to decode a [`V3] control file, it allows for
           control file corruption and out-of-date code to be distinguishable.
 
@@ -107,7 +107,7 @@ module Payload = struct
           [suffix_end_poff] is similar to [dict_end_poff] but for the suffix
           file.
 
-          [status] is a variant that encode the state of the irmin-pack
+          [status] is a variant that encode the state of the brassaia-pack
           directory. This field MUST be the last field of the record, in order
           to allow extensions *)
     end
@@ -119,7 +119,7 @@ module Payload = struct
         latest_gc_target_offset : int63;
         suffix_dead_bytes : int63;
       }
-      [@@deriving irmin]
+      [@@deriving brassaia]
       (** Similar to [from_v3_gced]. New fields:
 
           [latest_gc_target_offset] is the commit on which the latest gc was
@@ -163,7 +163,7 @@ module Payload = struct
         | T13
         | T14
         | T15
-      [@@deriving irmin]
+      [@@deriving brassaia]
 
       type t = {
         dict_end_poff : int63;
@@ -174,7 +174,7 @@ module Payload = struct
         chunk_num : int;
         status : status; (* must be last to allow extensions *)
       }
-      [@@deriving irmin]
+      [@@deriving brassaia]
       (** The same as {!V3.t}, with the following modifications:
 
           New fields
@@ -200,7 +200,7 @@ module Payload = struct
         suffix_dead_bytes : int63;
         mapping_end_poff : int63 option;
       }
-      [@@deriving irmin]
+      [@@deriving brassaia]
 
       type status =
         | From_v1_v2_post_upgrade of V3.from_v1_v2_post_upgrade
@@ -222,7 +222,7 @@ module Payload = struct
         | T13
         | T14
         | T15
-      [@@deriving irmin]
+      [@@deriving brassaia]
 
       type t = {
         dict_end_poff : int63;
@@ -234,7 +234,7 @@ module Payload = struct
         volume_num : int;
         status : status; (* must be last to allow extensions *)
       }
-      [@@deriving irmin]
+      [@@deriving brassaia]
       (** The same as {!V4.t}, with the following modifications:
 
           New fields
@@ -251,10 +251,10 @@ module Payload = struct
             investigation. *)
     end
 
-    type version = V3 of V3.t | V4 of V4.t | V5 of V5.t [@@deriving irmin]
+    type version = V3 of V3.t | V4 of V4.t | V5 of V5.t [@@deriving brassaia]
 
     type raw_payload = Valid of version | Invalid of version
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     module Latest = V5
   end
@@ -267,7 +267,7 @@ module Payload = struct
         mapping_end_poff : int63;
         checksum : int63;
       }
-      [@@deriving irmin]
+      [@@deriving brassaia]
       (** The payload for a control file of a volume.
 
           Fields
@@ -280,17 +280,17 @@ module Payload = struct
             writing. *)
     end
 
-    type version = V5 of V5.t [@@deriving irmin]
+    type version = V5 of V5.t [@@deriving brassaia]
 
     type raw_payload = Valid of version | Invalid of version
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     module Latest = V5
   end
 end
 
 module type S = sig
-  (** Abstraction for an irmin-pack control file.
+  (** Abstraction for an brassaia-pack control file.
 
       It is parameterized with [Io], a file system abstraction (e.g. unix,
       mirage, eio_linux).

@@ -18,12 +18,12 @@ include Indexable_intf
 open! Import
 
 module Closeable (CA : S) = struct
-  include Irmin.Indexable.Check_closed_store (CA)
+  include Brassaia.Indexable.Check_closed_store (CA)
 
-  (** override of {!Irmin.Indexable.S.add} to allow read-only *)
+  (** override of {!Brassaia.Indexable.S.add} to allow read-only *)
   let add t v = (get_if_open_exn t |> CA.add) v
 
-  (** override of {!Irmin.Indexable.S.unsafe_add} to allow read-only *)
+  (** override of {!Brassaia.Indexable.S.unsafe_add} to allow read-only *)
   let unsafe_add t k v = (get_if_open_exn t |> CA.unsafe_add) k v
 
   let index_direct t h = (get_if_open_exn t |> CA.index_direct) h

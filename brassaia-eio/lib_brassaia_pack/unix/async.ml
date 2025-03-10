@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-open! Irmin_pack_io.Import
+open! Brassaia_pack_io.Import
 
 module Unix = struct
   let kill_no_err pid =
@@ -44,10 +44,10 @@ module Unix = struct
   end
 
   type outcome = [ `Success | `Cancelled | `Failure of string ]
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   type status = [ `Running | `Success | `Cancelled | `Failure of string ]
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   type t = { pid : int; mutable status : status; lock : Eio.Mutex.t }
 

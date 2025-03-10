@@ -17,7 +17,7 @@
 include Metadata_intf
 
 module None = struct
-  type t = unit [@@deriving irmin]
+  type t = unit [@@deriving brassaia]
 
   let default = ()
   let merge = Merge.v t (fun ~old:_ () () -> Merge.ok ())

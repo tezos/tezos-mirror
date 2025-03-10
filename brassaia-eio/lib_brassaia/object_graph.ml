@@ -17,7 +17,7 @@
 open! Import
 include Object_graph_intf
 
-let src = Logs.Src.create "irmin.graph" ~doc:"Irmin graph support"
+let src = Logs.Src.create "brassaia.graph" ~doc:"Brassaia graph support"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
@@ -43,7 +43,7 @@ struct
       | `Node of Node_key.t
       | `Commit of Commit_key.t
       | `Branch of Branch.t ]
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     let equal = Type.(unstage (equal t))
     let compare = Type.(unstage (compare t))
@@ -95,7 +95,7 @@ struct
   (* XXX: for the binary format, we can use offsets in the vertex list
      to save space. *)
   module Dump = struct
-    type t = X.t list * (X.t * X.t) list [@@deriving irmin]
+    type t = X.t list * (X.t * X.t) list [@@deriving brassaia]
   end
 
   let vertex g = G.fold_vertex (fun k set -> k :: set) g []

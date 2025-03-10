@@ -15,13 +15,13 @@
  *)
 
 module S = struct
-  type t = int [@@deriving irmin ~equal ~short_hash]
+  type t = int [@@deriving brassaia ~equal ~short_hash]
 
   let hash t = short_hash t
 end
 
 module M = struct
-  include Irmin.Backend.Lru.Make (S)
+  include Brassaia.Backend.Lru.Make (S)
 
   let bindings t =
     let all = ref [] in

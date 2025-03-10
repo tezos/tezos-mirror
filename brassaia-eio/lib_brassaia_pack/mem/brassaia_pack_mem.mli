@@ -1,5 +1,5 @@
 (*
- * Copyright (c) 2022 Tarides <contact@tarides.com>
+ * Copyright (c) 2018-2022 Tarides <contact@tarides.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,17 +14,12 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-(** {1 Irmin Unix utilities}
+(** A fully in-memory implementation of the [Brassaia_pack] flavour of Brassaia
+    backend, intended for users that must be interoperable with the
+    idiosyncrasies of the persistent implementation. *)
 
-    This module provides utilities for Unix applications. *)
-
-module Info = Info.Make
-
-val info :
-  ?author:string ->
-  ('a, Format.formatter, unit, unit -> Irmin.Info.default) format4 ->
-  'a
-(** [info fmt ()] creates a fresh commit info, with the {{!Irmin.Info.S.date}
-    date} set to [Unix.gettimeoday ()] and the {{!Irmin.Info.S.author} author}
-    built using [Unix.gethostname()] and [Unix.getpid()] if [author] is not
-    provided. *)
+module Maker (_ : Brassaia_pack.Conf.S) :
+  Brassaia_pack.Maker
+    with type ('h, _) contents_key = 'h
+     and type 'h node_key = 'h
+     and type 'h commit_key = 'h

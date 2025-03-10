@@ -14,58 +14,56 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-(** The [irmin-pack-unix] package provides an implementation of {!Irmin_pack}
+(** The [brassaia-pack-unix] package provides an implementation of {!Brassaia_pack}
     for Unix systems.
 
-    [irmin-pack-unix] provides advanced features such as garbage collection,
+    [brassaia-pack-unix] provides advanced features such as garbage collection,
     snapshoting, integrity checks. *)
 
 (** {1 Store} *)
 
-module type S = Store.S
-module type Io_s = Io_intf.S
+open Brassaia_pack_io
 
-module Store_intf = Store_intf
+module type S = Brassaia_pack_io.S
 
-module Maker_io
-    (Io : Io_intf.S)
-    (Io_index : Index.Platform.S)
-    (Async : Async_intf.S)
-    (Config : Irmin_pack.Conf.S) : Store.Maker
-
-module KV
-    (Io : Io_intf.S)
-    (Io_index : Index.Platform.S)
-    (Async : Async_intf.S)
-    (Config : Irmin_pack.Conf.S) : Store.KV
+module Maker (Config : Brassaia_pack.Conf.S) : Store_intf.Maker
+module KV (Config : Brassaia_pack.Conf.S) : Store_intf.KV
 
 (** {1 Key and Values} *)
 
+(* module Pack_store = Pack_store *)
 module Pack_key = Pack_key
 module Pack_value = Pack_value
 
 (** {1 Integrity Checks} *)
 
-module Checks = Checks
-module Checks_intf = Checks_intf
+module Checks : sig
+  module Make (_ : Checks_intf.Store) : Checks_intf.S
+end
 
 (** {1 Statistics} *)
 
 module Stats = Stats
-module Stats_intf = Stats_intf
 
 (** {1 Internal Functors and Utilities} *)
 
 (** Following functors and modules are instantiated automatically or used
     internally when creating a store with {!Maker} or {!KV}.*)
 
-module Index = Pack_index
+module Index : sig
+  module type S = Index.S
+
+  module Make (K : Brassaia.Hash.S) :
+      module type of Index.Make_io (Io.Unix) (Index_unix.Private.Platform) (K)
+end
+
 module Inode = Inode
 module Pack_store = Pack_store
 module Atomic_write = Atomic_write
 module Dict = Dict
 module Dispatcher = Dispatcher
-module Async_intf = Async_intf
+module Io = Io
+module Async = Async
 module Errors = Errors
 module Io_errors = Io_errors
 module Control_file = Control_file
@@ -81,4 +79,3 @@ module Lru = Lru
 module Gc_raw = Gc
 module Traverse_pack_file = Traverse_pack_file
 module Snapshot = Snapshot
-module Import = Import

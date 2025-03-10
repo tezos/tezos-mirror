@@ -23,7 +23,7 @@ open struct
   module type Commit_portable = Commit.Portable.S
 end
 
-(** [S] is what a backend must define in order to be made an irmin store. *)
+(** [S] is what a backend must define in order to be made an brassaia store. *)
 module type S = sig
   module Schema : Schema.S
   (** A store schema, meant to be provided by the user. *)

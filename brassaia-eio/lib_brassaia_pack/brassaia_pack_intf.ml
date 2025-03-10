@@ -30,20 +30,20 @@ module type Checkable = sig
     (unit, [ `Wrong_hash | `Absent_value ]) result
 end
 
-module type S = Irmin.Generic_key.S
+module type S = Brassaia.Generic_key.S
 
-module S_is_a_store (X : S) : Irmin.Generic_key.S = X
+module S_is_a_store (X : S) : Brassaia.Generic_key.S = X
 
 module type Maker = sig
   type endpoint = unit
 
-  include Irmin.Key.Store_spec.S
+  include Brassaia.Key.Store_spec.S
 
-  module Make (Schema : Irmin.Schema.Extended) :
+  module Make (Schema : Brassaia.Schema.Extended) :
     S
     (* We can't have `with module Schema = Schema` here, since the Schema
        on the RHS contains more information than the one on the LHS. We _want_
-       to do something like `with module Schema = (Schema : Irmin.Schema.S)`,
+       to do something like `with module Schema = (Schema : Brassaia.Schema.S)`,
        but this isn't supported.
 
        TODO: extract these extensions as a separate functor argument instead. *)
@@ -81,8 +81,8 @@ module type Sigs = sig
     ?no_migrate:bool ->
     ?lower_root:string option ->
     string ->
-    Irmin.config
-  (** Configuration options for stores. See {!Irmin_pack.Conf} for more details. *)
+    Brassaia.config
+  (** Configuration options for stores. See {!Brassaia_pack.Conf} for more details. *)
 
   (** {1 Inode} *)
 

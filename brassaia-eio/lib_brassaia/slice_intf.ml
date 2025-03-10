@@ -17,20 +17,20 @@
 module type S = sig
   (** {1 Slices} *)
 
-  type t [@@deriving irmin]
+  type t [@@deriving brassaia]
   (** The type for slices. *)
 
-  type contents [@@deriving irmin]
+  type contents [@@deriving brassaia]
   (** The type for exported contents. *)
 
-  type node [@@deriving irmin]
+  type node [@@deriving brassaia]
   (** The type for exported nodes. *)
 
-  type commit [@@deriving irmin]
+  type commit [@@deriving brassaia]
   (** The type for exported commits. *)
 
   type value = [ `Contents of contents | `Node of node | `Commit of commit ]
-  [@@deriving irmin]
+  [@@deriving brassaia]
   (** The type for exported values. *)
 
   val empty : unit -> t

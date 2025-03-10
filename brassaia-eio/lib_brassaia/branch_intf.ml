@@ -17,7 +17,7 @@
 module type S = sig
   (** {1 Signature for Branches} *)
 
-  type t [@@deriving irmin]
+  type t [@@deriving brassaia]
   (** The type for branches. *)
 
   val main : t
@@ -27,7 +27,7 @@ module type S = sig
   (** Check if the branch is valid. *)
 end
 
-module Irmin_key = Key
+module Brassaia_key = Key
 
 module type Store = sig
   (** {1 Branch Store} *)
@@ -37,7 +37,7 @@ module type Store = sig
   module Key : S with type t = key
   (** Base functions on keys. *)
 
-  module Val : Irmin_key.S with type t = value
+  module Val : Brassaia_key.S with type t = value
   (** Base functions on values. *)
 end
 
@@ -45,7 +45,7 @@ module type Sigs = sig
   (** {1 Branches} *)
 
   module type S = S
-  (** The signature for branches. Irmin branches are similar to Git branches:
+  (** The signature for branches. Brassaia branches are similar to Git branches:
       they are used to associated user-defined names to head commits. Branches
       have a default value: the {{!Branch.S.main} main} branch. *)
 

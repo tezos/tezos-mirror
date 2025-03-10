@@ -21,9 +21,9 @@ module type S = sig
   (** A task *)
 
   type outcome = [ `Success | `Cancelled | `Failure of string ]
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
-  type status = [ outcome | `Running ] [@@deriving irmin]
+  type status = [ outcome | `Running ] [@@deriving brassaia]
 
   val async : (unit -> unit) -> t
   (** Start a task. *)

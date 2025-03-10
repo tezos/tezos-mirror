@@ -18,7 +18,7 @@ open! Import
 
 module type S = sig
   (** An abstraction on top of the index library that exposes an API that better
-      fits the irmin-pack use case. *)
+      fits the brassaia-pack use case. *)
 
   type t
   type key
@@ -75,5 +75,5 @@ module type Sigs = sig
   module Make_io
       (Io : Io_intf.S)
       (Io_index : Index.Platform.S)
-      (K : Irmin.Hash.S) : S with type key = K.t and module Io = Io
+      (K : Brassaia.Hash.S) : S with type key = K.t and module Io = Io
 end

@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-val suite : Irmin_test.Suite.t list
+val suite : Brassaia_test.Suite.t list
 
 val misc :
   _ Eio.Domain_manager.t -> (string * unit Alcotest.test_case list) list

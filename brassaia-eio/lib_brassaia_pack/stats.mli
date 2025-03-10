@@ -37,7 +37,7 @@ module Inode : sig
     inode_decode_bin : int;
     inode_encode_bin : int;
   }
-  [@@deriving irmin]
+  [@@deriving brassaia]
   (** The type for stats for a store S.
 
       - [inode_add + inode_remove + inode_of_seq + inode_of_raw] is the total

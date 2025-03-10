@@ -24,15 +24,15 @@ exception Dangling_hash
 let invalid_read fmt = Fmt.kstr (fun s -> raise (Invalid_read s)) fmt
 let corrupted_store fmt = Fmt.kstr (fun s -> raise (Corrupted_store s)) fmt
 
-module UnsafeTbl (K : Irmin.Hash.S) = Hashtbl.Make (struct
+module UnsafeTbl (K : Brassaia.Hash.S) = Hashtbl.Make (struct
   type t = K.t
 
   let hash = K.short_hash
-  let equal = Irmin.Type.(unstage (equal K.t))
+  let equal = Brassaia.Type.(unstage (equal K.t))
 end)
 
 (** Safe but might be incredibly slow. *)
-module Table (K : Irmin.Hash.S) = struct
+module Table (K : Brassaia.Hash.S) = struct
   module Unsafe = UnsafeTbl (K)
 
   type 'a t = { lock : Eio.Mutex.t; data : 'a Unsafe.t }
@@ -60,7 +60,7 @@ end
 module Make_without_close_checks
     (Fm : File_manager.S)
     (Dispatcher : Dispatcher.S with module Fm = Fm)
-    (Hash : Irmin.Hash.S with type t = Fm.Index.key)
+    (Hash : Brassaia.Hash.S with type t = Fm.Index.key)
     (Val : Pack_value.Persistent
              with type hash := Hash.t
               and type key := Hash.t Pack_key.t)
@@ -87,15 +87,15 @@ struct
   type 'a t = {
     lru : Lru.t;
     staging : Val.t Tbl.t;
-    indexing_strategy : Irmin_pack.Indexing_strategy.t;
+    indexing_strategy : Brassaia_pack.Indexing_strategy.t;
     fm : Fm.t;
     dict : Dict.t;
     dispatcher : Dispatcher.t;
   }
 
-  type hash = Hash.t [@@deriving irmin ~pp ~equal ~decode_bin]
-  type key = Key.t [@@deriving irmin ~pp]
-  type value = Val.t [@@deriving irmin ~pp]
+  type hash = Hash.t [@@deriving brassaia ~pp ~equal ~decode_bin]
+  type key = Key.t [@@deriving brassaia ~pp]
+  type value = Val.t [@@deriving brassaia ~pp]
 
   let get_location t k =
     match Pack_key.inspect k with
@@ -165,7 +165,7 @@ struct
               the {!total_entry_length} (including the hash and the kind). See
               [pack_value.mli] for a description. *)
     }
-    [@@deriving irmin ~pp_dump]
+    [@@deriving brassaia ~pp_dump]
 
     let min_length = Hash.hash_size + 1
     let max_length = Hash.hash_size + 1 + Varint.max_encoded_size
@@ -437,8 +437,8 @@ struct
 
   let cast t = (t :> read_write t)
 
-  (** [batch] is required by the [Backend] signature of irmin core, but
-      irmin-pack is really meant to be used using the [batch] of the repo (in
+  (** [batch] is required by the [Backend] signature of brassaia core, but
+      brassaia-pack is really meant to be used using the [batch] of the repo (in
       [ext.ml]). The following batch exists only for compatibility, but it is
       very tempting to replace the implementation by an [assert false]. *)
   let batch t f =
@@ -458,7 +458,7 @@ struct
         | Error err ->
             [%log.err
               "[pack] batch failed and flush failed. Silencing flush fail. (%a)"
-                (Irmin.Type.pp Errs.t) err]
+                (Brassaia.Type.pp Errs.t) err]
       in
       raise exn
     in
@@ -469,7 +469,7 @@ struct
     let use_index =
       (* the index is required for non-minimal indexing strategies and
          for commits. *)
-      (not (Irmin_pack.Indexing_strategy.is_minimal t.indexing_strategy))
+      (not (Brassaia_pack.Indexing_strategy.is_minimal t.indexing_strategy))
       || kind = Commit_v1
       || kind = Commit_v2
     in
@@ -533,7 +533,7 @@ end
 module Make
     (Fm : File_manager.S)
     (Dispatcher : Dispatcher.S with module Fm = Fm)
-    (Hash : Irmin.Hash.S with type t = Fm.Index.key)
+    (Hash : Brassaia.Hash.S with type t = Fm.Index.key)
     (Val : Pack_value.Persistent
              with type hash := Hash.t
               and type key := Hash.t Pack_key.t)

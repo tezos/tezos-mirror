@@ -14,11 +14,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-open Irmin.Export_for_backends
+open Brassaia.Export_for_backends
 module Int63 = Optint.Int63
 
 let get = function Some x -> x | None -> Alcotest.fail "None"
-let sha1 x = Irmin.Hash.SHA1.hash (fun f -> f x)
+let sha1 x = Brassaia.Hash.SHA1.hash (fun f -> f x)
 let sha1_contents x = sha1 ("B" ^ x)
 
 let rm_dir root =
@@ -35,10 +35,10 @@ let random_string n = String.init n (fun _i -> random_char ())
 let random_letter () = char_of_int (Char.code 'a' + Random.int 26)
 let random_letters n = String.init n (fun _i -> random_letter ())
 
-module Conf = Irmin_tezos.Conf
+module Conf = Brassaia_tezos.Conf
 
 module Schema = struct
-  open Irmin
+  open Brassaia
   module Metadata = Metadata.None
   module Contents = Contents.String_v2
   module Path = Path.String_list
@@ -50,22 +50,22 @@ module Schema = struct
 end
 
 module Contents = struct
-  include Irmin.Contents.String
+  include Brassaia.Contents.String
 
-  let kind _ = Irmin_pack.Pack_value.Kind.Contents
+  let kind _ = Brassaia_pack.Pack_value.Kind.Contents
 
-  type Irmin_pack.Pack_value.kinded += Contents of t
+  type Brassaia_pack.Pack_value.kinded += Contents of t
 
   let to_kinded t = Contents t
   let of_kinded = function Contents c -> c | _ -> assert false
 
-  module H = Irmin.Hash.Typed (Irmin.Hash.SHA1) (Irmin.Contents.String)
+  module H = Brassaia.Hash.Typed (Brassaia.Hash.SHA1) (Brassaia.Contents.String)
 
   let hash = H.hash
   let magic = 'B'
-  let weight _ = Irmin_pack.Pack_value.Immediate 1
-  let encode_triple = Irmin.Type.(unstage (encode_bin (triple H.t char t)))
-  let decode_triple = Irmin.Type.(unstage (decode_bin (triple H.t char t)))
+  let weight _ = Brassaia_pack.Pack_value.Immediate 1
+  let encode_triple = Brassaia.Type.(unstage (encode_bin (triple H.t char t)))
+  let decode_triple = Brassaia.Type.(unstage (decode_bin (triple H.t char t)))
   let length_header = Fun.const (Some `Varint)
   let encode_bin ~dict:_ ~offset_of_key:_ k x = encode_triple (k, magic, x)
 
@@ -74,28 +74,28 @@ module Contents = struct
     v
 
   let decode_bin_length =
-    match Irmin.Type.(Size.of_encoding (triple H.t char t)) with
+    match Brassaia.Type.(Size.of_encoding (triple H.t char t)) with
     | Dynamic f -> f
     | _ -> assert false
 end
 
-module I = Irmin_pack_unix.Index
-module Index = Irmin_pack_unix.Index.Make (Schema.Hash)
-module Key = Irmin_pack_unix.Pack_key.Make (Schema.Hash)
-module Io = Irmin_pack_unix.Io.Unix
-module Errs = Irmin_pack_unix.Io_errors.Make (Io)
-module File_manager = Irmin_pack_unix.File_manager.Make (Io) (Index) (Errs)
+module I = Brassaia_pack_unix.Index
+module Index = Brassaia_pack_unix.Index.Make (Schema.Hash)
+module Key = Brassaia_pack_unix.Pack_key.Make (Schema.Hash)
+module Io = Brassaia_pack_unix.Io.Unix
+module Errs = Brassaia_pack_unix.Io_errors.Make (Io)
+module File_manager = Brassaia_pack_unix.File_manager.Make (Io) (Index) (Errs)
 module Dict = File_manager.Dict
-module Dispatcher = Irmin_pack_unix.Dispatcher.Make (File_manager)
+module Dispatcher = Brassaia_pack_unix.Dispatcher.Make (File_manager)
 
 module Pack =
-  Irmin_pack_unix.Pack_store.Make (File_manager) (Dispatcher) (Schema.Hash)
+  Brassaia_pack_unix.Pack_store.Make (File_manager) (Dispatcher) (Schema.Hash)
     (Contents)
     (Errs)
 
 module Branch =
-  Irmin_pack_unix.Atomic_write.Make_persistent (Io) (Irmin.Branch.String)
-    (Irmin_pack.Atomic_write.Value.Of_hash (Schema.Hash))
+  Brassaia_pack_unix.Atomic_write.Make_persistent (Io) (Brassaia.Branch.String)
+    (Brassaia_pack.Atomic_write.Value.Of_hash (Schema.Hash))
 
 module Make_context (Config : sig
   val root : string
@@ -124,17 +124,17 @@ struct
 
   (* TODO : test the indexing_strategy minimal. *)
   let config ~readonly ~fresh name =
-    Irmin_pack.Conf.init ~fresh ~readonly
-      ~indexing_strategy:Irmin_pack.Indexing_strategy.always ~lru_size:0 name
+    Brassaia_pack.Conf.init ~fresh ~readonly
+      ~indexing_strategy:Brassaia_pack.Indexing_strategy.always ~lru_size:0 name
 
-  (* TODO : remove duplication with irmin_pack/ext.ml *)
+  (* TODO : remove duplication with brassaia_pack/ext.ml *)
   let get_fm config =
-    let readonly = Irmin_pack.Conf.readonly config in
+    let readonly = Brassaia_pack.Conf.readonly config in
     if readonly then File_manager.open_ro config |> Errs.raise_if_error
     else
-      let fresh = Irmin_pack.Conf.fresh config in
+      let fresh = Brassaia_pack.Conf.fresh config in
       if fresh then (
-        let root = Irmin_pack.Conf.root config in
+        let root = Brassaia_pack.Conf.root config in
         mkdir_dash_p root;
         File_manager.create_rw ~overwrite:true config |> Errs.raise_if_error)
       else File_manager.open_rw config |> Errs.raise_if_error
@@ -163,7 +163,7 @@ struct
     (* open the index created by the fm. *)
     let index = File_manager.index fm in
     let dict = File_manager.dict fm in
-    let lru = Irmin_pack_unix.Lru.create config in
+    let lru = Brassaia_pack_unix.Lru.create config in
     let pack = Pack.v ~config ~fm ~dict ~dispatcher ~lru in
     (f := fun () -> File_manager.flush fm |> Errs.raise_if_error);
     { name; index; pack; dict; fm }
@@ -192,7 +192,7 @@ module Alcotest = struct
           "Fail %s: expected function to raise, but it returned instead." msg
     | exception exn -> (
         match exn with
-        | Irmin_pack_unix.Errors.Pack_error e -> (
+        | Brassaia_pack_unix.Errors.Pack_error e -> (
             match pass e with
             | true -> ()
             | false ->
@@ -220,10 +220,10 @@ module Alcotest = struct
           msg (Printexc.to_string exn) (Printexc.to_string e)
 
   let testable_repr t =
-    Alcotest.testable (Irmin.Type.pp t) Irmin.Type.(unstage (equal t))
+    Alcotest.testable (Brassaia.Type.pp t) Brassaia.Type.(unstage (equal t))
 
   let check_repr ?pos t = Alcotest.check ?pos (testable_repr t)
-  let kind = testable_repr Irmin_pack.Pack_value.Kind.t
+  let kind = testable_repr Brassaia_pack.Pack_value.Kind.t
   let hash = testable_repr Schema.Hash.t
   let quick_tc name f = test_case name `Quick f
 end
@@ -347,13 +347,13 @@ let rec repeat = function
 let goto_project_root () =
   let cwd = Fpath.v (Sys.getcwd ()) in
   match cwd |> Fpath.segs |> List.rev with
-  | "irmin-pack" :: "test" :: "default" :: "_build" :: _ ->
+  | "brassaia-pack" :: "test" :: "default" :: "_build" :: _ ->
       let root = cwd |> repeat 4 Fpath.parent in
       Unix.chdir (Fpath.to_string root)
   | _ -> ()
 
 let rec unlink_path path =
-  match Irmin_pack_unix.Io.Unix.classify_path path with
+  match Brassaia_pack_unix.Io.Unix.classify_path path with
   | `No_such_file_or_directory -> ()
   | `Directory ->
       Sys.readdir path
@@ -371,7 +371,7 @@ let create_lower_root =
     let lower_path = Filename.concat "_build" lower_root in
     unlink_path lower_path;
     let$ _ =
-      if mkdir then Irmin_pack_unix.Io.Unix.mkdir lower_path else Result.ok ()
+      if mkdir then Brassaia_pack_unix.Io.Unix.mkdir lower_path else Result.ok ()
     in
     lower_path
 

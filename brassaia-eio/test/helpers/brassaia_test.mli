@@ -24,9 +24,9 @@ module Suite : sig
 
   val create :
     name:string ->
-    ?init:(config:Irmin.config -> unit) ->
-    ?clean:(config:Irmin.config -> unit) ->
-    config:Irmin.config ->
+    ?init:(config:Brassaia.config -> unit) ->
+    ?clean:(config:Brassaia.config -> unit) ->
+    config:Brassaia.config ->
     store:(module S) ->
     ?stats:(unit -> int * int) ->
     ?import_supported:bool ->
@@ -35,9 +35,9 @@ module Suite : sig
 
   val create_generic_key :
     name:string ->
-    ?init:(config:Irmin.config -> unit) ->
-    ?clean:(config:Irmin.config -> unit) ->
-    config:Irmin.config ->
+    ?init:(config:Brassaia.config -> unit) ->
+    ?clean:(config:Brassaia.config -> unit) ->
+    config:Brassaia.config ->
     store:(module Generic_key) ->
     ?stats:(unit -> int * int) ->
     ?import_supported:bool ->
@@ -45,20 +45,20 @@ module Suite : sig
     t
 
   val name : t -> string
-  val config : t -> Irmin.config
+  val config : t -> Brassaia.config
   val store : t -> (module S) option
-  val init : t -> config:Irmin.config -> unit
-  val clean : t -> config:Irmin.config -> unit
+  val init : t -> config:Brassaia.config -> unit
+  val clean : t -> config:Brassaia.config -> unit
 end
 
 val line : string -> unit
 
 module Schema = Common.Schema
 
-val store : (module Irmin.Maker) -> (module Irmin.Metadata.S) -> (module S)
-val testable : 'a Irmin.Type.t -> 'a Alcotest.testable
-val check : 'a Irmin.Type.t -> string -> 'a -> 'a -> unit
-val checks : 'a Irmin.Type.t -> string -> 'a list -> 'a list -> unit
+val store : (module Brassaia.Maker) -> (module Brassaia.Metadata.S) -> (module S)
+val testable : 'a Brassaia.Type.t -> 'a Alcotest.testable
+val check : 'a Brassaia.Type.t -> string -> 'a -> 'a -> unit
+val checks : 'a Brassaia.Type.t -> string -> 'a list -> 'a list -> unit
 
 module Store : sig
   val run :

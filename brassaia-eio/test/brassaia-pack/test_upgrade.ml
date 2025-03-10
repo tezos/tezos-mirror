@@ -18,13 +18,13 @@ open! Import
 open Common
 
 let ( / ) = Filename.concat
-let archive_v2_minimal = "test" / "irmin-pack" / "data" / "version_2_minimal"
-let archive_v2_always = "test" / "irmin-pack" / "data" / "version_2_always"
-let archive_v3_minimal = "test" / "irmin-pack" / "data" / "version_3_minimal"
-let archive_v3_always = "test" / "irmin-pack" / "data" / "version_3_always"
+let archive_v2_minimal = "test" / "brassaia-pack" / "data" / "version_2_minimal"
+let archive_v2_always = "test" / "brassaia-pack" / "data" / "version_2_always"
+let archive_v3_minimal = "test" / "brassaia-pack" / "data" / "version_3_minimal"
+let archive_v3_always = "test" / "brassaia-pack" / "data" / "version_3_always"
 
 let archive_v3_minimal_gced =
-  "test" / "irmin-pack" / "data" / "version_3_minimal_gced"
+  "test" / "brassaia-pack" / "data" / "version_3_minimal_gced"
 
 let root_local_build = "_build" / "test-upgrade"
 
@@ -38,7 +38,7 @@ type pack_entry = {
 
 let e h o l k =
   let h =
-    match Irmin.Type.(of_string Schema.Hash.t) h with
+    match Brassaia.Type.(of_string Schema.Hash.t) h with
     | Error (`Msg s) -> Alcotest.failf "failed hash_of_string %s" s
     | Ok h -> h
   in
@@ -85,17 +85,17 @@ let index_entries =
   List.map (fun e -> (e.h, e.o)) pack_entries |> List.to_seq |> Hashtbl.of_seq
 
 let key_of_entry x =
-  Irmin_pack_unix.Pack_key.v_direct ~offset:x.o ~length:x.l x.h
+  Brassaia_pack_unix.Pack_key.v_direct ~offset:x.o ~length:x.l x.h
 
 type start_mode = From_v2 | From_v3 | From_scratch | From_v3_c0_gced
-[@@deriving irmin]
+[@@deriving brassaia]
 
 type setup = {
   indexing_strategy : [ `always | `minimal ];
   start_mode : start_mode;
   lru_size : int;
 }
-[@@deriving irmin ~pp]
+[@@deriving brassaia ~pp]
 
 type phase =
   | S1_before_start
@@ -103,7 +103,7 @@ type phase =
   | S3_before_gc
   | S4_before_write
   | S5_before_close
-[@@deriving irmin ~pp]
+[@@deriving brassaia ~pp]
 
 (** A model is updated in conjunction with a store. Both should always reference
     the same entries *)
@@ -225,19 +225,19 @@ end
     the same entries *)
 module Store = struct
   module S = struct
-    module Maker = Irmin_pack_unix.Maker (Conf)
+    module Maker = Brassaia_pack_unix.Maker (Conf)
     include Maker.Make (Schema)
   end
 
   type repo = S.repo
 
   let config setup ?(readonly = false) ?(fresh = true) root =
-    let module Index = Irmin_pack.Indexing_strategy in
+    let module Index = Brassaia_pack.Indexing_strategy in
     let indexing_strategy =
       if setup.indexing_strategy = `always then Index.always else Index.minimal
     in
     let lru_size = setup.lru_size in
-    Irmin_pack.config ~readonly ~indexing_strategy ~lru_size ~fresh root
+    Brassaia_pack.config ~readonly ~indexing_strategy ~lru_size ~fresh root
 
   let v setup ~readonly ~fresh root =
     S.Repo.v (config setup ~readonly ~fresh root)
@@ -267,7 +267,7 @@ module Store = struct
       | `c -> S.Backend.Commit.mem (S.Backend.Repo.commit_t repo) k
       | `n -> S.Backend.Node.mem (S.Backend.Repo.node_t repo) k
       | `b -> S.Backend.Contents.mem (S.Backend.Repo.contents_t repo) k
-    with Irmin_pack_unix.Pack_store.Invalid_read _ ->
+    with Brassaia_pack_unix.Pack_store.Invalid_read _ ->
       (* In RW mode, [mem] will raise an exception if the offset of the key is
          out of the bounds of the pack file *)
       false
@@ -381,7 +381,7 @@ end
 
 exception Skip_the_rest_of_that_test
 
-type hash = Store.S.hash [@@deriving irmin ~pp]
+type hash = Store.S.hash [@@deriving brassaia ~pp]
 
 type t = {
   setup : setup;
@@ -533,7 +533,7 @@ let gc_rw t =
         | From_v2, _ | _, `always ->
             let () =
               Alcotest.check_raises "GC on V2/always"
-                (Irmin_pack_unix.Errors.Pack_error
+                (Brassaia_pack_unix.Errors.Pack_error
                    (`Gc_disallowed "Store does not support GC"))
                 (fun () -> Store.gc repo)
             in
@@ -579,7 +579,7 @@ let open_ro t current_phase =
         let fail_and_skip error =
           let () =
             Alcotest.check_raises "open empty/V2 store in RO"
-              (Irmin_pack_unix.Errors.Pack_error error) (fun () ->
+              (Brassaia_pack_unix.Errors.Pack_error error) (fun () ->
                 let repo =
                   Store.v t.setup ~readonly:true ~fresh:false root_local_build
                 in
@@ -591,7 +591,7 @@ let open_ro t current_phase =
           match (t.setup.start_mode, current_phase) with
           | From_scratch, S1_before_start ->
               let missing_path =
-                Irmin_pack.Layout.V1_and_v2.pack ~root:root_local_build
+                Brassaia_pack.Layout.V1_and_v2.pack ~root:root_local_build
               in
               fail_and_skip (`No_such_file_or_directory missing_path)
           | From_v2, S1_before_start -> fail_and_skip `Migration_needed

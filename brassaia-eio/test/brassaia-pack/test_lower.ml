@@ -20,18 +20,18 @@ open Common
 let src = Logs.Src.create "tests.lower" ~doc:"Test lower"
 
 module Log = (val Logs.src_log src : Logs.LOG)
-module Io = Irmin_pack_unix.Io.Unix
+module Io = Brassaia_pack_unix.Io.Unix
 
 let ( let$ ) res f = f @@ Result.get_ok res
 
 module Direct_tc = struct
-  module Control = Irmin_pack_unix.Control_file.Volume (Io)
-  module Errs = Irmin_pack_unix.Io_errors.Make (Io)
-  module Lower = Irmin_pack_unix.Lower.Make (Io) (Errs)
-  module Sparse = Irmin_pack_unix.Sparse_file.Make (Io)
+  module Control = Brassaia_pack_unix.Control_file.Volume (Io)
+  module Errs = Brassaia_pack_unix.Io_errors.Make (Io)
+  module Lower = Brassaia_pack_unix.Lower.Make (Io) (Errs)
+  module Sparse = Brassaia_pack_unix.Sparse_file.Make (Io)
 
   let create_control volume_path payload =
-    let path = Irmin_pack.Layout.V5.Volume.control ~root:volume_path in
+    let path = Brassaia_pack.Layout.V5.Volume.control ~root:volume_path in
     Control.create_rw ~path ~tmp_path:None ~overwrite:true payload
 
   let test_empty () =
@@ -88,7 +88,7 @@ module Direct_tc = struct
     let$ lower = Lower.v ~readonly:false ~volume_num:0 lower_root in
     let$ volume = Lower.add_volume lower in
     let payload =
-      Irmin_pack_unix.Control_file.Payload.Volume.Latest.
+      Brassaia_pack_unix.Control_file.Payload.Volume.Latest.
         {
           start_offset = Int63.zero;
           end_offset = Int63.of_int 42;
@@ -114,8 +114,8 @@ module Direct_tc = struct
 
        Then test that reloading and read_exn work as expected. *)
     let volume_path = Lower.Volume.path volume in
-    let mapping_path = Irmin_pack.Layout.V5.Volume.mapping ~root:volume_path in
-    let data_path = Irmin_pack.Layout.V5.Volume.data ~root:volume_path in
+    let mapping_path = Brassaia_pack.Layout.V5.Volume.mapping ~root:volume_path in
+    let data_path = Brassaia_pack.Layout.V5.Volume.data ~root:volume_path in
     let test_str = "hello" in
     let len = String.length test_str in
     let$ sparse =
@@ -129,7 +129,7 @@ module Direct_tc = struct
     let$ _ = Sparse.Ao.close sparse in
     let$ mapping_end_poff = Io.size_of_path mapping_path in
     let payload =
-      Irmin_pack_unix.Control_file.Payload.Volume.Latest.
+      Brassaia_pack_unix.Control_file.Payload.Volume.Latest.
         {
           start_offset = Int63.zero;
           end_offset;
@@ -150,7 +150,7 @@ end
 
 module Store_tc = struct
   module Store = struct
-    module Maker = Irmin_pack_unix.Maker (Conf)
+    module Maker = Brassaia_pack_unix.Maker (Conf)
     include Maker.Make (Schema)
   end
 
@@ -170,7 +170,7 @@ module Store_tc = struct
       (name, lower)
 
   let config ?(readonly = false) ?(fresh = false) ?lower_root root =
-    Irmin_pack.(
+    Brassaia_pack.(
       config ~readonly ~indexing_strategy:Indexing_strategy.minimal ~fresh
         ~lower_root root)
 
@@ -200,7 +200,7 @@ module Store_tc = struct
 
   let generation repo =
     let open Store.Internal in
-    let ({ status; _ } : Irmin_pack_unix.Control_file.Payload.Upper.Latest.t) =
+    let ({ status; _ } : Brassaia_pack_unix.Control_file.Payload.Upper.Latest.t) =
       file_manager repo |> File_manager.control |> File_manager.Control.payload
     in
     match status with
@@ -216,13 +216,13 @@ module Store_tc = struct
       Store.Internal.Index.iter
         (fun hash (_offset, _len, kind) ->
           match kind with
-          | Irmin_pack.Pack_value.Kind.Commit_v2 -> commits := hash :: !commits
+          | Brassaia_pack.Pack_value.Kind.Commit_v2 -> commits := hash :: !commits
           | _ -> ())
         index
     in
     List.map
       (fun hash ->
-        [%log.debug "read %a" Irmin.Type.(pp Store.Hash.t) hash];
+        [%log.debug "read %a" Brassaia.Type.(pp Store.Hash.t) hash];
         match Store.Commit.of_hash repo hash with
         | None -> Alcotest.fail "failed to read commit"
         | Some commit -> Store.Tree.fold (Store.Commit.tree commit) ())
@@ -263,7 +263,7 @@ module Store_tc = struct
     let _ = Store.Gc.start_exn repo (Store.Commit.key c) in
     let () =
       Alcotest.check_raises "add volume during gc"
-        (Irmin_pack_unix.Errors.Pack_error `Add_volume_forbidden_during_gc)
+        (Brassaia_pack_unix.Errors.Pack_error `Add_volume_forbidden_during_gc)
         (fun () -> Store.add_volume repo |> Lwt.return)
     in
     Store.Repo.close repo
@@ -272,7 +272,7 @@ module Store_tc = struct
     let repo = init ~include_lower:false () in
     let () =
       Alcotest.check_raises "add volume w/o lower"
-        (Irmin_pack_unix.Errors.Pack_error `Add_volume_requires_lower)
+        (Brassaia_pack_unix.Errors.Pack_error `Add_volume_requires_lower)
         (fun () -> Store.add_volume repo |> Lwt.return)
     in
     Store.Repo.close repo
@@ -332,7 +332,7 @@ module Store_tc = struct
   let test_migrate_v2 () =
     let ( / ) = Filename.concat in
     let root_archive =
-      "test" / "irmin-pack" / "data" / "version_2_to_3_always"
+      "test" / "brassaia-pack" / "data" / "version_2_to_3_always"
     in
     let root = "_build" / "test_lower_migrate_v2" in
     setup_test_env ~root_archive ~root_local_build:root;
@@ -345,7 +345,7 @@ module Store_tc = struct
   let test_migrate_v3 () =
     (* minimal indexing *)
     let ( / ) = Filename.concat in
-    let root_archive = "test" / "irmin-pack" / "data" / "version_3_minimal" in
+    let root_archive = "test" / "brassaia-pack" / "data" / "version_3_minimal" in
     let root = "_build" / "test_lower_migrate_v3_minimal" in
     setup_test_env ~root_archive ~root_local_build:root;
     let lower_root = root / "lower" in
@@ -356,7 +356,7 @@ module Store_tc = struct
 
     (* always indexing *)
     let ( / ) = Filename.concat in
-    let root_archive = "test" / "irmin-pack" / "data" / "version_3_always" in
+    let root_archive = "test" / "brassaia-pack" / "data" / "version_3_always" in
     let root = "_build" / "test_lower_migrate_v3_always" in
     setup_test_env ~root_archive ~root_local_build:root;
     let lower_root = root / "lower" in
@@ -435,7 +435,7 @@ module Store_tc = struct
     let _ = Store.Gc.start_exn repo (Store.Commit.key c5) in
     let _ = Store.Gc.finalise_exn ~wait:true repo in
     let get_direct_key key =
-      match Irmin_pack_unix.Pack_key.inspect key with
+      match Brassaia_pack_unix.Pack_key.inspect key with
       | Direct { offset; hash; length; volume_identifier } ->
           (offset, hash, length, volume_identifier)
       | _ -> assert false
@@ -490,10 +490,10 @@ module Store_tc = struct
     let () = Store.Repo.close repo in
     [%log.debug "test volume.1.control is moved to volume.control"];
     let volume_cf_gen_path =
-      Irmin_pack.Layout.V5.Volume.control_gc_tmp ~generation ~root:volume_root
+      Brassaia_pack.Layout.V5.Volume.control_gc_tmp ~generation ~root:volume_root
     in
     let volume_cf_path =
-      Irmin_pack.Layout.V5.Volume.control ~root:volume_root
+      Brassaia_pack.Layout.V5.Volume.control ~root:volume_root
     in
     let$ () = Io.move_file ~src:volume_cf_path ~dst:volume_cf_gen_path in
     let repo = Store.Repo.v (config ~fresh:false ~lower_root root) in

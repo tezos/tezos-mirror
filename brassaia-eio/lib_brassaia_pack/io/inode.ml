@@ -14,12 +14,12 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Irmin_pack.Inode
+include Brassaia_pack.Inode
 include Inode_intf
 
 module Make_persistent
-    (H : Irmin.Hash.S)
-    (Node : Irmin.Node.Generic_key.S
+    (H : Brassaia.Hash.S)
+    (Node : Brassaia.Node.Generic_key.S
               with type hash = H.t
                and type contents_key = H.t Pack_key.t
                and type node_key = H.t Pack_key.t)

@@ -18,7 +18,7 @@ open! Import
 open Printf
 open Astring
 
-let src = Logs.Src.create "irmin.dot" ~doc:"Irmin dot graph output"
+let src = Logs.Src.create "brassaia.dot" ~doc:"Brassaia dot graph output"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 

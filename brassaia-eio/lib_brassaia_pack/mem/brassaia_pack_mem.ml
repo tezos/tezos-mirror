@@ -16,33 +16,33 @@
 
 open! Import
 
-module Atomic_write (K : Irmin.Type.S) (V : Irmin.Hash.S) = struct
-  module AW = Irmin_mem.Atomic_write (K) (V)
+module Atomic_write (K : Brassaia.Type.S) (V : Brassaia.Hash.S) = struct
+  module AW = Brassaia_mem.Atomic_write (K) (V)
   include AW
 
-  let v () = AW.v (Irmin_mem.config ())
+  let v () = AW.v (Brassaia_mem.config ())
   let flush _t = ()
 end
 
 module Indexable_mem
-    (Hash : Irmin.Hash.S)
-    (Value : Irmin_pack.Pack_value.S
+    (Hash : Brassaia.Hash.S)
+    (Value : Brassaia_pack.Pack_value.S
                with type hash := Hash.t
                 and type key = Hash.t) =
 struct
   module Pack = Indexable.Maker (Hash)
   module Indexable_mem = Pack.Make (Value)
-  include Irmin_pack.Indexable.Closeable (Indexable_mem)
+  include Brassaia_pack.Indexable.Closeable (Indexable_mem)
 
   let v x = Indexable_mem.v x |> make_closeable
 end
 
-module Maker (Config : Irmin_pack.Conf.S) = struct
+module Maker (Config : Brassaia_pack.Conf.S) = struct
   type endpoint = unit
 
-  include Irmin.Key.Store_spec.Hash_keyed
+  include Brassaia.Key.Store_spec.Hash_keyed
 
-  module Make (Schema : Irmin.Schema.Extended) = struct
+  module Make (Schema : Brassaia.Schema.Extended) = struct
     module H = Schema.Hash
     module C = Schema.Contents
     module P = Schema.Path
@@ -51,7 +51,7 @@ module Maker (Config : Irmin_pack.Conf.S) = struct
     module Pack = Indexable.Maker (H)
 
     module XKey = struct
-      include Irmin.Key.Of_hash (H)
+      include Brassaia.Key.Of_hash (H)
 
       let unfindable_of_hash x = x
     end
@@ -63,10 +63,10 @@ module Maker (Config : Irmin_pack.Conf.S) = struct
 
       module Contents = struct
         module Pack_value =
-          Irmin_pack.Pack_value.Of_contents (Config) (H) (XKey) (C)
+          Brassaia_pack.Pack_value.Of_contents (Config) (H) (XKey) (C)
 
         module Indexable = Indexable_mem (H) (Pack_value)
-        include Irmin.Contents.Store_indexable (Indexable) (H) (C)
+        include Brassaia.Contents.Store_indexable (Indexable) (H) (C)
       end
 
       module Node = struct
@@ -74,16 +74,16 @@ module Maker (Config : Irmin_pack.Conf.S) = struct
 
         module Indexable = struct
           module Inter =
-            Irmin_pack.Inode.Make_internal (Config) (H) (XKey) (Value)
+            Brassaia_pack.Inode.Make_internal (Config) (H) (XKey) (Value)
 
           module CA = Pack.Make (Inter.Raw)
-          include Irmin_pack.Inode.Make (H) (XKey) (Value) (Inter) (CA)
+          include Brassaia_pack.Inode.Make (H) (XKey) (Value) (Inter) (CA)
 
           let v = CA.v
         end
 
         include
-          Irmin.Node.Generic_key.Store (Contents) (Indexable) (H)
+          Brassaia.Node.Generic_key.Store (Contents) (Indexable) (H)
             (Indexable.Val)
             (M)
             (P)
@@ -96,17 +96,17 @@ module Maker (Config : Irmin_pack.Conf.S) = struct
           include Schema.Commit (Node.Key) (XKey)
           module Info = Schema.Info
 
-          type hash = Hash.t [@@deriving irmin]
+          type hash = Hash.t [@@deriving brassaia]
         end
 
-        module Pack_value = Irmin_pack.Pack_value.Of_commit (H) (XKey) (Value)
+        module Pack_value = Brassaia_pack.Pack_value.Of_commit (H) (XKey) (Value)
         module Indexable = Indexable_mem (H) (Pack_value)
 
         include
-          Irmin.Commit.Generic_key.Store (Info) (Node) (Indexable) (H) (Value)
+          Brassaia.Commit.Generic_key.Store (Info) (Node) (Indexable) (H) (Value)
       end
 
-      module Commit_portable = Irmin.Commit.Portable.Of_commit (Commit.Value)
+      module Commit_portable = Brassaia.Commit.Portable.Of_commit (Commit.Value)
 
       module Branch = struct
         module Key = B
@@ -117,17 +117,17 @@ module Maker (Config : Irmin_pack.Conf.S) = struct
         end
 
         module AW = Atomic_write (Key) (Val)
-        include Irmin_pack.Atomic_write.Closeable (AW)
+        include Brassaia_pack.Atomic_write.Closeable (AW)
 
         let v () = AW.v () |> make_closeable
       end
 
-      module Slice = Irmin.Backend.Slice.Make (Contents) (Node) (Commit)
-      module Remote = Irmin.Backend.Remote.None (H) (B)
+      module Slice = Brassaia.Backend.Slice.Make (Contents) (Node) (Commit)
+      module Remote = Brassaia.Backend.Remote.None (H) (B)
 
       module Repo = struct
         type t = {
-          config : Irmin.Backend.Conf.t;
+          config : Brassaia.Backend.Conf.t;
           contents : read Contents.Indexable.t;
           node : read Node.Indexable.t;
           commit : read Commit.Indexable.t;
@@ -150,7 +150,7 @@ module Maker (Config : Irmin_pack.Conf.S) = struct
                       f contents node commit)))
 
         let v config =
-          let root = Irmin_pack.Conf.root config in
+          let root = Brassaia_pack.Conf.root config in
           let contents = Contents.Indexable.v root in
           let node = Node.Indexable.v root in
           let commit = Commit.Indexable.v root in
@@ -165,6 +165,6 @@ module Maker (Config : Irmin_pack.Conf.S) = struct
       end
     end
 
-    include Irmin.Of_backend (X)
+    include Brassaia.Of_backend (X)
   end
 end

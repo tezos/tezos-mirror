@@ -15,7 +15,7 @@
  *)
 
 module type S = sig
-  type t [@@deriving irmin]
+  type t [@@deriving brassaia]
   (** The type for keys. *)
 
   type hash

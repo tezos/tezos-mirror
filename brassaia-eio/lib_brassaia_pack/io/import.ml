@@ -14,9 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Irmin.Export_for_backends
+include Brassaia.Export_for_backends
 
-let src = Logs.Src.create "irmin-pack.unix" ~doc:"irmin-pack unix backend"
+let src = Logs.Src.create "brassaia-pack.unix" ~doc:"brassaia-pack unix backend"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
@@ -45,7 +45,7 @@ end
 module Int63 = struct
   include Optint.Int63
 
-  let t = Irmin.Type.int63
+  let t = Brassaia.Type.int63
 
   module Syntax = struct
     let ( + ) = add
@@ -60,15 +60,15 @@ module Int63 = struct
   end
 end
 
-type int63 = Int63.t [@@deriving irmin]
+type int63 = Int63.t [@@deriving brassaia]
 
-module Version = Irmin_pack.Version
+module Version = Brassaia_pack.Version
 
-module type S = Irmin_pack.S
+module type S = Brassaia_pack.S
 
-module Conf = Irmin_pack.Conf
-module Layout = Irmin_pack.Layout
-module Indexable = Irmin_pack.Indexable
+module Conf = Brassaia_pack.Conf
+module Layout = Brassaia_pack.Layout
+module Indexable = Brassaia_pack.Indexable
 
 module Result_syntax = struct
   let ( let+ ) res f = Result.map f res
@@ -77,7 +77,7 @@ module Result_syntax = struct
 end
 
 module Varint = struct
-  type t = int [@@deriving irmin ~decode_bin]
+  type t = int [@@deriving brassaia ~decode_bin]
 
   (** LEB128 stores 7 bits per byte. An OCaml [int] has at most 63 bits.
       [63 / 7] equals [9]. *)

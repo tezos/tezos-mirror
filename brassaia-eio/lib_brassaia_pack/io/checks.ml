@@ -45,7 +45,7 @@ let path =
   let open Cmdliner.Arg in
   required
   @@ pos 0 (some string) None
-  @@ info ~doc:"Path to the Irmin store on disk" ~docv:"PATH" []
+  @@ info ~doc:"Path to the Brassaia store on disk" ~docv:"PATH" []
 
 let deprecated_info = (Cmdliner.Term.info [@alert "-deprecated"])
 
@@ -61,16 +61,16 @@ struct
 
   (** Read basic metrics from an existing store. *)
   module Stat = struct
-    type size = Bytes of int [@@deriving irmin]
+    type size = Bytes of int [@@deriving brassaia]
 
     type io = { size : size; offset : int63; version : Version.t }
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     type objects = { nb_commits : int; nb_nodes : int; nb_contents : int }
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     type t = { hash_size : size; log_size : int; objects : objects }
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     let traverse_index ~root log_size =
       let index = Index.v_exn ~readonly:true ~fresh:false ~log_size root in
@@ -100,7 +100,7 @@ struct
       let log_size = conf root |> Conf.index_log_size in
       let objects = traverse_index ~root log_size in
       { hash_size = Bytes Hash.hash_size; log_size; objects }
-      |> Irmin.Type.pp_json ~minify:false t Fmt.stdout
+      |> Brassaia.Type.pp_json ~minify:false t Fmt.stdout
 
     let term_internal = Cmdliner.Term.(const (fun root () -> run ~root) $ path)
 
@@ -149,8 +149,8 @@ struct
   module Integrity_check_index = struct
     let conf root always =
       let indexing_strategy =
-        if always then Irmin_pack.Indexing_strategy.always
-        else Irmin_pack.Indexing_strategy.minimal
+        if always then Brassaia_pack.Indexing_strategy.always
+        else Brassaia_pack.Indexing_strategy.minimal
       in
       Conf.init ~readonly:true ~fresh:false ~no_migrate:true ~indexing_strategy
         root
@@ -186,8 +186,8 @@ struct
   module Integrity_check = struct
     let conf root always =
       let indexing_strategy =
-        if always then Irmin_pack.Indexing_strategy.always
-        else Irmin_pack.Indexing_strategy.minimal
+        if always then Brassaia_pack.Indexing_strategy.always
+        else Brassaia_pack.Indexing_strategy.minimal
       in
       Conf.init ~readonly:false ~fresh:false ~no_migrate:true ~indexing_strategy
         root
@@ -366,8 +366,8 @@ struct
           ]) () : empty =
       let default =
         let default_info =
-          let doc = "Check Irmin data-stores." in
-          deprecated_info ~doc "irmin-fsck"
+          let doc = "Check Brassaia data-stores." in
+          deprecated_info ~doc "brassaia-fsck"
         in
         Term.(ret (const (`Help (`Auto, None))), default_info)
       in
@@ -383,7 +383,7 @@ end
 module Integrity_checks
     (Io : Io_intf.S)
     (XKey : Pack_key.S)
-    (X : Irmin.Backend.S
+    (X : Brassaia.Backend.S
            with type Commit.key = XKey.t
             and type Node.key = XKey.t
             and type Schema.Hash.t = XKey.hash)
@@ -447,8 +447,8 @@ struct
     let counter, (progress_contents, progress_nodes, progress_commits) =
       Object_counter.start ppf
     in
-    let pp_hash = Irmin.Type.pp X.Hash.t in
-    let equal_hash = Irmin.Type.(unstage (equal X.Hash.t)) in
+    let pp_hash = Brassaia.Type.pp X.Hash.t in
+    let equal_hash = Brassaia.Type.(unstage (equal X.Hash.t)) in
     let add_error err hash =
       let msg =
         match err with
@@ -464,8 +464,8 @@ struct
              by a gc, in which indexed keys cannot occur. We might want to
              extends this to stores that have both indexed and direct keys. *)
           failwith
-            "Not supported for stores which have entries obtained with irmin < \
-             3.0. If all entries were added with irmin < 3.0, please use \
+            "Not supported for stores which have entries obtained with brassaia < \
+             3.0. If all entries were added with brassaia < 3.0, please use \
              [integrity_check] instead."
       | Direct { offset; length; hash; _ } -> (
           let result = check ~offset ~length hash in
@@ -564,9 +564,9 @@ end
 module Stats (S : sig
   type step
 
-  val step_t : step Irmin.Type.t
+  val step_t : step Brassaia.Type.t
 
-  module Hash : Irmin.Hash.S
+  module Hash : Brassaia.Hash.S
 end) =
 struct
   type step = Node of S.step | Inode
@@ -676,7 +676,7 @@ struct
 
     let pp_step ppf = function
       | Inode -> Fmt.pf ppf "-"
-      | Node x -> Fmt.pf ppf "%a" (Irmin.Type.pp S.step_t) x
+      | Node x -> Fmt.pf ppf "%a" (Brassaia.Type.pp S.step_t) x
 
     let pp_path = Fmt.list ~sep:(Fmt.any "/") pp_step
 

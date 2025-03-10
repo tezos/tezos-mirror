@@ -16,9 +16,9 @@
 
 open! Import
 include Logging_intf
-module Source_code_position = Ppx_irmin_internal_lib.Source_code_position
+module Source_code_position = Ppx_brassaia_internal_lib.Source_code_position
 
-(** A logs reporter that is aware of the tags added by [ppx_irmin.internal]. *)
+(** A logs reporter that is aware of the tags added by [ppx_brassaia.internal]. *)
 let reporter :
     ?filter_src:(Logs.src -> bool) ->
     ?prefix:string ->

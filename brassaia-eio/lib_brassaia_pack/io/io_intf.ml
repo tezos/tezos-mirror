@@ -31,7 +31,7 @@ module type S = sig
 
   (** {1 Errors} *)
 
-  type misc_error [@@deriving irmin]
+  type misc_error [@@deriving brassaia]
   (** An abstract error type that contains the IO-backend specific errors. (e.g.
       [Unix.error]) *)
 

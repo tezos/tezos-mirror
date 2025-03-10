@@ -14,22 +14,22 @@ module Log = (val Logs.src_log src : Logs.LOG)
 (** Set up modules to allow access to "version_1" store *)
 module Private = struct
   (* The behaviour under test is independent of which [Conf] we pick: *)
-  module Conf = Irmin_tezos.Conf
+  module Conf = Brassaia_tezos.Conf
 
-  (* Note: the existing stores use a different hash from [Irmin_tezos.Schema]
+  (* Note: the existing stores use a different hash from [Brassaia_tezos.Schema]
      (SHA1 rather than BLAKE2b) *)
   module Schema = Common.Schema
 
   (* from test_existing_stores.ml; the V2 is because
      test_existing_stores defines two different configs *)
-  module V2_maker = Irmin_pack_unix.Maker (Conf)
+  module V2_maker = Brassaia_pack_unix.Maker (Conf)
   module V2 = V2_maker.Make (Schema)
 
   (* the following modules are necessary to expose the File_manager.*)
-  module Index = Irmin_pack_unix.Index.Make (Schema.Hash)
-  module Io = Irmin_pack_unix.Io.Unix
-  module Errs = Irmin_pack_unix.Io_errors.Make (Io)
-  module File_manager = Irmin_pack_unix.File_manager.Make (Io) (Index) (Errs)
+  module Index = Brassaia_pack_unix.Index.Make (Schema.Hash)
+  module Io = Brassaia_pack_unix.Io.Unix
+  module Errs = Brassaia_pack_unix.Io_errors.Make (Io)
+  module File_manager = Brassaia_pack_unix.File_manager.Make (Io) (Index) (Errs)
 end
 
 module Util = struct
@@ -74,7 +74,7 @@ module Util = struct
 
   (** More specific utils from here *)
 
-  let v1_store_archive_dir = "test" / "irmin-pack" / "data" / "version_1"
+  let v1_store_archive_dir = "test" / "brassaia-pack" / "data" / "version_1"
 
   (** Find the project root, that contains the v1_store_archive_dir *)
   let project_root () =
@@ -87,15 +87,15 @@ module Util = struct
            current directory %s and ancestors"
           v1_store_archive_dir (Sys.getcwd ())
 
-  module Unix_ = Irmin_pack_unix.Io.Unix
+  module Unix_ = Brassaia_pack_unix.Io.Unix
 
   (** Get the version of the underlying file; file is assumed to exist; file is
-      assumed to be an Irmin_pack.IO.Unix file *)
+      assumed to be an Brassaia_pack.IO.Unix file *)
   let io_get_version ~root : [ `V1 | `V2 | `V3 | `V4 | `V5 ] =
     File_manager.version ~root |> Errs.raise_if_error
 
   let alco_check_version ~pos ~expected ~actual =
-    Alcotest.check_repr ~pos Irmin_pack.Version.t "" expected actual
+    Alcotest.check_repr ~pos Brassaia_pack.Version.t "" expected actual
 end
 
 open Util
@@ -117,8 +117,8 @@ module With_existing_store () = struct
 
   (* Code copied and modified from test_existing_stores.ml; this is
      the config for index and pack *)
-  let config ~readonly : Irmin.config =
-    Irmin_pack.config ~readonly ~index_log_size:1000 ~fresh:false tmp_dir
+  let config ~readonly : Brassaia.config =
+    Brassaia_pack.config ~readonly ~index_log_size:1000 ~fresh:false tmp_dir
 end
 
 (** {2 The tests} *)
@@ -131,7 +131,7 @@ let test_RO_no_migration () : unit =
 
   let () =
     Alcotest.check_raises "open V1 store in RO"
-      (Irmin_pack_unix.Errors.Pack_error `Migration_needed) (fun () ->
+      (Brassaia_pack_unix.Errors.Pack_error `Migration_needed) (fun () ->
         let repo = S.Repo.v (config ~readonly:true) in
         S.Repo.close repo)
   in

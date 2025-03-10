@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-module Metrics = Irmin.Metrics
+module Metrics = Brassaia.Metrics
 
 module Inode = struct
   type Metrics.origin += Inode_stats
@@ -41,7 +41,7 @@ module Inode = struct
     inode_decode_bin : int;
     inode_encode_bin : int;
   }
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   type stat = t Metrics.t
 

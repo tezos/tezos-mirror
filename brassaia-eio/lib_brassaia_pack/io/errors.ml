@@ -82,18 +82,18 @@ type base_error =
   | `Lower_has_no_volume
   | `Volume_not_found of string
   | `No_tmp_path_provided ]
-[@@deriving irmin ~pp]
+[@@deriving brassaia ~pp]
 (** [base_error] is the type of most errors that can occur in a [result], except
     for errors that have associated exceptions (see below) and backend-specific
     errors (see {!Io_errors}). *)
 
-type closed_error = [ `Closed ] [@@deriving irmin ~pp]
-type read_only_error = [ `Ro_not_allowed ] [@@deriving irmin ~pp]
+type closed_error = [ `Closed ] [@@deriving brassaia ~pp]
+type read_only_error = [ `Ro_not_allowed ] [@@deriving brassaia ~pp]
 type error = [ base_error | closed_error | read_only_error ]
 
 exception Pack_error of base_error
-exception Closed = Irmin.Closed
-exception RO_not_allowed = Irmin_pack.RO_not_allowed
+exception Closed = Brassaia.Closed
+exception RO_not_allowed = Brassaia_pack.RO_not_allowed
 
 (** Error manager *)
 module type S = sig
@@ -137,7 +137,7 @@ module Base : S with type t = error = struct
     | Error e -> log_error context e
 
   type err = Pack_error of base_error | Ro_not_allowed | Closed
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   let t_to_err = function
     | #read_only_error -> Ro_not_allowed
@@ -149,14 +149,14 @@ module Base : S with type t = error = struct
     | Ro_not_allowed -> `Ro_not_allowed
     | Pack_error e -> (e : base_error :> [> t ])
 
-  let err_result = Irmin.Type.(result int63 err_t)
+  let err_result = Brassaia.Type.(result int63 err_t)
 
   let to_json_string result =
     let convert = Result.map_error t_to_err in
-    convert result |> Irmin.Type.to_json_string err_result
+    convert result |> Brassaia.Type.to_json_string err_result
 
   let of_json_string string =
-    match (Irmin.Type.of_json_string err_result) string with
+    match (Brassaia.Type.of_json_string err_result) string with
     | Error (`Msg _) -> Error `Decoding_error
     | Ok result -> Result.map_error err_to_t result
 end

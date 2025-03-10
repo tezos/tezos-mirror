@@ -28,7 +28,7 @@ module Make (Args : Gc_args.S) = struct
   module Ao = Append_only_file.Make (Fm.Io) (Errs)
   module Gc_stats_worker = Gc_stats.Worker (Io)
 
-  let string_of_key = Irmin.Type.to_string key_t
+  let string_of_key = Brassaia.Type.to_string key_t
 
   module Priority_queue = struct
     module Offset_rev = struct
@@ -173,11 +173,11 @@ module Make (Args : Gc_args.S) = struct
     let open Result_syntax in
     let* prefix_size =
       if generation = 0 then Ok Int63.zero
-      else Irmin_pack.Layout.V3.prefix ~root ~generation |> Io.size_of_path
+      else Brassaia_pack.Layout.V3.prefix ~root ~generation |> Io.size_of_path
     in
     let+ mapping_size =
       if generation = 0 then Ok Int63.zero
-      else Irmin_pack.Layout.V3.mapping ~root ~generation |> Io.size_of_path
+      else Brassaia_pack.Layout.V3.mapping ~root ~generation |> Io.size_of_path
     in
     (mapping_size, prefix_size)
 
@@ -198,7 +198,7 @@ module Make (Args : Gc_args.S) = struct
     chunk_start_idx : int;
     dead_bytes : int63;
   }
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
   type gc_results = {
     suffix_params : suffix_params;
@@ -207,15 +207,15 @@ module Make (Args : Gc_args.S) = struct
     modified_volume : Lower.volume_identifier option;
     stats : Stats.Latest_gc.worker;
   }
-  [@@deriving irmin]
+  [@@deriving brassaia]
 
-  type gc_output = (gc_results, Args.Errs.t) result [@@deriving irmin]
+  type gc_output = (gc_results, Args.Errs.t) result [@@deriving brassaia]
 
   let run ~lower_root ~generation ~new_files_path root commit_key
       new_suffix_start_offset =
     let open Result_syntax in
     let config =
-      Irmin_pack.Conf.init ~fresh:false ~readonly:true ~lru_size:0 ~lower_root
+      Brassaia_pack.Conf.init ~fresh:false ~readonly:true ~lru_size:0 ~lower_root
         root
     in
 
@@ -264,9 +264,9 @@ module Make (Args : Gc_args.S) = struct
       (* Step 4. Create the new prefix. *)
       stats := Gc_stats_worker.finish_current_step !stats "prefix: start";
       let mapping =
-        Irmin_pack.Layout.V4.mapping ~root:new_files_path ~generation
+        Brassaia_pack.Layout.V4.mapping ~root:new_files_path ~generation
       in
-      let data = Irmin_pack.Layout.V4.prefix ~root:new_files_path ~generation in
+      let data = Brassaia_pack.Layout.V4.prefix ~root:new_files_path ~generation in
       let mapping_size =
         let prefix = Sparse.Ao.create ~mapping ~data |> Errs.raise_if_error in
         (* Step 5. Transfer to the new prefix, flush and close. *)
@@ -415,9 +415,9 @@ module Make (Args : Gc_args.S) = struct
 
   let write_gc_output ~root ~generation output =
     let open Result_syntax in
-    let path = Irmin_pack.Layout.V4.gc_result ~root ~generation in
+    let path = Brassaia_pack.Layout.V4.gc_result ~root ~generation in
     let* io = Io.create ~path ~overwrite:true in
-    let out = Irmin.Type.to_json_string gc_output_t output in
+    let out = Brassaia.Type.to_json_string gc_output_t output in
     let* () = Io.write_string io ~off:Int63.zero out in
     let* () = Io.fsync io in
     Io.close io

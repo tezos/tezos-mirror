@@ -15,13 +15,13 @@
  *)
 open! Import
 
-module Maker (K : Irmin.Hash.S) : sig
+module Maker (K : Brassaia.Hash.S) : sig
   type key = K.t
 
   module Make
-      (Val : Irmin_pack.Pack_value.S with type hash := K.t and type key := K.t) : sig
+      (Val : Brassaia_pack.Pack_value.S with type hash := K.t and type key := K.t) : sig
     include
-      Irmin_pack.Indexable.S
+      Brassaia_pack.Indexable.S
         with type hash = K.t
          and type key = K.t
          and type value = Val.t

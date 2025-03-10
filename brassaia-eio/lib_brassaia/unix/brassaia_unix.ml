@@ -1,5 +1,5 @@
 (*
- * Copyright (c) 2018-2022 Tarides <contact@tarides.com>
+ * Copyright (c) 2022 Tarides <contact@tarides.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,15 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-module Schema = Schema
+module Info = Info.Make
+module I = Info (Brassaia.Info.Default)
 
-module Conf = struct
-  let entries = 32
-  let stable_hash = 256
-  let contents_length_header = Some `Varint
-  let inode_child_order = `Seeded_hash
-  let forbid_empty_dir_persistence = true
-end
-
-module Maker = Irmin_pack_unix.Maker (Conf)
-module Store = Maker.Make (Schema)
+let info = I.v

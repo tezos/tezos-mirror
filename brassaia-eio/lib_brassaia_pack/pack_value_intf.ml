@@ -21,7 +21,7 @@ type weight = Immediate of int | Deferred of (unit -> int)
 type kinded = ..
 
 module type S = sig
-  include Irmin.Type.S
+  include Brassaia.Type.S
 
   type hash
   type key
@@ -41,13 +41,13 @@ module type S = sig
     dict:(string -> int option) ->
     offset_of_key:(key -> int63 option) ->
     hash ->
-    t Irmin.Type.encode_bin
+    t Brassaia.Type.encode_bin
 
   val decode_bin :
     dict:(int -> string option) ->
     key_of_offset:(int63 -> key) ->
     key_of_hash:(hash -> key) ->
-    t Irmin.Type.decode_bin
+    t Brassaia.Type.decode_bin
 
   val decode_bin_length : string -> int -> int
 
@@ -65,7 +65,7 @@ module type T = sig
   type t
 end
 
-(* A subset of [Irmin_pack.Conf.S] relevant to the format of pack entries,
+(* A subset of [Brassaia_pack.Conf.S] relevant to the format of pack entries,
    copied here to avoid cyclic dependencies. *)
 module type Config = sig
   val contents_length_header : length_header
@@ -82,7 +82,7 @@ module type Sigs = sig
       | Inode_v2_root
       | Inode_v2_nonroot
       | Dangling_parent_commit
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     val all : t list
     val to_enum : t -> int
@@ -100,37 +100,37 @@ module type Sigs = sig
   type nonrec kinded = kinded = ..
   (** [kinded] is an extenisble variant that each {!S} extends so that it can
       define {!S.to_kinded} and {!S.of_kinded}. Its purpose is to allow
-      containers, such as {!Irmin_pack_unix.Lru}, to store and return all types
+      containers, such as {!Brassaia_pack_unix.Lru}, to store and return all types
       of {!S} and thus be usable by modules defined over {!S}, such as
-      {!Irmin_pack_unix.Pack_store}. *)
+      {!Brassaia_pack_unix.Pack_store}. *)
 
   module type S = S with type kind := Kind.t
   module type Config = Config
 
   module Of_contents
       (_ : Config)
-      (Hash : Irmin.Hash.S)
+      (Hash : Brassaia.Hash.S)
       (Key : T)
-      (Contents : Irmin.Contents.S) :
+      (Contents : Brassaia.Contents.S) :
     S with type t = Contents.t and type hash = Hash.t and type key = Key.t
 
   module Of_commit
-      (Hash : Irmin.Hash.S)
-      (Key : Irmin.Key.S with type hash = Hash.t)
-      (Commit : Irmin.Commit.Generic_key.S
+      (Hash : Brassaia.Hash.S)
+      (Key : Brassaia.Key.S with type hash = Hash.t)
+      (Commit : Brassaia.Commit.Generic_key.S
                   with type node_key = Key.t
                    and type commit_key = Key.t) : sig
     include S with type t = Commit.t and type hash = Hash.t and type key = Key.t
 
     module Commit_direct : sig
-      type address = Offset of int63 | Hash of hash [@@deriving irmin]
+      type address = Offset of int63 | Hash of hash [@@deriving brassaia]
 
       type t = {
         node_offset : address;
         parent_offsets : address list;
         info : Commit.Info.t;
       }
-      [@@deriving irmin]
+      [@@deriving brassaia]
     end
   end
 end

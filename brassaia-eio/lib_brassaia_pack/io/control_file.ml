@@ -16,7 +16,7 @@
 
 open Import
 include Control_file_intf
-module Version = Irmin_pack.Version
+module Version = Brassaia_pack.Version
 
 module Checksum = struct
   let calculate ~encode_bin ~set_checksum ~payload =
@@ -82,25 +82,25 @@ module Serde = struct
       module Plv3 = struct
         include Payload.Upper.V3
 
-        let of_bin_string = Irmin.Type.(unstage (of_bin_string t))
+        let of_bin_string = Brassaia.Type.(unstage (of_bin_string t))
       end
 
       module Plv4 = struct
         include Payload.Upper.V4
 
         let is_checksum_valid payload =
-          let encode_bin = Irmin.Type.(unstage (pre_hash t)) in
+          let encode_bin = Brassaia.Type.(unstage (pre_hash t)) in
           let set_checksum payload checksum = { payload with checksum } in
           let get_checksum payload = payload.checksum in
           Checksum.is_valid ~payload ~encode_bin ~set_checksum ~get_checksum
 
-        let of_bin_string = Irmin.Type.(unstage (of_bin_string t))
+        let of_bin_string = Brassaia.Type.(unstage (of_bin_string t))
       end
 
       module Plv5 = struct
         include Payload.Upper.V5
 
-        let checksum_encode_bin = Irmin.Type.(unstage (pre_hash t))
+        let checksum_encode_bin = Brassaia.Type.(unstage (pre_hash t))
         let set_checksum payload checksum = { payload with checksum }
         let get_checksum payload = payload.checksum
 
@@ -112,8 +112,8 @@ module Serde = struct
           Checksum.calculate_and_set ~encode_bin:checksum_encode_bin
             ~set_checksum ~payload
 
-        let of_bin_string = Irmin.Type.(unstage (of_bin_string t))
-        let to_bin_string = Irmin.Type.(unstage (to_bin_string t))
+        let of_bin_string = Brassaia.Type.(unstage (of_bin_string t))
+        let to_bin_string = Brassaia.Type.(unstage (to_bin_string t))
       end
 
       type t = Payload.Upper.raw_payload =
@@ -252,7 +252,7 @@ module Serde = struct
       module Plv5 = struct
         include Payload.Volume.V5
 
-        let checksum_encode_bin = Irmin.Type.(unstage (pre_hash t))
+        let checksum_encode_bin = Brassaia.Type.(unstage (pre_hash t))
         let set_checksum payload checksum = { payload with checksum }
         let get_checksum payload = payload.checksum
 
@@ -264,8 +264,8 @@ module Serde = struct
           Checksum.calculate_and_set ~encode_bin:checksum_encode_bin
             ~set_checksum ~payload
 
-        let of_bin_string = Irmin.Type.(unstage (of_bin_string t))
-        let to_bin_string = Irmin.Type.(unstage (to_bin_string t))
+        let of_bin_string = Brassaia.Type.(unstage (of_bin_string t))
+        let to_bin_string = Brassaia.Type.(unstage (to_bin_string t))
       end
 
       type t = Payload.Volume.raw_payload =

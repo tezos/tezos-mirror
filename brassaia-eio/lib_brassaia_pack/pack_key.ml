@@ -17,7 +17,7 @@
 open! Import
 
 module type S = sig
-  include Irmin.Key.S
+  include Brassaia.Key.S
 
   val null : t
 

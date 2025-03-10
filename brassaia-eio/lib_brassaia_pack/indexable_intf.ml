@@ -17,7 +17,7 @@
 open! Import
 
 module type S = sig
-  include Irmin.Indexable.S
+  include Brassaia.Indexable.S
 
   val add : 'a t -> value -> key
   (** Overwrite [add] to work with a read-only database handler. *)

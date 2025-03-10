@@ -1,5 +1,5 @@
 (*
- * Copyright (c) 2018-2022 Tarides <contact@tarides.com>
+ * Copyright (c) 2022 Tarides <contact@tarides.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,20 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Irmin_pack_intf
+(** This module contains data structure implementations used in the
+    implementation of Brassaia. It is exposed only for internal use, and does not
+    provide a stable API. *)
 
-let config = Conf.init
-
-module Indexing_strategy = Indexing_strategy
-module Indexable = Indexable
-module Atomic_write = Atomic_write
-module Hash = Irmin.Hash.BLAKE2B
-module Path = Irmin.Path.String_list
-module Metadata = Irmin.Metadata.None
-module Version = Version
-module Conf = Conf
-module Stats = Stats
-module Layout = Layout
-module Inode = Inode
-module Pack_key = Pack_key
-module Pack_value = Pack_value
+module Fixed_size_string_set = Fixed_size_string_set
+(** Mutable sets of strings with a common length. *)

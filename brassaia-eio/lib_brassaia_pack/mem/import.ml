@@ -14,10 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Irmin.Export_for_backends
+include Brassaia.Export_for_backends
 module Int63 = Optint.Int63
 
-let src = Logs.Src.create "irmin-pack.mem" ~doc:"irmin-pack mem backend"
+let src = Logs.Src.create "brassaia-pack.mem" ~doc:"brassaia-pack mem backend"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 

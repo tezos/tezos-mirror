@@ -15,7 +15,7 @@
  *)
 
 module type S = sig
-  include Irmin.Atomic_write.S
+  include Brassaia.Atomic_write.S
 
   val flush : t -> unit
 end
@@ -27,7 +27,7 @@ module type Persistent = sig
 end
 
 module type Value = sig
-  include Irmin.Type.S
+  include Brassaia.Type.S
 
   val null : t
   (** A special value that is reserved for use by the implementation of
@@ -41,7 +41,7 @@ module type Sigs = sig
   module Value : sig
     module type S = Value
 
-    module Of_hash (X : Irmin.Hash.S) : S with type t = X.t
+    module Of_hash (X : Brassaia.Hash.S) : S with type t = X.t
   end
 
   module Closeable (AW : S) : sig

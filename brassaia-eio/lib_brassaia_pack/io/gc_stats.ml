@@ -57,7 +57,7 @@ module Main (Io : Io_intf.S) = struct
   let create first_stepname ~generation ~commit_offset
       ~before_suffix_start_offset ~before_suffix_end_offset
       ~after_suffix_start_offset =
-    let stats = Irmin.Type.(random S.stats_t |> unstage) () in
+    let stats = Brassaia.Type.(random S.stats_t |> unstage) () in
     (* [repr] provides doesn't provide a generator that fills a type with
        zeroes but it provides a random generator. Let's use it for our initial
        value. *)
@@ -124,12 +124,12 @@ module Worker (Io : Io_intf.S) = struct
 
   let create : string -> t =
    fun first_stepname ->
-    (* Reseting all irmin-pack stats. We'll reset again at every step.
+    (* Reseting all brassaia-pack stats. We'll reset again at every step.
 
        Since the GC worker lives alone in a fork, these global variable mutations
        will not interfere with the rest of the world. *)
     Stats.reset_stats ();
-    Irmin_pack.Stats.reset_stats ();
+    Brassaia_pack.Stats.reset_stats ();
 
     let wtime = Io.Stats.get_wtime () in
     let stime = Io.Stats.get_stime () in
@@ -216,7 +216,7 @@ module Worker (Io : Io_intf.S) = struct
     (* [clone] duplicates a value. Used below to snapshot mutable values. *)
     let clone typerepr v =
       match
-        Irmin.Type.to_string typerepr v |> Irmin.Type.of_string typerepr
+        Brassaia.Type.to_string typerepr v |> Brassaia.Type.of_string typerepr
       with
       | Error _ -> assert false
       | Ok v -> v
@@ -227,10 +227,10 @@ module Worker (Io : Io_intf.S) = struct
     Stats.report_index ();
     let index = Stats.((get ()).index |> Index.export |> clone Index.t) in
     let inode =
-      Irmin_pack.Stats.((get ()).inode |> Inode.export |> clone Inode.t)
+      Brassaia_pack.Stats.((get ()).inode |> Inode.export |> clone Inode.t)
     in
     Stats.reset_stats ();
-    Irmin_pack.Stats.reset_stats ();
+    Brassaia_pack.Stats.reset_stats ();
 
     let step = S.{ duration; rusage; ocaml_gc; index; pack_store; inode } in
 

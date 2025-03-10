@@ -23,11 +23,11 @@ let src = Logs.Src.create "tests.multicore" ~doc:"Tests"
 module Log = (val Logs.src_log src : Logs.LOG)
 
 module Store = struct
-  module Maker = Irmin_pack_unix.Maker (Conf)
+  module Maker = Brassaia_pack_unix.Maker (Conf)
   include Maker.Make (Schema)
 
   let config ?(readonly = false) ?(fresh = true) root =
-    Irmin_pack.config ~readonly ?index_log_size ~fresh root
+    Brassaia_pack.config ~readonly ?index_log_size ~fresh root
 end
 
 module Tree = Store.Tree

@@ -18,7 +18,7 @@ open! Import
 open Snapshot_intf
 
 module Make (Args : Args) = struct
-  module Hashes = Irmin.Hash.Set.Make (Args.Hash)
+  module Hashes = Brassaia.Hash.Set.Make (Args.Hash)
   open Args
   module Inode_pack = Inode.Pack
   module Pack_index = Fm.Index
@@ -34,14 +34,14 @@ module Make (Args : Args) = struct
     Io.rmdir path_index;
     Io.rmdir path
 
-  let pp_hash = Irmin.Type.pp Hash.t
-  let pp_key = Irmin.Type.pp Inode_pack.Key.t
-  let pp_kind = Irmin.Type.pp Pack_value.Kind.t
-  let pp_snapshot = Irmin.Type.pp Inode.Snapshot.inode_t
+  let pp_hash = Brassaia.Type.pp Hash.t
+  let pp_key = Brassaia.Type.pp Inode_pack.Key.t
+  let pp_kind = Brassaia.Type.pp Pack_value.Kind.t
+  let pp_snapshot = Brassaia.Type.pp Inode.Snapshot.inode_t
 
   module Export = struct
     module Value_unit = struct
-      type t = unit [@@deriving irmin]
+      type t = unit [@@deriving brassaia]
 
       let encode _ = ""
       let encoded_size = 0
@@ -223,7 +223,7 @@ module Make (Args : Args) = struct
 
   module Import = struct
     module Value = struct
-      type t = int63 * int [@@deriving irmin]
+      type t = int63 * int [@@deriving brassaia]
 
       let encoded_size = (64 / 8) + (32 / 8)
 
@@ -306,7 +306,7 @@ module Make (Args : Args) = struct
       (set_visit, visited, None)
 
     let save_on_disk log_size path =
-      (* Make sure we are not reusing the same index as irmin-pack. *)
+      (* Make sure we are not reusing the same index as brassaia-pack. *)
       let path = path ^ "_tmp" in
       [%log.info "save on disk: %s" path];
       let index = Index.v ~fresh:true ~readonly:false ~log_size path in

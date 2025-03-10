@@ -1,5 +1,5 @@
 (*
- * Copyright (c) 2022 Tarides <contact@tarides.com>
+ * Copyright (c) 2018-2022 Tarides <contact@tarides.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,20 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-module Info = Info.Make
-module I = Info (Irmin.Info.Default)
+include Brassaia_pack_intf
 
-let info = I.v
+let config = Conf.init
+
+module Indexing_strategy = Indexing_strategy
+module Indexable = Indexable
+module Atomic_write = Atomic_write
+module Hash = Brassaia.Hash.BLAKE2B
+module Path = Brassaia.Path.String_list
+module Metadata = Brassaia.Metadata.None
+module Version = Version
+module Conf = Conf
+module Stats = Stats
+module Layout = Layout
+module Inode = Inode
+module Pack_key = Pack_key
+module Pack_value = Pack_value

@@ -32,7 +32,7 @@ module Make (Io : Io_intf.S) = struct
 
   let empty_buffer t = Ao.empty_buffer t.ao
 
-  type nonrec int32 = int32 [@@deriving irmin ~to_bin_string ~decode_bin]
+  type nonrec int32 = int32 [@@deriving brassaia ~to_bin_string ~decode_bin]
 
   let append_string t v =
     let len = Int32.of_int (String.length v) in

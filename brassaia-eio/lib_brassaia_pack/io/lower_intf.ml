@@ -16,7 +16,7 @@
 
 open! Import
 
-type volume_identifier = string [@@deriving irmin]
+type volume_identifier = string [@@deriving brassaia]
 
 module type Volume = sig
   module Io : Io_intf.S
@@ -56,7 +56,7 @@ module type S = sig
   type t
   type open_error = [ Volume.open_error | `Volume_missing of string ]
   type close_error = [ | Io.close_error ]
-  type nonrec volume_identifier = volume_identifier [@@deriving irmin]
+  type nonrec volume_identifier = volume_identifier [@@deriving brassaia]
 
   type add_error =
     [ open_error
@@ -181,7 +181,7 @@ end
 module type Sigs = sig
   module type S = S
 
-  type nonrec volume_identifier = volume_identifier [@@deriving irmin]
+  type nonrec volume_identifier = volume_identifier [@@deriving brassaia]
 
   module Make_volume (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) :
     Volume with module Io = Io and module Errs = Errs

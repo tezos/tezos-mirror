@@ -21,27 +21,27 @@
     invocation of [M.create] will see and manipulate the same contents. *)
 
 module Conf : sig
-  val spec : Irmin.Backend.Conf.Spec.t
+  val spec : Brassaia.Backend.Conf.Spec.t
 end
 
-val config : unit -> Irmin.config
+val config : unit -> Brassaia.config
 (** Configuration values. *)
 
-module Append_only : Irmin.Append_only.Maker
+module Append_only : Brassaia.Append_only.Maker
 (** An in-memory store for append-only values. *)
 
-module Content_addressable : Irmin.Content_addressable.Maker
+module Content_addressable : Brassaia.Content_addressable.Maker
 (** An in-memory store for content-addressable values. *)
 
-module Atomic_write : Irmin.Atomic_write.Maker
+module Atomic_write : Brassaia.Atomic_write.Maker
 (** An in-memory store with atomic-write guarantees. *)
 
 (** Constructor for in-memory KV stores. *)
 module KV :
-  Irmin.KV_maker
+  Brassaia.KV_maker
     with type endpoint = unit
      and type metadata = unit
-     and type info = Irmin.Info.default
+     and type info = Brassaia.Info.default
 
-include Irmin.Maker with type endpoint = unit
-(** Constructor for in-memory Irmin store. *)
+include Brassaia.Maker with type endpoint = unit
+(** Constructor for in-memory Brassaia store. *)

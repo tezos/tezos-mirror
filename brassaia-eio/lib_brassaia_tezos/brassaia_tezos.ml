@@ -1,6 +1,5 @@
 (*
- * Copyright (c) 2013-2022 Thomas Gazagnaire <thomas@gazagnaire.org>
- * Copyright (c) 2019      Etienne Millon
+ * Copyright (c) 2018-2022 Tarides <contact@tarides.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -15,8 +14,15 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-module Make
-    (S : Irmin.Generic_key.KV with type Schema.Contents.t = string) : sig
-  val run :
-    config:(root:string -> Irmin.config) -> size:(root:string -> int) -> unit
+module Schema = Schema
+
+module Conf = struct
+  let entries = 32
+  let stable_hash = 256
+  let contents_length_header = Some `Varint
+  let inode_child_order = `Seeded_hash
+  let forbid_empty_dir_persistence = true
 end
+
+module Maker = Brassaia_pack_unix.Maker (Conf)
+module Store = Maker.Make (Schema)
