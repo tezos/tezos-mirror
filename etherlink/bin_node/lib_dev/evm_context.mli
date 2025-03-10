@@ -103,10 +103,13 @@ val shutdown : unit -> unit tzresult Lwt.t
 (** [delayed_inbox_hashes ctxt] returns the hashes in the delayed inbox. *)
 val delayed_inbox_hashes : unit -> Ethereum_types.hash list tzresult Lwt.t
 
-(** [patch_kernel path] modifies the state of the current head of the EVM node
-    to replace its kernel with the kernel file [path]. *)
+(** [patch_kernel ?block_number kernel] modifies the state of the
+    [block_number] (defaults to current head) of the EVM node to replace its
+    kernel with the provided [kernel]. *)
 val patch_kernel :
-  ?block_number:Ethereum_types.quantity -> string -> unit tzresult Lwt.t
+  ?block_number:Ethereum_types.quantity ->
+  Wasm_debugger.kernel ->
+  unit tzresult Lwt.t
 
 (** [provision_balance address value] modifies the state of the current head of
     the EVM node to increase the balance of [address] by [value].

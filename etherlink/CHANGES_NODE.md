@@ -14,6 +14,8 @@
   snapshots. (!16957)
 - The node now advertises the level of each log by default. It can be disabled through
   the use of [environment variables][docs]. (!16976)
+- Replaces `--initial-kernel` with `--kernel` in `run sandbox`, to patch the
+  kernel on pre-existing data directories. (!17148)
 
 [docs]: https://octez.tezos.com/docs/user/logging.html#environment-variables
 

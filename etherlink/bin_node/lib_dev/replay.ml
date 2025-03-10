@@ -5,9 +5,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let patch_kernel ~kernel_path evm_state =
+let patch_kernel ~kernel evm_state =
   let open Lwt_result_syntax in
-  let* content, binary = Wasm_debugger.read_kernel_from_file kernel_path in
+  let* content, binary = Wasm_debugger.read_kernel kernel in
   let*! kernel =
     if binary then Lwt.return content else Wasm_utils_functor.wat2wasm content
   in
@@ -34,18 +34,18 @@ let patch_verbosity ~kernel_verbosity evm_state =
   in
   return evm_state
 
-let alter_evm_state ~kernel_path ~kernel_verbosity evm_state =
+let alter_evm_state ~kernel ~kernel_verbosity evm_state =
   let open Lwt_result_syntax in
   let* evm_state =
-    match kernel_path with
+    match kernel with
     | None -> return evm_state
-    | Some kernel_path -> patch_kernel ~kernel_path evm_state
+    | Some kernel -> patch_kernel ~kernel evm_state
   in
   match kernel_verbosity with
   | None -> return evm_state
   | Some kernel_verbosity -> patch_verbosity ~kernel_verbosity evm_state
 
-let main ?profile ?kernel_path ?kernel_verbosity ~data_dir config number =
+let main ?profile ?kernel ?kernel_verbosity ~data_dir config number =
   let open Lwt_result_syntax in
   let* ro_ctxt = Evm_ro_context.load ~data_dir config in
   let* legacy_block_storage =
@@ -53,7 +53,7 @@ let main ?profile ?kernel_path ?kernel_verbosity ~data_dir config number =
   in
   if not legacy_block_storage then
     Block_storage_setup.enable ~keep_alive:config.keep_alive ro_ctxt.store ;
-  let alter_evm_state = alter_evm_state ~kernel_path ~kernel_verbosity in
+  let alter_evm_state = alter_evm_state ~kernel ~kernel_verbosity in
   let* apply_result =
     Evm_ro_context.replay ro_ctxt ?profile ~alter_evm_state number
   in

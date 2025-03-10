@@ -9,8 +9,11 @@
     buffer, or on-disk using a given path. *)
 type kernel = In_memory of string | On_disk of string
 
-val read_kernel_from_file :
-  Lwt_io.file_name -> (string * bool, tztrace) result Lwt.t
+(** [read_kernel kernel] returns a tuple consisting of the kernel code
+    [content] and a boolean [is_binary], where [is_binary] is [true] if
+    [content] is a WASM blob, and [false] if it is a wat file (WebAssembly text
+    format). *)
+val read_kernel : kernel -> (string * bool) tzresult Lwt.t
 
 val check_kernel :
   binary:bool ->

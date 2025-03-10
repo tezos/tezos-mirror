@@ -111,6 +111,9 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
             (fun address -> Evm_context.provision_balance address new_balance)
             funded_addresses
         in
+        let* () =
+          Option.iter_es (fun kernel -> Evm_context.patch_kernel kernel) kernel
+        in
         return_unit
     | None -> return_unit
   in

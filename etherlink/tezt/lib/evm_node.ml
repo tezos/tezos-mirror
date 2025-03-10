@@ -850,7 +850,7 @@ let run_args evm_node =
             genesis_timestamp
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
     | Sandbox {initial_kernel; genesis_timestamp; wallet_dir; _} ->
-        ["run"; "sandbox"; "--initial-kernel"; initial_kernel]
+        ["run"; "sandbox"; "--kernel"; initial_kernel]
         @ Cli_arg.optional_arg
             "genesis-timestamp"
             (fun timestamp ->

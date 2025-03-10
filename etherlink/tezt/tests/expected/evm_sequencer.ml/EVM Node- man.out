@@ -59,8 +59,7 @@ Miscellaneous commands:
                      [--max-number-of-chunks <10.>]
                      [--private-rpc-port <PORT>]
                      [--genesis-timestamp <[TIMESTAMP]>]
-                     [--initial-kernel <evm_installer.wasm>]
-                     [-d --wallet-dir <path>]
+                     [--kernel <evm_kernel.wasm>] [-d --wallet-dir <path>]
                      [-f --password-filename <filename>]
                      [--network <network>]
                      [--init-from-snapshot [snapshot url]] [--fund <0x...>]
@@ -91,7 +90,7 @@ Miscellaneous commands:
     --max-number-of-chunks <10.>: Maximum number of chunks per blueprint.
     --private-rpc-port <PORT>: The EVM node private server rpc port.
     --genesis-timestamp <[TIMESTAMP]>: Timestamp used for the genesis block, uses machine's clock if not provided
-    --initial-kernel <evm_installer.wasm>: Path to the EVM kernel used to launch the PVM, it will be loaded from storage afterward
+    --kernel <evm_kernel.wasm>: Path to the EVM kernel used to launch the PVM, it will be loaded from storage afterward
     -d --wallet-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR env)
     -f --password-filename <filename>: path to the password filename
     --network <network>: The network the EVM node will be connecting to. Can be `mainnet` or `testnet`.
