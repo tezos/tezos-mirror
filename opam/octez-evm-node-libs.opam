@@ -33,6 +33,7 @@ depends: [
   "tezos-dal-node-services"
   "octez-performance-metrics"
   "octez-protocol-021-PsQuebec-libs"
+  "tezos-protocol-021-PsQuebec"
 ]
 conflicts: [
   "websocket"
