@@ -30,3 +30,8 @@ val env_exn : unit -> Eio_unix.Stdenv.base
 
     You can't nest [main_run] calls. *)
 val main_run : ?eio:bool -> (unit -> 'a Lwt.t) -> 'a
+
+(** [main_run_eio] should be used if the code you are running is using
+    `Eio` libraries only. It will initialize the `Eio` event loop and run the
+    promise. *)
+val main_run_eio : (Eio_unix.Stdenv.base -> 'a) -> 'a

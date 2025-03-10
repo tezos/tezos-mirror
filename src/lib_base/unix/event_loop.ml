@@ -44,3 +44,10 @@ let main_run ?(eio = false) promise =
     instance := None ;
     res)
   else Lwt_main.run @@ promise ()
+
+let main_run_eio promise =
+  Eio_posix.run @@ fun env ->
+  init_eio_loop ~env () ;
+  let res = promise env in
+  instance := None ;
+  res
