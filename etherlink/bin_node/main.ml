@@ -954,6 +954,14 @@ let sequencer_disable_native_execution configuration =
       }
   | Never -> return configuration
 
+let kernel_from_args network kernel =
+  let open Evm_node_lib_dev.Wasm_debugger in
+  Option.either
+    kernel
+    (Option.bind network (function
+        | Mainnet -> Some (In_memory Evm_node_supported_installers.mainnet)
+        | Testnet -> None))
+
 let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
     ?rpc_batch_limit ?cors_origins ?cors_headers ?tx_pool_timeout_limit
     ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~keep_alive
@@ -962,12 +970,12 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
     ?private_rpc_port ?sequencer_str ?max_blueprints_lag ?max_blueprints_ahead
     ?max_blueprints_catchup ?catchup_cooldown ?log_filter_max_nb_blocks
     ?log_filter_max_nb_logs ?log_filter_chunk_size ?genesis_timestamp
-    ?restricted_rpcs ?kernel ?dal_slots ?sandbox_key ~finalized_view () =
+    ?restricted_rpcs ?kernel ?dal_slots ?sandbox_config ~finalized_view () =
   let open Lwt_result_syntax in
   let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
   let* sequencer_key =
-    match sandbox_key with
-    | Some (_pk, sk) ->
+    match sandbox_config with
+    | Some Evm_node_lib_dev.Sequencer.{secret_key = sk; _} ->
         let*? sk = Tezos_signer_backends.Unencrypted.make_sk sk in
         return_some sk
     | None ->
@@ -1010,7 +1018,7 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
   in
   let*! () = init_logs ~daily_logs:true ~data_dir configuration in
   let*! configuration =
-    match sandbox_key with
+    match sandbox_config with
     | None ->
         (* We are running in sequencer mode (not in sandbox mode), we need to disable native execution *)
         sequencer_disable_native_execution configuration
@@ -1025,7 +1033,7 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
     ~cctxt:(wallet_ctxt :> Client_context.wallet)
     ~configuration
     ?kernel
-    ?sandbox_key
+    ?sandbox_config
     ()
 
 let rpc_run_args =
@@ -2085,7 +2093,7 @@ let sequencer_config_args =
     dal_slots_arg
 
 let sandbox_config_args =
-  Tezos_clic.args10
+  Tezos_clic.args12
     preimages_arg
     preimages_endpoint_arg
     native_execution_policy_arg
@@ -2096,6 +2104,8 @@ let sandbox_config_args =
     initial_kernel_arg
     wallet_dir_arg
     (Client_config.password_filename_arg ())
+    (supported_network_arg ())
+    init_from_snapshot_arg
 
 let sequencer_command =
   let open Tezos_clic in
@@ -2214,7 +2224,9 @@ let sandbox_command =
              genesis_timestamp,
              kernel,
              wallet_dir,
-             password_filename ) )
+             password_filename,
+             network,
+             init_from_snapshot ) )
          () ->
       let open Lwt_result_syntax in
       let* restricted_rpcs =
@@ -2225,6 +2237,11 @@ let sandbox_command =
       in
       let rollup_node_endpoint =
         Option.value ~default:Uri.empty rollup_node_endpoint
+      in
+      let kernel = kernel_from_args network kernel in
+      let sandbox_config =
+        Evm_node_lib_dev.Sequencer.
+          {public_key = pk; secret_key = sk; init_from_snapshot; network}
       in
       start_sequencer
         ?password_filename
@@ -2257,7 +2274,7 @@ let sandbox_command =
         ?genesis_timestamp
         ?restricted_rpcs
         ?kernel
-        ~sandbox_key:(pk, sk)
+        ~sandbox_config
         ~finalized_view
         ())
 
@@ -2319,15 +2336,7 @@ let observer_command =
       let* restricted_rpcs =
         pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
       in
-      let kernel =
-        let open Evm_node_lib_dev.Wasm_debugger in
-        Option.either
-          kernel
-          (Option.bind network (function
-              | Mainnet ->
-                  Some (In_memory Evm_node_supported_installers.mainnet)
-              | Testnet -> None))
-      in
+      let kernel = kernel_from_args network kernel in
       start_observer
         ~data_dir
         ~keep_alive

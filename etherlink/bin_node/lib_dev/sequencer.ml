@@ -6,6 +6,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type sandbox_config = {
+  public_key : Signature.public_key;
+  secret_key : Signature.secret_key;
+  init_from_snapshot : string option;
+  network : Configuration.supported_network option;
+}
+
 let install_finalizer_seq server_public_finalizer server_private_finalizer
     finalizer_rpc_process =
   let open Lwt_syntax in
@@ -49,13 +56,13 @@ let loop_sequencer (sequencer_config : Configuration.sequencer) =
   loop Misc.(now ())
 
 let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
-    ~(configuration : Configuration.t) ?kernel ?sandbox_key () =
+    ~(configuration : Configuration.t) ?kernel ?sandbox_config () =
   let open Lwt_result_syntax in
   let open Configuration in
   let {rollup_node_endpoint; keep_alive; _} = configuration in
   let*? sequencer_config = Configuration.sequencer_config_exn configuration in
   let* rollup_node_smart_rollup_address =
-    if Option.is_some sandbox_key then return_none
+    if Option.is_some sandbox_config then return_none
     else
       let* sr1 =
         Rollup_services.smart_rollup_address
@@ -63,6 +70,20 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
           rollup_node_endpoint
       in
       return_some sr1
+  in
+  let*? snapshot_url =
+    match sandbox_config with
+    | Some {init_from_snapshot; network; _} ->
+        Option.map_e
+          (Snapshots.interpolate_snapshot_provider
+             ?rollup_address:
+               (Option.map
+                  Address.of_b58check_exn
+                  rollup_node_smart_rollup_address)
+             ?network
+             Configuration.(Rolling (gc_param_from_retention_period ~days:1)))
+          init_from_snapshot
+    | None -> Result.return_none
   in
   let* status, smart_rollup_address_typed =
     Evm_context.start
@@ -72,12 +93,13 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ?smart_rollup_address:rollup_node_smart_rollup_address
       ~store_perm:`Read_write
       ~sequencer_wallet:(sequencer_config.sequencer, cctxt)
+      ?snapshot_url
       ()
   in
   let smart_rollup_address_b58 = Address.to_string smart_rollup_address_typed in
   let* () =
-    match sandbox_key with
-    | Some (pk, _sk) -> Evm_context.patch_sequencer_key pk
+    match sandbox_config with
+    | Some {public_key = pk; _} -> Evm_context.patch_sequencer_key pk
     | None -> return_unit
   in
 
@@ -96,6 +118,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   in
   let* ro_ctxt =
     Evm_ro_context.load
+      ?network:(Option.bind sandbox_config (fun config -> config.network))
       ~smart_rollup_address:smart_rollup_address_typed
       ~data_dir
       configuration
@@ -172,7 +195,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       }
   in
   let* () =
-    if Option.is_some sandbox_key then
+    if Option.is_some sandbox_config then
       let*! () = Events.sandbox_started (Z.pred next_blueprint_number) in
       return_unit
     else
