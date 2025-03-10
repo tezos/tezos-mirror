@@ -1642,6 +1642,7 @@ let jobs pipeline_type =
           ~image:Images.rust_sdk_bindings
           ~stage:Stages.test
           ~dependencies:dependencies_needs_start
+          ~before_script:(before_script ~init_python_venv:true [])
           ~rules:
             (make_rules ~dependent:true ~changes:changeset_test_sdk_bindings ())
           [

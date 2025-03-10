@@ -12,6 +12,14 @@ check:
 build:
 	@cargo build --release
 
+.PHONY: generate-python
+generate-python: build
+	@cargo run --features uniffi/cli --bin uniffi-bindgen -- generate --language python --out-dir ../python/test --library target/release/libtezos.so
+	@cp target/release/libtezos.so ../python/test/libtezos.so
+
+.PHONY: generate-bindings
+generate-bindings: generate-python
+
 .PHONY: clean
 clean:
 	@cargo clean
