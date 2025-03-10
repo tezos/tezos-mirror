@@ -36,6 +36,9 @@ pub const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/evm/blueprints");
 
 const EVM_BLUEPRINT_NB_CHUNKS: RefPath = RefPath::assert_from(b"/nb_chunks");
 
+const EVM_CURRENT_BLOCK_HEADER: RefPath =
+    RefPath::assert_from(b"/evm/current_block_header");
+
 /// The store representation of a blueprint.
 /// It's designed to support storing sequencer blueprints,
 /// which can be chunked, and blueprints constructed from
@@ -294,6 +297,13 @@ impl Decodable for BlockHeader {
             evm_block_header,
         })
     }
+}
+
+pub fn store_current_block_header<Host: Runtime>(
+    host: &mut Host,
+    current_block_header: &BlockHeader,
+) -> Result<(), Error> {
+    store_rlp(current_block_header, host, &EVM_CURRENT_BLOCK_HEADER).map_err(Error::from)
 }
 
 /// For the tick model we only accept blueprints where cumulative size of chunks
