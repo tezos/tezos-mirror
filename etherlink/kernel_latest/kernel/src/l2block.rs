@@ -19,7 +19,6 @@ pub enum L2Block {
     Tezlink(TezBlock),
 }
 
-#[allow(dead_code)]
 impl L2Block {
     pub fn number(&self) -> U256 {
         match self {
