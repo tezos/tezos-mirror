@@ -1570,6 +1570,83 @@ let ensure_block_integrity ~block_result evm_setup =
   assert (block.transactions = block_result.transactions) ;
   unit
 
+let ensure_current_block_header_integrity evm_setup =
+  let open Evm_node_lib_dev_encoding in
+  let* block_header =
+    Sc_rollup_node.RPC.call
+      evm_setup.sc_rollup_node
+      ~rpc_hooks:Tezos_regression.rpc_hooks
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind
+         ~operation:Sc_rollup_rpc.Value
+         ~key:"/evm/current_block_header"
+         ()
+  in
+  let block_header =
+    match block_header with
+    | Some block_header -> block_header
+    | None -> Test.fail "Missing block header in storage"
+  in
+  let number, timestamp, `Hex hash, `Hex receipts_root, `Hex transactions_root =
+    match Rlp.decode (Hex.to_bytes (`Hex block_header)) with
+    | Ok
+        Rlp.(
+          List
+            [
+              Value number;
+              Value timestamp;
+              List
+                [
+                  List [Value hash; Value receipts_root; Value transactions_root];
+                ];
+            ]) ->
+        ( Z.to_int32 @@ Ethereum_types.decode_z_le number,
+          timestamp,
+          Hex.of_bytes hash,
+          Hex.of_bytes receipts_root,
+          Hex.of_bytes transactions_root )
+    | Ok item ->
+        Test.fail
+          "Failed to decode block header from RLP: bad format: %a"
+          Rlp.pp
+          item
+    | Error _ ->
+        Test.fail
+          "Failed to decode block header from RLP: invalid RLP: %s"
+          block_header
+  in
+
+  let* block =
+    Eth_cli.get_block
+      ~block_id:(Int32.to_string number)
+      ~endpoint:evm_setup.endpoint
+      ()
+  in
+
+  Check.(number = block.number)
+    ~__LOC__
+    Check.int32
+    ~error_msg:"Bad block header number, expected %R got %L." ;
+  Check.("0x" ^ hash = block.hash)
+    ~__LOC__
+    Check.string
+    ~error_msg:"Bad block header hash, expected %R got %L." ;
+  Check.(
+    Z.to_int64 @@ Ethereum_types.decode_z_le timestamp
+    = Tezos_base.Time.Protocol.to_seconds block.timestamp)
+    ~__LOC__
+    Check.int64
+    ~error_msg:"Bad block timestamp, expected %R got %L." ;
+  Check.("0x" ^ receipts_root = block.receiptRoot)
+    ~__LOC__
+    Check.string
+    ~error_msg:"Bad block receipts root, expected %R got %L." ;
+  Check.("0x" ^ transactions_root = block.transactionRoot)
+    ~__LOC__
+    Check.string
+    ~error_msg:"Bad block transactions root, expected %R got %L." ;
+  unit
+
 let latest_block ?(full_tx_objects = false) evm_node =
   Rpc.get_block_by_number ~full_tx_objects ~block:"latest" evm_node
 
@@ -3368,6 +3445,7 @@ let test_latest_kernel_migration protocols =
       let* () =
         ensure_block_integrity ~block_result:sanity_check.block_result evm_setup
       in
+      let* () = ensure_current_block_header_integrity evm_setup in
       let* () =
         set_and_get_simple_storage_check
           ~sender:deployer
