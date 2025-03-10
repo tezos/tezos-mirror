@@ -20,30 +20,23 @@ echo "# Octez Releases" >> index.md
 
 # [versions] is a 2D array representation of the [$versions_list_filename] JSON:
 # - one line per release or release candidate
-# - each line has two elements: "[major].[minor] [rc]", [rc] is "null" if it is not a release candidate
+# - each line has three elements: "[major].[minor] [rc] [latest]"
+#   - [rc] is "null" if it is not a release candidate
+#   - [latest] is "null" if it is not the latest release
 # shellcheck disable=SC2162
-mapfile -t versions < <(jq -r '[.[] | "\(.major).\(.minor) \(.rc // "null")"] | reverse | .[]' "${versions_list_filename}")
-
-# Get the version of the latest release:
-# - [release_versions] is an array representation of the [$versions_list_filename] JSON of the versions of all releases (we ignore release candidates).
-# - each element of the array is a release version with the format "[major].[minor]"
-# - elements of the array (i.e. versions) are separated by a whitespace
-# - the latest release appears first.
-# shellcheck disable=SC2162
-read -a releases_versions <<< "$(jq -r '[.[] | select(has("rc") | not) | "\(.major).\(.minor)"] | reverse | join(" ")' "${versions_list_filename}")"
-latest=${releases_versions[0]}
+mapfile -t versions < <(jq -r '[.[] | "\(.major).\(.minor) \(.rc // "null") \(.latest // "null")"] | reverse | .[]' "${versions_list_filename}")
 
 # Define the content of the release page.
-# We iterate on the 2d array [$versions], distinguishing between three cases:
-# - latest release (computed beforehand)
-# - non-latest release
+# We iterate on the [$versions] array, distinguishing between three cases:
 # - release candidate
-while read -r version rc; do
+# - release
+# - latest release
+while read -r version rc latest; do
   if [[ ${rc} != null ]]; then
     echo "## Octez Release Candidate ${version}~rc${rc}" >> index.md
     version="${version}-rc${rc}"
   else
-    if [[ "$version" == "$latest" ]]; then
+    if [[ ${latest} != null ]]; then
       echo "## Octez $version (latest)" >> index.md
     else
       echo "## Octez $version" >> index.md
