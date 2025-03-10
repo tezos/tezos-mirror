@@ -29,10 +29,8 @@ let get_attestation_map (type block_info attestation_operation dal_attestation)
 (* [filter_injectable_traps] filters a list of traps to identify which
    ones are injectable by checking if each trap's delegate has both an
    attestation and DAL attestation in [attestation_map]. *)
-let filter_injectable_traps ~attested_level ~published_level attestation_map
-    traps =
-  let open Lwt_result_syntax in
-  List.filter_map_s
+let filter_injectable_traps attestation_map traps =
+  List.filter_map
     (fun trap ->
       let Types.{delegate; slot_index; shard; shard_proof} = trap in
       let attestation_opt =
@@ -40,20 +38,14 @@ let filter_injectable_traps ~attested_level ~published_level attestation_map
       in
       match attestation_opt with
       | None ->
-          let*! () =
-            Event.emit_trap_delegate_attestation_not_found
-              ~delegate
-              ~slot_index
-              ~shard_index:shard.Cryptobox.index
-              ~published_level
-              ~attested_level
-          in
-          Lwt.return_none
+          (* The delegate did not TB attest or we have not found the delegate in
+             the attestation operation's receipt. *)
+          None
       | Some (_attestation, None) ->
-          (* The delegate did not DAL attest at all. *)
-          Lwt.return_none
+          (* The delegate did not DAL attest. *)
+          None
       | Some (attestation, Some dal_attestation) ->
-          Lwt.return_some
+          Some
             ( delegate,
               slot_index,
               attestation,
@@ -91,13 +83,7 @@ let inject_entrapment_evidences (type block_info)
       | [] -> return_unit
       | traps ->
           let attestation_map = get_attestation_map (module Plugin) block in
-          let*! traps_to_inject =
-            filter_injectable_traps
-              ~attested_level
-              ~published_level
-              attestation_map
-              traps
-          in
+          let traps_to_inject = filter_injectable_traps attestation_map traps in
           List.iter_es
             (fun ( delegate,
                    slot_index,
