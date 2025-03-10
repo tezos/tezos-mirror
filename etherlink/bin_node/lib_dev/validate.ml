@@ -127,10 +127,8 @@ let validate_with_state (module Backend_rpc : Services_backend_sig.S)
 
 type validation_mode = Stateless | With_state | Full
 
-let valid_transaction_object ~backend_rpc ~decode ~hash ~mode tx_raw =
+let valid_transaction_object ~backend_rpc ~hash ~mode tx =
   let open Lwt_result_syntax in
-  let tx_raw = Bytes.unsafe_of_string tx_raw in
-  let**? tx = decode tx_raw in
   let**? tx_object = Transaction.to_transaction_object ~hash tx in
   let* next_nonce =
     let (module Backend_rpc : Services_backend_sig.S) = backend_rpc in
@@ -157,27 +155,5 @@ let valid_transaction_object ~backend_rpc ~decode ~hash ~mode tx_raw =
 let is_tx_valid ((module Backend_rpc : Services_backend_sig.S) as backend_rpc)
     ~mode tx_raw =
   let hash = Ethereum_types.hash_raw_tx tx_raw in
-  match String.get_uint8 tx_raw 0 with
-  | 1 ->
-      let tx_raw = String.sub tx_raw 1 (String.length tx_raw - 1) in
-      valid_transaction_object
-        ~backend_rpc
-        ~decode:Transaction.decode_eip2930
-        ~hash
-        ~mode
-        tx_raw
-  | 2 ->
-      let tx_raw = String.sub tx_raw 1 (String.length tx_raw - 1) in
-      valid_transaction_object
-        ~backend_rpc
-        ~decode:Transaction.decode_eip1559
-        ~hash
-        ~mode
-        tx_raw
-  | _ ->
-      valid_transaction_object
-        ~backend_rpc
-        ~decode:Transaction.decode_legacy
-        ~hash
-        ~mode
-        tx_raw
+  let**? tx = Transaction.decode tx_raw in
+  valid_transaction_object ~backend_rpc ~hash ~mode tx

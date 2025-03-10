@@ -345,6 +345,20 @@ let encode_eip2930_transaction : transaction -> bytes = function
       Bytes.cat prefix (encode rlp)
   | _ -> invalid_arg "Transaction is not eip 2930"
 
+let decode tx_raw =
+  let decode, tx_raw =
+    match String.get_uint8 tx_raw 0 with
+    | 1 ->
+        let tx_raw = String.sub tx_raw 1 (String.length tx_raw - 1) in
+        (decode_eip2930, tx_raw)
+    | 2 ->
+        let tx_raw = String.sub tx_raw 1 (String.length tx_raw - 1) in
+        (decode_eip1559, tx_raw)
+    | _ -> (decode_legacy, tx_raw)
+  in
+  let tx_raw = Bytes.unsafe_of_string tx_raw in
+  decode tx_raw
+
 (** [message transaction] returns the "message" of the transaction, the
     binary blob that is signed and then to be used in signature recovery. *)
 let message : transaction -> bytes =

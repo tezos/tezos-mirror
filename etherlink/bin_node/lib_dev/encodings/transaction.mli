@@ -46,6 +46,11 @@ val decode_eip1559 : bytes -> (transaction, string) result
 (** [decode_eip2930 bytes] tries to decode [bytes] into a {!transaction}. *)
 val decode_eip2930 : bytes -> (transaction, string) result
 
+(** [decode bytes] tries to decode [bytes] into a {!transaction},
+    using {!decode_eip1559}, {!decode_eip2930} or {!decode_legacy}
+    depending of the first byte of [bytes]. *)
+val decode : string -> (transaction, string) result
+
 (** [to_transaction_object ~hash transaction] transforms a [transaction] and
     its [hash] to a {!Ethereum_types.transaction_object}. *)
 val to_transaction_object :
