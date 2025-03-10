@@ -88,21 +88,18 @@ let validate_max_fee_per_gas (module Backend_rpc : Services_backend_sig.S)
   if transaction.max_fee_per_gas >= base_fee_per_gas then return (Ok ())
   else return (Error "Max gas fee too low")
 
-let validate_pay_for_fees (transaction : Transaction.transaction) ~balance =
+let validate_balance_is_enough (transaction : Transaction.transaction) ~balance
+    =
   let open Lwt_result_syntax in
-  let cost = Z.mul transaction.gas_limit transaction.max_fee_per_gas in
-  if balance >= cost then return (Ok ())
-  else return (Error "Cannot prepay transaction.")
-
-let validate_total_cost (transaction : Transaction.transaction) ~balance =
-  let open Lwt_result_syntax in
+  let gas = transaction.gas_limit in
+  let gas_price = transaction.max_fee_per_gas in
+  let gas_cost = Z.mul gas gas_price in
   let total_cost =
-    let gas = transaction.gas_limit in
-    let gas_price = transaction.max_fee_per_gas in
     let value = transaction.value in
-    Z.add (Z.mul gas gas_price) value
+    Z.add gas_cost value
   in
-  if total_cost > balance then return (Error "Not enough funds")
+  if gas_cost > balance then return (Error "Cannot prepay transaction.")
+  else if total_cost > balance then return (Error "Not enough funds")
   else return (Ok ())
 
 let validate_stateless ~next_nonce backend_rpc transaction ~caller =
@@ -120,9 +117,8 @@ let validate_with_state (module Backend_rpc : Services_backend_sig.S)
   in
   let backend_rpc = (module Backend_rpc : Services_backend_sig.S) in
   let** () = validate_max_fee_per_gas backend_rpc transaction in
-  let** () = validate_pay_for_fees transaction ~balance in
   let** () = validate_gas_limit backend_rpc transaction in
-  let** () = validate_total_cost transaction ~balance in
+  let** () = validate_balance_is_enough transaction ~balance in
   return (Ok ())
 
 type validation_mode = Stateless | With_state | Full
