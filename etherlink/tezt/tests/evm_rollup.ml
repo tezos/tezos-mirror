@@ -5394,6 +5394,53 @@ let test_mcopy_opcode =
          operation") ;
   unit
 
+let test_transient_storage =
+  register_both
+    ~kernels:[Kernel.Latest]
+    ~tags:["evm"; "transient_storage"; "cancun"]
+    ~title:"Check TSTORE/TLOAD behavior as stated by Cancun's EIP-1153"
+  @@ fun ~protocol:_ ~evm_setup:({endpoint; produce_block; _} as evm_setup) ->
+  let*@ _ = evm_setup.produce_block () in
+  let* transient_storage_multiplier_resolved =
+    transient_storage_multiplier ()
+  in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* address, _tx =
+    deploy ~contract:transient_storage_multiplier_resolved ~sender evm_setup
+  in
+  let input, mul = (21L, 2L) in
+  let res = Int64.mul input mul in
+  let send_values () =
+    Eth_cli.contract_send
+      ~endpoint
+      ~abi_label:transient_storage_multiplier_resolved.label
+      ~address
+      ~method_call:(Printf.sprintf "multiply(%Ld, %Ld)" input mul)
+      ~source_private_key:sender.private_key
+      ()
+  in
+  let* tx = wait_for_application ~produce_block send_values in
+  let* () = check_tx_succeeded ~endpoint ~tx in
+  let* output =
+    let* response =
+      Eth_cli.contract_call
+        ()
+        ~endpoint
+        ~abi_label:transient_storage_multiplier_resolved.label
+        ~address
+        ~method_call:"get_output()"
+    in
+    return @@ Int64.of_string @@ String.trim response
+  in
+  Check.(
+    (output = res)
+      int64
+      ~error_msg:
+        "The output should be equal to the multiplication of the input and the \
+         multiplier") ;
+
+  unit
+
 let test_call_recursive_contract_estimate_gas =
   Protocol.register_test
     ~__FILE__
@@ -6557,6 +6604,7 @@ let register_evm_node ~protocols =
   test_l2_call_selfdetruct_contract_in_same_transaction_and_separate_transaction
     protocols ;
   test_mcopy_opcode protocols ;
+  test_transient_storage protocols ;
   test_reveal_storage protocols ;
   test_call_recursive_contract_estimate_gas protocols ;
   test_limited_stack_depth protocols ;

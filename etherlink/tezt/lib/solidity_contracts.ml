@@ -268,6 +268,14 @@ let mcopy () =
     ~contract:"MCOPY"
     ~evm_version:"cancun"
 
+(** The info for the "transient_storage_multiplier.sol" contract. *)
+let transient_storage_multiplier () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/transient_storage_multiplier.sol")
+    ~label:"transient_storage_multiplier"
+    ~contract:"TransientStorageMultiplier"
+    ~evm_version:"cancun"
+
 (** The info for the "recursive.sol" contract. *)
 let recursive () =
   compile_contract
