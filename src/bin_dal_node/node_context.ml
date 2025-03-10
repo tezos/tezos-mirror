@@ -28,7 +28,6 @@ type t = {
   config : Configuration_file.t;
   cryptobox : Cryptobox.t;
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
-  proto_parameters : Types.proto_parameters;
   mutable proto_plugins : Proto_plugins.t;
   mutable ongoing_amplifications : Types.Slot_id.Set.t;
   mutable slots_under_reconstruction :
@@ -46,8 +45,7 @@ type t = {
 }
 
 let init config profile_ctxt cryptobox shards_proofs_precomputation
-    proto_parameters proto_plugins store gs_worker transport_layer cctxt
-    ~last_finalized_level =
+    proto_plugins store gs_worker transport_layer cctxt ~last_finalized_level =
   let neighbors_cctxts =
     List.map
       (fun Configuration_file.{addr; port} ->
@@ -61,7 +59,6 @@ let init config profile_ctxt cryptobox shards_proofs_precomputation
     config;
     cryptobox;
     shards_proofs_precomputation;
-    proto_parameters;
     proto_plugins;
     ongoing_amplifications = Types.Slot_id.Set.empty;
     slots_under_reconstruction = Types.Slot_id.Map.empty;
@@ -108,22 +105,27 @@ let may_add_plugin ctxt cctxt ~block_level ~proto_level =
   ctxt.proto_plugins <- proto_plugins ;
   return_unit
 
+let get_plugin_and_parameters_for_level ctxt ~level =
+  Proto_plugins.get_plugin_and_parameters_for_level ctxt.proto_plugins ~level
+
 let get_plugin_for_level ctxt ~level =
-  Proto_plugins.get_plugin_for_level ctxt.proto_plugins ~level
+  let open Result_syntax in
+  let* plugin, _parameters = get_plugin_and_parameters_for_level ctxt ~level in
+  return plugin
 
 let get_all_plugins ctxt = Proto_plugins.to_list ctxt.proto_plugins
 
 let set_proto_plugins ctxt proto_plugins = ctxt.proto_plugins <- proto_plugins
 
-let get_proto_parameters ?level ctxt =
-  let open Lwt_result_syntax in
-  match level with
-  | None -> return ctxt.proto_parameters
-  | Some level ->
-      (* get the plugin from the plugin cache *)
-      let*? (module Plugin) = get_plugin_for_level ctxt ~level in
-      let cctxt = get_tezos_node_cctxt ctxt in
-      Plugin.get_constants `Main (`Level level) cctxt
+let get_proto_parameters ~level ctxt =
+  let open Result_syntax in
+  let level =
+    match level with
+    | `Last_proto -> ctxt.last_finalized_level
+    | `Level level -> level
+  in
+  let* _plugin, parameters = get_plugin_and_parameters_for_level ctxt ~level in
+  return parameters
 
 let storage_period ctxt proto_parameters =
   match ctxt.config.history_mode with
@@ -194,9 +196,7 @@ let fetch_committee ctxt ~level =
   match Committee_cache.find cache ~level with
   | Some committee -> return committee
   | None ->
-      let*? (module Plugin) =
-        Proto_plugins.get_plugin_for_level ctxt.proto_plugins ~level
-      in
+      let*? (module Plugin) = get_plugin_for_level ctxt ~level in
       let+ committee = Plugin.get_committee cctxt ~level in
       Committee_cache.add cache ~level ~committee ;
       committee

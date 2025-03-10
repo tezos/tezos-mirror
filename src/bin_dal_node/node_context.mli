@@ -34,7 +34,6 @@ val init :
   Profile_manager.t ->
   Cryptobox.t ->
   Cryptobox.shards_proofs_precomputation option ->
-  Types.proto_parameters ->
   Proto_plugins.t ->
   Store.t ->
   Gossipsub.Worker.t ->
@@ -46,15 +45,23 @@ val init :
 (** Returns all the registered plugins *)
 val get_all_plugins : t -> (module Dal_plugin.T) list
 
-(** Returns the plugin to be used for the given (block) level.
+(** Returns the plugin to be used for the given (block) level together with the
+    protocol parameters at that level.
+
     Recall that, for a migration level L:
     * to retrieve the metadata of the block L, one should use the plugin for the
       old protocol;
     * to retrieve context-related information, one should use the plugin for the
       new protocol.
+
     This function returns the plugin of [metadata.protocols.next_protocol], so it is
     tailored for the second use case. To get the plugin for the first use-case, just
     get the plugin for the predecessor of the target level. *)
+val get_plugin_and_parameters_for_level :
+  t -> level:int32 -> ((module Dal_plugin.T) * Types.proto_parameters) tzresult
+
+(** Returns the plugin to be used for the given (block) level. See
+    {!get_plugin_and_parameters_for_level}. *)
 val get_plugin_for_level : t -> level:int32 -> (module Dal_plugin.T) tzresult
 
 (** Tries to add a new plugin for the protocol with level [proto_level] to be used
@@ -72,6 +79,14 @@ val may_add_plugin :
 
 (** Set the protocol plugins to the given value. *)
 val set_proto_plugins : t -> Proto_plugins.t -> unit
+
+(** [get_proto_parameters ~level ctxt] returns the DAL node's protocol
+    parameters. When [level] is [`Last_proto], it returns the last known
+    parameters. If [level] is [`Level level], then the protocol parameters for
+    that level are returned. The parameters returned are obtained via
+    {!get_plugin_and_parameters_for_level}. *)
+val get_proto_parameters :
+  level:[`Last_proto | `Level of int32] -> t -> Types.proto_parameters tzresult
 
 (** Reconstruct the given slot id by calling the [reconstruct]
     function unless a reconstruction for the given slot id is alredy
@@ -98,13 +113,6 @@ val get_config : t -> Configuration_file.t
 
 (** [get_cryptobox ctxt] returns the DAL node's cryptobox *)
 val get_cryptobox : t -> Cryptobox.t
-
-(** [get_proto_parameters ?level ctxt] returns the DAL node's protocol
-    parameters stored in the context, when [level] is not provided. If [level]
-    is provided, then the protocol parameters for that level are fetched via the
-    relevant plugin. *)
-val get_proto_parameters :
-  ?level:int32 -> t -> Types.proto_parameters tzresult Lwt.t
 
 (** Update the node's last finalized level. *)
 val set_last_finalized_level : t -> int32 -> unit

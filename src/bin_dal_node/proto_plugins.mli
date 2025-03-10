@@ -16,7 +16,11 @@ type t
 (** It builds a value of type [t] containing a single plugin, given as
     parameter. *)
 val singleton :
-  first_level:int32 -> proto_level:int -> (module Dal_plugin.T) -> t
+  first_level:int32 ->
+  proto_level:int ->
+  (module Dal_plugin.T) ->
+  Types.proto_parameters ->
+  t
 
 val to_list : t -> (module Dal_plugin.T) list
 
@@ -25,18 +29,20 @@ type error +=
   | No_plugin_for_proto of {proto_hash : Protocol_hash.t}
 
 (** [get_plugin_for_level plugins ~level] searches in [plugins] the plugin for
-    the given [level] and returns it if found. Otherwise, it returns the error
-    [No plugin_for_level level].
+    the given [level] and returns it if found together with the associated
+    protocol parameters. Otherwise, it returns the error [No plugin_for_level
+    level].
 
     Recall that, for a migration level L:
     * to retrieve the metadata of the block L, one should use the plugin for the
       old protocol;
     * to retrieve context-related information, one should use the plugin for the
       new protocol.
-    This function returns the plugin of [metadata.protocols.next_protocol], so it is
-    tailored for the second use case. To get plugin for the first use-case, just
-    get the plugin for the predecessor of the target level. *)
-val get_plugin_for_level : t -> level:int32 -> (module Dal_plugin.T) tzresult
+    This function returns the plugin of [metadata.protocols.next_protocol], so
+    it is tailored for the second use case. To get plugin for the first
+    use-case, just get the plugin for the predecessor of the target level. *)
+val get_plugin_and_parameters_for_level :
+  t -> level:int32 -> ((module Dal_plugin.T) * Types.proto_parameters) tzresult
 
 (** [may_add rpc_ctxt plugins ~first_level ~proto_level] may add to [plugins] a
     new plugin for the protocol with level [proto_level] to be used starting
