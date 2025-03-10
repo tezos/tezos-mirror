@@ -283,6 +283,13 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
         (fun (enable_dal, dal_tags) ->
           List.iter
             (fun (enable_multichain, multichain_tags) ->
+              (* Since the set of RPCs the sequencer has access to is restricted in the multichain case,
+                 we need the intermediate RPC node to handle the extra RPCs necessary in the tests. *)
+              let spawn_rpc =
+                match spawn_rpc with
+                | None when enable_multichain -> Some (Port.fresh ())
+                | _ -> spawn_rpc
+              in
               register_test_for_kernels
                 ~__FILE__
                 ?max_delayed_inbox_blueprint_length
@@ -6562,6 +6569,7 @@ let test_reset =
       ~mode:(Evm_node.mode sequencer)
       ~data_dir:(Evm_node.data_dir sequencer)
       ~rpc_port:(Evm_node.rpc_port sequencer)
+      ?spawn_rpc:(Evm_node.spawn_rpc sequencer)
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Evm_node.run sequencer in

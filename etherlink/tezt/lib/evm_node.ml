@@ -116,6 +116,7 @@ module Parameters = struct
     endpoint : string;
     runner : Runner.t option;
     restricted_rpcs : string option;
+    spawn_rpc : int option;
   }
 
   type session_state = {mutable ready : bool}
@@ -776,7 +777,7 @@ let mode_with_new_private_rpc (mode : mode) =
 
 let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
     ?(mode = Proxy) ?history ?data_dir ?rpc_addr ?rpc_port ?restricted_rpcs
-    endpoint =
+    ?spawn_rpc endpoint =
   let arguments, rpc_addr, rpc_port =
     connection_arguments ?rpc_addr ?rpc_port ?runner ()
   in
@@ -816,6 +817,7 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
         endpoint;
         restricted_rpcs;
         runner;
+        spawn_rpc;
       }
   in
   on_event evm_node (handle_is_ready_event evm_node) ;
@@ -827,6 +829,8 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
 let name evm_node = evm_node.name
 
 let rpc_port evm_node = evm_node.persistent_state.rpc_port
+
+let spawn_rpc evm_node = evm_node.persistent_state.spawn_rpc
 
 let data_dir evm_node = evm_node.persistent_state.data_dir
 
@@ -931,7 +935,17 @@ let run ?(wait = true) ?(extra_arguments = []) evm_node =
       (run_args evm_node @ extra_arguments)
       ~on_terminate
   in
-  let* () = if wait then wait_for_ready evm_node else unit in
+  let* () =
+    if wait then
+      let* () = wait_for_ready evm_node
+      and* () =
+        match evm_node.persistent_state.spawn_rpc with
+        | None -> unit
+        | Some _ -> wait_for_spawn_rpc_ready evm_node
+      in
+      unit
+    else unit
+  in
   unit
 
 let spawn_command evm_node args =
@@ -1334,7 +1348,7 @@ let patch_config_gc ?history_mode json =
          | Full retention -> `String (Format.sprintf "full:%d" retention))
 
 let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
-    ?restricted_rpcs ?history_mode rollup_node =
+    ?restricted_rpcs ?history_mode ?spawn_rpc rollup_node =
   let evm_node =
     create
       ?name
@@ -1345,6 +1359,7 @@ let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
       ?rpc_addr
       ?rpc_port
       ?restricted_rpcs
+      ?spawn_rpc
       rollup_node
   in
   let* () = Process.check @@ spawn_init_config evm_node in
