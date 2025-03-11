@@ -2431,6 +2431,39 @@ let _octez_workers_tests =
         alcotezt;
       ]
 
+let octez_bees =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
+  octez_lib
+    "tezos-bees"
+    ~path:"src/lib_bees"
+    ~synopsis:"Parallel worker library"
+    ~preprocess
+    ~preprocessor_deps
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_stdlib_unix |> open_;
+        octez_profiler_backends;
+        octez_profiler_complex_backends;
+      ]
+
+let _octez_bees_tests =
+  tezt
+    ["mocked_worker"; "test_bees_unit"]
+    ~path:"src/lib_bees/test"
+    ~opam:"octez-libs"
+    ~deps:
+      [
+        octez_stdlib |> open_;
+        octez_stdlib_unix |> open_;
+        octez_base |> open_ |> open_ ~m:"TzPervasives"
+        |> open_ ~m:"Worker_types";
+        octez_bees |> open_;
+        octez_test_helpers |> open_;
+        octez_base_test_helpers |> open_;
+        alcotezt;
+      ]
+
 let octez_merkle_proof_encoding =
   octez_lib
     "tezos-context.merkle_proof_encoding"

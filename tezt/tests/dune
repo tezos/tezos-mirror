@@ -116,6 +116,7 @@
   src_lib_bls12_381_test_tezt_lib
   src_lib_benchmark_test_tezt_lib
   src_lib_benchmark_lib_micheline_rewriting_test_tezt_lib
+  src_lib_bees_test_tezt_lib
   src_lib_base_unix_test_tezt_lib
   src_lib_base_test_tezt_lib
   irmin_test_irmin_generic_key_tezt_lib
