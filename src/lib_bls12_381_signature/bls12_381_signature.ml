@@ -253,6 +253,21 @@ module MinPk = struct
         Bls12_381.G2.to_compressed_bytes res)
       signatures
 
+  let aggregate_signature_weighted_opt ?(subgroup_check = true)
+      signatures_with_weights =
+    let weights, signatures = List.split signatures_with_weights in
+    let scalars = List.map Bls12_381.Fr.of_z weights |> Array.of_list in
+    let signatures =
+      Bls12_381.G2.affine_array_of_compressed_bytes_opt
+        ~subgroup_check
+        (Array.of_list signatures)
+    in
+    Option.map
+      (fun signatures ->
+        let res = Bls12_381.G2.pippenger_with_affine_array signatures scalars in
+        Bls12_381.G2.to_compressed_bytes res)
+      signatures
+
   let aggregate_public_key_opt ?(subgroup_check = true) pks =
     let pks =
       Bls12_381.G1.affine_array_of_compressed_bytes_opt
@@ -576,6 +591,21 @@ module MinSig = struct
     Option.map
       (fun signatures ->
         let res = Bls12_381.G1.affine_add_bulk signatures in
+        Bls12_381.G1.to_compressed_bytes res)
+      signatures
+
+  let aggregate_signature_weighted_opt ?(subgroup_check = true)
+      signatures_with_weights =
+    let weights, signatures = List.split signatures_with_weights in
+    let scalars = List.map Bls12_381.Fr.of_z weights |> Array.of_list in
+    let signatures =
+      Bls12_381.G1.affine_array_of_compressed_bytes_opt
+        ~subgroup_check
+        (Array.of_list signatures)
+    in
+    Option.map
+      (fun signatures ->
+        let res = Bls12_381.G1.pippenger_with_affine_array signatures scalars in
         Bls12_381.G1.to_compressed_bytes res)
       signatures
 

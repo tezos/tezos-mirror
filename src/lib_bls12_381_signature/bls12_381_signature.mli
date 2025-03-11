@@ -120,13 +120,21 @@ module MinPk : sig
   val aggregate_signature_opt :
     ?subgroup_check:bool -> signature list -> signature option
 
+  (** [aggregate_signature_weighted_opt [(w_1, s_1);(w_1, s_2);...]] aggregates the signatures
+      [s_i] multiplied by their weights [w_i], i.e it returns the sum of [w_i * s_i].
+      Return [None] if deserialization of signatures fails. If [subgroup_check] is set, the
+      function also checks if the points are in G2. *)
+  val aggregate_signature_weighted_opt :
+    ?subgroup_check:bool -> (Z.t * signature) list -> signature option
+
   (** [aggregate_public_key_opt ?subgroup_check pks] aggregates the public keys
       [pks]. If [subgroup_check] is set, the function also checks if the
       points are in G1. *)
   val aggregate_public_key_opt : ?subgroup_check:bool -> pk list -> pk option
 
   (** [aggregate_public_key_weighted_opt [(w_1, pk_1);(w_2, pk_2);...]] aggregates the public
-      keys [pk_i] multiplied by their weights [w_i], i.e it returns the sum of [w_i * pk_i]. *)
+      keys [pk_i] multiplied by their weights [w_i], i.e it returns the sum of [w_i * pk_i].
+      If [subgroup_check] is set, the function also checks if the points are in G1. *)
   val aggregate_public_key_weighted_opt :
     ?subgroup_check:bool -> (Z.t * pk) list -> pk option
 
@@ -315,13 +323,21 @@ module MinSig : sig
   val aggregate_signature_opt :
     ?subgroup_check:bool -> signature list -> signature option
 
+  (** [aggregate_signature_weighted_opt [(w_1, s_1);(w_1, s_2);...]] aggregates the signatures
+      [s_i] multiplied by their weights [w_i], i.e it returns the sum of [w_i * s_i].
+      Return [None] if deserialization of signatures fails. If [subgroup_check] is set, the
+      function also checks if the points are in G1. *)
+  val aggregate_signature_weighted_opt :
+    ?subgroup_check:bool -> (Z.t * signature) list -> signature option
+
   (** [aggregate_public_key_opt ?subgroup_check pks] aggregates the public keys
       [pks]. If [subgroup_check] is set, the function also checks if the
       points are in G2. *)
   val aggregate_public_key_opt : ?subgroup_check:bool -> pk list -> pk option
 
   (** [aggregate_public_key_weighted_opt [(w_1, pk_1);(w_2, pk_2);...]] aggregates the public
-      keys [pk_i] multiplied by their weights [w_i], i.e it returns the sum of [w_i * pk_i]. *)
+      keys [pk_i] multiplied by their weights [w_i], i.e it returns the sum of [w_i * pk_i].
+      If [subgroup_check] is set, the function also checks if the points are in G2. *)
   val aggregate_public_key_weighted_opt :
     ?subgroup_check:bool -> (Z.t * pk) list -> pk option
 

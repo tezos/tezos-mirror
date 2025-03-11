@@ -452,15 +452,23 @@ module type AGGREGATE_SIGNATURE = sig
       function also checks if the points are in the prime subgroup. *)
   val aggregate_signature_opt : ?subgroup_check:bool -> t list -> t option
 
-  (** [aggregate_public_key_opt pk_list] creates an aggregated public key using
-      the list of public_keys [pk_list]. If [subgroup_check] is set, the function
-      also checks if the points are in the prime subgroup. *)
+  (** [aggregate_signature_weighted_opt [(w_1, s_1);(w_1, s_2);...]] aggregates the signatures
+      [s_i] multiplied by their weights [w_i], i.e it returns the sum of [w_i * s_i].
+      Return [None] if deserialization of signatures fails. If [subgroup_check] is set, the
+      function also checks if the points are in the prime subgroup. *)
+  val aggregate_signature_weighted_opt :
+    ?subgroup_check:bool -> (Z.t * t) list -> t option
+
+  (** [aggregate_public_key_opt ?subgroup_check pks] aggregates the public keys
+      [pks]. If [subgroup_check] is set, the function also checks if the
+      points are in the prime subgroup. *)
   val aggregate_public_key_opt :
     ?subgroup_check:bool -> Public_key.t list -> Public_key.t option
 
-  (** [aggregate_public_key_lc_opt pk_with_weights_list] creates an aggregated public
-      key as a weighted sum of the list of public keys and their weights in
-      [pk_with_weights_list]. *)
+  (** [aggregate_public_key_weighted_opt [(w_1, pk_1);(w_2, pk_2);...]] aggregates the public
+      keys [pk_i] multiplied by their weights [w_i], i.e it returns the sum of [w_i * pk_i].
+      If [subgroup_check] is set, the function also checks if the points are in the
+      prime subgroup. *)
   val aggregate_public_key_weighted_opt :
     ?subgroup_check:bool -> (Z.t * Public_key.t) list -> Public_key.t option
 end

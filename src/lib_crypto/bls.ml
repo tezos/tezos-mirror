@@ -389,6 +389,9 @@ let aggregate_check pk_msg_list signature =
 
 let aggregate_signature_opt = Bls12_381_signature.MinPk.aggregate_signature_opt
 
+let aggregate_signature_weighted_opt =
+  Bls12_381_signature.MinPk.aggregate_signature_weighted_opt
+
 let aggregate_public_key_opt =
   Bls12_381_signature.MinPk.aggregate_public_key_opt
 

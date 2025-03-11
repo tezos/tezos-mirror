@@ -514,6 +514,21 @@ let aggregate_signature_opt ?subgroup_check signatures =
       |> Option.map (fun s -> Bls12_381 s)
   | Error _ -> None
 
+let aggregate_signature_weighted_opt ?subgroup_check signatures_with_weights =
+  let open Result_syntax in
+  let aux acc (w, s) =
+    match s with
+    | Bls12_381 s -> return @@ ((w, s) :: acc)
+    | Unknown s ->
+        let* s = Bls.of_bytes s in
+        return ((w, s) :: acc)
+  in
+  match List.fold_left_e aux [] signatures_with_weights with
+  | Ok signatures ->
+      Bls.aggregate_signature_weighted_opt ?subgroup_check signatures
+      |> Option.map (fun s -> Bls12_381 s)
+  | Error _ -> None
+
 let aggregate_public_key_opt ?subgroup_check pks =
   List.map (function Public_key.Bls12_381 s -> s) pks
   |> Bls.aggregate_public_key_opt ?subgroup_check

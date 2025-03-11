@@ -529,6 +529,9 @@ struct
 
       val aggregate_signature_opt : ?subgroup_check:bool -> t list -> t option
 
+      val aggregate_signature_weighted_opt :
+        ?subgroup_check:bool -> (Z.t * t) list -> t option
+
       val aggregate_public_key_opt :
         ?subgroup_check:bool -> Public_key.t list -> Public_key.t option
 
