@@ -209,8 +209,8 @@ pub enum OpCode {
     Sll,
     Srl,
     Sra,
-    Slt,
-    Sltu,
+    SetLessThanSigned,
+    SetLessThanUnsigned,
     Addw,
     Subw,
     Sllw,
@@ -229,8 +229,8 @@ pub enum OpCode {
     Slliw,
     Srliw,
     Sraiw,
-    Slti,
-    Sltiu,
+    SetLessThanImmediateSigned,
+    SetLessThanImmediateUnsigned,
     Lb,
     Lh,
     Lw,
@@ -451,8 +451,8 @@ impl OpCode {
             Self::Sll => Args::run_sll,
             Self::Srl => Args::run_srl,
             Self::Sra => Args::run_sra,
-            Self::Slt => Args::run_slt,
-            Self::Sltu => Args::run_sltu,
+            Self::SetLessThanSigned => Args::run_set_less_than_signed,
+            Self::SetLessThanUnsigned => Args::run_set_less_than_unsigned,
             Self::Addw => Args::run_addw,
             Self::Subw => Args::run_subw,
             Self::Sllw => Args::run_sllw,
@@ -469,8 +469,8 @@ impl OpCode {
             Self::Slliw => Args::run_slliw,
             Self::Srliw => Args::run_srliw,
             Self::Sraiw => Args::run_sraiw,
-            Self::Slti => Args::run_slti,
-            Self::Sltiu => Args::run_sltiu,
+            Self::SetLessThanImmediateSigned => Args::run_set_less_than_immediate_signed,
+            Self::SetLessThanImmediateUnsigned => Args::run_set_less_than_immediate_unsigned,
             Self::Lb => Args::run_lb,
             Self::Lbnz => Args::run_lbnz,
             Self::Lh => Args::run_lh,
@@ -656,10 +656,10 @@ impl OpCode {
             Self::JrImm => Some(Args::run_jr_imm),
             Self::Addi => Some(Args::run_addi),
             Self::Andi => Some(Args::run_andi),
-            Self::Slt => Some(Args::run_slt),
-            Self::Sltu => Some(Args::run_sltu),
-            Self::Slti => Some(Args::run_slti),
-            Self::Sltiu => Some(Args::run_sltiu),
+            Self::SetLessThanSigned => Some(Args::run_set_less_than_signed),
+            Self::SetLessThanUnsigned => Some(Args::run_set_less_than_unsigned),
+            Self::SetLessThanImmediateSigned => Some(Args::run_set_less_than_immediate_signed),
+            Self::SetLessThanImmediateUnsigned => Some(Args::run_set_less_than_immediate_unsigned),
             _ => None,
         }
     }
@@ -1227,8 +1227,16 @@ impl Args {
     impl_r_type!(run_sll, non_zero);
     impl_r_type!(run_srl, non_zero);
     impl_r_type!(run_sra, non_zero);
-    impl_r_type!(integer::run_slt, run_slt, non_zero_rd);
-    impl_r_type!(integer::run_sltu, run_sltu, non_zero_rd);
+    impl_r_type!(
+        integer::run_set_less_than_signed,
+        run_set_less_than_signed,
+        non_zero_rd
+    );
+    impl_r_type!(
+        integer::run_set_less_than_unsigned,
+        run_set_less_than_unsigned,
+        non_zero_rd
+    );
     impl_r_type!(run_addw, non_zero_rd);
     impl_r_type!(run_subw, non_zero_rd);
     impl_r_type!(run_sllw, non_zero_rd);
@@ -1247,8 +1255,16 @@ impl Args {
     impl_i_type!(run_slliw, non_zero_rd);
     impl_i_type!(run_srliw, non_zero_rd);
     impl_i_type!(run_sraiw, non_zero_rd);
-    impl_i_type!(integer::run_slti, run_slti, non_zero_rd);
-    impl_i_type!(integer::run_sltiu, run_sltiu, non_zero_rd);
+    impl_i_type!(
+        integer::run_set_less_than_immediate_signed,
+        run_set_less_than_immediate_signed,
+        non_zero_rd
+    );
+    impl_i_type!(
+        integer::run_set_less_than_immediate_unsigned,
+        run_set_less_than_immediate_unsigned,
+        non_zero_rd
+    );
     impl_load_type!(run_lb);
     impl_load_type!(run_lh);
     impl_load_type!(run_lw);
@@ -1530,8 +1546,12 @@ impl From<&InstrCacheable> for Instruction {
             InstrCacheable::Sll(args) => Instruction::from_ic_sll(args),
             InstrCacheable::Srl(args) => Instruction::from_ic_srl(args),
             InstrCacheable::Sra(args) => Instruction::from_ic_sra(args),
-            InstrCacheable::Slt(args) => Instruction::new_slt(args.rd, args.rs1, args.rs2),
-            InstrCacheable::Sltu(args) => Instruction::new_sltu(args.rd, args.rs1, args.rs2),
+            InstrCacheable::Slt(args) => {
+                Instruction::new_set_less_than_signed(args.rd, args.rs1, args.rs2)
+            }
+            InstrCacheable::Sltu(args) => {
+                Instruction::new_set_less_than_unsigned(args.rd, args.rs1, args.rs2)
+            }
             InstrCacheable::Addw(args) => Instruction {
                 opcode: OpCode::Addw,
                 args: args.into(),
@@ -1577,8 +1597,12 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Sraiw,
                 args: args.to_args(InstrWidth::Uncompressed),
             },
-            InstrCacheable::Slti(args) => Instruction::new_slti(args.rd, args.rs1, args.imm),
-            InstrCacheable::Sltiu(args) => Instruction::new_sltiu(args.rd, args.rs1, args.imm),
+            InstrCacheable::Slti(args) => {
+                Instruction::new_set_less_than_immediate_signed(args.rd, args.rs1, args.imm)
+            }
+            InstrCacheable::Sltiu(args) => {
+                Instruction::new_set_less_than_immediate_unsigned(args.rd, args.rs1, args.imm)
+            }
             InstrCacheable::Lb(args) => Instruction::from_ic_lb(args),
             InstrCacheable::Lh(args) => Instruction::from_ic_lh(args),
             InstrCacheable::Lw(args) => Instruction::from_ic_lw(args),

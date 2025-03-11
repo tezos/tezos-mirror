@@ -156,7 +156,15 @@ pub fn run_andi(icb: &mut impl ICB, imm: i64, rs1: NonZeroXRegister, rd: NonZero
 ///
 /// Places the value 1 in `rd` if val(rs1) is less than the immediate
 /// when treated as signed integers, 0 otherwise
-pub fn run_slti(icb: &mut impl ICB, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
+///
+/// Relevant RISC-V opcodes:
+/// - SLTI
+pub fn run_set_less_than_immediate_signed(
+    icb: &mut impl ICB,
+    imm: i64,
+    rs1: XRegister,
+    rd: NonZeroXRegister,
+) {
     let lhs = icb.xregister_read(rs1);
     let rhs = icb.xvalue_of_imm(imm);
 
@@ -166,11 +174,17 @@ pub fn run_slti(icb: &mut impl ICB, imm: i64, rs1: XRegister, rd: NonZeroXRegist
     icb.xregister_write_nz(rd, res);
 }
 
-/// `SLTIU` I-type instruction
-///
 /// Places the value 1 in `rd` if val(rs1) is less than the immediate
 /// when treated as unsigned integers, 0 otherwise
-pub fn run_sltiu(icb: &mut impl ICB, imm: i64, rs1: XRegister, rd: NonZeroXRegister) {
+///
+/// Relevant RISC-V opcodes:
+/// - SLTIU
+pub fn run_set_less_than_immediate_unsigned(
+    icb: &mut impl ICB,
+    imm: i64,
+    rs1: XRegister,
+    rd: NonZeroXRegister,
+) {
     let lhs = icb.xregister_read(rs1);
     let rhs = icb.xvalue_of_imm(imm);
 
@@ -180,11 +194,17 @@ pub fn run_sltiu(icb: &mut impl ICB, imm: i64, rs1: XRegister, rd: NonZeroXRegis
     icb.xregister_write_nz(rd, res);
 }
 
-/// `SLT` R-type instruction
-///
 /// Places the value 1 in `rd` if val(rs1) < val(rs2)
 /// when treated as signed integers, 0 otherwise
-pub fn run_slt(icb: &mut impl ICB, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
+///
+/// Relevant RISC-V opcodes:
+/// - SLT
+pub fn run_set_less_than_signed(
+    icb: &mut impl ICB,
+    rs1: XRegister,
+    rs2: XRegister,
+    rd: NonZeroXRegister,
+) {
     let lhs = icb.xregister_read(rs1);
     let rhs = icb.xregister_read(rs2);
 
@@ -194,11 +214,17 @@ pub fn run_slt(icb: &mut impl ICB, rs1: XRegister, rs2: XRegister, rd: NonZeroXR
     icb.xregister_write_nz(rd, res);
 }
 
-/// `SLTU` R-type instruction
-///
 /// Places the value 1 in `rd` if val(rs1) < val(rs2)
 /// when treated as unsigned integers, 0 otherwise
-pub fn run_sltu(icb: &mut impl ICB, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
+///
+/// Relevant RISC-V opcodes:
+/// - SLTU
+pub fn run_set_less_than_unsigned(
+    icb: &mut impl ICB,
+    rs1: XRegister,
+    rs2: XRegister,
+    rd: NonZeroXRegister,
+) {
     let lhs = icb.xregister_read(rs1);
     let rhs = icb.xregister_read(rs2);
 
@@ -305,7 +331,7 @@ mod tests {
         }
     });
 
-    backend_test!(test_slt, F, {
+    backend_test!(test_set_less_than, F, {
         let mut core = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
 
         let v1_v2_exp_expu = [
@@ -315,17 +341,17 @@ mod tests {
             (123, 123123, 1, 1),
         ];
 
-        for (v1, v2, exp, expu) in v1_v2_exp_expu {
-            core.hart.xregisters.write(a1, v1);
-            core.hart.xregisters.write(a2, v2);
-            super::run_slt(&mut core, a1, a2, nz::t0);
-            assert_eq!(core.hart.xregisters.read(t0), exp);
-            super::run_sltu(&mut core, a1, a2, nz::t1);
-            assert_eq!(core.hart.xregisters.read(t1), expu);
-            super::run_slti(&mut core, v2 as i64, a1, nz::t0);
-            assert_eq!(core.hart.xregisters.read(t0), exp);
-            super::run_sltiu(&mut core, v2 as i64, a1, nz::t0);
-            assert_eq!(core.hart.xregisters.read(t0), expu);
+        for (val1, val2, expected, expected_unsigned) in v1_v2_exp_expu {
+            core.hart.xregisters.write(a1, val1);
+            core.hart.xregisters.write(a2, val2);
+            super::run_set_less_than_signed(&mut core, a1, a2, nz::t0);
+            assert_eq!(core.hart.xregisters.read(t0), expected);
+            super::run_set_less_than_unsigned(&mut core, a1, a2, nz::t1);
+            assert_eq!(core.hart.xregisters.read(t1), expected_unsigned);
+            super::run_set_less_than_immediate_signed(&mut core, val2 as i64, a1, nz::t0);
+            assert_eq!(core.hart.xregisters.read(t0), expected);
+            super::run_set_less_than_immediate_unsigned(&mut core, val2 as i64, a1, nz::t0);
+            assert_eq!(core.hart.xregisters.read(t0), expected_unsigned);
         }
     });
 }

@@ -1028,59 +1028,59 @@ mod tests {
             // equal values always false
             // -------------------------
             // Slt
-            test_slt(I::new_slt, (x1, 1), (x2, 1), FALSE),
-            test_slt(I::new_slt, (x0, 1), (x2, 0), FALSE),
-            test_slt(I::new_slt, (x3, -1), (x2, -1), FALSE),
+            test_slt(I::new_set_less_than_signed, (x1, 1), (x2, 1), FALSE),
+            test_slt(I::new_set_less_than_signed, (x0, 1), (x2, 0), FALSE),
+            test_slt(I::new_set_less_than_signed, (x3, -1), (x2, -1), FALSE),
             // Sltu
-            test_slt(I::new_sltu, (x1, 1), (x2, 1), FALSE),
-            test_slt(I::new_sltu, (x0, 1), (x2, 0), FALSE),
-            test_slt(I::new_sltu, (x3, -1), (x2, -1), FALSE),
+            test_slt(I::new_set_less_than_unsigned, (x1, 1), (x2, 1), FALSE),
+            test_slt(I::new_set_less_than_unsigned, (x0, 1), (x2, 0), FALSE),
+            test_slt(I::new_set_less_than_unsigned, (x3, -1), (x2, -1), FALSE),
             // Slti
-            test_slt_imm(I::new_slti, (x1, 1), 1, FALSE),
-            test_slt_imm(I::new_slti, (x0, 1), 0, FALSE),
-            test_slt_imm(I::new_slti, (x3, -1), -1, FALSE),
+            test_slt_imm(I::new_set_less_than_immediate_signed, (x1, 1), 1, FALSE),
+            test_slt_imm(I::new_set_less_than_immediate_signed, (x0, 1), 0, FALSE),
+            test_slt_imm(I::new_set_less_than_immediate_signed, (x3, -1), -1, FALSE),
             // Sltiu
-            test_slt_imm(I::new_sltiu, (x1, 1), 1, FALSE),
-            test_slt_imm(I::new_sltiu, (x0, 1), 0, FALSE),
-            test_slt_imm(I::new_sltiu, (x3, -1), -1, FALSE),
+            test_slt_imm(I::new_set_less_than_immediate_unsigned, (x1, 1), 1, FALSE),
+            test_slt_imm(I::new_set_less_than_immediate_unsigned, (x0, 1), 0, FALSE),
+            test_slt_imm(I::new_set_less_than_immediate_unsigned, (x3, -1), -1, FALSE),
             // --------------------------------
             // greater than values always false
             // --------------------------------
             // Slt
-            test_slt(I::new_slt, (x1, 3), (x2, 1), FALSE),
-            test_slt(I::new_slt, (x0, 0), (x2, -2), FALSE),
-            test_slt(I::new_slt, (x3, -1), (x2, -5), FALSE),
+            test_slt(I::new_set_less_than_signed, (x1, 3), (x2, 1), FALSE),
+            test_slt(I::new_set_less_than_signed, (x0, 0), (x2, -2), FALSE),
+            test_slt(I::new_set_less_than_signed, (x3, -1), (x2, -5), FALSE),
             // Sltu
-            test_slt(I::new_sltu, (x1, 1), (x2, 1), FALSE),
-            test_slt(I::new_sltu, (x2, 5), (x0, 0), FALSE),
-            test_slt(I::new_sltu, (x3, -1), (x2, 2), FALSE),
+            test_slt(I::new_set_less_than_unsigned, (x1, 1), (x2, 1), FALSE),
+            test_slt(I::new_set_less_than_unsigned, (x2, 5), (x0, 0), FALSE),
+            test_slt(I::new_set_less_than_unsigned, (x3, -1), (x2, 2), FALSE),
             // Slti
-            test_slt_imm(I::new_slti, (x1, 2), 1, FALSE),
-            test_slt_imm(I::new_slti, (x5, 1), 0, FALSE),
-            test_slt_imm(I::new_slti, (x3, -5), -6, FALSE),
+            test_slt_imm(I::new_set_less_than_immediate_signed, (x1, 2), 1, FALSE),
+            test_slt_imm(I::new_set_less_than_immediate_signed, (x5, 1), 0, FALSE),
+            test_slt_imm(I::new_set_less_than_immediate_signed, (x3, -5), -6, FALSE),
             // Sltiu
-            test_slt_imm(I::new_sltiu, (x1, 5), 1, FALSE),
-            test_slt_imm(I::new_sltiu, (x3, -1), 15, FALSE),
-            test_slt_imm(I::new_sltiu, (x3, -1), -6, FALSE),
+            test_slt_imm(I::new_set_less_than_immediate_unsigned, (x1, 5), 1, FALSE),
+            test_slt_imm(I::new_set_less_than_immediate_unsigned, (x3, -1), 15, FALSE),
+            test_slt_imm(I::new_set_less_than_immediate_unsigned, (x3, -1), -6, FALSE),
             // ----------------------------
             // less than values always true
             // ----------------------------
             // Slt
-            test_slt(I::new_slt, (x1, 2), (x2, 5), TRUE),
-            test_slt(I::new_slt, (x0, 0), (x2, 3), TRUE),
-            test_slt(I::new_slt, (x3, -5), (x2, -3), TRUE),
+            test_slt(I::new_set_less_than_signed, (x1, 2), (x2, 5), TRUE),
+            test_slt(I::new_set_less_than_signed, (x0, 0), (x2, 3), TRUE),
+            test_slt(I::new_set_less_than_signed, (x3, -5), (x2, -3), TRUE),
             // Sltu
-            test_slt(I::new_sltu, (x1, 1), (x2, -1), TRUE),
-            test_slt(I::new_sltu, (x0, 0), (x3, 5), TRUE),
-            test_slt(I::new_sltu, (x3, -2), (x2, -1), TRUE),
+            test_slt(I::new_set_less_than_unsigned, (x1, 1), (x2, -1), TRUE),
+            test_slt(I::new_set_less_than_unsigned, (x0, 0), (x3, 5), TRUE),
+            test_slt(I::new_set_less_than_unsigned, (x3, -2), (x2, -1), TRUE),
             // Slti
-            test_slt_imm(I::new_slti, (x1, 2), 5, TRUE),
-            test_slt_imm(I::new_slti, (x5, 0), 3, TRUE),
-            test_slt_imm(I::new_slti, (x3, -6), -5, TRUE),
+            test_slt_imm(I::new_set_less_than_immediate_signed, (x1, 2), 5, TRUE),
+            test_slt_imm(I::new_set_less_than_immediate_signed, (x5, 0), 3, TRUE),
+            test_slt_imm(I::new_set_less_than_immediate_signed, (x3, -6), -5, TRUE),
             // Sltiu
-            test_slt_imm(I::new_sltiu, (x1, 3), 5, TRUE),
-            test_slt_imm(I::new_sltiu, (x3, 5), -15, TRUE),
-            test_slt_imm(I::new_sltiu, (x3, -7), -6, TRUE),
+            test_slt_imm(I::new_set_less_than_immediate_unsigned, (x1, 3), 5, TRUE),
+            test_slt_imm(I::new_set_less_than_immediate_unsigned, (x3, 5), -15, TRUE),
+            test_slt_imm(I::new_set_less_than_immediate_unsigned, (x3, -7), -6, TRUE),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();

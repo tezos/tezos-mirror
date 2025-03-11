@@ -246,10 +246,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Slt`].
-    pub(crate) fn new_slt(rd: NonZeroXRegister, rs1: XRegister, rs2: XRegister) -> Self {
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for
+    /// [`OpCode::SetLessThanSigned`].
+    pub(crate) fn new_set_less_than_signed(
+        rd: NonZeroXRegister,
+        rs1: XRegister,
+        rs2: XRegister,
+    ) -> Self {
         Self {
-            opcode: OpCode::Slt,
+            opcode: OpCode::SetLessThanSigned,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -260,10 +265,14 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sltu`].
-    pub(crate) fn new_sltu(rd: NonZeroXRegister, rs1: XRegister, rs2: XRegister) -> Self {
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::SetLessThanUnsigned`].
+    pub(crate) fn new_set_less_than_unsigned(
+        rd: NonZeroXRegister,
+        rs1: XRegister,
+        rs2: XRegister,
+    ) -> Self {
         Self {
-            opcode: OpCode::Sltu,
+            opcode: OpCode::SetLessThanUnsigned,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -274,10 +283,14 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Slti`].
-    pub(crate) fn new_slti(rd: NonZeroXRegister, rs1: XRegister, imm: i64) -> Self {
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::SetLessThanImmediateSigned`].
+    pub(crate) fn new_set_less_than_immediate_signed(
+        rd: NonZeroXRegister,
+        rs1: XRegister,
+        imm: i64,
+    ) -> Self {
         Self {
-            opcode: OpCode::Slti,
+            opcode: OpCode::SetLessThanImmediateSigned,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -288,10 +301,14 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sltiu`].
-    pub(crate) fn new_sltiu(rd: NonZeroXRegister, rs1: XRegister, imm: i64) -> Self {
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::SetLessThanImmediateUnsigned`].
+    pub(crate) fn new_set_less_than_immediate_unsigned(
+        rd: NonZeroXRegister,
+        rs1: XRegister,
+        imm: i64,
+    ) -> Self {
         Self {
-            opcode: OpCode::Sltiu,
+            opcode: OpCode::SetLessThanImmediateUnsigned,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
