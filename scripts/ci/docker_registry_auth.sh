@@ -28,6 +28,11 @@ echo "DOCKER_BUILD_TARGET=${DOCKER_BUILD_TARGET:-}"
 echo "RUST_TOOLCHAIN_IMAGE_NAME=${RUST_TOOLCHAIN_IMAGE_NAME:-}"
 echo "CI_COMMIT_REF_PROTECTED=${CI_COMMIT_REF_PROTECTED:-}"
 
+# Export Google Auth token to build DockerFile
+echo "Current active user:"
+gcloud config get-value account
+echo -n "$(gcloud auth print-access-token)" > /tmp/npm_token.txt
+
 # Allow to push to private GCP Artifact Registry if the CI/CD variable is defined
 if [ -n "${GCP_REGISTRY:-}" ]; then
   # There are two registries for storing Docker images. The first allows pushes from
