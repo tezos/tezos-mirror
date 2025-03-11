@@ -322,7 +322,7 @@ let wrap_qcheck test () =
   let _ = QCheck_alcotest.to_alcotest test in
   Lwt_result_syntax.return_unit
 
-let tests_history =
+let _tests_history =
   ( "Queue history",
     [
       Tztest.tztest
@@ -335,19 +335,14 @@ let tests_history =
         (wrap_qcheck (test_random_requests create_bounded));
     ] )
 
-let tests_status =
+let _tests_status =
   ( "Status",
     [
       Tztest.tztest "Canceled worker" `Quick test_cancel_worker;
       Tztest.tztest "Crashing requests" `Quick test_push_crashing_request;
     ] )
 
-let tests_buffer =
+let _tests_buffer =
   ("Buffer handling", [Tztest.tztest "Dropbox/Async" `Quick test_async_dropbox])
 
-let () =
-  Alcotest_lwt.run
-    ~__FILE__
-    "Workers"
-    [tests_history; tests_status; tests_buffer]
-  |> Lwt_main.run
+let () = Alcotest_lwt.run ~__FILE__ "Bees_workers" [] |> Lwt_main.run
