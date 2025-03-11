@@ -15,6 +15,8 @@
  *)
 
 module Schema = Schema
+module Brassaia_pack = Brassaia_eio_pack.Brassaia_pack
+module Brassaia_pack_unix = Brassaia_eio_pack_unix.Brassaia_pack_unix
 
 module Conf : Brassaia_pack.Conf.S
 

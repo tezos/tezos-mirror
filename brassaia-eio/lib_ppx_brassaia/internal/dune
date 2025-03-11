@@ -1,0 +1,25 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name ppx_brassaia_eio_internal_lib)
+ (public_name octez-libs.ppx_brassaia_eio.internal_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  logs)
+ (modules ppx_brassaia_internal_lib))
+
+(library
+ (name ppx_brassaia_eio_internal)
+ (public_name octez-libs.ppx_brassaia_eio.internal)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  ppxlib
+  octez-libs.ppx_brassaia_eio.internal_lib
+  octez-libs.ppx_brassaia_eio)
+ (kind ppx_rewriter)
+ (ppx_runtime_libraries
+  logs
+  octez-libs.ppx_brassaia_eio.internal_lib)
+ (preprocess (pps ppxlib.metaquot))
+ (modules ppx_brassaia_internal))

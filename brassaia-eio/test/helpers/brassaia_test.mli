@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+module Brassaia = Brassaia_eio.Brassaia
+
 module type S = Common.S
 
 module type Generic_key = Common.Generic_key
@@ -71,8 +73,8 @@ val checks : 'a Brassaia.Type.t -> string -> 'a list -> 'a list -> unit
 
 module Store : sig
   val run :
+    __FILE__:string ->
     string ->
-    ?and_exit:bool ->
     ?slow:bool ->
     ?random_seed:int ->
     sleep:(float -> unit) ->

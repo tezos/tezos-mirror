@@ -98,8 +98,8 @@ module Util = struct
   let io_get_version ~root : [`V1 | `V2 | `V3 | `V4 | `V5] =
     File_manager.version ~root |> Errs.raise_if_error
 
-  let alco_check_version ~pos ~expected ~actual =
-    Alcotest.check_repr ~pos Brassaia_pack.Version.t "" expected actual
+  let alco_check_version ~pos:_ ~expected ~actual =
+    Alcotest.check_repr Brassaia_pack.Version.t "" expected actual
 end
 
 open Util

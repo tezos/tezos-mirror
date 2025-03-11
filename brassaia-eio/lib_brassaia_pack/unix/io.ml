@@ -14,9 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+module Brassaia_pack_io = Brassaia_eio_pack_io.Brassaia_pack_io
 open! Brassaia_pack_io.Import
 module Errors = Brassaia_pack_io.Errors
-module Syscalls = Index_unix.Syscalls
+module Syscalls = Brassaia_index_unix.Index_unix.Syscalls
 
 (* File utils, taken from index.unix package.
 

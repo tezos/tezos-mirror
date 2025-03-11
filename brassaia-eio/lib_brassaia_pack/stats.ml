@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+module Brassaia = Brassaia_eio.Brassaia
 module Metrics = Brassaia.Metrics
 
 module Inode = struct

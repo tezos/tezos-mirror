@@ -18,6 +18,8 @@
     backend, intended for users that must be interoperable with the
     idiosyncrasies of the persistent implementation. *)
 
+module Brassaia_pack = Brassaia_eio_pack.Brassaia_pack
+
 module Maker (_ : Brassaia_pack.Conf.S) :
   Brassaia_pack.Maker
     with type ('h, _) contents_key = 'h

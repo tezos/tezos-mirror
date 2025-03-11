@@ -15,6 +15,7 @@
  *)
 
 open! Import
+module Brassaia_pack = Brassaia_eio_pack.Brassaia_pack
 
 module Atomic_write (K : Brassaia.Type.S) (V : Brassaia.Hash.S) = struct
   module AW = Brassaia_mem.Atomic_write (K) (V)

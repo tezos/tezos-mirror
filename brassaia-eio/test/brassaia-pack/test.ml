@@ -15,8 +15,9 @@
  *)
 
 let () =
-  Eio_main.run @@ fun env ->
-  Brassaia_test.Store.run
+  Eio_posix.run @@ fun env ->
+  Brassaia_eio_test_helpers.Brassaia_test.Store.run
+    ~__FILE__
     "brassaia-pack"
     ~misc:(Test_pack.misc @@ Eio.Stdenv.domain_mgr env)
     ~sleep:Eio_unix.sleep

@@ -15,6 +15,7 @@
  *)
 
 open! Import
+module Brassaia = Brassaia_eio.Brassaia
 
 let random_char () = char_of_int (Random.int 256)
 
@@ -328,8 +329,15 @@ let testable t =
 
 let check t = Alcotest.check (testable t)
 
+let slist (type a) (a : a Alcotest.testable) compare =
+  let l = Alcotest.list a in
+  let eq l1 l2 =
+    Alcotest.equal l (List.sort compare l1) (List.sort compare l2)
+  in
+  Alcotest.testable (Alcotest.pp l) eq
+
 let checks t =
-  let t = Alcotest.slist (testable t) Brassaia.Type.(unstage (compare t)) in
+  let t = slist (testable t) Brassaia.Type.(unstage (compare t)) in
   Alcotest.check t
 
 (* also in test/brassaia-pack/common.ml *)

@@ -16,6 +16,8 @@
 
 open! Import
 open Common
+module Brassaia_test = Brassaia_eio_test_helpers.Brassaia_test
+(* module Brassaia_pack_mem = Brassaia_eio_pack.Brassaia_pack_mem *)
 
 let test_dir = Filename.concat "_build" "test-db-pack"
 
@@ -56,7 +58,7 @@ let suite_pack name_suffix indexing_strategy
     ()
 
 module Brassaia_tezos_conf = struct
-  include Brassaia_tezos.Conf
+  include Brassaia_eio_tezos.Brassaia_tezos.Conf
 
   (* The generic test suite relies a lot on the empty tree. Let's allow it. *)
   let forbid_empty_dir_persistence = false
@@ -463,13 +465,16 @@ module Branch = struct
     let v = Branch.find t "foo" in
     Alcotest.(check (option hash)) "foo" (Some x) v ;
     let br = Branch.list t in
-    Alcotest.(check (slist string compare)) "branches" branches br ;
+    Alcotest.(check (Brassaia_eio_test_helpers.Common.slist string compare))
+      "branches"
+      branches
+      br ;
     Branch.remove t "foo" ;
     let t = Branch.v ~fresh:false name in
     let v = Branch.find t "foo" in
     Alcotest.(check (option hash)) "foo none" None v ;
     let br = Branch.list t in
-    Alcotest.(check (slist string compare))
+    Alcotest.(check (Brassaia_eio_test_helpers.Common.slist string compare))
       "branches"
       (List.filter (( <> ) "foo") branches)
       br

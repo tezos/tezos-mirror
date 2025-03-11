@@ -22,6 +22,8 @@
 
 (** {1 Store} *)
 
+module Brassaia = Brassaia_eio.Brassaia
+module Brassaia_pack_io = Brassaia_eio_pack_io.Brassaia_pack_io
 open Brassaia_pack_io
 
 module type S = Brassaia_pack_io.S
@@ -55,7 +57,11 @@ module Index : sig
   module type S = Index.S
 
   module Make (K : Brassaia.Hash.S) :
-      module type of Index.Make_io (Io.Unix) (Index_unix.Private.Platform) (K)
+      module type of
+        Index.Make_io
+          (Io.Unix)
+          (Brassaia_index_unix.Index_unix.Private.Platform)
+          (K)
 end
 
 module Inode = Inode

@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+module Brassaia = Brassaia_eio.Brassaia
+
 type length_header = [`Varint] option
 
 type inode_child_order =

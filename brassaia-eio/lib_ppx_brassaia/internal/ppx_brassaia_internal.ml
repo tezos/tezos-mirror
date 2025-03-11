@@ -51,7 +51,9 @@ let log_function ~loc (source : Source.t) (level : Logs.level) =
 let tags ~loc =
   [%expr
     Logs.Tag.add
-      Ppx_brassaia_internal_lib.Source_code_position.tag
+      Ppx_brassaia_eio_internal_lib.Ppx_brassaia_internal_lib
+      .Source_code_position
+      .tag
       __POS__
       Logs.Tag.empty]
 

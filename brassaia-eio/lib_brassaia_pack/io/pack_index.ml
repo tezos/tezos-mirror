@@ -20,7 +20,7 @@ include Pack_index_intf
 
 module Make_io
     (Io : Io_intf.S)
-    (Io_index : Index.Platform.S)
+    (Io_index : Brassaia_index.Index.Platform.S)
     (K : Brassaia.Hash.S) =
 struct
   module Key = struct
@@ -66,9 +66,11 @@ struct
       (off, len, kind)
   end
 
-  module Stats = Index.Stats
-  module I = Index
-  module Index_raw = Index.Make (Key) (Val) (Io_index) (Index.Cache.Unbounded)
+  module Stats = Brassaia_index.Index.Stats
+  module I = Brassaia_index.Index
+  module Index_raw =
+    Brassaia_index.Index.Make (Key) (Val) (Io_index)
+      (Brassaia_index.Index.Cache.Unbounded)
   include Index_raw
   module Io = Io
 

@@ -16,10 +16,11 @@
 
 open! Import
 include Store_intf
+module Brassaia_pack = Brassaia_eio_pack.Brassaia_pack
 
 module Maker
     (Io : Io_intf.S)
-    (Io_index : Index.Platform.S)
+    (Io_index : Brassaia_index.Index.Platform.S)
     (Async : Async_intf.S)
     (Config : Conf.S) =
 struct

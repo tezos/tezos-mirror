@@ -15,9 +15,10 @@
  *)
 
 let () =
-  Eio_main.run @@ fun _env ->
-  Brassaia_test.Store.run
-    __FILE__
+  Eio_posix.run @@ fun _env ->
+  Brassaia_eio_test_helpers.Brassaia_test.Store.run
+    ~__FILE__
+    "brassaia/generic-key"
     ~slow:true
     ~misc:[]
     ~sleep:Eio_unix.sleep

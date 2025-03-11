@@ -671,7 +671,8 @@ module Gc_common (B : Gc_backend) = struct
         List.map (fun (f, s) -> (f, Int63.to_int s)) stats.worker.files
       in
       let compare a b = String.compare (fst a) (fst b) in
-      Alcotest.(check (slist (pair string int) compare))
+      Alcotest.(
+        check (Brassaia_eio_test_helpers.Common.slist (pair string int) compare))
         "test"
         [
           ("mapping", 72);

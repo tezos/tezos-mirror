@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-open Brassaia
+open Brassaia_eio.Brassaia
 
 let test_short_hash () =
   let h = Hash.BLAKE2B.hash (fun f -> f "") in

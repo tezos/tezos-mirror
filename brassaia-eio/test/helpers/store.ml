@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+module Brassaia = Brassaia_eio.Brassaia
 open! Import
 open Common
 
@@ -1178,7 +1179,7 @@ module Make (S : Generic_key) = struct
             ~node:(fun path _ (cs, ns) -> (cs, path :: ns))
             ([], [])
         in
-        let paths = Alcotest.slist (testable S.Path.t) compare in
+        let paths = slist (testable S.Path.t) compare in
         Alcotest.(check paths)
           (Fmt.str "contents depth=%a" Fmt.(Dump.option pp_depth) depth)
           ecs
@@ -2540,18 +2541,18 @@ let suite sleep (speed, x) =
     @ List.map (fun (n, test) -> ("Watch." ^ n, speed, test x)) T_watch.tests)
     (speed, x)
 
-let slow_suite (speed, x) =
+let slow_suite (_speed, x) =
   let (module S) = Suite.store_generic_key x in
   let module T = Make (S) in
   suite'
     ~prefix:"SLOW_"
     [
-      ("Commit wide node", speed, T.test_commit_wide_node x);
+      ("Commit wide node", `Slow, T.test_commit_wide_node x);
       ("Wide nodes", `Slow, T.test_wide_nodes x);
     ]
-    (speed, x)
+    (`Slow, x)
 
-let run name ?and_exit ?(slow = false) ?random_seed ~sleep ~misc tl =
+let run ~__FILE__ name ?(slow = false) ?random_seed ~sleep ~misc tl =
   let () =
     match random_seed with
     | Some x -> Random.init x
@@ -2559,6 +2560,7 @@ let run name ?and_exit ?(slow = false) ?random_seed ~sleep ~misc tl =
   in
   Printexc.record_backtrace true ;
   (* Ensure that failures occuring in async lwt threads are raised. *)
+  (Lwt.async_exception_hook := fun exn -> raise exn) ;
   let tl1 = List.map (suite sleep) tl in
   let tl1 = if slow then tl1 @ List.map slow_suite tl else tl1 in
-  Alcotest.run ?and_exit ~bail:true name (misc @ tl1)
+  Alcotest.run ~__FILE__ name (misc @ tl1)

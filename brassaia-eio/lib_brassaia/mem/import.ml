@@ -15,4 +15,4 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Brassaia.Export_for_backends
+include Brassaia_eio.Brassaia.Export_for_backends

@@ -20,6 +20,8 @@
     is instantiated to a module [M], it has a unique shared hash-table: multiple
     invocation of [M.create] will see and manipulate the same contents. *)
 
+module Brassaia = Brassaia_eio.Brassaia
+
 module Conf : sig
   val spec : Brassaia.Backend.Conf.Spec.t
 end

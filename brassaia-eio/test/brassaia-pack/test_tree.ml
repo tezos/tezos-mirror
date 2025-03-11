@@ -140,7 +140,11 @@ let fold ~order ~force t ~init ~f =
     init
 
 let equal_slist ~msg l1 l2 =
-  Alcotest.(check (slist (list string) Stdlib.compare)) msg l1 l2
+  Alcotest.(
+    check (Brassaia_eio_test_helpers.Common.slist (list string) Stdlib.compare))
+    msg
+    l1
+    l2
 
 let steps =
   ["00"; "01"; "02"; "03"; "05"; "06"; "07"; "09"; "0a"; "0b"; "0c";

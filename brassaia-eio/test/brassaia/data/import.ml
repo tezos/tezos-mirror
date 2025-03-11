@@ -1,18 +1,16 @@
-let check typ pos ~expected actual =
-  Alcotest.(check ~pos typ) "" expected actual
+let check typ _pos ~expected actual = Alcotest.(check typ "" expected actual)
 
-let check_bool = check Alcotest.bool
+let check_bool pos ~expected actual = check Alcotest.bool pos ~expected actual
 
-let check_ok_or_duplicate =
+let check_ok_or_duplicate pos ~expected actual =
   let pp : [`Ok | `Duplicate] Fmt.t =
     Fmt.of_to_string (function `Ok -> "`Ok" | `Duplicate -> "`Duplicate")
   in
-  check (Alcotest.testable pp ( = ))
+  check (Alcotest.testable pp ( = )) pos ~expected actual
 
-let check_invalid_arg pos f =
+let check_invalid_arg _pos f =
   let fail got =
     Alcotest.failf
-      ~pos
       "Expected function to raise `Invalid_argument`, but raised: %a"
       Fmt.(Dump.option exn)
       got

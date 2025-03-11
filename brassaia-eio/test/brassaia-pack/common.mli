@@ -14,6 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+module Brassaia = Brassaia_eio.Brassaia
+module Brassaia_pack = Brassaia_eio_pack.Brassaia_pack
+module Brassaia_pack_unix = Brassaia_eio_pack_unix.Brassaia_pack_unix
 open Brassaia.Perms
 module Int63 = Optint.Int63
 
@@ -67,13 +70,7 @@ module Alcotest : sig
 
   val check_raises : string -> exn -> (unit -> _) -> unit
 
-  val check_repr :
-    ?pos:Source_code_position.pos ->
-    'a Brassaia.Type.t ->
-    string ->
-    'a ->
-    'a ->
-    unit
+  val check_repr : 'a Brassaia.Type.t -> string -> 'a -> 'a -> unit
 
   val testable_repr : 'a Brassaia.Type.t -> 'a Alcotest.testable
 

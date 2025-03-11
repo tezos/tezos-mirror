@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+module Brassaia = Brassaia_eio.Brassaia
+module Brassaia_mem = Brassaia_eio_mem.Brassaia_mem
 open Brassaia
 
 (** A store abstraction over an append-only sequence of values. The key of a
@@ -25,7 +27,7 @@ module Slot_keyed_vector : Indexable.Maker_concrete_key1 = struct
     slot : int;
     hash : 'h;
     (* Sanity check that keys are used only w/ the stores that created them: *)
-    store_id : < >; 
+    store_id : < >;
   }
 
   let key_t hash_t =
@@ -94,7 +96,8 @@ module Slot_keyed_vector : Indexable.Maker_concrete_key1 = struct
     let check_hash_is_consistent pos k recovered_hash =
       let r = equal_hash k.hash recovered_hash in
       if not r then
-        Alcotest.(check ~pos (Brassaia_test.testable Hash.t))
+        Alcotest.(
+          check ~pos (Brassaia_eio_test_helpers.Brassaia_test.testable Hash.t))
           "Recovered hash is consistent with the key"
           k.hash
           recovered_hash
@@ -142,9 +145,11 @@ end)
 module Store = Store_maker.Make (Schema.KV (Contents.String))
 
 let suite =
-  let store = (module Store : Brassaia_test.Generic_key) in
-  let config = Brassaia_mem.config () in
-  Brassaia_test.Suite.create_generic_key
+  let store =
+    (module Store : Brassaia_eio_test_helpers.Brassaia_test.Generic_key)
+  in
+  let config = Brassaia_eio_mem.Brassaia_mem.config () in
+  Brassaia_eio_test_helpers.Brassaia_test.Suite.create_generic_key
     ~name:"store_offset"
     ~store
     ~config

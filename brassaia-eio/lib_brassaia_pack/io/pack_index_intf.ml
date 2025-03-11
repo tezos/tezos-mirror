@@ -27,7 +27,10 @@ module type S = sig
   type value = int63 * int * Pack_value.Kind.t
 
   module Index_raw :
-    Index.S with type value := value and type t := t and type key := key
+    Brassaia_index.Index.S
+      with type value := value
+       and type t := t
+       and type key := key
 
   module Io : Io_intf.S
 
@@ -78,7 +81,7 @@ module type S = sig
 
   val try_merge : t -> unit
 
-  module Key : Index.Key.S with type t = key
+  module Key : Brassaia_index.Index.Key.S with type t = key
 end
 
 module type Sigs = sig
@@ -86,6 +89,6 @@ module type Sigs = sig
 
   module Make_io
       (Io : Io_intf.S)
-      (Io_index : Index.Platform.S)
+      (Io_index : Brassaia_index.Index.Platform.S)
       (K : Brassaia.Hash.S) : S with type key = K.t and module Io = Io
 end

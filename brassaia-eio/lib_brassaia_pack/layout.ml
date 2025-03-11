@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+module Brassaia = Brassaia_eio.Brassaia
+
 let toplevel name ~root = Filename.(concat root name)
 
 module V1_and_v2 = struct

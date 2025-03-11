@@ -14,11 +14,21 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+module Brassaia_mem = Brassaia_eio_mem.Brassaia_mem
+
 let store =
-  Brassaia_test.store (module Brassaia_mem) (module Brassaia.Metadata.None)
+  Brassaia_eio_test_helpers.Brassaia_test.store
+    (module Brassaia_mem)
+    (module Brassaia_eio.Brassaia.Metadata.None)
 
 let config = Brassaia_mem.config ()
 
 let init ~config:_ = ()
 
-let suite = Brassaia_test.Suite.create ~name:"MEM" ~init ~store ~config ()
+let suite =
+  Brassaia_eio_test_helpers.Brassaia_test.Suite.create
+    ~name:"MEM"
+    ~init
+    ~store
+    ~config
+    ()

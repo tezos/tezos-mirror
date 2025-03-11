@@ -14,7 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-module Test_node = Brassaia_test.Node.Make (Brassaia.Node.Generic_key.Make)
+module Brassaia = Brassaia_eio.Brassaia
+module Test_node =
+  Brassaia_eio_test_helpers.Brassaia_test.Node.Make
+    (Brassaia.Node.Generic_key.Make)
 
 let suite =
   [
@@ -27,6 +30,6 @@ let suite =
 
 let () =
   Logs.set_level (Some Debug) ;
-  Logs.set_reporter (Brassaia_test.reporter ()) ;
+  Logs.set_reporter (Brassaia_eio_test_helpers.Brassaia_test.reporter ()) ;
   Random.self_init () ;
-  Eio_main.run @@ fun _ -> Alcotest.run "brassaia" suite
+  Eio_posix.run @@ fun _ -> Alcotest.run ~__FILE__ "brassaia" suite

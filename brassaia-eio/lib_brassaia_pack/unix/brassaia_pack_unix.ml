@@ -16,13 +16,23 @@
 
 (** {1 Store} *)
 
+module Brassaia = Brassaia_eio.Brassaia
+module Brassaia_pack = Brassaia_eio_pack.Brassaia_pack
+module Brassaia_pack_io = Brassaia_eio_pack_io.Brassaia_pack_io
+
 module type S = Brassaia_pack_io.Store_intf.S
 
 module Maker (Config : Brassaia_pack.Conf.S) =
-  Brassaia_pack_io.Maker_io (Io.Unix) (Index_unix.Private.Platform) (Async.Unix)
+  Brassaia_pack_io.Maker_io
+    (Io.Unix)
+    (Brassaia_index_unix.Index_unix.Private.Platform)
+    (Async.Unix)
     (Config)
 module KV (Config : Brassaia_pack.Conf.S) =
-  Brassaia_pack_io.KV (Io.Unix) (Index_unix.Private.Platform) (Async.Unix)
+  Brassaia_pack_io.KV
+    (Io.Unix)
+    (Brassaia_index_unix.Index_unix.Private.Platform)
+    (Async.Unix)
     (Config)
 open Brassaia_pack_io
 
@@ -39,11 +49,13 @@ module Index = struct
   module type S = Index.S
 
   module Make (K : Brassaia.Hash.S) =
-    Index.Make_io (Io.Unix) (Index_unix.Private.Platform) (K)
+    Index.Make_io (Io.Unix) (Brassaia_index_unix.Index_unix.Private.Platform)
+      (K)
 end
 
 module Checks = struct
-  module Make = Checks.Make (Io.Unix) (Index_unix.Private.Platform)
+  module Make =
+    Checks.Make (Io.Unix) (Brassaia_index_unix.Index_unix.Private.Platform)
 end
 
 module Inode = Inode

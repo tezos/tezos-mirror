@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+module Brassaia = Brassaia_eio.Brassaia
 open! Import
 
 let src = Logs.Src.create "brassaia.mem" ~doc:"Brassaia in-memory store"

@@ -54,8 +54,8 @@ module Make (Args : Args) = struct
     end
 
     module Index =
-      Index.Make (Pack_index.Key) (Value_unit) (Io_index)
-        (Index.Cache.Unbounded)
+      Brassaia_index.Index.Make (Pack_index.Key) (Value_unit) (Io_index)
+        (Brassaia_index.Index.Cache.Unbounded)
 
     type t = {
       fm : Fm.t;
@@ -263,7 +263,8 @@ module Make (Args : Args) = struct
     end
 
     module Index =
-      Index.Make (Pack_index.Key) (Value) (Io_index) (Index.Cache.Unbounded)
+      Brassaia_index.Index.Make (Pack_index.Key) (Value) (Io_index)
+        (Brassaia_index.Index.Cache.Unbounded)
 
     type path = string
 

@@ -34,6 +34,8 @@
 
     See `doc/brassaia-pack/version-history.md` for other documentation. *)
 
+module Brassaia = Brassaia_eio.Brassaia
+
 (** The type for version numbers. *)
 type t = [`V1 | `V2 | `V3 | `V4 | `V5] [@@deriving brassaia]
 

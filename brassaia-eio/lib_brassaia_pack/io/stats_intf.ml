@@ -43,7 +43,7 @@ module Pack_store = struct
 end
 
 module Index = struct
-  module S = Index.Stats
+  module S = Brassaia_index.Index.Stats
 
   type t = S.t = {
     mutable bytes_read : int;

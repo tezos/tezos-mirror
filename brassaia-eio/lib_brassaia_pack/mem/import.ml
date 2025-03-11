@@ -14,6 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+module Brassaia = Brassaia_eio.Brassaia
+module Brassaia_mem = Brassaia_eio_mem.Brassaia_mem
+module Brassaia_pack = Brassaia_eio_pack.Brassaia_pack
 include Brassaia.Export_for_backends
 module Int63 = Optint.Int63
 

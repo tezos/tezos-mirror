@@ -135,7 +135,10 @@ module type Sigs = sig
 
   module type S = S
 
-  module Make (Io : Io_intf.S) (Io_index : Index.Platform.S) (_ : Store) : S
+  module Make
+      (Io : Io_intf.S)
+      (Io_index : Brassaia_index.Index.Platform.S)
+      (_ : Store) : S
 
   module Integrity_checks
       (Io : Io_intf.S)

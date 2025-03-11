@@ -20,7 +20,7 @@ include Atomic_write_intf
 module Value = struct
   module type S = Value
 
-  module Of_hash (X : Brassaia.Hash.S) = struct
+  module Of_hash (X : Brassaia_eio.Brassaia.Hash.S) = struct
     type t = X.t [@@deriving brassaia ~of_bin_string]
 
     let null =
@@ -31,7 +31,7 @@ module Value = struct
 end
 
 module Closeable (AW : S) = struct
-  include Brassaia.Atomic_write.Check_closed_store (AW)
+  include Brassaia_eio.Brassaia.Atomic_write.Check_closed_store (AW)
 
   let flush t = get_if_open_exn t |> AW.flush
 end

@@ -199,8 +199,8 @@ let check_hash = Alcotest.check_repr Inode.Val.hash_t
 
 let check_values = Alcotest.check_repr Inode.Val.t
 
-let check_int pos ?(msg = "") ~expected actual =
-  Alcotest.(check ~pos int) msg expected actual
+let check_int _pos ?(msg = "") ~expected actual =
+  Alcotest.(check int) msg expected actual
 
 (* Exhaustive inode structure generator *)
 module Inode_permutations_generator = struct
@@ -896,11 +896,10 @@ module Child_ordering = struct
     let actual = Order.key step |> Order.index ~depth in
     check_int pos ~msg ~expected actual
 
-  let check_max_depth_exception pos (module Order : S) ~step ~depth =
+  let check_max_depth_exception _pos (module Order : S) ~step ~depth =
     match Order.key step |> Order.index ~depth with
     | index ->
         Alcotest.failf
-          ~pos
           "Expected [Max_depth %d] to be raised, but got a computed index of \
            %d instead"
           depth

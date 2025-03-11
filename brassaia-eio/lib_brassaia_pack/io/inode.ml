@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+module Brassaia = Brassaia_eio.Brassaia
+module Brassaia_pack = Brassaia_eio_pack.Brassaia_pack
 include Brassaia_pack.Inode
 include Inode_intf
 

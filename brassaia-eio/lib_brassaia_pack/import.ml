@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+module Brassaia = Brassaia_eio.Brassaia
 include Brassaia.Export_for_backends
 
 let src = Logs.Src.create "brassaia.pack" ~doc:"brassaia-pack backend"

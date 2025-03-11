@@ -14,6 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+module Brassaia = Brassaia_eio.Brassaia
+module Brassaia_pack = Brassaia_eio_pack.Brassaia_pack
+module Brassaia_pack_unix = Brassaia_eio_pack_unix.Brassaia_pack_unix
 open Brassaia.Export_for_backends
 module Int63 = Optint.Int63
 
@@ -245,7 +248,7 @@ module Alcotest = struct
   let testable_repr t =
     Alcotest.testable (Brassaia.Type.pp t) Brassaia.Type.(unstage (equal t))
 
-  let check_repr ?pos t = Alcotest.check ?pos (testable_repr t)
+  let check_repr t = Alcotest.check (testable_repr t)
 
   let kind = testable_repr Brassaia_pack.Pack_value.Kind.t
 

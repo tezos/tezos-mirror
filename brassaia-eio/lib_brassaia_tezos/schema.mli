@@ -15,10 +15,10 @@
  *)
 
 include
-  Brassaia.Schema.Extended
+  Brassaia_eio.Brassaia.Schema.Extended
     with type Contents.t = bytes
      and type Metadata.t = unit
      and type Path.t = string list
      and type Path.step = string
      and type Branch.t = string
-     and module Info = Brassaia.Info.Default
+     and module Info = Brassaia_eio.Brassaia.Info.Default

@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+module Brassaia = Brassaia_eio.Brassaia
 module Path = Brassaia.Path.String_list
 module Metadata = Brassaia.Metadata.None
 module Branch = Brassaia.Branch.String

@@ -14,13 +14,15 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-let check pos typ ~expected actual =
+module Brassaia = Brassaia_eio.Brassaia
+
+let check _pos typ ~expected actual =
   let typ =
     Alcotest.testable
       Brassaia.Type.(pp_dump typ)
       Brassaia.Type.(unstage (equal typ))
   in
-  Alcotest.(check ~pos typ) "" expected actual
+  Alcotest.check typ "" expected actual
 
 module type Map = sig
   type t [@@deriving brassaia]

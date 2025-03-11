@@ -1,4 +1,5 @@
-open Brassaia
+open Brassaia_eio.Brassaia
+module Brassaia_mem = Brassaia_eio_mem.Brassaia_mem
 
 (** A store in which all values are stored as immediates inside their respective
     keys. The store itself keeps no information, except for the bookkeeping
@@ -92,9 +93,11 @@ end)
 module Store = Store_maker.Make (Schema.KV (Contents.String))
 
 let suite =
-  let store = (module Store : Brassaia_test.Generic_key) in
-  let config = Brassaia_mem.config () in
-  Brassaia_test.Suite.create_generic_key
+  let store =
+    (module Store : Brassaia_eio_test_helpers.Brassaia_test.Generic_key)
+  in
+  let config = Brassaia_eio_mem.Brassaia_mem.config () in
+  Brassaia_eio_test_helpers.Brassaia_test.Suite.create_generic_key
     ~name:"inlined_contents"
     ~store
     ~config

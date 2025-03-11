@@ -22,6 +22,8 @@
 
 (** {1 Store} *)
 
+module Brassaia_pack = Brassaia_eio_pack.Brassaia_pack
+
 module type S = Store.S
 
 module type Io_s = Io_intf.S
@@ -30,13 +32,13 @@ module Store_intf = Store_intf
 
 module Maker_io
     (Io : Io_intf.S)
-    (Io_index : Index.Platform.S)
+    (Io_index : Brassaia_index.Index.Platform.S)
     (Async : Async_intf.S)
     (Config : Brassaia_pack.Conf.S) : Store.Maker
 
 module KV
     (Io : Io_intf.S)
-    (Io_index : Index.Platform.S)
+    (Io_index : Brassaia_index.Index.Platform.S)
     (Async : Async_intf.S)
     (Config : Brassaia_pack.Conf.S) : Store.KV
 

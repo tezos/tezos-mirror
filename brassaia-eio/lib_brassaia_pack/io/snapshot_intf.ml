@@ -36,7 +36,7 @@ module type Args = sig
        and type key = Hash.t Pack_key.t
        and type dispatcher = Dispatcher.t
 
-  module Io_index : Index.Platform.S
+  module Io_index : Brassaia_index.Index.Platform.S
 end
 
 module type Sigs = sig

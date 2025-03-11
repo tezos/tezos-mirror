@@ -55,7 +55,10 @@ let ppf_or_null = function
   | Some p -> p
   | None -> Format.make_formatter (fun _ _ _ -> ()) (fun () -> ())
 
-module Make (Io : Io_intf.S) (Io_index : Index.Platform.S) (Store : Store) =
+module Make
+    (Io : Io_intf.S)
+    (Io_index : Brassaia_index.Index.Platform.S)
+    (Store : Store) =
 struct
   module Hash = Store.Hash
   module Index = Pack_index.Make_io (Io) (Io_index) (Hash)

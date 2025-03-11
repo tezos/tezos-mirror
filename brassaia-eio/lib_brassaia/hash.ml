@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+module Brassaia_data = Brassaia_eio_data.Brassaia_data
 include Hash_intf
 
 module Make (H : Digestif.S) = struct

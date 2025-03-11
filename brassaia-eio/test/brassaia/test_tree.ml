@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+module Brassaia = Brassaia_eio.Brassaia
+module Brassaia_mem = Brassaia_eio_mem.Brassaia_mem
 open Brassaia.Export_for_backends
 open Brassaia
 
@@ -59,9 +61,8 @@ module Alcotest = struct
 
   let check_tree_lwt =
     let concrete_tree = gtestable Tree.concrete_t in
-    fun ?__POS__:pos msg ~expected b_lwt ->
-      b_lwt |> Tree.to_concrete
-      |> Alcotest.check ?pos concrete_tree msg expected
+    fun ?__POS__:_pos msg ~expected b_lwt ->
+      b_lwt |> Tree.to_concrete |> Alcotest.check concrete_tree msg expected
 
   let inspect =
     Alcotest.testable
@@ -75,11 +76,10 @@ module Alcotest = struct
       ( = )
 end
 
-let check_exn_lwt ~exn_type pos f =
+let check_exn_lwt ~exn_type _pos f =
   try
     let _ = f () in
     Alcotest.failf
-      ~pos
       "Expected a `%s` exception, but no exception was raised."
       (match exn_type with
       | `Dangling_hash -> "Dangling_hash"
@@ -585,7 +585,9 @@ let test_fold_force () =
     in
     let force = `False List.cons in
     Tree.fold ~force tree []
-    |> Alcotest.(check (slist (list string) Stdlib.compare))
+    |> Alcotest.(
+         check
+           (Brassaia_eio_test_helpers.Common.slist (list string) Stdlib.compare))
          "Unforced paths"
          [["dangling"; "subtree"; "hash"]; ["other"; "lazy"; "path"]]
   in
@@ -632,7 +634,7 @@ let test_fold_force () =
            "After folding, the tree is cleared"
            lazy_stats
     in
-    Alcotest.(check (slist string compare))
+    Alcotest.(check (Brassaia_eio_test_helpers.Common.slist string compare))
       "During forced fold, all contents were traversed"
       ["v-aa"; "v-ab"; "v-ac"; "v-b"; "v-c"]
       contents
@@ -768,19 +770,18 @@ module Broken = struct
       in
       let () =
         Tree.find broken_leaf beneath
-        |> Alcotest.(check ~pos:__POS__ (option reject)) "" None
+        |> Alcotest.(check (option reject)) "" None
       in
       let () =
         Store.Tree.find broken_node path
-        |> Alcotest.(check ~pos:__POS__ (option reject)) "" None
+        |> Alcotest.(check (option reject)) "" None
       in
 
       (* [list] on (or beneath) broken contents returns the empty list, but on
          (or beneath) broken nodes an exception is raised. *)
       let () =
         let&* path = [path; beneath] in
-        Tree.list broken_leaf path
-        |> Alcotest.(check ~pos:__POS__ (list reject)) "" []
+        Tree.list broken_leaf path |> Alcotest.(check (list reject)) "" []
       in
       let () =
         let&* path = [path; beneath] in

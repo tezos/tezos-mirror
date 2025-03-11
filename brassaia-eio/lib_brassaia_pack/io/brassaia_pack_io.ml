@@ -14,6 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+module Brassaia = Brassaia_eio.Brassaia
+module Brassaia_pack = Brassaia_eio_pack.Brassaia_pack
+
 (** {1 Store} *)
 
 module type S = Store_intf.S
@@ -25,7 +28,7 @@ module Maker_io = Store.Maker
 
 module KV
     (Io : Io_intf.S)
-    (Index_io : Index.Platform.S)
+    (Index_io : Brassaia_index.Index.Platform.S)
     (Async : Async_intf.S)
     (Config : Brassaia_pack.Conf.S) =
 struct
