@@ -854,7 +854,12 @@ let jobs pipeline_type =
 
   (* Packaging jobs *)
   let packaging =
-    Opam.jobs_opam_packages ~dependencies:dependencies_needs_start pipeline_type
+    match pipeline_type with
+    | Merge_train | Before_merging -> []
+    | Schedule_extended_test ->
+        Opam.jobs_opam_packages
+          ~dependencies:dependencies_needs_start
+          pipeline_type
   in
   (* Dependencies for jobs that should run immediately after jobs
      [job_build_x86_64] in [Before_merging] if they are present
