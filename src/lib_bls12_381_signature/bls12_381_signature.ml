@@ -241,10 +241,10 @@ module MinPk = struct
           else false
         else false)
 
-  let aggregate_signature_opt signatures =
+  let aggregate_signature_opt ?(subgroup_check = true) signatures =
     let signatures =
       Bls12_381.G2.affine_array_of_compressed_bytes_opt
-        ~subgroup_check:true
+        ~subgroup_check
         (Array.of_list signatures)
     in
     Option.map
@@ -570,10 +570,10 @@ module MinSig = struct
           else false
         else false)
 
-  let aggregate_signature_opt signatures =
+  let aggregate_signature_opt ?(subgroup_check = true) signatures =
     let signatures =
       Bls12_381.G1.affine_array_of_compressed_bytes_opt
-        ~subgroup_check:true
+        ~subgroup_check
         (Array.of_list signatures)
     in
     Option.map

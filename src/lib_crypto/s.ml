@@ -448,8 +448,9 @@ module type AGGREGATE_SIGNATURE = sig
     (Public_key.t * watermark option * bytes) list -> t -> bool
 
   (** [aggregate_signature_opt sig_list] creates an aggregated signature using
-      the list of signatures [sig_list]. *)
-  val aggregate_signature_opt : t list -> t option
+      the list of signatures [sig_list]. If [subgroup_check] is set, the
+      function also checks if the points are in the prime subgroup. *)
+  val aggregate_signature_opt : ?subgroup_check:bool -> t list -> t option
 
   (** [aggregate_public_key_opt pk_list] creates an aggregated public key using
       the list of public_keys [pk_list]. If [subgroup_check] is set, the function

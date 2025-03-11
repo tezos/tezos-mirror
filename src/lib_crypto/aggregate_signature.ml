@@ -499,7 +499,7 @@ let aggregate_check pks signature =
       |> Option.map (Bls.aggregate_check pks)
       |> Option.value ~default:false
 
-let aggregate_signature_opt signatures =
+let aggregate_signature_opt ?subgroup_check signatures =
   let open Result_syntax in
   let aux acc s =
     match s with
@@ -510,7 +510,7 @@ let aggregate_signature_opt signatures =
   in
   match List.fold_left_e aux [] signatures with
   | Ok signatures ->
-      Bls.aggregate_signature_opt signatures
+      Bls.aggregate_signature_opt ?subgroup_check signatures
       |> Option.map (fun s -> Bls12_381 s)
   | Error _ -> None
 

@@ -271,6 +271,8 @@ struct
     let verify = Aug.verify
 
     let aggregate_verify = Aug.aggregate_verify
+
+    let aggregate_signature_opt = aggregate_signature_opt ~subgroup_check:true
   end
 
   module Ed25519 = Signature.Ed25519
