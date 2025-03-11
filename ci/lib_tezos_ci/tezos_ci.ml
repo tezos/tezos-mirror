@@ -1028,6 +1028,7 @@ let trigger_job ?(dependencies = Staged []) ?rules ?description ~__POS__ ~stage
       ?inherit_
       ?rules
       ~stage:(Stage.name stage)
+      ~variables:[("PIPELINE_TYPE", child_pipeline_name)]
       ~name:job_name
       (Pipeline.path ~name:child_pipeline_name)
   in

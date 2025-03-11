@@ -1787,6 +1787,8 @@ opam:all_7:
 
 trigger:debian_repository_full:
   stage: test
+  variables:
+    PIPELINE_TYPE: debian_repository_full
   needs: []
   trigger:
     include: .gitlab/ci/pipelines/debian_repository_full.yml
@@ -1794,6 +1796,8 @@ trigger:debian_repository_full:
 
 trigger:rpm_repository_full:
   stage: test
+  variables:
+    PIPELINE_TYPE: rpm_repository_full
   needs: []
   trigger:
     include: .gitlab/ci/pipelines/rpm_repository_full.yml
@@ -1801,6 +1805,8 @@ trigger:rpm_repository_full:
 
 trigger:homebrew:
   stage: test
+  variables:
+    PIPELINE_TYPE: homebrew
   rules:
   - when: always
   needs: []

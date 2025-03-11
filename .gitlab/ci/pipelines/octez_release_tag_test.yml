@@ -267,6 +267,8 @@ gitlab:release:
 
 trigger:octez_monitoring:
   stage: build
+  variables:
+    PIPELINE_TYPE: octez_monitoring
   inherit:
     variables:
     - ci_image_name
