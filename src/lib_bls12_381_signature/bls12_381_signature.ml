@@ -265,7 +265,7 @@ module MinPk = struct
         Bls12_381.G1.to_compressed_bytes res)
       pks
 
-  let aggregate_public_key_lc_opt pks_with_weights =
+  let aggregate_public_key_weighted_opt pks_with_weights =
     let pks_opts =
       List.map
         (fun (w, pk) -> (w, Bls12_381.G1.of_compressed_bytes_opt pk))
@@ -594,7 +594,7 @@ module MinSig = struct
         Bls12_381.G2.to_compressed_bytes res)
       pks
 
-  let aggregate_public_key_lc_opt pks_with_weights =
+  let aggregate_public_key_weighted_opt pks_with_weights =
     let pks_opts =
       List.map
         (fun (w, pk) -> (w, Bls12_381.G2.of_compressed_bytes_opt pk))

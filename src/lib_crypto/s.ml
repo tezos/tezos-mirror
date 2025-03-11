@@ -459,9 +459,9 @@ module type AGGREGATE_SIGNATURE = sig
     ?subgroup_check:bool -> Public_key.t list -> Public_key.t option
 
   (** [aggregate_public_key_lc_opt pk_with_weights_list] creates an aggregated public
-      key as a linear combination from the list of public_keys and their weights in
+      key as a weighted sum of the list of public keys and their weights in
       [pk_with_weights_list]. *)
-  val aggregate_public_key_lc_opt :
+  val aggregate_public_key_weighted_opt :
     (Z.t * Public_key.t) list -> Public_key.t option
 end
 

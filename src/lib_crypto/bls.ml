@@ -392,8 +392,8 @@ let aggregate_signature_opt = Bls12_381_signature.MinPk.aggregate_signature_opt
 let aggregate_public_key_opt =
   Bls12_381_signature.MinPk.aggregate_public_key_opt
 
-let aggregate_public_key_lc_opt =
-  Bls12_381_signature.MinPk.aggregate_public_key_lc_opt
+let aggregate_public_key_weighted_opt =
+  Bls12_381_signature.MinPk.aggregate_public_key_weighted_opt
 
 module Primitive = struct
   include Bls12_381

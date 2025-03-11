@@ -532,7 +532,7 @@ struct
       val aggregate_public_key_opt :
         ?subgroup_check:bool -> Public_key.t list -> Public_key.t option
 
-      val aggregate_public_key_lc_opt :
+      val aggregate_public_key_weighted_opt :
         (Z.t * Public_key.t) list -> Public_key.t option
     end
 
