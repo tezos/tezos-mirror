@@ -39,6 +39,7 @@ pub fn make_stepper_factory() -> impl Fn() -> PvmStepper<'static, M64M, DefaultC
             hooks,
             address,
             1,
+            None,
             block_builder,
         )
         .unwrap()

@@ -67,6 +67,7 @@ fn test_jstz_regression<B: Block<M64M, Owned>>(block_builder: B::BlockBuilder) {
             hooks,
             ROLLUP_ADDRESS,
             ORIGINATION_LEVEL,
+            None,
             block_builder,
         )
         .unwrap();

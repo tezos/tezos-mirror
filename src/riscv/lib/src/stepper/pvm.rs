@@ -6,6 +6,7 @@
 mod reveals;
 
 use std::ops::Bound;
+use std::path::Path;
 
 use reveals::RevealRequestResponseMap;
 use serde::Serialize;
@@ -75,6 +76,7 @@ impl<'hooks, MC: MemoryConfig, B: Block<MC, Owned>, CL: CacheLayouts>
     PvmStepper<'hooks, MC, CL, Owned, B>
 {
     /// Create a new PVM stepper.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         program: &[u8],
         initrd: Option<&[u8]>,
@@ -82,6 +84,7 @@ impl<'hooks, MC: MemoryConfig, B: Block<MC, Owned>, CL: CacheLayouts>
         hooks: PvmHooks<'hooks>,
         rollup_address: [u8; 20],
         origination_level: u32,
+        preimages_dir: Option<Box<Path>>,
         block_builder: B::BlockBuilder,
     ) -> Result<Self, PvmStepperError> {
         let space = Owned::allocate::<PvmLayout<MC, CL>>();
@@ -105,7 +108,7 @@ impl<'hooks, MC: MemoryConfig, B: Block<MC, Owned>, CL: CacheLayouts>
         }
 
         let reveal_request_response_map =
-            RevealRequestResponseMap::new(rollup_address, origination_level);
+            RevealRequestResponseMap::new(rollup_address, origination_level, preimages_dir);
 
         Ok(Self {
             pvm,
@@ -200,7 +203,7 @@ impl<'hooks, MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerRead
             PvmStatus::WaitingForReveal => {
                 let reveal_request = self.pvm.reveal_request();
 
-                let Some(reveal_response_getter) = self
+                let Some(reveal_response) = self
                     .reveal_request_response_map
                     .get_response(reveal_request.as_slice())
                 else {
@@ -212,21 +215,6 @@ impl<'hooks, MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerRead
                             reveal_request.as_slice()
                         ),
                     };
-                };
-
-                let reveal_response = match reveal_response_getter() {
-                    Ok(response) => response,
-                    Err(error) => {
-                        return StepperStatus::Errored {
-                            steps: 0,
-                            cause: "PVM was waiting for reveal response".to_owned(),
-                            message: format!(
-                                "Retrieving reveal response did not succeed with {:?}",
-                                error
-                            )
-                            .to_owned(),
-                        };
-                    }
                 };
 
                 let success = self.pvm.provide_reveal_response(&reveal_response);

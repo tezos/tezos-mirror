@@ -36,7 +36,7 @@ let _ = Uses.make ~tag:"riscv_sandbox" ~path:"./src/riscv/" ()
 type vm_kind = Pvm | Test
 
 let run ~kind ~input ?inbox ?(max_steps = Int64.max_int) ?initrd
-    ?(print_steps = false) () =
+    ?(print_steps = false) ?preimages_dir () =
   let process =
     Process.spawn
       ~hooks:Tezt_tezos.Tezos_regression.hooks
@@ -55,6 +55,9 @@ let run ~kind ~input ?inbox ?(max_steps = Int64.max_int) ?initrd
       | Test -> ["--posix-exit-mode"; "machine"]
       | Pvm ->
           ["--pvm"; "--origination-level"; "1"]
+          @ (match preimages_dir with
+            | None -> []
+            | Some dir -> ["--preimages-dir"; Uses.path dir])
           @ if print_steps then ["--print-steps"] else [])
   in
   Process.check process

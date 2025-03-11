@@ -45,5 +45,6 @@ riscv_sandbox: src/riscv/riscv-sandbox
 riscv: src/riscv/tests/inline_asm/rv64-inline-asm-tests
 riscv: tezt/tests/riscv-tests/dummy-kernel-inbox.json
 riscv: tezt/tests/riscv-tests/jstz-inbox.json
+riscv: tezt/tests/riscv-tests/preimages
 tx_kernel: tx_kernel.wasm
 tx_kernel_dal: tx_kernel_dal.wasm

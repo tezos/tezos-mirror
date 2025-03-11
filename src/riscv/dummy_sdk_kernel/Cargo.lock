@@ -1011,8 +1011,10 @@ dependencies = [
 name = "riscv-dummy-sdk"
 version = "0.0.0"
 dependencies = [
+ "hex",
  "tezos-smart-rollup",
  "tezos-smart-rollup-constants",
+ "tezos_crypto_rs",
 ]
 
 [[package]]

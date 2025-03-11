@@ -45,6 +45,9 @@ let dummy_kernel_inbox =
     ~path:"tezt/tests/riscv-tests/dummy-kernel-inbox.json"
     ()
 
+let dummy_kernel_preimages =
+  Uses.make ~tag:"riscv" ~path:"tezt/tests/riscv-tests/preimages" ()
+
 let dummy_kernel_frozen =
   Uses.make ~tag:"riscv" ~path:"src/riscv/assets/riscv-dummy.elf" ()
 
@@ -68,6 +71,7 @@ let test_dummy_sdk_kernel () =
     ~input:hermit_loader
     ~initrd:dummy_sdk_kernel
     ~inbox:dummy_kernel_inbox
+    ~preimages_dir:dummy_kernel_preimages
     ()
 
 let inline_asm_tests =

@@ -71,6 +71,7 @@ pub fn gdb_server(opts: GdbServerOptions) -> Result<(), Box<dyn Error>> {
         PvmHooks::default(),
         [0; 20],
         0,
+        opts.preimage.preimages_dir,
         InterpretedBlockBuilder,
     )?;
 
