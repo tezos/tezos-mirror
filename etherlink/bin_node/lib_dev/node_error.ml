@@ -11,6 +11,16 @@ let exit_code_when_out_of_sync = 101
 
 let exit_code_when_flushed_blueprint = 102
 
+type error_source = [`Node | `Kernel]
+
+let error_source_encoding =
+  let open Data_encoding in
+  string_enum [("node", `Node); ("kernel", `Kernel)]
+
+let pp_proxy_finalize_multichain_source fmt = function
+  | `Node -> Format.fprintf fmt "Node"
+  | `Kernel -> Format.fprintf fmt "Kernel"
+
 type error +=
   | Diverged of {
       level : Z.t;
@@ -21,6 +31,8 @@ type error +=
   | Out_of_sync of {level_expected : int32; level_received : int32}
   | Cannot_handle_flushed_blueprint of Ethereum_types.quantity
   | Unexpected_multichain
+  | Proxy_finalize_with_multichain of error_source
+  | Mismatched_multichain of error_source
 
 let () =
   register_error_kind
@@ -95,4 +107,45 @@ let () =
        configuration attempted to configure multiple chains."
     Data_encoding.empty
     (function Unexpected_multichain -> Some () | _ -> None)
-    (fun () -> Unexpected_multichain)
+    (fun () -> Unexpected_multichain) ;
+  register_error_kind
+    `Permanent
+    ~id:"proxy_finalize_with_multichain"
+    ~title:"Proxy node finalized_view with multichain"
+    ~description:
+      "The proxy node with the finalized_view option is incompatible with the \
+       multichain features (originating from either the Node or the Kernel)."
+    ~pp:(fun ppf source ->
+      Format.fprintf
+        ppf
+        "The %a was configured in multichain mode, which is incompatible with \
+         the proxy node's finalized_view option."
+        pp_proxy_finalize_multichain_source
+        source)
+    Data_encoding.(obj1 (req "source" error_source_encoding))
+    (function Proxy_finalize_with_multichain src -> Some src | _ -> None)
+    (fun src -> Proxy_finalize_with_multichain src) ;
+  register_error_kind
+    `Permanent
+    ~id:"mismatched_multichain"
+    ~title:"Node and Kernel multichain configuration mismatch"
+    ~description:
+      "Node and Kernel configurations are mismatched in their multichain \
+       settings."
+    ~pp:(fun ppf source ->
+      match source with
+      | `Node ->
+          Format.fprintf
+            ppf
+            "The node is configured to work in a multichain environment, while \
+             the kernel is configured as to work in the single chain \
+             environment."
+      | `Kernel ->
+          Format.fprintf
+            ppf
+            "The kernel is configured to work in a multichain environment, \
+             while the node is configured as to work in the single chain \
+             environment.")
+    Data_encoding.(obj1 (req "source" error_source_encoding))
+    (function Mismatched_multichain source -> Some source | _ -> None)
+    (fun source -> Mismatched_multichain source)
