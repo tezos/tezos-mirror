@@ -38,12 +38,19 @@ let write_config ~name ~target_file agent =
   rotate 300
 }
 |})) ;
+  Log.info "Teztcloud.Logrotate: written configuration for %s" target_file ;
   (* Upload the generated config in the destination /etc/logrotate.d/$name *)
   let destination = config name in
+  Log.info
+    "Teztcloud.Logrotate: uploading %s to %s:%s"
+    target_file
+    (Agent.name agent)
+    destination ;
   let* _ = Agent.copy agent ~source ~destination in
   Lwt.return_unit
 
 let run ~name agent =
   let name = config name in
   (* Run logrotate as root in the docker container *)
+  Log.info "Teztcloud.Logrotate: executing task %s" name ;
   Agent.docker_run_command agent "logrotate" [name] |> Process.check
