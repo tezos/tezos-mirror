@@ -1555,6 +1555,7 @@ build-layer1-profiling:
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
   script:
+  - scripts/slim-mode.sh on
   - make build OCTEZ_EXECUTABLES?=octez-node
   - mkdir -p octez-binaries/x86_64/
   - mv octez-node octez-binaries/x86_64/

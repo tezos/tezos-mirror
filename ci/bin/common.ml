@@ -980,6 +980,7 @@ let job_build_layer1_profiling ?(expire_in = Duration (Days 1)) () =
          [])
     ~variables:[("TEZOS_PPX_PROFILER", "profiling"); ("PROFILE", "static")]
     [
+      "scripts/slim-mode.sh on";
       "make build OCTEZ_EXECUTABLES?=octez-node";
       "mkdir -p octez-binaries/x86_64/";
       "mv octez-node octez-binaries/x86_64/";
