@@ -242,6 +242,16 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       in
       return_unit
   in
+  let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
+  let* () =
+    match
+      (configuration.experimental_features.l2_chains, enable_multichain)
+    with
+    | None, false -> return_unit
+    | None, true -> tzfail (Node_error.Mismatched_multichain `Kernel)
+    | Some _, true -> return_unit
+    | Some _, false -> tzfail (Node_error.Mismatched_multichain `Node)
+  in
   let* finalizer_public_server =
     Rpc_server.start_public_server
       ~evm_services:
