@@ -103,7 +103,7 @@ odoc:
 odoc-lite:
 	$(MAKE) odoc-raw slim_mode=on odoc_errors=true
 
-.PHONY: odoc
+.PHONY: odoc-raw
 odoc-raw:
 	rm -rf $(TMPDOCDIR)/
 	mkdir -p $(TMPDOCDIR)/
