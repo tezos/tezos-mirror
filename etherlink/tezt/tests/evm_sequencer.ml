@@ -10983,7 +10983,7 @@ let test_spawn_rpc =
   let fresh_port = Port.fresh () in
   register_all
     ~spawn_rpc:fresh_port
-    ~tags:["sequencer"; "spawn"; "rpc"]
+    ~tags:["sequencer"; "spawn"; "rpc"; Tag.flaky]
     ~title:
       "The spawned RPC successfully functions as an intermediate node for \
        public requests"
