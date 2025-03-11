@@ -59,21 +59,12 @@ RUN apk update \
     libc-dev \
     libev \
     libffi \
-    # Used by 'scripts/install_dal_trusted_setup.sh' below
-    curl \
     sudo \
     sqlite-libs \
     # Used by teztale
     openssl-libs-static \
     sqlite-dev \
     postgresql-dev
-
-# Install dal SRS setup (need curl)
-COPY scripts/install_dal_trusted_setup.sh scripts/version.sh /tmp/
-RUN mkdir -p /usr/share/dal-trusted-setup && \
-    DAL_TRUSTED_SETUP=/usr/share/dal-trusted-setup \
-    sh /tmp/install_dal_trusted_setup.sh && \
-    rm /tmp/install_dal_trusted_setup.sh /tmp/version.sh
 
 USER tezos
 ENV USER=tezos
@@ -346,6 +337,13 @@ SHELL ["/bin/ash", "-euo", "pipefail", "-c"]
 RUN apk update \
  && apk add --no-cache curl git file make jq websocat gcc clang lld \
  && apk add --no-cache ca-certificates build-base musl-dev libusb-dev linux-headers procps-ng
+
+# Install dal SRS setup (need curl)
+COPY scripts/install_dal_trusted_setup.sh scripts/version.sh /tmp/
+RUN mkdir -p /usr/share/dal-trusted-setup && \
+    DAL_TRUSTED_SETUP=/usr/share/dal-trusted-setup \
+    sh /tmp/install_dal_trusted_setup.sh && \
+    rm /tmp/install_dal_trusted_setup.sh /tmp/version.sh
 
 ## Add npm from 3.21 main repository instead of 3.20 to get a newer version (v22) of nodejs.
 ## Should solve related hanging problems  cf.
