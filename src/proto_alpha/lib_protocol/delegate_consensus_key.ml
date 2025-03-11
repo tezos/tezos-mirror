@@ -79,6 +79,8 @@ type pk = Raw_context.consensus_pk = {
   delegate : Signature.Public_key_hash.t;
   consensus_pk : Signature.Public_key.t;
   consensus_pkh : Signature.Public_key_hash.t;
+  companion_pk : Bls.Public_key.t option;
+  companion_pkh : Bls.Public_key_hash.t option;
 }
 
 type t = {
@@ -95,7 +97,15 @@ let encoding =
        (req "delegate" Signature.Public_key_hash.encoding)
        (req "consensus_pkh" Signature.Public_key_hash.encoding)
 
-let pkh {delegate; consensus_pkh; consensus_pk = _} = {delegate; consensus_pkh}
+let pkh
+    {
+      delegate;
+      consensus_pkh;
+      companion_pkh = _;
+      consensus_pk = _;
+      companion_pk = _;
+    } =
+  {delegate; consensus_pkh}
 
 let zero =
   {
@@ -142,13 +152,21 @@ let init ctxt delegate pk =
   let*! ctxt = set_used ctxt pkh in
   Storage.Contract.Consensus_key.init ctxt (Contract_repr.Implicit delegate) pk
 
+let active_pubkey_kind (type a) ctxt ~(kind : a kind) delegate :
+    a tzresult Lwt.t =
+  match kind with
+  | Consensus ->
+      Storage.Contract.Consensus_key.get ctxt (Contract_repr.Implicit delegate)
+  | Companion ->
+      Storage.Contract.Companion_key.find ctxt (Contract_repr.Implicit delegate)
+
 let active_pubkey ctxt delegate =
   let open Lwt_result_syntax in
-  let* pk =
-    Storage.Contract.Consensus_key.get ctxt (Contract_repr.Implicit delegate)
-  in
-  let pkh = Signature.Public_key.hash pk in
-  return {consensus_pk = pk; consensus_pkh = pkh; delegate}
+  let* consensus_pk = active_pubkey_kind ctxt ~kind:Consensus delegate in
+  let consensus_pkh = Signature.Public_key.hash consensus_pk in
+  let* companion_pk = active_pubkey_kind ctxt ~kind:Companion delegate in
+  let companion_pkh = Option.map Bls.Public_key.hash companion_pk in
+  return {consensus_pk; consensus_pkh; companion_pk; companion_pkh; delegate}
 
 let active_key ctxt delegate =
   let open Lwt_result_syntax in
@@ -202,25 +220,31 @@ let pending_companion_updates ctxt delegate =
          Option.map (fun pk -> (c, Bls.Public_key.hash pk, pk)) pk)
        updates)
 
-let raw_active_pubkey_for_cycle ctxt delegate cycle =
+let raw_active_pubkey_for_cycle ctxt ~kind delegate cycle =
   let open Lwt_result_syntax in
-  let* pendings =
-    raw_pending_updates ctxt ~up_to_cycle:cycle ~kind:Consensus delegate
-  in
-  let* active = active_pubkey ctxt delegate in
+  let* pendings = raw_pending_updates ctxt ~up_to_cycle:cycle ~kind delegate in
+  let* active_pk = active_pubkey_kind ctxt ~kind delegate in
   let current_cycle = (Raw_context.current_level ctxt).cycle in
   match List.hd (List.rev pendings) with
-  | None -> return (current_cycle, active.consensus_pk)
+  | None -> return (current_cycle, active_pk)
   | Some (cycle, pk) -> return (cycle, pk)
 
 let active_pubkey_for_cycle ctxt delegate cycle =
   let open Lwt_result_syntax in
-  let+ _, consensus_pk = raw_active_pubkey_for_cycle ctxt delegate cycle in
-  {
-    consensus_pk;
-    consensus_pkh = Signature.Public_key.hash consensus_pk;
-    delegate;
-  }
+  let* _, consensus_pk =
+    raw_active_pubkey_for_cycle ctxt ~kind:Consensus delegate cycle
+  in
+  let* _, companion_pk =
+    raw_active_pubkey_for_cycle ctxt ~kind:Companion delegate cycle
+  in
+  return
+    {
+      consensus_pk;
+      consensus_pkh = Signature.Public_key.hash consensus_pk;
+      companion_pk;
+      companion_pkh = Option.map Bls.Public_key.hash companion_pk;
+      delegate;
+    }
 
 let register_update ctxt delegate pk =
   let open Lwt_result_syntax in
@@ -231,7 +255,7 @@ let register_update ctxt delegate pk =
   in
   let* () =
     let* first_active_cycle, active_pubkey =
-      raw_active_pubkey_for_cycle ctxt delegate update_cycle
+      raw_active_pubkey_for_cycle ctxt ~kind:Consensus delegate update_cycle
     in
     fail_when
       Signature.Public_key.(pk = active_pubkey)
