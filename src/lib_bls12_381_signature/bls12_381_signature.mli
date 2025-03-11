@@ -114,8 +114,11 @@ module MinPk : sig
       [signatures], following {{:
       https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-04#section-2.8
       } section 2.8}.
-      Return [None] if [INVALID] is expected in the specification *)
-  val aggregate_signature_opt : signature list -> signature option
+      Return [None] if [INVALID] is expected in the specification. If
+      [subgroup_check] is set, the function also checks if the points are in G2.
+      (set by default) *)
+  val aggregate_signature_opt :
+    ?subgroup_check:bool -> signature list -> signature option
 
   (** [aggregate_public_key_opt ?subgroup_check pks] aggregates the public keys
       [pks]. If [subgroup_check] is set, the function also checks if the
@@ -305,8 +308,11 @@ module MinSig : sig
       [signatures], following {{:
       https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-04#section-2.8
       } section 2.8 }.
-      Return [None] if [INVALID] is expected in the specification *)
-  val aggregate_signature_opt : signature list -> signature option
+      Return [None] if [INVALID] is expected in the specification. If
+      [subgroup_check] is set, the function also checks if the points are in G1.
+      (set by default) *)
+  val aggregate_signature_opt :
+    ?subgroup_check:bool -> signature list -> signature option
 
   (** [aggregate_public_key_opt ?subgroup_check pks] aggregates the public keys
       [pks]. If [subgroup_check] is set, the function also checks if the

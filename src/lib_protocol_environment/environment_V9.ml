@@ -307,7 +307,12 @@ struct
   module Ed25519 = Tezos_crypto.Signature.Ed25519
   module Secp256k1 = Tezos_crypto.Signature.Secp256k1
   module P256 = Tezos_crypto.Signature.P256
-  module Bls = Tezos_crypto.Signature.Bls
+
+  module Bls = struct
+    include Tezos_crypto.Signature.Bls
+
+    let aggregate_signature_opt = aggregate_signature_opt ~subgroup_check:true
+  end
 
   module Signature = struct
     include Tezos_crypto.Signature.V1

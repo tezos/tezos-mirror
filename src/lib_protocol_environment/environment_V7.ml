@@ -275,7 +275,13 @@ struct
   module Ed25519 = Signature.Ed25519
   module Secp256k1 = Signature.Secp256k1
   module P256 = Signature.P256
-  module Bls = Signature.Bls
+
+  module Bls = struct
+    include Tezos_crypto.Signature.Bls
+
+    let aggregate_signature_opt = aggregate_signature_opt ~subgroup_check:true
+  end
+
   module Signature = Signature.V0
   module Timelock = Tezos_crypto.Timelock_legacy
   module Vdf = Class_group_vdf.Vdf_self_contained
