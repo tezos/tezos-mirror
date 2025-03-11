@@ -339,10 +339,11 @@ let enc_trigger_job : trigger_job -> value =
           (if trigger.strategy_depend then Some "depend" else None);
       ]
   in
-  fun {name = _; stage; when_; inherit_; rules; needs; trigger} ->
+  fun {name = _; stage; variables; when_; inherit_; rules; needs; trigger} ->
     obj_flatten
       [
         opt "stage" string stage;
+        opt "variables" enc_variables variables;
         opt "inherit" enc_inherit inherit_;
         opt "rules" enc_job_rules rules;
         opt "needs" enc_needs needs;

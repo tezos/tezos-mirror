@@ -90,6 +90,7 @@ val trigger_job :
   ?inherit_:inherit_ ->
   ?rules:job_rule list ->
   ?stage:string ->
+  ?variables:variables ->
   ?when_:when_trigger_job ->
   ?strategy_depend:bool ->
   name:string ->
