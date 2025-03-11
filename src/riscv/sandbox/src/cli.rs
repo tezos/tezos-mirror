@@ -14,11 +14,10 @@ use clap::ValueEnum;
 pub enum Mode {
     /// Run a program using the RISC-V interpreter
     Run(RunOptions),
-    /// Launch a program in the debugger
-    Debug(DebugOptions),
     /// Benchmark a program
     Bench(BenchOptions),
     /// Launch a gdb server, for debugging the given program.
+    #[clap(alias = "debug")]
     GdbServer(GdbServerOptions),
 }
 
@@ -51,31 +50,6 @@ pub struct RunOptions {
     /// Print the number of steps taken by `run`.
     #[arg(long, default_value_t = false)]
     pub print_steps: bool,
-}
-
-#[derive(Debug, Clone, Parser)]
-pub struct DebugOptions {
-    #[command(flatten)]
-    pub common: CommonOptions,
-
-    /// Path to the input ELF executable
-    #[arg(long, short)]
-    pub input: Box<Path>,
-
-    /// Path to the initrd
-    #[arg(long)]
-    pub initrd: Option<Box<Path>>,
-
-    /// Demangle function symbols (True by default unless `--no-demangle` is passed)
-    #[arg(
-        long = "no-demangle",
-        default_value_t = true,
-        action(clap::ArgAction::SetFalse)
-    )]
-    pub demangle: bool,
-
-    #[command(flatten)]
-    pub preimage: PreimageOptions,
 }
 
 #[derive(Debug, Clone, Parser)]
