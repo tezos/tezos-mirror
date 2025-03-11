@@ -208,8 +208,8 @@ pub fn store_inbox_blueprint<Host: Runtime>(
 
 #[inline(always)]
 pub fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Error> {
-    match read_current_block_header(host) {
-        Ok(block_header) => Ok(block_header.blueprint_header.number + 1),
+    match read_current_blueprint_header(host) {
+        Ok(blueprint_header) => Ok(blueprint_header.number + 1),
         Err(Error::Storage(StorageError::Runtime(RuntimeError::PathNotFound))) => {
             Ok(U256::zero())
         }
@@ -305,6 +305,13 @@ pub fn read_current_block_header<Host: Runtime>(
     host: &Host,
 ) -> Result<BlockHeader, Error> {
     Ok(read_rlp(host, &EVM_CURRENT_BLOCK_HEADER)?)
+}
+
+pub fn read_current_blueprint_header<Host: Runtime>(
+    host: &Host,
+) -> Result<BlueprintHeader, Error> {
+    let block_header = read_current_block_header(host)?;
+    Ok(block_header.blueprint_header)
 }
 
 /// For the tick model we only accept blueprints where cumulative size of chunks
