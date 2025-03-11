@@ -274,7 +274,7 @@ let chain_id read =
   inspect_durable_and_decode
     read
     Durable_storage_path.chain_id
-    Chain_id.decode_le
+    L2_types.Chain_id.decode_le
 
 let l2_minimum_base_fee_per_gas read chain_id =
   inspect_durable_and_decode
@@ -299,7 +299,7 @@ let chain_family read chain_id =
   inspect_durable_and_decode
     read
     (Durable_storage_path.Chain_configuration.chain_family chain_id)
-    (fun x -> Ethereum_types.Chain_family.of_string_exn (Bytes.to_string x))
+    (fun x -> L2_types.Chain_family.of_string_exn (Bytes.to_string x))
 
 let world_state read chain_id =
   inspect_durable_and_decode

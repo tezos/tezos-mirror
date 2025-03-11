@@ -8,7 +8,7 @@
 
 (** [is_ready chain_id base_fee_per_gas] advertises that Floodgate has started
     and is ready to spam. *)
-val is_ready : Ethereum_types.chain_id -> Z.t -> unit Lwt.t
+val is_ready : L2_types.chain_id -> Z.t -> unit Lwt.t
 
 (** [tx_queue_is_ready ()] advertises that the [Tx_queue] is ready to receive
     transactions. *)

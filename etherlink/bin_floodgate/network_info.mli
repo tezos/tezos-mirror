@@ -6,7 +6,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {chain_id : Ethereum_types.chain_id; base_fee_per_gas : Z.t}
+type t = {chain_id : L2_types.chain_id; base_fee_per_gas : Z.t}
 
 val fetch : rpc_endpoint:Uri.t -> base_fee_factor:float -> t tzresult Lwt.t
 

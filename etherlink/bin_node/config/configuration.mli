@@ -86,11 +86,11 @@ type rpc_server =
 (** Parameters for monitoring websocket connection heartbeats. *)
 type monitor_websocket_heartbeat = {ping_interval : float; ping_timeout : float}
 
-val chain_id : supported_network -> Ethereum_types.chain_id
+val chain_id : supported_network -> L2_types.chain_id
 
 type l2_chain = {
-  chain_id : Ethereum_types.chain_id;
-  chain_family : Ethereum_types.chain_family;
+  chain_id : L2_types.chain_id;
+  chain_family : L2_types.chain_family;
 }
 
 type tx_queue = {

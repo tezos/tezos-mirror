@@ -234,11 +234,11 @@ end
 module Chain_id = struct
   type input = unit
 
-  type output = Ethereum_types.chain_id
+  type output = L2_types.chain_id
 
   let input_encoding = Data_encoding.unit
 
-  let output_encoding = Ethereum_types.Chain_id.encoding
+  let output_encoding = L2_types.Chain_id.encoding
 
   let method_ = "eth_chainId"
 
@@ -246,13 +246,13 @@ module Chain_id = struct
 end
 
 module Chain_family = struct
-  type input = Ethereum_types.chain_id
+  type input = L2_types.chain_id
 
-  type output = Ethereum_types.chain_family
+  type output = L2_types.chain_family
 
-  let input_encoding = Data_encoding.tup1 Ethereum_types.Chain_id.encoding
+  let input_encoding = Data_encoding.tup1 L2_types.Chain_id.encoding
 
-  let output_encoding = Ethereum_types.Chain_family.encoding
+  let output_encoding = L2_types.Chain_family.encoding
 
   let method_ = "tez_chainFamily"
 
@@ -1153,9 +1153,9 @@ let map_method_name ~rpc_server_family ~restrict method_name =
     | Rpc_types.Multichain_sequencer_rpc_server ->
         ( multichain_sequencer_supported_methods,
           multichain_sequencer_unsupported_methods )
-    | Rpc_types.Single_chain_node_rpc_server Ethereum_types.EVM ->
+    | Rpc_types.Single_chain_node_rpc_server L2_types.EVM ->
         (evm_supported_methods, evm_unsupported_methods)
-    | Rpc_types.Single_chain_node_rpc_server Ethereum_types.Michelson ->
+    | Rpc_types.Single_chain_node_rpc_server L2_types.Michelson ->
         (michelson_supported_methods, michelson_unsupported_methods)
   in
   let disabled =

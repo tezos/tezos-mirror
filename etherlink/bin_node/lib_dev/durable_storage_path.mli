@@ -162,15 +162,15 @@ module Trace : sig
 end
 
 module Chain_configuration : sig
-  val minimum_base_fee_per_gas : Ethereum_types.chain_id -> path
+  val minimum_base_fee_per_gas : L2_types.chain_id -> path
 
-  val da_fee_per_byte : Ethereum_types.chain_id -> path
+  val da_fee_per_byte : L2_types.chain_id -> path
 
-  val maximum_gas_per_transaction : Ethereum_types.chain_id -> path
+  val maximum_gas_per_transaction : L2_types.chain_id -> path
 
-  val chain_family : Ethereum_types.chain_id -> path
+  val chain_family : L2_types.chain_id -> path
 
-  val world_state : Ethereum_types.chain_id -> path
+  val world_state : L2_types.chain_id -> path
 end
 
 module Feature_flags : sig

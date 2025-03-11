@@ -61,17 +61,17 @@ type rpc_server = Resto | Dream
 type monitor_websocket_heartbeat = {ping_interval : float; ping_timeout : float}
 
 let chain_id network =
-  Ethereum_types.Chain_id
+  L2_types.Chain_id
     (Z.of_int (match network with Mainnet -> 0xa729 | Testnet -> 0x1f47b))
 
-let chain_id_encoding : Ethereum_types.chain_id Data_encoding.t =
-  let open Ethereum_types in
+let chain_id_encoding : L2_types.chain_id Data_encoding.t =
+  let open L2_types in
   let open Data_encoding in
   conv (fun (Chain_id z) -> z) (fun z -> Chain_id z) z
 
 type l2_chain = {
-  chain_id : Ethereum_types.chain_id;
-  chain_family : Ethereum_types.chain_family;
+  chain_id : L2_types.chain_id;
+  chain_family : L2_types.chain_family;
 }
 
 type tx_queue = {
@@ -901,7 +901,7 @@ let opt_monitor_websocket_heartbeat_encoding =
     ]
 
 let l2_chain_encoding : l2_chain Data_encoding.t =
-  let open Ethereum_types in
+  let open L2_types in
   let open Data_encoding in
   conv
     (fun {chain_id; chain_family} -> (chain_id, chain_family))
