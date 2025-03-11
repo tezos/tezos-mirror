@@ -105,25 +105,13 @@ end
 
 let quantity_of_z z = Qty z
 
-let z_to_hexa = Z.format "#x"
-
 let quantity_encoding =
   Data_encoding.conv
-    (fun (Qty q) -> z_to_hexa q)
+    (fun (Qty q) -> Helpers.z_to_hexa q)
     (fun q -> Qty (Z.of_string q))
     Data_encoding.string
 
 let pp_quantity fmt (Qty q) = Z.pp_print fmt q
-
-let decode_z_le bytes = Bytes.to_string bytes |> Z.of_bits
-
-let decode_z_be bytes =
-  Bytes.fold_left
-    (fun acc c ->
-      let open Z in
-      add (of_int (Char.code c)) (shift_left acc 8))
-    Z.zero
-    bytes
 
 type chain_id = Chain_id of Z.t [@@ocaml.unboxed]
 
@@ -134,13 +122,13 @@ module Chain_id = struct
 
   let encoding =
     Data_encoding.conv
-      (fun (Chain_id c) -> z_to_hexa c)
+      (fun (Chain_id c) -> Helpers.z_to_hexa c)
       of_string_exn
       Data_encoding.string
 
-  let decode_le bytes = Chain_id (decode_z_le bytes)
+  let decode_le bytes = Chain_id (Helpers.decode_z_le bytes)
 
-  let decode_be bytes = Chain_id (decode_z_be bytes)
+  let decode_be bytes = Chain_id (Helpers.decode_z_be bytes)
 
   let compare (Chain_id c1) (Chain_id c2) = Z.compare c1 c2
 
@@ -298,9 +286,9 @@ let decode_address bytes = Address (decode_hex bytes)
 
 let encode_address (Address address) = encode_hex address
 
-let decode_number_le bytes = decode_z_le bytes |> quantity_of_z
+let decode_number_le bytes = Helpers.decode_z_le bytes |> quantity_of_z
 
-let decode_number_be bytes = decode_z_be bytes |> quantity_of_z
+let decode_number_be bytes = Helpers.decode_z_be bytes |> quantity_of_z
 
 let decode_hash bytes = Hash (decode_hex bytes)
 

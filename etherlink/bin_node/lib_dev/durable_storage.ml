@@ -280,20 +280,20 @@ let l2_minimum_base_fee_per_gas read chain_id =
   inspect_durable_and_decode
     read
     (Durable_storage_path.Chain_configuration.minimum_base_fee_per_gas chain_id)
-    Ethereum_types.decode_z_le
+    Helpers.decode_z_le
 
 let l2_da_fee_per_byte read chain_id =
   inspect_durable_and_decode
     read
     (Durable_storage_path.Chain_configuration.da_fee_per_byte chain_id)
-    Ethereum_types.decode_z_le
+    Helpers.decode_z_le
 
 let l2_maximum_gas_per_transaction read chain_id =
   inspect_durable_and_decode
     read
     (Durable_storage_path.Chain_configuration.maximum_gas_per_transaction
        chain_id)
-    Ethereum_types.decode_z_le
+    Helpers.decode_z_le
 
 let chain_family read chain_id =
   inspect_durable_and_decode

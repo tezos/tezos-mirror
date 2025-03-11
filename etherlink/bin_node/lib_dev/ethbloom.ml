@@ -21,8 +21,8 @@ module Bits = struct
     original_byte land (1 lsl (7 - Int.rem position 8)) != 0
 end
 
-let positions input =
-  let hash = Helpers.keccak256 input in
+let positions (Ethereum_types.Hex input) =
+  let hash = Helpers.keccak256 (`Hex input) in
   let pos_for_idx idx =
     let hash_bytes = Bytes.sub hash idx 2 in
     let bit_to_set = Int.logand (Bytes.get_uint16_be hash_bytes 0) 0x07FF in

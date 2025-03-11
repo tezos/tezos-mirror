@@ -1614,7 +1614,7 @@ let ensure_current_block_header_integrity evm_setup =
                   List [Value hash; Value receipts_root; Value transactions_root];
                 ];
             ]) ->
-        ( Z.to_int32 @@ Ethereum_types.decode_z_le number,
+        ( Z.to_int32 @@ Helpers.decode_z_le number,
           timestamp,
           Hex.of_bytes hash,
           Hex.of_bytes receipts_root,
@@ -1646,7 +1646,7 @@ let ensure_current_block_header_integrity evm_setup =
     Check.string
     ~error_msg:"Bad block header hash, expected %R got %L." ;
   Check.(
-    Z.to_int64 @@ Ethereum_types.decode_z_le timestamp
+    Z.to_int64 @@ Helpers.decode_z_le timestamp
     = Tezos_base.Time.Protocol.to_seconds block.timestamp)
     ~__LOC__
     Check.int64
