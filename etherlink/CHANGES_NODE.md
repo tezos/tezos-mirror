@@ -263,6 +263,7 @@ it is not possible to downgrade to the previous version.
 ### Features
 
 - Defaults to the new block storage, which significantly reduces the size of
+  data directories
 - New command `switch history to` which is now the only way to change history
   mode for and already populated EVM node. (!16533)
 - CLI command `list events`, allows listing events relative to the EVM node. (!16446)
