@@ -32,7 +32,7 @@ dnf -y update
 # Install public key
 rpm --import "$REPO/$DISTRO/octez.asc"
 
-dnf -y install sudo procps
+dnf -y install sudo procps util-linux
 
 dnf -y install octez-client octez-node octez-baker
 
