@@ -142,16 +142,15 @@ of parameters. Zero parameters is represented as ``unit``, a single
 ``x`` parameter is represented as ``unit * x``, two parameters ``x`` and
 ``y`` is represented as ``(unit * x) * y``, etc.
 
-Note that query parameters are respresented as object. There’s no good
-reason for this that I know of. I guess it helps naming the different
-components of the query but so would a record and also there’s only a
-single query argument here anyway.
+Note that query parameters are represented as objects.
+This helps naming the different components of the query (it could also have been a record).
+In our case, it’s only a single query argument.
 
 Another usage example
 ---------------------
 
 :src:`src/lib_shell_services/chain_services.ml` declares all the
-chain-data-qeury RPC services. Excerpt:
+chain-data-query RPC services. Excerpt:
 
 ::
 
@@ -196,7 +195,10 @@ And the matching ``.mli`` excerpt:
 How to register services / declare a directory
 ==============================================
 
-Directories are sets of services each with a handler. You
+Directories are sets of services, each with a handler.
+Therefore, declaring the directory and registering its services is done at the same time.
+
+More specifically, you:
 
 1. start with the empty directory ``Tezos_rpc.Directory.empty``
 
@@ -210,7 +212,7 @@ Directories are sets of services each with a handler. You
    E.g., ``lwt_register1`` registers a 1-parameter service which cannot
    fail (its handler uses lwt as its monad, hence the prefix).
 
-3. combine multiple directories together by calling
+3. may combine multiple directories together by calling
    ``Tezos_rpc.Directory.merge``.
 
    Note that the merging of directories may fail by raising an exception
@@ -223,7 +225,7 @@ Directories are sets of services each with a handler. You
 :src:`src/lib_rpc/RPC_directory.ml` and it is a thin wrapper around
 :package-api:`Resto_directory.Make <octez-libs/Resto_directory/index.html>` which is in :src:`resto/src/resto_directory.ml`.
 The wrapper instantiates the functor with de/serialisation functions and
-shadows the ``*register*`` functions with some error-handling.
+shadows the ``*register*`` functions with some error-handling features.
 
 .. _usage-example-1:
 
@@ -292,11 +294,13 @@ parts of the code.
 How to serve a directory
 ========================
 
-Get a ``server`` value by calling
+Serving a directory involves configuring and launching a server that listens to a port and handles RPC requests.
+
+First, get a ``server`` value by calling
 ``Tezos_rpc_http.RPC_server.init_server``. This function takes a
 directory (see above).
 
-Call ``Tezos_rpc_http.RPC_server.launch``. The function takes the
+Then, call ``Tezos_rpc_http.RPC_server.launch``. The function takes the
 ``server`` value initialised above as well as some server-configuration
 parameters (think port number and such). The executable which calls this
 function now serves the RPC services registered in the directory.
@@ -313,6 +317,8 @@ The responsibilities are handled as follows:
   populating headers, etc.) and delegates the actual network management
   (sockets, connections, etc.) to Conduit.
 - Conduit does the bind/accept/etc. dance.
+
+For details about RPC handling and RPC server initialization, see :doc:`./rpc_architecture`.
 
 .. _usage-example-2:
 
@@ -361,14 +367,14 @@ TODO (Diana)
 How to call RPCs
 ================
 
-Using curl or whichever HTTP client works. But it can be difficult to
+In principle, you can call RPCs using curl or whichever HTTP client, but it can be difficult to
 de/serialise arguments and responses. It is even more difficult when
-using the ``application/octet-stream`` media type. (Although
-``octez-codec``, the executable from ``src/bin_codec``, can help, it is
+using the ``application/octet-stream`` media type. Although
+:ref:`octez-codec <octez-codec>`, the executable from ``src/bin_codec``, can help, it is
 still difficult and further explanations are beyond the scope of this
-document.)
+document.
 
-Instead, you can use the ``octez-client`` executable. This provides some
+Instead, you can use the :ref:`octez-client <howtouse_tezos_client>` executable. This provides some
 safety checks, some UI/UX niceties, and some built-in de/serialisation.
 The ``octez-client`` executable uses abstractions similar to the node’s
 RPC server in order to make RPC calls.
@@ -393,17 +399,17 @@ The stack is:
     injection: code can handle all the logic of calling RPC entry-points
     and using the returned value but the actual backend is passed
     dynamically as a client-context parameter. This is a leftover from a
-    time we were trying to separate a the code into native-vs-javascript
+    time we were trying to separate the code into native-vs-javascript
     parts and it could be greatly simplified.
   - The methods for performing the calls take a service as an argument
     as well as all the arguments (path, query, body) that the service
-    expect. It computes the correct path based on the service
+    expects. It computes the correct path based on the service
     declaration.
 
-How to register a RPC in the protocol
-=====================================
+How to register an RPC in the protocol
+======================================
 
-Shortly: same as other services but declared and registered inside the
-plugin part of the protocol so they can be patched without having to
+Shortly: declaring and registering an RPC in the protocol is the same as for other services but is done inside the
+plugin part of the protocol so the protocol services can be patched without having to
 inject a new protocol.
 
