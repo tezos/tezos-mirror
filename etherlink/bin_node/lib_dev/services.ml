@@ -550,7 +550,18 @@ let dispatch_request (rpc : Configuration.rpc)
             let f (address, block_param) =
               match block_param with
               | Ethereum_types.Block_parameter.(Block_parameter Pending) ->
-                  let* nonce = Tx_pool.nonce address in
+                  let* nonce =
+                    if
+                      Option.is_some
+                        config.experimental_features.enable_tx_queue
+                    then
+                      let* next_nonce = Backend_rpc.nonce address block_param in
+                      let next_nonce =
+                        Option.value ~default:Qty.zero next_nonce
+                      in
+                      Tx_queue.nonce ~next_nonce address
+                    else Tx_pool.nonce address
+                  in
                   rpc_ok nonce
               | _ ->
                   let* nonce = Backend_rpc.nonce address block_param in
@@ -678,10 +689,12 @@ let dispatch_request (rpc : Configuration.rpc)
                       Tx_pool_events.invalid_transaction ~transaction:tx_raw
                     in
                     rpc_error (Rpc_errors.transaction_rejected err None)
-                | Ok transaction_object -> (
+                | Ok (next_nonce, transaction_object) -> (
                     let* tx_hash =
                       if Configuration.is_tx_queue_enabled config then
-                        let* () = Tx_queue.inject transaction_object tx_raw in
+                        let* () =
+                          Tx_queue.inject ~next_nonce transaction_object tx_raw
+                        in
                         return (Ok transaction_object.hash)
                       else Tx_pool.add transaction_object txn
                     in
@@ -887,7 +900,9 @@ let dispatch_private_request (rpc : Configuration.rpc)
         build ~f module_ parameters
     | Method (Inject_transaction.Method, module_) ->
         let open Lwt_result_syntax in
-        let f (transaction_object, raw_txn) =
+        let f
+            ( (transaction_object : Ethereum_types.legacy_transaction_object),
+              raw_txn ) =
           let* is_valid =
             let* mode = Tx_pool.mode () in
             match mode with
@@ -896,18 +911,31 @@ let dispatch_private_request (rpc : Configuration.rpc)
                   (module Backend_rpc)
                   ~mode:With_state
                   raw_txn
-            | _ -> return @@ Ok transaction_object
+            | _ ->
+                let* next_nonce =
+                  Backend_rpc.nonce
+                    transaction_object.from
+                    (Block_parameter Latest)
+                in
+                let next_nonce =
+                  match next_nonce with
+                  | None -> Ethereum_types.Qty Z.zero
+                  | Some next_nonce -> next_nonce
+                in
+                return @@ Ok (next_nonce, transaction_object)
           in
           match is_valid with
           | Error err ->
               let transaction = Ethereum_types.hex_encode_string raw_txn in
               let*! () = Tx_pool_events.invalid_transaction ~transaction in
               rpc_error (Rpc_errors.transaction_rejected err None)
-          | Ok transaction_object -> (
+          | Ok (next_nonce, transaction_object) -> (
               let* tx_hash =
                 if Configuration.is_tx_queue_enabled config then
                   let transaction = Ethereum_types.hex_encode_string raw_txn in
-                  let* () = Tx_queue.inject transaction_object transaction in
+                  let* () =
+                    Tx_queue.inject ~next_nonce transaction_object transaction
+                  in
                   return @@ Ok transaction_object.hash
                 else Tx_pool.add transaction_object raw_txn
               in

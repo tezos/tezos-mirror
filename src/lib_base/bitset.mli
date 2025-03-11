@@ -40,6 +40,17 @@ val add : t -> int -> t tzresult
     This functions returns [Invalid_position i] if [i] is negative. *)
 val remove : t -> int -> t tzresult
 
+(** [shift_right bitset ~offset] returns a new bitset [bitset'] such
+    that for any [i] we have:
+
+    [mem (i - offset) bitset'] if and only if [i >= offset] and [mem i bitset].
+
+    In other words, positions smaller than `offset` are removed and positions larger
+    or equal than `offset` are decreased by `offset`.
+
+    This functions returns [Invalid_input "shift_right"] if [offset] is negative. *)
+val shift_right : t -> offset:int -> t tzresult
+
 (** [from_list positions] folds [add] over the [positions] starting from [empty].
     This function returns [Invalid_position i] if [i] is negative and appears in
     [positions]. *)

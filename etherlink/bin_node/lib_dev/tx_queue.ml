@@ -42,10 +42,219 @@ type pending_request = {
 type callback = all_variant variant_callback
 
 type request = {
+  next_nonce : Ethereum_types.quantity;
   payload : Ethereum_types.hex;
   tx_object : Ethereum_types.legacy_transaction_object;
   callback : callback;
 }
+
+(** [Nonce_bitset] registers known nonces from transactions that went
+    through the tx_queue from a specific sender address. With this
+    structure it's easy to do bookkeeping of address' nonce without
+    going through all the transactions of the queue.
+
+    The invariants are that for any nonce_bitset [nb]:
+
+    - When creating [nb], [nb.next_nonce] is the next valid nonce for
+    the state.
+
+    - When adding a nonce [n] to [nb], [n] must be superior or equal
+    to [nb.next_nonce]. This is enforced by the validation in
+    {!Validate.is_tx_valid}.
+
+    - [nb.next_nonce] can only increase over time. This is enforced by
+    [shift] and [offset].
+ *)
+module Nonce_bitset = struct
+  module Bitset = Tezos_base.Bitset
+
+  (** [t] allows to register for a given address all nonces that are
+      currently used by transaction in the tx_queue. *)
+  type t = {
+    next_nonce : Z.t;
+        (** [next_nonce] is the base value for any position found in
+            {!field:bitset}. It’s set to be the next expected nonce
+            for a given address, which is the nonce found in the
+            backend. *)
+    bitset : Bitset.t;
+  }
+
+  (** [create ~next_nonce] creates a {!t} struct with empty [bitset]. *)
+  let create ~next_nonce = {next_nonce; bitset = Bitset.empty}
+
+  (** [offset ~nonce1 ~nonce2] computes the difference between
+      [nonce1] and [nonce2].
+
+      Fails if [nonce2 > nonce1] or if the difference between the two is
+      more than {!Int.max_int}. *)
+  let offset ~nonce1 ~nonce2 =
+    let open Result_syntax in
+    if Z.gt nonce2 nonce1 then
+      error_with
+        "Internal: invalid nonce diff. nonce2 %a must be inferior or equal to \
+         nonce1 %a."
+        Z.pp_print
+        nonce2
+        Z.pp_print
+        nonce1
+    else
+      let offset = Z.(nonce1 - nonce2) in
+      if Z.fits_int offset then return (Z.to_int offset)
+      else
+        error_with
+          "Internal: invalid nonce offset, it's too large to fit in an integer."
+
+  (** [add bitset_nonce ~nonce] adds the nonce [nonce] to [bitset_nonce]. *)
+  let add {next_nonce; bitset} ~nonce =
+    let open Result_syntax in
+    let* offset_position = offset ~nonce1:nonce ~nonce2:next_nonce in
+    let* bitset = Bitset.add bitset offset_position in
+    return {next_nonce; bitset}
+
+  (** [remove bitset_nonce ~nonce] removes the nonce [nonce] from
+      [bitset_nonce].
+
+      If [nonce] is strictly inferior to [bitset_nonce.next_nonce] then
+      it's a no-op because nonce can't exist in the bitset. *)
+  let remove {next_nonce; bitset} ~nonce =
+    let open Result_syntax in
+    if Z.lt nonce next_nonce then
+      (* no need to remove a nonce that can't exist in the bitset *)
+      return {next_nonce; bitset}
+    else
+      let* offset_position = offset ~nonce1:nonce ~nonce2:next_nonce in
+      let* bitset = Bitset.remove bitset offset_position in
+      return {next_nonce; bitset}
+
+  (** [shift bitset_nonce ~nonce] shifts the bitset of [bitset_nonce]
+      so the next_nonce is now [nonce]. Shifting the bitset means
+      that nonces that are inferior to [nonce] are dropped.
+
+      Fails if [nonce] is strictly inferior to
+      [bitset_nonce.next_nonce]. *)
+  let shift {next_nonce; bitset} ~nonce =
+    let open Result_syntax in
+    let* offset = offset ~nonce1:nonce ~nonce2:next_nonce in
+    let* bitset = Bitset.shift_right bitset ~offset in
+    return {next_nonce = nonce; bitset}
+
+  (** [is_empty bitset_nonce] checks if the bitset is empty, i.e. no
+      position is at 1. *)
+  let is_empty {bitset; _} = Bitset.is_empty bitset
+
+  (** [next_gap bitset_nonce] returns the next available nonce. *)
+  let next_gap {next_nonce; bitset} =
+    let offset_position = Z.(trailing_zeros @@ lognot @@ Bitset.to_z bitset) in
+    Z.(next_nonce + of_int offset_position)
+
+  (** [shift_then_next_gap bitset_nonce ~shift_nonce] calls {!shift
+      ~nonce:shift_nonce} then {!next_gap bitset_nonce}. *)
+  let shift_then_next_gap bitset_nonce ~shift_nonce =
+    let open Result_syntax in
+    let* bitset_nonce = shift bitset_nonce ~nonce:shift_nonce in
+    return @@ next_gap bitset_nonce
+end
+
+module Address_nonce = struct
+  module S = String.Hashtbl
+
+  (** [t] contains the nonces of transactions from the tx_queue. If an
+      address has no transactions in the tx_queue, it will have no
+      value here. In other words, the bitset for that address is
+      removed when the last transaction from an address is either
+      confirmed or dropped. *)
+  type t = Nonce_bitset.t S.t
+
+  let empty ~start_size = S.create start_size
+
+  let find nonces ~addr = S.find nonces addr
+
+  let update nonces addr nonce_bitset =
+    if Nonce_bitset.is_empty nonce_bitset then S.remove nonces addr
+    else S.replace nonces addr nonce_bitset
+
+  let add nonces ~addr ~next_nonce ~nonce =
+    let open Result_syntax in
+    let nonce_bitset = S.find nonces addr in
+    let* nonce_bitset =
+      match nonce_bitset with
+      | Some nonce_bitset ->
+          (* Only shifts if the next_nonce we want to confirm is
+             superior of equal to current next nonce.
+
+             Checking here prevents a possible race condition where a
+             transaction is submitted a second time and the
+             confirmation of the first try is received while the
+             validation of that transaction is processed. In that case
+             we could add a transaction in the tx_queue that is
+             already confirmed. In such rare case the [bitset_nonce]
+             would have a [next_nonce] already superior to the given
+             one.
+
+             If [nonce_bitset.next_nonce > next_nonce] then there is no
+             need to shift because [next_nonce] is already in the past. *)
+          if Z.gt nonce_bitset.Nonce_bitset.next_nonce next_nonce then
+            return nonce_bitset
+          else Nonce_bitset.shift nonce_bitset ~nonce:next_nonce
+      | None -> return @@ Nonce_bitset.create ~next_nonce
+    in
+    let* nonce_bitset =
+      (* Only adds [nonce] if [bitset_nonce.next_nonce] is inferior or
+         equal. If [nonce_bitset.next_nonce > nonce] then there is no
+         need to add because [nonce] is already in the past.
+
+         This is follow-up to the previous comment where we are in a
+         rare ce condition of the transaction is being validated while
+         a transaction with a superior nonce is being confirmed. In
+         such case we simply don't register the nonce, and the
+         transaction will be dropped by the upstream node when
+         receiving it. *)
+      if Z.gt nonce_bitset.Nonce_bitset.next_nonce nonce then
+        return nonce_bitset
+      else Nonce_bitset.add nonce_bitset ~nonce
+    in
+    let () = S.replace nonces addr nonce_bitset in
+    return_unit
+
+  let confirm_nonce nonces ~addr ~nonce =
+    let open Result_syntax in
+    let nonce_bitset = S.find nonces addr in
+    match nonce_bitset with
+    | Some nonce_bitset ->
+        let next_nonce = Z.succ nonce in
+        if Z.gt nonce_bitset.Nonce_bitset.next_nonce next_nonce then
+          (* A tx with a superior nonce was already confirmed, nothing
+             to confirm.
+
+             This a an unexpected case but if it occurs it's not a
+             problem and the tx_queue is not corrupted. *)
+          return_unit
+        else
+          let* nonce_bitset =
+            Nonce_bitset.shift nonce_bitset ~nonce:next_nonce
+          in
+          update nonces addr nonce_bitset ;
+          return_unit
+    | None -> return_unit
+
+  let remove nonces ~addr ~nonce =
+    let open Result_syntax in
+    let nonce_bitset = S.find nonces addr in
+    match nonce_bitset with
+    | Some nonce_bitset ->
+        let* nonce_bitset = Nonce_bitset.remove nonce_bitset ~nonce in
+        update nonces addr nonce_bitset ;
+        return_unit
+    | None -> return_unit
+
+  let next_gap nonces ~addr ~next_nonce =
+    let open Result_syntax in
+    let nonce_bitset = S.find nonces addr in
+    match nonce_bitset with
+    | Some nonce_bitset ->
+        Nonce_bitset.shift_then_next_gap nonce_bitset ~shift_nonce:next_nonce
+    | None -> return next_nonce
+end
 
 module Tx_object = struct
   open Ethereum_types
@@ -58,7 +267,7 @@ module Tx_object = struct
   let add htbl
       (({hash = Hash (Hex hash); _} : Ethereum_types.legacy_transaction_object)
        as tx_object) =
-    S.add htbl hash tx_object
+    S.replace htbl hash tx_object
 
   let find htbl (Hash (Hex hash)) = S.find htbl hash
 
@@ -74,7 +283,7 @@ module Pending_transactions = struct
   let empty ~start_size = S.create start_size
 
   let add htbl (Hash (Hex hash)) pending_callback =
-    S.add
+    S.replace
       htbl
       hash
       ({pending_callback; since = Time.System.now ()} : pending_request)
@@ -105,6 +314,7 @@ type state = {
   mutable queue : queue_request Queue.t;
   pending : Pending_transactions.t;
   tx_object : Tx_object.t;
+  address_nonce : Address_nonce.t;
   config : Configuration.tx_queue;
   keep_alive : bool;
 }
@@ -135,6 +345,11 @@ module Request = struct
         txn_hash : Ethereum_types.hash;
       }
         -> (Ethereum_types.legacy_transaction_object option, tztrace) t
+    | Nonce : {
+        next_nonce : Ethereum_types.quantity;
+        address : Ethereum_types.address;
+      }
+        -> (Ethereum_types.quantity, tztrace) t
     | Tick : (unit, tztrace) t
     | Clear : (unit, tztrace) t
 
@@ -185,6 +400,18 @@ module Request = struct
           (obj1 (req "request" (constant "clear")))
           (function View Clear -> Some () | _ -> None)
           (fun _ -> assert false);
+        case
+          Json_only
+          ~title:"Nonce"
+          (obj3
+             (req "request" (constant "nonce"))
+             (req "next_nonce" Ethereum_types.quantity_encoding)
+             (req "address" Ethereum_types.address_encoding))
+          (function
+            | View (Nonce {next_nonce; address}) ->
+                Some ((), next_nonce, address)
+            | _ -> None)
+          (fun _ -> assert false);
       ]
 
   let pp fmt (View r) =
@@ -196,6 +423,8 @@ module Request = struct
     | Find {txn_hash = Hash (Hex txn_hash)} -> fprintf fmt "Find %s" txn_hash
     | Tick -> fprintf fmt "Tick"
     | Clear -> fprintf fmt "Clear"
+    | Nonce {next_nonce = _; address = Address (Hex address)} ->
+        fprintf fmt "Nonce %s" address
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -283,27 +512,72 @@ module Handlers = struct
     let open Lwt_result_syntax in
     let state = Worker.state self in
     match request with
-    | Inject {payload; tx_object; callback} ->
+    | Inject {next_nonce; payload; tx_object; callback} ->
+        let (Address (Hex addr)) = tx_object.from in
+        let (Qty tx_nonce) = tx_object.nonce in
         let pending_callback (reason : pending_variant) =
-          let*! () =
+          let open Lwt_syntax in
+          let* res =
             match reason with
-            | `Dropped -> Tx_queue_events.transaction_dropped tx_object.hash
-            | `Confirmed -> Tx_queue_events.transaction_confirmed tx_object.hash
+            | `Dropped ->
+                let* () = Tx_queue_events.transaction_dropped tx_object.hash in
+                return
+                @@ Address_nonce.remove
+                     state.address_nonce
+                     ~addr
+                     ~nonce:tx_nonce
+            | `Confirmed ->
+                let* () =
+                  Tx_queue_events.transaction_confirmed tx_object.hash
+                in
+                return
+                @@ Address_nonce.confirm_nonce
+                     state.address_nonce
+                     ~addr
+                     ~nonce:tx_nonce
+          in
+          let* () =
+            match res with
+            | Ok () -> return_unit
+            | Error errs -> Tx_queue_events.callback_error errs
           in
           Tx_object.remove state.tx_object tx_object.hash ;
           callback (reason :> all_variant)
         in
         let queue_callback reason =
-          (match reason with
-          | `Accepted ->
-              Pending_transactions.add
-                state.pending
-                tx_object.hash
-                pending_callback
-          | `Refused -> Tx_object.remove state.tx_object tx_object.hash) ;
+          let open Lwt_syntax in
+          let* res =
+            match reason with
+            | `Accepted ->
+                Pending_transactions.add
+                  state.pending
+                  tx_object.hash
+                  pending_callback ;
+                return_ok_unit
+            | `Refused ->
+                Tx_object.remove state.tx_object tx_object.hash ;
+                return
+                @@ Address_nonce.remove
+                     state.address_nonce
+                     ~addr
+                     ~nonce:tx_nonce
+          in
+          let* () =
+            match res with
+            | Ok () -> return_unit
+            | Error errs -> Tx_queue_events.callback_error errs
+          in
           callback (reason :> all_variant)
         in
         Tx_object.add state.tx_object tx_object ;
+        let Ethereum_types.(Qty next_nonce) = next_nonce in
+        let*? () =
+          Address_nonce.add
+            state.address_nonce
+            ~addr
+            ~next_nonce
+            ~nonce:tx_nonce
+        in
         Queue.add {payload; queue_callback} state.queue ;
         return_unit
     | Confirm {txn_hash} -> (
@@ -362,6 +636,12 @@ module Handlers = struct
         Queue.clear state.queue ;
         let*! () = Tx_queue_events.cleared () in
         return_unit
+    | Nonce {next_nonce; address = Address (Hex addr)} ->
+        let Ethereum_types.(Qty next_nonce) = next_nonce in
+        let*? next_gap =
+          Address_nonce.next_gap state.address_nonce ~addr ~next_nonce
+        in
+        return @@ Ethereum_types.Qty next_gap
 
   type launch_error = tztrace
 
@@ -376,6 +656,10 @@ module Handlers = struct
         (* start with /4 and let it grow if necessary to not allocate
            too much at start. *)
         tx_object = Tx_object.empty ~start_size:(config.max_size / 4);
+        address_nonce = Address_nonce.empty ~start_size:(config.max_size / 10);
+        (* start with /10 and let it grow if necessary to not allocate
+           too much at start. It's expected to have less different
+           addresses than transactions. *)
         config;
         keep_alive;
       }
@@ -449,12 +733,12 @@ let rec beacon ~tick_interval =
   let*! () = Lwt_unix.sleep tick_interval in
   beacon ~tick_interval
 
-let inject ?(callback = fun _ -> Lwt_syntax.return_unit)
+let inject ?(callback = fun _ -> Lwt_syntax.return_unit) ~next_nonce
     (tx_object : Ethereum_types.legacy_transaction_object) txn =
   let open Lwt_syntax in
   let* () = Tx_queue_events.add_transaction tx_object.hash in
   let* worker = worker_promise in
-  push_request worker (Inject {payload = txn; tx_object; callback})
+  push_request worker (Inject {next_nonce; payload = txn; tx_object; callback})
 
 let confirm txn_hash =
   bind_worker @@ fun w -> push_request w (Confirm {txn_hash})
@@ -482,9 +766,20 @@ let clear () =
   let*? w = Lazy.force worker in
   Worker.Queue.push_request_and_wait w Clear |> handle_request_error
 
+let nonce ~next_nonce address =
+  let open Lwt_result_syntax in
+  let*? w = Lazy.force worker in
+  Worker.Queue.push_request_and_wait w (Nonce {next_nonce; address})
+  |> handle_request_error
+
 let shutdown () =
   let open Lwt_result_syntax in
   bind_worker @@ fun w ->
   let*! () = Tx_queue_events.shutdown () in
   let*! () = Worker.shutdown w in
   return_unit
+
+module Internal_for_tests = struct
+  module Nonce_bitset = Nonce_bitset
+  module Address_nonce = Address_nonce
+end

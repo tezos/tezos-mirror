@@ -7,7 +7,8 @@
   test_ethbloom
   test_call_tracer_algo
   test_wasm_runtime
-  test_blueprint_roundtrip)
+  test_blueprint_roundtrip
+  test_bitset_nonce)
  (libraries
   bls12-381.archive
   octez-evm-node-libs.evm_node_rust_deps
@@ -89,3 +90,12 @@
   invalidRLPTest.json
   ../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm)
  (action (run %{dep:./test_blueprint_roundtrip.exe})))
+
+(rule
+ (alias runtest)
+ (package octez-evm-node-tests)
+ (deps
+  rlptest.json
+  invalidRLPTest.json
+  ../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm)
+ (action (run %{dep:./test_bitset_nonce.exe})))
