@@ -593,7 +593,7 @@ module Handlers = struct
     let open Lwt_result_syntax in
     let state = Worker.state self in
     match request with
-    | Inject {next_nonce; payload; tx_object; callback} -> (
+    | Inject {next_nonce; payload; tx_object; callback} ->
         let (Address (Hex addr)) = tx_object.from in
         let (Qty tx_nonce) = tx_object.nonce in
         let pending_callback (reason : pending_variant) =
@@ -654,33 +654,40 @@ module Handlers = struct
           in
           callback (reason :> all_variant)
         in
-        let nb_txs_in_queue =
-          Transactions_per_addr.find state.tx_per_address tx_object.from
-        in
-        (* Check number of txs by user in tx_queue. *)
-        match nb_txs_in_queue with
-        | Some i when i >= state.config.tx_per_addr_limit ->
-            let*! () =
-              Tx_pool_events.txs_per_user_threshold_reached
-                ~address:(Ethereum_types.Address.to_string tx_object.from)
-            in
-            return
-              (Error
-                 "Limit of transaction for a user was reached. Transaction is \
-                  rejected.")
-        | Some _ | None ->
-            Transactions_per_addr.increment state.tx_per_address tx_object.from ;
-            Tx_object.add state.tx_object tx_object ;
-            let Ethereum_types.(Qty next_nonce) = next_nonce in
-            let*? () =
-              Address_nonce.add
-                state.address_nonce
-                ~addr
-                ~next_nonce
-                ~nonce:tx_nonce
-            in
-            Queue.add {payload; queue_callback} state.queue ;
-            return (Ok ()))
+        if Compare.Int.(Queue.length state.queue < state.config.max_size) then (
+          (* Check number of txs by user in tx_queue. *)
+          let nb_txs_in_queue =
+            Transactions_per_addr.find state.tx_per_address tx_object.from
+          in
+          match nb_txs_in_queue with
+          | Some i when i >= state.config.tx_per_addr_limit ->
+              let*! () =
+                Tx_pool_events.txs_per_user_threshold_reached
+                  ~address:(Ethereum_types.Address.to_string tx_object.from)
+              in
+              return
+                (Error
+                   "Limit of transaction for a user was reached. Transaction \
+                    is rejected.")
+          | Some _ | None ->
+              let*! () = Tx_queue_events.add_transaction tx_object.hash in
+              Transactions_per_addr.increment
+                state.tx_per_address
+                tx_object.from ;
+              Tx_object.add state.tx_object tx_object ;
+              let Ethereum_types.(Qty next_nonce) = next_nonce in
+              let*? () =
+                Address_nonce.add
+                  state.address_nonce
+                  ~addr
+                  ~next_nonce
+                  ~nonce:tx_nonce
+              in
+              Queue.add {payload; queue_callback} state.queue ;
+              return (Ok ()))
+        else
+          return
+            (Error "Transaction limit was reached. Transaction is rejected.")
     | Confirm {txn_hash} -> (
         match Pending_transactions.pop state.pending txn_hash with
         | Some {pending_callback; _} ->
@@ -843,7 +850,6 @@ let beacon ~evm_node_endpoint ~tick_interval =
 let inject ?(callback = fun _ -> Lwt_syntax.return_unit) ~next_nonce
     (tx_object : Ethereum_types.legacy_transaction_object) txn =
   let open Lwt_syntax in
-  let* () = Tx_queue_events.add_transaction tx_object.hash in
   let* worker = worker_promise in
   Worker.Queue.push_request_and_wait
     worker
