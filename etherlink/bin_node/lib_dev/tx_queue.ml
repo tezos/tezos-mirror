@@ -309,11 +309,39 @@ module Pending_transactions = struct
     !dropped
 end
 
+module Transactions_per_addr = struct
+  module S = String.Hashtbl
+
+  type t = int64 S.t
+
+  let empty ~start_size = S.create start_size
+
+  let remove s (Ethereum_types.Address (Hex h)) = S.remove s h
+
+  let find s (Ethereum_types.Address (Hex h)) = S.find s h
+
+  let add s (Ethereum_types.Address (Hex h)) i = S.replace s h i
+
+  let decrement s address =
+    let current = find s address in
+    match current with
+    | Some i when i <= 1L -> remove s address
+    | Some i -> add s address (Int64.pred i)
+    | None -> ()
+
+  let increment s address =
+    let current = find s address in
+    match current with
+    | Some i -> add s address (Int64.succ i)
+    | None -> add s address 1L
+end
+
 type state = {
   evm_node_endpoint : Uri.t;
   mutable queue : queue_request Queue.t;
   pending : Pending_transactions.t;
   tx_object : Tx_object.t;
+  tx_per_address : Transactions_per_addr.t;
   address_nonce : Address_nonce.t;
   config : Configuration.tx_queue;
   keep_alive : bool;
@@ -339,7 +367,7 @@ end
 
 module Request = struct
   type ('a, 'b) t =
-    | Inject : request -> (unit, tztrace) t
+    | Inject : request -> ((unit, string) result, tztrace) t
     | Confirm : {txn_hash : Ethereum_types.hash} -> (unit, tztrace) t
     | Find : {
         txn_hash : Ethereum_types.hash;
@@ -499,6 +527,28 @@ let send_transactions_batch ~evm_node_endpoint ~keep_alive transactions =
     assert (M.is_empty missed_callbacks) ;
     return_unit
 
+(** clear values and keep the allocated space *)
+let clear
+    ({
+       queue;
+       pending;
+       tx_object;
+       tx_per_address;
+       address_nonce;
+       evm_node_endpoint = _;
+       config = _;
+       keep_alive = _;
+     } :
+      state) =
+  (* full matching so when a new element is added to the state it's not
+     forgotten to clear it. *)
+  String.Hashtbl.clear pending ;
+  String.Hashtbl.clear tx_object ;
+  String.Hashtbl.clear tx_per_address ;
+  String.Hashtbl.clear address_nonce ;
+  Queue.clear queue ;
+  ()
+
 module Handlers = struct
   open Request
 
@@ -512,7 +562,7 @@ module Handlers = struct
     let open Lwt_result_syntax in
     let state = Worker.state self in
     match request with
-    | Inject {next_nonce; payload; tx_object; callback} ->
+    | Inject {next_nonce; payload; tx_object; callback} -> (
         let (Address (Hex addr)) = tx_object.from in
         let (Qty tx_nonce) = tx_object.nonce in
         let pending_callback (reason : pending_variant) =
@@ -541,6 +591,7 @@ module Handlers = struct
             | Ok () -> return_unit
             | Error errs -> Tx_queue_events.callback_error errs
           in
+          Transactions_per_addr.decrement state.tx_per_address tx_object.from ;
           Tx_object.remove state.tx_object tx_object.hash ;
           callback (reason :> all_variant)
         in
@@ -555,6 +606,9 @@ module Handlers = struct
                   pending_callback ;
                 return_ok_unit
             | `Refused ->
+                Transactions_per_addr.decrement
+                  state.tx_per_address
+                  tx_object.from ;
                 Tx_object.remove state.tx_object tx_object.hash ;
                 return
                 @@ Address_nonce.remove
@@ -569,17 +623,33 @@ module Handlers = struct
           in
           callback (reason :> all_variant)
         in
-        Tx_object.add state.tx_object tx_object ;
-        let Ethereum_types.(Qty next_nonce) = next_nonce in
-        let*? () =
-          Address_nonce.add
-            state.address_nonce
-            ~addr
-            ~next_nonce
-            ~nonce:tx_nonce
+        let nb_txs_in_queue =
+          Transactions_per_addr.find state.tx_per_address tx_object.from
         in
-        Queue.add {payload; queue_callback} state.queue ;
-        return_unit
+        (* Check number of txs by user in tx_queue. *)
+        match nb_txs_in_queue with
+        | Some i when i >= state.config.tx_per_addr_limit ->
+            let*! () =
+              Tx_pool_events.txs_per_user_threshold_reached
+                ~address:(Ethereum_types.Address.to_string tx_object.from)
+            in
+            return
+              (Error
+                 "Limit of transaction for a user was reached. Transaction is \
+                  rejected.")
+        | Some _ | None ->
+            Transactions_per_addr.increment state.tx_per_address tx_object.from ;
+            Tx_object.add state.tx_object tx_object ;
+            let Ethereum_types.(Qty next_nonce) = next_nonce in
+            let*? () =
+              Address_nonce.add
+                state.address_nonce
+                ~addr
+                ~next_nonce
+                ~nonce:tx_nonce
+            in
+            Queue.add {payload; queue_callback} state.queue ;
+            return (Ok ()))
     | Confirm {txn_hash} -> (
         match Pending_transactions.pop state.pending txn_hash with
         | Some {pending_callback; _} ->
@@ -630,10 +700,7 @@ module Handlers = struct
             Lwt.async (fun () -> pending_callback `Dropped))
           txns
     | Clear ->
-        (* clear values and keep the allocated space *)
-        String.Hashtbl.clear state.pending ;
-        String.Hashtbl.clear state.tx_object ;
-        Queue.clear state.queue ;
+        clear state ;
         let*! () = Tx_queue_events.cleared () in
         return_unit
     | Nonce {next_nonce; address = Address (Hex addr)} ->
@@ -660,6 +727,9 @@ module Handlers = struct
         (* start with /10 and let it grow if necessary to not allocate
            too much at start. It's expected to have less different
            addresses than transactions. *)
+        tx_per_address = Transactions_per_addr.empty ~start_size:500;
+        (* Provide an arbitrary size for the initial hash tables, to
+           be revisited if needs be. *)
         config;
         keep_alive;
       }
@@ -738,7 +808,10 @@ let inject ?(callback = fun _ -> Lwt_syntax.return_unit) ~next_nonce
   let open Lwt_syntax in
   let* () = Tx_queue_events.add_transaction tx_object.hash in
   let* worker = worker_promise in
-  push_request worker (Inject {next_nonce; payload = txn; tx_object; callback})
+  Worker.Queue.push_request_and_wait
+    worker
+    (Inject {next_nonce; payload = txn; tx_object; callback})
+  |> handle_request_error
 
 let confirm txn_hash =
   bind_worker @@ fun w -> push_request w (Confirm {txn_hash})

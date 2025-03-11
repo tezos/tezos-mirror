@@ -1291,7 +1291,11 @@ let optional_json_put ~name v f json =
         (name, JSON.annotate ~origin:"evm_node.config_patch" @@ value_json)
         json
 
-type tx_queue_config = {max_size : int; max_lifespan : int}
+type tx_queue_config = {
+  max_size : int;
+  max_lifespan : int;
+  tx_per_addr_limit : int;
+}
 
 let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false)
@@ -1320,11 +1324,12 @@ let patch_config_with_experimental_feature
        enable_tx_queue
        ~name:"enable_tx_queue"
        (match tx_queue_config with
-       | Some {max_size; max_lifespan} ->
+       | Some {max_size; max_lifespan; tx_per_addr_limit} ->
            `O
              [
                ("max_size", `Float (Float.of_int max_size));
                ("max_lifespan", `Float (Float.of_int max_lifespan));
+               ("tx_per_addr_limit", `String (string_of_int tx_per_addr_limit));
              ]
        | None -> `Bool true)
   |> optional_json_put

@@ -180,9 +180,11 @@
         /* Replace the observer tx pool by a tx queue */
         /* tx queue configuration */
         { /* Some */
-          "max_size": integer ∈ [-2^30, 2^30],
-          "max_transaction_batch_length"?: integer ∈ [-2^30, 2^30],
-          "max_lifespan"?: integer ∈ [-2^30, 2^30] }
+          "max_size"?: integer ∈ [-2^30, 2^30],
+          "max_transaction_batch_length"?:
+            integer ∈ [-2^30, 2^30] /* Some */ || null /* None */,
+          "max_lifespan"?: integer ∈ [-2^30, 2^30],
+          "tx_per_addr_limit"?: $int64 }
         || null
         /* None */
         || boolean

@@ -10759,6 +10759,7 @@ let test_tx_queue =
            {
              max_size = 1000;
              max_lifespan = 100000 (* absurd value so no TX are dropped *);
+             tx_per_addr_limit = 100000;
            }
          ()
   in
@@ -11001,6 +11002,7 @@ let test_tx_queue_nonce =
            {
              max_size = 1000;
              max_lifespan = 100000 (* absurd value so no TX are dropped *);
+             tx_per_addr_limit = 100000;
            }
          ()
   in
@@ -11295,6 +11297,145 @@ let test_observer_init_from_snapshot =
   let*@ _block = Rpc.get_block_by_number ~block:"1" observer in
   unit
 
+let test_tx_queue_limit =
+  register_all
+    ~tags:["observer"; "tx_queue"; "limit"]
+    ~time_between_blocks:Nothing
+    ~kernels:[Latest] (* node only test *)
+    ~use_threshold_encryption:Register_without_feature
+    ~use_dal:Register_without_feature
+    ~websockets:false
+    ~title:
+      "Submits transactions to an observer with a tx queue and make sure its \
+       limit are respected."
+  @@ fun {sequencer; observer; _} _protocol ->
+  let* () =
+    let*@ _ = produce_block sequencer in
+    unit
+  and* () = Evm_node.wait_for_blueprint_applied observer 1 in
+  let* () = Evm_node.terminate observer in
+
+  let max_number_of_txs = 10 in
+  let* () =
+    Evm_node.Config_file.update observer
+    @@ Evm_node.patch_config_with_experimental_feature
+         ~enable_tx_queue:true
+         ~tx_queue_config:
+           {
+             max_size = 1000;
+             max_lifespan = 100000 (* absurd value so no TX are dropped *);
+             tx_per_addr_limit = max_number_of_txs;
+           }
+         ()
+  in
+  let* () = Evm_node.run observer in
+
+  (* helper to craft a tx with given nonce. *)
+  let raw_tx ~nonce =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~value:Wei.one
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+
+  Log.info
+    "send %d txs, all are successfully added to the queue"
+    max_number_of_txs ;
+  let* () =
+    Lwt_list.iter_p
+      (fun i ->
+        let* raw_tx = raw_tx ~nonce:i in
+        let*@ _hash = Rpc.send_raw_transaction ~raw_tx observer in
+        unit)
+      (range 0 (max_number_of_txs - 1))
+  in
+
+  Log.info "Then send an additional txs, that fails" ;
+  let*@? _error =
+    let* raw_tx = raw_tx ~nonce:max_number_of_txs in
+    Rpc.send_raw_transaction ~raw_tx observer
+  in
+
+  Log.info "Wait for all txs to be included by the sequencer" ;
+  let wait_for_all_tx_process ~nb_txs ~name ~waiter =
+    let rec aux total =
+      if total = nb_txs then (
+        Log.info "All (%d) txs processed: \"%s\"." total name ;
+        unit)
+      else if total > nb_txs then
+        Test.fail
+          "more transaction where processed (%s) than expected, impossible"
+          name
+      else
+        let* nb = waiter () in
+        let total = total + nb in
+        Log.debug "Processed %d of txs. (%s)" total name ;
+        aux total
+    in
+    aux 0
+  in
+
+  (* Checks that all txs were included in a block by the sequencer *)
+  let sequencer_wait_tx_included () =
+    let waiter () =
+      let* _hash = Evm_node.wait_for_block_producer_tx_injected sequencer in
+      return 1
+    in
+    wait_for_all_tx_process
+      ~nb_txs:max_number_of_txs
+      ~name:"tx included by sequencer"
+      ~waiter
+  in
+
+  (* produce enough blocks to include all txs submited *)
+  let produce_block_until_all_included () =
+    let res = ref None in
+    let _p =
+      let* () = sequencer_wait_tx_included () in
+      res := Some () ;
+      unit
+    in
+    let result_f () = return !res in
+    bake_until
+      ~__LOC__
+      ~bake:(fun () ->
+        let*@ _ = produce_block sequencer in
+        unit)
+      ~result_f
+      ()
+  in
+  let observer_wait_tx_confirmed () =
+    let waiter () =
+      let* _ = Evm_node.wait_for_tx_queue_transaction_confirmed observer in
+      return 1
+    in
+    wait_for_all_tx_process
+      ~nb_txs:max_number_of_txs
+      ~name:"tx confirmed in observer"
+      ~waiter
+  in
+
+  let* () = produce_block_until_all_included ()
+  and* () = observer_wait_tx_confirmed () in
+
+  Log.info
+    "Resend %d txs, all are successfully added to the queue"
+    max_number_of_txs ;
+  let* () =
+    Lwt_list.iter_p
+      (fun i ->
+        let* raw_tx = raw_tx ~nonce:i in
+        let*@ _hash = Rpc.send_raw_transaction ~raw_tx observer in
+        unit)
+      (range max_number_of_txs ((2 * max_number_of_txs) - 1))
+  in
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -11446,4 +11587,5 @@ let () =
   test_tx_queue_clear [Alpha] ;
   test_spawn_rpc protocols ;
   test_observer_init_from_snapshot protocols ;
-  test_tx_queue_nonce [Alpha]
+  test_tx_queue_nonce [Alpha] ;
+  test_tx_queue_limit [Alpha]

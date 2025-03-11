@@ -302,7 +302,11 @@ val spawn_init_config_minimal :
 
 type rpc_server = Resto | Dream
 
-type tx_queue_config = {max_size : int; max_lifespan : int}
+type tx_queue_config = {
+  max_size : int;
+  max_lifespan : int;
+  tx_per_addr_limit : int;
+}
 
 (** [patch_config_with_experimental_feature
     ?drop_duplicate_when_injection ?next_wasm_runtime ?rpc_server

@@ -94,6 +94,7 @@ type tx_queue = {
   max_size : int;
   max_transaction_batch_length : int option;
   max_lifespan_s : int;
+  tx_per_addr_limit : int64;
 }
 
 (** Configuration settings for experimental features, with no backward
