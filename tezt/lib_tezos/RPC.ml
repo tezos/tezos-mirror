@@ -591,6 +591,14 @@ let post_chain_block_helpers_forge_operations ?(chain = "main")
     ["chains"; chain; "blocks"; block; "helpers"; "forge"; "operations"]
     Fun.id
 
+let post_chain_block_helpers_forge_signed_operations ?(chain = "main")
+    ?(block = "head") ~data () =
+  make
+    ~data
+    POST
+    ["chains"; chain; "blocks"; block; "helpers"; "forge"; "signed_operations"]
+    Fun.id
+
 let post_chain_block_helpers_forge_bls_consensus_operations ?(chain = "main")
     ?(block = "head") ~data () =
   make
