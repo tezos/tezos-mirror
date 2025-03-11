@@ -18,21 +18,38 @@ sudo apk add pandoc jq
 
 echo "# Octez Releases" >> index.md
 
-# $versions_list_filename is a JSON file containing a list of records with major, minor, and rc fields.
-# Concatenate those version numbers, in reverse order, to extract the latest one
-# (without the rc number).
+# [versions] is a 2D array representation of the [$versions_list_filename] JSON:
+# - one line per release or release candidate
+# - each line has two elements: "[major].[minor] [rc]", [rc] is "null" if it is not a release candidate
 # shellcheck disable=SC2162
-read -a versions <<< "$(jq -r '[.[] | "\(.major).\(.minor)" ] | reverse | join(" ")' "${versions_list_filename}")"
-latest=${versions[0]}
+mapfile -t versions < <(jq -r '[.[] | "\(.major).\(.minor) \(.rc // "null")"] | reverse | .[]' "${versions_list_filename}")
 
-# Define the content of the release page
-for version in "${versions[@]}"; do
-  if [[ "$version" == "$latest" ]]; then
-    echo "## Octez $version (latest)" >> index.md
+# Get the version of the latest release:
+# - [release_versions] is an array representation of the [$versions_list_filename] JSON of the versions of all releases (we ignore release candidates).
+# - each element of the array is a release version with the format "[major].[minor]"
+# - elements of the array (i.e. versions) are separated by a whitespace
+# - the latest release appears first.
+# shellcheck disable=SC2162
+read -a releases_versions <<< "$(jq -r '[.[] | select(has("rc") | not) | "\(.major).\(.minor)"] | reverse | join(" ")' "${versions_list_filename}")"
+latest=${releases_versions[0]}
+
+# Define the content of the release page.
+# We iterate on the 2d array [$versions], distinguishing between three cases:
+# - latest release (computed beforehand)
+# - non-latest release
+# - release candidate
+while read -r version rc; do
+  if [[ ${rc} != null ]]; then
+    echo "## Octez Release Candidate ${version}~rc${rc}" >> index.md
+    version="${version}-rc${rc}"
   else
-    echo "## Octez $version" >> index.md
+    if [[ "$version" == "$latest" ]]; then
+      echo "## Octez $version (latest)" >> index.md
+    else
+      echo "## Octez $version" >> index.md
+    fi
   fi
-  echo "### Static binaries" >> index.md
+  echo "### Static Binaries" >> index.md
   for arch in x86_64 arm64; do
     echo "#### $arch" >> index.md
 
@@ -60,8 +77,7 @@ for version in "${versions[@]}"; do
     echo -e "### RPM Packages\n"
     echo -e "For installation instructions, refer to the [Octez RPM Packages Guide](https://tezos.gitlab.io/introduction/howtoget.html#fedora-octez-packages)\n"
   } >> index.md
-
-done
+done <<< "$(printf "%s\n" "${versions[@]}")"
 
 echo "Generating html file."
 pandoc index.md -s --template="./docs/release_page/template.html" --metadata title="Octez Releases" -o index.html
