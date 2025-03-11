@@ -7,7 +7,7 @@
 
 let config name = Format.asprintf "/etc/logrotate.d/%s" name
 
-let write_config ~name ~target_file agent =
+let write_config ~name ~target_file ~max_rotations agent =
   (* Write file locally *)
   let source = Temp.file (Format.asprintf "%s.logrotate" (Agent.name agent)) in
   (* Choose a reasonable 300 rotations of 200MB max file
@@ -32,12 +32,11 @@ let write_config ~name ~target_file agent =
   compress
 # Copies the log file then truncates the original instead of moving it
   copytruncate
-# Runs rotation commands with root user and group permissions
+# Runs rotation commands with root user and group permissions  daily
   su root root
-# Maximum number of rotations before removing the oldests
-  rotate 300
-}
-|})) ;
+# Maximum number of rotations before removing the oldests.
+|}
+        ^ Format.asprintf "  rotate %d\n}\n" max_rotations)) ;
   Log.info "Teztcloud.Logrotate: written configuration for %s" target_file ;
   (* Upload the generated config in the destination /etc/logrotate.d/$name *)
   let destination = config name in

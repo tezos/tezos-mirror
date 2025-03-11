@@ -130,6 +130,9 @@ val faketime : string option
 (** Equivalent to [Cli.binaries_path]. *)
 val binaries_path : string
 
+(** Equivalent to [Cli.log_rotation] *)
+val log_rotation : int
+
 (** [init ()] initialises and deploys a Docker registry using Terraform, only when the
     [mode] is either [`Host] or [`Cloud]. *)
 val init : unit -> unit Lwt.t

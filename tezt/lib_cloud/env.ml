@@ -92,6 +92,8 @@ let binaries_path = Cli.binaries_path
 
 let process_monitoring = Cli.process_monitoring
 
+let log_rotation = Cli.log_rotation
+
 let init () =
   if tezt_cloud = "" then
     Test.fail

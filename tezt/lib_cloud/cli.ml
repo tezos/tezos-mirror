@@ -370,3 +370,13 @@ let binaries_path =
       "Where to find binaries in the docker image by default (default is: \
        '/tmp/tezt-runners')"
     Types.Agent_configuration.default_gcp_binaries_path
+
+let log_rotation =
+  Clap.default_int
+    ~section
+    ~long:"log-rotation"
+    ~description:
+      "Maximum number of log rotations before removing older log files. \
+       Default is 300 if a log-file is specified.\n\
+      \       Set to 0 to completely disable log-rotation"
+    300

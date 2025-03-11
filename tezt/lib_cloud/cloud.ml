@@ -169,33 +169,38 @@ let orchestrator ?(alerts = []) ?(tasks = []) deployement f =
       Lwt.return_some prometheus
     else Lwt.return_none
   in
-  (* FIXME: env/cli instead of true *)
-  let logrotate = true in
-  (* Logrotate: write a configuration file inside each container *)
+  (* Enable logrotate if --log_rotation was not set to 0... *)
+  let logrotate = Env.log_rotation <> 0 in
   let* logrotate =
+    (* ... and if log-file was specified *)
     match (logrotate, Tezt.Cli.Logs.file) with
     (* If no logfile, do not enable logrotate *)
     | _, None -> Lwt.return false
     (* If logfile and logrotate, configure each agent *)
     | true, Some target_file ->
         let* () =
+          (* Logrotate: write a configuration file inside each container *)
           Lwt_list.iter_s
             (fun agent ->
-              Logrotate.write_config ~name:"tezt-cloud" ~target_file agent)
+              Logrotate.write_config
+                ~name:"tezt-cloud"
+                ~target_file
+                ~max_rotations:Env.log_rotation
+                agent)
             agents
         in
         Lwt.return true
-    (* If no logrorate, return false *)
+    (* If no logrotate, return false *)
     | false, _ -> Lwt.return_false
   in
   let tasks =
     if logrotate then
       let name = "logrotate" in
       (* chronos: triggers logrotate every 4 hours.
-         if each 4 hours, the criteria to trigger a rotation is meet, they
+         if each 4 hours, the criteria to trigger a rotation is met, they
          will be rotated.
-         note that rotation involves a in important IO stress for the machine *)
-      let tm = "0 1-23/4 * * *" in
+         Note that rotation may involve an important IO stress for the machine *)
+      let tm = "0 0-23/4 * * *" in
       let action () =
         Lwt_list.iter_s
           (fun agent -> Logrotate.run ~name:"tezt-cloud" agent)

@@ -138,3 +138,8 @@ val faketime : string option
 
 (** Where to find binaries path by default in the docker image. *)
 val binaries_path : string
+
+(** How many log rotation until we remove older logs
+    Defaults to 300
+    Use 0 to disable log-rotation *)
+val log_rotation : int
