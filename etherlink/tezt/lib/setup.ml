@@ -487,6 +487,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ?rpc_server
       ?enable_websocket:websockets
       ?spawn_rpc
+      ?enable_tx_queue
       (* When adding new experimental feature please make sure it's a
          good idea to activate it for all test or not. *)
       ()
