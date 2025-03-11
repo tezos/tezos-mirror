@@ -24,12 +24,11 @@
           [callback] is called with [`Dropped].}} *)
 type callback = [`Accepted | `Confirmed | `Dropped | `Refused] -> unit Lwt.t
 
-(** [start ~evm_node_endpoint ~max_transaction_batch_length ()] starts
-    the worker, meaning it is possible to call {!inject}, {!confirm}
-    and {!beacon}. *)
+(** [start ~config ~max_transaction_batch_length ()] starts the
+    worker, meaning it is possible to call {!inject}, {!confirm} and
+    {!beacon}. *)
 val start :
   config:Configuration.tx_queue ->
-  evm_node_endpoint:Uri.t ->
   keep_alive:bool ->
   unit ->
   unit tzresult Lwt.t
@@ -72,9 +71,11 @@ val inject :
     transaction has been included in a blueprint. *)
 val confirm : Ethereum_types.hash -> unit tzresult Lwt.t
 
-(** [beacon ~tick_interval] is a never fulfilled promise which triggers a tick
-    in the [Tx_queue] every [tick_interval] seconds. *)
-val beacon : tick_interval:float -> unit tzresult Lwt.t
+(** [beacon ~evm_node_endpoint ~tick_interval] is a never fulfilled
+    promise which triggers a tick in the [Tx_queue] every
+    [tick_interval] seconds. *)
+val beacon :
+  evm_node_endpoint:Uri.t -> tick_interval:float -> unit tzresult Lwt.t
 
 (** [find hash] returns the transaction associated with that hash if
     it's found in the tx_queue. *)
@@ -89,6 +90,18 @@ val nonce :
   next_nonce:Ethereum_types.quantity ->
   Ethereum_types.address ->
   Ethereum_types.quantity tzresult Lwt.t
+
+(** [lock_transactions] locks the transactions in the queue, new
+    transactions can be added but nothing can be retrieved with
+    {!pop_transactions}. *)
+val lock_transactions : unit -> unit tzresult Lwt.t
+
+(** [unlock_transactions] unlocks the transactions if it was locked by
+    {!lock_transactions}. *)
+val unlock_transactions : unit -> unit tzresult Lwt.t
+
+(** [is_locked] checks if the queue is locked. *)
+val is_locked : unit -> bool tzresult Lwt.t
 
 (**/*)
 

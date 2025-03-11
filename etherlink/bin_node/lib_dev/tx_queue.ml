@@ -8,11 +8,7 @@
 
 open Tezos_workers
 
-type parameters = {
-  evm_node_endpoint : Uri.t;
-  config : Configuration.tx_queue;
-  keep_alive : bool;
-}
+type parameters = {config : Configuration.tx_queue; keep_alive : bool}
 
 type queue_variant = [`Accepted | `Refused]
 
@@ -337,7 +333,6 @@ module Transactions_per_addr = struct
 end
 
 type state = {
-  evm_node_endpoint : Uri.t;
   mutable queue : queue_request Queue.t;
   pending : Pending_transactions.t;
   tx_object : Tx_object.t;
@@ -345,6 +340,7 @@ type state = {
   address_nonce : Address_nonce.t;
   config : Configuration.tx_queue;
   keep_alive : bool;
+  mutable locked : bool;
 }
 
 module Types = struct
@@ -378,8 +374,11 @@ module Request = struct
         address : Ethereum_types.address;
       }
         -> (Ethereum_types.quantity, tztrace) t
-    | Tick : (unit, tztrace) t
+    | Tick : {evm_node_endpoint : Uri.t} -> (unit, tztrace) t
     | Clear : (unit, tztrace) t
+    | Lock_transactions : (unit, tztrace) t
+    | Unlock_transactions : (unit, tztrace) t
+    | Is_locked : (bool, tztrace) t
 
   type view = View : _ t -> view
 
@@ -411,8 +410,13 @@ module Request = struct
         case
           Json_only
           ~title:"Tick"
-          (obj1 (req "request" (constant "tick")))
-          (function View Tick -> Some () | _ -> None)
+          (obj2
+             (req "request" (constant "tick"))
+             (req "evm_node_endpoint" string))
+          (function
+            | View (Tick {evm_node_endpoint}) ->
+                Some ((), Uri.to_string evm_node_endpoint)
+            | _ -> None)
           (fun _ -> assert false);
         case
           Json_only
@@ -440,6 +444,24 @@ module Request = struct
                 Some ((), next_nonce, address)
             | _ -> None)
           (fun _ -> assert false);
+        case
+          Json_only
+          ~title:"Lock_transactions"
+          (obj1 (req "request" (constant "lock_transactions")))
+          (function View Lock_transactions -> Some () | _ -> None)
+          (fun _ -> assert false);
+        case
+          Json_only
+          ~title:"Unlock_transactions"
+          (obj1 (req "request" (constant "unlock_transactions")))
+          (function View Unlock_transactions -> Some () | _ -> None)
+          (fun _ -> assert false);
+        case
+          Json_only
+          ~title:"Is_locked"
+          (obj1 (req "request" (constant "is_locked")))
+          (function View Is_locked -> Some () | _ -> None)
+          (fun _ -> assert false);
       ]
 
   let pp fmt (View r) =
@@ -449,10 +471,13 @@ module Request = struct
     | Confirm {txn_hash = Hash (Hex txn_hash)} ->
         fprintf fmt "Confirm %s" txn_hash
     | Find {txn_hash = Hash (Hex txn_hash)} -> fprintf fmt "Find %s" txn_hash
-    | Tick -> fprintf fmt "Tick"
+    | Tick _ -> fprintf fmt "Tick"
     | Clear -> fprintf fmt "Clear"
     | Nonce {next_nonce = _; address = Address (Hex address)} ->
         fprintf fmt "Nonce %s" address
+    | Lock_transactions -> Format.fprintf fmt "Locking the transactions"
+    | Unlock_transactions -> Format.fprintf fmt "Unlocking the transactions"
+    | Is_locked -> Format.fprintf fmt "Checking if the tx queue is locked"
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -535,9 +560,9 @@ let clear
        tx_object;
        tx_per_address;
        address_nonce;
-       evm_node_endpoint = _;
        config = _;
        keep_alive = _;
+       locked = _;
      } :
       state) =
   (* full matching so when a new element is added to the state it's not
@@ -548,6 +573,12 @@ let clear
   String.Hashtbl.clear address_nonce ;
   Queue.clear queue ;
   ()
+
+let lock_transactions state = state.locked <- true
+
+let unlock_transactions state = state.locked <- false
+
+let is_locked state = state.locked
 
 module Handlers = struct
   open Request
@@ -657,7 +688,7 @@ module Handlers = struct
             return_unit
         | None -> return_unit)
     | Find {txn_hash} -> return @@ Tx_object.find state.tx_object txn_hash
-    | Tick ->
+    | Tick {evm_node_endpoint} ->
         let all_transactions = Queue.to_seq state.queue in
         let* transactions_to_inject, remaining_transactions =
           match state.config.max_transaction_batch_length with
@@ -686,7 +717,7 @@ module Handlers = struct
         let+ () =
           send_transactions_batch
             ~keep_alive:state.keep_alive
-            ~evm_node_endpoint:state.evm_node_endpoint
+            ~evm_node_endpoint
             transactions_to_inject
         in
 
@@ -709,15 +740,16 @@ module Handlers = struct
           Address_nonce.next_gap state.address_nonce ~addr ~next_nonce
         in
         return @@ Ethereum_types.Qty next_gap
+    | Lock_transactions -> return (lock_transactions state)
+    | Unlock_transactions -> return (unlock_transactions state)
+    | Is_locked -> return (is_locked state)
 
   type launch_error = tztrace
 
-  let on_launch _self () ({evm_node_endpoint; config; keep_alive} : parameters)
-      =
+  let on_launch _self () ({config; keep_alive} : parameters) =
     let open Lwt_result_syntax in
     return
       {
-        evm_node_endpoint;
         queue = Queue.create ();
         pending = Pending_transactions.empty ~start_size:(config.max_size / 4);
         (* start with /4 and let it grow if necessary to not allocate
@@ -732,6 +764,7 @@ module Handlers = struct
            be revisited if needs be. *)
         config;
         keep_alive;
+        locked = false;
       }
 
   let on_error (type a b) _self _status_request (_r : (a, b) Request.t)
@@ -795,13 +828,17 @@ let push_request worker request =
   let*! (pushed : bool) = Worker.Queue.push_request worker request in
   if not pushed then tzfail Tx_queue_is_closed else return_unit
 
-let tick () = bind_worker @@ fun w -> push_request w Tick
+let tick ~evm_node_endpoint =
+  bind_worker @@ fun w -> push_request w (Tick {evm_node_endpoint})
 
-let rec beacon ~tick_interval =
+let beacon ~evm_node_endpoint ~tick_interval =
   let open Lwt_result_syntax in
-  let* () = tick () in
-  let*! () = Lwt_unix.sleep tick_interval in
-  beacon ~tick_interval
+  let rec loop () =
+    let* () = tick ~evm_node_endpoint in
+    let*! () = Lwt_unix.sleep tick_interval in
+    loop ()
+  in
+  loop ()
 
 let inject ?(callback = fun _ -> Lwt_syntax.return_unit) ~next_nonce
     (tx_object : Ethereum_types.legacy_transaction_object) txn =
@@ -816,15 +853,9 @@ let inject ?(callback = fun _ -> Lwt_syntax.return_unit) ~next_nonce
 let confirm txn_hash =
   bind_worker @@ fun w -> push_request w (Confirm {txn_hash})
 
-let start ~config ~evm_node_endpoint ~keep_alive () =
+let start ~config ~keep_alive () =
   let open Lwt_result_syntax in
-  let* worker =
-    Worker.launch
-      table
-      ()
-      {evm_node_endpoint; config; keep_alive}
-      (module Handlers)
-  in
+  let* worker = Worker.launch table () {config; keep_alive} (module Handlers) in
   Lwt.wakeup worker_waker worker ;
   let*! () = Tx_queue_events.is_ready () in
   return_unit
@@ -851,6 +882,17 @@ let shutdown () =
   let*! () = Tx_queue_events.shutdown () in
   let*! () = Worker.shutdown w in
   return_unit
+
+let lock_transactions () =
+  bind_worker @@ fun w -> push_request w Lock_transactions
+
+let unlock_transactions () =
+  bind_worker @@ fun w -> push_request w Unlock_transactions
+
+let is_locked () =
+  let open Lwt_result_syntax in
+  let*? worker = Lazy.force worker in
+  Worker.Queue.push_request_and_wait worker Is_locked |> handle_request_error
 
 module Internal_for_tests = struct
   module Nonce_bitset = Nonce_bitset
