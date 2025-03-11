@@ -424,7 +424,10 @@ module Handler = struct
         ~dal_constants
         ~pred_publication_level_dal_constants:
           (lazy
-            (Node_context.get_proto_parameters ctxt ~level:pred_published_level))
+            (Lwt.return
+            @@ Node_context.get_proto_parameters
+                 ctxt
+                 ~level:(`Level pred_published_level)))
     in
     let cells_of_level =
       List.map
@@ -574,8 +577,8 @@ module Handler = struct
       Node_context.get_plugin_for_level ctxt ~level:pred_level
     in
     let* block_info = Plugin.block_info cctxt ~block ~metadata:`Always in
-    let* dal_constants =
-      Node_context.get_proto_parameters ctxt ~level:block_level
+    let*? dal_constants =
+      Node_context.get_proto_parameters ctxt ~level:(`Level block_level)
     in
     let* () =
       if dal_constants.Types.feature_enable then
@@ -713,8 +716,8 @@ module Handler = struct
               ~proto_level:finalized_shell_header.proto_level
               ~block_level:level
           in
-          let* proto_parameters =
-            Node_context.get_proto_parameters ctxt ~level
+          let*? proto_parameters =
+            Node_context.get_proto_parameters ctxt ~level:(`Level level)
           in
           (* At each potential published_level [level], we prefetch the
              committee for its corresponding attestation_level (that is:
@@ -1100,7 +1103,9 @@ let update_and_register_profiles ctxt =
   let open Lwt_result_syntax in
   let profile_ctxt = Node_context.get_profile_ctxt ctxt in
   let gs_worker = Node_context.get_gs_worker ctxt in
-  let* proto_parameters = Node_context.get_proto_parameters ctxt in
+  let*? proto_parameters =
+    Node_context.get_proto_parameters ctxt ~level:`Last_proto
+  in
   let profile_ctxt =
     Profile_manager.register_profile
       profile_ctxt
@@ -1167,7 +1172,9 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
     let* block_info =
       Plugin.block_info cctxt ~block:(`Level level) ~metadata:`Always
     in
-    let* dal_constants = Node_context.get_proto_parameters ctxt ~level in
+    let*? dal_constants =
+      Node_context.get_proto_parameters ctxt ~level:(`Level level)
+    in
     Handler.store_skip_list_cells
       ctxt
       cctxt
@@ -1484,14 +1491,15 @@ let run ~data_dir ~configuration_override =
     wait_for_block_with_plugin cctxt
   in
   let head_level = header.Block_header.shell.level in
+  let* proto_parameters =
+    Plugin.get_constants `Main (`Level head_level) cctxt
+  in
   let proto_plugins =
     Proto_plugins.singleton
       ~first_level:head_level
       ~proto_level:header.shell.proto_level
       (module Plugin)
-  in
-  let* proto_parameters =
-    Plugin.get_constants `Main (`Level head_level) cctxt
+      proto_parameters
   in
   (* Set proto number of slots hook. *)
   Value_size_hooks.set_number_of_slots proto_parameters.number_of_slots ;
@@ -1544,7 +1552,6 @@ let run ~data_dir ~configuration_override =
       profile_ctxt
       cryptobox
       shards_proofs_precomputation
-      proto_parameters
       proto_plugins
       store
       gs_worker
