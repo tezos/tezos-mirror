@@ -231,6 +231,7 @@ mod test {
     use crate::create_state;
     use crate::interpreter::atomics::SC_FAILURE;
     use crate::interpreter::atomics::SC_SUCCESS;
+    use crate::interpreter::integer::run_addi;
     use crate::machine_state::MachineCoreState;
     use crate::machine_state::MachineCoreStateLayout;
     use crate::machine_state::registers::a0;
@@ -266,7 +267,7 @@ mod test {
                     // Correct sequence of LR.x / SC.y instructions
                     // SC.x succeeds and stores the expected value
                     state.$lr(a0, a1, a2, false, false)?;
-                    state.hart.xregisters.run_addi(imm, nz::a2, nz::a1);
+                    run_addi(&mut *state, imm, nz::a2, nz::a1);
                     state.$sc(a0, a1, a2, false, false)?;
                     let res = state.hart.xregisters.read(a2);
                     let val: $t = state.read_from_address(r1_addr)?;

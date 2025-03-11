@@ -644,12 +644,16 @@ impl OpCode {
     pub fn to_lowering<I: ICB>(self) -> Option<IcbLoweringFn<I>> {
         match self {
             Self::Mv => Some(Args::run_mv),
+            Self::Neg => Some(Args::run_neg),
             Self::Nop => Some(Args::run_nop),
             Self::Add => Some(Args::run_add),
+            Self::Sub => Some(Args::run_sub),
             Self::And => Some(Args::run_and),
             Self::Or => Some(Args::run_or),
             Self::Li => Some(Args::run_li),
             Self::J => Some(Args::run_j),
+            Self::Addi => Some(Args::run_addi),
+            Self::Andi => Some(Args::run_andi),
             _ => None,
         }
     }
@@ -816,6 +820,15 @@ macro_rules! impl_i_type {
         ) -> Result<ProgramCounterUpdate<Address>, Exception> {
             core.hart.xregisters.$fn(self.imm, self.rs1.x, self.rd.nzx);
             Ok(Next(self.width))
+        }
+    };
+
+    ($impl: path, $fn: ident, non_zero) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+            $impl(icb, self.imm, self.rs1.nzx, self.rd.nzx);
+            icb.ok(Next(self.width))
         }
     };
 }
@@ -1183,7 +1196,7 @@ macro_rules! impl_f_r_type {
 impl Args {
     // RV64I R-type instructions
     impl_r_type!(integer::run_add, run_add, non_zero);
-    impl_r_type!(run_sub, non_zero);
+    impl_r_type!(integer::run_sub, run_sub, non_zero);
     impl_r_type!(run_xor, non_zero);
     impl_r_type!(integer::run_and, run_and, non_zero);
     impl_r_type!(integer::run_or, run_or, non_zero);
@@ -1199,11 +1212,11 @@ impl Args {
     impl_r_type!(run_sraw, non_zero_rd);
 
     // RV64I I-type instructions
-    impl_i_type!(run_addi, non_zero);
+    impl_i_type!(integer::run_addi, run_addi, non_zero);
     impl_i_type!(run_addiw, non_zero_rd);
     impl_i_type!(run_xori, non_zero);
     impl_i_type!(run_ori, non_zero);
-    impl_i_type!(run_andi, non_zero);
+    impl_i_type!(integer::run_andi, run_andi, non_zero);
     impl_i_type!(run_slli, non_zero);
     impl_i_type!(run_srli, non_zero);
     impl_i_type!(run_srai, non_zero);
@@ -1402,6 +1415,7 @@ impl Args {
 
     // RV32C compressed instructions
     impl_cr_nz_type!(integer::run_mv, run_mv);
+    impl_cr_nz_type!(integer::run_neg, run_neg);
     impl_cb_type!(run_beqz);
     impl_cb_type!(run_bnez);
     impl_cb_type!(run_bltz);
@@ -1409,7 +1423,6 @@ impl Args {
     impl_cb_type!(run_bltez);
     impl_cb_type!(run_bgz);
     impl_ci_type!(load_store::run_li, run_li, non_zero);
-    impl_cr_type!(run_neg, non_zero);
 
     fn run_j<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
         let addr = branching::run_j(icb, self.imm);
