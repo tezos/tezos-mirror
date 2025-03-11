@@ -22,6 +22,8 @@ Run:
 
     tobi --help
 
+This outputs [Tobi's main help page](tobi--help.html).
+
 ## Install Tobi with Tobi
 
 Let's install Tobi again, but with Tobi.
