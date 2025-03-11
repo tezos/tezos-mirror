@@ -85,6 +85,10 @@ val jsonrpc_websocket_register :
   Rpc_encodings.websocket_handler ->
   t
 
+(** Registers a {!/describe} service for a Resto directory. No effect for a
+    Dream directory. *)
+val register_describe : t -> t
+
 (** {2 Curried functions with respect to service parameters} *)
 
 val register0 :
