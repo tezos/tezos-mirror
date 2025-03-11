@@ -367,7 +367,7 @@ RUN apk del sqlite-dev sqlite-libs \
  # We need eth since e2e tests. This requires git as well.
  && npm --verbose install -g eth-cli@2.0.2 \
  # We need solc to compile solidity smart-contracts
- && npm --verbose install -g solc@0.8.26 \
+ && npm --verbose install -g solc@0.8.28 \
  && PATH="/root/.cargo/bin:${PATH}" \
  && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | ash -s -- -y \
  && RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=lld" cargo install \
