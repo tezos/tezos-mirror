@@ -3,13 +3,21 @@
 # SPDX-License-Identifier: MIT
 
 TEST_DIR = test
+UNIFFI_DIR = uniffi_generated_files
 
-UNIFFI_GENERATED_FILES = $(TEST_DIR)/libtezos.so $(TEST_DIR)/tezos.py
+link-lib: $(UNIFFI_DIR)/libtezos.so $(UNIFFI_DIR)/tezos.py
+	@ln -f $(UNIFFI_DIR)/libtezos.so $(TEST_DIR)/libtezos.so
+	@ln -f $(UNIFFI_DIR)/tezos.py $(TEST_DIR)/tezos.py
+
+.PHONY: build
+build: link-lib
 
 .PHONY: clean
 clean:
-	@rm -f $(UNIFFI_GENERATED_FILES)
+	@rm -f $(TEST_DIR)/libtezos.so $(TEST_DIR)/tezos.py
 
 .PHONY: test
-test: $(UNIFFI_GENERATED_FILES)
+test: build \
+	$(TEST_DIR)/libtezos.so \
+	$(TEST_DIR)/tezos.py
 	@pytest $(TEST_DIR) -v

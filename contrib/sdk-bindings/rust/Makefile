@@ -12,26 +12,27 @@ check:
 build:
 	@cargo build --release
 
-.PHONY: generate-python
-generate-python: build
-	@cargo run --features uniffi/cli --bin uniffi-bindgen -- generate --language python --out-dir ../python/test --library target/release/libtezos.so
-	@cp target/release/libtezos.so ../python/test/libtezos.so
 
-.PHONY: generate-kotlin
-generate-kotlin: build
-	@cargo run --features uniffi/cli --bin uniffi-bindgen -- generate --language kotlin --out-dir ../kotlin/demo/app/src/main/kotlin --library target/release/libtezos.so
-	@cp target/release/libtezos.so ../kotlin/demo/app/src/main/resources/libtezos.so
+TEZOS_LIB = target/release/libtezos.so
+OUT_DIR = uniffi_generated_files
 
-.PHONY: generate-swift
-generate-swift: build
-	@cargo run --features uniffi/cli --bin uniffi-bindgen -- generate --language swift --out-dir ../swift/uniffi_bindings --library target/release/libtezos.a
-	@cp target/release/libtezos.so ../swift/resources/libtezos.so
+.PHONY: generate-%
+generate-%: build
+	@cargo run --features uniffi/cli --bin uniffi-bindgen -- generate --language $* --out-dir ../$*/$(OUT_DIR)/ --library $(TEZOS_LIB)
+	@cp $(TEZOS_LIB) ../$*/$(OUT_DIR)/libtezos.so
 
 .PHONY: generate-bindings
 generate-bindings: generate-python generate-kotlin generate-swift
 
+.PHONY: clean-%
+clean-%:
+	@rm -rf ../$*/$(OUT_DIR)
+
+.PHONY: clean-bindings
+clean-bindings: clean-python clean-kotlin clean-swift
+
 .PHONY: clean
-clean:
+clean: clean-bindings
 	@cargo clean
 
 .PHONY: test

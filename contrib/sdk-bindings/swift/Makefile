@@ -2,15 +2,26 @@
 #
 # SPDX-License-Identifier: MIT
 
+UNIFFI_DIR = uniffi_generated_files
 UNIFFI_BINDINGS_DIR = uniffi_bindings
 LIB_DIR = tezos
 RESOURCES_DIR = resources
 
 TEST_EXE = test.exe
 
+link-lib: $(UNIFFI_DIR)/tezos.swift \
+	$(UNIFFI_DIR)/tezosFFI.h \
+	$(UNIFFI_DIR)/tezosFFI.modulemap \
+	$(UNIFFI_DIR)/libtezos.so
+	@ln -f $(UNIFFI_DIR)/tezos.swift $(UNIFFI_BINDINGS_DIR)/tezos.swift
+	@ln -f $(UNIFFI_DIR)/tezosFFI.h $(UNIFFI_BINDINGS_DIR)/tezosFFI.h
+	@ln -f $(UNIFFI_DIR)/tezosFFI.modulemap $(UNIFFI_BINDINGS_DIR)/tezosFFI.modulemap
+	@ln -f $(UNIFFI_DIR)/libtezos.so $(RESOURCES_DIR)/libtezos.so
+
 # Build the `Tezos` lib from `tezos.swift`
 .PHONY: build
-build: $(UNIFFI_BINDINGS_DIR)/tezos.swift \
+build: link-lib \
+	$(UNIFFI_BINDINGS_DIR)/tezos.swift \
 	$(UNIFFI_BINDINGS_DIR)/tezosFFI.h \
 	$(UNIFFI_BINDINGS_DIR)/tezosFFI.modulemap \
 	$(RESOURCES_DIR)/libtezos.so
