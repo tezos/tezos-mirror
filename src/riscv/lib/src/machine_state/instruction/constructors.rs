@@ -246,6 +246,79 @@ impl Instruction {
         }
     }
 
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for
+    /// [`OpCode::SetLessThanSigned`].
+    pub(crate) fn new_set_less_than_signed(
+        rd: NonZeroXRegister,
+        rs1: XRegister,
+        rs2: XRegister,
+    ) -> Self {
+        Self {
+            opcode: OpCode::SetLessThanSigned,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width: InstrWidth::Uncompressed,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::SetLessThanUnsigned`].
+    pub(crate) fn new_set_less_than_unsigned(
+        rd: NonZeroXRegister,
+        rs1: XRegister,
+        rs2: XRegister,
+    ) -> Self {
+        Self {
+            opcode: OpCode::SetLessThanUnsigned,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width: InstrWidth::Uncompressed,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::SetLessThanImmediateSigned`].
+    pub(crate) fn new_set_less_than_immediate_signed(
+        rd: NonZeroXRegister,
+        rs1: XRegister,
+        imm: i64,
+    ) -> Self {
+        Self {
+            opcode: OpCode::SetLessThanImmediateSigned,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                imm,
+                width: InstrWidth::Uncompressed,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::SetLessThanImmediateUnsigned`].
+    pub(crate) fn new_set_less_than_immediate_unsigned(
+        rd: NonZeroXRegister,
+        rs1: XRegister,
+        imm: i64,
+    ) -> Self {
+        Self {
+            opcode: OpCode::SetLessThanImmediateUnsigned,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                imm,
+                width: InstrWidth::Uncompressed,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
     /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::And`].
     pub(crate) fn new_and(
         rd: NonZeroXRegister,

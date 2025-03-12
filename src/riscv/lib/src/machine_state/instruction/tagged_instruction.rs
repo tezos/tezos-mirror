@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024-2025 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -366,8 +366,20 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
             ArgsShape::NZXSrcNZXDest
         }
 
-        Addiw | Addw | Subw | Sllw | Srlw | Sraw | Slti | Sltiu | Slliw | Srliw | Sraiw | Slt
-        | Sltu | Auipc => ArgsShape::XSrcNZXDest,
+        Addiw
+        | Addw
+        | Subw
+        | Sllw
+        | Srlw
+        | Sraw
+        | Slliw
+        | Srliw
+        | Sraiw
+        | SetLessThanSigned
+        | SetLessThanUnsigned
+        | SetLessThanImmediateSigned
+        | SetLessThanImmediateUnsigned
+        | Auipc => ArgsShape::XSrcNZXDest,
     }
 }
 
