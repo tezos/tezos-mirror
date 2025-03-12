@@ -5341,6 +5341,24 @@ let _octez_scoru_wasm_fast_tests =
       ]
     ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
 
+let octez_experimental_agnostic_baker_lib =
+  public_lib
+    "octez-experimental-agnostic-baker-lib"
+    ~path:"src/lib_agnostic_baker"
+    ~internal_name:"octez_experimental_agnostic_baker"
+    ~synopsis:"Octez: library for Agnostic Baker"
+    ~deps:
+      [
+        octez_rustzcash_deps;
+        bls12_381_archive;
+        data_encoding |> open_;
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_base_unix |> open_;
+        octez_client_base_unix |> open_;
+        octez_node_config;
+        octez_client_commands |> open_;
+      ]
+
 (* PROTOCOL PACKAGES *)
 
 module Protocol : sig
@@ -7179,12 +7197,10 @@ let hash = Protocol.hash
           [
             octez_base |> open_ ~m:"TzPervasives";
             client |> if_some |> open_;
-            embedded |> open_;
             main |> open_;
-            octez_validation |> open_;
+            baking |> if_some |> open_;
             baking_commands |> if_some |> open_;
-            octez_client_commands |> open_;
-            octez_client_base_unix |> open_;
+            octez_experimental_agnostic_baker_lib |> open_;
           ]
         ~linkall:true
     in
@@ -8278,13 +8294,9 @@ let _octez_experimental_agnostic_baker =
       ([
          octez_rust_deps;
          bls12_381_archive;
-         data_encoding |> open_;
          octez_base |> open_ ~m:"TzPervasives" |> open_;
          octez_base_unix |> open_;
-         octez_validation |> open_;
-         octez_client_base_unix |> open_;
-         octez_node_config;
-         octez_client_commands |> open_;
+         octez_experimental_agnostic_baker_lib |> open_;
        ]
       @ protocol_deps)
     ~linkall:true

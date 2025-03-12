@@ -23,6 +23,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type baking_mode = Local of {local_data_dir_path : string} | Remote
+
+val run_baker :
+  string option
+  * bool
+  * string option
+  * Protocol.Alpha_context.Tez.t
+  * Q.t
+  * Q.t
+  * int option
+  * bool
+  * Protocol.Per_block_votes_repr.per_block_vote option
+  * Protocol.Per_block_votes_repr.per_block_vote option
+  * string option
+  * Baking_configuration.Operations_source.t option
+  * Uri.t option
+  * bool
+  * Baking_configuration.state_recorder_config
+  * Q.t option
+  * Q.t option ->
+  baking_mode ->
+  Environment.Signature.public_key_hash list ->
+  Protocol_client_context.full ->
+  unit Error_monad.tzresult Lwt.t
+
 val delegate_commands :
   unit -> Protocol_client_context.full Tezos_clic.command list
 

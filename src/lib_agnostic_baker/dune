@@ -1,0 +1,24 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_experimental_agnostic_baker)
+ (public_name octez-experimental-agnostic-baker-lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-rustzcash-deps
+  bls12-381.archive
+  octez-libs.data-encoding
+  octez-libs.base
+  octez-libs.base.unix
+  octez-shell-libs.client-base-unix
+  octez-node-config
+  octez-shell-libs.client-commands)
+ (flags
+  (:standard)
+  -open Data_encoding
+  -open Tezos_base.TzPervasives
+  -open Tezos_base
+  -open Tezos_base_unix
+  -open Tezos_client_base_unix
+  -open Tezos_client_commands))
