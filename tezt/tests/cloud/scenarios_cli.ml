@@ -415,6 +415,8 @@ module type Layer1 = sig
 
   val stake : int list option
 
+  val agnostic_bakers : int list option
+
   val stresstest : (string * string * int * int) option
 
   val maintenance_delay : int option
