@@ -323,7 +323,7 @@ impl ManagerDeserialise for Owned {
 }
 
 impl ManagerClone for Owned {
-    fn clone_region<E: StaticCopy, const LEN: usize>(
+    fn clone_region<E: Clone + 'static, const LEN: usize>(
         region: &Self::Region<E, LEN>,
     ) -> Self::Region<E, LEN> {
         #[allow(clippy::clone_on_copy)]
@@ -336,8 +336,8 @@ impl ManagerClone for Owned {
 
     fn clone_enriched_cell<V: EnrichedValue>(cell: &Self::EnrichedCell<V>) -> Self::EnrichedCell<V>
     where
-        V::E: Copy,
-        V::D: Copy,
+        V::E: Clone,
+        V::D: Clone,
     {
         #[allow(clippy::clone_on_copy)]
         cell.clone()
