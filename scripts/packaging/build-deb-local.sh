@@ -19,7 +19,7 @@ packages() {
   EXECUTABLES=$(cat script-inputs/*-executables)
   for ex in $EXECUTABLES; do
     if [ -f "$ex" ]; then
-      cp "$ex" scripts/packaging/octez/binaries/
+      cp -f "$ex" scripts/packaging/octez/binaries/
     fi
   done
 
@@ -32,6 +32,13 @@ packages() {
 zcash() {
   # Link the zcash DAL parameters to be packaged
   if [ ! -e scripts/packaging/octez-data/zcash-params ]; then
+    md5sum --status -c script-inputs/sapling-params.md5
+    if $? != 0; then
+      echo "Sapling params md5 mismatch. You can fix this problem running :"
+      echo "md5sum _opam/share/zcash-params/* > script-inputs/sapling-params.md5"
+      md5sum -c script-inputs/sapling-params.md5
+      exit 1
+    fi
     ln -s "$OPAM_SWITCH_PREFIX/share/zcash-params" scripts/packaging/octez-data/
   fi
 
@@ -118,20 +125,19 @@ else
 fi
 
 cat << EOF > scripts/packaging/octez/debian/changelog
-octez (0.0.1-1) unstable; urgency=medium
+octez (0.0.1-1) stable; urgency=medium
 
   * Initial release
 
- -- Nomadic Labs <pkg@nomadic-labs.com>  Thu, 06 Jul 2017 09:19:24 +0000
+ -- Nomadic Labs <pkg@nomadic-labs.com>  Tue, 04 Mar 2025 15:23:20 +0100
 
 EOF
-cp scripts/packaging/octez/debian/changelog scripts/packaging/octez-data/debian/changelog
 
 # Set a version for the debian package we are building.
 debchange --changelog scripts/packaging/octez/debian/changelog \
   --newversion "$DEBVERSION" "$DEBCHANGELOG"
 debchange --changelog scripts/packaging/octez-data/debian/changelog \
-  --newversion "$DEBVERSION" "$DEBCHANGELOG"
+  --newversion "1.0.0" "Sapling params"
 
 TARGET=all
 
