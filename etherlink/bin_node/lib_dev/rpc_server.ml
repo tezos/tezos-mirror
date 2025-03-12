@@ -125,8 +125,8 @@ let monitor_performances ~data_dir =
   Lwt.dont_wait aux (Fun.const ())
 
 let start_public_server ~(rpc_server_family : Rpc_types.rpc_server_family)
-    ?delegate_health_check_to ?evm_services ?data_dir validation
-    (config : Configuration.t) ctxt =
+    ?delegate_health_check_to ?evm_services ?tezlink_services:_ ?data_dir
+    validation (config : Configuration.t) ctxt =
   let open Lwt_result_syntax in
   let*! can_start_performance_metrics =
     Octez_performance_metrics.supports_performance_metrics ()
