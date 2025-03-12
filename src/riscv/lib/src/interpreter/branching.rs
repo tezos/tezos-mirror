@@ -26,15 +26,6 @@ where
         imm as u64 & !1
     }
 
-    /// Performs an unconditional control transfer to the target address,
-    /// `target_address = val(rs1) + imm`
-    ///
-    /// Relevant RISC-V opcodes:
-    /// - JALR
-    pub fn run_jr_imm(&mut self, imm: i64, rs1: NonZeroXRegister) -> Address {
-        self.xregisters.read_nz(rs1).wrapping_add(imm as u64) & !1
-    }
-
     /// Store the next instruction address in `rd` and jump to the target address.
     /// Always returns the target address (val(rs1) + imm)
     ///
@@ -95,12 +86,40 @@ pub fn run_j<I: ICB>(icb: &mut I, imm: i64) -> <I as ICB>::XValue {
     icb.xvalue_wrapping_add(current_pc, imm)
 }
 
+/// Performs an unconditional control transfer to the address in register `rs1`.
+///
+/// Relevant RISC-V opcodes:
+/// - JALR
+/// - C.JR
+pub fn run_jr<I: ICB>(icb: &mut I, rs1: NonZeroXRegister) -> <I as ICB>::XValue {
+    // The target address is obtained by setting the
+    // least-significant bit of the address in rs1 to zero
+    let lhs = icb.xregister_read_nz(rs1);
+    let rhs = icb.xvalue_of_imm(!1);
+    icb.xvalue_bitwise_and(lhs, rhs)
+}
+
+/// Performs an unconditional control transfer to the target address,
+/// `target_address = val(rs1) + imm`
+///
+/// Relevant RISC-V opcodes:
+/// - JALR
+pub fn run_jr_imm<I: ICB>(icb: &mut I, imm: i64, rs1: NonZeroXRegister) -> <I as ICB>::XValue {
+    let lhs = icb.xregister_read_nz(rs1);
+    let rhs = icb.xvalue_of_imm(imm);
+    let intermediate: <I as ICB>::XValue = icb.xvalue_wrapping_add(lhs, rhs);
+    let new_rhs = icb.xvalue_of_imm(!1);
+    icb.xvalue_bitwise_and(intermediate, new_rhs)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::backend_test;
     use crate::create_state;
-    use crate::machine_state::hart_state::HartState;
-    use crate::machine_state::hart_state::HartStateLayout;
+    use crate::interpreter::branching::run_jr_imm;
+    use crate::machine_state::MachineCoreState;
+    use crate::machine_state::MachineCoreStateLayout;
+    use crate::machine_state::memory::M4K;
     use crate::machine_state::registers::nz;
     use crate::parser::instruction::InstrWidth;
 
@@ -128,38 +147,42 @@ mod tests {
             ),
         ];
         for (init_pc, imm, init_rs1, rs1, rd, res_pc, res_rd) in ipc_imm_irs1_rs1_rd_fpc_frd {
-            let mut state = create_state!(HartState, F);
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
 
             // TEST JalrImm
-            state.pc.write(init_pc);
-            state.xregisters.write_nz(rs1, init_rs1);
-            let new_pc = state.run_jalr_imm(imm, rs1, rd, InstrWidth::Uncompressed);
+            state.hart.pc.write(init_pc);
+            state.hart.xregisters.write_nz(rs1, init_rs1);
+            let new_pc = state
+                .hart
+                .run_jalr_imm(imm, rs1, rd, InstrWidth::Uncompressed);
 
-            assert_eq!(state.pc.read(), init_pc);
+            assert_eq!(state.hart.pc.read(), init_pc);
             assert_eq!(new_pc, res_pc);
-            assert_eq!(state.xregisters.read_nz(rd), res_rd);
+            assert_eq!(state.hart.xregisters.read_nz(rd), res_rd);
 
             // TEST JAbsolute
-            state.pc.write(init_pc);
-            let new_pc = state.run_j_absolute(imm);
+            state.hart.pc.write(init_pc);
+            let new_pc = state.hart.run_j_absolute(imm);
 
-            assert_eq!(state.pc.read(), init_pc);
+            assert_eq!(state.hart.pc.read(), init_pc);
             assert_eq!(new_pc, imm as u64 & !1);
 
             // TEST JalrAbsolute
-            state.pc.write(init_pc);
-            let new_pc = state.run_jalr_absolute(imm, rd, InstrWidth::Uncompressed);
+            state.hart.pc.write(init_pc);
+            let new_pc = state
+                .hart
+                .run_jalr_absolute(imm, rd, InstrWidth::Uncompressed);
 
-            assert_eq!(state.pc.read(), init_pc);
+            assert_eq!(state.hart.pc.read(), init_pc);
             assert_eq!(new_pc, imm as u64 & !1);
-            assert_eq!(state.xregisters.read_nz(rd), res_rd);
+            assert_eq!(state.hart.xregisters.read_nz(rd), res_rd);
 
             // TEST JrImm
-            state.pc.write(init_pc);
-            state.xregisters.write_nz(rs1, init_rs1);
-            let new_pc = state.run_jr_imm(imm, rs1);
+            state.hart.pc.write(init_pc);
+            state.hart.xregisters.write_nz(rs1, init_rs1);
+            let new_pc = run_jr_imm(&mut state, imm, rs1);
 
-            assert_eq!(state.pc.read(), init_pc);
+            assert_eq!(state.hart.pc.read(), init_pc);
             assert_eq!(new_pc, res_pc);
         }
     });
