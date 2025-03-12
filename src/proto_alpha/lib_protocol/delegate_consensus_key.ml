@@ -125,9 +125,12 @@ let pp ppf {delegate; consensus_pkh} =
 
 (* Invariant:
       No two delegates use the same active consensus key at a given time.
+      No two delegates use the same active companion key at a given time.
+      An active key is either a consensus key, or a companion key: it
+   cannot be both at once.
 
-   To ensure that, {!Storage.Consensus_keys} contains keys that will be active
-   at cycle `current + consensus_rights_delay + 1`.
+   To ensure that, {!Storage.Consensus_keys} contains keys (both consensus and
+   companion) that will be active at cycle `current + consensus_rights_delay + 1`.
 *)
 
 let check_unused ctxt pkh =
@@ -270,6 +273,45 @@ let register_update ctxt delegate pk =
   let*! ctxt = set_unused ctxt old_pkh in
   let*! ctxt =
     Storage.Pending_consensus_keys.add
+      (ctxt, update_cycle)
+      (Contract_repr.Implicit delegate)
+      pk
+  in
+  return ctxt
+
+let register_update_companion ctxt delegate pk =
+  let open Lwt_result_syntax in
+  let update_cycle =
+    let current_level = Raw_context.current_level ctxt in
+    let cycles_delay = Constants_storage.consensus_key_activation_delay ctxt in
+    Cycle_repr.add current_level.cycle (cycles_delay + 1)
+  in
+  let* () =
+    let* first_active_cycle, active_companion_pubkey =
+      raw_active_pubkey_for_cycle ctxt ~kind:Companion delegate update_cycle
+    in
+    match active_companion_pubkey with
+    | None -> return_unit
+    | Some active_pubkey ->
+        fail_when
+          Bls.Public_key.(pk = active_pubkey)
+          (Invalid_consensus_key_update_noop first_active_cycle)
+  in
+  let pkh : Signature.public_key_hash =
+    Signature.Bls (Bls.Public_key.hash pk)
+  in
+  let* () = check_unused ctxt pkh in
+  let*! ctxt = set_used ctxt pkh in
+  let* {companion_pkh = old_pkh; _} =
+    active_pubkey_for_cycle ctxt delegate update_cycle
+  in
+  let*! ctxt =
+    match old_pkh with
+    | None -> Lwt.return ctxt
+    | Some old_pkh -> set_unused ctxt (Signature.Bls old_pkh)
+  in
+  let*! ctxt =
+    Storage.Pending_companion_keys.add
       (ctxt, update_cycle)
       (Contract_repr.Implicit delegate)
       pk
