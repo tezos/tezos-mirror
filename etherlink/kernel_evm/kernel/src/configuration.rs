@@ -1,3 +1,8 @@
+// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+//
+// SPDX-License-Identifier: MIT
+
 use crate::{
     blueprint_storage::DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS,
     chains::ChainFamily,
@@ -11,7 +16,11 @@ use crate::{
     },
     tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS},
 };
-use evm_execution::read_ticketer;
+use evm::Config;
+use evm_execution::{
+    configuration::{fetch_evm_configuration, EVMVersion},
+    read_ticketer,
+};
 use primitive_types::U256;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
@@ -62,6 +71,7 @@ impl std::fmt::Display for ConfigurationMode {
 pub struct ChainConfig {
     pub chain_id: U256,
     pub chain_family: ChainFamily,
+    pub evm_configuration: Config,
 }
 
 impl Default for ChainConfig {
@@ -69,6 +79,7 @@ impl Default for ChainConfig {
         Self {
             chain_id: U256::from(CHAIN_ID),
             chain_family: ChainFamily::Evm,
+            evm_configuration: EVMVersion::to_config(&EVMVersion::default()),
         }
     }
 }
@@ -84,10 +95,11 @@ impl std::fmt::Display for ChainConfig {
 }
 
 impl ChainConfig {
-    pub fn new_evm_config(chain_id: U256) -> Self {
+    pub fn new_evm_config(chain_id: U256, evm_configuration: Config) -> Self {
         ChainConfig {
             chain_id,
             chain_family: ChainFamily::Evm,
+            evm_configuration,
         }
     }
 }
@@ -243,9 +255,10 @@ pub fn fetch_configuration<Host: Runtime>(
     let limits = fetch_limits(host);
     let sequencer = sequencer(host).unwrap_or_default();
     let enable_fa_bridge = is_enable_fa_bridge(host).unwrap_or_default();
+    let evm_configuration = fetch_evm_configuration(host);
     let dal: Option<DalConfiguration> = fetch_dal_configuration(host);
     let evm_node_flag = evm_node_flag(host).unwrap_or(false);
-    let chain_config = ChainConfig::new_evm_config(chain_id);
+    let chain_config = ChainConfig::new_evm_config(chain_id, evm_configuration);
     match sequencer {
         Some(sequencer) => {
             let delayed_bridge = read_delayed_transaction_bridge(host)

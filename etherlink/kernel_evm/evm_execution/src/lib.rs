@@ -11,10 +11,11 @@ use crate::trace::TracerInput::{CallTracer, StructLogger};
 use account_storage::{AccountStorageError, EthereumAccountStorage};
 use alloc::borrow::Cow;
 use alloc::collections::TryReserveError;
+use configuration::EVMVersion;
 use crypto::hash::{ContractKt1Hash, HashTrait};
 use evm::executor::stack::PrecompileFailure;
 use handler::{EvmHandler, ExecutionOutcome, ExecutionResult};
-use host::path::RefPath;
+use host::{path::RefPath, runtime::RuntimeError};
 use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, Level::*};
@@ -27,6 +28,7 @@ mod access_record;
 pub mod abi;
 pub mod account_storage;
 pub mod code_storage;
+pub mod configuration;
 pub mod fa_bridge;
 pub mod handler;
 pub mod precompiles;
@@ -437,6 +439,30 @@ pub const ENABLE_FAST_WITHDRAWAL: RefPath =
 
 pub fn fast_withdrawals_enabled<Host: Runtime>(host: &Host) -> bool {
     host.store_read_all(&ENABLE_FAST_WITHDRAWAL).is_ok()
+}
+
+// Path to the EVM version.
+const EVM_VERSION: RefPath = RefPath::assert_from(b"/evm/evm_version");
+
+pub fn store_evm_version(
+    host: &mut impl Runtime,
+    evm_version: &EVMVersion,
+) -> Result<(), RuntimeError> {
+    host.store_write_all(&EVM_VERSION, &evm_version.to_le_bytes())
+}
+
+pub fn read_evm_version(host: &mut impl Runtime) -> EVMVersion {
+    let evm_version = host.store_read_all(&EVM_VERSION);
+    match evm_version {
+        Ok(evm_version) => match evm_version.as_slice().try_into().ok() {
+            Some(evm_version) => EVMVersion::from_le_bytes(evm_version),
+            None => EVMVersion::default(),
+        },
+        Err(_) => {
+            let _ = store_evm_version(host, &EVMVersion::default());
+            EVMVersion::default()
+        }
+    }
 }
 
 #[cfg(test)]
