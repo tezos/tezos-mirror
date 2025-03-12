@@ -10,6 +10,7 @@ pkgs.mkShell {
 
     # Python
     pkgs.python39
+    pkgs.python39Packages.pytest
     pkgs.yapf
 
     # Kotlin
