@@ -338,168 +338,6 @@ evm_events_follower_started:
     { /* evm_events_follower_started version 0 */
       "evm_events_follower_started.v0": any }
 
-websocket_monitoring_exception:
-  description: monitoring for websocket {conn} raised exception {exception}
-  level: warning
-  section: evm_node.websocket
-  json format:
-    { /* websocket_monitoring_exception version 0 */
-      "websocket_monitoring_exception.v0":
-        { "conn": $unistring,
-          "exception": $unistring } }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-websocket_unsubscribe:
-  description: unsubscribe {id} for connection {conn}: {reason}
-  level: info
-  section: evm_node.websocket
-  json format:
-    { /* websocket_unsubscribe version 0 */
-      "websocket_unsubscribe.v0":
-        { "conn": $unistring,
-          "id": $unistring,
-          "reason": $unistring } }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-request_completed_debug:
-  description: {view} {worker_status}
-  level: debug
-  section: evm_node.websocket
-  json format:
-    { /* request_completed_debug version 0 */
-      "request_completed_debug.v0":
-        { "view":
-            { "opcode":
-                "continuation"
-                || "text"
-                || "binary"
-                || "close"
-                || "ping"
-                || "pong"
-                || { /* ctrl */
-                     "ctrl": integer ∈ [-2^30, 2^30] }
-                || { /* nonctrl */
-                     "nonctrl": integer ∈ [-2^30, 2^30] },
-              "extension": integer ∈ [-2^30, 2^30],
-              "final": boolean,
-              "content": $unistring },
-          "worker_status":
-            { "pushed": $timestamp.system,
-              "treated": $timestamp.system,
-              "completed": $timestamp.system } } }
-    $int64:
-      /* 64 bit integers
-         Decimal representation of 64 bit integers */
-      string
-    $timestamp.rfc:
-      /* RFC 3339 formatted timestamp
-         A date in RFC 3339 notation. */
-      $unistring
-    $timestamp.system:
-      /* A timestamp as seen by the underlying, local computer:
-         subsecond-level precision, epoch or rfc3339 based. */
-      $timestamp.rfc /* RFC encoding */ || $int64 /* Second since epoch */
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-request_failed:
-  description: request {view} failed ({worker_status}): {errors}
-  level: warning
-  section: evm_node.websocket
-  json format:
-    { /* request_failed version 0 */
-      "request_failed.v0":
-        { "view":
-            { "opcode":
-                "continuation"
-                || "text"
-                || "binary"
-                || "close"
-                || "ping"
-                || "pong"
-                || { /* ctrl */
-                     "ctrl": integer ∈ [-2^30, 2^30] }
-                || { /* nonctrl */
-                     "nonctrl": integer ∈ [-2^30, 2^30] },
-              "extension": integer ∈ [-2^30, 2^30],
-              "final": boolean,
-              "content": $unistring },
-          "worker_status":
-            { "pushed": $timestamp.system,
-              "treated": $timestamp.system,
-              "completed": $timestamp.system },
-          "errors": any } }
-    $int64:
-      /* 64 bit integers
-         Decimal representation of 64 bit integers */
-      string
-    $timestamp.rfc:
-      /* RFC 3339 formatted timestamp
-         A date in RFC 3339 notation. */
-      $unistring
-    $timestamp.system:
-      /* A timestamp as seen by the underlying, local computer:
-         subsecond-level precision, epoch or rfc3339 based. */
-      $timestamp.rfc /* RFC encoding */ || $int64 /* Second since epoch */
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-websocket_missing_worker:
-  description: no worker for websocket connection {conn}
-  level: error
-  section: evm_node.websocket
-  json format:
-    { /* websocket_missing_worker version 0 */
-      "websocket_missing_worker.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-websocket_starting:
-  description: starting worker for websocket connection {conn}
-  level: notice
-  section: evm_node.websocket
-  json format:
-    { /* websocket_starting version 0 */
-      "websocket_starting.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-websocket_shutdown:
-  description: shutting down websocket worker for connection {conn}: {reason} ({subscriptions} subscriptions)
-  level: notice
-  section: evm_node.websocket
-  json format:
-    { /* websocket_shutdown version 0 */
-      "websocket_shutdown.v0":
-        { "conn": $unistring,
-          "reason": $unistring,
-          "subscriptions": integer ∈ [-2^30, 2^30] } }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
 evm_context_switch_history_mode:
   description: switching history mode from {from} to {to_}
   level: warning
@@ -1241,6 +1079,168 @@ store_init:
   json format:
     { /* store_init version 0 */
       "store_init.v0": any }
+
+websocket_monitoring_exception:
+  description: monitoring for websocket {conn} raised exception {exception}
+  level: warning
+  section: evm_node.websocket
+  json format:
+    { /* websocket_monitoring_exception version 0 */
+      "websocket_monitoring_exception.v0":
+        { "conn": $unistring,
+          "exception": $unistring } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+
+websocket_unsubscribe:
+  description: unsubscribe {id} for connection {conn}: {reason}
+  level: info
+  section: evm_node.websocket
+  json format:
+    { /* websocket_unsubscribe version 0 */
+      "websocket_unsubscribe.v0":
+        { "conn": $unistring,
+          "id": $unistring,
+          "reason": $unistring } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+
+request_completed_debug:
+  description: {view} {worker_status}
+  level: debug
+  section: evm_node.websocket
+  json format:
+    { /* request_completed_debug version 0 */
+      "request_completed_debug.v0":
+        { "view":
+            { "opcode":
+                "continuation"
+                || "text"
+                || "binary"
+                || "close"
+                || "ping"
+                || "pong"
+                || { /* ctrl */
+                     "ctrl": integer ∈ [-2^30, 2^30] }
+                || { /* nonctrl */
+                     "nonctrl": integer ∈ [-2^30, 2^30] },
+              "extension": integer ∈ [-2^30, 2^30],
+              "final": boolean,
+              "content": $unistring },
+          "worker_status":
+            { "pushed": $timestamp.system,
+              "treated": $timestamp.system,
+              "completed": $timestamp.system } } }
+    $int64:
+      /* 64 bit integers
+         Decimal representation of 64 bit integers */
+      string
+    $timestamp.rfc:
+      /* RFC 3339 formatted timestamp
+         A date in RFC 3339 notation. */
+      $unistring
+    $timestamp.system:
+      /* A timestamp as seen by the underlying, local computer:
+         subsecond-level precision, epoch or rfc3339 based. */
+      $timestamp.rfc /* RFC encoding */ || $int64 /* Second since epoch */
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+
+request_failed:
+  description: request {view} failed ({worker_status}): {errors}
+  level: warning
+  section: evm_node.websocket
+  json format:
+    { /* request_failed version 0 */
+      "request_failed.v0":
+        { "view":
+            { "opcode":
+                "continuation"
+                || "text"
+                || "binary"
+                || "close"
+                || "ping"
+                || "pong"
+                || { /* ctrl */
+                     "ctrl": integer ∈ [-2^30, 2^30] }
+                || { /* nonctrl */
+                     "nonctrl": integer ∈ [-2^30, 2^30] },
+              "extension": integer ∈ [-2^30, 2^30],
+              "final": boolean,
+              "content": $unistring },
+          "worker_status":
+            { "pushed": $timestamp.system,
+              "treated": $timestamp.system,
+              "completed": $timestamp.system },
+          "errors": any } }
+    $int64:
+      /* 64 bit integers
+         Decimal representation of 64 bit integers */
+      string
+    $timestamp.rfc:
+      /* RFC 3339 formatted timestamp
+         A date in RFC 3339 notation. */
+      $unistring
+    $timestamp.system:
+      /* A timestamp as seen by the underlying, local computer:
+         subsecond-level precision, epoch or rfc3339 based. */
+      $timestamp.rfc /* RFC encoding */ || $int64 /* Second since epoch */
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+
+websocket_missing_worker:
+  description: no worker for websocket connection {conn}
+  level: error
+  section: evm_node.websocket
+  json format:
+    { /* websocket_missing_worker version 0 */
+      "websocket_missing_worker.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+
+websocket_starting:
+  description: starting worker for websocket connection {conn}
+  level: notice
+  section: evm_node.websocket
+  json format:
+    { /* websocket_starting version 0 */
+      "websocket_starting.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+
+websocket_shutdown:
+  description: shutting down websocket worker for connection {conn}: {reason} ({subscriptions} subscriptions)
+  level: notice
+  section: evm_node.websocket
+  json format:
+    { /* websocket_shutdown version 0 */
+      "websocket_shutdown.v0":
+        { "conn": $unistring,
+          "reason": $unistring,
+          "subscriptions": integer ∈ [-2^30, 2^30] } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
 
 tracer_input:
   description: Tracer with input {inputs} 
@@ -2111,19 +2111,6 @@ evm_events_unreadable_event:
         { "index": integer ∈ [-2^30, 2^30],
           "level": integer ∈ [-2^31-1, 2^31] } }
 
-websocket_missing_worker:
-  description: no worker for websocket connection {conn}
-  level: error
-  section: evm_node.websocket
-  json format:
-    { /* websocket_missing_worker version 0 */
-      "websocket_missing_worker.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
 evm_context_get_block_failed:
   description: get block by number failed for level {level}{trace}
   level: error
@@ -2367,6 +2354,19 @@ migrations_from_the_future:
       "migrations_from_the_future.v0":
         { "applied": integer ∈ [-2^30, 2^30],
           "known": integer ∈ [-2^30, 2^30] } }
+
+websocket_missing_worker:
+  description: no worker for websocket connection {conn}
+  level: error
+  section: evm_node.websocket
+  json format:
+    { /* websocket_missing_worker version 0 */
+      "websocket_missing_worker.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
 
 tx_pool_connection_lost:
   description: connection with the rollup node has been lost, retrying...
