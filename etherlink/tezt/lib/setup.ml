@@ -205,7 +205,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     ?(drop_duplicate_when_injection = true)
     ?(blueprints_publisher_order_enabled = true) ?rollup_history_mode
     ~enable_dal ?dal_slots ~enable_multichain ?rpc_server ?websockets
-    ?history_mode ?enable_tx_queue ?spawn_rpc protocol =
+    ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path protocol =
   let* node, client =
     setup_l1
       ?commitment_period
@@ -305,6 +305,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ?rpc_server
       ?enable_websocket:websockets
       ?enable_tx_queue
+      ?periodic_snapshot_path
       ()
   in
   let* sequencer_mode =
@@ -408,7 +409,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?rollup_history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None)
     ~enable_multichain ?rpc_server ?websockets ?history_mode ?enable_tx_queue
-    ?spawn_rpc body ~title ~tags protocols =
+    ?spawn_rpc ?periodic_snapshot_path body ~title ~tags protocols =
   let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
   let tags = kernel_tag :: tags in
   let additional_uses =
@@ -463,6 +464,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?rpc_server
         ?enable_tx_queue
         ?spawn_rpc
+        ?periodic_snapshot_path
         protocol
     in
     body sequencer_setup protocol
@@ -507,7 +509,8 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
     ?additional_uses ~threshold_encryption ~enable_dal ?dal_slots
     ~enable_multichain ?rpc_server ?websockets ?enable_fast_withdrawal
-    ?history_mode ?enable_tx_queue ?spawn_rpc ~title ~tags body protocols =
+    ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ~title
+    ~tags body protocols =
   List.iter
     (fun kernel ->
       register_test
@@ -549,6 +552,7 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
         ~enable_multichain
         ?enable_tx_queue
         ?spawn_rpc
+        ?periodic_snapshot_path
         ~title
         ~tags
         body

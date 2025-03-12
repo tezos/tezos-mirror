@@ -305,10 +305,29 @@ module State = struct
         ~head_level
         (Ptime.diff stop_timestamp start_timestamp)
     in
-    Lwt.dont_wait gc_waiter (fun exn ->
-        Metrics.stop_pruning () ;
-        Evm_context_events.gc_waiter_failed exn) ;
-    return_unit
+
+    let data_dir = ctxt.data_dir in
+    match ctxt.configuration.experimental_features.periodic_snapshot_path with
+    | Some path ->
+        let*! () =
+          Lwt.catch gc_waiter (fun exn ->
+              Metrics.stop_pruning () ;
+              Evm_context_events.gc_waiter_failed exn ;
+              Lwt.reraise exn)
+        in
+        let snapshot_file =
+          if Filename.is_relative path then Filename.concat data_dir path
+          else path
+        in
+        let* _dest =
+          Snapshots.export ~snapshot_file ~compression:On_the_fly ~data_dir ()
+        in
+        return_unit
+    | None ->
+        Lwt.dont_wait gc_waiter (fun exn ->
+            Metrics.stop_pruning () ;
+            Evm_context_events.gc_waiter_failed exn) ;
+        return_unit
 
   let maybe_split_context ctxt conn timestamp level =
     let open Lwt_result_syntax in
@@ -1309,6 +1328,14 @@ module State = struct
             Evm_store.Metadata.store conn metadata)
       in
       return metadata
+    in
+    let*! () =
+      match
+        ( history_mode,
+          configuration.experimental_features.periodic_snapshot_path )
+      with
+      | Archive, Some _ -> Events.ignored_periodic_snapshot ()
+      | _ -> Lwt.return_unit
     in
     let*! () = Evm_context_events.start_history_mode history_mode in
 

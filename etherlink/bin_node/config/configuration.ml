@@ -145,6 +145,7 @@ type experimental_features = {
   spawn_rpc : int option;
   l2_chains : l2_chain list option;
   enable_tx_queue : tx_queue option;
+  periodic_snapshot_path : string option;
 }
 
 type sequencer = {
@@ -291,6 +292,7 @@ let default_experimental_features =
     spawn_rpc = None;
     l2_chains = default_l2_chains;
     enable_tx_queue = None;
+    periodic_snapshot_path = None;
   }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".octez-evm-node"
@@ -920,6 +922,7 @@ let experimental_features_encoding =
            spawn_rpc;
            l2_chains : l2_chain list option;
            enable_tx_queue;
+           periodic_snapshot_path;
          } ->
       ( ( drop_duplicate_on_injection,
           blueprints_publisher_order_enabled,
@@ -933,7 +936,8 @@ let experimental_features_encoding =
           monitor_websocket_heartbeat,
           spawn_rpc,
           l2_chains,
-          enable_tx_queue ) ))
+          enable_tx_queue,
+          periodic_snapshot_path ) ))
     (fun ( ( drop_duplicate_on_injection,
              blueprints_publisher_order_enabled,
              enable_send_raw_transaction,
@@ -946,7 +950,8 @@ let experimental_features_encoding =
              monitor_websocket_heartbeat,
              spawn_rpc,
              l2_chains,
-             enable_tx_queue ) ) ->
+             enable_tx_queue,
+             periodic_snapshot_path ) ) ->
       {
         drop_duplicate_on_injection;
         blueprints_publisher_order_enabled;
@@ -959,6 +964,7 @@ let experimental_features_encoding =
         spawn_rpc;
         l2_chains;
         enable_tx_queue;
+        periodic_snapshot_path;
       })
     (merge_objs
        (obj6
@@ -1009,7 +1015,7 @@ let experimental_features_encoding =
                 DEPRECATED: You should remove this option from your \
                 configuration file."
              bool))
-       (obj7
+       (obj8
           (dft
              "rpc_server"
              ~description:
@@ -1038,7 +1044,7 @@ let experimental_features_encoding =
              "spawn_rpc"
              ~description:"Spawn a RPC node listening on the given port"
              (option @@ obj1 (req "protected_port" (ranged_int 1 65535)))
-             None)
+             default_experimental_features.spawn_rpc)
           (dft
              "l2_chains"
              ~description:
@@ -1051,7 +1057,12 @@ let experimental_features_encoding =
              "enable_tx_queue"
              ~description:"Replace the observer tx pool by a tx queue"
              tx_queue_opt_encoding
-             default_experimental_features.enable_tx_queue)))
+             default_experimental_features.enable_tx_queue)
+          (dft
+             "periodic_snapshot_path"
+             ~description:"Path to the periodic snapshot file"
+             (option string)
+             default_experimental_features.periodic_snapshot_path)))
 
 let proxy_encoding =
   let open Data_encoding in

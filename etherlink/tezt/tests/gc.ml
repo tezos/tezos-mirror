@@ -19,6 +19,7 @@
 *)
 
 open Rpc.Syntax
+open Helpers
 
 let register ?genesis_timestamp ?(history_mode = Evm_node.Rolling 5) ~title
     ~tags f =
@@ -46,11 +47,7 @@ let register ?genesis_timestamp ?(history_mode = Evm_node.Rolling 5) ~title
   in
   f sequencer
 
-let days n = Ptime.Span.of_int_s (n * 86400)
-
 let test_gc_boundaries () =
-  let genesis_time = Client.Time.of_notation_exn "2020-01-01T00:00:00Z" in
-  let genesis_timestamp = Client.At genesis_time in
   register
     ~genesis_timestamp
     ~history_mode:(Rolling 3)
@@ -67,11 +64,7 @@ let test_gc_boundaries () =
   let* _ =
     fold 9 () (fun i () ->
         let level = level + i + 1 in
-        let timestamp =
-          (* Move one day every block *)
-          Ptime.add_span genesis_time (days (i + 1))
-          |> Option.get |> Client.Time.to_notation
-        in
+        let timestamp = get_timestamp i in
         let wait_for_split = Evm_node.wait_for_split ~level sequencer in
         let wait_for_gc =
           if level > 3 then
@@ -123,14 +116,7 @@ let test_gc_boundaries () =
   unit
 
 let test_switch_history_mode () =
-  let genesis_time = Client.Time.of_notation_exn "2020-01-01T00:00:00Z" in
-  let genesis_timestamp = Client.At genesis_time in
   let retention_period = 2 in
-  let get_timestamp i =
-    (* Move one day every block *)
-    Ptime.add_span genesis_time (days (i + 1))
-    |> Option.get |> Client.Time.to_notation
-  in
   let blocks_before_switch = 3 in
   register
     ~genesis_timestamp
@@ -189,13 +175,6 @@ let test_switch_history_mode () =
   unit
 
 let test_switch_history_mode_shorter_retention_period () =
-  let genesis_time = Client.Time.of_notation_exn "2020-01-01T00:00:00Z" in
-  let genesis_timestamp = Client.At genesis_time in
-  let get_timestamp i =
-    (* Move one day every block *)
-    Ptime.add_span genesis_time (days (i + 1))
-    |> Option.get |> Client.Time.to_notation
-  in
   let initial_retention_period = 5 in
   let new_retention_period = 2 in
   let blocks_to_produce = initial_retention_period + 1 in
@@ -261,12 +240,6 @@ let test_invalid_switch_history_mode () =
   unit
 
 let test_full_history_mode_gc () =
-  let genesis_time = Client.Time.of_notation_exn "2020-01-01T00:00:00Z" in
-  let genesis_timestamp = Client.At genesis_time in
-  let get_timestamp i =
-    Ptime.add_span genesis_time (days (i + 1))
-    |> Option.get |> Client.Time.to_notation
-  in
   register
     ~genesis_timestamp
     ~history_mode:(Full 2)

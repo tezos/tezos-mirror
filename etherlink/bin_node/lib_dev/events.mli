@@ -39,6 +39,11 @@ val failed_upgrade :
     since its EVM state was already initialized. *)
 val ignored_kernel_arg : unit -> unit Lwt.t
 
+(** [ignored_periodic_snapshot_arg ()] advertises that the EVM node has
+    ignored the request to create periodic snapshots when garbage collecting
+    since it was started in Archive mode. *)
+val ignored_periodic_snapshot : unit -> unit Lwt.t
+
 (** [catching_up_evm_event ~from ~to_] advertises that the sequencer
     is catching up on event produced by the evm kernel in the rollup
     node from L1 level [from] to [to_]. *)
@@ -160,6 +165,8 @@ val exporting_snapshot : string -> unit Lwt.t
 
 val still_exporting_snapshot :
   total:int -> progress:int -> string -> Ptime.Span.t -> unit Lwt.t
+
+val finished_exporting_snapshot : string -> unit Lwt.t
 
 val compressing_snapshot : string -> unit Lwt.t
 

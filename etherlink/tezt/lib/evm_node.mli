@@ -238,6 +238,8 @@ val wait_for_spawn_rpc_ready : ?timeout:float -> t -> unit Lwt.t
 
 val wait_for_import_finished : ?timeout:float -> t -> unit Lwt.t
 
+val wait_for_finished_exporting_snapshot : ?timeout:float -> t -> string Lwt.t
+
 val wait_for_block_producer_locked : ?timeout:float -> t -> unit Lwt.t
 
 val wait_for_block_producer_tx_injected : ?timeout:float -> t -> string Lwt.t
@@ -326,6 +328,7 @@ val patch_config_with_experimental_feature :
   ?enable_tx_queue:bool ->
   ?tx_queue_config:tx_queue_config ->
   ?spawn_rpc:int ->
+  ?periodic_snapshot_path:string ->
   unit ->
   JSON.t ->
   JSON.t

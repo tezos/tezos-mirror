@@ -24,7 +24,8 @@
     },
     "spawn_rpc": null,
     "l2_chains": null,
-    "enable_tx_queue": null
+    "enable_tx_queue": null,
+    "periodic_snapshot_path": null
   },
   "proxy": {
     "ignore_block_param": false
@@ -84,7 +85,8 @@
     },
     "spawn_rpc": null,
     "l2_chains": null,
-    "enable_tx_queue": null
+    "enable_tx_queue": null,
+    "periodic_snapshot_path": null
   },
   "proxy": {
     "ignore_block_param": false
@@ -137,7 +139,8 @@
     },
     "spawn_rpc": null,
     "l2_chains": null,
-    "enable_tx_queue": null
+    "enable_tx_queue": null,
+    "periodic_snapshot_path": null
   },
   "proxy": {
     "evm_node_endpoint": "hidden",
