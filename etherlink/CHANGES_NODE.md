@@ -13,6 +13,8 @@
 
 ### RPCs changes
 
+- Added a `/describe` endpoint compatible with `octez-client`. (!17190)
+
 ### Metrics changes
 
 ### Execution changes
