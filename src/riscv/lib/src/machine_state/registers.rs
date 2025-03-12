@@ -197,6 +197,15 @@ impl<M: backend::ManagerBase> XRegisters<M> {
         self.registers.struct_ref::<F>()
     }
 
+    /// Try to read a 64-bit value from the registers and coerce it to another type.
+    #[inline]
+    pub fn try_read<T: TryFrom<XValue>>(&self, reg: XRegister) -> Result<T, T::Error>
+    where
+        M: backend::ManagerRead,
+    {
+        self.read(reg).try_into()
+    }
+
     /// Read an integer from the registers.
     #[inline]
     pub fn read(&self, reg: XRegister) -> XValue
@@ -658,6 +667,21 @@ mod tests {
             let after = NONZERO_REGISTERS.map(|r| registers.read(r));
             assert_eq!(after, expected);
         }
+    });
+
+    backend_test!(test_try_read_u32, F, {
+        let mut registers = create_state!(XRegisters, XRegistersLayout, F);
+
+        // Reading an integer that is too large should fail
+        registers.write(x1, 1 << 32);
+        assert!(registers.try_read::<u32>(x1).is_err());
+
+        // Reading an integer that is negative should fail
+        registers.write(x1, -1i64 as u64);
+        assert!(registers.try_read::<u32>(x1).is_err());
+
+        registers.write(x1, 42);
+        assert_eq!(registers.try_read::<u32>(x1), Ok(42));
     });
 
     #[test]

@@ -17,29 +17,21 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// Handle the `openat` system call. All access to the file system is denied.
     ///
     /// See: <https://www.man7.org/linux/man-pages/man3/openat.3p.html>
-    pub(super) fn handle_openat(
-        &mut self,
-        core: &mut MachineCoreState<impl MemoryConfig, M>,
-    ) -> bool
+    pub(super) fn handle_openat(&mut self) -> Result<bool, Error>
     where
         M: ManagerReadWrite,
     {
-        core.hart.xregisters.write_system_call_error(Error::Access);
-        true
+        Err(Error::Access)
     }
 
     /// Handle the `readlinkat` system call. All access to the file system is denied.
     ///
     /// See: <https://man7.org/linux/man-pages/man2/readlink.2.html>
-    pub(super) fn handle_readlinkat(
-        &mut self,
-        core: &mut MachineCoreState<impl MemoryConfig, M>,
-    ) -> bool
+    pub(super) fn handle_readlinkat(&mut self) -> Result<bool, Error>
     where
         M: ManagerReadWrite,
     {
-        core.hart.xregisters.write_system_call_error(Error::Access);
-        true
+        Err(Error::Access)
     }
 
     // Handle the `getcwd` system call. This is a simple implementation that returns the root
@@ -49,7 +41,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     pub(super) fn handle_getcwd(
         &mut self,
         core: &mut MachineCoreState<impl MemoryConfig, M>,
-    ) -> bool
+    ) -> Result<bool, Error>
     where
         M: ManagerReadWrite,
     {
@@ -59,27 +51,20 @@ impl<M: ManagerBase> SupervisorState<M> {
         let length = core.hart.xregisters.read(registers::a1);
 
         if length == 0 && buffer != 0 {
-            core.hart
-                .xregisters
-                .write_system_call_error(Error::InvalidArgument);
-            return true;
+            return Err(Error::InvalidArgument);
         }
 
         if (length as usize) < CWD.len() {
-            core.hart.xregisters.write_system_call_error(Error::Range);
-            return true;
+            return Err(Error::Range);
         }
 
         // TODO: RV-487: Memory mappings are not yet protected. We assume the kernel knows what
         // it's doing for now.
-        let Ok(()) = core.main_memory.write_all(buffer, CWD) else {
-            core.hart.xregisters.write_system_call_error(Error::Fault);
-            return true;
-        };
+        core.main_memory.write_all(buffer, CWD)?;
 
         // Return the buffer address as an indicator of success
         core.hart.xregisters.write(registers::a0, buffer);
 
-        true
+        Ok(true)
     }
 }

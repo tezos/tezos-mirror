@@ -21,7 +21,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     pub(super) fn handle_getrandom(
         &mut self,
         core: &mut MachineCoreState<impl MemoryConfig, M>,
-    ) -> bool
+    ) -> Result<bool, Error>
     where
         M: ManagerReadWrite,
     {
@@ -33,14 +33,11 @@ impl<M: ManagerBase> SupervisorState<M> {
 
         // TODO: RV-487: Memory mappings are not yet protected. We assume the kernel knows what
         // it's doing for now.
-        let Ok(()) = core.main_memory.write_all(buffer, data) else {
-            core.hart.xregisters.write_system_call_error(Error::Fault);
-            return true;
-        };
+        core.main_memory.write_all(buffer, data)?;
 
         core.hart.xregisters.write(registers::a0, actual_length);
 
-        true
+        Ok(true)
     }
 }
 
