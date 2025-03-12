@@ -95,7 +95,7 @@ struct
       [X.check] when using the corresponding key. It then tests that the
       aggregation of all these signatures obtained using
       [X.aggregate_signature_opt] is accepted by [X.aggregate_check]. *)
-  let test_prop_sign_check
+  let test_prop_aug_sign_check
       ( (seed1, msg1, watermark1),
         (seed2, msg2, watermark2),
         (seed3, msg3, watermark3) ) =
@@ -125,7 +125,7 @@ struct
     && X.check_aug ?watermark:watermark3 pk3 signed3 msg3
     && is_valid_aggregated_sign
 
-  let test_prop_sign_check =
+  let test_prop_aug_sign_check =
     let gen =
       let open Gen in
       let+ seed1 = string_size (pure 32) >|= Bytes.of_string
@@ -147,12 +147,78 @@ struct
           (option Bytes.unsafe_to_string))
     in
     Test.make
-      ~name:("Aggregate_signature_" ^ Desc.name ^ "_sign_check")
+      ~name:("Aggregate_signature_" ^ Desc.name ^ "_aug_sign_check")
       ~print:(Print.triple print_param print_param print_param)
       gen
-      test_prop_sign_check
+      test_prop_aug_sign_check
 
-  let tests = [test_prop_sign_check]
+  let test_prop_pop_sign_check ~subgroup_check
+      (((seed1, weight1), (seed2, weight2), (seed3, weight3)), watermark, msg) =
+    let _, pk1, sk1 = X.generate_key ~seed:seed1 () in
+    let _, pk2, sk2 = X.generate_key ~seed:seed2 () in
+    let _, pk3, sk3 = X.generate_key ~seed:seed3 () in
+    let watermark = Option.map X.watermark_of_bytes watermark in
+    let signed1 = X.sign ?watermark sk1 msg in
+    let signed2 = X.sign ?watermark sk2 msg in
+    let signed3 = X.sign ?watermark sk3 msg in
+    let is_ok_aggregate_pk =
+      X.aggregate_public_key_opt ~subgroup_check [pk1; pk2; pk3] |> function
+      | None -> false
+      | Some pk_agg -> (
+          X.aggregate_signature_opt [signed1; signed2; signed3] |> function
+          | None -> false
+          | Some signed_agg -> X.check ?watermark pk_agg signed_agg msg)
+    in
+    let is_ok_aggregate_pk_weighted =
+      X.aggregate_public_key_weighted_opt
+        ~subgroup_check
+        [(weight1, pk1); (weight2, pk2); (weight3, pk3)]
+      |> function
+      | None -> false
+      | Some pk_agg -> (
+          X.aggregate_signature_weighted_opt
+            [(weight1, signed1); (weight2, signed2); (weight3, signed3)]
+          |> function
+          | None -> false
+          | Some signed_agg -> X.check ?watermark pk_agg signed_agg msg)
+    in
+    X.check ?watermark pk1 signed1 msg
+    && X.check ?watermark pk2 signed2 msg
+    && X.check ?watermark pk3 signed3 msg
+    && is_ok_aggregate_pk && is_ok_aggregate_pk_weighted
+
+  let test_prop_pop_sign_check ~subgroup_check =
+    let gen =
+      let open Gen in
+      let+ seed1 = string_size (pure 32) >|= Bytes.of_string
+      and+ seed2 = string_size (pure 32) >|= Bytes.of_string
+      and+ seed3 = string_size (pure 32) >|= Bytes.of_string
+      and+ weight1 = int >|= Z.of_int
+      and+ weight2 = int >|= Z.of_int
+      and+ weight3 = int >|= Z.of_int
+      and+ msg = string >|= Bytes.of_string
+      and+ wm = gen_watermark |> option in
+      (((seed1, weight1), (seed2, weight2), (seed3, weight3)), wm, msg)
+    in
+    let print_param = Print.(pair Bytes.unsafe_to_string Z.to_string) in
+    Test.make
+      ~name:
+        ("Aggregate_signature_" ^ Desc.name ^ "_pop_sign_check"
+        ^ if subgroup_check then "" else "_fast")
+      ~print:
+        Print.(
+          triple
+            (triple print_param print_param print_param)
+            (option Bytes.unsafe_to_string)
+            Bytes.unsafe_to_string)
+      gen
+      (test_prop_pop_sign_check ~subgroup_check)
+
+  let tests =
+    [
+      test_prop_pop_sign_check ~subgroup_check:true;
+      test_prop_pop_sign_check ~subgroup_check:false;
+    ]
 end
 
 (** Test: instantiate Signature_Properties over Signature

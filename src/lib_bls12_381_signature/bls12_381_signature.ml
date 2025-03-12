@@ -253,6 +253,21 @@ module MinPk = struct
         Bls12_381.G2.to_compressed_bytes res)
       signatures
 
+  let aggregate_signature_weighted_opt ?(subgroup_check = true)
+      signatures_with_weights =
+    let weights, signatures = List.split signatures_with_weights in
+    let scalars = List.map Bls12_381.Fr.of_z weights |> Array.of_list in
+    let signatures =
+      Bls12_381.G2.affine_array_of_compressed_bytes_opt
+        ~subgroup_check
+        (Array.of_list signatures)
+    in
+    Option.map
+      (fun signatures ->
+        let res = Bls12_381.G2.pippenger_with_affine_array signatures scalars in
+        Bls12_381.G2.to_compressed_bytes res)
+      signatures
+
   let aggregate_public_key_opt ?(subgroup_check = true) pks =
     let pks =
       Bls12_381.G1.affine_array_of_compressed_bytes_opt
@@ -265,23 +280,20 @@ module MinPk = struct
         Bls12_381.G1.to_compressed_bytes res)
       pks
 
-  let aggregate_public_key_lc_opt pks_with_weights =
-    let pks_opts =
-      List.map
-        (fun (w, pk) -> (w, Bls12_381.G1.of_compressed_bytes_opt pk))
-        pks_with_weights
+  let aggregate_public_key_weighted_opt ?(subgroup_check = true)
+      pks_with_weights =
+    let weights, pks = List.split pks_with_weights in
+    let scalars = List.map Bls12_381.Fr.of_z weights |> Array.of_list in
+    let pks =
+      Bls12_381.G1.affine_array_of_compressed_bytes_opt
+        ~subgroup_check
+        (Array.of_list pks)
     in
-    let pks_are_ok = List.for_all (fun (_, pk) -> Option.is_some pk) pks_opts in
-    if not pks_are_ok then None
-    else
-      let pks =
-        List.map
-          (fun (w, pk) ->
-            Bls12_381.G1.mul (Option.get pk) (Bls12_381.Fr.of_z w))
-          pks_opts
-      in
-      let aggregated_pk = Bls12_381.G1.add_bulk pks in
-      Some (Bls12_381.G1.to_compressed_bytes aggregated_pk)
+    Option.map
+      (fun pks ->
+        let res = Bls12_381.G1.pippenger_with_affine_array pks scalars in
+        Bls12_381.G1.to_compressed_bytes res)
+      pks
 
   let core_aggregate_verify pks_with_msgs aggregated_signature ciphersuite =
     let rec aux aggregated_signature pks_with_msgs ctxt =
@@ -582,6 +594,21 @@ module MinSig = struct
         Bls12_381.G1.to_compressed_bytes res)
       signatures
 
+  let aggregate_signature_weighted_opt ?(subgroup_check = true)
+      signatures_with_weights =
+    let weights, signatures = List.split signatures_with_weights in
+    let scalars = List.map Bls12_381.Fr.of_z weights |> Array.of_list in
+    let signatures =
+      Bls12_381.G1.affine_array_of_compressed_bytes_opt
+        ~subgroup_check
+        (Array.of_list signatures)
+    in
+    Option.map
+      (fun signatures ->
+        let res = Bls12_381.G1.pippenger_with_affine_array signatures scalars in
+        Bls12_381.G1.to_compressed_bytes res)
+      signatures
+
   let aggregate_public_key_opt ?(subgroup_check = true) pks =
     let pks =
       Bls12_381.G2.affine_array_of_compressed_bytes_opt
@@ -594,23 +621,20 @@ module MinSig = struct
         Bls12_381.G2.to_compressed_bytes res)
       pks
 
-  let aggregate_public_key_lc_opt pks_with_weights =
-    let pks_opts =
-      List.map
-        (fun (w, pk) -> (w, Bls12_381.G2.of_compressed_bytes_opt pk))
-        pks_with_weights
+  let aggregate_public_key_weighted_opt ?(subgroup_check = true)
+      pks_with_weights =
+    let weights, pks = List.split pks_with_weights in
+    let scalars = List.map Bls12_381.Fr.of_z weights |> Array.of_list in
+    let pks =
+      Bls12_381.G2.affine_array_of_compressed_bytes_opt
+        ~subgroup_check
+        (Array.of_list pks)
     in
-    let pks_are_ok = List.for_all (fun (_, pk) -> Option.is_some pk) pks_opts in
-    if not pks_are_ok then None
-    else
-      let pks =
-        List.map
-          (fun (w, pk) ->
-            Bls12_381.G2.mul (Option.get pk) (Bls12_381.Fr.of_z w))
-          pks_opts
-      in
-      let aggregated_pk = Bls12_381.G2.add_bulk pks in
-      Some (Bls12_381.G2.to_compressed_bytes aggregated_pk)
+    Option.map
+      (fun pks ->
+        let res = Bls12_381.G2.pippenger_with_affine_array pks scalars in
+        Bls12_381.G2.to_compressed_bytes res)
+      pks
 
   let core_aggregate_verify pks_with_msgs aggregated_signature ciphersuite =
     let rec aux aggregated_signature pks_with_msgs ctxt =
