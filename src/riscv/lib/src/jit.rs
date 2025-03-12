@@ -113,6 +113,12 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
     /// produce functions that can be run over the current
     /// memory configuration and manager.
     pub fn new() -> Result<Self, JitError> {
+        if std::mem::size_of::<usize>() != std::mem::size_of::<u64>() {
+            return Err(JitError::UnsupportedPlatform(
+                "octez-riscv only support 64-bit architectures",
+            ));
+        }
+
         let mut flag_builder = settings::builder();
         flag_builder.set("use_colocated_libcalls", "false")?;
         flag_builder.set("is_pic", "false")?;
@@ -229,6 +235,7 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
             pc_val,
             pc_offset: 0,
             jsa_call,
+            end_block: None,
         }
     }
 

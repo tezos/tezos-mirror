@@ -6,6 +6,7 @@
 //!
 //! [instructions]: crate::machine_state::instruction::Instruction
 
+use cranelift::codegen::ir;
 use cranelift::codegen::ir::InstBuilder;
 use cranelift::codegen::ir::MemFlags;
 use cranelift::codegen::ir::Type;
@@ -47,32 +48,71 @@ pub(super) struct Builder<'a, MC: MemoryConfig, JSA: JitStateAccess> {
 
     /// The static offset so far of the `instr_pc`
     pub pc_offset: Address,
+
+    /// The final block that is last executed within a block - it is responsible for
+    /// flushing `steps` and the `instr_pc` back to the state.
+    pub end_block: Option<ir::Block>,
 }
 
 impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
-    /// Consume the builder, allowing for the function under construction to be [`finalised`].
+    /// Finalise the end block - by flushing PC & Steps.
     ///
-    /// [`finalised`]: super::JIT::finalise
-    pub(super) fn end(mut self) {
+    /// The end block takes two dynamic-parameters: `(instr_pc, steps)`.
+    /// If an end block has already been created, we re-use it.
+    fn finalise_end_block(&mut self, end_block: ir::Block) {
+        if self.end_block.is_some() {
+            return;
+        }
+
+        self.builder.switch_to_block(end_block);
+        // We will pass the instr_pc & steps as parameters
+        let pc_val = self.builder.append_block_param(end_block, I64);
+        let steps_val = self.builder.append_block_param(end_block, I64);
+
         // flush steps
-        let steps = self
-            .builder
-            .ins()
-            .load(self.ptr, MemFlags::trusted(), self.steps_ptr_val, 0);
-        let steps = self.builder.ins().iadd_imm(steps, self.steps as i64);
         self.builder
             .ins()
-            .store(MemFlags::trusted(), steps, self.steps_ptr_val, 0);
+            .store(MemFlags::trusted(), steps_val, self.steps_ptr_val, 0);
+
+        // flush pc
+        self.jsa_call
+            .pc_write(&mut self.builder, self.core_ptr_val, pc_val);
+
+        self.builder.ins().return_(&[]);
+
+        self.end_block = Some(end_block);
+    }
+
+    /// Jump from the current block to the end block.
+    pub fn jump_to_end(&mut self) {
+        // flush steps
+        let steps_val =
+            self.builder
+                .ins()
+                .load(self.ptr, MemFlags::trusted(), self.steps_ptr_val, 0);
+        let steps_val = self.builder.ins().iadd_imm(steps_val, self.steps as i64);
 
         // flush pc
         let pc_val = self
             .builder
             .ins()
             .iadd_imm(self.pc_val, self.pc_offset as i64);
-        self.jsa_call
-            .pc_write(&mut self.builder, self.core_ptr_val, pc_val);
 
-        self.builder.ins().return_(&[]);
+        let end_block = self
+            .end_block
+            .unwrap_or_else(|| self.builder.create_block());
+
+        self.builder.ins().jump(end_block, &[pc_val, steps_val]);
+
+        self.finalise_end_block(end_block)
+    }
+
+    /// Consume the builder, allowing for the function under construction to be [`finalised`].
+    ///
+    /// [`finalised`]: super::JIT::finalise
+    pub(super) fn end(mut self) {
+        self.jump_to_end();
+        self.builder.seal_all_blocks();
         self.builder.finalize();
     }
 
