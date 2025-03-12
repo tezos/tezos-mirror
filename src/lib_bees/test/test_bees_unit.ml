@@ -99,18 +99,22 @@ let create_handlers (type a) ?on_completion ?(slow = false) () =
     with type self = a Worker.t
      and type launch_error = error trace)
 
-let create table handlers ?timeout name =
+let create table handlers ?(timeout : float option) name =
+  let timeout =
+    Option.bind timeout (fun timeout ->
+        Ptime.(of_float_s timeout |> Option.map Ptime.to_span))
+  in
   Worker.launch ?timeout table name 0 handlers
 
-let create_queue ?on_completion =
+let create_queue ?timeout ?on_completion =
   let table = Worker.create_table Queue in
-  create table (create_handlers ?on_completion ())
+  create ?timeout table (create_handlers ?on_completion ())
 
-let create_bounded ?on_completion =
+let create_bounded ?timeout ?on_completion =
   let table = Worker.create_table (Bounded {size = 2}) in
-  create table (create_handlers ?on_completion ())
+  create ?timeout table (create_handlers ?on_completion ())
 
-let create_dropbox ?on_completion ?slow =
+let create_dropbox ?timeout ?on_completion ?slow =
   let table =
     let open Worker in
     let merge _w (Any_request (neu, neu_metadata)) (old : _ option) =
@@ -128,7 +132,7 @@ let create_dropbox ?on_completion ?slow =
     in
     Worker.create_table (Dropbox {merge})
   in
-  create table (create_handlers ?slow ?on_completion ())
+  create ?timeout table (create_handlers ?slow ?on_completion ())
 
 open Mocked_worker.Request
 
