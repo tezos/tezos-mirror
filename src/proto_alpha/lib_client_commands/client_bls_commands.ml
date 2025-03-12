@@ -43,4 +43,23 @@ let commands () =
             in
             return_unit
         | None -> cctxt#error "Failed to aggregate the signatures");
+    command
+      ~group
+      ~desc:"Create a BLS proof by signing a public key"
+      no_options
+      (prefixes ["create"; "bls"; "proof"; "for"]
+      @@ Client_keys.Secret_key.source_param @@ stop)
+      (fun () sk_uri (cctxt : #Protocol_client_context.full) ->
+        let open Lwt_result_syntax in
+        let* pk_uri = Client_keys.neuterize sk_uri in
+        let* pk = Client_keys.public_key pk_uri in
+        match pk with
+        | Bls _ ->
+            let msg =
+              Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding pk
+            in
+            let* proof = Client_keys.sign cctxt sk_uri msg in
+            let*! () = cctxt#message "%a" Signature.pp proof in
+            return_unit
+        | _ -> cctxt#error "Failed to produce a proof: input is not a BLS key");
   ]
