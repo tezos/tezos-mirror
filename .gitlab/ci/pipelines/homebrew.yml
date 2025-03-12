@@ -6,9 +6,6 @@ workflow:
   - if: $foo != "bar" || $foo == "bar"
     when: always
 
-variables:
-  PIPELINE_TYPE: homebrew
-
 stages:
 - start
 - build
