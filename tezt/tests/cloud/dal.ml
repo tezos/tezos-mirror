@@ -1512,6 +1512,126 @@ module Monitoring_app = struct
               ~level
               ~cycle
               ~lost_dal_rewards
+
+    let report_dal_accusations ~webhook ~network ~level ~cycle dal_accusations =
+      let data =
+        let header =
+          Format.sprintf
+            "*[dal-accusations]* On network `%s`, delegates have been accused \
+             at cycle `%d`, level `%d`."
+            (Network.to_string network)
+            cycle
+            level
+        in
+        let content =
+          List.map
+            (fun ( `attestation_level attestation_level,
+                   `slot_index slot_index,
+                   `delegate delegate,
+                   `op_hash hash ) ->
+              Format.sprintf
+                "▪ `%s` for attesting slot index `%d` at level `%d`. \
+                 <https://%s.tzkt.io/%s|See online>"
+                (String.sub delegate 0 7)
+                slot_index
+                attestation_level
+                (Network.to_string network)
+                hash)
+            dal_accusations
+        in
+        `O [("blocks", `A (Format_app.section (header :: content) ()))]
+      in
+      let endpoint = endpoint_of_webhook webhook in
+      let rpc =
+        RPC_core.make
+          ~data:(Data data)
+          POST
+          (String.split_on_char '/' (Uri.path webhook))
+          (fun _json -> ())
+      in
+      let* _response = RPC_core.call_raw endpoint rpc in
+      Lwt.return_unit
+
+    let check_for_dal_accusations t ~cycle ~level ~operations ~endpoint =
+      match t.configuration.monitor_app_configuration with
+      | None -> unit
+      | Some {dal_slack_webhook = webhook} ->
+          let open JSON in
+          let accusations =
+            operations |> as_list |> Fun.flip List.nth 2 |> as_list
+          in
+          let dal_entrapments =
+            List.filter_map
+              (fun accusation ->
+                let contents =
+                  accusation |-> "contents" |> as_list |> Fun.flip List.nth 0
+                in
+                match contents |-> "kind" |> as_string_opt with
+                | Some "dal_entrapment_evidence" ->
+                    let attestation_level =
+                      contents |-> "attestation" |-> "operations" |-> "level"
+                      |> as_int
+                    in
+                    let slot_index = contents |-> "slot_index" |> as_int in
+                    let shard =
+                      contents |-> "shard_with_proof" |-> "shard" |> as_list
+                      |> Fun.flip List.nth 0 |> as_int
+                    in
+                    let hash = accusation |-> "hash" |> as_string in
+                    Some
+                      ( `attestation_level attestation_level,
+                        `shard shard,
+                        `slot_index slot_index,
+                        `op_hash hash )
+                | None | Some _ -> None)
+              accusations
+          in
+          (* todo: optimize to avoid too many RPC calls (?) *)
+          let* dal_accusations =
+            Lwt_list.map_p
+              (fun ( `attestation_level attestation_level,
+                     `shard shard,
+                     `slot_index slot_index,
+                     `op_hash hash ) ->
+                let* json =
+                  RPC_core.call
+                    endpoint
+                    (RPC.get_chain_block_context_dal_shards
+                       ~level:attestation_level
+                       ())
+                in
+                let assignment =
+                  let open JSON in
+                  List.find_opt
+                    (fun assignment ->
+                      let indexes =
+                        assignment |-> "indexes" |> as_list |> List.map as_int
+                      in
+                      List.mem shard indexes)
+                    (json |> as_list)
+                in
+                let delegate =
+                  Option.fold
+                    ~none:"should_not_happen"
+                    ~some:(fun x -> x |-> "delegate" |> as_string)
+                    assignment
+                in
+                return
+                  ( `attestation_level attestation_level,
+                    `slot_index slot_index,
+                    `delegate delegate,
+                    `op_hash hash ))
+              dal_entrapments
+          in
+          if List.is_empty dal_accusations then unit
+          else
+            let network = t.configuration.network in
+            report_dal_accusations
+              ~webhook
+              ~network
+              ~cycle
+              ~level
+              dal_accusations
   end
 end
 
@@ -1602,6 +1722,15 @@ let get_infos_per_level t ~level =
        not provided. *)
     let* () =
       Monitoring_app.Alert.check_for_lost_dal_rewards t ~metadata ~level
+    in
+    let* () =
+      let cycle = JSON.(metadata |-> "level_info" |-> "cycle" |> as_int) in
+      Monitoring_app.Alert.check_for_dal_accusations
+        t
+        ~cycle
+        ~level
+        ~operations
+        ~endpoint:t.bootstrap.node_rpc_endpoint
     in
     unit
   in
