@@ -1846,6 +1846,13 @@ let octez_base_unix =
     "base.unix"
     ~internal_name:"tezos_base_unix"
     ~path:"src/lib_base/unix"
+    ~foreign_stubs:
+      {
+        language = C;
+        flags = [S ":standard"];
+        include_dirs = [];
+        names = ["socket"];
+      }
     ~deps:
       [
         octez_error_monad |> open_;
