@@ -328,4 +328,13 @@ let activate ctxt ~new_cycle =
       ~f:(fun delegate pk ctxt ->
         Storage.Contract.Consensus_key.add ctxt delegate pk)
   in
-  Storage.Pending_consensus_keys.clear (ctxt, new_cycle)
+  let* ctxt = Storage.Pending_consensus_keys.clear (ctxt, new_cycle) in
+  let* ctxt =
+    Storage.Pending_companion_keys.fold
+      (ctxt, new_cycle)
+      ~order:`Undefined
+      ~init:ctxt
+      ~f:(fun delegate pk ctxt ->
+        Storage.Contract.Companion_key.add ctxt delegate pk)
+  in
+  Storage.Pending_companion_keys.clear (ctxt, new_cycle)
