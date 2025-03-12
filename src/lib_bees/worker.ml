@@ -571,7 +571,7 @@ struct
     type launch_error = H.launch_error
 
     let on_launch self name params =
-      Lwt_eio.Promise.await_lwt @@ H.on_launch self name params
+      Lwt_eio.run_lwt_in_main @@ fun () -> H.on_launch self name params
 
     let on_close self = Lwt_eio.run_lwt_in_main @@ fun () -> H.on_close self
 
