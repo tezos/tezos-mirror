@@ -32,6 +32,7 @@ octez-evm-node-libs: etherlink/bin_node/config, etherlink/bin_node/installers, e
 octez-evm-node-tests: etherlink/bin_node/test
 octez-evm-wasm-runtime-tests: etherlink/lib_wasm_runtime_callbacks/test
 octez-experimental-agnostic-baker: src/bin_agnostic_baker
+octez-experimental-agnostic-baker-lib: src/lib_agnostic_baker
 octez-injector: src/lib_injector
 octez-injector-server: contrib/octez_injector_server
 octez-internal-libs: irmin/lib_irmin, irmin/lib_irmin/data, irmin/lib_irmin/mem, irmin/lib_irmin_pack, irmin/lib_irmin_pack/mem, irmin/lib_irmin_pack/unix, irmin/lib_irmin_tezos, irmin/lib_ppx_irmin, irmin/lib_ppx_irmin/internal, irmin/test/helpers
