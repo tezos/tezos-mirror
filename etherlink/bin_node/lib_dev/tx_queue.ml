@@ -379,6 +379,7 @@ module Request = struct
     | Lock_transactions : (unit, tztrace) t
     | Unlock_transactions : (unit, tztrace) t
     | Is_locked : (bool, tztrace) t
+    | Content : (Ethereum_types.txpool, tztrace) t
 
   type view = View : _ t -> view
 
@@ -478,6 +479,7 @@ module Request = struct
     | Lock_transactions -> Format.fprintf fmt "Locking the transactions"
     | Unlock_transactions -> Format.fprintf fmt "Unlocking the transactions"
     | Is_locked -> Format.fprintf fmt "Checking if the tx queue is locked"
+    | Content -> fprintf fmt "Content"
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -750,6 +752,44 @@ module Handlers = struct
     | Lock_transactions -> return (lock_transactions state)
     | Unlock_transactions -> return (unlock_transactions state)
     | Is_locked -> return (is_locked state)
+    | Content ->
+        let open Ethereum_types in
+        let process_transactions tx_map lookup_fn acc =
+          String.Hashtbl.fold
+            (fun hash value acc ->
+              match lookup_fn hash value with
+              | Some (obj : Ethereum_types.legacy_transaction_object) ->
+                  let existing_nonce_map =
+                    AddressMap.find_opt obj.from acc
+                    |> Option.value ~default:NonceMap.empty
+                  in
+                  let updated_nonce_map =
+                    NonceMap.add (Qty.to_z obj.nonce) obj existing_nonce_map
+                  in
+                  AddressMap.add obj.from updated_nonce_map acc
+              | None -> acc)
+            tx_map
+            acc
+        in
+
+        (* Process pending and collect found transactions *)
+        let pending =
+          process_transactions
+            state.pending
+            (fun hash _v -> String.Hashtbl.find_opt state.tx_object hash)
+            AddressMap.empty
+        in
+
+        (* Process tx_object separately to collect the queued (unmatched) transactions *)
+        let queued =
+          process_transactions
+            state.tx_object
+            (fun hash obj ->
+              if String.Hashtbl.mem state.pending hash then None else Some obj)
+            AddressMap.empty
+        in
+
+        return {pending; queued}
 
   type launch_error = tztrace
 
@@ -881,6 +921,11 @@ let nonce ~next_nonce address =
   let*? w = Lazy.force worker in
   Worker.Queue.push_request_and_wait w (Nonce {next_nonce; address})
   |> handle_request_error
+
+let content () =
+  let open Lwt_result_syntax in
+  let*? w = Lazy.force worker in
+  Worker.Queue.push_request_and_wait w Content |> handle_request_error
 
 let shutdown () =
   let open Lwt_result_syntax in

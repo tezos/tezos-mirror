@@ -10922,6 +10922,18 @@ let test_tx_queue_clear =
              _protocol ->
   let* () = Evm_node.terminate observer in
   let* () =
+    Evm_node.Config_file.update observer
+    @@ Evm_node.patch_config_with_experimental_feature
+         ~enable_tx_queue:true
+         ~tx_queue_config:
+           {
+             max_size = 1000;
+             max_lifespan = 100_000 (* absurd value so no TX are dropped *);
+             tx_per_addr_limit = 100_000;
+           }
+         ()
+  in
+  let* () =
     Evm_node.run ~extra_arguments:["--dont-track-rollup-node"] observer
   in
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
@@ -10946,6 +10958,14 @@ let test_tx_queue_clear =
       ~sender:Constant.bootstrap3
       raw_tx
   in
+
+  let* _ = Rpc.send_raw_transaction ~raw_tx observer
+  and* _ = Evm_node.wait_for_tx_queue_injecting_transaction observer in
+  let*@ pending, queued = Rpc.txpool_content observer in
+  Check.((List.length pending = 1) int)
+    ~error_msg:"Amount of 'Pending' tx should be 1" ;
+  Check.((List.length queued = 0) int)
+    ~error_msg:"Amount of 'Queued' tx should be 0" ;
 
   (* Mark at which level the delayed inbox item was added. *)
   let* add_level = Client.level client in
@@ -10972,6 +10992,11 @@ let test_tx_queue_clear =
   and* _ = wait_for_flush
   and* _ = wait_for_processed_l1_level_flushed
   and* () = wait_for_clear in
+
+  let*@ pending, queued = Rpc.txpool_content observer in
+  Check.((List.length pending + List.length queued = 0) int)
+    ~error_msg:"'Pending' and 'Queued' tx should be empty" ;
+
   unit
 
 let test_tx_queue_nonce =
