@@ -258,12 +258,18 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
         Evm_ro_context.(
           evm_services_methods ro_ctxt sequencer_config.time_between_blocks)
       ~data_dir
+      ~rpc_server_family:
+        (if enable_multichain then Rpc_types.Multichain_sequencer_rpc_server
+         else Rpc_types.Single_chain_node_rpc_server EVM)
       Full
       configuration
       (backend, smart_rollup_address_typed)
   in
   let* finalizer_private_server =
     Rpc_server.start_private_server
+      ~rpc_server_family:
+        (if enable_multichain then Rpc_types.Multichain_sequencer_rpc_server
+         else Rpc_types.Single_chain_node_rpc_server EVM)
       ~block_production:`Single_node
       configuration
       (backend, smart_rollup_address_typed)

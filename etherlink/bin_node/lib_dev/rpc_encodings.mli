@@ -359,7 +359,10 @@ type map_result =
   | Disabled
 
 val map_method_name :
-  restrict:Configuration.restricted_rpcs -> string -> map_result
+  rpc_server_family:Rpc_types.rpc_server_family ->
+  restrict:Configuration.restricted_rpcs ->
+  string ->
+  map_result
 
 type websocket_subscription = {
   id : Ethereum_types.Subscription.id;

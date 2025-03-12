@@ -440,14 +440,17 @@ let process_trace_result trace =
       let msg = Format.asprintf "%a" pp_print_trace e in
       rpc_error (Rpc_errors.internal_error msg)
 
-let dispatch_request (rpc : Configuration.rpc)
-    (validation : Validate.validation_mode) (config : Configuration.t)
+let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) (validation : Validate.validation_mode)
+    (config : Configuration.t)
     ((module Backend_rpc : Services_backend_sig.S), _)
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_result_syntax in
   let open Ethereum_types in
   let*! value =
-    match map_method_name ~restrict:rpc.restricted_rpcs method_ with
+    match
+      map_method_name ~rpc_server_family ~restrict:rpc.restricted_rpcs method_
+    with
     | Unknown ->
         Metrics.inc_rpc_method ~name:"unknown" ;
         Lwt.return_error (Rpc_errors.method_not_found method_)
@@ -849,8 +852,8 @@ let dispatch_request (rpc : Configuration.rpc)
   in
   Lwt.return JSONRPC.{value; id}
 
-let dispatch_private_request (rpc : Configuration.rpc)
-    (config : Configuration.t)
+let dispatch_private_request (rpc_server_family : Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) (config : Configuration.t)
     ((module Backend_rpc : Services_backend_sig.S), _) ~block_production
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_syntax in
@@ -867,7 +870,9 @@ let dispatch_private_request (rpc : Configuration.rpc)
   let* value =
     (* Private RPCs can only be accessed locally, they're not accessible to the
        end user. *)
-    match map_method_name ~restrict:rpc.restricted_rpcs method_ with
+    match
+      map_method_name ~rpc_server_family ~restrict:rpc.restricted_rpcs method_
+    with
     | Unknown ->
         return
           (Error
@@ -1022,10 +1027,15 @@ let empty_stream =
 
 let empty_sid = Ethereum_types.(Subscription.Id (Hex ""))
 
-let dispatch_websocket (rpc : Configuration.rpc) validation config ctx
-    (input : JSONRPC.request) =
+let dispatch_websocket (rpc_server_family : Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) validation config ctx (input : JSONRPC.request) =
   let open Lwt_syntax in
-  match map_method_name ~restrict:rpc.restricted_rpcs input.method_ with
+  match
+    map_method_name
+      ~rpc_server_family
+      ~restrict:rpc.restricted_rpcs
+      input.method_
+  with
   | Method (Subscribe.Method, module_) ->
       let sub_stream = ref empty_stream in
       let sid = ref empty_sid in
@@ -1064,14 +1074,23 @@ let dispatch_websocket (rpc : Configuration.rpc) validation config ctx
       let+ value = build_with_input ~f module_ input.parameters in
       websocket_response_of_response JSONRPC.{value; id = input.id}
   | _ ->
-      let+ response = dispatch_request rpc validation config ctx input in
+      let+ response =
+        dispatch_request rpc_server_family rpc validation config ctx input
+      in
       websocket_response_of_response response
 
-let dispatch_private_websocket ~block_production (rpc : Configuration.rpc)
-    config ctx (input : JSONRPC.request) =
+let dispatch_private_websocket (rpc_server_family : Rpc_types.rpc_server_family)
+    ~block_production (rpc : Configuration.rpc) config ctx
+    (input : JSONRPC.request) =
   let open Lwt_syntax in
   let+ response =
-    dispatch_private_request ~block_production rpc config ctx input
+    dispatch_private_request
+      rpc_server_family
+      ~block_production
+      rpc
+      config
+      ctx
+      input
   in
   websocket_response_of_response response
 
@@ -1080,24 +1099,25 @@ let generic_dispatch (rpc : Configuration.rpc) config ctx dir path
   Evm_directory.register0 dir (dispatch_batch_service ~path) (fun () input ->
       dispatch_handler rpc config ctx dispatch_request input |> Lwt_result.ok)
 
-let dispatch_public (rpc : Configuration.rpc) validation config ctx dir =
+let dispatch_public (rpc_server_family : Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) validation config ctx dir =
   generic_dispatch
     rpc
     config
     ctx
     dir
     Path.root
-    (dispatch_request rpc validation)
+    (dispatch_request rpc_server_family rpc validation)
 
-let dispatch_private (rpc : Configuration.rpc) ~block_production config ctx dir
-    =
+let dispatch_private (rpc_server_family : Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) ~block_production config ctx dir =
   generic_dispatch
     rpc
     config
     ctx
     dir
     Path.(add_suffix root "private")
-    (dispatch_private_request rpc ~block_production)
+    (dispatch_private_request rpc_server_family rpc ~block_production)
 
 let generic_websocket_dispatch (config : Configuration.t) ctx dir path
     dispatch_websocket =
@@ -1111,51 +1131,55 @@ let generic_websocket_dispatch (config : Configuration.t) ctx dir path
       (dispatch_websocket config ctx)
   else dir
 
-let dispatch_websocket_public (rpc : Configuration.rpc) validation config ctx
-    dir =
+let dispatch_websocket_public (rpc_server_family : Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) validation config ctx dir =
   generic_websocket_dispatch
     config
     ctx
     dir
     "/ws"
-    (dispatch_websocket rpc validation)
+    (dispatch_websocket rpc_server_family rpc validation)
 
-let dispatch_websocket_private (rpc : Configuration.rpc) ~block_production
-    config ctx dir =
+let dispatch_websocket_private (rpc_server_family : Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) ~block_production config ctx dir =
   generic_websocket_dispatch
     config
     ctx
     dir
     "/private/ws"
-    (dispatch_private_websocket ~block_production rpc)
+    (dispatch_private_websocket rpc_server_family ~block_production rpc)
 
-let directory ?delegate_health_check_to rpc validation config
+let directory ~rpc_server_family ?delegate_health_check_to rpc validation config
     ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
   Evm_directory.empty config.experimental_features.rpc_server
   |> version |> configuration config
   |> health_check ?delegate_to:delegate_health_check_to
   |> dispatch_public
+       rpc_server_family
        rpc
        validation
        config
        ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
   |> dispatch_websocket_public
+       rpc_server_family
        rpc
        validation
        config
        ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
 
-let private_directory rpc config
+let private_directory ~rpc_server_family rpc config
     ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
     ~block_production =
   Evm_directory.empty config.experimental_features.rpc_server
   |> version
   |> dispatch_private
+       rpc_server_family
        rpc
        config
        ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
        ~block_production
   |> dispatch_websocket_private
+       rpc_server_family
        rpc
        config
        ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)

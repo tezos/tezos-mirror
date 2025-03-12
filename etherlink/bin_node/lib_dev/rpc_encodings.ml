@@ -167,6 +167,16 @@ module type METHOD = sig
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+(* A simple equality check for two (module METHOD) values by comparing the method_ field. *)
+let equal_method (module M1 : METHOD) (module M2 : METHOD) =
+  M1.method_ = M2.method_
+
+let get_diff (list1 : (module METHOD) list) (list2 : (module METHOD) list) :
+    (module METHOD) list =
+  List.filter
+    (fun m1 -> not (List.exists (fun m2 -> equal_method m1 m2) list2))
+    list1
+
 let encoding_with_optional_extended_block_param encoding =
   Evm_node_lib_dev_encoding.Helpers.encoding_with_optional_last_param
     encoding
@@ -979,7 +989,7 @@ type map_result =
   | Unknown
   | Disabled
 
-let supported_methods : (module METHOD) list =
+let evm_supported_methods : (module METHOD) list =
   [
     (module Kernel_version);
     (module Kernel_root_hash);
@@ -1029,7 +1039,7 @@ let supported_methods : (module METHOD) list =
     (module Trace_block);
   ]
 
-let unsupported_methods : string list =
+let evm_unsupported_methods : string list =
   [
     (* net *)
     "net_listening";
@@ -1077,7 +1087,42 @@ let unsupported_methods : string list =
     "engine_newPayloadV4";
   ]
 
-let map_method_name ~restrict method_name =
+let michelson_supported_methods = evm_supported_methods
+
+let multichain_sequencer_supported_methods : (module METHOD) list =
+  [
+    (module Block_number);
+    (module Send_raw_transaction);
+    (* Private RPCs *)
+    (module Produce_block);
+    (module Inject_transaction);
+    (module Durable_state_value);
+    (module Durable_state_subkeys);
+    (module Replay_block);
+  ]
+
+let michelson_unsupported_methods = evm_unsupported_methods
+
+let multichain_sequencer_unsupported_methods =
+  let diff_methods =
+    get_diff evm_supported_methods multichain_sequencer_supported_methods
+  in
+  let diff_method_names =
+    List.map (fun (module M : METHOD) -> M.method_) diff_methods
+  in
+  evm_unsupported_methods @ diff_method_names
+
+let map_method_name ~rpc_server_family ~restrict method_name =
+  let supported_methods, unsupported_methods =
+    match rpc_server_family with
+    | Rpc_types.Multichain_sequencer_rpc_server ->
+        ( multichain_sequencer_supported_methods,
+          multichain_sequencer_unsupported_methods )
+    | Rpc_types.Single_chain_node_rpc_server Ethereum_types.EVM ->
+        (evm_supported_methods, evm_unsupported_methods)
+    | Rpc_types.Single_chain_node_rpc_server Ethereum_types.Michelson ->
+        (michelson_supported_methods, michelson_unsupported_methods)
+  in
   let disabled =
     match restrict with
     | Configuration.Pattern {regex; _} -> Re.execp regex method_name
