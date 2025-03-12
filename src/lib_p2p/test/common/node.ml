@@ -243,7 +243,9 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
         (Option.fold_f ~some:timer ~none:Lwt_utils.never_ending timeout)
         (fun _canceler ->
           let iteration = ref 0 in
-          let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
+          let* sched =
+            P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) ()
+          in
           let trigger = P2p_trigger.create () in
           let watcher = Lwt_watcher.create_input () in
           let log event = Lwt_watcher.notify watcher event in

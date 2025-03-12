@@ -114,7 +114,7 @@ let receive conn =
 let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
     ~read_buffer_size main_socket n =
   let open Lwt_result_syntax in
-  let sched =
+  let* sched =
     P2p_io_scheduler.create
       ?max_download_speed
       ?read_queue_size
@@ -169,12 +169,17 @@ let rec send conn nb_simple_msgs =
 
 let client ?max_upload_speed ?write_queue_size addr port time _n =
   let open Lwt_syntax in
-  let sched =
+  let* sched =
     P2p_io_scheduler.create
       ?max_upload_speed
       ?write_queue_size
       ~read_buffer_size:(1 lsl 12)
       ()
+  in
+  let* sched =
+    match sched with
+    | Error err -> Lwt.fail (Error err)
+    | Ok sched -> return sched
   in
   let* conn = connect addr port in
   let conn = P2p_io_scheduler.register sched conn in

@@ -883,6 +883,7 @@ module Internal_for_tests = struct
   }
 
   let mock_dependencies default_metadata =
+    let open Lwt_result_syntax in
     {
       pool_greylist_peer = (fun _ _ -> ());
       peer_state_info_trusted = (fun _ -> true);
@@ -901,11 +902,11 @@ module Internal_for_tests = struct
           let connection_info =
             P2p_connection.Internal_for_tests.Info.mock default_metadata
           in
-          let authenticated_connection =
+          let* authenticated_connection =
             P2p_socket.Internal_for_tests.mock_authenticated_connection
               default_metadata
           in
-          Lwt.return_ok (connection_info, authenticated_connection));
+          return (connection_info, authenticated_connection));
       socket_accept =
         (fun ?incoming_message_queue_size:_
              ?outgoing_message_queue_size:_
@@ -979,8 +980,7 @@ module Internal_for_tests = struct
       }
 
   let create ?(config = dumb_config) ?(log = fun _ -> ())
-      ?(triggers = P2p_trigger.create ())
-      ?(io_sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) ())
+      ?(triggers = P2p_trigger.create ()) ?io_sched
       ?(announced_version = Network_version.Internal_for_tests.mock ())
       ?(conn_meta_config = conn_meta_config_default ())
       ?(message_config = message_config_default ())
@@ -989,7 +989,13 @@ module Internal_for_tests = struct
       ?(incoming = P2p_point.Table.create ~random:true 53)
       ?(new_connection_hook = []) ?(disconnection_hook = [])
       ?(answerer = lazy (P2p_protocol.create_private ())) pool dependencies :
-      ('msg, 'peer_meta, 'conn_meta) t =
+      ('msg, 'peer_meta, 'conn_meta) t tzresult Lwt.t =
+    let open Lwt_result_syntax in
+    let* io_sched =
+      match io_sched with
+      | None -> P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) ()
+      | Some io_sched -> return io_sched
+    in
     let pool =
       match pool with
       | `Pool pool -> pool
@@ -1004,21 +1010,22 @@ module Internal_for_tests = struct
       | `Make_default_dependencies default_conn_meta ->
           mock_dependencies default_conn_meta
     in
-    {
-      config;
-      pool;
-      log;
-      triggers;
-      io_sched;
-      announced_version;
-      conn_meta_config;
-      message_config;
-      custom_p2p_versions;
-      encoding;
-      incoming;
-      new_connection_hook;
-      disconnection_hook;
-      answerer;
-      dependencies;
-    }
+    return
+      {
+        config;
+        pool;
+        log;
+        triggers;
+        io_sched;
+        announced_version;
+        conn_meta_config;
+        message_config;
+        custom_p2p_versions;
+        encoding;
+        incoming;
+        new_connection_hook;
+        disconnection_hook;
+        answerer;
+        dependencies;
+      }
 end

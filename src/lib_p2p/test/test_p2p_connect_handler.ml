@@ -41,7 +41,7 @@ let point_id : P2p_point.Id.t = (P2p_addr.of_string_exn "0.0.0.0", 0)
 let test_connect_destroy =
   let open Lwt_result_syntax in
   tztest "Connect then destroy" `Quick @@ fun () ->
-  let t =
+  let* t =
     P2p_connect_handler.Internal_for_tests.create
       (`Make_default_pool ())
       (`Dependencies dependencies)
@@ -77,7 +77,7 @@ let test_correct_incoming_connection_number =
     {dependencies with socket_accept = socket_accept_hanging_forever}
   in
   let incoming = P2p_point.Table.create 0 in
-  let t =
+  let* t =
     P2p_connect_handler.Internal_for_tests.create
       ~config
       ~incoming
@@ -107,7 +107,7 @@ let test_on_new_connection =
   in
   tztest "on_new_connection hook is triggered on new connection" `Quick
   @@ fun () ->
-  let t =
+  let* t =
     P2p_connect_handler.Internal_for_tests.create
       (`Make_default_pool ())
       (`Dependencies dependencies)

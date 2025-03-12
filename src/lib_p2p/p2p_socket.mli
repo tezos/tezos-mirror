@@ -295,7 +295,8 @@ module Internal_for_tests : sig
 
   val raw_write_sync : ('msg, 'meta) t -> Bytes.t -> unit tzresult Lwt.t
 
-  val mock_authenticated_connection : 'meta -> 'meta authenticated_connection
+  val mock_authenticated_connection :
+    'meta -> 'meta authenticated_connection tzresult Lwt.t
 
   val mock :
     ?reader:(int * 'msg) tzresult Lwt_pipe.Maybe_bounded.t ->

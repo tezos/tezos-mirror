@@ -72,9 +72,8 @@ module Scheduler (IO : IO) = struct
      recursive types: fields canceler, counter and quota. *)
   [@@@ocaml.warning "-30"]
 
-  type t = {
+  type inner_state = {
     ma_state : Moving_average.state;
-    canceler : Lwt_canceler.t;
     mutable worker : unit Lwt.t;
     counter : Moving_average.t;
     max_speed : int option;
@@ -100,6 +99,8 @@ module Scheduler (IO : IO) = struct
 
   [@@@ocaml.warning "+30"]
 
+  let full_name = Format.sprintf "io_scheduler(%s)" IO.name
+
   (* if the connection is not already closed,
      - mark it closed
      - call the closer on the out_param
@@ -108,7 +109,9 @@ module Scheduler (IO : IO) = struct
     let open Lwt_syntax in
     if conn.closed then Lwt.return_unit
     else
-      let* () = Events.(emit connection_closed) ("cancel", conn.id, IO.name) in
+      let* () =
+        Events.(emit connection_closed) ("cancel", conn.id, full_name)
+      in
       conn.closed <- true ;
       let* () = Unit.catch_s (fun () -> IO.close conn.out_param err) in
       Error_monad.cancel_with_exceptions conn.canceler
@@ -157,9 +160,30 @@ module Scheduler (IO : IO) = struct
   let check_quota st =
     if st.max_speed <> None && st.quota < 0 then
       let open Lwt_syntax in
-      let* () = Events.(emit wait_quota) IO.name in
+      let* () = Events.(emit wait_quota) full_name in
       Lwt_condition.wait st.quota_updated
     else Lwt.pause ()
+
+  module Name = P2p_workers.Unique_name_maker (struct
+    let base = ["p2p_io_scheduler"; IO.name]
+  end)
+
+  (* Note that we can only rely on a callback request for now and not a queue.
+     The worker works with two queues: one for high priority requests, one for
+     low priority. When the worker will eventually implement queues with
+     priorities it will be useful to use it and not rely on a callback
+     anymore with internal queues. *)
+  module Request = P2p_workers.Loop_request
+
+  module Types = struct
+    type state = inner_state
+
+    type parameters = {ma_state : Moving_average.state; max_speed : int option}
+  end
+
+  module Worker = Tezos_workers.Worker.MakeSingle (Name) (Request) (Types)
+
+  type t = Worker.callback Worker.t
 
   (* Main worker loop:
 
@@ -196,14 +220,16 @@ module Scheduler (IO : IO) = struct
      Implicit assumption: the quota of the scheduler and the
      connections are updated asynchronously by the moving_average
      worker. *)
-  let rec worker_loop st =
+  let loop worker =
     let open Lwt_syntax in
+    let st = Worker.state worker in
     let* () = check_quota st in
-    let* () = Events.(emit wait) IO.name in
+    let* () = Events.(emit wait) full_name in
     let* () =
-      Lwt.pick [Lwt_canceler.when_canceling st.canceler; wait_data st]
+      Lwt.pick
+        [Lwt_canceler.when_canceling (Worker.canceler worker); wait_data st]
     in
-    if Lwt_canceler.canceled st.canceler then Lwt.return_unit
+    if Lwt_canceler.canceled (Worker.canceler worker) then Lwt.return_unit
     else
       let prio, (conn, msg) =
         if not (Queue.is_empty st.readys_high) then
@@ -211,19 +237,21 @@ module Scheduler (IO : IO) = struct
         else (false, Queue.pop st.readys_low)
       in
       match msg with
-      | Error (Canceled :: _) -> worker_loop st
+      | Error (Canceled :: _) -> return_unit
       | Error (P2p_errors.Connection_closed :: _ as err)
       | Error (Exn Lwt_pipe.Closed :: _ as err) ->
-          let* () = Events.(emit connection_closed) ("pop", conn.id, IO.name) in
+          let* () =
+            Events.(emit connection_closed) ("pop", conn.id, full_name)
+          in
           let* () = cancel conn err in
-          worker_loop st
+          return_unit
       | Error err ->
           let* () =
-            Events.(emit unexpected_error) ("pop", conn.id, IO.name, err)
+            Events.(emit unexpected_error) ("pop", conn.id, full_name, err)
           in
           conn.add_closing_reason (Scheduled_pop_unexpected_error err) ;
           let* () = cancel conn err in
-          worker_loop st
+          return_unit
       | Ok msg ->
           conn.current_push <-
             (let* r = IO.push conn.out_param msg in
@@ -232,55 +260,93 @@ module Scheduler (IO : IO) = struct
              | Error (P2p_errors.Connection_closed :: _ as err)
              | Error (Exn Lwt_pipe.Closed :: _ as err) ->
                  let* () =
-                   Events.(emit connection_closed) ("push", conn.id, IO.name)
+                   Events.(emit connection_closed) ("push", conn.id, full_name)
                  in
                  let* () = cancel conn err in
                  return_ok_unit
              | Error err ->
                  let* () =
-                   Events.(emit unexpected_error) ("push", conn.id, IO.name, err)
+                   Events.(emit unexpected_error)
+                     ("push", conn.id, full_name, err)
                  in
                  conn.add_closing_reason (Scheduled_push_unexpected_error err) ;
                  let* () = cancel conn err in
                  return_error err) ;
           let len = IO.length msg in
-          let* () = Events.(emit handle_connection) (len, conn.id, IO.name) in
+          let* () = Events.(emit handle_connection) (len, conn.id, full_name) in
           Moving_average.add st.counter len ;
           st.quota <- st.quota - len ;
           Moving_average.add conn.counter len ;
           if prio then conn.quota <- conn.quota - len ;
           waiter st conn ;
-          worker_loop st
+          return_unit
+
+  module Handlers = struct
+    type self = Worker.callback Worker.t
+
+    type launch_error = tztrace
+
+    let on_launch _self () Types.{ma_state; max_speed} =
+      Lwt.return_ok
+        {
+          ma_state;
+          worker = Lwt.return_unit;
+          counter = Moving_average.create ma_state ~init:0 ~alpha;
+          max_speed;
+          (* if max_speed is None the quota will be ignored anyway *)
+          quota = Option.value ~default:0 max_speed;
+          quota_updated = Lwt_condition.create ();
+          readys = Lwt_condition.create ();
+          readys_high = Queue.create ();
+          readys_low = Queue.create ();
+        }
+
+    let on_request :
+        type resp err.
+        self -> (resp, err) P2p_workers.loop -> (resp, err) result Lwt.t =
+     fun self P2p_workers.Loop ->
+      let open Lwt_result_syntax in
+      let*! () = loop self in
+      return_unit
+
+    let on_no_request _ = Lwt.return_unit
+
+    let on_close _ = Lwt.return_unit
+
+    let on_error :
+        type resp err.
+        self ->
+        Tezos_base.Worker_types.request_status ->
+        (resp, err) P2p_workers.loop ->
+        err ->
+        [`Continue | `Shutdown] tzresult Lwt.t =
+     fun _ _ _ _ -> Lwt.return_ok `Continue
+
+    let on_completion :
+        type resp err.
+        self ->
+        (resp, err) P2p_workers.loop ->
+        resp ->
+        Tezos_base.Worker_types.request_status ->
+        unit Lwt.t =
+     fun _ _ _ _ -> Lwt.return_unit
+  end
 
   (* Create an IO scheduler over a moving average state and optional
      maximum speed. *)
   let create ma_state max_speed =
-    let st =
-      {
-        ma_state;
-        canceler = Lwt_canceler.create ();
-        worker = Lwt.return_unit;
-        counter = Moving_average.create ma_state ~init:0 ~alpha;
-        max_speed;
-        (* if max_speed is None the quota will be ignored anyway *)
-        quota = Option.value ~default:0 max_speed;
-        quota_updated = Lwt_condition.create ();
-        readys = Lwt_condition.create ();
-        readys_high = Queue.create ();
-        readys_low = Queue.create ();
-      }
+    let callback =
+      Worker.(
+        Callback
+          (fun () ->
+            Lwt.return (Any_request (P2p_workers.Loop, {scope = None}))))
     in
-    st.worker <-
-      Lwt_utils.worker
-        IO.name
-        ~on_event:Internal_event.Lwt_worker_logger.on_event
-        ~run:(fun () -> worker_loop st)
-        ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler) ;
-    st
+    Worker.(
+      launch (create_table callback) () {ma_state; max_speed} (module Handlers))
 
   (* Scheduled connection. *)
   let create_connection st in_param out_param canceler id add_closing_reason =
-    Events.(emit__dont_wait__use_with_care create_connection (id, IO.name)) ;
+    Events.(emit__dont_wait__use_with_care create_connection (id, full_name)) ;
     let conn =
       {
         id;
@@ -306,7 +372,7 @@ module Scheduler (IO : IO) = struct
      The low priority queue is scanned for connections that deserve to
      be moved to the high priority queue. *)
   let update_quota st =
-    Events.(emit__dont_wait__use_with_care update_quota IO.name) ;
+    Events.(emit__dont_wait__use_with_care update_quota full_name) ;
     Option.iter
       (fun max_speed ->
         st.quota <- min st.quota 0 + max_speed ;
@@ -327,9 +393,8 @@ module Scheduler (IO : IO) = struct
      The canceler does not have attached callback. *)
   let shutdown st =
     let open Lwt_syntax in
-    let* () = Error_monad.cancel_with_exceptions st.canceler in
-    let* () = st.worker in
-    Events.(emit shutdown) IO.name
+    let* () = Worker.shutdown st in
+    Events.(emit shutdown) full_name
 end
 
 module ReadIO = struct
@@ -343,7 +408,7 @@ module ReadIO = struct
      a time frame. Otherwise, the bandwidth usage will not be
      regular.*)
 
-  let name = "io_scheduler(read)"
+  let name = "read"
 
   type in_param = {
     fd : P2p_fd.t;
@@ -406,7 +471,7 @@ module WriteIO = struct
      component user should take care of sending small enough data
      chunks to avoid irregular bandwidth usage. *)
 
-  let name = "io_scheduler(write)"
+  let name = "write"
 
   type in_param = Bytes.t Lwt_pipe.Maybe_bounded.t
 
@@ -484,9 +549,9 @@ type t = {
 let reset_quota st =
   Events.(emit__dont_wait__use_with_care reset_quota ()) ;
   let {Moving_average.average = current_inflow; _} =
-    Moving_average.stat st.read_scheduler.counter
+    Moving_average.stat (ReadScheduler.Worker.state st.read_scheduler).counter
   and {Moving_average.average = current_outflow; _} =
-    Moving_average.stat st.write_scheduler.counter
+    Moving_average.stat (WriteScheduler.Worker.state st.write_scheduler).counter
   in
   let nb_conn = P2p_fd.Table.length st.connected in
   (if nb_conn > 0 then
@@ -497,8 +562,8 @@ let reset_quota st =
          conn.read_conn.quota <- min conn.read_conn.quota 0 + fair_read_quota ;
          conn.write_conn.quota <- min conn.write_conn.quota 0 + fair_write_quota)
        st.connected) ;
-  ReadScheduler.update_quota st.read_scheduler ;
-  WriteScheduler.update_quota st.write_scheduler
+  ReadScheduler.update_quota (ReadScheduler.Worker.state st.read_scheduler) ;
+  WriteScheduler.update_quota (WriteScheduler.Worker.state st.write_scheduler)
 
 (* [create] a scheduler for reading and writing on registered
    connections and starting the associated moving average worker.
@@ -507,17 +572,20 @@ let reset_quota st =
 *)
 let create ?max_upload_speed ?max_download_speed ?read_queue_size
     ?write_queue_size ~read_buffer_size () =
+  let open Lwt_result_syntax in
   Events.(emit__dont_wait__use_with_care create ()) ;
   let ma_state =
     Moving_average.fresh_state ~id:"p2p-io-sched" ~refresh_interval:1.0
   in
+  let* read_scheduler = ReadScheduler.create ma_state max_download_speed in
+  let* write_scheduler = WriteScheduler.create ma_state max_upload_speed in
   let st =
     {
       closed = false;
       ma_state;
       connected = P2p_fd.Table.create 53;
-      read_scheduler = ReadScheduler.create ma_state max_download_speed;
-      write_scheduler = WriteScheduler.create ma_state max_upload_speed;
+      read_scheduler;
+      write_scheduler;
       max_upload_speed;
       max_download_speed;
       read_buffer_size;
@@ -526,7 +594,7 @@ let create ?max_upload_speed ?max_download_speed ?read_queue_size
     }
   in
   Moving_average.on_update ma_state (fun () -> reset_quota st) ;
-  st
+  return st
 
 let ma_state {ma_state; _} = ma_state
 
@@ -580,7 +648,7 @@ let register st fd =
     let add_closing_reason reason = P2p_fd.add_closing_reason ~reason fd in
     let read_conn =
       ReadScheduler.create_connection
-        st.read_scheduler
+        (ReadScheduler.Worker.state st.read_scheduler)
         {fd; maxlen = st.read_buffer_size; read_buffer}
         read_queue
         canceler
@@ -588,7 +656,7 @@ let register st fd =
         add_closing_reason
     and write_conn =
       WriteScheduler.create_connection
-        st.write_scheduler
+        (WriteScheduler.Worker.state st.write_scheduler)
         write_queue
         fd
         canceler
@@ -640,8 +708,11 @@ let convert ~ws ~rs =
   }
 
 let global_stat {read_scheduler; write_scheduler; _} =
-  let rs = Moving_average.stat read_scheduler.counter
-  and ws = Moving_average.stat write_scheduler.counter in
+  let rs =
+    Moving_average.stat (ReadScheduler.Worker.state read_scheduler).counter
+  and ws =
+    Moving_average.stat (WriteScheduler.Worker.state write_scheduler).counter
+  in
   convert ~rs ~ws
 
 let stat {read_conn; write_conn; _} =
