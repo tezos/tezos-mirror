@@ -898,7 +898,6 @@ let job_build_kernels ?rules () : tezos_job =
       "make -f kernels.mk build";
       "make -f etherlink.mk evm_kernel.wasm";
       "make -C src/riscv riscv-dummy.elf";
-      "make -C src/riscv riscv-dummy-sdk.elf";
     ]
     ~artifacts:
       (artifacts
@@ -913,7 +912,6 @@ let job_build_kernels ?rules () : tezos_job =
            "tx_kernel_dal.wasm";
            "dal_echo_kernel.wasm";
            "src/riscv/riscv-dummy.elf";
-           "src/riscv/riscv-dummy-sdk.elf";
          ])
   |> enable_kernels
   |> enable_sccache ~key:"kernels-sccache" ~path:"$CI_PROJECT_DIR/_sccache"

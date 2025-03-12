@@ -23,7 +23,7 @@ SANDBOX_ENABLE_FEATURES ?=
 NIGHTLY_VERSION = nightly-2025-01-30
 
 .PHONY: build
-build: riscv-dummy.elf riscv-dummy-sdk.elf riscv-sandbox
+build: riscv-dummy.elf riscv-sandbox
 	@cargo build --release --workspace $(NATIVE_OPT)
 	@make -C jstz build
 
@@ -44,10 +44,6 @@ riscv-dummy.elf::
 riscv-supervised-dummy.elf::
 	@make -C supervised_dummy_kernel build
 	@ln -f supervised_dummy_kernel/target/riscv64gc-unknown-linux-musl/debug/riscv-supervised-dummy $@
-
-riscv-dummy-sdk.elf::
-	@make -C dummy_sdk_kernel build
-	@ln -f dummy_sdk_kernel/target/riscv64gc-unknown-hermit/release/riscv-dummy-sdk $@
 
 # Update checked-in binaries
 .PHONY: update-assets
@@ -85,7 +81,6 @@ endif
 	@make -C jstz build-deps
 	@make -C dummy_kernel build-deps
 	@make -C supervised_dummy_kernel build-deps
-	@make -C dummy_sdk_kernel build-deps
 
 .PHONY: test
 test: build
@@ -113,7 +108,6 @@ check:
 
 	@make -C dummy_kernel check
 	@make -C supervised_dummy_kernel check
-	@make -C dummy_sdk_kernel check
 	@make -C jstz check
 
 .PHONY: audit
@@ -131,6 +125,5 @@ clean:
 	@cargo clean
 	@make -C dummy_kernel clean
 	@make -C supervised_dummy_kernel clean
-	@make -C dummy_sdk_kernel clean
 	@make -C jstz clean
-	@rm -f riscv-sandbox riscv-dummy.elf riscv-dummy-sdk.elf
+	@rm -f riscv-sandbox riscv-dummy.elf
