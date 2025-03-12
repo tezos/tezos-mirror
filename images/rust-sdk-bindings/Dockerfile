@@ -24,7 +24,9 @@ RUN apt-get update && \
     build-essential \
     sccache \
     # Python requirements
-    python3 python3-venv && \
+    python3 python3-venv \
+    # Kotlin requirements
+    openjdk-17-jdk && \
     rm -rf /var/lib/apt/lists/*
 
 # install toolchain

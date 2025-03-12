@@ -17,8 +17,13 @@ generate-python: build
 	@cargo run --features uniffi/cli --bin uniffi-bindgen -- generate --language python --out-dir ../python/test --library target/release/libtezos.so
 	@cp target/release/libtezos.so ../python/test/libtezos.so
 
+.PHONY: generate-kotlin
+generate-kotlin: build
+	@cargo run --features uniffi/cli --bin uniffi-bindgen -- generate --language kotlin --out-dir ../kotlin/demo/app/src/main/kotlin --library target/release/libtezos.so
+	@cp target/release/libtezos.so ../kotlin/demo/app/src/main/resources/libtezos.so
+
 .PHONY: generate-bindings
-generate-bindings: generate-python
+generate-bindings: generate-python generate-kotlin
 
 .PHONY: clean
 clean:

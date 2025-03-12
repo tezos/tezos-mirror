@@ -11,5 +11,10 @@ pkgs.mkShell {
     # Python
     pkgs.python39
     pkgs.yapf
+
+    # Kotlin
+    pkgs.kotlin
+    pkgs.ktlint
+    pkgs.gradle
   ];
 }
