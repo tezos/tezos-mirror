@@ -8,6 +8,7 @@ use tezos_smart_rollup::michelson::MichelsonUnit;
 use tezos_smart_rollup::prelude::*;
 use tezos_smart_rollup::storage::path::OwnedPath;
 use tezos_smart_rollup::types::SmartRollupAddress;
+use tezos_smart_rollup_constants::core::PREIMAGE_HASH_SIZE;
 
 #[entrypoint::main]
 pub fn entry(host: &mut impl Runtime) {
@@ -66,6 +67,30 @@ pub fn entry(host: &mut impl Runtime) {
 
         assert!(sbi_crypto::ed25519_verify(&public_key, &sig, data));
     }
+
+    // TODO: RV-501: Errors during decode reveal request are not fatal
+
+    host.write_debug("Reveal metadata...\n");
+    let result = host.reveal_metadata();
+    host.write_debug("Reveal metadata succeeded, result: \n");
+    host.write_debug(&format!("Rollup address: {:?}\n", result));
+
+    host.write_debug("Reveal preimage...\n");
+
+    let hash: [u8; PREIMAGE_HASH_SIZE] = [
+        // tag byte of preimage hash
+        vec![0u8],
+        digest_256(hex::decode("cafebabe").unwrap().as_slice()),
+    ]
+    .concat()
+    .try_into()
+    .unwrap();
+    let mut buffer = [0u8; 4096];
+    let result_size = host.reveal_preimage(&hash, &mut buffer[..]).unwrap();
+    host.write_debug(&format!(
+        "Preimage: {:?}\n",
+        hex::encode(&buffer[..result_size])
+    ));
 
     debug_msg!(host, "Done\n");
 
