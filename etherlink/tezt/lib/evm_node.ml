@@ -598,6 +598,18 @@ let wait_for_tx_queue_cleared ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"tx_queue_cleared.v0"
   @@ Fun.const (Some ())
 
+let wait_for_block_producer_rejected_transaction ?timeout ?hash evm_node =
+  wait_for_event
+    ?timeout
+    evm_node
+    ~event:"block_producer_transaction_rejected.v0"
+  @@ fun json ->
+  let found_hash = JSON.(json |-> "tx_hash" |> as_string) in
+  let reason = JSON.(json |-> "error" |> as_string) in
+  match hash with
+  | Some hash -> if found_hash = hash then Some reason else None
+  | None -> Some reason
+
 let wait_for_split ?level evm_node =
   wait_for_event evm_node ~event:"evm_context_gc_split.v0" @@ fun json ->
   let event_level = JSON.(json |-> "level" |> as_int) in

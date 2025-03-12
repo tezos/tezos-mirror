@@ -386,7 +386,12 @@ module Request = struct
     | Is_locked : (bool, tztrace) t
     | Content : (Ethereum_types.txpool, tztrace) t
     | Pop_transactions : {
-        maximum_cumulative_size : int;
+        validation_state : 'a;
+        validate_tx :
+          'a ->
+          string ->
+          Ethereum_types.legacy_transaction_object ->
+          [`Keep of 'a | `Drop | `Stop] tzresult Lwt.t;
       }
         -> ((string * Ethereum_types.legacy_transaction_object) list, tztrace) t
     | Confirm_transactions : {
@@ -486,12 +491,10 @@ module Request = struct
         case
           Json_only
           ~title:"Pop_transactions"
-          (obj2
-             (req "request" (constant "pop_transactions"))
-             (req "maximum_cumulatize_size" int31))
+          (obj1 (req "request" (constant "pop_transactions")))
           (function
-            | View (Pop_transactions {maximum_cumulative_size}) ->
-                Some ((), maximum_cumulative_size)
+            | View (Pop_transactions {validation_state = _; validate_tx = _}) ->
+                Some ()
             | _ -> None)
           (fun _ -> assert false);
         case
@@ -525,11 +528,8 @@ module Request = struct
     | Unlock_transactions -> Format.fprintf fmt "Unlocking the transactions"
     | Is_locked -> Format.fprintf fmt "Checking if the tx queue is locked"
     | Content -> fprintf fmt "Content"
-    | Pop_transactions {maximum_cumulative_size} ->
-        fprintf
-          fmt
-          "Popping transactions of maximum cumulative size %d bytes"
-          maximum_cumulative_size
+    | Pop_transactions {validation_state = _; validate_tx = _} ->
+        fprintf fmt "Popping transactions with validation function"
     | Confirm_transactions _ -> fprintf fmt "Confirming transactions"
 end
 
@@ -633,33 +633,43 @@ let unlock_transactions state = state.locked <- false
 
 let is_locked state = state.locked
 
-let pop_queue_until state ~maximum_cumulative_size =
+let pop_queue_until state ~validation_state ~validate_tx =
   let open Lwt_result_syntax in
-  let rec aux (current_size, rev_selected) =
+  let rec aux validation_state rev_selected =
     match Queue.peek_opt state.queue with
     | None -> return rev_selected
-    | Some {hash; payload; queue_callback} ->
+    | Some {hash; payload; queue_callback} -> (
         let raw_tx = Ethereum_types.hex_to_bytes payload in
-        let new_size = current_size + String.length raw_tx in
-        if new_size <= maximum_cumulative_size then
-          (* Drop the tx because it's selected. *)
-          let _ = Queue.take state.queue in
-          let tx_object = Tx_object.find state.tx_object hash in
-          match tx_object with
-          | None ->
-              (* Drop that tx because no tx_object associated. this is
-                 an inpossible case, we log it to investigate. *)
-              let*! () = Tx_queue_events.missing_tx_object hash in
-              let*! () = queue_callback `Refused in
-              aux (current_size, rev_selected)
-          | Some tx_object ->
-              let rev_selected =
-                ((raw_tx, tx_object), queue_callback) :: rev_selected
-              in
-              aux (new_size, rev_selected)
-        else return rev_selected
+        let tx_object = Tx_object.find state.tx_object hash in
+        match tx_object with
+        | None ->
+            (* Drop that tx because no tx_object associated. this is
+               an inpossible case, we log it to investigate. *)
+            let*! () = Tx_queue_events.missing_tx_object hash in
+            let _ = Queue.take state.queue in
+            let*! () = queue_callback `Refused in
+            aux validation_state rev_selected
+        | Some tx_object -> (
+            let* is_valid = validate_tx validation_state raw_tx tx_object in
+            match is_valid with
+            | `Stop -> return rev_selected
+            (* `Stop means that we don't pop transaction anymore. We
+               don't remove the last peek tx because it could be valid
+               for another call. *)
+            | `Drop ->
+                (* `Drop, the current tx was evaluated and was refused
+                   by the caller. *)
+                let _ = Queue.take state.queue in
+                let*! () = queue_callback `Refused in
+                aux validation_state rev_selected
+            | `Keep validation_state ->
+                (* `Keep, the current tx was evaluated and was validated
+                   by the caller. *)
+                let _ = Queue.take state.queue in
+                let*! () = queue_callback `Accepted in
+                aux validation_state ((raw_tx, tx_object) :: rev_selected)))
   in
-  let* rev_selected = aux (0, []) in
+  let* rev_selected = aux validation_state [] in
   return @@ List.rev rev_selected
 
 module Handlers = struct
@@ -872,26 +882,10 @@ module Handlers = struct
         in
 
         return {pending; queued}
-    | Pop_transactions {maximum_cumulative_size} ->
+    | Pop_transactions {validation_state; validate_tx} ->
         let open Lwt_result_syntax in
         if is_locked state then return []
-        else
-          let* selected = pop_queue_until state ~maximum_cumulative_size in
-          let*! selected =
-            List.map_s
-              (fun (tx, callback) ->
-                let open Lwt_syntax in
-                let* () = callback `Accepted in
-                return tx)
-              selected
-          in
-          (* All transactions popped are considered `Accepted, and are
-             added to the pending state. The only consumer of that
-             request is the block producer, a local worker that will
-             process all popped transaction, and confirm only
-             transactions that were included in a block with
-             [Confirm_transactions] *)
-          return selected
+        else pop_queue_until state ~validate_tx ~validation_state
     | Confirm_transactions {confirmed_txs; clear_pending_queue_after} ->
         let*! () =
           Seq.S.iter
@@ -1071,12 +1065,12 @@ let is_locked () =
   let*? worker = Lazy.force worker in
   Worker.Queue.push_request_and_wait worker Is_locked |> handle_request_error
 
-let pop_transactions ~maximum_cumulative_size =
+let pop_transactions ~validate_tx ~initial_validation_state =
   let open Lwt_result_syntax in
   let*? w = Lazy.force worker in
   Worker.Queue.push_request_and_wait
     w
-    (Pop_transactions {maximum_cumulative_size})
+    (Pop_transactions {validate_tx; validation_state = initial_validation_state})
   |> handle_request_error
 
 let confirm_transactions ~clear_pending_queue_after ~confirmed_txs =

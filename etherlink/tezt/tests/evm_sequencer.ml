@@ -11456,7 +11456,7 @@ let test_tx_queue_nonce =
   let* () =
     let*@ included_nb_txs = produce_block sequencer in
     Check.(
-      (included_nb_txs = nb_txs + 2)
+      (included_nb_txs = nb_txs + 1)
         int
         ~__LOC__
         ~error_msg:"Produce block included %L transaction expected %R") ;
@@ -12046,6 +12046,143 @@ let test_fa_deposit_and_withdrawals_events =
   capture_logs ~header:"FA Withdrawal" receipt.logs ;
   unit
 
+let test_block_producer_validation =
+  register_all
+    ~tags:["observer"; "tx_queue"; "validation"]
+    ~time_between_blocks:Nothing
+    ~kernels:[Latest] (* node only test *)
+    ~use_threshold_encryption:Register_without_feature
+    ~use_dal:Register_without_feature
+    ~websockets:false
+    ~enable_tx_queue:true (* enables it in the sequencer *)
+    ~title:"Test part of the validation is done when producing blocks."
+  @@ fun {sequencer; observer; _} _protocol ->
+  let* () =
+    let*@ _ = produce_block sequencer in
+    unit
+  and* () = Evm_node.wait_for_blueprint_applied observer 1 in
+  let* () = Evm_node.terminate observer in
+
+  let* () =
+    (* modify the config of the observer. *)
+    Evm_node.Config_file.update observer
+    @@ Evm_node.patch_config_with_experimental_feature
+         ~enable_tx_queue:true
+         ~tx_queue_config:
+           {
+             max_size = 1000;
+             max_lifespan = 100000 (* absurd value so no TX are dropped *);
+             tx_per_addr_limit = 1000000 (* absurd value so no TX are limited *);
+           }
+         ()
+  in
+  let* () = Evm_node.run observer in
+  let send_and_wait_sequencer_receive ~raw_tx =
+    let wait_sequencer_see_tx =
+      Evm_node.wait_for_tx_queue_add_transaction sequencer
+    in
+    let* hash =
+      let*@ hash = Rpc.send_raw_transaction ~raw_tx observer in
+      return hash
+    and* _ = wait_sequencer_see_tx in
+    return hash
+  in
+
+  (* helper to craft a tx with given nonce. *)
+  let gas_price = 1_000_000_000 in
+  let gas = 23_000 in
+  let gas_cost = Wei.of_eth_int (1 * 23) in
+  let*@ balance_b0 =
+    Rpc.get_balance ~address:Eth_account.bootstrap_accounts.(0).address observer
+  in
+  let*@ balance_b1 =
+    Rpc.get_balance ~address:Eth_account.bootstrap_accounts.(1).address observer
+  in
+
+  let* raw_tx_empty_account_bO =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price
+      ~gas
+      ~value:Wei.(balance_b0 - gas_cost)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  let* raw_tx_empty_account_b1 =
+    let*@ _ =
+      Rpc.get_balance
+        ~address:Eth_account.bootstrap_accounts.(1).address
+        observer
+    in
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(1).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price
+      ~gas
+      ~value:Wei.(balance_b0 + balance_b1 - (gas_cost * Z.of_int 2))
+      ~address:Eth_account.bootstrap_accounts.(2).address
+      ()
+  in
+  let* raw_tx_invalid_value =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:1
+      ~gas_price
+      ~gas
+      ~value:(Wei.of_eth_int 100)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  let* raw_tx_invalid_nonce =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(1).private_key
+      ~chain_id:1337
+      ~nonce:10
+      ~gas_price
+      ~gas
+      ~value:Wei.one
+      ~address:Eth_account.bootstrap_accounts.(2).address
+      ()
+  in
+  let* _hash =
+    (* tx included *)
+    send_and_wait_sequencer_receive ~raw_tx:raw_tx_empty_account_bO
+  in
+  let* invalid_balance_hash1 =
+    send_and_wait_sequencer_receive ~raw_tx:raw_tx_invalid_value
+  in
+  let* _hash =
+    (* The transaction is included because the balance of b1 is
+       covered by the preceding transaction,
+       `raw_tx_empty_account_b0`. *)
+    send_and_wait_sequencer_receive ~raw_tx:raw_tx_empty_account_b1
+  in
+  let* invalid_nonce_hash2 =
+    send_and_wait_sequencer_receive ~raw_tx:raw_tx_invalid_nonce
+  in
+  let* txs =
+    let*@ txs = produce_block sequencer in
+    return txs
+  and* reason1 =
+    Evm_node.wait_for_block_producer_rejected_transaction
+      ~hash:invalid_balance_hash1
+      sequencer
+  and* reason2 =
+    Evm_node.wait_for_block_producer_rejected_transaction
+      ~hash:invalid_nonce_hash2
+      sequencer
+  in
+  Check.(reason1 =~ rex "Not enough funds")
+    ~error_msg:"transaction rejected for invalid reason, found %L, expected %R" ;
+  Check.(reason2 =~ rex "Transaction nonce is not the expected nonce")
+    ~error_msg:"transaction rejected for invalid reason, found %L, expected %R" ;
+  Check.((txs = 2) int ~error_msg:"block has %L, but expected %R") ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -12205,4 +12342,5 @@ let () =
   test_deposit_event [Alpha] ;
   test_withdrawal_events [Alpha] ;
   test_fa_deposit_and_withdrawals_events [Alpha] ;
-  test_current_level protocols
+  test_current_level protocols ;
+  test_block_producer_validation [Alpha]

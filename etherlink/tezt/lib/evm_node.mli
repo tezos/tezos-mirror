@@ -445,6 +445,12 @@ val wait_for_tx_queue_injecting_transaction : ?timeout:float -> t -> int Lwt.t
 (** [wait_for_tx_queue_cleared ?timeout evm_node] waits for the [tx_queue_cleared.v0]. *)
 val wait_for_tx_queue_cleared : ?timeout:float -> t -> unit Lwt.t
 
+(** [wait_for_block_producer_rejected_transaction ?timeout ?hash
+    evm_node] waits for the [block_producer_rejected_transaction.v0]
+    and returns the reason for the tx to be rejected. *)
+val wait_for_block_producer_rejected_transaction :
+  ?timeout:float -> ?hash:string -> t -> string Lwt.t
+
 (** [wait_for_shutdown ?can_terminate evm_node] waits until a node terminates
     and return its status. If the node is not running, make the test fail. If
     [can_terminate] is `true` and the node was already terminated, returns

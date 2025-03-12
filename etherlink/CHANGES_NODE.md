@@ -57,7 +57,7 @@ you start using them, you probably want to use `octez-evm-node check config
   This limits is for pending transactions the node has seen.
   configurable with `tx_per_addr_limit`. (!16903)
 - An sequencer EVM node can uses the tx_queue to speed the inclusion
-  of transaction. (!17134 !17100 !17109)
+  of transaction. (!17134 !17100 !17109 !17211)
 - `tx_queue` now has a maximum number of transactions. (!17083)
 - Observer nodes can now be run with `periodic_snapshot_path` defined in
   the configuration. It exports a snapshot to the given path every time they

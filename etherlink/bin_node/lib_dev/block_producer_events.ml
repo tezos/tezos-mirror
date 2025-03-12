@@ -42,6 +42,17 @@ module Event = struct
       ~msg:"transaction pool and block production are locked"
       ~level:Error
       ()
+
+  let transaction_rejected =
+    declare_2
+      ~section
+      ~name:"block_producer_transaction_rejected"
+      ~msg:"transaction {tx_hash} is not valid with current state: {error}"
+      ~level:Debug
+      ~pp1:(fun fmt Ethereum_types.(Hash (Hex h)) ->
+        Format.fprintf fmt "%10s" h)
+      ("tx_hash", Ethereum_types.hash_encoding)
+      ("error", Data_encoding.string)
 end
 
 let transaction_selected ~hash =
@@ -52,3 +63,6 @@ let started () = Internal_event.Simple.emit Event.started ()
 let shutdown () = Internal_event.Simple.emit Event.shutdown ()
 
 let production_locked () = Internal_event.Simple.emit Event.production_locked ()
+
+let transaction_rejected tx_hash error =
+  Internal_event.Simple.emit Event.transaction_rejected (tx_hash, error)
