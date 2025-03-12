@@ -46,7 +46,7 @@ type options = {
   public_addr : P2p_point.Id.t option;
       (** The endpoint on which the DAL node can be contacted by other DAL nodes. *)
   endpoint : Uri.t option;  (** The endpoint on which to contact the L1 node. *)
-  profile : Profile_manager.t option;
+  profile : Profile_manager.unresolved_profile option;
       (** Profiles of the DAL node used for tracking shards. *)
   metrics_addr : P2p_point.Id.t option;  (** Metrics server endpoint. *)
   peers : string list;  (** DAL nodes to connect to. *)

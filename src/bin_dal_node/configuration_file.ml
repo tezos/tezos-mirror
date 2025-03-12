@@ -73,7 +73,7 @@ type t = {
   expected_pow : float;
   endpoint : Uri.t;
   metrics_addr : P2p_point.Id.t option;
-  profile : Profile_manager.t;
+  profile : Profile_manager.unresolved_profile;
   history_mode : history_mode;
   version : int;
   service_name : string option;
@@ -135,7 +135,7 @@ let default =
     endpoint = default_endpoint;
     metrics_addr = None;
     history_mode = default_history_mode;
-    profile = Profile_manager.empty;
+    profile = Profile_manager.Empty;
     version = current_version;
     service_name = None;
     service_namespace = None;
@@ -298,8 +298,8 @@ let encoding : t Data_encoding.t =
           (dft
              "profiles"
              ~description:"The Octez DAL node profiles"
-             Profile_manager.encoding
-             Profile_manager.empty)
+             Profile_manager.unresolved_encoding
+             Profile_manager.Empty)
           (req "version" ~description:"The configuration file version" int31)
           (dft
              "service_name"
@@ -329,6 +329,44 @@ let encoding : t Data_encoding.t =
              default.verbose)))
 
 module V0 = struct
+  type v0_profile =
+    | Bootstrap
+    | Operator of Operator_profile.t
+    | Random_observer
+
+  let v0_profile_encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"Bootstrap node"
+          (Tag 1)
+          (obj1 (req "kind" (constant "bootstrap")))
+          (function Bootstrap -> Some () | _ -> None)
+          (function () -> Bootstrap);
+        case
+          ~title:"Controller"
+          (Tag 2)
+          (obj2
+             (req "kind" (constant "controller"))
+             (req "controller_profiles" Operator_profile.encoding))
+          (function
+            | Operator operator_profiles -> Some ((), operator_profiles)
+            | _ -> None)
+          (function (), operator_profiles -> Operator operator_profiles);
+        case
+          ~title:"Random_observer"
+          (Tag 3)
+          (obj1 (req "kind" (constant "random_observer")))
+          (function Random_observer -> Some () | _ -> None)
+          (function () -> Random_observer);
+      ]
+
+  let to_latest_profile = function
+    | Random_observer -> Profile_manager.Random_observer
+    | Bootstrap -> Profile_manager.bootstrap
+    | Operator op_profile -> Profile_manager.operator op_profile
+
   (* Legacy V0 configuration type used solely for migration purposes.
 
      This type represents the legacy (V0) version of the configuration,
@@ -359,7 +397,7 @@ module V0 = struct
     * Uri.t (* endpoint *)
     * P2p_point.Id.t (* metrics_addr *)
 
-  and tup2 = history_mode (* history_mode *) * Profile_manager.t (* profile *)
+  and tup2 = history_mode (* history_mode *) * v0_profile (* profile *)
 
   let encoding : t Data_encoding.t =
     let open Data_encoding in
@@ -377,7 +415,7 @@ module V0 = struct
          (dft "metrics-addr" P2p_point.Id.encoding default_metrics_addr))
       (obj2
          (dft "history_mode" history_mode_encoding default_history_mode)
-         (dft "profiles" Profile_manager.encoding Profile_manager.empty))
+         (dft "profiles" v0_profile_encoding (Operator Operator_profile.empty)))
 
   let to_latest_version
       ( ( data_dir,
@@ -401,7 +439,7 @@ module V0 = struct
       endpoint;
       metrics_addr = Some metrics_addr;
       history_mode;
-      profile;
+      profile = to_latest_profile profile;
       version = current_version;
       service_name = None;
       service_namespace = None;
@@ -444,7 +482,7 @@ module V1 = struct
 
   and tup2 =
     history_mode (* history_mode *)
-    * Profile_manager.t (* profile *)
+    * V0.v0_profile (* profile *)
     * int (*version  *)
     * string option (* service_name *)
     * string option (*service_namespace  *)
@@ -468,7 +506,10 @@ module V1 = struct
          (dft "metrics-addr" (Encoding.option P2p_point.Id.encoding) None))
       (obj8
          (dft "history_mode" history_mode_encoding default_history_mode)
-         (dft "profiles" Profile_manager.encoding Profile_manager.empty)
+         (dft
+            "profiles"
+            V0.v0_profile_encoding
+            (V0.Operator Operator_profile.empty))
          (req "version" int31)
          (dft "service_name" (Data_encoding.option Data_encoding.string) None)
          (dft
@@ -511,7 +552,7 @@ module V1 = struct
       endpoint;
       metrics_addr;
       history_mode;
-      profile;
+      profile = V0.to_latest_profile profile;
       version;
       service_name;
       service_namespace;

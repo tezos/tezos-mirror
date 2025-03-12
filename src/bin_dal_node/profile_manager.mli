@@ -29,6 +29,11 @@
 (** A profile manager context stores profile-specific data used by the daemon.  *)
 type t
 
+(** Type for a "profile" produced from CLI parsing and/or reading the
+    configuration file, which may be refined (for instance by determining
+    the slot to be observed for "random observers"). *)
+type unresolved_profile = Profile of t | Random_observer | Empty
+
 (** [is_bootstrap_profile t] returns [true] if the node has a bootstrap profile. *)
 val is_bootstrap_profile : t -> bool
 
@@ -54,20 +59,25 @@ val can_publish_on_slot_index : Types.slot_index -> t -> bool
 
 val encoding : t Data_encoding.t
 
+val unresolved_encoding : unresolved_profile Data_encoding.t
+
 (** The empty profile manager context. *)
 val empty : t
 
-val bootstrap : t
+val bootstrap : unresolved_profile
 
-val random_observer : t
+val random_observer : unresolved_profile
 
 (** [operator op] returns an operator with the profile described by [op] *)
-val operator : Operator_profile.t -> t
+val operator : Operator_profile.t -> unresolved_profile
 
 (** Merge the two sets of profiles. In case of incompatibility (that is, case
    [Bootstrap] vs the other kinds), the profiles from [higher_prio] take
    priority. *)
-val merge_profiles : lower_prio:t -> higher_prio:t -> t
+val merge_profiles :
+  lower_prio:unresolved_profile ->
+  higher_prio:unresolved_profile ->
+  unresolved_profile
 
 (** [add_and_register_operator_profile t ~number_of_slots gs_worker
     operator_profile] adds the new [operator_profile] to [t]. It registers any
@@ -128,7 +138,7 @@ val get_attested_data_default_store_period : t -> Types.proto_parameters -> int
     This function is called when generating an observer profile from a
     random profile before launching a DAL node, as implemented in the
     daemon. *)
-val resolve_random_observer_profile : t -> number_of_slots:int -> t
+val resolve_profile : unresolved_profile -> number_of_slots:int -> t
 
 (** Returns [true] iff the node should support refutation games. *)
 val supports_refutations : t -> bool

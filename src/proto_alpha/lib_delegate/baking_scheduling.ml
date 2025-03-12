@@ -958,7 +958,7 @@ let register_dal_profiles cctxt dal_node_rpc_ctxt delegates =
     in
     let*! () =
       match profiles with
-      | Tezos_dal_node_services.Types.Bootstrap | Random_observer -> warn ()
+      | Tezos_dal_node_services.Types.Bootstrap -> warn ()
       | Operator operator_profile ->
           let attesters =
             Tezos_dal_node_services.Operator_profile.attesters operator_profile
