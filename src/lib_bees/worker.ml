@@ -663,7 +663,7 @@ struct
           (* [Error_monad.cancel_with_exceptions] relies on
              [Lwt_canceler.cancel] which means that it can be called multiple
              times and still be executed only once. *)
-          ( Lwt_eio.run_lwt @@ fun () ->
+          ( Lwt_eio.run_lwt_in_main @@ fun () ->
             Error_monad.cancel_with_exceptions worker.canceler ) ;
           `Stop_daemon
       | Running birth -> (
