@@ -1435,6 +1435,84 @@ module Monitoring_app = struct
           let action () = action ~webhook ~configuration () in
           [Chronos.task ~name:"network-overview" ~tm:"0 0-23/6 * * *" ~action]
   end
+
+  module Alert = struct
+    let report_lost_dal_rewards ~webhook ~network ~level ~cycle
+        ~lost_dal_rewards =
+      let data =
+        let header =
+          Format.sprintf
+            "*[lost-dal-rewards]* On network `%s`, delegates have lost DAL \
+             rewards at cycle `%d`, level `%d`. \
+             <https://%s.tzkt.io/%d/implicit_operations/dal_attestation_reward \
+             |See online>"
+            (Network.to_string network)
+            cycle
+            level
+            (Network.to_string network)
+            level
+        in
+        let content =
+          List.map
+            (fun (`delegate delegate, `change change) ->
+              Format.sprintf
+                "▪ `%s` has missed ~%d tez DAL attestation rewards"
+                (String.sub delegate 0 7)
+                (change / 100_000))
+            lost_dal_rewards
+        in
+        `O [("blocks", `A (Format_app.section (header :: content) ()))]
+      in
+      let endpoint = endpoint_of_webhook webhook in
+      let rpc =
+        RPC_core.make
+          ~data:(Data data)
+          POST
+          (String.split_on_char '/' (Uri.path webhook))
+          (fun _json -> ())
+      in
+      let* _response = RPC_core.call_raw endpoint rpc in
+      Lwt.return_unit
+
+    let check_for_lost_dal_rewards t ~metadata ~level =
+      (* todo: dont proceed when level position <> blocks_per_cycle - 1 *)
+      match t.configuration.monitor_app_configuration with
+      | None -> unit
+      | Some {dal_slack_webhook = webhook} ->
+          let cycle = JSON.(metadata |-> "level_info" |-> "cycle" |> as_int) in
+          let balance_updates =
+            JSON.(metadata |-> "balance_updates" |> as_list)
+          in
+          let lost_dal_rewards =
+            List.filter_map
+              (fun balance_update ->
+                let category =
+                  JSON.(balance_update |-> "category" |> as_string_opt)
+                in
+                match category with
+                | None -> None
+                | Some category ->
+                    if String.equal category "lost DAL attesting rewards" then
+                      let delegate =
+                        JSON.(balance_update |-> "delegate" |> as_string)
+                      in
+                      let change =
+                        JSON.(balance_update |-> "change" |> as_int)
+                      in
+                      Some (`delegate delegate, `change change)
+                    else None)
+              balance_updates
+          in
+          if List.is_empty lost_dal_rewards then unit
+          else
+            let network = t.configuration.network in
+            report_lost_dal_rewards
+              ~webhook
+              ~network
+              ~level
+              ~cycle
+              ~lost_dal_rewards
+  end
 end
 
 let get_infos_per_level t ~level =
@@ -1518,6 +1596,14 @@ let get_infos_per_level t ~level =
         return Tez.(acc + balance))
       (return Tez.zero)
       etherlink_operators
+  in
+  let* () =
+    (* None of these actions are performed if `--dal-slack-webhook` is
+       not provided. *)
+    let* () =
+      Monitoring_app.Alert.check_for_lost_dal_rewards t ~metadata ~level
+    in
+    unit
   in
   Lwt.return
     {
