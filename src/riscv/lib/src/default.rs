@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::ops::Range;
+
 /// Like [`Default`] but uses an associated constant instead of a function to produce the default
 /// value.
 pub trait ConstDefault {
@@ -19,6 +21,10 @@ impl ConstDefault for bool {
 
 impl<T: ConstDefault, const LEN: usize> ConstDefault for [T; LEN] {
     const DEFAULT: Self = [T::DEFAULT; LEN];
+}
+
+impl<T: ConstDefault> ConstDefault for Range<T> {
+    const DEFAULT: Self = T::DEFAULT..T::DEFAULT;
 }
 
 macro_rules! impl_const_default_int {

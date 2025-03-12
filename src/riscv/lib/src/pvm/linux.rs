@@ -11,6 +11,7 @@ mod parameters;
 mod rng;
 
 use std::ffi::CStr;
+use std::ops::Range;
 
 use tezos_smart_rollup_constants::riscv::SBI_FIRMWARE_TEZOS;
 
@@ -256,12 +257,10 @@ where
         // Other parts of the supervisor make use of program start and end to properly divide the
         // memory. These addresses need to be properly aligned.
         let program_start = VirtAddr::new(program_start).align_down(PAGE_SIZE);
-        self.system_state.program_start.write(program_start);
-
         let program_end = VirtAddr::new(program_end)
             .align_up(PAGE_SIZE)
             .ok_or(MachineError::MemoryTooSmall)?;
-        self.system_state.program_end.write(program_end);
+        self.system_state.program.write(program_start..program_end);
 
         Ok(())
     }
@@ -272,10 +271,9 @@ where
         M: ManagerReadWrite,
     {
         let stack_top = VirtAddr::new(MC::TOTAL_BYTES as u64);
-        let program_break = self.system_state.program_end.read();
 
         // We must fit at least one guard page between the program break and the stack
-        let guarded_stack_space = stack_top - program_break;
+        let guarded_stack_space = stack_top - self.system_state.program.end;
         if guarded_stack_space < PAGE_SIZE.get() as i64 {
             return Err(MachineError::MemoryTooSmall);
         }
@@ -316,8 +314,10 @@ where
             .xregisters
             .write(registers::sp, stack_top.to_machine_address());
 
-        // Remember the stack bottom for later use
-        self.system_state.stack_guard_start.write(stack_guard);
+        // Remember the stack guard for later use
+        self.system_state
+            .stack_guard
+            .write(stack_guard..stack_bottom);
 
         Ok(())
     }
@@ -353,11 +353,13 @@ where
         self.machine_state.core.hart.mode.write(Mode::User);
 
         // Setup heap addresses
-        let program_end = self.system_state.program_end.read();
+        let program_end = self.system_state.program.end;
         let heap_start = (program_end + BREAK_SIZE)
             .align_up(PAGE_SIZE)
             .ok_or(MachineError::MemoryTooSmall)?;
-        self.system_state.heap_start.write(heap_start);
+        self.system_state
+            .heap
+            .write(heap_start..self.system_state.stack_guard.start);
         self.system_state.heap_next_free.write(heap_start);
 
         Ok(())
@@ -382,17 +384,15 @@ struct_layout! {
         tid_address: Atom<VirtAddr>,
         exited: Atom<bool>,
         exit_code: Atom<u64>,
-        program_start: Atom<VirtAddr>,
-        program_end: Atom<VirtAddr>,
+        program: Atom<Range<VirtAddr>>,
         program_break: Atom<VirtAddr>,
-        stack_guard_start: Atom<VirtAddr>,
-        heap_start: Atom<VirtAddr>,
+        heap: Atom<Range<VirtAddr>>,
         heap_next_free: Atom<VirtAddr>,
+        stack_guard: Atom<Range<VirtAddr>>,
     }
 }
 
 /// Linux supervisor state
-// TODO: RV-533: Represent memory-related start and end combinations as `Range<VirtAddr>`
 pub struct SupervisorState<M: ManagerBase> {
     /// Thread lock address
     tid_address: Cell<VirtAddr, M>,
@@ -403,23 +403,20 @@ pub struct SupervisorState<M: ManagerBase> {
     /// Exit code for when the process exited
     exit_code: Cell<u64, M>,
 
-    /// First byte of the program in memory
-    program_start: Cell<VirtAddr, M>,
-
-    /// First byte after the program in memory
-    program_end: Cell<VirtAddr, M>,
+    /// Program in memory
+    program: Cell<Range<VirtAddr>, M>,
 
     /// Program break
     program_break: Cell<VirtAddr, M>,
 
-    /// First byte of the heap
-    heap_start: Cell<VirtAddr, M>,
+    /// Heap memory
+    heap: Cell<Range<VirtAddr>, M>,
 
     /// First free byte in the heap
     heap_next_free: Cell<VirtAddr, M>,
 
-    /// First byte of the stack guard page
-    stack_guard_start: Cell<VirtAddr, M>,
+    /// Stack guard
+    stack_guard: Cell<Range<VirtAddr>, M>,
 }
 
 impl<M: ManagerBase> SupervisorState<M> {
@@ -429,11 +426,10 @@ impl<M: ManagerBase> SupervisorState<M> {
             tid_address: space.tid_address,
             exited: space.exited,
             exit_code: space.exit_code,
-            program_start: space.program_start,
-            program_end: space.program_end,
+            program: space.program,
             program_break: space.program_break,
-            stack_guard_start: space.stack_guard_start,
-            heap_start: space.heap_start,
+            stack_guard: space.stack_guard,
+            heap: space.heap,
             heap_next_free: space.heap_next_free,
         }
     }
@@ -447,11 +443,10 @@ impl<M: ManagerBase> SupervisorState<M> {
             tid_address: self.tid_address.struct_ref::<F>(),
             exited: self.exited.struct_ref::<F>(),
             exit_code: self.exit_code.struct_ref::<F>(),
-            program_start: self.program_start.struct_ref::<F>(),
-            program_end: self.program_end.struct_ref::<F>(),
+            program: self.program.struct_ref::<F>(),
             program_break: self.program_break.struct_ref::<F>(),
-            stack_guard_start: self.stack_guard_start.struct_ref::<F>(),
-            heap_start: self.heap_start.struct_ref::<F>(),
+            stack_guard: self.stack_guard.struct_ref::<F>(),
+            heap: self.heap.struct_ref::<F>(),
             heap_next_free: self.heap_next_free.struct_ref::<F>(),
         }
     }
@@ -690,11 +685,10 @@ impl<M: ManagerClone> Clone for SupervisorState<M> {
             tid_address: self.tid_address.clone(),
             exited: self.exited.clone(),
             exit_code: self.exit_code.clone(),
-            program_start: self.program_start.clone(),
-            program_end: self.program_end.clone(),
+            program: self.program.clone(),
             program_break: self.program_break.clone(),
-            stack_guard_start: self.stack_guard_start.clone(),
-            heap_start: self.heap_start.clone(),
+            stack_guard: self.stack_guard.clone(),
+            heap: self.heap.clone(),
             heap_next_free: self.heap_next_free.clone(),
         }
     }
