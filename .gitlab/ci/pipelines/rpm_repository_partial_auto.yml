@@ -6,9 +6,6 @@ workflow:
   - if: $foo != "bar" || $foo == "bar"
     when: always
 
-variables:
-  PIPELINE_TYPE: rpm_repository_partial_auto
-
 stages:
 - start
 - images

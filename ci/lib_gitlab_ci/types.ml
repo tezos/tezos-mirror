@@ -320,6 +320,7 @@ type trigger = {include_ : string; strategy_depend : bool}
 type trigger_job = {
   name : string;
   stage : string option;
+  variables : variables option;
   when_ : when_trigger_job option;
   inherit_ : inherit_ option;
   rules : job_rule list option;

@@ -1626,6 +1626,8 @@ select_tezts:
 
 trigger:debian_repository_partial_auto:
   stage: test
+  variables:
+    PIPELINE_TYPE: debian_repository_partial_auto
   rules:
   - changes:
     - debian-deps-build.Dockerfile
@@ -1670,6 +1672,8 @@ trigger:debian_repository_partial_auto:
 
 trigger:rpm_repository_partial_auto:
   stage: test
+  variables:
+    PIPELINE_TYPE: rpm_repository_partial_auto
   rules:
   - changes:
     - manifest/**/*.ml*
@@ -1711,6 +1715,8 @@ trigger:rpm_repository_partial_auto:
 
 trigger:homebrew_auto:
   stage: test
+  variables:
+    PIPELINE_TYPE: homebrew_auto
   rules:
   - changes:
     - manifest/**/*.ml*

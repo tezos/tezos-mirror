@@ -61,14 +61,15 @@ let job ?after_script ?allow_failure ?artifacts ?before_script ?cache ?id_tokens
     parallel;
   }
 
-let trigger_job ?needs ?inherit_ ?rules ?stage ?when_ ?(strategy_depend = true)
-    ~name trigger_include =
+let trigger_job ?needs ?inherit_ ?rules ?stage ?variables ?when_
+    ?(strategy_depend = true) ~name trigger_include =
   {
     name;
     needs;
     inherit_;
     rules;
     stage;
+    variables;
     when_;
     trigger = {include_ = trigger_include; strategy_depend};
   }
