@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 module Imported_protocol = Tezos_protocol_021_PsQuebec
+module Imported_protocol_parameters = Tezos_protocol_021_PsQuebec_parameters
 
 type level = {
   level : int32;

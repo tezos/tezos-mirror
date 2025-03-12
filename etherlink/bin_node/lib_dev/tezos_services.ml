@@ -6,6 +6,7 @@
 (*****************************************************************************)
 module Imported_protocol = Tezos_protocol_021_PsQuebec
 module Imported_protocol_plugin = Tezos_protocol_plugin_021_PsQuebec
+module Imported_protocol_parameters = Tezos_protocol_021_PsQuebec_parameters
 
 (* The output type of the current_level service but with less duplicated
    information. Can be changed, as long as the [conversion_encoding] is also
