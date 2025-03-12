@@ -172,3 +172,7 @@ module Chain_configuration : sig
 
   val world_state : Ethereum_types.chain_id -> path
 end
+
+module Feature_flags : sig
+  val multichain : path
+end

@@ -97,11 +97,22 @@ let main
       ()
   in
   let* (_chain_family : Ethereum_types.chain_family) =
-    if finalized_view then return Ethereum_types.EVM
+    if finalized_view then
+      if
+        (* When finalized_view is set, it's too early to request the
+           feature flag from the rollup node. *)
+        Option.is_some config.experimental_features.l2_chains
+      then
+        (* The finalized view of the proxy mode and the multichain feature are not compatible. *)
+        tzfail (Node_error.Proxy_finalize_with_multichain `Node)
+      else return Ethereum_types.EVM
     else
-      match config.experimental_features.l2_chains with
-      | None -> return Ethereum_types.EVM
-      | Some [l2_chain] -> Rollup_node_rpc.chain_family l2_chain.chain_id
+      let* enable_multichain = Rollup_node_rpc.is_multichain_enabled () in
+      match (config.experimental_features.l2_chains, enable_multichain) with
+      | None, false -> return Ethereum_types.EVM
+      | None, true -> tzfail (Node_error.Mismatched_multichain `Kernel)
+      | Some [_], false -> tzfail (Node_error.Mismatched_multichain `Node)
+      | Some [l2_chain], true -> Rollup_node_rpc.chain_family l2_chain.chain_id
       | _ -> tzfail Node_error.Unexpected_multichain
   in
   let* server_finalizer =
@@ -115,4 +126,9 @@ let main
   in
   let wait, _resolve = Lwt.wait () in
   let* () = wait in
-  return_unit
+  if finalized_view then
+    let* enable_multichain = Rollup_node_rpc.is_multichain_enabled () in
+    if enable_multichain then
+      tzfail (Node_error.Proxy_finalize_with_multichain `Kernel)
+    else return_unit
+  else return_unit

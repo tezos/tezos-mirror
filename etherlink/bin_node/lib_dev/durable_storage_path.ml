@@ -242,3 +242,9 @@ module Chain_configuration = struct
 
   let world_state chain_id = root chain_id ^ "/world_state"
 end
+
+module Feature_flags = struct
+  let root = EVM.make "/feature_flags"
+
+  let multichain = root ^ "/enable_multichain"
+end
