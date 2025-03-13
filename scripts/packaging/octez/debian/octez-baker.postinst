@@ -22,10 +22,6 @@ for file in /usr/bin/octez-baker-*; do
   fi
 done
 
-# we guess the active protocol
-ACTIVE_PROTOCOL=$(echo "$PROTO_CHOICES" | tr ' ' '\n' | grep -v '^(alpha|next)$' | sort | head -n 1)
-NEXT_PROTOCOL=$(echo "$PROTO_CHOICES" | tr ' ' '\n' | grep -v '^(alpha|next)$' | sort | head -n 2 | tail -n 1)
-
 case "${1}" in
 configure)
   # if $2 is empty, then we're doing a fresh install.
@@ -35,15 +31,10 @@ configure)
     echoerr "Fresh installation (or reconfigure) of the Octez baker"
 
     db_get octez-baker/liquidity-vote
-    echo "LQVOTE=${RET}" > /etc/default/octez-baker-active
-    echo "LQVOTE=${RET}" > /etc/default/octez-baker-next
+    echo "LQVOTE=${RET}" > /etc/default/octez-baker
 
     db_get octez-baker/baker-key
-    echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-active
-    echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-next
-
-    echo "PROTOCOL=${ACTIVE_PROTOCOL}" >> /etc/default/octez-baker-active
-    echo "PROTOCOL=${NEXT_PROTOCOL}" >> /etc/default/octez-baker-next
+    echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker
 
     db_get octez-baker/dal-node
     DAL=${RET}
@@ -51,12 +42,10 @@ configure)
     true)
       db_get octez-baker/dal-node-url
       DALURL=${RET}
-      echo "RUNTIME_OPTS=\"--dal-node $DALURL\"" >> /etc/default/octez-baker-next
-      echo "RUNTIME_OPTS=\"--dal-node $DALURL\"" >> /etc/default/octez-baker-active
+      echo "RUNTIME_OPTS=\"--dal-node $DALURL\"" >> /etc/default/octez-baker
       ;;
     false)
-      echo "RUNTIME_OPTS=--without-dal" >> /etc/default/octez-baker-next
-      echo "RUNTIME_OPTS=--without-dal" >> /etc/default/octez-baker-active
+      echo "RUNTIME_OPTS=--without-dal" >> /etc/default/octez-baker
       ;;
     esac
 
@@ -75,19 +64,12 @@ configure)
       echoerr "Setting defaults in /etc/default/octez-baker-*"
       echoerr "Migrating values when possible"
 
-      echo "PROTOCOL=${ACTIVE_PROTOCOL}" >> /etc/default/octez-baker-active
-      echoerr "ACTIVE PROTO=${ACTIVE_PROTOCOL}"
-      echo "PROTOCOL=${NEXT_PROTOCOL}" >> /etc/default/octez-baker-next
-      echoerr "NEXT PROTO=${NEXT_PROTOCOL}"
-
       db_get octez-baker/liquidity-vote
-      echo "LQVOTE=${RET}" >> /etc/default/octez-baker-active
-      echo "LQVOTE=${RET}" >> /etc/default/octez-baker-next
+      echo "LQVOTE=${RET}" >> /etc/default/octez-baker
       echoerr "LQVOTE=${RET}"
 
       db_get octez-baker/baker-key
-      echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-active
-      echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker-next
+      echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker
       echoerr "BAKER_KEY=${RET}"
 
       db_get octez-baker/dal-node
@@ -96,13 +78,11 @@ configure)
       true)
         db_get octez-baker/dal-node-url
         DALURL=${RET}
-        echo "RUNTIME_OPTS=\"--dal-node $DALURL\"" >> /etc/default/octez-baker-next
-        echo "RUNTIME_OPTS=\"--dal-node $DALURL\"" >> /etc/default/octez-baker-active
+        echo "RUNTIME_OPTS=\"--dal-node $DALURL\"" >> /etc/default/octez-baker
         echoerr "RUNTIME_OPTS=--dal-node $DALURL"
         ;;
       false)
-        echo "RUNTIME_OPTS=--without-dal" >> /etc/default/octez-baker-next
-        echo "RUNTIME_OPTS=--without-dal" >> /etc/default/octez-baker-active
+        echo "RUNTIME_OPTS=--without-dal" >> /etc/default/octez-baker
         echoerr "RUNTIME_OPTS=--without-dal"
         ;;
       esac

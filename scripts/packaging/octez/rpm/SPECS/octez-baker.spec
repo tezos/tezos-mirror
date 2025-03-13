@@ -19,35 +19,31 @@ Requires(pre): octez-client
 %install
 mkdir -p %{buildroot}/usr/bin/
 mkdir -p %{buildroot}/usr/share/octez-baker
-install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-baker-* %{buildroot}/usr/bin/
-install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-accuser-* %{buildroot}/usr/bin/
+install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-baker-P* %{buildroot}/usr/bin/
+install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-accuser-P* %{buildroot}/usr/bin/
 install -m 0755 $HOME/rpmbuild/SPECS/scripts/wait-for-node-up.sh %{buildroot}/usr/share/octez-baker/
+install -m 0755 $HOME/rpmbuild/SPECS/scripts/systemd-octez-bakers.sh %{buildroot}/usr/share/octez-baker/
 install -D -m 644 $HOME/rpmbuild/SPECS/manpages/octez-baker.1 %{buildroot}%{_mandir}/man1/octez-baker.1
 gzip %{buildroot}%{_mandir}/man1/octez-baker.1
 install -D -m 644 $HOME/rpmbuild/SPECS/manpages/octez-accuser.1 %{buildroot}%{_mandir}/man1/octez-accuser.1
 gzip %{buildroot}%{_mandir}/man1/octez-accuser.1
-install -D -m 644 $HOME/rpmbuild/SPECS/octez-baker.octez-accuser-active.service %{buildroot}/usr/lib/systemd/system/octez-accuser-active.service
-install -D -m 644 $HOME/rpmbuild/SPECS/octez-baker.octez-accuser-next.service %{buildroot}/usr/lib/systemd/system/octez-accuser-next.service
-install -D -m 644 $HOME/rpmbuild/SPECS/octez-baker.octez-baker-active.service %{buildroot}/usr/lib/systemd/system/octez-baker-active.service
-install -D -m 644 $HOME/rpmbuild/SPECS/octez-baker.octez-baker-next.service %{buildroot}/usr/lib/systemd/system/octez-baker-next.service
-install -D -m 644  $HOME/rpmbuild/SPECS/octez-baker.octez-accuser-active.default %{buildroot}/etc/default/octez-accuser-active
-install -D -m 644  $HOME/rpmbuild/SPECS/octez-baker.octez-accuser-next.default %{buildroot}/etc/default/octez-accuser-next
-install -D -m 644  $HOME/rpmbuild/SPECS/octez-baker.octez-baker-active.default %{buildroot}/etc/default/octez-baker-active
-install -D -m 644  $HOME/rpmbuild/SPECS/octez-baker.octez-baker-next.default %{buildroot}/etc/default/octez-baker-next
+install -D -m 644 $HOME/rpmbuild/SPECS/octez-baker.octez-accuser@.service %{buildroot}/usr/lib/systemd/system/octez-accuser@.service
+install -D -m 644 $HOME/rpmbuild/SPECS/octez-baker@.service %{buildroot}/usr/lib/systemd/system/octez-baker@.service
+install -D -m 644 $HOME/rpmbuild/SPECS/octez-baker.service %{buildroot}/usr/lib/systemd/system/octez-baker.service
+install -D -m 644  $HOME/rpmbuild/SPECS/octez-baker.octez-accuser.default %{buildroot}/etc/default/octez-accuser
+install -D -m 644  $HOME/rpmbuild/SPECS/octez-baker.default %{buildroot}/etc/default/octez-baker
 %files
 /usr/bin/octez-baker-*
 /usr/bin/octez-accuser-*
 /usr/share/octez-baker/wait-for-node-up.sh
+/usr/share/octez-baker/systemd-octez-bakers.sh
 %{_mandir}/man1/octez-baker.1*
 %{_mandir}/man1/octez-accuser.1*
-/usr/lib/systemd/system/octez-accuser-active.service
-/usr/lib/systemd/system/octez-accuser-next.service
-/usr/lib/systemd/system/octez-baker-active.service
-/usr/lib/systemd/system/octez-baker-next.service
-/etc/default/octez-accuser-active
-/etc/default/octez-accuser-next
-/etc/default/octez-baker-active
-/etc/default/octez-baker-next
+/usr/lib/systemd/system/octez-accuser@.service
+/usr/lib/systemd/system/octez-baker@.service
+/usr/lib/systemd/system/octez-baker.service
+/etc/default/octez-accuser
+/etc/default/octez-baker
 %postun
 %post
 %preun

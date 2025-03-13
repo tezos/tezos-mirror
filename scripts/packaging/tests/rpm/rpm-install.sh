@@ -34,8 +34,7 @@ rpm --import "$REPO/$DISTRO/octez.asc"
 
 dnf -y install sudo procps
 
-sudo dnf -y install octez-client
-dnf -y install octez-node
+dnf -y install octez-client octez-node octez-baker
 
 #shellcheck disable=SC2129,SC1091
 echo "NETWORK=ghostnet" >> /etc/default/octez-node
@@ -44,7 +43,7 @@ echo "SNAPSHOT_NO_CHECK=" >> /etc/default/octez-node
 #shellcheck disable=SC1091
 . /etc/default/octez-node
 
-rm "$DATADIR/config.json"
+rm -f "$DATADIR/config.json"
 su tezos -c "/usr/bin/octez-node config init \
       --data-dir=$DATADIR \
       --network=$NETWORK \
@@ -54,19 +53,31 @@ su tezos -c "/usr/bin/octez-node config init \
 
 # if systemd is available we test the service scripts
 if [ "$(ps --no-headers -o comm 1)" = "systemd" ]; then
+
   systemctl enable octez-node
   systemctl start octez-node
 
-  sleep 5
-  systemctl status octez-node
+  systemctl enable octez-baker
+  systemctl start octez-baker.service
 
-  journalctl -xeu octez-node.service
+  systemctl status octez-baker.service
 
-fi
+  sudo su tezos -c "octez-node config show"
 
-sudo dnf -y install octez-baker
+  echo "-----------------------"
+  cat /etc/default/octez-node
 
-# If systemd is available we stop the service scripts started above.
-if [ "$(ps --no-headers -o comm 1)" = "systemd" ]; then
-  systemctl stop octez-node
+  echo "-----------------------"
+  cat /etc/default/octez-baker
+
+  echo "-----------------------"
+  tail /var/log/tezos/node.log
+
+  echo "-----------------------"
+  for logfile in /var/log/tezos/baker-P*.log; do
+    if [ -e "$logfile" ]; then
+      tail "$logfile"
+    fi
+  done
+
 fi

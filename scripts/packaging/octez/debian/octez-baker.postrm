@@ -22,16 +22,8 @@ purge)
   echo "Octez baker purged"
   ;;
 upgrade)
-  for s in baker accuser; do
-    for p in next active; do
-      # Check if the daemon was running before the upgrade
-      if [ -f "/run/octez-baker/$s-$p-daemon_was_running" ]; then
-        # Start the daemon if it was running
-        echo "Restarting Octez baker daemon: octez-$s-$p"
-        $debsystemctl "start octez-$s-$p.service"
-      fi
-    done
-  done
+  echo "Restarting Octez baker daemon: octez-baker"
+  $debsystemctl "start octez-baker.service"
   ;;
 failed-upgrade | abort-install | abort-upgrade | disappear) ;;
 *)
