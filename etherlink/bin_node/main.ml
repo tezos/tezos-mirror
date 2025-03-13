@@ -367,8 +367,10 @@ let kernel_verbosity_arg =
       | "fatal" -> return Fatal
       | _ -> failwith "%s is an invalid verbosity level" value )
 
+let config_filename ~data_dir = Filename.concat data_dir "config.json"
+
 let data_dir_arg =
-  let default = Configuration.default_data_dir in
+  let default = Filename.concat (Sys.getenv "HOME") ".octez-evm-node" in
   Tezos_clic.default_arg
     ~long:"data-dir"
     ~placeholder:"data-dir"
@@ -906,7 +908,7 @@ let start_proxy ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
       ~finalized_view
       ~proxy_ignore_block_param:ignore_block_param
       ~verbose
-      ()
+      (config_filename ~data_dir)
   in
   (* We patch [config] to take into account the proxy-specific argument
      [--read-only]. *)
@@ -971,7 +973,8 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
     ?private_rpc_port ?sequencer_str ?max_blueprints_lag ?max_blueprints_ahead
     ?max_blueprints_catchup ?catchup_cooldown ?log_filter_max_nb_blocks
     ?log_filter_max_nb_logs ?log_filter_chunk_size ?genesis_timestamp
-    ?restricted_rpcs ?kernel ?dal_slots ?sandbox_config ~finalized_view () =
+    ?restricted_rpcs ?kernel ?dal_slots ?sandbox_config ~finalized_view
+    config_file =
   let open Lwt_result_syntax in
   let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
   let* sequencer_key =
@@ -1015,7 +1018,7 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
       ?restricted_rpcs
       ?dal_slots
       ~finalized_view
-      ()
+      config_file
   in
   let*! () = init_logs ~daily_logs:true ~data_dir configuration in
   let*! configuration =
@@ -1089,6 +1092,7 @@ let rpc_command =
         when_ Option.(is_some rollup_node_endpoint) @@ fun () ->
         failwith "unexpected --rollup-node-endpoint argument"
       in
+      let config_file = config_filename ~data_dir in
       let* read_write_config =
         (* We read the configuration used for the read-write node, without
            altering it ([keep_alive] and [verbose] are
@@ -1102,7 +1106,7 @@ let rpc_command =
           ~keep_alive
           ~verbose
           ~finalized_view
-          ()
+          config_file
       in
       let default_addr rpc =
         let evm_node_addr =
@@ -1165,7 +1169,8 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
     ?threshold_encryption_bundler_endpoint ?tx_pool_timeout_limit
     ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?log_filter_chunk_size
     ?log_filter_max_nb_logs ?log_filter_max_nb_blocks ?restricted_rpcs ?kernel
-    ~no_sync ~init_from_snapshot ?history_mode ~finalized_view ?network () =
+    ~no_sync ~init_from_snapshot ?history_mode ~finalized_view ?network
+    config_file =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -1200,7 +1205,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?history_mode
       ~finalized_view
       ?network
-      ()
+      config_file
   in
   let*! () = init_logs ~daily_logs:true ~data_dir config in
   let* () = websocket_checks config in
@@ -1416,7 +1421,8 @@ let init_from_rollup_node_command =
     @@ rollup_node_data_dir_param @@ stop)
     (fun (data_dir, omit_delayed_tx_events) rollup_node_data_dir () ->
       let open Lwt_result_syntax in
-      let* configuration = Cli.create_or_read_config ~data_dir () in
+      let config_file = config_filename ~data_dir in
+      let* configuration = Cli.create_or_read_config ~data_dir config_file in
       let*! () = init_logs ~daily_logs:false ~data_dir configuration in
       Evm_node_lib_dev.Evm_context.init_from_rollup_node
         ~configuration
@@ -1526,13 +1532,14 @@ let replay_command =
          l2_level
          () ->
       let open Lwt_result_syntax in
+      let config_file = config_filename ~data_dir in
       let* configuration =
         Cli.create_or_read_config
           ~data_dir
           ?preimages
           ?preimages_endpoint
           ?native_execution_policy
-          ()
+          config_file
       in
       let*! () = init_logs ~daily_logs:false ~data_dir configuration in
       Evm_node_lib_dev.Replay.main
@@ -1566,7 +1573,8 @@ let patch_kernel_command =
     (fun (data_dir, block_number, force) kernel_path () ->
       let open Lwt_result_syntax in
       let open Evm_node_lib_dev in
-      let* configuration = Cli.create_or_read_config ~data_dir () in
+      let config_file = config_filename ~data_dir in
+      let* configuration = Cli.create_or_read_config ~data_dir config_file in
       let*! () = init_logs ~daily_logs:false ~data_dir configuration in
       (* We remove the [observer] configuration. This [patch] should not need
          to interact with an upstream EVM node. *)
@@ -1680,6 +1688,7 @@ mode.|}
              dal_slots,
              network ) )
          () ->
+      let config_file = config_filename ~data_dir in
       Evm_node_lib_dev.Data_dir.use ~data_dir @@ fun () ->
       let* restricted_rpcs =
         pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
@@ -1732,11 +1741,11 @@ mode.|}
           ~finalized_view
           ?network
           ?history_mode
-          ()
+          config_file
       in
       let*! () = init_logs ~daily_logs:false ~data_dir config in
       let* () = websocket_checks config in
-      Configuration.save ~force ~data_dir config)
+      Configuration.save ~force ~data_dir config config_file)
 
 let check_config_command =
   let open Tezos_clic in
@@ -1757,15 +1766,10 @@ let check_config_command =
           ()))
     (prefixes ["check"; "config"] @@ stop)
     (fun (data_dir, config_path, print_config, network) () ->
-      let* config =
-        match config_path with
-        | Some config_path ->
-            load_file
-              ?network
-              ~data_dir:Configuration.default_data_dir
-              config_path
-        | None -> load ?network ~data_dir ()
+      let config_file =
+        Option.value ~default:(config_filename ~data_dir) config_path
       in
+      let* config = load ?network ~data_dir config_file in
       let*! () = init_logs ~daily_logs:false ~data_dir config in
       let* () = websocket_checks config in
       if print_config then
@@ -2160,6 +2164,7 @@ let sequencer_command =
       let* restricted_rpcs =
         pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
       in
+      let config_file = config_filename ~data_dir in
       start_sequencer
         ?password_filename
         ~wallet_dir
@@ -2193,7 +2198,7 @@ let sequencer_command =
         ?kernel
         ?dal_slots
         ~finalized_view
-        ())
+        config_file)
 
 let sandbox_command =
   let open Tezos_clic in
@@ -2258,6 +2263,7 @@ let sandbox_command =
             funded_addresses = Option.value ~default:[] funded_addresses;
           }
       in
+      let config_file = config_filename ~data_dir in
       start_sequencer
         ?password_filename
         ~wallet_dir
@@ -2291,7 +2297,7 @@ let sandbox_command =
         ?kernel
         ~sandbox_config
         ~finalized_view
-        ())
+        config_file)
 
 let observer_run_args =
   Tezos_clic.args11
@@ -2348,6 +2354,7 @@ let observer_command =
              network ) )
          () ->
       let open Lwt_result_syntax in
+      let config_file = config_filename ~data_dir in
       let* restricted_rpcs =
         pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
       in
@@ -2381,13 +2388,16 @@ let observer_command =
         ?history_mode
         ~finalized_view
         ?network
-        ())
+        config_file)
 
 let export_snapshot (data_dir, snapshot_file, compress_on_the_fly, uncompressed)
     =
   let open Lwt_result_syntax in
   let open Evm_node_lib_dev.Snapshots in
-  let* configuration = Configuration.Cli.create_or_read_config ~data_dir () in
+  let config_file = config_filename ~data_dir in
+  let* configuration =
+    Configuration.Cli.create_or_read_config ~data_dir config_file
+  in
   let*! () = init_logs ~daily_logs:false ~data_dir configuration in
 
   let compression =
@@ -2534,10 +2544,13 @@ let switch_history_mode_command =
             data_dir
         else Ok ()
       in
+      let config_file = config_filename ~data_dir in
       let* store = Evm_store.init ~data_dir ~perm:`Read_write () in
       let* () =
         Evm_store.use store @@ fun conn ->
-        let* config = Cli.create_or_read_config ~data_dir ~history_mode () in
+        let* config =
+          Cli.create_or_read_config ~data_dir ~history_mode config_file
+        in
         let*! () = init_logs ~daily_logs:false ~data_dir config in
         let* store_history_mode = Evm_store.Metadata.find_history_mode conn in
 
@@ -2549,12 +2562,10 @@ let switch_history_mode_command =
             ()
         in
         let* () = Evm_store.Metadata.store_history_mode conn history_mode in
-        let*! config_exists =
-          Lwt_unix.file_exists (Configuration.config_filename ~data_dir)
-        in
+        let*! config_exists = Lwt_unix.file_exists config_file in
         when_ config_exists @@ fun () ->
         (* Update configuration accordingly for nodes that already have one. *)
-        Configuration.save ~force:true ~data_dir config
+        Configuration.save ~force:true ~data_dir config config_file
       in
       let*! () = Evm_store.close store in
       return_unit)
@@ -2581,7 +2592,8 @@ let patch_state_command =
     @@ stop)
     (fun (data_dir, block_number, force) key value () ->
       let open Evm_node_lib_dev in
-      let* configuration = Cli.create_or_read_config ~data_dir () in
+      let config_file = config_filename ~data_dir in
+      let* configuration = Cli.create_or_read_config ~data_dir config_file in
       let*! () = init_logs ~daily_logs:false ~data_dir configuration in
       if force then
         (* We remove the [observer] configuration. This [patch] should not need
@@ -2617,8 +2629,13 @@ let preemptive_kernel_download_command =
          root_hash
          () ->
       let open Lwt_result_syntax in
+      let config_file = config_filename ~data_dir in
       let* configuration =
-        Cli.create_or_read_config ~data_dir ?preimages ?preimages_endpoint ()
+        Cli.create_or_read_config
+          ~data_dir
+          ?preimages
+          ?preimages_endpoint
+          config_file
       in
       let*! () = init_logs ~daily_logs:false ~data_dir configuration in
       let kernel_execution_config = configuration.kernel_execution in

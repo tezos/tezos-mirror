@@ -295,10 +295,6 @@ let default_experimental_features =
     periodic_snapshot_path = None;
   }
 
-let default_data_dir = Filename.concat (Sys.getenv "HOME") ".octez-evm-node"
-
-let config_filename ~data_dir = Filename.concat data_dir "config.json"
-
 let default_rpc_addr = "127.0.0.1"
 
 let default_rpc_port = 8545
@@ -1433,17 +1429,16 @@ let pp_print_json ~data_dir fmt config =
   in
   Data_encoding.Json.pp fmt json
 
-let save ~force ~data_dir config =
+let save ~force ~data_dir config config_file =
   let open Lwt_result_syntax in
   let json = Data_encoding.Json.construct (encoding data_dir) config in
-  let config_file = config_filename ~data_dir in
   let*! exists = Lwt_unix.file_exists config_file in
   if exists && not force then
     failwith
       "Configuration file %S already exists. Use --force to overwrite."
       config_file
   else
-    let*! () = Lwt_utils_unix.create_dir data_dir in
+    let*! () = Lwt_utils_unix.create_dir (Filename.dirname config_file) in
     Lwt_utils_unix.Json.write_file config_file json
 
 module Json_syntax = struct
@@ -1565,8 +1560,8 @@ let load_file ?network ~data_dir path =
   let config = Data_encoding.Json.destruct (encoding ?network data_dir) json in
   return config
 
-let load ?network ~data_dir () =
-  load_file ?network ~data_dir (config_filename ~data_dir)
+let load ?network ~data_dir config_file =
+  load_file ?network ~data_dir config_file
 
 let error_missing_config ~name = [error_of_fmt "missing %s config" name]
 
@@ -1982,7 +1977,7 @@ module Cli = struct
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?sequencer_sidecar_endpoint ?restricted_rpcs ?finalized_view
-      ?proxy_ignore_block_param ?dal_slots ?network ?history_mode () =
+      ?proxy_ignore_block_param ?dal_slots ?network ?history_mode config_file =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -1997,12 +1992,11 @@ module Cli = struct
            please choose a different directory for the EVM node data."
       else return_unit
     in
-    let config_file = config_filename ~data_dir in
     let*! exists_config = Lwt_unix.file_exists config_file in
     if exists_config then
       (* Read configuration from file and patch if user wanted to override
          some fields with values provided by arguments. *)
-      let* configuration = load ?network ~data_dir () in
+      let* configuration = load ?network ~data_dir config_file in
       let configuration =
         patch_configuration_from_args
           ?rpc_addr

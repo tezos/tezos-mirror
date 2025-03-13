@@ -6,6 +6,9 @@
 
 ### Configuration changes
 
+- Fixes `check config` ignoring `--data-dir` when passed `--config-file`.
+  (!17214)
+
 ### RPCs changes
 
 ### Metrics changes

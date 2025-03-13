@@ -215,24 +215,18 @@ val encoding : ?network:supported_network -> string -> t Data_encoding.t
 (** Encoding for {!type-rpc_server}. *)
 val rpc_server_encoding : rpc_server Data_encoding.t
 
-(** [default_data_dir] is the default value for [data_dir]. *)
-val default_data_dir : string
-
-(** [config_filename data_dir] returns
-    the configuration filename from the [data_dir] *)
-val config_filename : data_dir:string -> string
-
-(** [save ~force ~data_dir configuration] writes the [configuration]
-    file in [data_dir]. If [force] is [true], existing configurations
-    are overwritten. *)
-val save : force:bool -> data_dir:string -> t -> unit tzresult Lwt.t
+(** [save ~force ~data_dir configuration config_file] writes the
+    [config_file] file. If [force] is [true], existing configurations are
+    overwritten. *)
+val save : force:bool -> data_dir:string -> t -> string -> unit tzresult Lwt.t
 
 val load_file :
   ?network:supported_network -> data_dir:string -> string -> t tzresult Lwt.t
 
-(** [load ~data_dir] loads a proxy configuration stored in [data_dir]. *)
+(** [load ~data_dir config_file] loads the configuration stored in
+    [config_file] with preimage directory relative to [data_dir]. *)
 val load :
-  ?network:supported_network -> data_dir:string -> unit -> t tzresult Lwt.t
+  ?network:supported_network -> data_dir:string -> string -> t tzresult Lwt.t
 
 (** [sequencer_config_exn config] returns the sequencer config of
     [config] or fails *)
@@ -415,7 +409,7 @@ module Cli : sig
     ?dal_slots:int list ->
     ?network:supported_network ->
     ?history_mode:history_mode ->
-    unit ->
+    string ->
     t tzresult Lwt.t
 end
 
