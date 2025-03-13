@@ -1475,44 +1475,59 @@ module Monitoring_app = struct
       let* _response = RPC_core.call_raw endpoint rpc in
       Lwt.return_unit
 
-    let check_for_lost_dal_rewards t ~metadata ~level =
-      (* todo: dont proceed when level position <> blocks_per_cycle - 1 *)
+    let check_for_lost_dal_rewards t ~metadata =
       match t.configuration.monitor_app_configuration with
       | None -> unit
       | Some {dal_slack_webhook = webhook} ->
-          let cycle = JSON.(metadata |-> "level_info" |-> "cycle" |> as_int) in
-          let balance_updates =
-            JSON.(metadata |-> "balance_updates" |> as_list)
+          (* We don't have access to the `blocks_per_cycle` proto
+             constant here. To check whether we are at the end of the
+             cycle, we use the following condition:
+             (cycle + 1) * (cycle_position + 1) = level_position + 1.
+          *)
+          let cycle, cycle_position, level_position =
+            let open JSON in
+            let level_info = metadata |-> "level_info" in
+            ( level_info |-> "cycle" |> as_int,
+              level_info |-> "cycle_position" |> as_int,
+              level_info |-> "level_position" |> as_int )
           in
-          let lost_dal_rewards =
-            List.filter_map
-              (fun balance_update ->
-                let category =
-                  JSON.(balance_update |-> "category" |> as_string_opt)
-                in
-                match category with
-                | None -> None
-                | Some category ->
-                    if String.equal category "lost DAL attesting rewards" then
-                      let delegate =
-                        JSON.(balance_update |-> "delegate" |> as_string)
-                      in
-                      let change =
-                        JSON.(balance_update |-> "change" |> as_int)
-                      in
-                      Some (`delegate delegate, `change change)
-                    else None)
-              balance_updates
-          in
-          if List.is_empty lost_dal_rewards then unit
+          if (cycle + 1) * (cycle_position + 1) <> level_position + 1 then unit
           else
-            let network = t.configuration.network in
-            report_lost_dal_rewards
-              ~webhook
-              ~network
-              ~level
-              ~cycle
-              ~lost_dal_rewards
+            let level =
+              JSON.(metadata |-> "level_info" |-> "level" |> as_int)
+            in
+            let balance_updates =
+              JSON.(metadata |-> "balance_updates" |> as_list)
+            in
+            let lost_dal_rewards =
+              List.filter_map
+                (fun balance_update ->
+                  let category =
+                    JSON.(balance_update |-> "category" |> as_string_opt)
+                  in
+                  match category with
+                  | None -> None
+                  | Some category ->
+                      if String.equal category "lost DAL attesting rewards" then
+                        let delegate =
+                          JSON.(balance_update |-> "delegate" |> as_string)
+                        in
+                        let change =
+                          JSON.(balance_update |-> "change" |> as_int)
+                        in
+                        Some (`delegate delegate, `change change)
+                      else None)
+                balance_updates
+            in
+            if List.is_empty lost_dal_rewards then unit
+            else
+              let network = t.configuration.network in
+              report_lost_dal_rewards
+                ~webhook
+                ~network
+                ~level
+                ~cycle
+                ~lost_dal_rewards
 
     let report_dal_accusations ~webhook ~network ~level ~cycle dal_accusations =
       let data =
@@ -1721,9 +1736,7 @@ let get_infos_per_level t ~level =
   let* () =
     (* None of these actions are performed if `--dal-slack-webhook` is
        not provided. *)
-    let* () =
-      Monitoring_app.Alert.check_for_lost_dal_rewards t ~metadata ~level
-    in
+    let* () = Monitoring_app.Alert.check_for_lost_dal_rewards t ~metadata in
     let* () =
       let cycle = JSON.(metadata |-> "level_info" |-> "cycle" |> as_int) in
       Monitoring_app.Alert.check_for_dal_accusations
