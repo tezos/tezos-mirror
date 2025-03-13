@@ -253,10 +253,12 @@ fn execute_transaction(
     )
 }
 
-fn data_to_skip(data: &[u8], skip_data: &SkipData) -> bool {
-    for skip_data in skip_data.datas.iter() {
-        if data == skip_data {
-            return true;
+fn data_to_skip(name: &str, data: &[u8], skip_data: &SkipData) -> bool {
+    for (skip_name, skip_datas) in skip_data.datas.iter() {
+        for skip_data in skip_datas {
+            if data == skip_data.0 && name == skip_name {
+                return true;
+            }
         }
     }
     false
@@ -339,6 +341,7 @@ pub fn run_test(
         for (spec_name, tests) in &unit.post {
             let config = match spec_name {
                 SpecName::Shanghai => Config::shanghai(),
+                SpecName::Cancun => Config::cancun(),
                 // TODO: enable future configs when parallelization is enabled.
                 // Other tests are ignored
                 _ => continue,
@@ -380,7 +383,7 @@ pub fn run_test(
                     .unwrap()
                     .clone();
 
-                if data_to_skip(&data, skip_data) {
+                if data_to_skip(&name, &data, skip_data) {
                     continue;
                 }
 

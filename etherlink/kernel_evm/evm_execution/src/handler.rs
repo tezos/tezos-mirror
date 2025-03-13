@@ -24,7 +24,7 @@ use crate::trace::{
     StructLoggerInput, TracerInput,
 };
 use crate::transaction::TransactionContext;
-use crate::transaction_layer_data::TransactionLayerData;
+use crate::transaction_layer_data::{CallContext, TransactionLayerData};
 use crate::utilities::create_address_legacy;
 use crate::EthereumError;
 use crate::PrecompileSet;
@@ -41,7 +41,7 @@ use evm::{
 use primitive_types::{H160, H256, U256};
 use sha3::{Digest, Keccak256};
 use std::cmp::min;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::fmt::Debug;
 use tezos_data_encoding::enc::{BinResult, BinWriter};
 use tezos_ethereum::block::BlockConstants;
@@ -361,6 +361,10 @@ impl CacheStorageValue {
 /// address and an index (StorageKey) to a value (CacheStorageValue).
 pub type LayerCache = HashMap<StorageKey, CacheStorageValue>;
 
+/// A transient layer associates at each address and index (StorageKey)
+/// its value (H256).
+pub type TransientLayer = HashMap<StorageKey, H256>;
+
 /// The storage cache is associating at each layer (usize) its
 /// own cache (LayerCache). For each slot that is modified or
 /// read during a call it will be added to the cache in its own
@@ -371,6 +375,13 @@ pub type LayerCache = HashMap<StorageKey, CacheStorageValue>;
 // In memory it means we take at most:
 // 300_000 × 32B = 9_600_000B = 9.6MB
 pub type StorageCache = HashMap<usize, LayerCache>;
+
+/// The transient storage is a temporary data storage area within the
+/// EVM. It is associating at each layer (usize) its own storage map.
+/// For each slot that is modified it will be added to the associated
+/// layer and map. If the value did not exist, by default we return the
+/// default value as specified by EIP-1153.
+pub type TransientStorage = HashMap<usize, TransientLayer>;
 
 /// The implementation of the SputnikVM [Handler] trait
 pub struct EvmHandler<'a, Host: Runtime> {
@@ -409,6 +420,12 @@ pub struct EvmHandler<'a, Host: Runtime> {
     /// access storage slots before any transaction happens.
     /// See: `fn original_storage`.
     original_storage_cache: LayerCache,
+    /// Transient storage as specified by EIP-1153.
+    pub transient_storage: TransientStorage,
+    /// All the freshly created contracts.
+    /// It will help identify created contracts within the same transaction
+    /// accross all the execution layers to help comply with EIP-6780.
+    pub created_contracts: BTreeSet<H160>,
     /// Reentrancy guard prevents circular calls to impure precompiles
     reentrancy_guard: ReentrancyGuard,
 }
@@ -443,6 +460,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             tracer,
             storage_cache: HashMap::with_capacity(10),
             original_storage_cache: HashMap::with_capacity(10),
+            transient_storage: HashMap::with_capacity(10),
+            created_contracts: BTreeSet::new(),
             reentrancy_guard: ReentrancyGuard::new(vec![
                 WITHDRAWAL_ADDRESS,
                 FA_BRIDGE_PRECOMPILE_ADDRESS,
@@ -693,8 +712,14 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     fn is_static(&self) -> bool {
         self.transaction_data
             .last()
-            .map(|data| data.is_static)
+            .map(|data| data.call_context.is_static)
             .unwrap_or(false)
+    }
+
+    /// Returns true if [address] was created during the on-going transaction accross
+    /// all the layers.
+    fn was_created(&self, address: &H160) -> bool {
+        self.created_contracts.contains(address)
     }
 
     /// Record the base fee part of the transaction cost. We need the SputnikVM
@@ -1368,7 +1393,13 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         is_static: bool,
     ) -> Result<ExecutionOutcome, EthereumError> {
         self.increment_nonce(caller)?;
-        self.begin_initial_transaction(is_static, gas_limit)?;
+        self.begin_initial_transaction(
+            CallContext {
+                is_static,
+                is_creation: false,
+            },
+            gas_limit,
+        )?;
 
         if self.mark_address_as_hot(caller).is_err() {
             return Err(EthereumError::InconsistentState(Cow::from(
@@ -1416,7 +1447,13 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         let address = self.create_address(default_create_scheme)?;
         self.increment_nonce(caller)?;
 
-        self.begin_initial_transaction(false, gas_limit)?;
+        self.begin_initial_transaction(
+            CallContext {
+                is_static: false,
+                is_creation: true,
+            },
+            gas_limit,
+        )?;
 
         if self.mark_address_as_hot(caller).is_err() {
             return Err(EthereumError::InconsistentState(Cow::from(
@@ -1610,7 +1647,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     /// this.
     pub(crate) fn begin_initial_transaction(
         &mut self,
-        is_static: bool,
+        call_context: CallContext,
         gas_limit: Option<u64>,
     ) -> Result<(), EthereumError> {
         let number_of_tx_layer = self.evm_account_storage.stack_depth();
@@ -1632,7 +1669,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         }
 
         self.transaction_data.push(TransactionLayerData::new(
-            self.is_static() || is_static,
+            self.is_static() || call_context.is_static,
+            call_context.is_creation,
             gas_limit,
             self.config,
             AccessRecord::default(),
@@ -1697,6 +1735,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 .commit_transaction(self.host)
                 .map_err(EthereumError::from)?;
 
+            if let ExecutionResult::ContractDeployed(new_address, _) = result {
+                self.created_contracts.insert(new_address);
+            }
+
             Ok(ExecutionOutcome {
                 gas_used,
                 logs: last_layer.logs,
@@ -1753,6 +1795,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         let _ = self.transaction_data.pop();
         self.storage_cache.clear();
+        self.transient_storage.clear();
         self.original_storage_cache.clear();
 
         Ok(ExecutionOutcome {
@@ -1880,7 +1923,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     /// Begin an intermediate transaction
     pub fn begin_inter_transaction(
         &mut self,
-        is_static: bool,
+        call_context: CallContext,
         gas_limit: Option<u64>,
     ) -> Result<(), EthereumError> {
         let number_of_tx_layer = self.evm_account_storage.stack_depth();
@@ -1903,7 +1946,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         let accessed_storage_keys = current_top.accessed_storage_keys.clone();
 
         self.transaction_data.push(TransactionLayerData::new(
-            self.is_static() || is_static,
+            self.is_static() || call_context.is_static,
+            call_context.is_creation,
             gas_limit,
             self.config,
             accessed_storage_keys,
@@ -1937,6 +1981,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         let gas_refunded = self.gas_refunded();
 
         commit_storage_cache(self, number_of_tx_layer);
+        commit_transient_storage(self, number_of_tx_layer);
 
         self.evm_account_storage
             .commit_transaction(self.host)
@@ -2008,6 +2053,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         }
 
         self.storage_cache.remove(&number_of_tx_layer);
+        self.transient_storage.remove(&number_of_tx_layer);
 
         self.evm_account_storage
             .rollback_transaction(self.host)
@@ -2044,7 +2090,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         execution_result: Result<CreateOutcome, EthereumError>,
     ) -> Capture<CreateOutcome, T> {
         match execution_result {
-            Ok((ref exit_reason, _, _)) => match exit_reason {
+            Ok((ref exit_reason, new_address, _)) => match exit_reason {
                 ExitReason::Succeed(_) => {
                     log!(
                         self.host,
@@ -2052,6 +2098,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                         "Intermediate transaction ended with: {:?}",
                         exit_reason
                     );
+
+                    if let Some(new_address) = new_address {
+                        self.created_contracts.insert(new_address);
+                    }
 
                     if let Err(err) = self.commit_inter_transaction() {
                         log!(
@@ -2264,6 +2314,20 @@ fn commit_storage_cache<Host: Runtime>(
     }
 }
 
+fn commit_transient_storage<Host: Runtime>(
+    handler: &mut EvmHandler<'_, Host>,
+    current_layer: usize,
+) {
+    let commit_layer = current_layer - 1;
+    if let Some(t_storage) = handler.transient_storage.remove(&current_layer) {
+        if let Some(prev_t_storage) = handler.transient_storage.get_mut(&commit_layer) {
+            prev_t_storage.extend(t_storage);
+        } else {
+            handler.transient_storage.insert(commit_layer, t_storage);
+        }
+    }
+}
+
 fn cached_storage_access<Host: Runtime>(
     handler: &mut EvmHandler<'_, Host>,
     address: H160,
@@ -2292,6 +2356,77 @@ fn cached_storage_access<Host: Runtime>(
         }
 
         value.map(|x| x.h256()).unwrap_or_default()
+    }
+}
+
+/// SELFDESTRUCT implementation prior to EIP-6780.
+/// See https://eips.ethereum.org/EIPS/eip-6780.
+fn mark_delete_legacy<Host: Runtime>(
+    handler: &mut EvmHandler<'_, Host>,
+    address: H160,
+    target: H160,
+) -> Result<(), ExitError> {
+    let new_deletion = match handler.transaction_data.last_mut() {
+        Some(top_layer) => Ok(top_layer.deleted_contracts.insert(address)),
+        None => Err(ExitError::Other(Cow::from(
+            "No transaction data for delete",
+        ))),
+    }?;
+    if new_deletion && address == target {
+        handler.reset_balance(address).map_err(|_| {
+            ExitError::Other(Cow::from("Could not reset balance when deleting contract"))
+        })
+    } else if new_deletion {
+        let balance = handler.balance(address);
+
+        handler
+            .execute_transfer(address, target, balance)
+            .map_err(|_| {
+                ExitError::Other(Cow::from(
+                    "Could not execute transfer on contract delete",
+                ))
+            })?;
+        Ok(())
+    } else {
+        log!(handler.host, Debug, "Contract already marked to delete");
+        Ok(())
+    }
+}
+
+/// SELFDESTRUCT implementation after EIP-6780.
+/// See https://eips.ethereum.org/EIPS/eip-6780.
+fn mark_delete_eip6780<Host: Runtime>(
+    handler: &mut EvmHandler<'_, Host>,
+    address: H160,
+    target: H160,
+) -> Result<(), ExitError> {
+    if address != target {
+        let balance = handler.balance(address);
+
+        handler
+            .execute_transfer(address, target, balance)
+            .map_err(|_| {
+                ExitError::Other(Cow::from(
+                    "Could not execute transfer on contract delete",
+                ))
+            })?;
+    }
+
+    match handler.transaction_data.last_mut() {
+        Some(top_layer) => {
+            if top_layer.call_context.is_creation {
+                top_layer.deleted_contracts.insert(address);
+                handler.reset_balance(address).map_err(|_| {
+                    ExitError::Other(Cow::from(
+                        "Could not reset balance when deleting contract",
+                    ))
+                })?;
+            }
+            Ok(())
+        }
+        None => Err(ExitError::Other(Cow::from(
+            "No transaction data for delete",
+        ))),
     }
 }
 
@@ -2343,6 +2478,18 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
     fn storage(&mut self, address: H160, index: H256) -> H256 {
         let layer = self.evm_account_storage.stack_depth();
         cached_storage_access(self, address, index, layer)
+    }
+
+    fn transient_storage(&self, address: H160, index: H256) -> H256 {
+        let layer = self.evm_account_storage.stack_depth();
+        for layer in (0..=layer).rev() {
+            if let Some(t_storage) = self.transient_storage.get(&layer) {
+                if let Some(value) = t_storage.get(&StorageKey { address, index }) {
+                    return *value;
+                }
+            }
+        }
+        H256::zero()
     }
 
     fn original_storage(&mut self, address: H160, index: H256) -> H256 {
@@ -2417,6 +2564,18 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
         self.block.base_fee_per_gas()
     }
 
+    fn blob_hash(&self, _index: H256) -> H256 {
+        // Etherlink doesn't support blob as defined by
+        // EIP-4844 (Proto-Danksharding).
+        // As such, the following value will always return
+        // zero.
+        H256::zero()
+    }
+
+    fn block_blob_base_fee(&self) -> U256 {
+        self.block.blob_base_fee()
+    }
+
     fn block_randomness(&self) -> Option<H256> {
         self.block.prevrandao // Always None
     }
@@ -2484,6 +2643,29 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
         Ok(())
     }
 
+    fn set_transient_storage(
+        &mut self,
+        address: H160,
+        index: H256,
+        value: H256,
+    ) -> Result<(), ExitError> {
+        if self.is_static() {
+            return Err(ExitError::Other(Cow::from(
+                "TSTORE cannot be executed inside a static call",
+            )));
+        }
+
+        let layer = self.evm_account_storage.stack_depth();
+        if let Some(t_storage) = self.transient_storage.get_mut(&layer) {
+            t_storage.insert(StorageKey { address, index }, value);
+        } else {
+            let mut t_storage = HashMap::new();
+            t_storage.insert(StorageKey { address, index }, value);
+            self.transient_storage.insert(layer, t_storage);
+        }
+        Ok(())
+    }
+
     fn log(
         &mut self,
         address: H160,
@@ -2498,31 +2680,13 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
     }
 
     fn mark_delete(&mut self, address: H160, target: H160) -> Result<(), ExitError> {
-        let new_deletion = match self.transaction_data.last_mut() {
-            Some(top_layer) => Ok(top_layer.deleted_contracts.insert(address)),
-            None => Err(ExitError::Other(Cow::from(
-                "No transaction data for delete",
-            ))),
-        }?;
-        if new_deletion && address == target {
-            self.reset_balance(address).map_err(|_| {
-                ExitError::Other(Cow::from(
-                    "Could not reset balance when deleting contract",
-                ))
-            })
-        } else if new_deletion {
-            let balance = self.balance(address);
-
-            self.execute_transfer(address, target, balance)
-                .map_err(|_| {
-                    ExitError::Other(Cow::from(
-                        "Could not execute transfer on contract delete",
-                    ))
-                })?;
-            Ok(())
+        // To comply with EIP-6780, if the opcode is considered not deprecated or if
+        // the address where the SELFDESTRUCT is called was just created, we keep
+        // the legacy behavior, otherwise we use the "deprecated" behavior.
+        if !self.config.selfdestruct_deprecated || self.was_created(&address) {
+            mark_delete_legacy(self, address, target)
         } else {
-            log!(self.host, Debug, "Contract already marked to delete");
-            Ok(())
+            mark_delete_eip6780(self, address, target)
         }
     }
 
@@ -2630,7 +2794,13 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
                     ));
                 }
 
-                match self.begin_inter_transaction(false, gas_limit) {
+                match self.begin_inter_transaction(
+                    CallContext {
+                        is_static: false,
+                        is_creation: true,
+                    },
+                    gas_limit,
+                ) {
                     Ok(()) => {
                         let gas_before = self.gas_used();
                         let result = self.execute_create(
@@ -2775,7 +2945,10 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
                 }
 
                 if let Err(err) = self.begin_inter_transaction(
-                    call_scheme == CallScheme::StaticCall,
+                    CallContext {
+                        is_static: call_scheme == CallScheme::StaticCall,
+                        is_creation: false,
+                    },
                     gas_limit,
                 ) {
                     return Capture::Exit((ethereum_error_to_exit_reason(&err), vec![]));
@@ -3004,13 +3177,21 @@ mod test {
         )
     }
 
+    const CONFIG: Config = Config {
+        // The current implementation doesn't support Cancun call
+        // stack limit of 256.  We need to set a lower limit until we
+        // have switched to a head-based recursive calls.
+        call_stack_limit: 256,
+        ..Config::cancun()
+    };
+
     #[test]
     fn legacy_create_to_correct_address() {
         let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
 
         let gas_price = U256::from(21000);
 
@@ -3053,7 +3234,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller: H160 =
             H160::from_str("9bbfed6889322e016e0a02ee459d306fc19545d8").unwrap();
 
@@ -3095,7 +3276,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
 
         let gas_price = U256::from(21000);
 
@@ -3141,7 +3322,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(28349_u64);
 
         // We use an origin distinct from caller for testing purposes
@@ -3180,7 +3361,15 @@ mod test {
 
         set_code(&mut handler, &address, code);
 
-        handler.begin_initial_transaction(false, None).unwrap();
+        handler
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: false,
+                },
+                None,
+            )
+            .unwrap();
 
         let result = handler.execute_call(address, transfer, input, transaction_context);
 
@@ -3206,7 +3395,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(28349_u64);
 
         let gas_price = U256::from(21000);
@@ -3274,7 +3463,15 @@ mod test {
 
         set_code(&mut handler, &address, code);
 
-        handler.begin_initial_transaction(false, None).unwrap();
+        handler
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: false,
+                },
+                None,
+            )
+            .unwrap();
 
         let result = handler.execute_call(address, transfer, input, transaction_context);
 
@@ -3300,7 +3497,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(2340);
 
         let gas_price = U256::from(21000);
@@ -3369,7 +3566,15 @@ mod test {
 
         set_code(&mut handler, &address, code);
 
-        handler.begin_initial_transaction(false, None).unwrap();
+        handler
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: false,
+                },
+                None,
+            )
+            .unwrap();
 
         let result =
             handler.execute_call(address, transfer, input.to_vec(), transaction_context);
@@ -3395,7 +3600,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(8213);
 
         let gas_price = U256::from(21000);
@@ -3464,7 +3669,15 @@ mod test {
 
         set_code(&mut handler, &address, code);
 
-        handler.begin_initial_transaction(false, None).unwrap();
+        handler
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: false,
+                },
+                None,
+            )
+            .unwrap();
 
         let result =
             handler.execute_call(address, transfer, input.to_vec(), transaction_context);
@@ -3488,7 +3701,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(444);
 
         let gas_price = U256::from(21000);
@@ -3529,7 +3742,15 @@ mod test {
 
         set_code(&mut handler, &address, code);
 
-        handler.begin_initial_transaction(false, None).unwrap();
+        handler
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: false,
+                },
+                None,
+            )
+            .unwrap();
 
         let result = handler.execute_call(address, transfer, input, transaction_context);
 
@@ -3560,7 +3781,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(117);
 
         let gas_price = U256::from(21000);
@@ -3584,7 +3805,15 @@ mod test {
 
         let expected_address = handler.create_address(create_scheme).unwrap_or_default();
 
-        handler.begin_initial_transaction(false, None).unwrap();
+        handler
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: true,
+                },
+                None,
+            )
+            .unwrap();
 
         let result = handler.execute_create(caller, value, init_code, expected_address);
 
@@ -3617,7 +3846,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(117);
 
         let gas_price = U256::from(21000);
@@ -3653,7 +3882,15 @@ mod test {
         ];
 
         let contract_address = handler.create_address(create_scheme).unwrap_or_default();
-        handler.begin_initial_transaction(false, None).unwrap();
+        handler
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: true,
+                },
+                None,
+            )
+            .unwrap();
 
         let result =
             handler.execute_create(caller, value, initial_code, contract_address);
@@ -3683,7 +3920,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(118);
 
         let gas_price = U256::from(21000);
@@ -3721,7 +3958,15 @@ mod test {
         set_code(&mut handler, &address, code);
         set_balance(&mut handler, &caller, U256::from(101_u32));
 
-        handler.begin_initial_transaction(false, None).unwrap();
+        handler
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: false,
+                },
+                None,
+            )
+            .unwrap();
 
         let result = handler.execute_call(address, transfer, input, transaction_context);
 
@@ -3746,7 +3991,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -3783,7 +4028,15 @@ mod test {
         set_code(&mut handler, &address, code);
         set_balance(&mut handler, &caller, U256::from(99_u32));
 
-        handler.begin_initial_transaction(false, None).unwrap();
+        handler
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: false,
+                },
+                None,
+            )
+            .unwrap();
 
         let result = handler.execute_call(address, transfer, input, transaction_context);
 
@@ -3808,7 +4061,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -3854,7 +4107,15 @@ mod test {
         set_code(&mut handler, &address, code);
         set_balance(&mut handler, &caller, U256::from(99_u32));
 
-        handler.begin_initial_transaction(false, None).unwrap();
+        handler
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: false,
+                },
+                None,
+            )
+            .unwrap();
 
         let result = handler.execute_call(address, transfer, input, transaction_context);
 
@@ -3879,7 +4140,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -3950,7 +4211,13 @@ mod test {
         set_balance(&mut handler, &caller, U256::from(99_u32));
 
         handler
-            .begin_initial_transaction(false, Some(30000))
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: false,
+                },
+                Some(30000),
+            )
             .unwrap();
 
         let result = handler.execute_call(address, transfer, input, transaction_context);
@@ -3968,7 +4235,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -4003,7 +4270,15 @@ mod test {
         set_code(&mut handler, &address, code);
         set_balance(&mut handler, &caller, U256::from(99_u32));
 
-        handler.begin_initial_transaction(false, None).unwrap();
+        handler
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: false,
+                },
+                None,
+            )
+            .unwrap();
 
         let result = handler.execute_call(address, transfer, input, transaction_context);
 
@@ -4020,7 +4295,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -4068,7 +4343,15 @@ mod test {
         set_code(&mut handler, &address, code);
         set_balance(&mut handler, &caller, U256::from(99_u32));
 
-        handler.begin_initial_transaction(false, None).unwrap();
+        handler
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: false,
+                },
+                None,
+            )
+            .unwrap();
 
         let result = handler.execute_call(address, transfer, input, transaction_context);
 
@@ -4089,7 +4372,7 @@ mod test {
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
 
-        let config = Config::shanghai();
+        let config = CONFIG;
 
         let caller_address: [u8; 20] =
             hex::decode("a94f5374fce5edbc8e2a8697c15331677e6ebf0b")
@@ -4131,7 +4414,15 @@ mod test {
         set_code(&mut handler, &target_address, code);
         set_balance(&mut handler, &caller, U256::from(1000000000000000000u64));
 
-        handler.begin_initial_transaction(false, None).unwrap();
+        handler
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: false,
+                },
+                None,
+            )
+            .unwrap();
 
         let result =
             handler.execute_call(target_address, None, input, transaction_context);
@@ -4157,7 +4448,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
 
         let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
 
@@ -4182,7 +4473,13 @@ mod test {
         let contract_address = handler.create_address(scheme).unwrap_or_default();
 
         handler
-            .begin_initial_transaction(false, Some(10000))
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: true,
+                },
+                Some(10000),
+            )
             .unwrap();
 
         let result =
@@ -4200,7 +4497,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -4259,7 +4556,15 @@ mod test {
         set_balance(&mut handler, &caller, U256::from(1000_u32));
         set_balance(&mut handler, &address_1, U256::from(1000_u32));
 
-        handler.begin_initial_transaction(false, None).unwrap();
+        handler
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: false,
+                },
+                None,
+            )
+            .unwrap();
 
         let result =
             handler.execute_call(address_1, transfer, input, transaction_context);
@@ -4276,7 +4581,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -4305,7 +4610,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
 
         let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
         let withdrawal_contract =
@@ -4349,7 +4654,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -4414,7 +4719,13 @@ mod test {
         set_balance(&mut handler, &address_1, U256::from(1000_u32));
 
         handler
-            .begin_initial_transaction(false, Some(1000000))
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: false,
+                },
+                Some(1000000),
+            )
             .unwrap();
 
         let result =
@@ -4432,7 +4743,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -4510,7 +4821,13 @@ mod test {
         set_balance(&mut handler, &address_1, U256::from(1000_u32));
 
         handler
-            .begin_initial_transaction(false, Some(1000000))
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: false,
+                },
+                Some(1000000),
+            )
             .unwrap();
 
         let result =
@@ -4532,6 +4849,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
+        // This test is specifically testing a Shanghai behaviour:
         let config = Config::shanghai();
 
         let caller = H160::from_str("095e7baea6a6c7c4c2dfeb977efac326af552d87").unwrap();
@@ -4598,7 +4916,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
 
         let gas_price = U256::from(21000);
 
@@ -4651,7 +4969,13 @@ mod test {
         let transfer: Option<Transfer> = None;
 
         handler
-            .begin_initial_transaction(false, Some(1000000))
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: false,
+                },
+                Some(1000000),
+            )
             .unwrap();
 
         let _ = handler.execute_call(contrac_addr, transfer, input, transaction_context);
@@ -4672,7 +4996,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(523_u64);
 
         let mut handler = EvmHandler::new(
@@ -4689,11 +5013,23 @@ mod test {
         );
 
         handler
-            .begin_initial_transaction(false, Some(150000))
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: false,
+                },
+                Some(150000),
+            )
             .unwrap();
 
         handler
-            .begin_inter_transaction(false, Some(150000))
+            .begin_inter_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: false,
+                },
+                Some(150000),
+            )
             .unwrap();
 
         let ecmul = H160::from_low_u64_be(7u64);
@@ -4731,7 +5067,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -4813,7 +5149,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -4834,7 +5170,13 @@ mod test {
         let initial_code = [1; 49153]; // MAX_INIT_CODE_SIZE + 1
 
         handler
-            .begin_initial_transaction(false, Some(150000))
+            .begin_initial_transaction(
+                CallContext {
+                    is_static: false,
+                    is_creation: true,
+                },
+                Some(150000),
+            )
             .unwrap();
 
         let capture = handler.create(
@@ -4865,7 +5207,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
 
         let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
 
@@ -4882,7 +5224,13 @@ mod test {
             None,
         );
 
-        let _ = handler.begin_initial_transaction(false, None);
+        let _ = handler.begin_initial_transaction(
+            CallContext {
+                is_static: false,
+                is_creation: true,
+            },
+            None,
+        );
 
         set_balance(&mut handler, &caller, U256::from(1000000000));
         set_nonce(&mut handler, &caller, u64::MAX);
@@ -4909,7 +5257,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(523_u64);
 
         let mut handler = EvmHandler::new(
@@ -4987,6 +5335,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
+        // This test is specifically testing a Shanghai behaviour:
         let config = Config::shanghai();
         let caller = H160::from_low_u64_be(111_u64);
 
@@ -5059,7 +5408,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = Config::shanghai();
+        let config = CONFIG;
         let caller = H160::from_low_u64_be(111_u64);
 
         let gas_price = U256::from(21000);

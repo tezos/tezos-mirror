@@ -19,7 +19,7 @@ tezos-smart-rollup-mock.workspace = true
 tezos-smart-rollup-host.workspace = true
 tezos-smart-rollup-core.workspace = true
 
-hex.workspace = true
+hex = { version = "0.4.3", features = ["serde"] }
 hex-literal.workspace = true
 
 bytes = "1.5"

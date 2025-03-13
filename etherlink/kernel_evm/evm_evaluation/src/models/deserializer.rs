@@ -109,27 +109,6 @@ where
     Ok(Some(H160::from_str(&string).map_err(D::Error::custom)?))
 }
 
-pub fn deserialize_vec_str_as_u8_vectors<'de, D>(
-    deserializer: D,
-) -> Result<Vec<Vec<u8>>, D::Error>
-where
-    D: de::Deserializer<'de>,
-{
-    let strings: Vec<String> = Vec::deserialize(deserializer)?;
-
-    let mut vecs: Vec<Vec<u8>> = vec![];
-
-    for string in strings.iter() {
-        vecs.push(
-            hex::decode(string.strip_prefix("0x").unwrap_or(string))
-                .map_err(D::Error::custom)
-                .unwrap(),
-        )
-    }
-
-    Ok(vecs)
-}
-
 pub fn deserialize_str_as_bytes<'de, D>(deserializer: D) -> Result<Bytes, D::Error>
 where
     D: de::Deserializer<'de>,

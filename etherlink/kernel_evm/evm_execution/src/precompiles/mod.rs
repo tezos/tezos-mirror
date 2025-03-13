@@ -29,6 +29,7 @@ use crate::EthereumError;
 use alloc::collections::btree_map::BTreeMap;
 use blake2::blake2f_precompile;
 use ecdsa::ecrecover_precompile;
+use evm::executor::stack::PrecompileFailure;
 use evm::{Context, ExitReason, Handler, Transfer};
 use fa_bridge::fa_bridge_precompile;
 use hash::{ripemd160_precompile, sha256_precompile};
@@ -162,6 +163,21 @@ pub const WITHDRAWAL_ADDRESS: H160 = H160([
     0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
 ]);
 
+// This precompile is part of EIP-4844 which we don't support
+// on Etherlink, as they are related to blobs.
+// See: https://eips.ethereum.org/EIPS/eip-4844#point-evaluation-precompile
+fn kzg_point_evaluation<Host: Runtime>(
+    _handler: &mut EvmHandler<Host>,
+    _input: &[u8],
+    _context: &Context,
+    _is_static: bool,
+    _transfer: Option<Transfer>,
+) -> Result<PrecompileOutcome, EthereumError> {
+    Err(EthereumError::PrecompileFailed(PrecompileFailure::Fatal {
+        exit_status: evm::ExitFatal::NotSupported,
+    }))
+}
+
 pub fn evm_precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
     BTreeMap::from([
         (
@@ -199,6 +215,10 @@ pub fn evm_precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
         (
             H160::from_low_u64_be(9u64),
             blake2f_precompile as PrecompileFn<Host>,
+        ),
+        (
+            H160::from_low_u64_be(10u64),
+            kzg_point_evaluation as PrecompileFn<Host>,
         ),
     ])
 }
@@ -282,11 +302,11 @@ mod test_helpers {
     use crate::account_storage::account_path;
     use crate::account_storage::init_account_storage as init_evm_account_storage;
     use crate::account_storage::EthereumAccountStorage;
+    use crate::fa_bridge::test_utils::CONFIG;
     use crate::handler::EvmHandler;
     use crate::handler::ExecutionOutcome;
     use crate::EthereumError;
     use crate::NATIVE_TOKEN_TICKETER_PATH;
-    use evm::Config;
     use evm::Transfer;
     use host::runtime::Runtime;
     use primitive_types::{H160, U256};
@@ -342,7 +362,7 @@ mod test_helpers {
         );
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let precompiles = precompile_set::<MockKernelHost>(false);
-        let config = Config::shanghai();
+        let config = CONFIG;
         let gas_price = U256::from(21000);
 
         set_ticketer(&mut mock_runtime, DUMMY_TICKETER);

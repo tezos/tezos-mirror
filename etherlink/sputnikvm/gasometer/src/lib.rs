@@ -477,6 +477,10 @@ pub fn dynamic_opcode_cost<H: Handler>(
 
 		Opcode::BASEFEE if config.has_base_fee => GasCost::Base,
 		Opcode::BASEFEE => GasCost::Invalid(opcode),
+		Opcode::BLOBHASH if config.has_blob_instructions => GasCost::BlobHash,
+		Opcode::BLOBHASH => GasCost::Invalid(opcode),
+		Opcode::BLOBBASEFEE if config.has_blob_instructions => GasCost::BlobBaseFee,
+		Opcode::BLOBBASEFEE => GasCost::Invalid(opcode),
 
 		Opcode::EXTCODESIZE => {
 			let target = stack.peek(0)?.into();
@@ -536,6 +540,10 @@ pub fn dynamic_opcode_cost<H: Handler>(
 		Opcode::CALLDATACOPY | Opcode::CODECOPY => GasCost::VeryLowCopy {
 			len: U256::from_big_endian(&stack.peek(2)?[..]),
 		},
+		Opcode::MCOPY if config.has_mcopy => GasCost::VeryLowCopy {
+			len: U256::from_big_endian(&stack.peek(2)?[..]),
+		},
+		Opcode::MCOPY => GasCost::Invalid(opcode),
 		Opcode::EXP => GasCost::Exp {
 			power: U256::from_big_endian(&stack.peek(1)?[..]),
 		},
@@ -576,6 +584,10 @@ pub fn dynamic_opcode_cost<H: Handler>(
 				target_is_cold: handler.is_cold(address, Some(index))?,
 			}
 		}
+		Opcode::TLOAD if config.has_transient_storage => GasCost::TLoad,
+		Opcode::TLOAD => GasCost::Invalid(opcode),
+		Opcode::TSTORE if config.has_transient_storage => GasCost::TStore,
+		Opcode::TSTORE => GasCost::Invalid(opcode),
 		Opcode::LOG0 if !is_static => GasCost::Log {
 			n: 0,
 			len: U256::from_big_endian(&stack.peek(1)?[..]),
@@ -642,10 +654,12 @@ pub fn dynamic_opcode_cost<H: Handler>(
 			len: U256::from_big_endian(&stack.peek(1)?[..]),
 		}),
 
-		Opcode::CODECOPY | Opcode::CALLDATACOPY | Opcode::RETURNDATACOPY => Some(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(0)?[..]),
-			len: U256::from_big_endian(&stack.peek(2)?[..]),
-		}),
+		Opcode::CODECOPY | Opcode::CALLDATACOPY | Opcode::RETURNDATACOPY | Opcode::MCOPY => {
+			Some(MemoryCost {
+				offset: U256::from_big_endian(&stack.peek(0)?[..]),
+				len: U256::from_big_endian(&stack.peek(2)?[..]),
+			})
+		}
 
 		Opcode::EXTCODECOPY => Some(MemoryCost {
 			offset: U256::from_big_endian(&stack.peek(1)?[..]),
@@ -835,6 +849,10 @@ impl<'config> Inner<'config> {
 				self.config.gas_ext_code_hash,
 				self.config,
 			),
+			GasCost::TLoad => consts::G_TLOAD,
+			GasCost::TStore => consts::G_TSTORE,
+			GasCost::BlobHash => consts::G_BLOBHASH,
+			GasCost::BlobBaseFee => consts::G_BLOBBASEFEE,
 		})
 	}
 
@@ -991,6 +1009,14 @@ pub enum GasCost {
 		/// True if target has not been previously accessed in this transaction
 		target_is_cold: bool,
 	},
+	/// Gas cost for `TLOAD`.
+	TLoad,
+	/// Gas cost for `TSTORE`.
+	TStore,
+	/// Gas cost for `BLOBHASH`.
+	BlobHash,
+	/// Gas cost for `BLOBBASEFEE`.
+	BlobBaseFee,
 }
 
 /// Storage opcode will access. Used for tracking accessed storage (EIP-2929).

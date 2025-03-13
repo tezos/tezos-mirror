@@ -160,6 +160,10 @@ fn eval_jump(state: &mut Machine, _opcode: Opcode, _position: usize) -> Control 
 	self::misc::jump(state)
 }
 
+fn eval_mcopy(state: &mut Machine, _opcode: Opcode, _position: usize) -> Control {
+	self::misc::mcopy(state)
+}
+
 fn eval_jumpi(state: &mut Machine, _opcode: Opcode, _position: usize) -> Control {
 	self::misc::jumpi(state)
 }
@@ -492,6 +496,7 @@ pub fn eval(state: &mut Machine, opcode: Opcode, position: usize) -> Control {
 		table[Opcode::MLOAD.as_usize()] = eval_mload as _;
 		table[Opcode::MSTORE.as_usize()] = eval_mstore as _;
 		table[Opcode::MSTORE8.as_usize()] = eval_mstore8 as _;
+		table[Opcode::MCOPY.as_usize()] = eval_mcopy as _;
 		table[Opcode::JUMP.as_usize()] = eval_jump as _;
 		table[Opcode::JUMPI.as_usize()] = eval_jumpi as _;
 		table[Opcode::PC.as_usize()] = eval_pc as _;

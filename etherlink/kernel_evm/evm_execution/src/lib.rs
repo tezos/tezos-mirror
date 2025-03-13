@@ -469,11 +469,11 @@ mod test {
         "60fe47b1000000000000000000000000000000000000000000000000000000000000002a";
 
     const CONFIG: Config = Config {
-        // The current implementation doesn't support Shanghai call
+        // The current implementation doesn't support Cancun call
         // stack limit of 256.  We need to set a lower limit until we
         // have switched to a head-based recursive calls.
         call_stack_limit: 256,
-        ..Config::shanghai()
+        ..Config::cancun()
     };
 
     // The compiled initialization code for the Ethereum demo contract given
@@ -609,7 +609,7 @@ mod test {
         let caller = H160::from_low_u64_be(985493);
         let call_data: Vec<u8> = vec![];
         let transaction_value = U256::from(100_u32);
-        let config = Config::shanghai();
+        let config = CONFIG;
         let gas_price = U256::from(1);
 
         set_balance(
@@ -674,7 +674,7 @@ mod test {
         let caller = H160::from_low_u64_be(1234);
         let call_data: Vec<u8> = vec![];
         let transaction_value = U256::from(100_u32);
-        let config = Config::shanghai();
+        let config = CONFIG;
         let gas_price = U256::from(1);
 
         set_balance(
@@ -2144,7 +2144,8 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            // This test is specifically testing a Shanghai behaviour:
+            Config::shanghai(),
             Some(target),
             caller,
             vec![],

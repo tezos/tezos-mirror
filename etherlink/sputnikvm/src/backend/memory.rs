@@ -31,6 +31,8 @@ pub struct MemoryVicinity {
 	pub block_gas_limit: U256,
 	/// Environmental base fee per gas.
 	pub block_base_fee_per_gas: U256,
+	/// Environmental blob base fee.
+	pub block_blob_base_fee: U256,
 	/// Environmental randomness.
 	///
 	/// In Ethereum, this is the randomness beacon provided by the beacon
@@ -61,15 +63,24 @@ pub struct MemoryAccount {
 pub struct MemoryBackend<'vicinity> {
 	vicinity: &'vicinity MemoryVicinity,
 	state: BTreeMap<H160, MemoryAccount>,
+	blob_hashes: BTreeMap<H256, H256>,
+	transient_state: BTreeMap<(H160, H256), H256>,
 	logs: Vec<Log>,
 }
 
 impl<'vicinity> MemoryBackend<'vicinity> {
 	/// Create a new memory backend.
-	pub fn new(vicinity: &'vicinity MemoryVicinity, state: BTreeMap<H160, MemoryAccount>) -> Self {
+	pub fn new(
+		vicinity: &'vicinity MemoryVicinity,
+		state: BTreeMap<H160, MemoryAccount>,
+		blob_hashes: BTreeMap<H256, H256>,
+		transient_state: BTreeMap<(H160, H256), H256>,
+	) -> Self {
 		Self {
 			vicinity,
 			state,
+			blob_hashes,
+			transient_state,
 			logs: Vec::new(),
 		}
 	}
@@ -121,8 +132,17 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 	fn block_gas_limit(&self) -> U256 {
 		self.vicinity.block_gas_limit
 	}
+
+	fn blob_hash(&self, index: H256) -> H256 {
+		self.blob_hashes.get(&index).copied().unwrap_or_default()
+	}
+
 	fn block_base_fee_per_gas(&self) -> U256 {
 		self.vicinity.block_base_fee_per_gas
+	}
+
+	fn block_blob_base_fee(&self) -> U256 {
+		self.vicinity.block_blob_base_fee
 	}
 
 	fn chain_id(&self) -> U256 {
@@ -154,6 +174,13 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 		self.state
 			.get(&address)
 			.map(|v| v.storage.get(&index).cloned().unwrap_or_default())
+			.unwrap_or_default()
+	}
+
+	fn transient_storage(&self, address: H160, index: H256) -> H256 {
+		self.transient_state
+			.get(&(address, index))
+			.cloned()
 			.unwrap_or_default()
 	}
 

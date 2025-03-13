@@ -70,8 +70,12 @@ pub trait Backend {
 	fn block_randomness(&self) -> Option<H256>;
 	/// Environmental block gas limit.
 	fn block_gas_limit(&self) -> U256;
+	/// Environmental blob hash at index.
+	fn blob_hash(&self, index: H256) -> H256;
 	/// Environmental block base fee.
 	fn block_base_fee_per_gas(&self) -> U256;
+	/// Returns the value of the blob base-fee of the current block it is executing in.
+	fn block_blob_base_fee(&self) -> U256;
 	/// Environmental chain ID.
 	fn chain_id(&self) -> U256;
 
@@ -83,6 +87,8 @@ pub trait Backend {
 	fn code(&self, address: H160) -> Vec<u8>;
 	/// Get storage value of address at index.
 	fn storage(&self, address: H160, index: H256) -> H256;
+	/// Get transient storage value of address at index.
+	fn transient_storage(&self, address: H160, index: H256) -> H256;
 	/// Get original storage value of address at index, if available.
 	fn original_storage(&self, address: H160, index: H256) -> Option<H256>;
 }

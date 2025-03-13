@@ -130,3 +130,13 @@ macro_rules! as_usize_or_fail {
 		$v.as_usize()
 	}};
 }
+
+macro_rules! as_usize_or_revert {
+	($value:expr) => {{
+		if $value > U256::from(usize::MAX) {
+			return Control::Exit(crate::ExitReason::Revert(ExitRevert::Reverted));
+		} else {
+			$value.as_usize()
+		}
+	}};
+}

@@ -14,6 +14,14 @@
 - The EVM is now refunding accounts as expected during inter (layer)
   transactions. (!16973)
  
+### Features
+
+- The EVM's configuration has been bumped to Cancun. (!16141)\
+  The following EIPs are now supported by Etherlink:
+  * [EIP-1153](https://eips.ethereum.org/EIPS/eip-1153)
+  * [EIP-5656](https://eips.ethereum.org/EIPS/eip-5656)
+  * [EIP-6780](https://eips.ethereum.org/EIPS/eip-6780)
+
 ### Internal
 
 - Rework block production to simplify data flow and remove unnecessary

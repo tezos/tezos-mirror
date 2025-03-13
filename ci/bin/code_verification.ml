@@ -3,6 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2024-2025 TriliTech <contact@trili.tech>                    *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -1746,8 +1747,8 @@ let jobs pipeline_type =
           [
             "make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs \
              evm-evaluation-assessor";
-            "git clone --depth 1 --branch v13 \
-             https://github.com/ethereum/tests ethereum_tests";
+            "git clone --depth 1 --branch v14.1@etherlink \
+             https://github.com/functori/tests ethereum_tests";
             "./evm-evaluation-assessor --eth-tests ./ethereum_tests/ \
              --resources ./etherlink/kernel_evm/evm_evaluation/resources/ -c";
           ]

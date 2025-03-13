@@ -23,6 +23,7 @@ pub struct BlockFees {
     minimum_base_fee_per_gas: U256,
     base_fee_per_gas: U256,
     da_fee_per_byte: U256,
+    blob_base_fee: U256,
 }
 
 impl BlockFees {
@@ -36,6 +37,11 @@ impl BlockFees {
             minimum_base_fee_per_gas,
             base_fee_per_gas,
             da_fee_per_byte,
+            // Etherlink doesn't support blob as defined by
+            // EIP-7516.
+            // As such, the following value will always return
+            // zero.
+            blob_base_fee: U256::zero(),
         }
     }
 
@@ -55,6 +61,11 @@ impl BlockFees {
     #[inline(always)]
     pub const fn da_fee_per_byte(&self) -> U256 {
         self.da_fee_per_byte
+    }
+
+    #[inline(always)]
+    pub const fn blob_base_fee(&self) -> U256 {
+        self.blob_base_fee
     }
 }
 
@@ -108,6 +119,11 @@ impl BlockConstants {
     #[inline(always)]
     pub const fn base_fee_per_gas(&self) -> U256 {
         self.block_fees.base_fee_per_gas
+    }
+
+    #[inline(always)]
+    pub const fn blob_base_fee(&self) -> U256 {
+        self.block_fees.blob_base_fee
     }
 }
 

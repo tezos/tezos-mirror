@@ -2816,6 +2816,27 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             self.record_dynamic_cost(cost, memory_cost)
         }
     }
+
+    fn transient_storage(&self, _address: H160, _index: H256) -> H256 {
+        panic!("Not available on bifrost")
+    }
+
+    fn blob_hash(&self, _index: H256) -> H256 {
+        panic!("Not available on bifrost")
+    }
+
+    fn block_blob_base_fee(&self) -> U256 {
+        panic!("Not available on bifrost")
+    }
+
+    fn set_transient_storage(
+        &mut self,
+        _address: H160,
+        _index: H256,
+        _value: H256,
+    ) -> Result<(), ExitError> {
+        panic!("Not available on bifrost")
+    }
 }
 
 #[cfg(test)]

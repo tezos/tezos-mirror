@@ -206,6 +206,7 @@ pub trait StackState<'config>: Backend {
 
 	fn inc_nonce(&mut self, address: H160) -> Result<(), ExitError>;
 	fn set_storage(&mut self, address: H160, key: H256, value: H256);
+	fn set_transient_storage(&mut self, address: H160, key: H256, value: H256);
 	fn reset_storage(&mut self, address: H160);
 	fn log(&mut self, address: H160, topics: Vec<H256>, data: Vec<u8>);
 	fn set_deleted(&mut self, address: H160);
@@ -1049,6 +1050,10 @@ impl<'config, 'precompiles, S: StackState<'config>, P: PrecompileSet> Handler
 		self.state.storage(address, index)
 	}
 
+	fn transient_storage(&self, address: H160, index: H256) -> H256 {
+		self.state.transient_storage(address, index)
+	}
+
 	fn original_storage(&mut self, address: H160, index: H256) -> H256 {
 		self.state
 			.original_storage(address, index)
@@ -1120,8 +1125,14 @@ impl<'config, 'precompiles, S: StackState<'config>, P: PrecompileSet> Handler
 	fn block_gas_limit(&self) -> U256 {
 		self.state.block_gas_limit()
 	}
+	fn blob_hash(&self, index: H256) -> H256 {
+		self.state.blob_hash(index)
+	}
 	fn block_base_fee_per_gas(&self) -> U256 {
 		self.state.block_base_fee_per_gas()
+	}
+	fn block_blob_base_fee(&self) -> U256 {
+		self.state.block_blob_base_fee()
 	}
 	fn chain_id(&self) -> U256 {
 		self.state.chain_id()
@@ -1133,6 +1144,16 @@ impl<'config, 'precompiles, S: StackState<'config>, P: PrecompileSet> Handler
 
 	fn set_storage(&mut self, address: H160, index: H256, value: H256) -> Result<(), ExitError> {
 		self.state.set_storage(address, index, value);
+		Ok(())
+	}
+
+	fn set_transient_storage(
+		&mut self,
+		address: H160,
+		index: H256,
+		value: H256,
+	) -> Result<(), ExitError> {
+		self.state.set_transient_storage(address, index, value);
 		Ok(())
 	}
 
