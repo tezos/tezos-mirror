@@ -48,6 +48,14 @@ let aggregate_unimplemented_error = function
   | Validate_errors.Consensus.Aggregate_not_implemented -> true
   | _ -> false
 
+let signature_invalid_error = function
+  | Operation_repr.Invalid_signature -> true
+  | _ -> false
+
+let non_bls_in_aggregate = function
+  | Validate_errors.Consensus.Non_bls_key_in_aggregate -> true
+  | _ -> false
+
 let find_aggregate_result receipt =
   let result_opt =
     List.find_map
@@ -131,6 +139,22 @@ let check_attestations_aggregate_result ~committee
           pp
           resulting_committee_pkhs
 
+(* [find_attester_with_bls_key attesters] returns the first attester with a BLS
+   key, if any. *)
+let find_attester_with_bls_key =
+  List.find_map (fun (attester : RPC.Validators.t) ->
+      match (attester.consensus_key, attester.slots) with
+      | Bls _, slot :: _ -> Some (attester, slot)
+      | _ -> None)
+
+(* [find_attester_with_non_bls_key attesters] returns the first attester
+   with a non-BLS key, if any. *)
+let find_attester_with_non_bls_key =
+  List.find_map (fun (attester : RPC.Validators.t) ->
+      match (attester.consensus_key, attester.slots) with
+      | (Ed25519 _ | Secp256k1 _ | P256 _), slot :: _ -> Some (attester, slot)
+      | _ -> None)
+
 let test_aggregate_feature_flag_enabled () =
   let open Lwt_result_syntax in
   let* _genesis, attested_block =
@@ -161,16 +185,11 @@ let test_aggregate_attestation_with_a_single_bls_attestation () =
     init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
   in
   let* attesters = Context.get_attesters (B block) in
+  (* Find an attester with a BLS consensus key. *)
   let attester, slot =
-    (* Find an attester with a BLS consensus key. *)
     WithExceptions.Option.get
       ~loc:__LOC__
-      (List.find_map
-         (fun (attester : RPC.Validators.t) ->
-           match (attester.consensus_key, attester.slots) with
-           | Bls _, slot :: _ -> Some (attester, slot)
-           | _ -> None)
-         attesters)
+      (find_attester_with_bls_key attesters)
   in
   let* attestation =
     Op.raw_attestation ~delegate:attester.RPC.Validators.delegate ~slot block
@@ -216,6 +235,75 @@ let test_aggregate_attestation_with_multiple_bls_attestations () =
   let delegates = List.map fst bls_delegates_with_slots in
   check_attestations_aggregate_result ~committee:delegates result
 
+let test_aggregate_attestation_invalid_signature () =
+  let open Lwt_result_syntax in
+  let* _genesis, block =
+    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+  in
+  let* attesters = Context.get_attesters (B block) in
+  (* Find an attester with a BLS consensus key. *)
+  let attester, _ =
+    WithExceptions.Option.get
+      ~loc:__LOC__
+      (find_attester_with_bls_key attesters)
+  in
+  (* Craft an aggregate with a single attestation signed by this delegate *)
+  let* aggregate =
+    Op.attestations_aggregate ~committee:[attester.consensus_key] block
+  in
+  (* Swap the signature for Signature.Bls.zero *)
+  match aggregate.protocol_data with
+  | Operation_data {contents; _} ->
+      let aggregate_with_incorrect_signature =
+        {
+          aggregate with
+          protocol_data =
+            Operation_data {contents; signature = Some (Bls Signature.Bls.zero)};
+        }
+      in
+      (* Bake a block containing this operation and expect an error *)
+      let*! res =
+        Block.bake ~operation:aggregate_with_incorrect_signature block
+      in
+      Assert.proto_error ~loc:__LOC__ res signature_invalid_error
+
+let test_aggregate_attestation_non_bls_delegate () =
+  let open Lwt_result_syntax in
+  let* _genesis, block =
+    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+  in
+  let* attesters = Context.get_attesters (B block) in
+  (* Find an attester with a non-BLS consensus key. *)
+  let attester, slot =
+    WithExceptions.Option.get
+      ~loc:__LOC__
+      (find_attester_with_non_bls_key attesters)
+  in
+  (* Craft an attestation for this attester to retreive a signature and a
+     triplet {level, round, block_payload_hash} *)
+  let* {shell; protocol_data = {contents; signature}} =
+    Op.raw_attestation ~delegate:attester.RPC.Validators.delegate ~slot block
+  in
+  match contents with
+  | Single (Attestation {consensus_content; _}) ->
+      let {level; round; block_payload_hash; _} :
+          Alpha_context.consensus_content =
+        consensus_content
+      in
+      (* Craft an aggregate including the attester slot and signature *)
+      let consensus_content : Alpha_context.consensus_aggregate_content =
+        {level; round; block_payload_hash}
+      in
+      let contents : _ Alpha_context.contents_list =
+        Single (Attestations_aggregate {consensus_content; committee = [slot]})
+      in
+      let aggregate : operation =
+        {shell; protocol_data = Operation_data {contents; signature}}
+      in
+      (* Bake a block containing this aggregate and expect an error *)
+      let*! res = Block.bake ~operation:aggregate block in
+      Assert.proto_error ~loc:__LOC__ res non_bls_in_aggregate
+
 let tests =
   [
     Tztest.tztest
@@ -234,6 +322,14 @@ let tests =
       "test_aggregate_attestation_with_multiple_bls_attestations"
       `Quick
       test_aggregate_attestation_with_multiple_bls_attestations;
+    Tztest.tztest
+      "test_aggregate_attestation_invalid_signature"
+      `Quick
+      test_aggregate_attestation_invalid_signature;
+    Tztest.tztest
+      "test_aggregate_attestation_non_bls_delegate"
+      `Quick
+      test_aggregate_attestation_non_bls_delegate;
   ]
 
 let () =
