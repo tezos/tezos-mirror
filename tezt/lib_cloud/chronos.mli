@@ -24,7 +24,11 @@ type task
     "any value".
 
     Relies on UTC (Coordinated Universal Time), also known as GMT for
-    time. Remember Paris is (UTC+1).
+    time. Paris operates on Central European Time (CET), which is
+    UTC+1 during standard time (winter months). During daylight saving
+    time (summer months), Paris switches to Central European Summer
+    Time (CEST), which is UTC+2.
+
 
     For example, "30 2 * * 1" means "2:30 AM every Monday (GMT)".
 
