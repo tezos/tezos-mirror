@@ -20,57 +20,56 @@ open! Import
 module type Core = sig
   (** {1 Node values} *)
 
-  type t [@@deriving brassaia]
   (** The type for node values. *)
+  type t [@@deriving brassaia]
 
-  type metadata [@@deriving brassaia]
   (** The type for node metadata. *)
+  type metadata [@@deriving brassaia]
 
-  type contents_key [@@deriving brassaia]
   (** The type for contents keys. *)
+  type contents_key [@@deriving brassaia]
 
-  type node_key [@@deriving brassaia]
   (** The type for node keys. *)
+  type node_key [@@deriving brassaia]
 
-  type step [@@deriving brassaia]
   (** The type for steps between nodes. *)
+  type step [@@deriving brassaia]
 
-  type value = [ `Node of node_key | `Contents of contents_key * metadata ]
-  [@@deriving brassaia]
   (** The type for either (node) keys or (contents) keys combined with their
       metadata. *)
+  type value = [`Node of node_key | `Contents of contents_key * metadata]
+  [@@deriving brassaia]
 
-  type hash [@@deriving brassaia]
   (** The type of hashes of values. *)
+  type hash [@@deriving brassaia]
 
-  val of_list : (step * value) list -> t
   (** [of_list l] is the node [n] such that [list n = l]. *)
+  val of_list : (step * value) list -> t
 
-  val list :
-    ?offset:int -> ?length:int -> ?cache:bool -> t -> (step * value) list
   (** [list t] is the contents of [t]. [offset] and [length] are used to
       paginate results. *)
+  val list :
+    ?offset:int -> ?length:int -> ?cache:bool -> t -> (step * value) list
 
-  val of_seq : (step * value) Seq.t -> t
   (** [of_seq s] is the node [n] such that [seq n = s]. *)
+  val of_seq : (step * value) Seq.t -> t
 
-  val seq :
-    ?offset:int -> ?length:int -> ?cache:bool -> t -> (step * value) Seq.t
   (** [seq t] is the contents of [t]. [offset] and [length] are used to paginate
       results.
 
       See {!caching} for an explanation of the [cache] parameter *)
+  val seq :
+    ?offset:int -> ?length:int -> ?cache:bool -> t -> (step * value) Seq.t
 
-  val empty : unit -> t
   (** [empty ()] is the empty node. *)
+  val empty : unit -> t
 
-  val is_empty : t -> bool
   (** [is_empty t] is true iff [t] is {!empty}. *)
+  val is_empty : t -> bool
 
-  val length : t -> int
   (** [length t] is the number of entries in [t]. *)
+  val length : t -> int
 
-  val hash_exn : ?force:bool -> t -> hash
   (** [hash_exn t] is the hash of [t].
 
       Another way of computing it is [Hash.Typed(Hash)(Node).hash t] which
@@ -80,28 +79,29 @@ module type Core = sig
       [hash_exn t] is [hash_exn ~force:true t] which is not expected to raise an
       exception. [hash_exn ~force:false t] will raise [Not_found] if the hash
       requires IOs to be computed. *)
+  val hash_exn : ?force:bool -> t -> hash
 
-  val clear : t -> unit
   (** Cleanup internal caches. *)
+  val clear : t -> unit
 
-  val find : ?cache:bool -> t -> step -> value option
   (** [find t s] is the value associated with [s] in [t].
 
       A node can point to user-defined {{!contents_key} contents}. The edge
       between the node and the contents is labeled by a {!step}.
 
       See {!caching} for an explanation of the [cache] parameter *)
+  val find : ?cache:bool -> t -> step -> value option
 
-  val add : t -> step -> value -> t
   (** [add t s v] is the node where [find t v] is [Some s] but is similar to [t]
       otherwise. *)
+  val add : t -> step -> value -> t
 
-  val remove : t -> step -> t
   (** [remove t s] is the node where [find t s] is [None] but is similar to [t]
       otherwise. *)
+  val remove : t -> step -> t
 
-  module Metadata : Metadata.S with type t = metadata
   (** Metadata functions. *)
+  module Metadata : Metadata.S with type t = metadata
 
   (** {2:caching caching}
 
@@ -124,38 +124,37 @@ module type Core = sig
       purpose (so [Tree.hash] and [Tree.equal] are not in the Lwt monad as
       well). *)
 
-  type effect := expected_depth:int -> node_key -> t option
   (** The type for read effects. *)
+  type effect := expected_depth:int -> node_key -> t option
 
-  val with_handler : (effect -> effect) -> t -> t
   (** [with_handler f] replace the current effect handler [h] by [f h]. [f h]
       will be called for all the recursive read effects that are required by
       recursive operations on nodes. .*)
+  val with_handler : (effect -> effect) -> t -> t
 
-  type head :=
-    [ `Node of (step * value) list | `Inode of int * (int * hash) list ]
+  type head := [`Node of (step * value) list | `Inode of int * (int * hash) list]
   [@@deriving brassaia]
 
-  val head : t -> head
   (** Reveal the shallow internal structure of the node.
 
       Only hashes and not keys are revealed in the [`Inode] case, this is
       because these inodes might not be keyed yet. *)
+  val head : t -> head
 end
 
 module type S_generic_key = sig
-  include Core
   (** @inline *)
+  include Core
 
   (** {2 merging} *)
 
+  (** [merge] is the merge function for nodes. *)
   val merge :
     contents:contents_key option Merge.t ->
     node:node_key option Merge.t ->
     t Merge.t
-  (** [merge] is the merge function for nodes. *)
 
-  exception Dangling_hash of { context : string; hash : hash }
+  exception Dangling_hash of {context : string; hash : hash}
 end
 
 module type S = sig
@@ -185,28 +184,28 @@ module type Portable = sig
 
   (** {2 merging} *)
 
+  (** [merge] is the merge function for nodes. *)
   val merge :
     contents:contents_key option Merge.t ->
     node:node_key option Merge.t ->
     t Merge.t
-  (** [merge] is the merge function for nodes. *)
 
   (** {1 Proofs} *)
 
+  (** The type for proof trees. *)
   type proof =
     [ `Blinded of hash
     | `Values of (step * value) list
     | `Inode of int * (int * proof) list ]
   [@@deriving brassaia]
-  (** The type for proof trees. *)
 
   val to_proof : t -> proof
 
-  val of_proof : depth:int -> proof -> t option
   (** [of_proof ~depth p] is [None] if [p] is corrupted or incompatible with
       [depth]. It is [Some t] when [t] is a node if the operation succeeded.
 
       [hash_exn t] never raises [Not_found] *)
+  val of_proof : depth:int -> proof -> t option
 end
 
 open struct
@@ -241,14 +240,14 @@ end
 module type Store = sig
   include Indexable.S
 
-  module Path : Path.S
   (** [Path] provides base functions on node paths. *)
+  module Path : Path.S
 
-  val merge : [> read_write ] t -> key option Merge.t
   (** [merge] is the 3-way merge function for nodes keys. *)
+  val merge : [> read_write] t -> key option Merge.t
 
-  module Metadata : Metadata.S
   (** [Metadata] provides base functions for node metadata. *)
+  module Metadata : Metadata.S
 
   (** [Val] provides base functions for node values. *)
   module Val :
@@ -261,75 +260,63 @@ module type Store = sig
 
   module Hash : Hash.Typed with type t = hash and type value = value
 
-  module Contents : Contents.Store with type key = Val.contents_key
   (** [Contents] is the underlying contents store. *)
+  module Contents : Contents.Store with type key = Val.contents_key
 end
 
 module type Graph = sig
   (** {1 Node Graphs} *)
 
-  type 'a t
   (** The type for store handles. *)
+  type 'a t
 
-  type metadata [@@deriving brassaia]
   (** The type for node metadata. *)
+  type metadata [@@deriving brassaia]
 
-  type contents_key [@@deriving brassaia]
   (** The type of user-defined contents. *)
+  type contents_key [@@deriving brassaia]
 
-  type node_key [@@deriving brassaia]
   (** The type for node values. *)
+  type node_key [@@deriving brassaia]
 
-  type step [@@deriving brassaia]
   (** The type of steps. A step is used to pass from one node to another. *)
+  type step [@@deriving brassaia]
 
-  type path [@@deriving brassaia]
   (** The type of store paths. A path is composed of {{!step} steps}. *)
+  type path [@@deriving brassaia]
 
-  type value = [ `Node of node_key | `Contents of contents_key * metadata ]
-  [@@deriving brassaia]
   (** The type for store values. *)
+  type value = [`Node of node_key | `Contents of contents_key * metadata]
+  [@@deriving brassaia]
 
-  val empty : [> write ] t -> node_key
   (** The empty node. *)
+  val empty : [> write] t -> node_key
 
-  val v : [> write ] t -> (step * value) list -> node_key
   (** [v t n] is a new node containing [n]. *)
+  val v : [> write] t -> (step * value) list -> node_key
 
-  val list : [> read ] t -> node_key -> (step * value) list
   (** [list t n] is the contents of the node [n]. *)
+  val list : [> read] t -> node_key -> (step * value) list
 
-  val find : [> read ] t -> node_key -> path -> value option
   (** [find t n p] is the contents of the path [p] starting form [n]. *)
+  val find : [> read] t -> node_key -> path -> value option
 
-  val add : [> read_write ] t -> node_key -> path -> value -> node_key
   (** [add t n p v] is the node [x] such that [find t x p] is [Some v] and it
       behaves the same [n] for other operations. *)
+  val add : [> read_write] t -> node_key -> path -> value -> node_key
 
-  val remove : [> read_write ] t -> node_key -> path -> node_key
   (** [remove t n path] is the node [x] such that [find t x] is [None] and it
       behhaves then same as [n] for other operations. *)
+  val remove : [> read_write] t -> node_key -> path -> node_key
 
-  val closure :
-    [> read ] t -> min:node_key list -> max:node_key list -> node_key list
   (** [closure t min max] is the unordered list of nodes [n] reachable from a
       node of [max] along a path which: (i) either contains no [min] or (ii) it
       ends with a [min].
 
       {b Note:} Both [min] and [max] are subsets of [n]. *)
+  val closure :
+    [> read] t -> min:node_key list -> max:node_key list -> node_key list
 
-  val iter :
-    [> read ] t ->
-    min:node_key list ->
-    max:node_key list ->
-    ?node:(node_key -> unit) ->
-    ?contents:(contents_key -> unit) ->
-    ?edge:(node_key -> node_key -> unit) ->
-    ?skip_node:(node_key -> bool) ->
-    ?skip_contents:(contents_key -> bool) ->
-    ?rev:bool ->
-    unit ->
-    unit
   (** [iter t min max node edge skip rev ()] iterates in topological order over
       the closure of [t].
 
@@ -342,6 +329,18 @@ module type Graph = sig
       order: [node n] is applied only after it was applied on all its
       predecessors; [edge n p] is applied after [node n]. Note that [edge n p]
       is applied even if [p] is skipped. *)
+  val iter :
+    [> read] t ->
+    min:node_key list ->
+    max:node_key list ->
+    ?node:(node_key -> unit) ->
+    ?contents:(contents_key -> unit) ->
+    ?edge:(node_key -> node_key -> unit) ->
+    ?skip_node:(node_key -> bool) ->
+    ?skip_contents:(contents_key -> bool) ->
+    ?rev:bool ->
+    unit ->
+    unit
 end
 
 module type Sigs = sig
@@ -365,14 +364,16 @@ module type Sigs = sig
       object keys that are not strictly equal to hashes. *)
   module Generic_key : sig
     module type S = S_generic_key
+
     module type Maker = Maker_generic_key
+
     module type Core = Core
 
     module Make : Maker
 
-    module Make_v2 : Maker
     (** [Make_v2] provides a similar implementation as [Make] but the hash
         computation is compatible with versions older than brassaia.3.0 *)
+    module Make_v2 : Maker
 
     module Store
         (C : Contents.Store)
@@ -405,6 +406,7 @@ module type Sigs = sig
          and type metadata = N.metadata
 
     val import : N.t -> t
+
     val export : t -> N.t
   end
 
@@ -442,8 +444,8 @@ module type Sigs = sig
     module type S = Portable
   end
 
-  module type Store = Store
   (** [Store] specifies the signature for node stores. *)
+  module type Store = Store
 
   (** [Store] creates node stores. *)
   module Store
@@ -462,9 +464,9 @@ module type Sigs = sig
        and module Metadata = M
        and module Val = V
 
-  module type Graph = Graph
   (** [Graph] specifies the signature for node graphs. A node graph is a
       deterministic DAG, labeled by steps. *)
+  module type Graph = Graph
 
   module Graph (N : Store) :
     Graph

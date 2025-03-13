@@ -18,9 +18,13 @@ module Schema = Schema
 
 module Conf = struct
   let entries = 32
+
   let stable_hash = 256
+
   let contents_length_header = Some `Varint
+
   let inode_child_order = `Seeded_hash
+
   let forbid_empty_dir_persistence = true
 end
 

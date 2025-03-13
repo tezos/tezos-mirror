@@ -25,7 +25,9 @@ module Make (I : Brassaia.Info.S) = struct
           match author with
           | Some a -> a
           | None ->
-              Printf.sprintf "Brassaia %s.[%d]" (Unix.gethostname ())
+              Printf.sprintf
+                "Brassaia %s.[%d]"
+                (Unix.gethostname ())
                 (Unix.getpid ())
         in
         v ~author ~message date)

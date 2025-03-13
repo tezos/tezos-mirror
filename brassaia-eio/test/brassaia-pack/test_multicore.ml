@@ -18,6 +18,7 @@ open! Import
 open Common
 
 let root = Filename.concat "_build" "test-multicore"
+
 let src = Logs.Src.create "tests.multicore" ~doc:"Tests"
 
 module Log = (val Logs.src_log src : Logs.LOG)
@@ -34,15 +35,15 @@ module Tree = Store.Tree
 
 let info () = Store.Info.empty
 
-type shape = [ `Contents of string | `Node of (string * shape) list ]
+type shape = [`Contents of string | `Node of (string * shape) list]
 
 let shape0 : shape =
   `Node
     [
       ("a", `Contents "a");
       ("b", `Contents "b");
-      ("c", `Node [ ("d", `Contents "cd"); ("e", `Contents "ce") ]);
-      ("f", `Node [ ("g", `Node [ ("h", `Contents "fgh") ]) ]);
+      ("c", `Node [("d", `Contents "cd"); ("e", `Contents "ce")]);
+      ("f", `Node [("g", `Node [("h", `Contents "fgh")])]);
       ("i", `Contents "i");
     ]
 
@@ -56,24 +57,24 @@ let shape1 : shape =
           [
             ("d", `Contents "cd");
             ("e", `Contents "ce");
-            ("c_new", `Node [ ("c_new_new", `Contents "c_new_new") ]);
+            ("c_new", `Node [("c_new_new", `Contents "c_new_new")]);
           ] );
-      ("f", `Node [ ("g", `Node [ ("h", `Contents "fgh") ]) ]);
+      ("f", `Node [("g", `Node [("h", `Contents "fgh")])]);
       ("i", `Contents "i");
       ("new", `Contents "new");
       ( "new_new",
-        `Node [ ("a", `Contents "new_new_a"); ("b", `Contents "new_new_b") ] );
+        `Node [("a", `Contents "new_new_a"); ("b", `Contents "new_new_b")] );
     ]
 
 let shape2 : shape =
   `Node
     [
       ("a", `Contents "a");
-      ("c", `Node [ ("e", `Contents "ce") ]);
+      ("c", `Node [("e", `Contents "ce")]);
       ( "f",
         `Node
           [
-            ("g", `Node [ ("h", `Contents "updated") ]);
+            ("g", `Node [("h", `Contents "updated")]);
             ("fresh", `Contents "added");
           ] );
       ("i", `Contents "i");
@@ -84,14 +85,16 @@ let rec flatten_shape acc path : shape -> _ = function
   | `Node children ->
       List.fold_left
         (fun acc (name, child) -> flatten_shape acc (name :: path) child)
-        acc children
+        acc
+        children
 
 let flatten_shape shape = flatten_shape [] [] shape
 
 let make_tree shape =
   List.fold_left
     (fun tree (k, v) -> Tree.add tree k v)
-    (Tree.empty ()) (flatten_shape shape)
+    (Tree.empty ())
+    (flatten_shape shape)
 
 let rec list_shape acc path : shape -> _ = function
   | `Contents _c -> (List.rev path, []) :: acc
@@ -102,7 +105,8 @@ let rec list_shape acc path : shape -> _ = function
       let acc = (List.rev path, l) :: acc in
       List.fold_left
         (fun acc (name, child) -> list_shape acc (name :: path) child)
-        acc children
+        acc
+        children
 
 let list_shape shape = list_shape [] [] shape
 
@@ -119,10 +123,10 @@ let domains_run d_mgr fns =
     List.map
       (fun fn () ->
         Eio.Domain_manager.run d_mgr (fun () ->
-            Atomic.decr count;
+            Atomic.decr count ;
             while Atomic.get count > 0 do
               Domain.cpu_relax ()
-            done;
+            done ;
             fn ()))
       fns
   in
@@ -140,12 +144,12 @@ let find_all tree paths =
     paths
 
 let test_find d_mgr =
-  Logs.set_level None;
-  make_store shape0;
+  Logs.set_level None ;
+  make_store shape0 ;
   let repo = Store.Repo.v (Store.config ~readonly:true ~fresh:false root) in
   let tree = Store.main repo |> Store.Head.get |> Store.Commit.tree in
   let paths = flatten_shape shape0 in
-  domains_spawn d_mgr (fun () -> find_all tree paths);
+  domains_spawn d_mgr (fun () -> find_all tree paths) ;
   Store.Repo.close repo
 
 let rec expected_lengths acc path : shape -> _ = function
@@ -154,13 +158,14 @@ let rec expected_lengths acc path : shape -> _ = function
       let acc = (List.rev path, Some (List.length children)) :: acc in
       List.fold_left
         (fun acc (name, child) -> expected_lengths acc (name :: path) child)
-        acc children
+        acc
+        children
 
 let expected_lengths shape = expected_lengths [] [] shape
 
 let test_length d_mgr =
-  Logs.set_level None;
-  make_store shape0;
+  Logs.set_level None ;
+  make_store shape0 ;
   let repo = Store.Repo.v (Store.config ~readonly:true ~fresh:false root) in
   let tree = Store.main repo |> Store.Head.get |> Store.Commit.tree in
   let lengths = expected_lengths shape0 in
@@ -172,15 +177,16 @@ let test_length d_mgr =
         assert (expected = value))
       lengths
   in
-  domains_spawn ~nb:2 d_mgr all_length;
+  domains_spawn ~nb:2 d_mgr all_length ;
   Store.Repo.close repo
 
 let rec remove_all acc path : shape -> _ = function
-  | `Contents _ -> [ `Remove (List.rev path) ]
+  | `Contents _ -> [`Remove (List.rev path)]
   | `Node children ->
       List.fold_left
         (fun acc (name, child) -> remove_all acc (name :: path) child)
-        acc children
+        acc
+        children
 
 let rec diff_shape acc path (old_shape : shape option) (new_shape : shape) =
   match (old_shape, new_shape) with
@@ -199,20 +205,22 @@ let rec diff_shape acc path (old_shape : shape option) (new_shape : shape) =
             match List.assoc_opt old_name new_children with
             | None -> remove_all acc (old_name :: path) old_child
             | Some _ -> acc)
-          acc old_children
+          acc
+          old_children
       in
       List.fold_left
         (fun acc (name, new_child) ->
           let old_child = List.assoc_opt name old_children in
           diff_shape acc (name :: path) old_child new_child)
-        acc new_children
+        acc
+        new_children
 
 let diff_shape old_shape new_shape =
   List.rev @@ diff_shape [] [] (Some old_shape) new_shape
 
 let test_add_remove d_mgr =
-  Logs.set_level None;
-  make_store shape0;
+  Logs.set_level None ;
+  make_store shape0 ;
   let repo = Store.Repo.v (Store.config ~readonly:true ~fresh:false root) in
   let tree = Store.main repo |> Store.Head.get |> Store.Commit.tree in
   let patch = diff_shape shape0 shape1 in
@@ -223,16 +231,17 @@ let test_add_remove d_mgr =
         (fun tree -> function
           | `Add (path, contents) -> Tree.add tree path contents
           | `Remove path -> Tree.remove tree path)
-        tree patch
+        tree
+        patch
     in
-    find_all tree after_paths;
+    find_all tree after_paths ;
     List.iter
       (function
         | `Add (name, _) -> assert (Tree.mem tree name)
         | `Remove name -> assert (not (Tree.mem tree name)))
       patch
   in
-  domains_spawn ~nb:2 d_mgr add_all;
+  domains_spawn ~nb:2 d_mgr add_all ;
   Store.Repo.close repo
 
 let apply_op tree = function
@@ -245,18 +254,20 @@ let check_patch_was_applied patch tree =
       | `Add (name, contents) ->
           if not (Store.Tree.find tree name = Some contents) then
             failwith
-              (Printf.sprintf "Add %S failed"
+              (Printf.sprintf
+                 "Add %S failed"
                  (Repr.to_string Store.path_t name))
       | `Remove name ->
           if Store.Tree.mem tree name then
             failwith
-              (Printf.sprintf "Remove %S failed"
+              (Printf.sprintf
+                 "Remove %S failed"
                  (Repr.to_string Store.path_t name)))
     patch
 
 let test_commit d_mgr =
-  Logs.set_level None;
-  make_store shape0;
+  Logs.set_level None ;
+  make_store shape0 ;
   let repo = Store.Repo.v (Store.config ~readonly:false ~fresh:false root) in
   let store = Store.main repo in
   let patch01 = diff_shape shape0 shape1 in
@@ -265,18 +276,18 @@ let test_commit d_mgr =
     List.iter
       (fun op ->
         Store.with_tree_exn ~strategy:`Merge ~info store [] (function
-          | None -> assert false
-          | Some tree -> Some (apply_op tree op)))
-      patch;
+            | None -> assert false
+            | Some tree -> Some (apply_op tree op)))
+      patch ;
     let tree = Store.main repo |> Store.Head.get |> Store.Commit.tree in
     check_patch_was_applied patch tree
   in
-  domains_run d_mgr [ do_commit patch01; do_commit patch02 ];
+  domains_run d_mgr [do_commit patch01; do_commit patch02] ;
   Store.Repo.close repo
 
 let test_merkle d_mgr =
-  Logs.set_level None;
-  make_store shape0;
+  Logs.set_level None ;
+  make_store shape0 ;
   let repo = Store.Repo.v (Store.config ~readonly:false ~fresh:false root) in
   let tree = Store.main repo |> Store.Head.get |> Store.Commit.tree in
   let hash = Store.Tree.key tree |> Option.get in
@@ -292,12 +303,12 @@ let test_merkle d_mgr =
     | Ok (new_tree, ()) -> check_patch_was_applied patch new_tree
     | Error _ -> assert false
   in
-  domains_run d_mgr [ do_proof patch01; do_proof patch02 ];
+  domains_run d_mgr [do_proof patch01; do_proof patch02] ;
   Store.Repo.close repo
 
 let test_hash d_mgr =
-  Logs.set_level None;
-  make_store shape0;
+  Logs.set_level None ;
+  make_store shape0 ;
   let repo = Store.Repo.v (Store.config ~readonly:false ~fresh:false root) in
   let tree = Store.main repo |> Store.Head.get |> Store.Commit.tree in
   let patch01 = diff_shape shape0 shape1 in
@@ -308,7 +319,8 @@ let test_hash d_mgr =
       (fun (tree, trees) op ->
         let new_tree = apply_op tree op in
         (new_tree, new_tree :: trees))
-      (tree, [ tree ]) patch
+      (tree, [tree])
+      patch
   in
   let do_hash result () =
     let hashes = List.map Store.Tree.hash trees in
@@ -316,17 +328,18 @@ let test_hash d_mgr =
   in
   let result1 = Atomic.make [] in
   let result2 = Atomic.make [] in
-  domains_run d_mgr [ do_hash result1; do_hash result2 ];
+  domains_run d_mgr [do_hash result1; do_hash result2] ;
   List.iter2
     (fun h1 h2 -> assert (h1 = h2))
-    (Atomic.get result1) (Atomic.get result2);
+    (Atomic.get result1)
+    (Atomic.get result2) ;
   Store.Repo.close repo
 
 let list_all cache tree paths =
   List.iter
     (fun (path, expected) ->
       let value = Store.Tree.list ~cache tree path in
-      assert (List.length expected = List.length value);
+      assert (List.length expected = List.length value) ;
       List.iter
         (fun (s, t) ->
           let t' = List.assoc s value in
@@ -336,28 +349,28 @@ let list_all cache tree paths =
     paths
 
 let test_list_disk ~cache d_mgr =
-  Logs.set_level None;
-  make_store shape0;
+  Logs.set_level None ;
+  make_store shape0 ;
   let repo = Store.Repo.v (Store.config ~readonly:true ~fresh:false root) in
   let tree = Store.main repo |> Store.Head.get |> Store.Commit.tree in
   let paths = list_shape shape0 in
-  domains_spawn d_mgr (fun () -> list_all cache tree paths);
+  domains_spawn d_mgr (fun () -> list_all cache tree paths) ;
   Store.Repo.close repo
 
 let test_list_mem ~cache d_mgr =
-  Logs.set_level None;
-  make_store shape0;
+  Logs.set_level None ;
+  make_store shape0 ;
   let repo = Store.Repo.v (Store.config ~readonly:true ~fresh:false root) in
   let tree = Store.main repo |> Store.Head.get |> Store.Commit.tree in
   let patch = diff_shape shape0 shape1 in
   let paths = list_shape shape1 in
   let tree = List.fold_left apply_op tree patch in
-  domains_spawn d_mgr (fun _ -> list_all cache tree paths);
+  domains_spawn d_mgr (fun _ -> list_all cache tree paths) ;
   Store.Repo.close repo
 
 let test_commit_of_hash d_mgr =
-  Logs.set_level None;
-  make_store shape0;
+  Logs.set_level None ;
+  make_store shape0 ;
   let repo = Store.Repo.v (Store.config ~readonly:false ~fresh:false root) in
   let store = Store.main repo in
   let patch01 = diff_shape shape0 shape1 in
@@ -370,7 +383,7 @@ let test_commit_of_hash d_mgr =
       let tree = Store.Commit.tree commit1 in
       let tree = apply_op tree op in
       Store.set_tree_exn ~info store [] tree)
-    patch01;
+    patch01 ;
   let commit2 = Store.Head.get store in
   let hash2 = Store.Commit.hash commit2 in
   let tree2 = Store.Commit.tree commit2 in
@@ -379,7 +392,7 @@ let test_commit_of_hash d_mgr =
       let tree = Store.Commit.tree commit2 in
       let tree = apply_op tree op in
       Store.set_tree_exn ~info store [] tree)
-    patch02;
+    patch02 ;
   let commit3 = Store.Head.get store in
   let hash3 = Store.Commit.hash commit3 in
   let tree3 = Store.Commit.tree commit3 in
@@ -388,24 +401,24 @@ let test_commit_of_hash d_mgr =
       Store.Commit.of_hash repo hash1 |> Option.get |> Store.Commit.tree
     in
     let diffs = Store.Tree.diff tree1 t1 in
-    assert (diffs = []);
+    assert (diffs = []) ;
     let t2 =
       Store.Commit.of_hash repo hash2 |> Option.get |> Store.Commit.tree
     in
     let diffs = Store.Tree.diff tree2 t2 in
-    assert (diffs = []);
+    assert (diffs = []) ;
     let t3 =
       Store.Commit.of_hash repo hash3 |> Option.get |> Store.Commit.tree
     in
     let diffs = Store.Tree.diff tree3 t3 in
     assert (diffs = [])
   in
-  domains_spawn d_mgr do_commit_of_hash;
+  domains_spawn d_mgr do_commit_of_hash ;
   Store.Repo.close repo
 
 let test_commit_parents d_mgr =
-  Logs.set_level None;
-  make_store shape0;
+  Logs.set_level None ;
+  make_store shape0 ;
   let repo = Store.Repo.v (Store.config ~readonly:false ~fresh:false root) in
   let store = Store.main repo in
   let patch01 = diff_shape shape0 shape1 in
@@ -416,25 +429,27 @@ let test_commit_parents d_mgr =
     @@ List.fold_left_map
          (fun tree op ->
            let tree = apply_op tree op in
-           Store.set_tree_exn ~info store [] tree;
+           Store.set_tree_exn ~info store [] tree ;
            (tree, Store.Head.get store))
-         tree patch01
+         tree
+         patch01
   in
   let do_commit_parents () =
     ignore
       (List.fold_left
          (fun parent commit ->
            let parents = Store.Commit.parents commit in
-           assert (parents = [ Store.Commit.key parent ]);
+           assert (parents = [Store.Commit.key parent]) ;
            commit)
-         commit commits)
+         commit
+         commits)
   in
-  domains_spawn d_mgr do_commit_parents;
+  domains_spawn d_mgr do_commit_parents ;
   Store.Repo.close repo
 
 let test_commit_v d_mgr =
-  Logs.set_level None;
-  make_store shape0;
+  Logs.set_level None ;
+  make_store shape0 ;
   let repo = Store.Repo.v (Store.config ~readonly:false ~fresh:false root) in
   let store = Store.main repo in
   let patch01 = diff_shape shape0 shape1 in
@@ -442,13 +457,15 @@ let test_commit_v d_mgr =
   let tree = List.fold_left apply_op (Store.Commit.tree commit) patch01 in
   let do_commit_v () =
     let _ =
-      Store.Commit.v repo ~info:(info ())
-        ~parents:[ Store.Commit.key commit ]
+      Store.Commit.v
+        repo
+        ~info:(info ())
+        ~parents:[Store.Commit.key commit]
         tree
     in
     ()
   in
-  domains_spawn d_mgr do_commit_v;
+  domains_spawn d_mgr do_commit_v ;
   Store.Repo.close repo
 
 let tests d_mgr =

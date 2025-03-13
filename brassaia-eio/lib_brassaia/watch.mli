@@ -17,5 +17,5 @@
 (** [Watch] provides helpers to register event notifications on read-write
     stores. *)
 
-include Watch_intf.Sigs
 (** @inline *)
+include Watch_intf.Sigs

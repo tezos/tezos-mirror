@@ -16,5 +16,5 @@
 
 (** Remote stores. *)
 
-include Remote_intf.Sigs
 (** @inline *)
+include Remote_intf.Sigs

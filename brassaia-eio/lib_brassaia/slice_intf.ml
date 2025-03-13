@@ -17,35 +17,35 @@
 module type S = sig
   (** {1 Slices} *)
 
-  type t [@@deriving brassaia]
   (** The type for slices. *)
+  type t [@@deriving brassaia]
 
-  type contents [@@deriving brassaia]
   (** The type for exported contents. *)
+  type contents [@@deriving brassaia]
 
-  type node [@@deriving brassaia]
   (** The type for exported nodes. *)
+  type node [@@deriving brassaia]
 
-  type commit [@@deriving brassaia]
   (** The type for exported commits. *)
+  type commit [@@deriving brassaia]
 
-  type value = [ `Contents of contents | `Node of node | `Commit of commit ]
-  [@@deriving brassaia]
   (** The type for exported values. *)
+  type value = [`Contents of contents | `Node of node | `Commit of commit]
+  [@@deriving brassaia]
 
-  val empty : unit -> t
   (** Create a new empty slice. *)
+  val empty : unit -> t
 
-  val add : t -> value -> unit
   (** [add t v] adds [v] to [t]. *)
+  val add : t -> value -> unit
 
-  val iter : t -> (value -> unit) -> unit
   (** [iter t f] calls [f] on all values of [t]. *)
+  val iter : t -> (value -> unit) -> unit
 end
 
 module type Sigs = sig
-  module type S = S
   (** The signature for slices. *)
+  module type S = S
 
   (** Build simple slices. *)
   module Make (C : Contents.Store) (N : Node.Store) (H : Commit.Store) :

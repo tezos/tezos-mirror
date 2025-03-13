@@ -18,16 +18,20 @@ open Import
 include Pack_store_intf
 
 exception Invalid_read of string
+
 exception Corrupted_store of string
+
 exception Dangling_hash
 
 let invalid_read fmt = Fmt.kstr (fun s -> raise (Invalid_read s)) fmt
+
 let corrupted_store fmt = Fmt.kstr (fun s -> raise (Corrupted_store s)) fmt
 
 module UnsafeTbl (K : Brassaia.Hash.S) = Hashtbl.Make (struct
   type t = K.t
 
   let hash = K.short_hash
+
   let equal = Brassaia.Type.(unstage (equal K.t))
 end)
 
@@ -35,25 +39,25 @@ end)
 module Table (K : Brassaia.Hash.S) = struct
   module Unsafe = UnsafeTbl (K)
 
-  type 'a t = { lock : Eio.Mutex.t; data : 'a Unsafe.t }
+  type 'a t = {lock : Eio.Mutex.t; data : 'a Unsafe.t}
 
   let create n =
     let lock = Eio.Mutex.create () in
     let data = Unsafe.create n in
-    { lock; data }
+    {lock; data}
 
-  let add { lock; data } k v =
+  let add {lock; data} k v =
     Eio.Mutex.use_rw ~protect:true lock @@ fun () -> Unsafe.add data k v
 
-  let mem { lock; data } k =
+  let mem {lock; data} k =
     Eio.Mutex.use_rw ~protect:true lock @@ fun () -> Unsafe.mem data k
 
-  let find_opt { lock; data } k =
+  let find_opt {lock; data} k =
     Eio.Mutex.use_rw ~protect:true lock @@ fun () -> Unsafe.find_opt data k
 
   let find t k = match find_opt t k with Some v -> v | None -> raise Not_found
 
-  let clear { lock; data } =
+  let clear {lock; data} =
     Eio.Mutex.use_rw ~protect:true lock @@ fun () -> Unsafe.clear data
 end
 
@@ -77,11 +81,14 @@ struct
     include Lru
 
     let add t k v = Val.to_kinded v |> add t k (Val.weight v)
+
     let find t k = find t k |> Val.of_kinded
   end
 
   type file_manager = Fm.t
+
   type dict = Dict.t
+
   type dispatcher = Dispatcher.t
 
   type 'a t = {
@@ -94,7 +101,9 @@ struct
   }
 
   type hash = Hash.t [@@deriving brassaia ~pp ~equal ~decode_bin]
+
   type key = Key.t [@@deriving brassaia ~pp]
+
   type value = Val.t [@@deriving brassaia ~pp]
 
   let get_location t k =
@@ -103,9 +112,9 @@ struct
         match Index.find (Fm.index t.fm) hash with
         | None -> raise Dangling_hash
         | Some (off, len, _kind) ->
-            Pack_key.promote_exn k ~offset:off ~length:len;
+            Pack_key.promote_exn k ~offset:off ~length:len ;
             (off, len, None))
-    | Direct { offset; length; volume_identifier; _ } ->
+    | Direct {offset; length; volume_identifier; _} ->
         (offset, length, volume_identifier)
 
   let get_offset t k =
@@ -125,7 +134,7 @@ struct
   let len_of_direct_key k =
     match Pack_key.inspect k with
     | Indexed _ -> assert false
-    | Direct { length; _ } -> length
+    | Direct {length; _} -> length
 
   let off_of_direct_key k =
     match Pack_key.to_offset k with
@@ -133,7 +142,7 @@ struct
     | Some offset -> offset
 
   let index_direct_with_kind t hash =
-    [%log.debug "index %a" pp_hash hash];
+    [%log.debug "index %a" pp_hash hash] ;
     match Index.find (Fm.index t.fm) hash with
     | None -> None
     | Some (offset, length, kind) ->
@@ -148,9 +157,9 @@ struct
   let v ~config ~fm ~dict ~dispatcher ~lru =
     let indexing_strategy = Conf.indexing_strategy config in
     let staging = Tbl.create 127 in
-    Fm.register_suffix_consumer fm ~after_flush:(fun () -> Tbl.clear staging);
-    Fm.register_prefix_consumer fm ~after_reload:(fun () -> Ok (Lru.clear lru));
-    { lru; staging; indexing_strategy; fm; dict; dispatcher }
+    Fm.register_suffix_consumer fm ~after_flush:(fun () -> Tbl.clear staging) ;
+    Fm.register_prefix_consumer fm ~after_reload:(fun () -> Ok (Lru.clear lru)) ;
+    {lru; staging; indexing_strategy; fm; dict; dispatcher}
 
   module Entry_prefix = struct
     type t = {
@@ -168,6 +177,7 @@ struct
     [@@deriving brassaia ~pp_dump]
 
     let min_length = Hash.hash_size + 1
+
     let max_length = Hash.hash_size + 1 + Varint.max_encoded_size
 
     let total_entry_length t =
@@ -182,13 +192,20 @@ struct
            final entry in the pack file (if the data section of the entry is
            shorter than [Varint.max_encoded_size]. In this case, an invalid read
            may be discovered below when attempting to decode the length header. *)
-        Dispatcher.read_range_exn dispatcher ?volume_identifier ~off
-          ~min_len:Entry_prefix.min_length ~max_len:Entry_prefix.max_length buf
+        Dispatcher.read_range_exn
+          dispatcher
+          ?volume_identifier
+          ~off
+          ~min_len:Entry_prefix.min_length
+          ~max_len:Entry_prefix.max_length
+          buf
       with Errors.Pack_error `Read_out_of_bounds ->
         invalid_read
           "Attempted to read an entry at offset %a in the pack file, but got \
            less than %d bytes"
-          Int63.pp off Entry_prefix.max_length
+          Int63.pp
+          off
+          Entry_prefix.max_length
     in
     let hash =
       (* Bytes.unsafe_to_string usage: buf is created locally, so we have unique
@@ -216,7 +233,7 @@ struct
           let length_header_length = !pos_ref - length_header_start in
           Some (length_header_length + length_header)
     in
-    { Entry_prefix.hash; kind; size_of_value_and_length_header }
+    {Entry_prefix.hash; kind; size_of_value_and_length_header}
 
   (* This function assumes magic is written at hash_size + 1 for every
      object. *)
@@ -242,7 +259,10 @@ struct
         invalid_read
           "invalid key %a checked for membership (read hash %a at this offset \
            instead)"
-          pp_key k pp_hash hash;
+          pp_key
+          k
+          pp_hash
+          hash ;
       (* At this point we consider the key to be contained in the pack
          file. However, we could also be in the presence of a forged (or
          unlucky) key that points to an offset that mimics a real pack
@@ -259,22 +279,25 @@ struct
            constructed for this store. *)
         (if not (Control.readonly (Fm.control t.fm)) then
            let io_offset = Dispatcher.end_offset t.dispatcher in
-           invalid_read "invalid key %a checked for membership (IO offset = %a)"
-             pp_key k Int63.pp io_offset);
+           invalid_read
+             "invalid key %a checked for membership (IO offset = %a)"
+             pp_key
+             k
+             Int63.pp
+             io_offset) ;
         false
     | Errors.Pack_error (`Invalid_sparse_read _) -> false
     | Errors.Pack_error (`Invalid_prefix_read _) -> false
 
   let unsafe_mem t k =
-    [%log.debug "[pack] mem %a" pp_key k];
+    [%log.debug "[pack] mem %a" pp_key k] ;
     match Pack_key.inspect k with
     | Indexed hash ->
         (* The key doesn't contain an offset, let's skip the lookup in [lru] and
            go straight to disk read. *)
         Tbl.mem t.staging hash || pack_file_contains_key t k
-    | Direct { offset; hash; _ } ->
-        Tbl.mem t.staging hash
-        || Lru.mem t.lru offset
+    | Direct {offset; hash; _} ->
+        Tbl.mem t.staging hash || Lru.mem t.lru offset
         || pack_file_contains_key t k
 
   let mem t k = unsafe_mem t k
@@ -288,7 +311,7 @@ struct
   (** Produce a key from an offset in the context of decoding inode and commit
       children. *)
   let key_of_offset ?volume_identifier t offset =
-    [%log.debug "key_of_offset: %a" Int63.pp offset];
+    [%log.debug "key_of_offset: %a" Int63.pp offset] ;
     (* Attempt to eagerly read the length at the same time as reading the
        hash in order to save an extra IO read when dereferencing the key: *)
     let entry_prefix =
@@ -310,7 +333,7 @@ struct
       | kind -> (kind, volume_identifier)
     in
     let key =
-      let entry_prefix = { entry_prefix with kind } in
+      let entry_prefix = {entry_prefix with kind} in
       match Entry_prefix.total_entry_length entry_prefix with
       | Some length ->
           Pack_key.v_direct ~offset ~length ?volume_identifier entry_prefix.hash
@@ -341,7 +364,10 @@ struct
            creation, we assume Dispatcher.read_if_not_gced returns unique
            ownership; we give up unique ownership in call to
            [Bytes.unsafe_to_string]. This is safe. *)
-        Val.decode_bin ~key_of_offset ~key_of_hash ~dict
+        Val.decode_bin
+          ~key_of_offset
+          ~key_of_hash
+          ~dict
           (Bytes.unsafe_to_string buf)
           (ref 0)
       in
@@ -359,35 +385,47 @@ struct
         match Control.readonly (Fm.control t.fm) with
         | false ->
             invalid_read
-              "attempt to dereference invalid key %a (IO offset = %a)" pp_key
-              key Int63.pp io_offset
+              "attempt to dereference invalid key %a (IO offset = %a)"
+              pp_key
+              key
+              Int63.pp
+              io_offset
         | true ->
             [%log.debug
               "Direct store key references an unknown starting offset %a \
                (length = %d, IO offset = %a)"
-              Int63.pp (off_of_direct_key key) (len_of_direct_key key) Int63.pp
-                io_offset];
+                Int63.pp
+                (off_of_direct_key key)
+                (len_of_direct_key key)
+                Int63.pp
+                io_offset] ;
             None)
     | Errors.Pack_error (`Invalid_sparse_read _) -> None
     | Errors.Pack_error (`Invalid_prefix_read _) as e -> raise e
 
   let unsafe_find ~check_integrity t k =
-    [%log.debug "[pack] find %a" pp_key k];
+    [%log.debug "[pack] find %a" pp_key k] ;
     let find_location = ref Stats.Pack_store.Not_found in
     let find_in_pack_file_guarded ~is_indexed =
       let res = find_in_pack_file ~key_of_offset t k in
       Option.iter
         (fun v ->
           if is_indexed then find_location := Stats.Pack_store.Pack_indexed
-          else find_location := Stats.Pack_store.Pack_direct;
-          Lru.add t.lru (off_of_direct_key k) v;
+          else find_location := Stats.Pack_store.Pack_direct ;
+          Lru.add t.lru (off_of_direct_key k) v ;
           if check_integrity then
             check_key k v |> function
             | Ok () -> ()
             | Error (expected, got) ->
-                corrupted_store "Got hash %a, expecting %a (for val: %a)."
-                  pp_hash got pp_hash expected pp_value v)
-        res;
+                corrupted_store
+                  "Got hash %a, expecting %a (for val: %a)."
+                  pp_hash
+                  got
+                  pp_hash
+                  expected
+                  pp_value
+                  v)
+        res ;
       res
     in
     let value_opt =
@@ -396,24 +434,24 @@ struct
           match Tbl.find t.staging hash with
           | v ->
               (* Hit in staging, but we don't have offset to put in LRU *)
-              find_location := Stats.Pack_store.Staging;
+              find_location := Stats.Pack_store.Staging ;
               Some v
           | exception Not_found -> find_in_pack_file_guarded ~is_indexed:true)
-      | Direct { offset; hash; _ } -> (
+      | Direct {offset; hash; _} -> (
           match Tbl.find t.staging hash with
           | v ->
-              Lru.add t.lru offset v;
-              find_location := Stats.Pack_store.Staging;
+              Lru.add t.lru offset v ;
+              find_location := Stats.Pack_store.Staging ;
               Some v
           | exception Not_found -> (
               match Lru.find t.lru offset with
               | v ->
-                  find_location := Stats.Pack_store.Lru;
+                  find_location := Stats.Pack_store.Lru ;
                   Some v
               | exception Not_found ->
                   find_in_pack_file_guarded ~is_indexed:false))
     in
-    Stats.report_pack_store ~field:!find_location;
+    Stats.report_pack_store ~field:!find_location ;
     value_opt
 
   let unsafe_find_no_prefetch t key =
@@ -444,21 +482,22 @@ struct
   let batch t f =
     [%log.warn
       "[pack] calling batch directory on a store is not recommended. Use \
-       repo.batch instead."];
+       repo.batch instead."] ;
     let on_success res =
-      Fm.flush t.fm |> Errs.raise_if_error;
+      Fm.flush t.fm |> Errs.raise_if_error ;
       res
     in
     let on_fail exn =
       [%log.info
-        "[pack] batch failed. calling flush. (%s)" (Printexc.to_string exn)];
+        "[pack] batch failed. calling flush. (%s)" (Printexc.to_string exn)] ;
       let () =
         match Fm.flush t.fm with
         | Ok () -> ()
         | Error err ->
             [%log.err
               "[pack] batch failed and flush failed. Silencing flush fail. (%a)"
-                (Brassaia.Type.pp Errs.t) err]
+                (Brassaia.Type.pp Errs.t)
+                err]
       in
       raise exn
     in
@@ -470,30 +509,29 @@ struct
       (* the index is required for non-minimal indexing strategies and
          for commits. *)
       (not (Brassaia_pack.Indexing_strategy.is_minimal t.indexing_strategy))
-      || kind = Commit_v1
-      || kind = Commit_v2
+      || kind = Commit_v1 || kind = Commit_v2
     in
     let unguarded_append () =
       let offset_of_key k =
         match Pack_key.inspect k with
-        | Direct { offset; _ } ->
-            Stats.incr_appended_offsets ();
+        | Direct {offset; _} ->
+            Stats.incr_appended_offsets () ;
             Some offset
         | Indexed hash -> (
             (* TODO: Why don't we promote the key here? *)
             match Index.find (Fm.index t.fm) hash with
             | None ->
-                Stats.incr_appended_hashes ();
+                Stats.incr_appended_hashes () ;
                 None
             | Some (offset, _, _) ->
-                Stats.incr_appended_offsets ();
+                Stats.incr_appended_offsets () ;
                 Some offset)
       in
       let dict = Dict.index t.dict in
       let off = Dispatcher.end_offset t.dispatcher in
 
       let append = Suffix.append_exn (Fm.suffix t.fm) in
-      Val.encode_bin ~offset_of_key ~dict hash v append;
+      Val.encode_bin ~offset_of_key ~dict hash v append ;
 
       let open Int63.Syntax in
       let len = Int63.to_int (Dispatcher.end_offset t.dispatcher - off) in
@@ -503,9 +541,9 @@ struct
         if should_index then
           Index.add ~overcommit (Fm.index t.fm) hash (off, len, kind)
       in
-      Tbl.add t.staging hash v;
-      Lru.add t.lru off v;
-      [%log.debug "[pack] append %a" pp_key key];
+      Tbl.add t.staging hash v ;
+      Lru.add t.lru off v ;
+      [%log.debug "[pack] append %a" pp_key key] ;
       key
     in
     match ensure_unique && use_index with
@@ -560,11 +598,13 @@ struct
     Inner.index_direct_with_kind (get_if_open_exn t)
 
   let purge_lru t = Inner.purge_lru (get_if_open_exn t)
+
   let key_of_offset t offset = Inner.key_of_offset (get_if_open_exn t) offset
 
   let unsafe_find_no_prefetch t key =
     Inner.unsafe_find_no_prefetch (get_if_open_exn t) key
 
   let get_offset t key = Inner.get_offset (get_if_open_exn t) key
+
   let get_length t key = Inner.get_length (get_if_open_exn t) key
 end

@@ -25,6 +25,7 @@ module Generator = struct
     include Brassaia_tezos.Conf
 
     let entries = 2
+
     let stable_hash = 3
   end
 
@@ -32,6 +33,7 @@ module Generator = struct
 
   module Store = struct
     open Brassaia_pack_unix.Maker (Conf)
+
     include Make (Schema)
   end
 
@@ -42,20 +44,20 @@ module Generator = struct
 
   let create_store ?(before_closing = fun _repo _head -> ()) indexing_strategy
       path =
-    rm_dir path;
+    rm_dir path ;
     let large_contents = String.make 4096 'Z' in
     let rw = Store.Repo.v (config ~indexing_strategy path) in
-    let tree = Store.Tree.singleton [ "a"; "b1"; "c1"; "d1"; "e1" ] "x1" in
-    let tree = Store.Tree.add tree [ "a"; "b1"; "c1"; "d2"; "e2" ] "x2" in
-    let tree = Store.Tree.add tree [ "a"; "b1"; "c1"; "d3"; "e3" ] "x2" in
-    let tree = Store.Tree.add tree [ "a"; "b2"; "c2"; "e3" ] "x2" in
+    let tree = Store.Tree.singleton ["a"; "b1"; "c1"; "d1"; "e1"] "x1" in
+    let tree = Store.Tree.add tree ["a"; "b1"; "c1"; "d2"; "e2"] "x2" in
+    let tree = Store.Tree.add tree ["a"; "b1"; "c1"; "d3"; "e3"] "x2" in
+    let tree = Store.Tree.add tree ["a"; "b2"; "c2"; "e3"] "x2" in
     let c1 = Store.Commit.v rw ~parents:[] ~info tree in
 
-    let tree = Store.Tree.add tree [ "a"; "b3" ] large_contents in
-    let c2 = Store.Commit.v rw ~parents:[ Store.Commit.key c1 ] ~info tree in
+    let tree = Store.Tree.add tree ["a"; "b3"] large_contents in
+    let c2 = Store.Commit.v rw ~parents:[Store.Commit.key c1] ~info tree in
 
-    let tree = Store.Tree.remove tree [ "a"; "b1"; "c1" ] in
-    let c3 = Store.Commit.v rw ~parents:[ Store.Commit.key c2 ] ~info tree in
+    let tree = Store.Tree.remove tree ["a"; "b1"; "c1"] in
+    let c3 = Store.Commit.v rw ~parents:[Store.Commit.key c2] ~info tree in
 
     let () = before_closing rw (Store.Commit.key c3) in
 
@@ -73,7 +75,7 @@ module Generator = struct
 
   let create_snapshot_store ~src ~dest =
     let before_closing repo head =
-      rm_dir dest;
+      rm_dir dest ;
       Store.create_one_commit_store repo head dest
     in
     create_store ~before_closing Brassaia_pack.Indexing_strategy.minimal src
@@ -83,16 +85,19 @@ let ensure_data_dir () =
   if not (Sys.file_exists "data") then Unix.mkdir "data" 0o755
 
 let generate () =
-  ensure_data_dir ();
+  ensure_data_dir () ;
   let _ =
-    Generator.create_store Brassaia_pack.Indexing_strategy.minimal "data/minimal"
+    Generator.create_store
+      Brassaia_pack.Indexing_strategy.minimal
+      "data/minimal"
   in
   let _ =
     Generator.create_store Brassaia_pack.Indexing_strategy.always "data/always"
   in
   let _ = Generator.create_gced_store "data/gced" in
   let _ =
-    Generator.create_snapshot_store ~src:"data/snapshot_src"
+    Generator.create_snapshot_store
+      ~src:"data/snapshot_src"
       ~dest:"data/snapshot"
   in
   ()

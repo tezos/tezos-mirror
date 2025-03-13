@@ -41,7 +41,8 @@ let is_valid_utf8 str =
   try
     Uutf.String.fold_utf_8
       (fun _ _ -> function `Malformed _ -> raise Utf8_failure | _ -> ())
-      () str;
+      ()
+      str ;
     true
   with Utf8_failure -> false
 
@@ -53,13 +54,12 @@ module Make (S : Store.Generic_key.S) = struct
   module Node = S.Backend.Node
   module Commit = S.Backend.Commit
   module Slice = S.Backend.Slice
-
   module Graph =
     Object_graph.Make (Contents.Hash) (Node.Hash) (Commit.Hash) (Branch.Key)
-
   module Info = S.Info
 
   let pp_author = Type.pp Info.author_t
+
   let pp_message = Type.pp Info.message_t
 
   let fprintf (t : db) ?depth ?(html = false) ?full ~date name =
@@ -67,7 +67,7 @@ module Make (S : Store.Generic_key.S) = struct
       "depth=%s html=%b full=%s"
         (match depth with None -> "<none>" | Some d -> string_of_int d)
         html
-        (match full with None -> "<none>" | Some b -> string_of_bool b)];
+        (match full with None -> "<none>" | Some b -> string_of_bool b)] ;
     let slice = S.Repo.export ?full ?depth (S.repo t) in
     let vertex = Hashtbl.create 102 in
     let add_vertex v l = Hashtbl.add vertex v l in
@@ -118,7 +118,9 @@ module Make (S : Store.Generic_key.S) = struct
             \  <div class='message'><pre>%s</pre></div>\n\
             \  <div>&nbsp</div>\n\
              </div>"
-            k pp_author (Info.author o)
+            k
+            pp_author
+            (Info.author o)
             (date (Info.date o))
             (String.Ascii.escape message)
         else sprintf "%s" k
@@ -153,22 +155,21 @@ module Make (S : Store.Generic_key.S) = struct
     let nodes = ref [] in
     let commits = ref [] in
     Slice.iter slice (function
-      | `Contents c -> contents := c :: !contents
-      | `Node n -> nodes := n :: !nodes
-      | `Commit c -> commits := c :: !commits);
+        | `Contents c -> contents := c :: !contents
+        | `Node n -> nodes := n :: !nodes
+        | `Commit c -> commits := c :: !commits) ;
     List.iter
       (fun (k, c) ->
-        add_vertex (`Contents k) [ `Shape `Box; label_of_contents k c ])
-      !contents;
+        add_vertex (`Contents k) [`Shape `Box; label_of_contents k c])
+      !contents ;
     List.iter
       (fun (k, t) ->
-        add_vertex (`Node k) [ `Shape `Box; `Style `Dotted; label_of_node k t ])
-      !nodes;
+        add_vertex (`Node k) [`Shape `Box; `Style `Dotted; label_of_node k t])
+      !nodes ;
     List.iter
       (fun (k, r) ->
-        add_vertex (`Commit k)
-          [ `Shape `Box; `Style `Bold; label_of_commit k r ])
-      !commits;
+        add_vertex (`Commit k) [`Shape `Box; `Style `Bold; label_of_commit k r])
+      !commits ;
     List.iter
       (fun (k, t) ->
         List.iter
@@ -176,24 +177,25 @@ module Make (S : Store.Generic_key.S) = struct
             match v with
             | `Contents (v, _meta) ->
                 let v = Contents.Key.to_hash v in
-                add_edge (`Node k)
-                  [ `Style `Dotted; label_of_step l ]
+                add_edge
+                  (`Node k)
+                  [`Style `Dotted; label_of_step l]
                   (`Contents v)
             | `Node n ->
                 let n = Node.Key.to_hash n in
-                add_edge (`Node k) [ `Style `Solid; label_of_step l ] (`Node n))
+                add_edge (`Node k) [`Style `Solid; label_of_step l] (`Node n))
           (Node.Val.list t))
-      !nodes;
+      !nodes ;
     List.iter
       (fun (k, r) ->
         List.iter
           (fun c ->
             let c = Commit.Key.to_hash c in
-            add_edge (`Commit k) [ `Style `Bold ] (`Commit c))
-          (Commit.Val.parents r);
+            add_edge (`Commit k) [`Style `Bold] (`Commit c))
+          (Commit.Val.parents r) ;
         let node_hash = Commit.Val.node r |> Node.Key.to_hash in
-        add_edge (`Commit k) [ `Style `Dashed ] (`Node node_hash))
-      !commits;
+        add_edge (`Commit k) [`Style `Dashed] (`Node node_hash))
+      !commits ;
     let branch_t = S.Backend.Repo.branch_t (S.repo t) in
     let bs = Branch.list branch_t in
     List.iter
@@ -202,10 +204,11 @@ module Make (S : Store.Generic_key.S) = struct
         | None -> ()
         | Some k ->
             let k = Commit.Key.to_hash k in
-            add_vertex (`Branch r)
-              [ `Shape `Plaintext; label_of_tag r; `Style `Filled ];
-            add_edge (`Branch r) [ `Style `Bold ] (`Commit k))
-      bs;
+            add_vertex
+              (`Branch r)
+              [`Shape `Plaintext; label_of_tag r; `Style `Filled] ;
+            add_edge (`Branch r) [`Style `Bold] (`Commit k))
+      bs ;
     let vertex = Hashtbl.fold (fun k v acc -> (k, v) :: acc) vertex [] in
     fun ppf -> Graph.output ppf vertex !edges name
 

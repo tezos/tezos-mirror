@@ -27,7 +27,7 @@ struct
   module Sparse = Sparse_file.Make (Io)
 
   type t =
-    | Empty of { path : string }
+    | Empty of {path : string}
     | Nonempty of {
         path : string;
         control : Payload.t;
@@ -54,8 +54,8 @@ struct
     Ok
       (let path = volume_path in
        match control with
-       | None -> Empty { path }
-       | Some control -> Nonempty { path; control; sparse = None })
+       | None -> Empty {path}
+       | Some control -> Nonempty {path; control; sparse = None})
 
   let create_empty volume_path =
     let open Result_syntax in
@@ -103,23 +103,23 @@ struct
     Control.create_rw ~path:control ~tmp_path:None ~overwrite:false payload
     >>= Control.close
 
-  let path = function Empty { path } -> path | Nonempty { path; _ } -> path
+  let path = function Empty {path} -> path | Nonempty {path; _} -> path
 
   let control = function
     | Empty _ -> None
-    | Nonempty { control; _ } -> Some control
+    | Nonempty {control; _} -> Some control
 
   let is_empty = function Empty _ -> true | Nonempty _ -> false
 
   let contains ~off = function
     | Empty _ -> false
-    | Nonempty { control; _ } ->
+    | Nonempty {control; _} ->
         let open Int63.Syntax in
         control.start_offset <= off && off < control.end_offset
 
   let open_ = function
     | Empty _ -> Ok () (* Opening an empty volume is a no-op *)
-    | Nonempty ({ path = root; sparse; control; _ } as t) -> (
+    | Nonempty ({path = root; sparse; control; _} as t) -> (
         match sparse with
         | Some _ -> Ok () (* Sparse file is already open *)
         | None ->
@@ -132,7 +132,7 @@ struct
 
   let close = function
     | Empty _ -> Ok () (* Closing an empty volume is a no-op *)
-    | Nonempty ({ sparse; _ } as t) -> (
+    | Nonempty ({sparse; _} as t) -> (
         match sparse with
         | None -> Error `Double_close
         | Some s ->
@@ -141,12 +141,14 @@ struct
             t.sparse <- None)
 
   let identifier t = path t
+
   let identifier_eq ~id t = String.equal (identifier t) id
+
   let eq a b = identifier_eq ~id:(identifier b) a
 
   let read_range_exn ~off ~min_len ~max_len b = function
     | Empty _ -> Errs.raise_error (`Invalid_volume_read (`Empty, off))
-    | Nonempty { sparse; _ } -> (
+    | Nonempty {sparse; _} -> (
         match sparse with
         | None -> Errs.raise_error (`Invalid_volume_read (`Closed, off))
         | Some s -> Sparse.read_range_exn s ~off ~min_len ~max_len b)
@@ -157,7 +159,7 @@ struct
     let* () =
       match t with
       | Empty _ -> Ok ()
-      | Nonempty { control; _ } ->
+      | Nonempty {control; _} ->
           if control.end_offset <= first_off then Ok ()
           else
             Error
@@ -174,23 +176,25 @@ struct
              copy pre-GC prefix/mapping as new volume *)
           let old_generation = pred generation in
           let old_mapping =
-            Brassaia_pack.Layout.V5.mapping ~root:upper_root
+            Brassaia_pack.Layout.V5.mapping
+              ~root:upper_root
               ~generation:old_generation
           in
           let old_prefix =
-            Brassaia_pack.Layout.V5.prefix ~root:upper_root
+            Brassaia_pack.Layout.V5.prefix
+              ~root:upper_root
               ~generation:old_generation
           in
           let* () = Io.copy_file ~src:old_prefix ~dst:data in
           let* () = Io.copy_file ~src:old_mapping ~dst:mapping in
           Io.size_of_path mapping
-      | Nonempty { control; _ } -> Ok control.mapping_end_poff
+      | Nonempty {control; _} -> Ok control.mapping_end_poff
     in
     (* Append archived data *)
     let* ao = Sparse.Ao.open_ao ~mapping_size ~mapping ~data in
     List.iter
       (fun (off, seq) -> Sparse.Ao.append_seq_exn ao ~off seq)
-      to_archive;
+      to_archive ;
     let end_offset = Sparse.Ao.end_off ao in
     let mapping_end_poff = Sparse.Ao.mapping_size ao in
     let* () = Sparse.Ao.flush ao in
@@ -199,18 +203,21 @@ struct
     let start_offset =
       match t with
       | Empty _ -> first_off
-      | Nonempty { control; _ } -> control.start_offset
+      | Nonempty {control; _} -> control.start_offset
     in
     let new_control =
       Control_file.Payload.Volume.V5.
-        { start_offset; end_offset; mapping_end_poff; checksum = Int63.zero }
+        {start_offset; end_offset; mapping_end_poff; checksum = Int63.zero}
     in
     (* Write into temporary file on disk *)
     let control_gc_tmp =
       Brassaia_pack.Layout.V5.Volume.control_gc_tmp ~generation ~root
     in
     let* c =
-      Control.create_rw ~path:control_gc_tmp ~tmp_path:None ~overwrite:true
+      Control.create_rw
+        ~path:control_gc_tmp
+        ~tmp_path:None
+        ~overwrite:true
         new_control
     in
     let* () = Control.close c in
@@ -222,7 +229,9 @@ struct
         [%log.warn
           "Lower.archive_seq: Nothing to archive! volume=%S generation=%i \
            is_first=%b"
-          (identifier t) generation is_first];
+            (identifier t)
+            generation
+            is_first] ;
         Ok (identifier t)
     | (first_off, _) :: _ ->
         archive_seq ~upper_root ~generation ~is_first ~to_archive ~first_off t
@@ -236,7 +245,7 @@ struct
     match Io.classify_path control_tmp with
     | `File -> Io.move_file ~src:control_tmp ~dst:control
     | `No_such_file_or_directory ->
-        [%log.info "No tmp volume control file to swap. %s" control];
+        [%log.info "No tmp volume control file to swap. %s" control] ;
         Ok ()
     | `Directory | `Other -> assert false
 
@@ -265,8 +274,10 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
     mutable open_volume : Volume.t option;
   }
 
-  type open_error = [ Volume.open_error | `Volume_missing of string ]
-  type close_error = [ | Io.close_error ]
+  type open_error = [Volume.open_error | `Volume_missing of string]
+
+  type close_error = [ | Io.close_error]
+
   type nonrec volume_identifier = volume_identifier [@@deriving brassaia]
 
   type add_error =
@@ -302,14 +313,15 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
             | Ok v -> v)
       in
       try Ok (Array.init volume_num volume)
-      with LoadVolumeError err -> Error (err : open_error :> [> open_error ])
+      with LoadVolumeError err -> Error (err : open_error :> [> open_error])
     in
-    t.volumes <- volumes;
+    t.volumes <- volumes ;
     Ok t
 
   let v ~readonly ~volume_num root =
-    load_volumes ~volume_num
-      { root; readonly; volumes = [||]; open_volume = None }
+    load_volumes
+      ~volume_num
+      {root; readonly; volumes = [||]; open_volume = None}
 
   let reload ~volume_num t =
     let open Result_syntax in
@@ -317,7 +329,9 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
     Ok ()
 
   let set_readonly t flag = t.readonly <- flag
+
   let close = close_open_volume
+
   let volume_num t = Array.length t.volumes
 
   let appendable_volume t =
@@ -337,7 +351,7 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
       Layout.directory ~root:t.root ~idx:next_idx
     in
     let* vol = Volume.create_empty volume_path in
-    t.volumes <- Array.append t.volumes [| vol |];
+    t.volumes <- Array.append t.volumes [|vol|] ;
     Ok vol
 
   let find_volume ~off t = Array.find_opt (Volume.contains ~off) t.volumes
@@ -361,8 +375,11 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
 
   let read_range_exn ~off ~min_len ~max_len ?volume t b =
     [%log.debug
-      "read_range_exn ~off:%a ~min_len:%i ~max_len:%i" Int63.pp off min_len
-        max_len];
+      "read_range_exn ~off:%a ~min_len:%i ~max_len:%i"
+        Int63.pp
+        off
+        min_len
+        max_len] ;
     let set_open_volume t v =
       (* Maintain one open volume at a time. *)
       let open Result_syntax in
@@ -379,7 +396,7 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
       | None -> find_volume_by_offset_exn t ~off
       | Some id -> find_volume_by_identifier_exn t ~id
     in
-    set_open_volume t volume |> Errs.raise_if_error;
+    set_open_volume t volume |> Errs.raise_if_error ;
     let len = Volume.read_range_exn ~off ~min_len ~max_len b volume in
     (len, Volume.identifier volume)
 

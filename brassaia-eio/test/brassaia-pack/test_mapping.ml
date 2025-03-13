@@ -31,27 +31,27 @@ let rec make_string_seq len () =
 (** Call the [Mapping_file] routines to process [pairs] *)
 let process_on_disk pairs =
   let mapping = Brassaia_pack.Layout.V5.mapping ~root:test_dir ~generation:1 in
-  Io.unlink mapping |> ignore;
+  Io.unlink mapping |> ignore ;
   let data = Brassaia_pack.Layout.V5.prefix ~root:test_dir ~generation:1 in
-  Io.unlink data |> ignore;
+  Io.unlink data |> ignore ;
   let sparse = Sparse_file.Ao.create ~mapping ~data |> Errs.raise_if_error in
   List.iter
     (fun (off, len) ->
-      Format.printf "%i (+%i) => %i@." off len (off + len);
+      Format.printf "%i (+%i) => %i@." off len (off + len) ;
       let str = make_string_seq len in
       let off = Int63.of_int off in
       Sparse_file.Ao.append_seq_exn sparse ~off str)
-    (List.rev pairs);
+    (List.rev pairs) ;
   let mapping_size = Int63.to_int (Sparse_file.Ao.mapping_size sparse) in
-  Sparse_file.Ao.flush sparse |> Errs.raise_if_error;
-  Sparse_file.Ao.close sparse |> Errs.raise_if_error;
+  Sparse_file.Ao.flush sparse |> Errs.raise_if_error ;
+  Sparse_file.Ao.close sparse |> Errs.raise_if_error ;
   let sparse =
     Sparse_file.open_ro ~mapping_size ~mapping ~data |> Errs.raise_if_error
   in
   let l = ref [] in
   let f ~off ~len = l := (Int63.to_int off, len) :: !l in
-  Sparse_file.iter sparse f |> Errs.raise_if_error;
-  Sparse_file.close sparse |> Errs.raise_if_error;
+  Sparse_file.iter sparse f |> Errs.raise_if_error ;
+  Sparse_file.close sparse |> Errs.raise_if_error ;
   !l |> List.rev
 
 (** Emulate the behaviour of the [Mapping_file] routines to process [pairs] *)
@@ -62,11 +62,12 @@ let test input_entries =
   let input_entries' = process_in_mem input_entries in
   Alcotest.(check (list (pair int int)))
     "Comparison between Mapping_file result and the in-memory equivalent"
-    input_entries' output_entries
+    input_entries'
+    output_entries
 
 (** Produce an array of contiguous offset/length pairs starting from offset 0 *)
 let produce_suffix_segmentation len seed =
-  let rng = Random.State.make [| seed |] in
+  let rng = Random.State.make [|seed|] in
   let _, elts =
     List.init len Fun.id
     |> List.fold_left
@@ -79,7 +80,7 @@ let produce_suffix_segmentation len seed =
 
 (** Randomly produce a subset of the [full_seg] segmentation. *)
 let produce_suffix_segmentation_subset full_seg ~seed =
-  let rng = Random.State.make [| seed |] in
+  let rng = Random.State.make [|seed|] in
   List.filter_map (fun (off, len) ->
       if Random.State.bool rng then None
       else
@@ -90,14 +91,14 @@ let produce_suffix_segmentation_subset full_seg ~seed =
 let test ~full_seg_length ~random_test_count =
   (* [mkdir] may fail if the directory exists. The files in it will be
      overwritten at computation time. *)
-  Io.mkdir test_dir |> ignore;
+  Io.mkdir test_dir |> ignore ;
 
   let seg = produce_suffix_segmentation full_seg_length 42 in
   let rec aux i =
     if i >= random_test_count then ()
     else
       let subset = produce_suffix_segmentation_subset seg ~seed:i in
-      if subset <> [] then test subset;
+      if subset <> [] then test subset ;
       aux (i + 1)
   in
   aux 0

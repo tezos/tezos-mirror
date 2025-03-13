@@ -16,5 +16,5 @@
 
 (** Values. *)
 
-include Contents_intf.Sigs
 (** @inline *)
+include Contents_intf.Sigs

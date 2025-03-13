@@ -18,23 +18,28 @@ include Info_intf
 
 module Default = struct
   type author = string [@@deriving brassaia]
+
   type message = string [@@deriving brassaia]
 
-  type t = { date : int64; author : author; message : message }
+  type t = {date : int64; author : author; message : message}
   [@@deriving brassaia ~equal]
 
   type f = unit -> t
 
-  let empty = { date = 0L; author = ""; message = "" }
+  let empty = {date = 0L; author = ""; message = ""}
+
   let is_empty = equal empty
 
   let v ?(author = "") ?(message = "") date =
-    let r = { date; message; author } in
+    let r = {date; message; author} in
     if is_empty r then empty else r
 
   let date t = t.date
+
   let author t = t.author
+
   let message t = t.message
+
   let none () = empty
 end
 

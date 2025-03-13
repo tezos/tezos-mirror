@@ -30,13 +30,16 @@ module Make (Args : Args) = struct
     |> List.iter (fun name ->
            match Io.unlink (Filename.concat path_index name) with
            | Ok () -> ()
-           | Error (`Sys_error msg) -> failwith msg);
-    Io.rmdir path_index;
+           | Error (`Sys_error msg) -> failwith msg) ;
+    Io.rmdir path_index ;
     Io.rmdir path
 
   let pp_hash = Brassaia.Type.pp Hash.t
+
   let pp_key = Brassaia.Type.pp Inode_pack.Key.t
+
   let pp_kind = Brassaia.Type.pp Pack_value.Kind.t
+
   let pp_snapshot = Brassaia.Type.pp Inode.Snapshot.inode_t
 
   module Export = struct
@@ -44,7 +47,9 @@ module Make (Args : Args) = struct
       type t = unit [@@deriving brassaia]
 
       let encode _ = ""
+
       let encoded_size = 0
+
       let decode _ _ = ()
     end
 
@@ -67,7 +72,7 @@ module Make (Args : Args) = struct
       let fm = Fm.open_ro config |> Fm.Errs.raise_if_error in
       let dispatcher = Dispatcher.v fm |> Fm.Errs.raise_if_error in
       let log_size = Conf.index_log_size config in
-      { fm; dispatcher; log_size; inode_pack; contents_pack }
+      {fm; dispatcher; log_size; inode_pack; contents_pack}
 
     let close t = Fm.close t.fm
 
@@ -81,7 +86,7 @@ module Make (Args : Args) = struct
           (* This case cannot happen, as [key_of_hash] converts an
              indexed key to a direct one. *)
           assert false
-      | Direct { length; _ } -> length
+      | Direct {length; _} -> length
 
     let io_read_and_decode_entry_prefix ~off t =
       let entry_prefix : Inode_pack.Entry_prefix.t =
@@ -102,23 +107,25 @@ module Make (Args : Args) = struct
       let buf = Bytes.create len in
       let _ = Dispatcher.read_exn t.dispatcher ~off ~len buf in
       let entry_of_offset offset =
-        [%log.debug "key_of_offset: %a" Int63.pp offset];
+        [%log.debug "key_of_offset: %a" Int63.pp offset] ;
         io_read_and_decode_entry_prefix ~off:offset t
       in
       let entry_of_hash hash = key_of_hash hash t.inode_pack in
       (* Bytes.unsafe_to_string usage: buf is created locally, uniquely owned; we assume
          Dispatcher.read_exn returns unique ownership; then call to Bytes.unsafe_to_string
          gives up unique ownership of buf. This is safe. *)
-      Inode.Raw.decode_children_offsets ~entry_of_offset ~entry_of_hash
+      Inode.Raw.decode_children_offsets
+        ~entry_of_offset
+        ~entry_of_hash
         (Bytes.unsafe_to_string buf) (* safe: see comment above *)
         (ref 0)
 
-    type visit = { visited : Hash.t -> bool; set_visit : Hash.t -> unit }
+    type visit = {visited : Hash.t -> bool; set_visit : Hash.t -> unit}
 
     let iter t v f_contents f_inodes (root_key, root_kind) =
       let total_visited = ref 0 in
       let set_visit h =
-        incr total_visited;
+        incr total_visited ;
         v.set_visit h
       in
       let rec aux (key, kind) =
@@ -131,24 +138,28 @@ module Make (Args : Args) = struct
                [Inode.Raw.decode_children_offsets] converts it to a direct key
                before the call to [aux]. *)
             assert false
-        | Direct { length; offset; hash; _ } ->
+        | Direct {length; offset; hash; _} ->
             if v.visited hash then ()
             else (
-              set_visit hash;
-              [%log.debug "visit hash: %a, %a" pp_hash hash pp_kind kind];
+              set_visit hash ;
+              [%log.debug "visit hash: %a, %a" pp_hash hash pp_kind kind] ;
               (* [unsafe_find] decodes the values based on their kind, we need
                  to detect the type in order to call the correspoding
                  [unsafe_find].*)
               match kind with
               | Contents -> (
                   let value =
-                    Contents_pack.unsafe_find ~check_integrity:false
-                      t.contents_pack key
+                    Contents_pack.unsafe_find
+                      ~check_integrity:false
+                      t.contents_pack
+                      key
                   in
                   match value with
                   | None ->
-                      Fmt.failwith "contents not found in store. Key: %a "
-                        pp_key key
+                      Fmt.failwith
+                        "contents not found in store. Key: %a "
+                        pp_key
+                        key
                   | Some value ->
                       let snapshot_blob = value in
                       f_contents snapshot_blob)
@@ -159,17 +170,21 @@ module Make (Args : Args) = struct
                   in
                   let () = List.iter (fun key -> aux key) children in
                   let value =
-                    Inode_pack.unsafe_find ~check_integrity:false t.inode_pack
+                    Inode_pack.unsafe_find
+                      ~check_integrity:false
+                      t.inode_pack
                       key
                   in
                   match value with
                   | None ->
-                      Fmt.failwith "node not found in store. Key: %a " pp_key
+                      Fmt.failwith
+                        "node not found in store. Key: %a "
+                        pp_key
                         key
                   | Some value ->
                       let snapshot_inode = Inode.to_snapshot value in
                       [%log.debug
-                        "iter inode snapshot: %a" pp_snapshot snapshot_inode];
+                        "iter inode snapshot: %a" pp_snapshot snapshot_inode] ;
                       f_inodes snapshot_inode)
               | Commit_v1 | Commit_v2 ->
                   (* The traversal starts with a node, it never iters over
@@ -188,7 +203,7 @@ module Make (Args : Args) = struct
       !total_visited
 
     let run_in_memory t f_contents f_inodes root_key =
-      [%log.info "iter in memory"];
+      [%log.info "iter in memory"] ;
       let visited_hash = Hashes.create ~initial_slots:100_000 () in
       let visited h = Hashes.mem visited_hash h in
       let set_visit h =
@@ -197,10 +212,10 @@ module Make (Args : Args) = struct
             Fmt.failwith "should not visit hash twice. Hash: %a " pp_hash h
         | `Ok -> ()
       in
-      iter t { visited; set_visit } f_contents f_inodes root_key
+      iter t {visited; set_visit} f_contents f_inodes root_key
 
     let run_on_disk path t f_contents f_inodes root_key =
-      [%log.info "iter on disk"];
+      [%log.info "iter on disk"] ;
       let index =
         Index.v ~fresh:true ~readonly:false ~log_size:t.log_size path
       in
@@ -210,9 +225,9 @@ module Make (Args : Args) = struct
           Fmt.failwith "Should not visit hash twice. Hash: %a " pp_hash h
         else Index.replace index h ()
       in
-      let total = iter t { visited; set_visit } f_contents f_inodes root_key in
-      Index.close index;
-      rm_index path;
+      let total = iter t {visited; set_visit} f_contents f_inodes root_key in
+      Index.close index ;
+      rm_index path ;
       total
 
     let run ?on_disk =
@@ -229,8 +244,8 @@ module Make (Args : Args) = struct
 
       let encode ((off, len) : t) =
         let buf = Bytes.create encoded_size in
-        Bytes.set_int64_be buf 0 (Int63.to_int64 off);
-        Bytes.set_int32_be buf 8 (Int32.of_int len);
+        Bytes.set_int64_be buf 0 (Int63.to_int64 off) ;
+        Bytes.set_int32_be buf 8 (Int32.of_int len) ;
         (* Bytes.unsafe_to_string usage: buf is local, uniquely owned; we assume the
            Bytes.set... functions return unique ownership; then Bytes.unsafe_to_string
            gives up unique ownership of buf to get shared ownership of the resulting
@@ -266,24 +281,25 @@ module Make (Args : Args) = struct
             Contents_pack.add writer b)
       in
       let hash = Inode.Key.to_hash key in
-      t.set_visit hash key;
+      t.set_visit hash key ;
       key
 
     let save_inodes t i : Hash.t Pack_key.t =
       let inode = Inode.of_snapshot t.inode_pack ~index:t.visited i in
       let key = Inode.save ~allow_non_root:true t.inode_pack inode in
       let hash = Inode.Key.to_hash key in
-      t.set_visit hash key;
+      t.set_visit hash key ;
       key
 
     let hash_not_found h =
       Fmt.failwith
         "You are trying to save to the backend an inode that contains pointers \
          to objects unknown to the backend. Hash: %a"
-        pp_hash h
+        pp_hash
+        h
 
     let save_reuse_index inodes =
-      [%log.info "save reuse index "];
+      [%log.info "save reuse index "] ;
       (* objects are added to index by [save_contents] and [save_inodes]
          functions. *)
       let set_visit _ _ = () in
@@ -295,7 +311,7 @@ module Make (Args : Args) = struct
       (set_visit, visited, None)
 
     let save_in_memory () =
-      [%log.info "save in memory"];
+      [%log.info "save in memory"] ;
       let tbl : (Hash.t, Hash.t Pack_key.t) Hashtbl.t = Hashtbl.create 10 in
       let set_visit h k = Hashtbl.add tbl h k in
       let visited h =
@@ -308,13 +324,13 @@ module Make (Args : Args) = struct
     let save_on_disk log_size path =
       (* Make sure we are not reusing the same index as brassaia-pack. *)
       let path = path ^ "_tmp" in
-      [%log.info "save on disk: %s" path];
+      [%log.info "save on disk: %s" path] ;
       let index = Index.v ~fresh:true ~readonly:false ~log_size path in
 
       let set_visit h k =
         let offset, length =
           match Pack_key.inspect k with
-          | Direct { offset; length; _ } -> (offset, length)
+          | Direct {offset; length; _} -> (offset, length)
           | Indexed _ ->
               (* Visited objects have direct keys. *)
               assert false
@@ -337,12 +353,12 @@ module Make (Args : Args) = struct
         | Some (`Path path) -> save_on_disk log_size path
         | Some `Reuse -> save_reuse_index inode_pack
       in
-      { inode_pack; contents_pack; visited; set_visit; index }
+      {inode_pack; contents_pack; visited; set_visit; index}
 
     let close t =
       Option.iter
         (fun (path, index) ->
-          Index.close index;
+          Index.close index ;
           rm_index path)
         t.index
   end

@@ -14,5 +14,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Snapshot_intf.Sigs
 (** @inline *)
+include Snapshot_intf.Sigs

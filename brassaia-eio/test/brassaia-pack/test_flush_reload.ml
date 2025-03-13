@@ -39,10 +39,16 @@ let check_suffix repo model =
       | false, false -> ()
       | true, true -> ()
       | true, false ->
-          Alcotest.failf "Pack entry with hash:%a off:%d shouldn't be there"
-            pp_hash e.h (Int63.to_int e.o)
+          Alcotest.failf
+            "Pack entry with hash:%a off:%d shouldn't be there"
+            pp_hash
+            e.h
+            (Int63.to_int e.o)
       | false, true ->
-          Alcotest.failf "Pack entry with hash:%a off:%d is missing" pp_hash e.h
+          Alcotest.failf
+            "Pack entry with hash:%a off:%d is missing"
+            pp_hash
+            e.h
             (Int63.to_int e.o))
     pack_entries
 
@@ -50,8 +56,8 @@ let check_ro t =
   match t.ro with
   | None -> assert false
   | Some (model, repo) ->
-      check_dict repo model;
-      check_index repo model;
+      check_dict repo model ;
+      check_index repo model ;
       check_suffix repo model
 
 type phase_flush =
@@ -62,22 +68,22 @@ type phase_flush =
 [@@deriving brassaia ~pp]
 
 let write1_dict model =
-  Model.preload_dict model;
+  Model.preload_dict model ;
   Model.write1_dict model
 
 let write1_suffix model =
-  write1_dict model;
-  Model.preload_suffix model;
+  write1_dict model ;
+  Model.preload_suffix model ;
   Model.write1_suffix model
 
 let write1_index model =
-  write1_suffix model;
-  Model.preload_index model;
+  write1_suffix model ;
+  Model.preload_index model ;
   Model.write1_index model
 
 let reload_ro t current_phase =
   [%logs.app
-    "*** reload_ro %a, %a" pp_setup t.setup pp_phase_flush current_phase];
+    "*** reload_ro %a, %a" pp_setup t.setup pp_phase_flush current_phase] ;
   match t.ro with
   | None -> assert false
   | Some (model, repo) ->
@@ -86,7 +92,7 @@ let reload_ro t current_phase =
         | S1_before_flush -> ()
         | S2_after_flush_dict -> ()
         | S3_after_flush_suffix ->
-            write1_dict model;
+            write1_dict model ;
             write1_suffix model
         | S4_after_flush -> write1_index model
       in
@@ -113,7 +119,7 @@ let start t =
 let test_one t ~(ro_reload_at : phase_flush) =
   let aux phase =
     let () = check_ro t in
-    if ro_reload_at = phase then reload_ro t phase;
+    if ro_reload_at = phase then reload_ro t phase ;
     check_ro t
   in
   let rw, _ = start t in
@@ -138,7 +144,7 @@ let test_one_guarded setup ~ro_reload_at =
 let setup =
   (* We are using indexing strategy always here to have more entries in index
      for the flush/reload tests. *)
-  { start_mode = From_scratch; indexing_strategy = `always; lru_size = 0 }
+  {start_mode = From_scratch; indexing_strategy = `always; lru_size = 0}
 
 let test_flush () =
   let t = test_one_guarded setup in
@@ -157,25 +163,25 @@ type phase_reload =
 [@@deriving brassaia ~pp]
 
 let write1_index model =
-  Model.preload_index model;
+  Model.preload_index model ;
   Model.write1_index model
 
 let write1_suffix model =
-  Model.preload_suffix model;
+  Model.preload_suffix model ;
   Model.write1_suffix model
 
 let write1_dict model =
-  Model.preload_dict model;
+  Model.preload_dict model ;
   Model.write1_dict model
 
 let write_all model =
-  write1_index model;
-  write1_suffix model;
+  write1_index model ;
+  write1_suffix model ;
   write1_dict model
 
 let flush_rw t (current_phase : phase_reload) =
   [%logs.app
-    "*** flush_rw %a, %a" pp_setup t.setup pp_phase_reload current_phase];
+    "*** flush_rw %a, %a" pp_setup t.setup pp_phase_reload current_phase] ;
   let () =
     match t.ro with
     | None -> assert false
@@ -183,7 +189,7 @@ let flush_rw t (current_phase : phase_reload) =
         match current_phase with
         | S1_before_reload -> write_all model
         | S2_after_reload_index ->
-            write1_dict model;
+            write1_dict model ;
             write1_suffix model
         | S3_after_reload_control | S4_after_reload_suffix | S5_after_reload ->
             (* If the control has not changed, suffix and dict are not reloaded. *)

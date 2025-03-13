@@ -52,14 +52,18 @@ struct
 
   module T = struct
     type hash = H.t [@@deriving brassaia ~pp ~to_bin_string ~equal]
+
     type key = Key.t [@@deriving brassaia ~pp ~equal]
+
     type node_key = Node.node_key [@@deriving brassaia]
+
     type contents_key = Node.contents_key [@@deriving brassaia]
 
     type step = Node.step
     [@@deriving brassaia ~compare ~to_bin_string ~of_bin_string ~short_hash]
 
     type metadata = Node.metadata [@@deriving brassaia ~equal]
+
     type value = Node.value [@@deriving brassaia ~equal]
 
     module Metadata = Node.Metadata
@@ -68,7 +72,7 @@ struct
 
     let raise_dangling_hash c hash =
       let context = "Brassaia_pack.Inode." ^ c in
-      raise (Dangling_hash { context; hash })
+      raise (Dangling_hash {context; hash})
 
     let unsafe_keyvalue_of_hashvalue = function
       | `Contents (h, m) -> `Contents (Key.unfindable_of_hash h, m)
@@ -96,10 +100,10 @@ struct
     let log_entry = int_of_float (log (float Conf.entries) /. log 2.)
 
     let () =
-      assert (log_entry >= 1);
+      assert (log_entry >= 1) ;
       (* NOTE: the [`Hash_bits] mode is restricted to inodes with at most 1024
          entries in order to simplify the implementation (see below). *)
-      assert ((not (Conf.inode_child_order = `Hash_bits)) || log_entry <= 10);
+      assert ((not (Conf.inode_child_order = `Hash_bits)) || log_entry <= 10) ;
       assert (Conf.entries = int_of_float (2. ** float log_entry))
 
     let key =
@@ -122,7 +126,7 @@ struct
        When [n] is not a power of 2, [hash_bits] needs to handle
        unaligned reads properly. *)
     let hash_bits ~depth k =
-      assert (Bytes.length k = Step.hash_size);
+      assert (Bytes.length k = Step.hash_size) ;
       (* We require above that the child indices have at most 10 bits to ensure
          that they span no more than 2 bytes of the step hash. The 3 byte case
          (with [1 + 8 + 1]) does not happen for 10-bit indices because 10 is
@@ -132,7 +136,7 @@ struct
       let initial_bit_pos = log_entry * depth in
       let n = initial_bit_pos / byte in
       let r = initial_bit_pos mod byte in
-      if n >= Step.hash_size then raise (Max_depth depth);
+      if n >= Step.hash_size then raise (Max_depth depth) ;
       if r + log_entry <= byte then
         (* The index is contained in a single character of the hash *)
         let i = Bytes.get_uint8 k n in
@@ -146,12 +150,13 @@ struct
         let rest = log_entry - to_read in
         let mask = (1 lsl to_read) - 1 in
         let r0 = (i0 land mask) lsl rest in
-        if n + 1 >= Step.hash_size then raise (Max_depth depth);
+        if n + 1 >= Step.hash_size then raise (Max_depth depth) ;
         let i1 = Bytes.get_uint8 k (n + 1) in
         let r1 = i1 lsr (byte - rest) in
         r0 + r1
 
     let short_hash = Brassaia.Type.(unstage (short_hash bytes))
+
     let seeded_hash ~depth k = abs (short_hash ~seed:depth k) mod Conf.entries
 
     let index =
@@ -175,15 +180,23 @@ struct
     open T
 
     type t [@@deriving brassaia]
+
     type v = private Key of Key.t | Hash of hash Lazy.t
 
     val inspect : t -> v
+
     val of_key : key -> t
+
     val of_hash : hash Lazy.t -> t
+
     val promote_exn : t -> key -> unit
+
     val to_hash : t -> hash
+
     val to_lazy_hash : t -> hash Lazy.t
+
     val to_key_exn : t -> key
+
     val is_key : t -> bool
   end = struct
     open T
@@ -203,7 +216,9 @@ struct
     type t = v ref
 
     let inspect t = !t
+
     let of_key k = ref (Key k)
+
     let of_hash h = ref (Hash h)
 
     let promote_exn t k =
@@ -219,7 +234,10 @@ struct
       if not (equal_hash existing_hash (Key.to_hash k)) then
         Fmt.failwith
           "Attempted to promote existing reference %a to an inconsistent key %a"
-          pp_dump_v !t pp_key k;
+          pp_dump_v
+          !t
+          pp_key
+          k ;
       t := Key k
 
     let to_hash t =
@@ -234,7 +252,9 @@ struct
       match !t with
       | Key k -> k
       | Hash h ->
-          Fmt.failwith "Encountered unkeyed hash but expected key: %a" pp_hash
+          Fmt.failwith
+            "Encountered unkeyed hash but expected key: %a"
+            pp_hash
             (Lazy.force h)
 
     let t =
@@ -262,7 +282,7 @@ struct
     (** Distinguishes between the two possible modes of binary value. *)
     type _ mode = Ptr_key : key mode | Ptr_any : Val_ref.t mode
 
-    type 'vref with_index = { index : int; vref : 'vref } [@@deriving brassaia]
+    type 'vref with_index = {index : int; vref : 'vref} [@@deriving brassaia]
 
     type 'vref tree = {
       depth : int;
@@ -281,7 +301,7 @@ struct
           type t = Val_ref.t v [@@deriving brassaia]
         end)
 
-    type 'vref t = { hash : H.t Lazy.t; root : bool; v : 'vref v }
+    type 'vref t = {hash : H.t Lazy.t; root : bool; v : 'vref v}
 
     let t : type vref. vref Brassaia.Type.t -> vref t Brassaia.Type.t =
      fun vref_t ->
@@ -289,14 +309,14 @@ struct
       let v_t = v_t vref_t in
       let pre_hash_v = pre_hash_v vref_t in
       let pre_hash x = pre_hash_v x.v in
-      record "Bin.t" (fun hash root v -> { hash = Lazy.from_val hash; root; v })
+      record "Bin.t" (fun hash root v -> {hash = Lazy.from_val hash; root; v})
       |+ field "hash" H.t (fun t -> Lazy.force t.hash)
       |+ field "root" bool (fun t -> t.root)
       |+ field "v" v_t (fun t -> t.v)
-      |> sealr
-      |> like ~pre_hash
+      |> sealr |> like ~pre_hash
 
-    let v ~hash ~root v = { hash; root; v }
+    let v ~hash ~root v = {hash; root; v}
+
     let hash t = Lazy.force t.hash
 
     let depth t =
@@ -310,12 +330,16 @@ struct
     open T
 
     type dict_key = int [@@deriving brassaia]
-    type pack_offset = int63 [@@deriving brassaia]
-    type name = Indirect of dict_key | Direct of step
-    type address = Offset of pack_offset | Hash of H.t [@@deriving brassaia]
-    type ptr = { index : int; hash : address } [@@deriving brassaia]
 
-    type tree = { depth : int; length : int; entries : ptr list }
+    type pack_offset = int63 [@@deriving brassaia]
+
+    type name = Indirect of dict_key | Direct of step
+
+    type address = Offset of pack_offset | Hash of H.t [@@deriving brassaia]
+
+    type ptr = {index : int; hash : address} [@@deriving brassaia]
+
+    type tree = {depth : int; length : int; entries : ptr list}
     [@@deriving brassaia]
 
     type value =
@@ -396,12 +420,13 @@ struct
     type nonrec int = int [@@deriving brassaia ~encode_bin ~decode_bin]
 
     let no_length = 0
+
     let is_real_length length = not (length = 0)
 
-    type v1 = { mutable length : int; v : v } [@@deriving brassaia]
     (** [length] is the length of the binary encoding of [v]. It is not known
         right away. [length] is [no_length] when it isn't known. Calling
         [encode_bin] or [size_of] will make [length] known. *)
+    type v1 = {mutable length : int; v : v} [@@deriving brassaia]
 
     (** [tagged_v] sits between [v] and [t]. It is a variant with the header
         binary encoded as the magic. *)
@@ -412,33 +437,33 @@ struct
       | V2_nonroot of v1
     [@@deriving brassaia]
 
-    let encode_bin_tv_staggered ({ v; _ } as tv) kind f =
+    let encode_bin_tv_staggered ({v; _} as tv) kind f =
       match size_of_v v with
       | Some length ->
-          tv.length <- length;
-          encode_bin_kind kind f;
-          encode_bin_int length f;
+          tv.length <- length ;
+          encode_bin_kind kind f ;
+          encode_bin_int length f ;
           encode_bin_v v f
       | None ->
           let buf = Buffer.create 1024 in
-          encode_bin_v v (Buffer.add_string buf);
+          encode_bin_v v (Buffer.add_string buf) ;
           let length = Buffer.length buf in
-          tv.length <- length;
-          encode_bin_kind kind f;
-          encode_bin_int length f;
+          tv.length <- length ;
+          encode_bin_kind kind f ;
+          encode_bin_int length f ;
           f (Buffer.contents buf)
 
     let encode_bin_tv tv f =
       match tv with
       | V1_stable _ -> assert false
       | V1_unstable _ -> assert false
-      | V2_root { length; v } when is_real_length length ->
-          encode_bin_kind Pack_value.Kind.Inode_v2_root f;
-          encode_bin_int length f;
+      | V2_root {length; v} when is_real_length length ->
+          encode_bin_kind Pack_value.Kind.Inode_v2_root f ;
+          encode_bin_int length f ;
           encode_bin_v v f
-      | V2_nonroot { length; v } when is_real_length length ->
-          encode_bin_kind Pack_value.Kind.Inode_v2_nonroot f;
-          encode_bin_int length f;
+      | V2_nonroot {length; v} when is_real_length length ->
+          encode_bin_kind Pack_value.Kind.Inode_v2_nonroot f ;
+          encode_bin_int length f ;
           encode_bin_v v f
       | V2_root tv -> encode_bin_tv_staggered tv Pack_value.Kind.Inode_v2_root f
       | V2_nonroot tv ->
@@ -455,14 +480,14 @@ struct
           V1_stable v
       | Inode_v2_root ->
           let length = decode_bin_int s off in
-          assert (is_real_length length);
+          assert (is_real_length length) ;
           let v = decode_bin_v s off in
-          V2_root { length; v }
+          V2_root {length; v}
       | Inode_v2_nonroot ->
           let length = decode_bin_int s off in
-          assert (is_real_length length);
+          assert (is_real_length length) ;
           let v = decode_bin_v s off in
-          V2_nonroot { length; v }
+          V2_nonroot {length; v}
       | Commit_v1 | Commit_v2 -> assert false
       | Contents -> assert false
       | Dangling_parent_commit -> assert false
@@ -488,16 +513,16 @@ struct
       Brassaia.Type.Size.custom_dynamic ~of_encoding ()
 
     let tagged_v_t =
-      Brassaia.Type.like ~bin:(encode_bin_tv, decode_bin_tv, size_of_tv) tagged_v_t
+      Brassaia.Type.like
+        ~bin:(encode_bin_tv, decode_bin_tv, size_of_tv)
+        tagged_v_t
 
-    type t = { hash : H.t; tv : tagged_v } [@@deriving brassaia]
+    type t = {hash : H.t; tv : tagged_v} [@@deriving brassaia]
 
     let v ~root ~hash v =
       let length = no_length in
-      let tv =
-        if root then V2_root { v; length } else V2_nonroot { v; length }
-      in
-      { hash; tv }
+      let tv = if root then V2_root {v; length} else V2_nonroot {v; length} in
+      {hash; tv}
 
     (** The rule to determine the [is_root] property of a v1 [Value] is a bit
         convoluted, it relies on the fact that back then the following property
@@ -519,13 +544,13 @@ struct
         - A [Value] has at most [Conf.stable_hash] leaves because
           [Conf.entries <= Conf.stable_hash] is enforced. *)
     let is_root = function
-      | { tv = V1_stable (Values _); _ } -> true
-      | { tv = V1_unstable (Values _); _ } -> false
-      | { tv = V1_stable (Tree { depth; _ }); _ }
-      | { tv = V1_unstable (Tree { depth; _ }); _ } ->
+      | {tv = V1_stable (Values _); _} -> true
+      | {tv = V1_unstable (Values _); _} -> false
+      | {tv = V1_stable (Tree {depth; _}); _}
+      | {tv = V1_unstable (Tree {depth; _}); _} ->
           depth = 0
-      | { tv = V2_root _; _ } -> true
-      | { tv = V2_nonroot _; _ } -> false
+      | {tv = V2_root _; _} -> true
+      | {tv = V2_nonroot _; _} -> false
   end
 
   (** [Val_impl] defines the recursive structure of inodes.
@@ -620,7 +645,8 @@ struct
               e.g. through the [add] or [to_concrete] functions. It shouldn't be
               collected on [clear] because it will be needed for [save]. *)
 
-    and partial_ptr = { target : partial_ptr_target Atomic.t } [@@unboxed]
+    and partial_ptr = {target : partial_ptr_target Atomic.t} [@@unboxed]
+
     and total_ptr = Total_ptr of total_ptr t [@@unboxed]
 
     and truncated_ptr =
@@ -629,7 +655,8 @@ struct
               parent and successfully index the hash. *)
       | Intact of truncated_ptr t
 
-    and 'ptr tree = { depth : int; length : int; entries : 'ptr option array }
+    and 'ptr tree = {depth : int; length : int; entries : 'ptr option array}
+
     and 'ptr v = Values of value StepMap.t | Tree of 'ptr tree
 
     and 'ptr t = {
@@ -645,19 +672,19 @@ struct
       let val_ref : type ptr. ptr layout -> ptr -> Val_ref.t = function
         | Total -> fun (Total_ptr ptr) -> ptr.v_ref
         | Partial _ -> (
-            fun { target } ->
+            fun {target} ->
               match Atomic.get target with
               | Lazy key -> Val_ref.of_key key
-              | Lazy_loaded { v_ref; _ } | Dirty { v_ref; _ } -> v_ref)
+              | Lazy_loaded {v_ref; _} | Dirty {v_ref; _} -> v_ref)
         | Truncated -> ( function Broken v -> v | Intact ptr -> ptr.v_ref)
 
       let key_exn : type ptr. ptr layout -> ptr -> key = function
         | Total -> fun (Total_ptr ptr) -> Val_ref.to_key_exn ptr.v_ref
         | Partial _ -> (
-            fun { target } ->
+            fun {target} ->
               match Atomic.get target with
               | Lazy key -> key
-              | Lazy_loaded { v_ref; _ } | Dirty { v_ref; _ } ->
+              | Lazy_loaded {v_ref; _} | Dirty {v_ref; _} ->
                   Val_ref.to_key_exn v_ref)
         | Truncated -> (
             function
@@ -680,7 +707,7 @@ struct
         match layout with
         | Total -> fun (Total_ptr t) -> t
         | Partial find -> (
-            fun { target } ->
+            fun {target} ->
               match Atomic.get target with
               | Dirty entry | Lazy_loaded entry ->
                   (* [target] is already cached. [cache] is only concerned with
@@ -689,13 +716,16 @@ struct
                   entry
               | Lazy key -> (
                   if not force then
-                    raise_dangling_hash context (Key.to_hash key);
+                    raise_dangling_hash context (Key.to_hash key) ;
                   match find ~expected_depth key with
                   | None ->
-                      Fmt.failwith "%a: unknown inode key (%s)" pp_key key
+                      Fmt.failwith
+                        "%a: unknown inode key (%s)"
+                        pp_key
+                        key
                         context
                   | Some x ->
-                      if cache then Atomic.set target (Lazy_loaded x);
+                      if cache then Atomic.set target (Lazy_loaded x) ;
                       x))
         | Truncated -> (
             function
@@ -706,15 +736,15 @@ struct
 
       let of_target : type ptr. ptr layout -> ptr t -> ptr = function
         | Total -> fun target -> Total_ptr target
-        | Partial _ -> fun target -> { target = Atomic.make (Dirty target) }
+        | Partial _ -> fun target -> {target = Atomic.make (Dirty target)}
         | Truncated -> fun target -> Intact target
 
       let of_key : type ptr. ptr layout -> key -> ptr = function
         | Total -> assert false
-        | Partial _ -> fun key -> { target = Atomic.make (Lazy key) }
+        | Partial _ -> fun key -> {target = Atomic.make (Lazy key)}
         | Truncated -> fun key -> Broken (Val_ref.of_key key)
 
-      type ('input, 'output) cps = { f : 'r. 'input -> ('output -> 'r) -> 'r }
+      type ('input, 'output) cps = {f : 'r. 'input -> ('output -> 'r) -> 'r}
       [@@ocaml.unboxed]
 
       let save :
@@ -735,13 +765,13 @@ struct
               save_dirty.f entry (fun key ->
                   Val_ref.promote_exn entry.v_ref key)
         | Partial _ -> (
-            fun { target } ->
+            fun {target} ->
               match Atomic.get target with
               | Dirty entry ->
                   save_dirty.f entry (fun key ->
                       if clear then Atomic.set target (Lazy key)
                       else (
-                        Atomic.set target (Lazy_loaded entry);
+                        Atomic.set target (Lazy_loaded entry) ;
                         Val_ref.promote_exn entry.v_ref key))
               | Lazy_loaded entry ->
                   (* In this case, [entry.v_ref] is a [Hash h] such that [mem t
@@ -792,7 +822,8 @@ struct
             (fun acc -> function
               | None -> acc
               | Some ptr -> (None, `Inode (key_of_ptr ptr)) :: acc)
-            [] i.entries
+            []
+            i.entries
       | Values l ->
           StepMap.fold
             (fun s v acc ->
@@ -802,7 +833,8 @@ struct
                 | `Contents (k, _) -> (Some s, `Contents k)
               in
               v :: acc)
-            l []
+            l
+            []
 
     let length_of_v = function
       | Values vs -> StepMap.cardinal vs
@@ -823,15 +855,16 @@ struct
       | Tree i ->
           Array.fold_left
             (fun i -> function None -> i | Some _ -> i + 1)
-            0 i.entries
+            0
+            i.entries
       | Values vs -> StepMap.cardinal vs
 
     type cont = off:int -> len:int -> (step * value) Seq.node
 
     let rec seq_tree layout bucket_seq ~depth ~cache : cont -> cont =
      fun k ~off ~len ->
-      assert (off >= 0);
-      assert (len > 0);
+      assert (off >= 0) ;
+      assert (len > 0) ;
       match bucket_seq () with
       | Seq.Nil -> k ~off ~len
       | Seq.Cons (None, rest) -> seq_tree layout rest ~depth ~cache k ~off ~len
@@ -851,14 +884,18 @@ struct
             let off = off - trg_len in
             seq_tree layout rest ~depth ~cache k ~off ~len
           else
-            seq_v layout trg.v ~cache
+            seq_v
+              layout
+              trg.v
+              ~cache
               (seq_tree layout rest ~depth ~cache k)
-              ~off ~len
+              ~off
+              ~len
 
     and seq_values layout value_seq : cont -> cont =
      fun k ~off ~len ->
-      assert (off >= 0);
-      assert (len > 0);
+      assert (off >= 0) ;
+      assert (len > 0) ;
       match value_seq () with
       | Seq.Nil -> k ~off ~len
       | Cons (x, rest) ->
@@ -877,8 +914,8 @@ struct
 
     and seq_v layout v ~cache : cont -> cont =
      fun k ~off ~len ->
-      assert (off >= 0);
-      assert (len > 0);
+      assert (off >= 0) ;
+      assert (len > 0) ;
       match v with
       | Tree t ->
           let depth = t.depth in
@@ -900,15 +937,15 @@ struct
 
     let seq layout ?offset:(off = 0) ?length:(len = Int.max_int) ?(cache = true)
         t : (step * value) Seq.t =
-      if off < 0 then invalid_arg "Invalid pagination offset";
-      if len < 0 then invalid_arg "Invalid pagination length";
+      if off < 0 then invalid_arg "Invalid pagination offset" ;
+      if len < 0 then invalid_arg "Invalid pagination length" ;
       if len = 0 then Seq.empty
       else fun () -> seq_v layout t.v ~cache empty_continuation ~off ~len
 
     let list layout ?offset:(off = 0) ?length:(len = Int.max_int)
         ?(cache = true) t : (step * value) list =
-      if off < 0 then invalid_arg "Invalid pagination offset";
-      if len < 0 then invalid_arg "Invalid pagination length";
+      if off < 0 then invalid_arg "Invalid pagination offset" ;
+      if len < 0 then invalid_arg "Invalid pagination length" ;
       if len = 0 then []
       else list_v layout t.v ~cache empty_continuation ~off ~len
 
@@ -925,7 +962,7 @@ struct
     let to_bin_v :
         type ptr vref. ptr layout -> vref Bin.mode -> ptr v -> vref Bin.v =
      fun layout mode node ->
-      Stats.incr_inode_to_binv ();
+      Stats.incr_inode_to_binv () ;
       match node with
       | Values vs ->
           let vs = StepMap.bindings vs in
@@ -942,20 +979,22 @@ struct
                 | None -> (i + 1, acc)
                 | Some ptr ->
                     let vref = vref_of_ptr ptr in
-                    (i + 1, { Bin.index = i; vref } :: acc))
-              (0, []) t.entries
+                    (i + 1, {Bin.index = i; vref} :: acc))
+              (0, [])
+              t.entries
           in
           let entries = List.rev entries in
-          Bin.Tree { depth = t.depth; length = t.length; entries }
+          Bin.Tree {depth = t.depth; length = t.length; entries}
 
     let is_root t = t.root
+
     let is_stable t = should_be_stable ~length:(length t) ~root:(is_root t)
 
     let to_bin layout mode t =
       let v = to_bin_v layout mode t.v in
       Bin.v ~root:(is_root t) ~hash:(Val_ref.to_lazy_hash t.v_ref) v
 
-    type len = [ `Eq of int | `Ge of int ] [@@deriving brassaia]
+    type len = [`Eq of int | `Ge of int] [@@deriving brassaia]
 
     module Concrete = struct
       type kinded_key =
@@ -964,12 +1003,12 @@ struct
         | Node of node_key
       [@@deriving brassaia]
 
-      type entry = { name : step; key : kinded_key } [@@deriving brassaia]
+      type entry = {name : step; key : kinded_key} [@@deriving brassaia]
 
-      type 'a pointer = { index : int; pointer : hash; tree : 'a }
+      type 'a pointer = {index : int; pointer : hash; tree : 'a}
       [@@deriving brassaia]
 
-      type 'a tree = { depth : int; length : int; pointers : 'a pointer list }
+      type 'a tree = {depth : int; length : int; pointers : 'a pointer list}
       [@@deriving brassaia]
 
       type t = Tree of t tree | Values of entry list | Blinded
@@ -979,9 +1018,9 @@ struct
         match v with
         | `Contents (contents_key, m) ->
             if T.equal_metadata m Metadata.default then
-              { name; key = Contents contents_key }
-            else { name; key = Contents_x (m, contents_key) }
-        | `Node node_key -> { name; key = Node node_key }
+              {name; key = Contents contents_key}
+            else {name; key = Contents_x (m, contents_key)}
+        | `Node node_key -> {name; key = Node node_key}
 
       let of_entry e =
         ( e.name,
@@ -1011,7 +1050,8 @@ struct
                 match (acc, length p.tree) with
                 | `Eq x, `Eq y -> `Eq (x + y)
                 | (`Eq x | `Ge x), (`Eq y | `Ge y) -> `Ge (x + y))
-              (`Eq 0) t.pointers
+              (`Eq 0)
+              t.pointers
         | Blinded -> `Ge 0
 
       let pp = Brassaia.Type.pp_json t
@@ -1022,14 +1062,32 @@ struct
 
       let pp_error ppf = function
         | `Invalid_hash (got, expected, t) ->
-            Fmt.pf ppf "invalid hash for %a@,got: %a@,expecting: %a" pp t
-              pp_hash got pp_hash expected
+            Fmt.pf
+              ppf
+              "invalid hash for %a@,got: %a@,expecting: %a"
+              pp
+              t
+              pp_hash
+              got
+              pp_hash
+              expected
         | `Invalid_depth (got, expected, t) ->
-            Fmt.pf ppf "invalid depth for %a@,got: %d@,expecting: %d" pp t got
+            Fmt.pf
+              ppf
+              "invalid depth for %a@,got: %d@,expecting: %d"
+              pp
+              t
+              got
               expected
         | `Invalid_length (got, expected, t) ->
-            Fmt.pf ppf "invalid length for %a@,got: %a@,expecting: %d" pp t
-              pp_len got expected
+            Fmt.pf
+              ppf
+              "invalid length for %a@,got: %a@,expecting: %d"
+              pp
+              t
+              pp_len
+              got
+              expected
         | `Duplicated_entries t -> Fmt.pf ppf "duplicated entries: %a" pp t
         | `Duplicated_pointers t -> Fmt.pf ppf "duplicated pointers: %a" pp t
         | `Unsorted_entries t -> Fmt.pf ppf "entries should be sorted: %a" pp t
@@ -1037,8 +1095,11 @@ struct
             Fmt.pf ppf "pointers should be sorted: %a" pp t
         | `Blinded_root -> Fmt.pf ppf "blinded root"
         | `Too_large_values t ->
-            Fmt.pf ppf "A Values should have at most Conf.entries elements: %a"
-              pp t
+            Fmt.pf
+              ppf
+              "A Values should have at most Conf.entries elements: %a"
+              pp
+              t
         | `Empty -> Fmt.pf ppf "concrete subtrees cannot be empty"
     end
 
@@ -1062,15 +1123,20 @@ struct
                             let pointer, tree =
                               try
                                 aux
-                                  (Ptr.target ~expected_depth ~cache:true ~force
-                                     "to_concrete" la t)
-                              with Dangling_hash { hash; _ } ->
+                                  (Ptr.target
+                                     ~expected_depth
+                                     ~cache:true
+                                     ~force
+                                     "to_concrete"
+                                     la
+                                     t)
+                              with Dangling_hash {hash; _} ->
                                 (hash, Concrete.Blinded)
                             in
-                            (i + 1, { Concrete.index = i; tree; pointer } :: acc))
-                      (0, []) tr.entries
-                    |> snd
-                    |> List.rev;
+                            (i + 1, {Concrete.index = i; tree; pointer} :: acc))
+                      (0, [])
+                      tr.entries
+                    |> snd |> List.rev;
                 } )
         | Values l ->
             ( h,
@@ -1080,14 +1146,23 @@ struct
       snd (aux t)
 
     exception Invalid_hash of hash * hash * Concrete.t
+
     exception Invalid_depth of int * int * Concrete.t
+
     exception Invalid_length of len * int * Concrete.t
+
     exception Empty
+
     exception Duplicated_entries of Concrete.t
+
     exception Duplicated_pointers of Concrete.t
+
     exception Unsorted_entries of Concrete.t
+
     exception Unsorted_pointers of Concrete.t
+
     exception Blinded_root
+
     exception Too_large_values of Concrete.t
 
     let hash_equal = Brassaia.Type.(unstage (equal hash_t))
@@ -1101,17 +1176,17 @@ struct
         List.sort_uniq (fun x y -> compare x.Concrete.index y.Concrete.index)
       in
       let check_entries t es =
-        if es = [] then raise Empty;
+        if es = [] then raise Empty ;
         let s = sort_entries es in
         if List.compare_length_with es Conf.entries > 0 then
-          raise (Too_large_values t);
-        if List.compare_lengths s es <> 0 then raise (Duplicated_entries t);
+          raise (Too_large_values t) ;
+        if List.compare_lengths s es <> 0 then raise (Duplicated_entries t) ;
         if s <> es then raise (Unsorted_entries t)
       in
       let check_pointers t ps =
-        if ps = [] then raise Empty;
+        if ps = [] then raise Empty ;
         let s = sort_pointers ps in
-        if List.length s <> List.length ps then raise (Duplicated_pointers t);
+        if List.length s <> List.length ps then raise (Duplicated_pointers t) ;
         if s <> ps then raise (Unsorted_pointers t)
       in
       let hash v = Bin.V.hash (to_bin_v la Bin.Ptr_any v) in
@@ -1119,13 +1194,13 @@ struct
         match t with
         | Concrete.Blinded -> None
         | Concrete.Values l ->
-            check_entries t l;
+            check_entries t l ;
             Some (Values (StepMap.of_list (List.map Concrete.of_entry l)))
         | Concrete.Tree tr ->
             let entries = Array.make Conf.entries None in
-            check_pointers t tr.pointers;
+            check_pointers t tr.pointers ;
             List.iter
-              (fun { Concrete.index; pointer; tree } ->
+              (fun {Concrete.index; pointer; tree} ->
                 match aux (depth + 1) tree with
                 | None ->
                     (* Child is blinded *)
@@ -1146,12 +1221,12 @@ struct
                 | Some v ->
                     let hash = hash v in
                     if not (hash_equal hash pointer) then
-                      raise (Invalid_hash (hash, pointer, t));
+                      raise (Invalid_hash (hash, pointer, t)) ;
                     let v_ref = Val_ref.of_hash (Lazy.from_val pointer) in
-                    let t = { v_ref; root = false; v } in
+                    let t = {v_ref; root = false; v} in
                     entries.(index) <- Some (Ptr.of_target la t))
-              tr.pointers;
-            if depth <> tr.depth then raise (Invalid_depth (depth, tr.depth, t));
+              tr.pointers ;
+            if depth <> tr.depth then raise (Invalid_depth (depth, tr.depth, t)) ;
             let () =
               match Concrete.length t with
               | `Eq length ->
@@ -1162,7 +1237,7 @@ struct
                     raise (Invalid_length (`Ge length, tr.length, t))
             in
 
-            Some (Tree { depth = tr.depth; length = tr.length; entries })
+            Some (Tree {depth = tr.depth; length = tr.length; entries})
       in
       let v =
         match aux depth t with None -> raise Blinded_root | Some v -> v
@@ -1178,7 +1253,7 @@ struct
           Node.hash node
         else hash v
       in
-      { v_ref = Val_ref.of_hash (Lazy.from_val hash); root = depth = 0; v }
+      {v_ref = Val_ref.of_hash (Lazy.from_val hash); root = depth = 0; v}
 
     let of_concrete ~depth la t =
       try Ok (of_concrete_exn ~depth la t) with
@@ -1208,7 +1283,7 @@ struct
     let stabilize_root layout t =
       let n = length t in
       (* If [t] is the empty inode (i.e. [n = 0]) then is is already stable *)
-      if n > Conf.stable_hash then { t with root = true }
+      if n > Conf.stable_hash then {t with root = true}
       else
         let v_ref =
           Val_ref.of_hash
@@ -1216,10 +1291,10 @@ struct
               (let vs = seq layout ~cache:false t in
                Node.hash (Node.of_seq vs)))
         in
-        { v_ref; v = t.v; root = true }
+        {v_ref; v = t.v; root = true}
 
     let index ~depth k =
-      if depth >= max_depth then raise (Max_depth depth);
+      if depth >= max_depth then raise (Max_depth depth) ;
       Child_ordering.index ~depth k
 
     (** This function shouldn't be called with the [Total] layout. In the
@@ -1235,12 +1310,12 @@ struct
             let entries = Array.make Conf.entries None in
             let ptr_of_key = Ptr.of_key layout in
             List.iter
-              (fun { Bin.index; vref } ->
+              (fun {Bin.index; vref} ->
                 entries.(index) <- Some (ptr_of_key vref))
-              t.entries;
-            Tree { depth = t.Bin.depth; length = t.length; entries }
+              t.entries ;
+            Tree {depth = t.Bin.depth; length = t.length; entries}
       in
-      { v_ref = Val_ref.of_hash t.Bin.hash; root = t.Bin.root; v }
+      {v_ref = Val_ref.of_hash t.Bin.hash; root = t.Bin.root; v}
 
     let recompute_hash layout t =
       if is_stable t then
@@ -1254,7 +1329,7 @@ struct
     let empty : 'a. 'a layout -> 'a t =
      fun _ ->
       let v_ref = Val_ref.of_hash (lazy (Node.hash (Node.empty ()))) in
-      { root = false; v_ref; v = Values StepMap.empty }
+      {root = false; v_ref; v = Values StepMap.empty}
 
     let values layout vs =
       let length = StepMap.cardinal vs in
@@ -1264,14 +1339,14 @@ struct
         let v_ref =
           Val_ref.of_hash (lazy (Bin.V.hash (to_bin_v layout Bin.Ptr_any v)))
         in
-        { v_ref; root = false; v }
+        {v_ref; root = false; v}
 
     let tree layout is =
       let v = Tree is in
       let v_ref =
         Val_ref.of_hash (lazy (Bin.V.hash (to_bin_v layout Bin.Ptr_any v)))
       in
-      { v_ref; root = false; v }
+      {v_ref; root = false; v}
 
     let is_empty t =
       match t.v with Values vs -> StepMap.is_empty vs | Tree _ -> false
@@ -1288,8 +1363,13 @@ struct
             | Some i ->
                 let expected_depth = t.depth + 1 in
                 aux
-                  (Ptr.target ~expected_depth ~cache ~force:true "find_value"
-                     layout i)
+                  (Ptr.target
+                     ~expected_depth
+                     ~cache
+                     ~force:true
+                     "find_value"
+                     layout
+                     i)
                     .v)
       in
       aux t.v
@@ -1297,7 +1377,7 @@ struct
     let find ?(cache = true) layout t s = find_value ~cache layout t s
 
     let rec add layout ~depth ~copy ~replace parent s key v k =
-      Stats.incr_inode_rec_add ();
+      Stats.incr_inode_rec_add () ;
       match parent.v with
       | Values vs ->
           let length =
@@ -1308,40 +1388,62 @@ struct
             else
               let vs = StepMap.bindings (StepMap.add s v vs) in
               let empty =
-                tree layout
-                  { length = 0; depth; entries = Array.make Conf.entries None }
+                tree
+                  layout
+                  {length = 0; depth; entries = Array.make Conf.entries None}
               in
               let aux t (s', v) =
                 let key' = Child_ordering.key s' in
-                (add [@tailcall]) layout ~depth ~copy:false ~replace t s' key' v
+                (add [@tailcall])
+                  layout
+                  ~depth
+                  ~copy:false
+                  ~replace
+                  t
+                  s'
+                  key'
+                  v
                   (fun x -> x)
               in
               List.fold_left aux empty vs
           in
           k parent
       | Tree tr -> (
-          assert (depth = tr.depth);
+          assert (depth = tr.depth) ;
           let length = if replace then tr.length else tr.length + 1 in
           let entries = if copy then Array.copy tr.entries else tr.entries in
           let i = index ~depth key in
           match entries.(i) with
           | None ->
               let child = values layout (StepMap.singleton s v) in
-              entries.(i) <- Some (Ptr.of_target layout child);
-              let parent = tree layout { tr with length; entries } in
+              entries.(i) <- Some (Ptr.of_target layout child) ;
+              let parent = tree layout {tr with length; entries} in
               k parent
           | Some ptr ->
               let child =
                 let expected_depth = depth + 1 in
                 (* [cache] is unimportant here as we've already called
                    [find_value] for that path.*)
-                Ptr.target ~expected_depth ~cache:true ~force:true "add" layout
+                Ptr.target
+                  ~expected_depth
+                  ~cache:true
+                  ~force:true
+                  "add"
+                  layout
                   ptr
               in
-              (add [@tailcall]) layout ~depth:(depth + 1) ~copy ~replace child s
-                key v (fun child ->
-                  entries.(i) <- Some (Ptr.of_target layout child);
-                  let parent = tree layout { tr with length; entries } in
+              (add [@tailcall])
+                layout
+                ~depth:(depth + 1)
+                ~copy
+                ~replace
+                child
+                s
+                key
+                v
+                (fun child ->
+                  entries.(i) <- Some (Ptr.of_target layout child) ;
+                  let parent = tree layout {tr with length; entries} in
                   k parent))
 
     let add layout ~copy t s v =
@@ -1356,7 +1458,7 @@ struct
           |> stabilize_root layout
 
     let rec remove layout parent s key k =
-      Stats.incr_inode_rec_remove ();
+      Stats.incr_inode_rec_remove () ;
       match parent.v with
       | Values vs ->
           let parent = values layout (StepMap.remove s vs) in
@@ -1380,18 +1482,23 @@ struct
                   let expected_depth = depth + 1 in
                   (* [cache] is unimportant here as we've already called
                      [find_value] for that path.*)
-                  Ptr.target ~expected_depth ~cache:true ~force:true "remove"
-                    layout ptr
+                  Ptr.target
+                    ~expected_depth
+                    ~cache:true
+                    ~force:true
+                    "remove"
+                    layout
+                    ptr
                 in
                 if length child = 1 then (
-                  entries.(i) <- None;
-                  let parent = tree layout { depth; length = len; entries } in
+                  entries.(i) <- None ;
+                  let parent = tree layout {depth; length = len; entries} in
                   k parent)
                 else
                   (remove [@tailcall]) layout child s key (fun child ->
-                      entries.(i) <- Some (Ptr.of_target layout child);
+                      entries.(i) <- Some (Ptr.of_target layout child) ;
                       let parent =
-                        tree layout { tr with length = len; entries }
+                        tree layout {tr with length = len; entries}
                       in
                       k parent))
 
@@ -1417,14 +1524,15 @@ struct
         let rec aux_small seq map =
           match seq () with
           | Seq.Nil ->
-              assert (!len <= Conf.entries);
+              assert (!len <= Conf.entries) ;
               values la map
           | Seq.Cons ((s, v), rest) ->
               let map =
-                StepMap.update s
+                StepMap.update
+                  s
                   (function
                     | None ->
-                        incr len;
+                        incr len ;
                         Some v
                     | Some _ -> Some v)
                   map
@@ -1455,9 +1563,10 @@ struct
           | None ->
               Fmt.failwith
                 "You are trying to save to the backend an inode deserialized \
-                 using [Brassaia.Type] that used to contain pointer(s) to inodes \
-                 which are unknown to the backend. Hash: %a"
-                pp_hash h
+                 using [Brassaia.Type] that used to contain pointer(s) to \
+                 inodes which are unknown to the backend. Hash: %a"
+                pp_hash
+                h
           | Some key ->
               (* The backend already knows this target inode, there is no need to
                  traverse further down. This happens during the unit tests. *)
@@ -1465,14 +1574,14 @@ struct
         in
         fun ~save_dirty arr ->
           let iter_ptr =
-            Ptr.save ~broken:{ f = broken } ~save_dirty ~clear layout
+            Ptr.save ~broken:{f = broken} ~save_dirty ~clear layout
           in
           Array.iter (Option.iter iter_ptr) arr
       in
       let rec aux ~depth t =
         match t.v with
         | Values _ -> (
-            [%log.debug "Inode.save values depth:%d" depth];
+            [%log.debug "Inode.save values depth:%d" depth] ;
             let unguarded_add hash =
               let value =
                 (* NOTE: the choice of [Bin.mode] is irrelevant (and this
@@ -1481,7 +1590,7 @@ struct
                 to_bin layout Bin.Ptr_key t
               in
               let key = add hash value in
-              Val_ref.promote_exn t.v_ref key;
+              Val_ref.promote_exn t.v_ref key ;
               key
             in
             match Val_ref.inspect t.v_ref with
@@ -1489,7 +1598,7 @@ struct
                 if mem key then key else unguarded_add (Key.to_hash key)
             | Hash hash -> unguarded_add (Lazy.force hash))
         | Tree n ->
-            [%log.debug "Inode.save tree depth:%d" depth];
+            [%log.debug "Inode.save tree depth:%d" depth] ;
             let save_dirty t k =
               let key =
                 match Val_ref.inspect t.v_ref with
@@ -1508,10 +1617,10 @@ struct
                           aux ~depth:(depth + 1) t
                     | None -> aux ~depth:(depth + 1) t)
               in
-              Val_ref.promote_exn t.v_ref key;
+              Val_ref.promote_exn t.v_ref key ;
               k key
             in
-            iter_entries ~save_dirty:{ f = save_dirty } n.entries;
+            iter_entries ~save_dirty:{f = save_dirty} n.entries ;
             let bin =
               (* Serialising with [Bin.Ptr_key] is safe here because just called
                  [Ptr.save] on any dirty children (and we never try to save
@@ -1519,7 +1628,7 @@ struct
               to_bin layout Bin.Ptr_key t
             in
             let key = add (Val_ref.to_hash t.v_ref) bin in
-            Val_ref.promote_exn t.v_ref key;
+            Val_ref.promote_exn t.v_ref key ;
             key
       in
       aux ~depth:0 t
@@ -1536,8 +1645,13 @@ struct
                 | Some t ->
                     let t =
                       let expected_depth = tree.depth + 1 in
-                      Ptr.target ~expected_depth ~cache:true ~force:true
-                        "check_stable" layout t
+                      Ptr.target
+                        ~expected_depth
+                        ~cache:true
+                        ~force:true
+                        "check_stable"
+                        layout
+                        t
                     in
                     (if stable then not (is_stable t) else true)
                     && check t stable)
@@ -1556,8 +1670,13 @@ struct
                 | None -> false
                 | Some t ->
                     let expected_depth = inodes.depth + 1 in
-                    Ptr.target ~expected_depth ~cache:true ~force:true
-                      "contains_empty_map" layout t
+                    Ptr.target
+                      ~expected_depth
+                      ~cache:true
+                      ~force:true
+                      "contains_empty_map"
+                      layout
+                      t
                     |> check_lower)
               inodes.entries
       in
@@ -1566,7 +1685,7 @@ struct
     let is_tree t = match t.v with Tree _ -> true | Values _ -> false
 
     module Proof = struct
-      type value = [ `Contents of hash * metadata | `Node of hash ]
+      type value = [`Contents of hash * metadata | `Node of hash]
       [@@deriving brassaia]
 
       type t =
@@ -1599,21 +1718,20 @@ struct
                   let hash = Lazy.from_val e.pointer in
                   proof_of_concrete hash e.tree (fun proof ->
                       (e.index, proof) :: acc))
-                [] (List.rev tr.pointers)
+                []
+                (List.rev tr.pointers)
             in
             k (`Inode (tr.length, proofs))
 
       let hash_values ~depth l =
         let inode = values Truncated (StepMap.of_list l) in
-        let t =
-          match depth with 0 -> { inode with root = true } | _ -> inode
-        in
+        let t = match depth with 0 -> {inode with root = true} | _ -> inode in
         hash t
 
       let hash_inode ~depth ~length es =
         let entries = Array.make Conf.entries None in
-        List.iter (fun (index, ptr) -> entries.(index) <- Some ptr) es;
-        let v : truncated_ptr v = Tree { depth; length; entries } in
+        List.iter (fun (index, ptr) -> entries.(index) <- Some ptr) es ;
+        let v : truncated_ptr v = Tree {depth; length; entries} in
         Bin.V.hash (to_bin_v Truncated Bin.Ptr_any v)
 
       let rec concrete_of_proof :
@@ -1623,7 +1741,7 @@ struct
         | `Blinded h -> k h Concrete.Blinded
         | `Values vs ->
             let vs = List.map strengthen_step_value vs in
-            assert (List.compare_length_with vs Conf.entries <= 0);
+            assert (List.compare_length_with vs Conf.entries <= 0) ;
             let hash = hash_values ~depth vs in
             let c = Concrete.Values (List.map Concrete.to_entry vs) in
             k hash c
@@ -1639,12 +1757,12 @@ struct
        fun ~length ~depth proofs k ->
         let rec aux ps es = function
           | [] ->
-              let c = Concrete.Tree { depth; length; pointers = ps } in
+              let c = Concrete.Tree {depth; length; pointers = ps} in
               let hash = hash_inode ~depth ~length es in
               k hash c
           | (index, proof) :: proofs ->
               concrete_of_proof ~depth:(depth + 1) proof (fun pointer tree ->
-                  let ps = { Concrete.tree; pointer; index } :: ps in
+                  let ps = {Concrete.tree; pointer; index} :: ps in
                   let h = Val_ref.of_hash (Lazy.from_val pointer) in
                   let es = (index, Broken h) :: es in
                   aux ps es proofs)
@@ -1652,6 +1770,7 @@ struct
         aux [] [] (List.rev proofs)
 
       let proof_of_concrete h p = proof_of_concrete h p Fun.id
+
       let concrete_of_proof ~depth p = concrete_of_proof ~depth p (fun _ t -> t)
 
       let to_proof la t : t =
@@ -1660,9 +1779,7 @@ struct
             (* To preserve the stable hash, the proof needs to contain
                all the underlying values. *)
             let bindings =
-              seq la t
-              |> Seq.map Concrete.to_entry
-              |> List.of_seq
+              seq la t |> Seq.map Concrete.to_entry |> List.of_seq
               |> List.fast_sort (fun x y ->
                      compare_step x.Concrete.name y.Concrete.name)
             in
@@ -1691,7 +1808,7 @@ struct
               let v_ref = Val_ref.of_hash (Lazy.from_val hash) in
               match t.v with
               | Values _ -> assert false
-              | Tree { depth; length; entries } ->
+              | Tree {depth; length; entries} ->
                   let ptr_of_key = Ptr.of_key la in
                   let entries =
                     Array.map
@@ -1707,8 +1824,8 @@ struct
                             Some (ptr_of_key key))
                       entries
                   in
-                  let v = Tree { depth; length; entries } in
-                  let t = { v_ref; v; root = true } in
+                  let v = Tree {depth; length; entries} in
+                  let t = {v_ref; v; root = true} in
                   Some t)
         | _ -> (
             let c = concrete_of_proof ~depth proof in
@@ -1717,6 +1834,7 @@ struct
             | Error _ -> None)
 
       let of_concrete t = proof_of_concrete (lazy (failwith "blinded root")) t
+
       let to_concrete = concrete_of_proof ~depth:0
     end
 
@@ -1726,7 +1844,7 @@ struct
       type kinded_hash = Contents of hash * metadata | Node of hash
       [@@deriving brassaia]
 
-      type entry = { step : string; hash : kinded_hash } [@@deriving brassaia]
+      type entry = {step : string; hash : kinded_hash} [@@deriving brassaia]
 
       type inode_tree = {
         depth : int;
@@ -1738,7 +1856,7 @@ struct
       type v = Inode_tree of inode_tree | Inode_value of entry list
       [@@deriving brassaia]
 
-      type inode = { v : v; root : bool } [@@deriving brassaia]
+      type inode = {v : v; root : bool} [@@deriving brassaia]
     end
 
     let of_entry ~index e : step * Node.value =
@@ -1764,8 +1882,8 @@ struct
       in
       List.iter
         (fun (index, pointer) -> entries.(index) <- Some (ptr_of_key pointer))
-        tr.Snapshot.pointers;
-      { depth = tr.depth; length = tr.length; entries }
+        tr.Snapshot.pointers ;
+      {depth = tr.depth; length = tr.length; entries}
 
     let of_snapshot ~index layout (v : Snapshot.inode) =
       let t =
@@ -1779,16 +1897,22 @@ struct
 
   module Raw = struct
     type hash = H.t [@@deriving brassaia]
+
     type key = Key.t
+
     type t = T.key Bin.t [@@deriving brassaia]
+
     type metadata = T.metadata [@@deriving brassaia]
+
     type Pack_value.kinded += Node of t
 
     let to_kinded t = Node t
+
     let of_kinded = function Node n -> n | _ -> assert false
+
     let depth = Bin.depth
 
-    exception Invalid_depth of { expected : int; got : int; v : t }
+    exception Invalid_depth of {expected : int; got : int; v : t}
 
     let kind (t : t) =
       (* This is the kind of newly appended values, let's use v2 then *)
@@ -1810,9 +1934,13 @@ struct
       Pack_value.Deferred (fun () -> repr_size_adjustment * repr_size t)
 
     let hash t = Bin.hash t
+
     let step_to_bin = T.step_to_bin_string
+
     let step_of_bin = T.step_of_bin_string
+
     let encode_compress = Brassaia.Type.(unstage (encode_bin Compress.t))
+
     let decode_compress = Brassaia.Type.(unstage (decode_bin Compress.t))
 
     let length_header = function
@@ -1835,7 +1963,7 @@ struct
         hash ->
         t Brassaia.Type.encode_bin =
      fun ~dict ~offset_of_key hash t ->
-      Stats.incr_inode_encode_bin ();
+      Stats.incr_inode_encode_bin () ;
       let step s : Compress.name =
         let str = step_to_bin s in
         if String.length str <= 3 then Direct s
@@ -1852,7 +1980,7 @@ struct
       let ptr : T.key Bin.with_index -> Compress.ptr =
        fun n ->
         let hash = address_of_key n.vref in
-        { index = n.index; hash }
+        {index = n.index; hash}
       in
       let value : T.step * T.value -> Compress.value = function
         | s, `Contents (c, m) ->
@@ -1867,14 +1995,14 @@ struct
       (* List.map is fine here as the number of entries is small *)
       let v : T.key Bin.v -> Compress.v = function
         | Values vs -> Values (List.map value vs)
-        | Tree { depth; length; entries } ->
+        | Tree {depth; length; entries} ->
             let entries = List.map ptr entries in
-            Tree { Compress.depth; length; entries }
+            Tree {Compress.depth; length; entries}
       in
       let t = Compress.v ~root:t.root ~hash (v t.v) in
       encode_compress t
 
-    exception Exit of [ `Msg of string ]
+    exception Exit of [`Msg of string]
 
     let decode_bin :
         dict:(int -> string option) ->
@@ -1882,7 +2010,7 @@ struct
         key_of_hash:(hash -> key) ->
         t Brassaia.Type.decode_bin =
      fun ~dict ~key_of_offset ~key_of_hash t pos_ref ->
-      Stats.incr_inode_decode_bin ();
+      Stats.incr_inode_decode_bin () ;
       let i = decode_compress t pos_ref in
       let step : Compress.name -> T.step = function
         | Direct n -> n
@@ -1901,7 +2029,7 @@ struct
       let ptr : Compress.ptr -> T.key Bin.with_index =
        fun n ->
         let vref = key n.hash in
-        { index = n.index; vref }
+        {index = n.index; vref}
       in
       let value : Compress.value -> T.step * T.value = function
         | Contents (n, h, metadata) ->
@@ -1919,14 +2047,14 @@ struct
           match tv with
           | V1_stable v -> v
           | V1_unstable v -> v
-          | V2_root { v; _ } -> v
-          | V2_nonroot { v; _ } -> v
+          | V2_root {v; _} -> v
+          | V2_nonroot {v; _} -> v
         in
         match v with
         | Values vs -> Values (List.rev_map value (List.rev vs))
-        | Tree { depth; length; entries } ->
+        | Tree {depth; length; entries} ->
             let entries = List.map ptr entries in
-            Tree { depth; length; entries }
+            Tree {depth; length; entries}
       in
       let root = Compress.is_root i in
       let v = t i.tv in
@@ -1936,11 +2064,11 @@ struct
 
     let decode_children_offsets ~entry_of_offset ~entry_of_hash t pos_ref =
       let i = decode_compress t pos_ref in
-      let { Compress.tv; _ } = i in
+      let {Compress.tv; _} = i in
       let v =
         match tv with
         | V1_stable v | V1_unstable v -> v
-        | V2_root { v; _ } | V2_nonroot { v; _ } -> v
+        | V2_root {v; _} | V2_nonroot {v; _} -> v
       in
       let entry_of_address = function
         | Compress.Offset offset -> entry_of_offset offset
@@ -1953,9 +2081,9 @@ struct
               | Compress.Contents (_, address, _) | Node (_, address) ->
                   entry_of_address address)
             ls
-      | Tree { entries; _ } ->
+      | Tree {entries; _} ->
           List.map
-            (function ({ hash; _ } : Compress.ptr) -> entry_of_address hash)
+            (function ({hash; _} : Compress.ptr) -> entry_of_address hash)
             entries
 
     module Snapshot = Val_impl.Snapshot
@@ -1966,10 +2094,10 @@ struct
       match v with
       | `Contents (contents_key, m) ->
           let h = Key.to_hash contents_key in
-          { Snapshot.step; hash = Contents (h, m) }
+          {Snapshot.step; hash = Contents (h, m)}
       | `Node node_key ->
           let h = Key.to_hash node_key in
-          { step; hash = Node h }
+          {step; hash = Node h}
 
     (* The implementation of [of_snapshot] is in the module [Val]. This is
        because we cannot compute the hash of a root from [Bin]. *)
@@ -1983,17 +2111,17 @@ struct
               length = tree.length;
               pointers =
                 List.map
-                  (fun { Bin.index; vref } ->
+                  (fun {Bin.index; vref} ->
                     let hash = Key.to_hash vref in
                     (index, hash))
                   tree.entries;
             }
           in
-          { v = Inode_tree inode_tree; root = t.root }
+          {v = Inode_tree inode_tree; root = t.root}
       | Values vs ->
           let vs = List.map to_entry vs in
           let v = Snapshot.Inode_value vs in
-          { v; root = t.root }
+          {v; root = t.root}
   end
 
   module Snapshot = Val_impl.Snapshot
@@ -2001,6 +2129,7 @@ struct
   let to_snapshot = Raw.to_snapshot
 
   type hash = T.hash
+
   type key = Key.t
 
   let pp_hash = T.pp_hash
@@ -2014,7 +2143,7 @@ struct
       | Partial of I.partial_ptr I.layout * I.partial_ptr I.t
       | Truncated of I.truncated_ptr I.t
 
-    type 'b apply_fn = { f : 'a. 'a I.layout -> 'a I.t -> 'b } [@@unboxed]
+    type 'b apply_fn = {f : 'a. 'a I.layout -> 'a I.t -> 'b} [@@unboxed]
 
     let apply : t -> 'b apply_fn -> 'b =
      fun t f ->
@@ -2023,7 +2152,7 @@ struct
       | Partial (layout, v) -> f.f layout v
       | Truncated v -> f.f I.Truncated v
 
-    type map_fn = { f : 'a. 'a I.layout -> 'a I.t -> 'a I.t } [@@unboxed]
+    type map_fn = {f : 'a. 'a I.layout -> 'a I.t -> 'a I.t} [@@unboxed]
 
     let map : t -> map_fn -> t =
      fun t f ->
@@ -2038,50 +2167,53 @@ struct
           let v' = f.f I.Truncated v in
           if v == v' then t else Truncated v'
 
-    let pred t = apply t { f = (fun layout v -> I.pred layout v) }
+    let pred t = apply t {f = (fun layout v -> I.pred layout v)}
 
     let of_seq l =
-      Stats.incr_inode_of_seq ();
+      Stats.incr_inode_of_seq () ;
       Total (I.of_seq Total l)
 
     let of_list l = of_seq (List.to_seq l)
 
     let seq ?offset ?length ?cache t =
-      apply t { f = (fun layout v -> I.seq layout ?offset ?length ?cache v) }
+      apply t {f = (fun layout v -> I.seq layout ?offset ?length ?cache v)}
 
     let list ?offset ?length ?cache t =
-      apply t { f = (fun layout v -> I.list layout ?offset ?length ?cache v) }
+      apply t {f = (fun layout v -> I.list layout ?offset ?length ?cache v)}
 
     let empty () = of_list []
-    let is_empty t = apply t { f = (fun _ v -> I.is_empty v) }
+
+    let is_empty t = apply t {f = (fun _ v -> I.is_empty v)}
 
     let find ?cache t s =
-      apply t { f = (fun layout v -> I.find ?cache layout v s) }
+      apply t {f = (fun layout v -> I.find ?cache layout v s)}
 
     let add t s value =
-      Stats.incr_inode_add ();
+      Stats.incr_inode_add () ;
       let f layout v =
-        I.check_write_op_supported v;
+        I.check_write_op_supported v ;
         I.add ~copy:true layout v s value
       in
-      map t { f }
+      map t {f}
 
     let remove t s =
-      Stats.incr_inode_remove ();
+      Stats.incr_inode_remove () ;
       let f layout v =
-        I.check_write_op_supported v;
+        I.check_write_op_supported v ;
         I.remove layout v s
       in
-      map t { f }
+      map t {f}
 
     let t : t Brassaia.Type.t =
-      let pre_hash_binv = Brassaia.Type.(unstage (pre_hash (Bin.v_t Val_ref.t))) in
+      let pre_hash_binv =
+        Brassaia.Type.(unstage (pre_hash (Bin.v_t Val_ref.t)))
+      in
       let pre_hash_node = Brassaia.Type.(unstage (pre_hash Node.t)) in
       let pre_hash x =
-        let stable = apply x { f = (fun _ v -> I.is_stable v) } in
+        let stable = apply x {f = (fun _ v -> I.is_stable v)} in
         if not stable then
           let bin =
-            apply x { f = (fun layout v -> I.to_bin layout Bin.Ptr_any v) }
+            apply x {f = (fun layout v -> I.to_bin layout Bin.Ptr_any v)}
           in
           pre_hash_binv bin.v
         else
@@ -2093,55 +2225,63 @@ struct
       in
       let module Ptr_any = struct
         let t =
-          Brassaia.Type.map (Bin.t Val_ref.t)
+          Brassaia.Type.map
+            (Bin.t Val_ref.t)
             (fun _ -> assert false)
             (fun x ->
-              apply x { f = (fun layout v -> I.to_bin layout Bin.Ptr_any v) })
+              apply x {f = (fun layout v -> I.to_bin layout Bin.Ptr_any v)})
 
         type nonrec t = t [@@deriving brassaia ~equal ~compare ~pp]
 
         (* TODO(repr): add these to [ppx_repr] meta-deriving *)
         (* TODO(repr): why is there no easy way to get a decoder value to pass to [map ~json]? *)
         let encode_json = Brassaia.Type.encode_json t
+
         let decode_json _ = failwith "TODO"
       end in
-      Brassaia.Type.map ~pre_hash ~pp:Ptr_any.pp
+      Brassaia.Type.map
+        ~pre_hash
+        ~pp:Ptr_any.pp
         ~json:(Ptr_any.encode_json, Ptr_any.decode_json)
-        ~equal:Ptr_any.equal ~compare:Ptr_any.compare (Bin.t T.key_t)
+        ~equal:Ptr_any.equal
+        ~compare:Ptr_any.compare
+        (Bin.t T.key_t)
         (fun bin -> Truncated (I.of_bin I.Truncated bin))
-        (fun x ->
-          apply x { f = (fun layout v -> I.to_bin layout Bin.Ptr_key v) })
+        (fun x -> apply x {f = (fun layout v -> I.to_bin layout Bin.Ptr_key v)})
 
-    let hash_exn ?force t = apply t { f = (fun _ v -> I.hash_exn ?force v) }
+    let hash_exn ?force t = apply t {f = (fun _ v -> I.hash_exn ?force v)}
 
     let save ?(allow_non_root = false) ~add ~index ~mem t =
       if Conf.forbid_empty_dir_persistence && is_empty t then
         failwith
           "Persisting an empty node is forbidden by the configuration of the \
-           brassaia-pack store";
+           brassaia-pack store" ;
       let f layout v =
-        if not allow_non_root then I.check_write_op_supported v;
+        if not allow_non_root then I.check_write_op_supported v ;
         I.save layout ~add ~index ~mem v
       in
-      apply t { f }
+      apply t {f}
 
     let of_raw (find' : expected_depth:int -> key -> key Bin.t option) v =
-      Stats.incr_inode_of_raw ();
+      Stats.incr_inode_of_raw () ;
       let rec find ~expected_depth h =
         Option.map (I.of_bin layout) (find' ~expected_depth h)
       and layout = I.Partial find in
       Partial (layout, I.of_bin layout v)
 
     let recompute_hash t =
-      apply t { f = (fun layout v -> I.recompute_hash layout v) }
+      apply t {f = (fun layout v -> I.recompute_hash layout v)}
 
-    let to_raw t =
-      apply t { f = (fun layout v -> I.to_bin layout Bin.Ptr_key v) }
+    let to_raw t = apply t {f = (fun layout v -> I.to_bin layout Bin.Ptr_key v)}
 
-    let stable t = apply t { f = (fun _ v -> I.is_stable v) }
-    let length t = apply t { f = (fun _ v -> I.length v) }
-    let clear t = apply t { f = (fun layout v -> I.clear layout v) }
-    let nb_children t = apply t { f = (fun _ v -> I.nb_children v) }
+    let stable t = apply t {f = (fun _ v -> I.is_stable v)}
+
+    let length t = apply t {f = (fun _ v -> I.length v)}
+
+    let clear t = apply t {f = (fun layout v -> I.clear layout v)}
+
+    let nb_children t = apply t {f = (fun _ v -> I.nb_children v)}
+
     let index ~depth s = I.index ~depth (Child_ordering.key s)
 
     let integrity_check t =
@@ -2159,7 +2299,7 @@ struct
         in
         check_stable () && not (contains_empty_map_non_root ())
       in
-      apply t { f }
+      apply t {f}
 
     let merge ~contents ~node : t Brassaia.Merge.t =
       let merge = Node.merge ~contents ~node in
@@ -2195,8 +2335,7 @@ struct
           (* To preserve the stable hash, the proof needs to contain
              all the underlying values. *)
           let elts =
-            I.seq la v
-            |> List.of_seq
+            I.seq la v |> List.of_seq
             |> List.fast_sort (fun (x, _) (y, _) -> compare_step x y)
           in
           `Node elts
@@ -2211,10 +2350,10 @@ struct
                 | Some ptr ->
                     let h = I.Ptr.val_ref la ptr |> Val_ref.to_hash in
                     entries := (i, h) :: !entries
-              done;
+              done ;
               `Inode (v.length, !entries)
       in
-      apply t { f }
+      apply t {f}
   end
 
   module Val = struct
@@ -2224,9 +2363,10 @@ struct
       include Val_portable
 
       type node_key = hash [@@deriving brassaia]
+
       type contents_key = hash [@@deriving brassaia]
 
-      type value = [ `Contents of hash * metadata | `Node of hash ]
+      type value = [`Contents of hash * metadata | `Node of hash]
       [@@deriving brassaia]
 
       let of_node t = t
@@ -2258,7 +2398,10 @@ struct
         let promote_merge :
             hash option Brassaia.Merge.t -> key option Brassaia.Merge.t =
          fun t ->
-          Brassaia.Merge.like [%typ: key option] t (Option.map Key.to_hash)
+          Brassaia.Merge.like
+            [%typ: key option]
+            t
+            (Option.map Key.to_hash)
             (Option.map Key.unfindable_of_hash)
         in
         fun ~contents ~node ->
@@ -2269,7 +2412,7 @@ struct
       type proof = I.Proof.t [@@deriving brassaia]
 
       let to_proof (t : t) : proof =
-        apply t { f = (fun la v -> I.Proof.to_proof la v) }
+        apply t {f = (fun la v -> I.Proof.to_proof la v)}
 
       let of_proof ~depth (p : proof) =
         let find ~expected_depth:_ k =
@@ -2301,7 +2444,7 @@ struct
     end
 
     let to_concrete t =
-      apply t { f = (fun la v -> I.to_concrete ~force:true la v) }
+      apply t {f = (fun la v -> I.to_concrete ~force:true la v)}
 
     let of_concrete t =
       match I.of_concrete Truncated ~depth:0 t with
@@ -2343,11 +2486,15 @@ struct
   module Val = Inter.Val
 
   type 'a t = 'a Pack.t
+
   type key = Key.t [@@deriving brassaia ~equal]
+
   type hash = Hash.t
+
   type value = Inter.Val.t
 
   let mem t k = Pack.mem t k
+
   let index t k = Pack.index t k
 
   exception Invalid_depth = Inter.Raw.Invalid_depth
@@ -2355,7 +2502,12 @@ struct
   let pp_value = Brassaia.Type.pp Inter.Raw.t
 
   let pp_invalid_depth ppf (expected, got, v) =
-    Fmt.pf ppf "Invalid depth: got %d, expecting %d (%a)" got expected pp_value
+    Fmt.pf
+      ppf
+      "Invalid depth: got %d, expecting %d (%a)"
+      got
+      expected
+      pp_value
       v
 
   let check_depth_opt ~expected_depth:expected = function
@@ -2364,7 +2516,7 @@ struct
         match Inter.Raw.depth v with
         | None -> ()
         | Some got ->
-            if got <> expected then raise (Invalid_depth { expected; got; v }))
+            if got <> expected then raise (Invalid_depth {expected; got; v}))
 
   let unsafe_find ~check_integrity t k =
     match Pack.unsafe_find ~check_integrity t k with
@@ -2372,7 +2524,7 @@ struct
     | Some v ->
         let find ~expected_depth k =
           let v = Pack.unsafe_find ~check_integrity t k in
-          check_depth_opt ~expected_depth v;
+          check_depth_opt ~expected_depth v ;
           v
         in
         let v = Val.of_raw find v in
@@ -2384,30 +2536,42 @@ struct
     let add k v =
       Pack.unsafe_append ~ensure_unique:true ~overcommit:false t k v
     in
-    Val.save ?allow_non_root ~add ~index:(Pack.index_direct t)
-      ~mem:(Pack.unsafe_mem t) v
+    Val.save
+      ?allow_non_root
+      ~add
+      ~index:(Pack.index_direct t)
+      ~mem:(Pack.unsafe_mem t)
+      v
 
   let hash_exn = Val.hash_exn
+
   let add t v = save t v
+
   let equal_hash = Brassaia.Type.(unstage (equal H.t))
 
   let check_hash expected got =
     if equal_hash expected got then ()
     else
-      Fmt.invalid_arg "corrupted value: got %a, expecting %a" Inter.pp_hash
-        expected Inter.pp_hash got
+      Fmt.invalid_arg
+        "corrupted value: got %a, expecting %a"
+        Inter.pp_hash
+        expected
+        Inter.pp_hash
+        got
 
   let unsafe_add t k v =
-    check_hash k (hash_exn v);
+    check_hash k (hash_exn v) ;
     save t v
 
   let batch = Pack.batch
+
   let close = Pack.close
+
   let decode_bin_length = Inter.Raw.decode_bin_length
 
   let protect_from_invalid_depth_exn f =
     try f () with
-    | Invalid_depth { expected; got; v } ->
+    | Invalid_depth {expected; got; v} ->
         let msg = Fmt.to_to_string pp_invalid_depth (expected, got, v) in
         Error msg
     | e -> raise e

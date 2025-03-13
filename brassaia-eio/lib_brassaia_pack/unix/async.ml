@@ -21,8 +21,11 @@ module Unix = struct
     try Unix.kill pid Sys.sigkill
     with Unix.Unix_error (e, s1, s2) ->
       [%log.warn
-        "Killing process with pid %d failed with error (%s, %s, %s)" pid
-          (Unix.error_message e) s1 s2]
+        "Killing process with pid %d failed with error (%s, %s, %s)"
+          pid
+          (Unix.error_message e)
+          s1
+          s2]
 
   (** [Exit] is a stack of PIDs that will be killed [at_exit]. *)
   module Exit = struct
@@ -43,21 +46,22 @@ module Unix = struct
       List.iter kill_no_err pids
   end
 
-  type outcome = [ `Success | `Cancelled | `Failure of string ]
+  type outcome = [`Success | `Cancelled | `Failure of string]
   [@@deriving brassaia]
 
-  type status = [ `Running | `Success | `Cancelled | `Failure of string ]
+  type status = [`Running | `Success | `Cancelled | `Failure of string]
   [@@deriving brassaia]
 
-  type t = { pid : int; mutable status : status; lock : Eio.Mutex.t }
+  type t = {pid : int; mutable status : status; lock : Eio.Mutex.t}
 
   module Exit_code = struct
     let success = 0
+
     let unhandled_exn = 42
   end
 
   let async f =
-    Stdlib.flush_all ();
+    Stdlib.flush_all () ;
     match Unix.fork () with
     | 0 ->
         (* Lwt_main.Exit_hooks.remove_all ();
@@ -67,14 +71,14 @@ module Unix = struct
           | () -> Exit_code.success
           | exception e ->
               [%log.err
-                "Unhandled exception in child process %s" (Printexc.to_string e)];
+                "Unhandled exception in child process %s" (Printexc.to_string e)] ;
               Exit_code.unhandled_exn
         in
         (* Use [Unix._exit] to avoid calling [at_exit] hooks. *)
         Unix._exit exit_code
     | pid ->
-        Exit.add pid;
-        { pid; status = `Running; lock = Eio.Mutex.create () }
+        Exit.add pid ;
+        {pid; status = `Running; lock = Eio.Mutex.create ()}
 
   let status_of_process_outcome = function
     | Unix.WEXITED n when n = Exit_code.success -> `Success
@@ -88,12 +92,12 @@ module Unix = struct
     Eio.Mutex.use_rw ~protect:true t.lock @@ fun () ->
     match t.status with
     | `Running ->
-        let pid, _ = Unix.waitpid [ Unix.WNOHANG ] t.pid in
+        let pid, _ = Unix.waitpid [Unix.WNOHANG] t.pid in
         if pid = 0 then (
           (* Child process is still running. *)
-          kill_no_err t.pid;
-          Exit.remove t.pid;
-          t.status <- `Cancelled;
+          kill_no_err t.pid ;
+          Exit.remove t.pid ;
+          t.status <- `Cancelled ;
           true)
         else false
     | _ -> false
@@ -102,12 +106,12 @@ module Unix = struct
     Eio.Mutex.use_rw ~protect:true t.lock @@ fun () ->
     match t.status with
     | `Running ->
-        let pid, status = Unix.waitpid [ Unix.WNOHANG ] t.pid in
+        let pid, status = Unix.waitpid [Unix.WNOHANG] t.pid in
         if pid = 0 then `Running
         else
           let s = status_of_process_outcome status in
-          Exit.remove pid;
-          t.status <- s;
+          Exit.remove pid ;
+          t.status <- s ;
           s
     | #outcome as s -> s
 
@@ -117,8 +121,8 @@ module Unix = struct
     | `Running ->
         let pid, status = Unix.waitpid [] t.pid in
         let s = status_of_process_outcome status in
-        Exit.remove pid;
-        t.status <- s;
+        Exit.remove pid ;
+        t.status <- s ;
         s
     | #outcome as s -> s
 end

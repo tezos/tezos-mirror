@@ -18,28 +18,31 @@ open! Import
 
 module type Child_ordering = sig
   type step
+
   type key
 
   val key : step -> key
+
   val index : depth:int -> key -> int
 end
 
 module type Snapshot = sig
   type hash
+
   type metadata
 
   type kinded_hash = Contents of hash * metadata | Node of hash
   [@@deriving brassaia]
 
-  type entry = { step : string; hash : kinded_hash } [@@deriving brassaia]
+  type entry = {step : string; hash : kinded_hash} [@@deriving brassaia]
 
-  type inode_tree = { depth : int; length : int; pointers : (int * hash) list }
+  type inode_tree = {depth : int; length : int; pointers : (int * hash) list}
   [@@deriving brassaia]
 
   type v = Inode_tree of inode_tree | Inode_value of entry list
   [@@deriving brassaia]
 
-  type inode = { v : v; root : bool } [@@deriving brassaia]
+  type inode = {v : v; root : bool} [@@deriving brassaia]
 end
 
 module type Value = sig
@@ -53,7 +56,7 @@ module type Value = sig
   val pred :
     t ->
     (step option
-    * [ `Node of node_key | `Inode of node_key | `Contents of contents_key ])
+    * [`Node of node_key | `Inode of node_key | `Contents of contents_key])
     list
 
   module Portable :
@@ -65,8 +68,8 @@ module type Value = sig
 
   val nb_children : t -> int
 
-  val recompute_hash : t -> hash
   (** Recompute hash for inodes, used in eager integrity checks.*)
+  val recompute_hash : t -> hash
 end
 
 module type Raw = sig
@@ -74,7 +77,7 @@ module type Raw = sig
 
   val depth : t -> int option
 
-  exception Invalid_depth of { expected : int; got : int; v : t }
+  exception Invalid_depth of {expected : int; got : int; v : t}
 
   val decode_children_offsets :
     entry_of_offset:(int63 -> 'a) ->
@@ -86,9 +89,10 @@ end
 
 module type S = sig
   include Brassaia.Indexable.S
+
   module Hash : Brassaia.Hash.S with type t = hash
 
-  val unsafe_find : check_integrity:bool -> [< read ] t -> key -> value option
+  val unsafe_find : check_integrity:bool -> [< read] t -> key -> value option
 
   module Val :
     Value
@@ -98,23 +102,36 @@ module type S = sig
        and type Portable.hash := hash
 
   val decode_bin_length : string -> int -> int
-  val integrity_check_inodes : [ `Read ] t -> key -> (unit, string) result
+
+  val integrity_check_inodes : [`Read] t -> key -> (unit, string) result
+
   val save : ?allow_non_root:bool -> 'a t -> value -> key
 end
 
 module type Compress = sig
   type step
+
   type hash
+
   type metadata
+
   type dict_key = int
+
   type pack_offset = int63
+
   type name = Indirect of dict_key | Direct of step
+
   type address = Offset of pack_offset | Hash of hash
-  type ptr = { index : dict_key; hash : address }
-  type tree = { depth : dict_key; length : dict_key; entries : ptr list }
+
+  type ptr = {index : dict_key; hash : address}
+
+  type tree = {depth : dict_key; length : dict_key; entries : ptr list}
+
   type value = Contents of name * address * metadata | Node of name * address
+
   type v = Values of value list | Tree of tree
-  type v1 = { mutable length : int; v : v }
+
+  type v1 = {mutable length : int; v : v}
 
   type tagged_v =
     | V1_stable of v
@@ -122,18 +139,20 @@ module type Compress = sig
     | V2_root of v1
     | V2_nonroot of v1
 
-  type t = { hash : hash; tv : tagged_v } [@@deriving brassaia]
+  type t = {hash : hash; tv : tagged_v} [@@deriving brassaia]
 end
 
 (** Unstable internal API agnostic about the underlying storage. Use it only to
     implement or test inodes. *)
 module type Internal = sig
   type hash
+
   type key
 
   val pp_hash : hash Fmt.t
 
   module Snapshot : Snapshot with type hash = hash
+
   module Raw : Raw with type hash = hash and type key = key
 
   module Val : sig
@@ -144,6 +163,7 @@ module type Internal = sig
          and type metadata = Snapshot.metadata
 
     val of_raw : (expected_depth:int -> key -> Raw.t option) -> Raw.t -> t
+
     val to_raw : t -> Raw.t
 
     val save :
@@ -155,11 +175,13 @@ module type Internal = sig
       key
 
     val stable : t -> bool
+
     val length : t -> int
+
     val index : depth:int -> step -> int
 
-    val integrity_check : t -> bool
     (** Checks the integrity of an inode. *)
+    val integrity_check : t -> bool
 
     module Concrete : sig
       (** {1 Concrete trees} *)
@@ -171,23 +193,24 @@ module type Internal = sig
         | Node of node_key
       [@@deriving brassaia]
 
-      type entry = { name : step; key : kinded_key } [@@deriving brassaia]
       (** The type of entries. *)
+      type entry = {name : step; key : kinded_key} [@@deriving brassaia]
 
-      type 'a pointer = { index : int; pointer : hash; tree : 'a }
-      [@@deriving brassaia]
       (** The type for internal pointers between concrete {!tree}s. *)
-
-      type 'a tree = { depth : int; length : int; pointers : 'a pointer list }
+      type 'a pointer = {index : int; pointer : hash; tree : 'a}
       [@@deriving brassaia]
+
       (** The type for trees. *)
+      type 'a tree = {depth : int; length : int; pointers : 'a pointer list}
+      [@@deriving brassaia]
 
       (** The type for concrete trees. *)
       type t = Tree of t tree | Values of entry list | Blinded
       [@@deriving brassaia]
 
-      type len := [ `Eq of int | `Ge of int ]
+      type len := [`Eq of int | `Ge of int]
 
+      (** The type for errors. *)
       type error =
         [ `Invalid_hash of hash * hash * t
         | `Invalid_depth of int * int * t
@@ -200,20 +223,19 @@ module type Internal = sig
         | `Too_large_values of t
         | `Empty ]
       [@@deriving brassaia]
-      (** The type for errors. *)
 
-      val pp_error : error Fmt.t
       (** [pp_error] is the pretty-printer for errors. *)
+      val pp_error : error Fmt.t
     end
 
-    val to_concrete : t -> Concrete.t
     (** [to_concrete t] is the concrete inode tree equivalent to [t]. *)
+    val to_concrete : t -> Concrete.t
 
-    val of_concrete : Concrete.t -> (t, Concrete.error) result
     (** [of_concrete c] is [Ok t] iff [c] and [t] are equivalent.
 
         The result is [Error e] when a subtree tree of [c] has an integrity
         error. *)
+    val of_concrete : Concrete.t -> (t, Concrete.error) result
 
     module Portable : sig
       (* Extend to the portable signature *)
@@ -222,8 +244,8 @@ module type Internal = sig
       module Proof : sig
         val of_concrete : Concrete.t -> proof
 
-        val to_concrete : proof -> Concrete.t
         (** This function produces unfindable keys. Only use in tests *)
+        val to_concrete : proof -> Concrete.t
       end
     end
 
@@ -247,9 +269,13 @@ end
 
 module type Sigs = sig
   module type S = S
+
   module type Internal = Internal
+
   module type Child_ordering = Child_ordering
+
   module type Raw = Raw
+
   module type Snapshot = Snapshot
 
   exception Max_depth of int

@@ -33,10 +33,12 @@ module Maker_generic_key (I : Info.S) = struct
     module Info = I
 
     type hash = H.t [@@deriving brassaia ~compare]
+
     type node_key = N.t [@@deriving brassaia ~compare]
+
     type commit_key = C.t [@@deriving brassaia]
 
-    type t = { node : node_key; parents : commit_key list; info : Info.t }
+    type t = {node : node_key; parents : commit_key list; info : Info.t}
     [@@deriving brassaia]
 
     type t_not_prefixed = t [@@deriving brassaia]
@@ -51,25 +53,29 @@ module Maker_generic_key (I : Info.S) = struct
        a commit starts with the hash of the root and can start with a "B" - the
        prefix of the contents is not enough to prevent the collision). *)
     let pre_hash_prefixed x f =
-      f "C";
+      f "C" ;
       pre_hash x f
 
     let t = Type.(like t ~pre_hash:pre_hash_prefixed)
+
     let parents t = t.parents
+
     let node t = t.node
+
     let info t = t.info
+
     let compare_commit_key x y = compare_hash (C.to_hash x) (C.to_hash y)
 
     let v ~info ~node ~parents =
       let parents = List.fast_sort compare_commit_key parents in
-      { node; parents; info }
+      {node; parents; info}
 
     module Portable = struct
       module Info = I
 
       type commit = t
 
-      type t = { node : hash; parents : hash list; info : Info.t }
+      type t = {node : hash; parents : hash list; info : Info.t}
       [@@deriving brassaia]
 
       type t_not_prefixed = t [@@deriving brassaia]
@@ -77,28 +83,32 @@ module Maker_generic_key (I : Info.S) = struct
       let pre_hash = Type.(unstage (pre_hash t))
 
       let pre_hash_prefixed x f =
-        f "C";
+        f "C" ;
         pre_hash x f
 
       let t = Type.(like t ~pre_hash:pre_hash_prefixed)
 
       type commit_key = H.t [@@deriving brassaia]
+
       type node_key = H.t [@@deriving brassaia]
+
       type hash = H.t [@@deriving brassaia]
 
       let parents t = t.parents
+
       let node t = t.node
+
       let info t = t.info
 
       let v ~info ~node ~parents =
         let parents = List.fast_sort compare_hash parents in
-        { node; parents; info }
+        {node; parents; info}
 
       let of_commit : commit -> t =
-       fun { node; parents; info } ->
+       fun {node; parents; info} ->
         let node = N.to_hash node in
         let parents = List.map C.to_hash parents in
-        { node; parents; info }
+        {node; parents; info}
     end
   end
 
@@ -146,23 +156,33 @@ struct
   module Info = I
 
   type 'a t = 'a N.t * 'a S.t
+
   type key = Key.t [@@deriving brassaia ~equal]
+
   type value = S.value
+
   type hash = S.hash
 
   let add (_, t) = S.add t
+
   let unsafe_add (_, t) = S.unsafe_add t
+
   let mem (_, t) = S.mem t
+
   let index (_, t) = S.index t
+
   let find (_, t) = S.find t
+
   let batch (n, s) f = N.batch n (fun n -> S.batch s (fun s -> f (n, s)))
 
   let close (n, s) =
-    N.close n;
+    N.close n ;
     S.close s
 
   let merge_node (t, _) = Merge.f (N.merge t)
+
   let pp_key = Type.pp Key.t
+
   let err_not_found k = Fmt.kstr invalid_arg "Commit.get: %a not found" pp_key k
 
   let get (_, t) k =
@@ -173,10 +193,11 @@ struct
     | Some node -> node
 
   let equal_key = Type.(unstage (equal Key.t))
+
   let equal_opt_keys = Type.(unstage (equal (option Key.t)))
 
   let merge_commit info t ~old k1 k2 =
-    [%log.debug "Commit.merge %a %a" pp_key k1 pp_key k2];
+    [%log.debug "Commit.merge %a %a" pp_key k1 pp_key k2] ;
     let v1 = get t k1 in
     let v2 = get t k2 in
     if List.mem ~equal:equal_key k1 (Val.parents v2) then Merge.ok k2
@@ -189,7 +210,7 @@ struct
       let old =
         match old () with
         | Error (`Conflict msg) ->
-            [%log.debug "old: conflict %s" msg];
+            [%log.debug "old: conflict %s" msg] ;
             None
         | Ok o -> o
       in
@@ -206,7 +227,7 @@ struct
         merge_node t ~old (Some (Val.node v1)) (Some (Val.node v2))
         >>=* fun node ->
         let node = empty_if_none t node in
-        let parents = [ k1; k2 ] in
+        let parents = [k1; k2] in
         let commit = Val.v ~node ~parents ~info:(info ()) in
         let key = add t commit in
         Merge.ok key
@@ -216,6 +237,7 @@ end
 
 module Generic_key = struct
   module type S = S_generic_key
+
   module type Maker = Maker_generic_key
 
   module Maker = Maker_generic_key
@@ -252,9 +274,13 @@ end
 
 module History (S : Store) = struct
   type commit_key = S.Key.t [@@deriving brassaia]
+
   type node_key = S.Val.node_key [@@deriving brassaia]
+
   type v = S.Val.t [@@deriving brassaia]
+
   type info = S.Info.t [@@deriving brassaia]
+
   type 'a t = 'a S.t
 
   let merge t ~info =
@@ -275,7 +301,7 @@ module History (S : Store) = struct
   let pp_key = Type.pp S.Key.t
 
   let parents t c =
-    [%log.debug "parents %a" pp_key c];
+    [%log.debug "parents %a" pp_key c] ;
     match S.find t c with None -> [] | Some c -> S.Val.parents c
 
   module U = struct
@@ -285,11 +311,11 @@ module History (S : Store) = struct
   module Graph = Object_graph.Make (U) (S.Node.Key) (S.Key) (U)
 
   let edges t =
-    [%log.debug "edges"];
-    [ `Node (S.Val.node t) ] @ List.map (fun k -> `Commit k) (S.Val.parents t)
+    [%log.debug "edges"] ;
+    [`Node (S.Val.node t)] @ List.map (fun k -> `Commit k) (S.Val.parents t)
 
   let closure t ~min ~max =
-    [%log.debug "closure"];
+    [%log.debug "closure"] ;
     let pred = function
       | `Commit k -> ( match S.find t k with Some r -> edges r | None -> [])
       | _ -> []
@@ -299,7 +325,8 @@ module History (S : Store) = struct
     let g = Graph.closure ~pred ~min ~max () in
     List.fold_left
       (fun acc -> function `Commit k -> k :: acc | _ -> acc)
-      [] (Graph.vertex g)
+      []
+      (Graph.vertex g)
 
   let iter t ~min ~max ?(commit = ignore) ?edge ?(skip = fun _ -> false)
       ?(rev = true) () =
@@ -325,7 +352,9 @@ module History (S : Store) = struct
     type t = S.Key.t
 
     let compare = Type.(unstage (compare S.Key.t))
+
     let hash k = S.Hash.short_hash (S.Key.to_hash k)
+
     let equal = Type.(unstage (equal S.Key.t))
   end
 
@@ -338,7 +367,9 @@ module History (S : Store) = struct
     | Some c -> KSet.of_list (S.Val.parents c)
 
   let equal_keys = Type.(unstage (equal S.Key.t))
+
   let str_key k = String.sub (Type.to_string S.Key.t k) 0 4
+
   let pp_key = Fmt.of_to_string str_key
 
   let pp_keys ppf keys =
@@ -346,6 +377,7 @@ module History (S : Store) = struct
     Fmt.pf ppf "[%a]" Fmt.(list ~sep:(any " ") pp_key) keys
 
   let str_keys = Fmt.to_to_string pp_keys
+
   let lca_calls = ref 0
 
   let rec unqueue todo seen =
@@ -361,7 +393,7 @@ module History (S : Store) = struct
   let traverse_bfs t ~f ~pp:_ ~check ~init ~return =
     let todo = Queue.create () in
     let add_todo d x = Queue.add (d, x) todo in
-    KSet.iter (add_todo 0) init;
+    KSet.iter (add_todo 0) init ;
     let rec aux seen =
       match check () with
       | (`Too_many_lcas | `Max_depth_reached) as x -> Error x
@@ -376,7 +408,7 @@ module History (S : Store) = struct
               let parents = read_parents t commit in
               let () = f depth commit parents in
               let parents = KSet.diff parents seen in
-              KSet.iter (add_todo (depth + 1)) parents;
+              KSet.iter (add_todo (depth + 1)) parents ;
               aux seen)
     in
     aux KSet.empty
@@ -421,19 +453,31 @@ module History (S : Store) = struct
       (let pp m =
          KHashtbl.fold
            (fun k v acc -> if v = m then str_key k :: acc else acc)
-           t.marks []
+           t.marks
+           []
          |> String.concat " "
        in
-       Fmt.str "d: %d, seen1: %s, seen2: %s, seenboth: %s, lcas: %s (%d) %s"
-         t.depth (pp Seen1) (pp Seen2) (pp SeenBoth) (pp LCA) t.lcas
-         (String.concat " | "
+       Fmt.str
+         "d: %d, seen1: %s, seen2: %s, seenboth: %s, lcas: %s (%d) %s"
+         t.depth
+         (pp Seen1)
+         (pp Seen2)
+         (pp SeenBoth)
+         (pp LCA)
+         t.lcas
+         (String.concat
+            " | "
             (Hashtbl.fold
                (fun d ks acc -> Fmt.str "(%d: %s)" d (str_keys ks) :: acc)
-               t.layers [])))
+               t.layers
+               [])))
 
   let get_mark_exn t elt = KHashtbl.find t.marks elt
+
   let get_mark t elt = try Some (get_mark_exn t elt) with Not_found -> None
+
   let set_mark t elt mark = KHashtbl.replace t.marks elt mark
+
   let get_layer t d = try Hashtbl.find t.layers d with Not_found -> KSet.empty
 
   let add_to_layer t d k =
@@ -445,6 +489,7 @@ module History (S : Store) = struct
     try KHashtbl.find t.parents c with Not_found -> KSet.empty
 
   let incr_lcas t = t.lcas <- t.lcas + 1
+
   let decr_lcas t = t.lcas <- t.lcas - 1
 
   let both_seen t k =
@@ -465,8 +510,8 @@ module History (S : Store) = struct
         complete = false;
       }
     in
-    set_mark t c1 Seen1;
-    set_mark t c2 Seen2;
+    set_mark t c1 Seen1 ;
+    set_mark t c2 Seen2 ;
     t
 
   (* update the parent mark and keep the number of lcas up-to-date. *)
@@ -476,11 +521,11 @@ module History (S : Store) = struct
       | Seen1, Some Seen1 | Seen1, None -> Seen1
       | Seen2, Some Seen2 | Seen2, None -> Seen2
       | SeenBoth, Some LCA ->
-          decr_lcas t;
+          decr_lcas t ;
           SeenBoth
       | SeenBoth, _ -> SeenBoth
       | Seen1, Some Seen2 | Seen2, Some Seen1 ->
-          incr_lcas t;
+          incr_lcas t ;
           LCA
       | _, Some LCA -> LCA
       | _ -> SeenBoth
@@ -489,15 +534,15 @@ module History (S : Store) = struct
     let is_init () = equal_keys commit t.c1 || equal_keys commit t.c2 in
     let is_shared () = new_mark = SeenBoth || new_mark = LCA in
     if is_shared () && is_init () then (
-      [%log.debug "fast-forward"];
-      t.complete <- true);
-    set_mark t commit new_mark;
+      [%log.debug "fast-forward"] ;
+      t.complete <- true) ;
+    set_mark t commit new_mark ;
     new_mark
 
   (* update the ancestors which have already been visisted. *)
   let update_ancestors_marks t mark commit =
     let todo = Queue.create () in
-    Queue.add commit todo;
+    Queue.add commit todo ;
     let rec loop mark =
       if Queue.is_empty todo then ()
       else
@@ -517,17 +562,17 @@ module History (S : Store) = struct
   (* We are looking for LCAs, doing a breadth-first-search from the two starting commits.
      This is called each time we visit a new commit. *)
   let update_parents t depth commit parents =
-    add_parent t commit parents;
-    add_to_layer t depth commit;
+    add_parent t commit parents ;
+    add_to_layer t depth commit ;
     if depth <> t.depth then (
-      assert (depth = t.depth + 1);
+      assert (depth = t.depth + 1) ;
 
       (* before starting to explore a new layer, check if we really
          have some work to do, ie. do we still have a commit seen only
          by one node? *)
       let layer = get_layer t t.depth in
       let complete = KSet.for_all (both_seen t) layer in
-      if complete then t.complete <- true else t.depth <- depth);
+      if complete then t.complete <- true else t.depth <- depth) ;
     let mark = get_mark_exn t commit in
     KSet.iter (update_ancestors_marks t mark) parents
 
@@ -541,12 +586,12 @@ module History (S : Store) = struct
     else `Continue
 
   let lcas t ?(max_depth = max_int) ?(n = max_int) c1 c2 =
-    incr lca_calls;
+    incr lca_calls ;
     if max_depth < 0 then Error `Max_depth_reached
     else if n <= 0 then Error `Too_many_lcas
-    else if equal_keys c1 c2 then Ok [ c1 ]
+    else if equal_keys c1 c2 then Ok [c1]
     else
-      let init = KSet.of_list [ c1; c2 ] in
+      let init = KSet.of_list [c1; c2] in
       let s = empty_state c1 c2 in
       let check () = check ~max_depth ~n s in
       let pp () = pp_state s in
@@ -560,7 +605,7 @@ module History (S : Store) = struct
           [%log.debug "lcas %d: depth=%d time=%.4fs" !lca_calls s.depth t1])
 
   let rec three_way_merge t ~info ?max_depth ?n c1 c2 =
-    [%log.debug "3-way merge between %a and %a" pp_key c1 pp_key c2];
+    [%log.debug "3-way merge between %a and %a" pp_key c1 pp_key c2] ;
     if equal_keys c1 c2 then Merge.ok c1
     else
       let lcas = lcas t ?max_depth ?n c1 c2 in
@@ -592,7 +637,7 @@ module History (S : Store) = struct
       | Error `Too_many_lcas -> Merge.conflict "Too many lcas"
       | Error `Max_depth_reached -> Merge.conflict "Max depth reached"
       | Ok [] -> Merge.ok None (* no common ancestor *)
-      | Ok [ x ] -> Merge.ok (Some x)
+      | Ok [x] -> Merge.ok (Some x)
       | Ok (c :: cs) ->
           let rec aux acc = function
             | [] -> Merge.ok (Some acc)
@@ -605,7 +650,7 @@ module History (S : Store) = struct
 
   let rec lca t ~info ?max_depth ?n = function
     | [] -> Merge.conflict "History.lca: empty"
-    | [ c ] -> Merge.ok (Some c)
+    | [c] -> Merge.ok (Some c)
     | c1 :: c2 :: cs -> (
         lca_aux t ~info ?max_depth ?n c1 c2 >>=* function
         | None -> Merge.ok None
@@ -650,11 +695,11 @@ module V1 = struct
       let pre_hash =
         let hash_length_header : string =
           let b = Bytes.create 8 in
-          Bytes.set_int64_be b 0 (Int64.of_int Hash.hash_size);
+          Bytes.set_int64_be b 0 (Int64.of_int Hash.hash_size) ;
           Bytes.unsafe_to_string b
         in
         fun x f ->
-          f hash_length_header;
+          f hash_length_header ;
           pre_hash x f
 
       let t = Type.like K.t ~bin:(encode_bin, decode_bin, size_of) ~pre_hash
@@ -669,17 +714,25 @@ module V1 = struct
     end)
 
     type node_key = Node_key.t [@@deriving brassaia]
+
     type commit_key = Commit_key.t [@@deriving brassaia]
-    type t = { parents : commit_key list; c : C.t }
+
+    type t = {parents : commit_key list; c : C.t}
 
     module Info = Info
 
-    let import c = { c; parents = C.parents c }
+    let import c = {c; parents = C.parents c}
+
     let export t = t.c
+
     let node t = C.node t.c
+
     let parents t = t.parents
+
     let info t = C.info t.c
-    let v ~info ~node ~parents = { parents; c = C.v ~node ~parents ~info }
+
+    let v ~info ~node ~parents = {parents; c = C.v ~node ~parents ~info}
+
     let make = v
 
     let t : t Type.t =
@@ -687,8 +740,7 @@ module V1 = struct
       record "commit" (fun node parents info -> make ~info ~node ~parents)
       |+ field "node" Node_key.t node
       |+ field "parents" (list ~len:`Int64 Commit_key.t) parents
-      |+ field "info" Info.t info
-      |> sealr
+      |+ field "info" Info.t info |> sealr
   end
 end
 

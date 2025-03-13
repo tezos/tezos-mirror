@@ -14,6 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-type 'a t = [ `Updated of 'a * 'a | `Removed of 'a | `Added of 'a ]
-[@@deriving brassaia]
 (** The type for representing differences betwen values. *)
+type 'a t = [`Updated of 'a * 'a | `Removed of 'a | `Added of 'a]
+[@@deriving brassaia]

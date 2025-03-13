@@ -14,8 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Store_intf.Sigs
 (** @inline *)
+include Store_intf.Sigs
 
 module Maker
     (Io : Io_intf.S)

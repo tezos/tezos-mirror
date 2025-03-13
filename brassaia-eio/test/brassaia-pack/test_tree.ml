@@ -18,9 +18,11 @@ open! Import
 open Common
 
 let root = Filename.concat "_build" "test-tree"
+
 let src = Logs.Src.create "tests.tree" ~doc:"Tests"
 
 module Log = (val Logs.src_log src : Logs.LOG)
+
 module Hash = Brassaia.Hash.SHA1
 
 type ('key, 'value) op =
@@ -43,28 +45,33 @@ module Make (Conf : Brassaia_pack.Conf.S) = struct
 
   module Tree = Store.Tree
 
-  type context = { repo : Store.repo; tree : Store.tree }
+  type context = {repo : Store.repo; tree : Store.tree}
 
   let export_tree_to_store tree =
     let repo = Store.Repo.v (config ~fresh:true root) in
     let store = Store.empty repo in
     let () = Store.set_tree_exn ~info store [] tree in
     let tree = Store.tree store in
-    { repo; tree }
+    {repo; tree}
 
-  let close { repo; _ } = Store.Repo.close repo
+  let close {repo; _} = Store.Repo.close repo
 
   let fold ~order t ~init ~f =
-    Tree.fold ~order ~force:`True ~cache:false ~uniq:`False
+    Tree.fold
+      ~order
+      ~force:`True
+      ~cache:false
+      ~uniq:`False
       ~contents:(fun k _v acc -> if k = [] then acc else f k acc)
-      t init
+      t
+      init
 
   let init_bindings n =
     let zero = String.make 10 '0' in
     List.init n (fun n ->
         let h = Store.Contents.hash (string_of_int n) in
         let h = Brassaia.Type.to_string Store.Hash.t h in
-        ([ h ], zero))
+        ([h], zero))
 
   let init_tree bindings =
     let tree = Tree.empty () in
@@ -90,7 +97,8 @@ module Make (Conf : Brassaia_pack.Conf.S) = struct
         let len_tree = Tree.length tree k in
         Alcotest.(check int)
           (Fmt.str "expected tree length at %a" Fmt.(Dump.list string) k)
-          len_expected len_tree;
+          len_expected
+          len_tree ;
         tree
 
   let run_disjoint ops tree =
@@ -110,6 +118,7 @@ module Make (Conf : Brassaia_pack.Conf.S) = struct
     t
 
   let bin_of_proof = Brassaia.Type.(unstage (to_bin_string Tree.Proof.t))
+
   let proof_of_bin = Brassaia.Type.(unstage (of_bin_string Tree.Proof.t))
 end
 
@@ -121,9 +130,14 @@ type bindings = string list list [@@deriving brassaia]
 let equal_ordered_slist ~msg l1 l2 = Alcotest.check_repr bindings_t msg l1 l2
 
 let fold ~order ~force t ~init ~f =
-  Tree.fold ~order ~force ~cache:false ~uniq:`False
+  Tree.fold
+    ~order
+    ~force
+    ~cache:false
+    ~uniq:`False
     ~contents:(fun k _v acc -> if k = [] then acc else f k acc)
-    t init
+    t
+    init
 
 let equal_slist ~msg l1 l2 =
   Alcotest.(check (slist (list string) Stdlib.compare)) msg l1 l2
@@ -163,20 +177,19 @@ let version =
   let version = Sys.ocaml_version in
   Char.code version.[0] - 48
 
-let some_steps = [ "0g"; "1g"; "0h"; "2g"; "1h"; "2h" ]
+let some_steps = ["0g"; "1g"; "0h"; "2g"; "1h"; "2h"]
 
 let some_random_steps =
-  if version >= 5 then
-    [ [ "1g" ]; [ "0h" ]; [ "2h" ]; [ "1h" ]; [ "2g" ]; [ "0g" ] ]
-  else [ [ "2g" ]; [ "1h" ]; [ "0h" ]; [ "2h" ]; [ "0g" ]; [ "1g" ] ]
+  if version >= 5 then [["1g"]; ["0h"]; ["2h"]; ["1h"]; ["2g"]; ["0g"]]
+  else [["2g"]; ["1h"]; ["0h"]; ["2h"]; ["0g"]; ["1g"]]
 
 let another_random_steps =
-  if version >= 5 then
-    [ [ "0g" ]; [ "0h" ]; [ "1h" ]; [ "2h" ]; [ "2g" ]; [ "1g" ] ]
-  else [ [ "1g" ]; [ "2h" ]; [ "1h" ]; [ "0g" ]; [ "0h" ]; [ "2g" ] ]
+  if version >= 5 then [["0g"]; ["0h"]; ["1h"]; ["2h"]; ["2g"]; ["1g"]]
+  else [["1g"]; ["2h"]; ["1h"]; ["0g"]; ["0h"]; ["2g"]]
 
 let zero = String.make 10 '0'
-let bindings steps = List.map (fun x -> ([ x ], zero)) steps
+
+let bindings steps = List.map (fun x -> ([x], zero)) steps
 
 let test_fold ?export_tree_to_store:(export_tree_to_store' = true) ~order
     bindings expected =
@@ -195,7 +208,9 @@ let test_fold ?export_tree_to_store:(export_tree_to_store' = true) ~order
     fold
       ~force:
         (if export_tree_to_store' then `True else `False (Fun.const Fun.id))
-      ~order tree ~init:[]
+      ~order
+      tree
+      ~init:[]
       ~f:(fun k acc -> k :: acc)
   in
   let keys = List.rev keys in
@@ -205,7 +220,7 @@ let test_fold ?export_tree_to_store:(export_tree_to_store' = true) ~order
     | `Random _ -> ("random", equal_ordered_slist)
     | `Undefined -> ("undefined", equal_slist)
   in
-  equal_lists ~msg:(Fmt.str "Visit elements in %s order" msg) expected keys;
+  equal_lists ~msg:(Fmt.str "Visit elements in %s order" msg) expected keys ;
   close ()
 
 let test_fold_sorted () =
@@ -215,17 +230,20 @@ let test_fold_sorted () =
 
 let test_fold_random () =
   let bindings = bindings some_steps in
-  let state = Random.State.make [| 0 |] in
+  let state = Random.State.make [|0|] in
   let () = test_fold ~order:(`Random state) bindings some_random_steps in
-  let state = Random.State.make [| 1 |] in
+  let state = Random.State.make [|1|] in
   let () = test_fold ~order:(`Random state) bindings another_random_steps in
 
   (* Random fold order should still be respected if [~force:`False]. This is a
      regression test for a bug in which the fold order of in-memory nodes during
      a non-forcing traversal was always sorted. *)
-  let state = Random.State.make [| 1 |] in
+  let state = Random.State.make [|1|] in
   let () =
-    test_fold ~order:(`Random state) ~export_tree_to_store:false bindings
+    test_fold
+      ~order:(`Random state)
+      ~export_tree_to_store:false
+      bindings
       another_random_steps
   in
   ()
@@ -245,38 +263,44 @@ let check_equivalence tree proof op =
       let proof = Tree.add proof k v in
       Alcotest.(check_repr Store.Hash.t)
         (Fmt.str "same hash add %a" Fmt.(Dump.list string) k)
-        (Tree.hash tree) (Tree.hash proof);
+        (Tree.hash tree)
+        (Tree.hash proof) ;
       (tree, proof)
   | Del k ->
       let tree = Tree.remove tree k in
       let proof = Tree.remove proof k in
       Alcotest.(check_repr Store.Hash.t)
         (Fmt.str "same hash del %a" Fmt.(Dump.list string) k)
-        (Tree.hash tree) (Tree.hash proof);
+        (Tree.hash tree)
+        (Tree.hash proof) ;
       (tree, proof)
   | Find k ->
       let v_tree = Tree.find tree k in
       let v_proof = Tree.find proof k in
       Alcotest.(check (option string))
         (Fmt.str "same value at %a" Fmt.(Dump.list string) k)
-        v_tree v_proof;
+        v_tree
+        v_proof ;
       (tree, proof)
   | Find_tree k ->
       let v_tree = Tree.find_tree tree k in
       let v_proof = Tree.find_tree tree k in
       Alcotest.(check_repr [%typ: Store.tree option])
         (Fmt.str "same tree at %a" Fmt.(Dump.list string) k)
-        v_tree v_proof;
+        v_tree
+        v_proof ;
       (tree, proof)
   | Length (k, len_expected) ->
       let len_tree = Tree.length tree k in
       Alcotest.(check int)
         (Fmt.str "expected tree length at %a" Fmt.(Dump.list string) k)
-        len_expected len_tree;
+        len_expected
+        len_tree ;
       let len_proof = Tree.length proof k in
       Alcotest.(check int)
         (Fmt.str "same tree length at %a" Fmt.(Dump.list string) k)
-        len_tree len_proof;
+        len_tree
+        len_proof ;
       (tree, proof)
 
 let test_proofs ctxt ops =
@@ -292,13 +316,15 @@ let test_proofs ctxt ops =
   (* test encoding *)
   let enc = bin_of_proof proof in
   let dec = proof_of_bin enc in
-  Alcotest.(check_repr Tree.Proof.t) "same proof" proof dec;
+  Alcotest.(check_repr Tree.Proof.t) "same proof" proof dec ;
 
   (* test equivalence *)
   let tree_proof = Tree.Proof.to_tree proof in
 
   Alcotest.(check_repr Store.Hash.t)
-    "same initial hash" hash (Tree.hash tree_proof);
+    "same initial hash"
+    hash
+    (Tree.hash tree_proof) ;
 
   let _ =
     List.fold_left
@@ -306,15 +332,15 @@ let test_proofs ctxt ops =
       (tree, tree_proof)
       (ops
       @ [
-          Add ([ "00" ], "0");
-          Add ([ "00" ], "1");
-          Del [ "00" ];
-          Find [ "00" ];
-          Add ([ "00" ], "0");
-          Add ([ "00" ], "1");
-          Find [ "00" ];
-          Find_tree [ "01" ];
-          Find_tree [ "z"; "o"; "o" ];
+          Add (["00"], "0");
+          Add (["00"], "1");
+          Del ["00"];
+          Find ["00"];
+          Add (["00"], "0");
+          Add (["00"], "1");
+          Find ["00"];
+          Find_tree ["01"];
+          Find_tree ["z"; "o"; "o"];
         ])
   in
   ()
@@ -322,7 +348,7 @@ let test_proofs ctxt ops =
 let test_large_inode () =
   let bindings = bindings steps in
   let ctxt = init_tree bindings in
-  let ops = [ Add ([ "00" ], "3"); Del [ "01" ] ] in
+  let ops = [Add (["00"], "3"); Del ["01"]] in
   test_proofs ctxt ops
 
 let fewer_steps =
@@ -334,7 +360,7 @@ let fewer_steps =
 let test_small_inode () =
   let bindings = bindings fewer_steps in
   let ctxt = init_tree bindings in
-  let ops = [ Add ([ "00" ], ""); Del [ "01" ] ] in
+  let ops = [Add (["00"], ""); Del ["01"]] in
   test_proofs ctxt ops
 
 let test_length_proof () =
@@ -344,28 +370,28 @@ let test_length_proof () =
   let ops =
     [
       Length ([], size) (* initial size *);
-      Add ([ "01" ], "0");
+      Add (["01"], "0");
       Length ([], size) (* "01" was already accounted for *);
-      Add ([ "01" ], "1");
+      Add (["01"], "1");
       Length ([], size) (* adding it again doesn't change the length *);
-      Add ([ "new" ], "0");
+      Add (["new"], "0");
       Length ([], size + 1) (* "new" is a new file, so the length changes *);
-      Add ([ "new" ], "1");
+      Add (["new"], "1");
       Length ([], size + 1) (* adding it again doesn't change the length *);
-      Del [ "inexistant" ];
+      Del ["inexistant"];
       Length ([], size + 1)
       (* removing an inexistant object doesn't change the length *);
-      Del [ "00" ];
+      Del ["00"];
       Length ([], size) (* but removing the existing "00" does *);
-      Del [ "00" ];
+      Del ["00"];
       Length ([], size) (* removing "00" twice doesn't change the length *);
-      Del [ "new" ];
+      Del ["new"];
       Length ([], size - 1) (* removing the fresh "new" does *);
-      Del [ "new" ];
+      Del ["new"];
       Length ([], size - 1) (* but only once *);
-      Add ([ "new" ], "2");
+      Add (["new"], "2");
       Length ([], size) (* adding "new" again does *);
-      Add ([ "00" ], "2");
+      Add (["00"], "2");
       Length ([], size + 1) (* adding "00" again does too *);
     ]
   in
@@ -379,12 +405,12 @@ let test_deeper_proof () =
       List.fold_left (fun tree (k, v) -> Tree.add tree k v) tree bindings
     in
     let level_two =
-      let tree = Tree.add_tree tree [ "0g" ] level_one in
+      let tree = Tree.add_tree tree ["0g"] level_one in
       let bindings = bindings steps in
       List.fold_left (fun tree (k, v) -> Tree.add tree k v) tree bindings
     in
     let level_three =
-      let tree = Tree.add_tree tree [ "1g" ] level_two in
+      let tree = Tree.add_tree tree ["1g"] level_two in
       let bindings = bindings fewer_steps in
       List.fold_left (fun tree (k, v) -> Tree.add tree k v) tree bindings
     in
@@ -392,19 +418,23 @@ let test_deeper_proof () =
   in
   let ops =
     [
-      Find [ "1g"; "0g"; "00" ];
-      Del [ "1g"; "0g"; "01" ];
-      Find [ "02" ];
-      Find_tree [ "1g"; "02" ];
+      Find ["1g"; "0g"; "00"];
+      Del ["1g"; "0g"; "01"];
+      Find ["02"];
+      Find_tree ["1g"; "02"];
     ]
   in
   test_proofs ctxt ops
 
 module Binary = Make (struct
   let entries = 2
+
   let stable_hash = 2
+
   let inode_child_order = `Hash_bits
+
   let contents_length_header = Some `Varint
+
   let forbid_empty_dir_persistence = false
 end)
 
@@ -413,9 +443,7 @@ let test_large_proofs () =
   (* Build a proof on a large store (branching factor = 32) *)
   let bindings = init_bindings 100_000 in
   let ops n =
-    bindings
-    |> List.to_seq
-    |> Seq.take n
+    bindings |> List.to_seq |> Seq.take n
     |> Seq.map (fun (s, _) -> Find_tree s)
     |> List.of_seq
   in
@@ -449,13 +477,14 @@ let test_large_proofs () =
   let d = compare_proofs 10_000 in
   List.iter
     (fun (n, k32, k2) ->
-      Fmt.pr "Size of Merkle proof for %d operations:\n" n;
-      Fmt.pr "- Merkle B-trees (32 children)       : %dkB\n%!" k32;
+      Fmt.pr "Size of Merkle proof for %d operations:\n" n ;
+      Fmt.pr "- Merkle B-trees (32 children)       : %dkB\n%!" k32 ;
       Fmt.pr "- binary Merkle trees                : %dkB\n%!" k2)
-    [ a; b; c; d ]
+    [a; b; c; d]
 
 module Custom = Make (struct
   let entries = 2
+
   let stable_hash = 2
 
   let index ~depth step =
@@ -463,7 +492,9 @@ module Custom = Make (struct
     ascii_code - 48
 
   let inode_child_order = `Custom index
+
   let contents_length_header = Some `Varint
+
   let forbid_empty_dir_persistence = false
 end)
 
@@ -483,15 +514,13 @@ let check_contents_hash h s =
       Alcotest.(check string) "check hash" s s'
 
 let test_extenders () =
-  let bindings =
-    [ ([ "00000" ], "x"); ([ "00001" ], "y"); ([ "00010" ], "z") ]
-  in
-  let bindings2 = ([ "10000" ], "x1") :: bindings in
-  let bindings3 = ([ "10001" ], "y") :: bindings2 in
+  let bindings = [(["00000"], "x"); (["00001"], "y"); (["00010"], "z")] in
+  let bindings2 = (["10000"], "x1") :: bindings in
+  let bindings3 = (["10001"], "y") :: bindings2 in
 
   let f t =
-    let v = Custom.Tree.get t [ "00000" ] in
-    Alcotest.(check string) "00000" "x" v;
+    let v = Custom.Tree.get t ["00000"] in
+    Alcotest.(check string) "00000" "x" v ;
     (t, ())
   in
 
@@ -499,34 +528,34 @@ let test_extenders () =
     let ctxt = Custom.init_tree bindings in
     let key = Custom.Tree.key ctxt.tree |> Option.get in
     let p, () = Custom.Tree.produce_proof ctxt.repo key f in
-    [%log.debug "Verifying proof %a" pp_proof p];
+    [%log.debug "Verifying proof %a" pp_proof p] ;
     let r = Custom.Tree.verify_proof p f in
     match r with
     | Ok (_, ()) -> ()
     | Error e ->
-        Alcotest.failf "check_proof: %a"
+        Alcotest.failf
+          "check_proof: %a"
           (Brassaia.Type.pp Custom.Tree.verifier_error_t)
           e
   in
-  List.iter check_proof [ bindings; bindings2; bindings3 ]
+  List.iter check_proof [bindings; bindings2; bindings3]
 
 let test_hardcoded_proof () =
-  let bindings =
-    [ ([ "00000" ], "x"); ([ "00001" ], "y"); ([ "00010" ], "z") ]
-  in
+  let bindings = [(["00000"], "x"); (["00001"], "y"); (["00010"], "z")] in
   let fail_with_tree elt =
     Alcotest.failf "Unexpected elt in proof %a" (Brassaia.Type.pp P.tree_t) elt
   in
   let fail_with_inode_tree elt =
-    Alcotest.failf "Unexpected elt in proof %a"
+    Alcotest.failf
+      "Unexpected elt in proof %a"
       (Brassaia.Type.pp P.inode_tree_t)
       elt
   in
   let ctxt = Custom.init_tree bindings in
   let key = Custom.Tree.key ctxt.tree |> Option.get in
   let f t =
-    let v = Custom.Tree.get t [ "00000" ] in
-    Alcotest.(check string) "00000" "x" v;
+    let v = Custom.Tree.get t ["00000"] in
+    Alcotest.(check string) "00000" "x" v ;
     (t, ())
   in
   let p, () = Custom.Tree.produce_proof ctxt.repo key f in
@@ -534,21 +563,19 @@ let test_hardcoded_proof () =
 
   let check_depth_2 = function
     | P.Inode_values
-        [ ("00000", Contents ("x", ())); ("00001", Blinded_contents (h1, ())) ]
-      ->
+        [("00000", Contents ("x", ())); ("00001", Blinded_contents (h1, ()))] ->
         check_hash h1 "95cb0bfd2977c761298d9624e4b4d4c72a39974a"
     | t -> fail_with_inode_tree t
   in
   let check_depth_1 = function
-    | P.Inode_tree { length = 3; proofs = [ (0, t); (1, P.Blinded_inode h1) ] }
-      ->
-        check_hash h1 "4295267989ab4c4a036eb78f0610a57042e2b49f";
+    | P.Inode_tree {length = 3; proofs = [(0, t); (1, P.Blinded_inode h1)]} ->
+        check_hash h1 "4295267989ab4c4a036eb78f0610a57042e2b49f" ;
         check_depth_2 t
     | t -> fail_with_inode_tree t
   in
   let () =
     match (state : P.tree) with
-    | P.Extender { length = 3; segments = [ 0; 0; 0 ]; proof = t } ->
+    | P.Extender {length = 3; segments = [0; 0; 0]; proof = t} ->
         check_depth_1 t
     | _ -> fail_with_tree state
   in
@@ -559,7 +586,7 @@ let tree_of_list ls =
   List.fold_left (fun tree (k, v) -> Tree.add tree k v) tree ls
 
 let test_reexport_node () =
-  let tree = Store.Tree.add (Store.Tree.empty ()) [ "foo"; "a" ] "a" in
+  let tree = Store.Tree.add (Store.Tree.empty ()) ["foo"; "a"] "a" in
   let repo1 = Store.Repo.v (config ~fresh:true root) in
   let _ =
     Store.Backend.Repo.batch repo1 (fun c n _ -> Store.save_tree repo1 c n tree)
@@ -568,17 +595,19 @@ let test_reexport_node () =
   (* Re-export the same tree using a different repo. *)
   let repo2 = Store.Repo.v (config ~fresh:false root) in
   let _ =
-    Alcotest.check_raises "re-export tree from another repo"
-      (Failure "Can't export the node key from another repo") (fun () ->
+    Alcotest.check_raises
+      "re-export tree from another repo"
+      (Failure "Can't export the node key from another repo")
+      (fun () ->
         Store.Backend.Repo.batch repo2 (fun c n _ ->
             Store.save_tree repo2 c n tree))
   in
   let () = Store.Repo.close repo2 in
   (* Re-export a fresh tree using a different repo. *)
   let repo2 = Store.Repo.v (config ~fresh:false root) in
-  let tree = Store.Tree.add (Store.Tree.empty ()) [ "foo"; "a" ] "a" in
+  let tree = Store.Tree.add (Store.Tree.empty ()) ["foo"; "a"] "a" in
   let _ = Store.Tree.hash tree in
-  let c1 = Store.Tree.get_tree tree [ "foo" ] in
+  let c1 = Store.Tree.get_tree tree ["foo"] in
   let _ =
     Store.Backend.Repo.batch repo2 (fun c n _ -> Store.save_tree repo2 c n c1)
   in
@@ -595,13 +624,21 @@ let tests =
   [
     Alcotest.test_case "fold over keys in sorted order" `Quick test_fold_sorted;
     Alcotest.test_case "fold over keys in random order" `Quick test_fold_random;
-    Alcotest.test_case "fold over keys in undefined order" `Quick
+    Alcotest.test_case
+      "fold over keys in undefined order"
+      `Quick
       test_fold_undefined;
-    Alcotest.test_case "test Merkle proof for large inodes" `Quick
+    Alcotest.test_case
+      "test Merkle proof for large inodes"
+      `Quick
       test_large_inode;
-    Alcotest.test_case "test Merkle proof for small inodes" `Quick
+    Alcotest.test_case
+      "test Merkle proof for small inodes"
+      `Quick
       test_small_inode;
-    Alcotest.test_case "test Merkle proof for Tree.length" `Quick
+    Alcotest.test_case
+      "test Merkle proof for Tree.length"
+      `Quick
       test_length_proof;
     Alcotest.test_case "test deeper Merkle proof" `Quick test_deeper_proof;
     Alcotest.test_case "test large Merkle proof" `Slow test_large_proofs;

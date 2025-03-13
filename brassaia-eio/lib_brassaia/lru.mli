@@ -19,10 +19,16 @@ module Make (H : Hashtbl.HashedType) : sig
   type 'a t
 
   val create : int -> 'a t
+
   val add : 'a t -> H.t -> 'a -> unit
+
   val find : 'a t -> H.t -> 'a
+
   val mem : 'a t -> H.t -> bool
+
   val clear : 'a t -> unit
+
   val iter : 'a t -> (H.t -> 'a -> unit) -> unit
+
   val drop : 'a t -> 'a option
 end

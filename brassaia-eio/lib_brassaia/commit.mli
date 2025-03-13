@@ -23,5 +23,5 @@
     {{!Backend.Commit.Store} node} value. See the {{!Backend.Node.Store} Node}
     signature for more details on node values. *)
 
-include Commit_intf.Sigs
 (** @inline *)
+include Commit_intf.Sigs

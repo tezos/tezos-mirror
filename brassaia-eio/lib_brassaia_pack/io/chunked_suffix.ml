@@ -22,7 +22,8 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
   module Errs = Errs
   module Ao = Append_only_file.Make (Io) (Errs)
 
-  type chunk = { idx : int; suffix_off : int63; ao : Ao.t }
+  type chunk = {idx : int; suffix_off : int63; ao : Ao.t}
+
   type create_error = Io.create_error
 
   type open_error =
@@ -44,13 +45,14 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
     type t
 
     val v : int -> (int -> chunk) -> t
+
     val appendable : t -> chunk
 
-    val find : off:int63 -> t -> chunk * int63
     (** [find ~off t] returns the chunk that contains suffix offset [off], along
         with the corresponding [poff] within the chunk.
 
         Raises `Read_out_of_bounds exception. *)
+    val find : off:int63 -> t -> chunk * int63
 
     val fold :
       (acc:'a -> is_appendable:bool -> chunk:chunk -> 'a) -> 'a -> t -> 'a
@@ -63,9 +65,9 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
         is_legacy:bool ->
         is_appendable:bool ->
         (Ao.t, open_error) result) ->
-      (t, [> open_error ]) result
+      (t, [> open_error]) result
 
-    val close : t -> (unit, [> Io.close_error | `Pending_flush ]) result
+    val close : t -> (unit, [> Io.close_error | `Pending_flush]) result
 
     val add_new_appendable :
       open_chunk:
@@ -74,22 +76,23 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
         is_appendable:bool ->
         (Ao.t, add_new_error) result) ->
       t ->
-      (unit, [> add_new_error ]) result
+      (unit, [> add_new_error]) result
 
-    val length : t -> int63
     (** [length t] is the length of bytes for all chunks *)
+    val length : t -> int63
 
-    val start_idx : t -> int
     (** [start_idx t] is the idx of the first chunk *)
+    val start_idx : t -> int
 
-    val count : t -> int
     (** [count t] is the number of chunks *)
+    val count : t -> int
   end = struct
-    type t = { mutable chunks : chunk Array.t }
+    type t = {mutable chunks : chunk Array.t}
 
     exception OpenInventoryError of open_error
 
-    let v num create = { chunks = Array.init num create }
+    let v num create = {chunks = Array.init num create}
+
     let appendable t = Array.get t.chunks (Array.length t.chunks - 1)
 
     let find ~off t =
@@ -116,7 +119,8 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
         (fun acc chunk ->
           let is_appendable = chunk.idx = appendable_idx in
           f ~acc ~is_appendable ~chunk)
-        acc t.chunks
+        acc
+        t.chunks
 
     let open_ ~start_idx ~chunk_num ~open_chunk =
       let off_acc = ref Int63.zero in
@@ -129,12 +133,12 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
         match open_result with
         | Error err -> raise (OpenInventoryError err)
         | Ok ao ->
-            off_acc := end_offset_of_chunk suffix_off ao;
-            { idx = chunk_idx; suffix_off; ao }
+            off_acc := end_offset_of_chunk suffix_off ao ;
+            {idx = chunk_idx; suffix_off; ao}
       in
       try Ok (v chunk_num create_chunk)
       with OpenInventoryError err ->
-        Error (err : open_error :> [> open_error ])
+        Error (err : open_error :> [> open_error])
 
     let close t =
       (* Close immutable chunks, ignoring errors. *)
@@ -150,13 +154,13 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
 
     let wrap_error result =
       Result.map_error
-        (fun err -> (err : add_new_error :> [> add_new_error ]))
+        (fun err -> (err : add_new_error :> [> add_new_error]))
         result
 
     let reopen_last_chunk ~open_chunk t =
       (* Close the previous appendable chunk and reopen as non-appendable. *)
       let open Result_syntax in
-      let ({ idx; ao; suffix_off } as last_chunk) = appendable t in
+      let ({idx; ao; suffix_off} as last_chunk) = appendable t in
       let is_legacy = is_legacy idx in
       (* Compute the suffix_off for the following chunk. *)
       let length = end_offset_of_chunk suffix_off ao in
@@ -165,7 +169,7 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
         open_chunk ~chunk_idx:idx ~is_legacy ~is_appendable:false |> wrap_error
       in
       let pos = Array.length t.chunks - 1 in
-      t.chunks.(pos) <- { last_chunk with ao };
+      t.chunks.(pos) <- {last_chunk with ao} ;
       Ok length
 
     let create_appendable_chunk ~open_chunk t suffix_off =
@@ -174,7 +178,7 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
       let* ao =
         open_chunk ~chunk_idx:next_id ~is_legacy:false ~is_appendable:true
       in
-      Ok { idx = next_id; suffix_off; ao }
+      Ok {idx = next_id; suffix_off; ao}
 
     let add_new_appendable ~open_chunk t =
       let open Result_syntax in
@@ -182,7 +186,7 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
       let* chunk =
         create_appendable_chunk ~open_chunk t next_suffix_off |> wrap_error
       in
-      t.chunks <- Array.append t.chunks [| chunk |];
+      t.chunks <- Array.append t.chunks [|chunk|] ;
       Ok ()
 
     let length t =
@@ -190,10 +194,11 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
       Array.fold_left (fun sum c -> sum + Ao.end_poff c.ao) Int63.zero t.chunks
 
     let count t = Array.length t.chunks
+
     let start_idx t = t.chunks.(0).idx
   end
 
-  type t = { inventory : Inventory.t; root : string; dead_header_size : int }
+  type t = {inventory : Inventory.t; root : string; dead_header_size : int}
 
   let chunk_path = Layout.V4.suffix_chunk
 
@@ -202,13 +207,13 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
     let chunk_idx = start_idx in
     let path = chunk_path ~root ~chunk_idx in
     let+ ao = Ao.create_rw ~path ~overwrite in
-    let chunk = { idx = chunk_idx; suffix_off = Int63.zero; ao } in
+    let chunk = {idx = chunk_idx; suffix_off = Int63.zero; ao} in
     let inventory = Inventory.v 1 (Fun.const chunk) in
-    { inventory; root; dead_header_size = 0 }
+    {inventory; root; dead_header_size = 0}
 
   (** A module to adjust values when mapping from chunks to append-only files *)
   module Ao_shim = struct
-    type t = { dead_header_size : int; end_poff : int63 }
+    type t = {dead_header_size : int; end_poff : int63}
 
     let v ~path ~appendable_chunk_poff ~dead_header_size ~is_legacy
         ~is_appendable =
@@ -227,7 +232,7 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
           | Ok s -> Ok Int63.Syntax.(s - Int63.of_int dead_header_size)
           | Error _ as e -> e
       in
-      { dead_header_size; end_poff }
+      {dead_header_size; end_poff}
   end
 
   let open_rw ~root ~appendable_chunk_poff ~start_idx ~chunk_num
@@ -235,8 +240,12 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
     let open Result_syntax in
     let open_chunk ~chunk_idx ~is_legacy ~is_appendable =
       let path = chunk_path ~root ~chunk_idx in
-      let* { dead_header_size; end_poff } =
-        Ao_shim.v ~path ~appendable_chunk_poff ~dead_header_size ~is_legacy
+      let* {dead_header_size; end_poff} =
+        Ao_shim.v
+          ~path
+          ~appendable_chunk_poff
+          ~dead_header_size
+          ~is_legacy
           ~is_appendable
       in
       match is_appendable with
@@ -244,26 +253,34 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
       | false -> Ao.open_ro ~path ~end_poff ~dead_header_size
     in
     let+ inventory = Inventory.open_ ~start_idx ~chunk_num ~open_chunk in
-    { inventory; root; dead_header_size }
+    {inventory; root; dead_header_size}
 
   let open_ro ~root ~appendable_chunk_poff ~dead_header_size ~start_idx
       ~chunk_num =
     let open Result_syntax in
     let open_chunk ~chunk_idx ~is_legacy ~is_appendable =
       let path = chunk_path ~root ~chunk_idx in
-      let* { dead_header_size; end_poff } =
-        Ao_shim.v ~path ~appendable_chunk_poff ~dead_header_size ~is_legacy
+      let* {dead_header_size; end_poff} =
+        Ao_shim.v
+          ~path
+          ~appendable_chunk_poff
+          ~dead_header_size
+          ~is_legacy
           ~is_appendable
       in
       Ao.open_ro ~path ~end_poff ~dead_header_size
     in
     let+ inventory = Inventory.open_ ~start_idx ~chunk_num ~open_chunk in
-    { inventory; root; dead_header_size }
+    {inventory; root; dead_header_size}
 
   let start_idx t = Inventory.start_idx t.inventory
+
   let chunk_num t = Inventory.count t.inventory
+
   let appendable_ao t = (Inventory.appendable t.inventory).ao
+
   let appendable_chunk_poff t = appendable_ao t |> Ao.end_poff
+
   let end_soff t = Inventory.length t.inventory
 
   let read_exn t ~off ~len buf =
@@ -283,9 +300,9 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
       let len_i = Int63.to_int len_read in
       let is_first_read = progress_off = Int63.zero in
       let ao_buf = if is_first_read then buf else Bytes.create len_i in
-      Ao.read_exn chunk.ao ~off:poff ~len:len_i ao_buf;
+      Ao.read_exn chunk.ao ~off:poff ~len:len_i ao_buf ;
       if not is_first_read then
-        Bytes.blit ao_buf 0 buf (Int63.to_int progress_off) len_i;
+        Bytes.blit ao_buf 0 buf (Int63.to_int progress_off) len_i ;
 
       (* Read more if any is [rem]aining. *)
       let rem = len_requested - len_read in
@@ -304,7 +321,7 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
       else if bytes_after_off > max_len then max_len
       else bytes_after_off
     in
-    read_exn t ~off ~len buf;
+    read_exn t ~off ~len buf ;
     len
 
   let append_exn t s = Ao.append_exn (appendable_ao t) s
@@ -320,9 +337,13 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
     let dead_header_size = t.dead_header_size in
     let open_chunk ~chunk_idx ~is_legacy ~is_appendable =
       let path = chunk_path ~root ~chunk_idx in
-      let* { dead_header_size; end_poff } =
-        Ao_shim.v ~path ~appendable_chunk_poff:Int63.zero ~dead_header_size
-          ~is_legacy ~is_appendable
+      let* {dead_header_size; end_poff} =
+        Ao_shim.v
+          ~path
+          ~appendable_chunk_poff:Int63.zero
+          ~dead_header_size
+          ~is_legacy
+          ~is_appendable
       in
       match is_appendable with
       | true -> Ao.create_rw ~path ~overwrite:true
@@ -331,8 +352,11 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
     Inventory.add_new_appendable ~open_chunk t.inventory
 
   let close t = Inventory.close t.inventory
+
   let empty_buffer t = appendable_ao t |> Ao.empty_buffer
+
   let flush t = appendable_ao t |> Ao.flush
+
   let fsync t = appendable_ao t |> Ao.fsync
 
   let refresh_appendable_chunk_poff t new_poff =
@@ -347,5 +371,6 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
         let start_suffix_off = chunk.suffix_off in
         let end_suffix_off = Int63.Syntax.(start_suffix_off + len) in
         f ~acc ~idx:chunk.idx ~start_suffix_off ~end_suffix_off ~is_appendable)
-      acc t.inventory
+      acc
+      t.inventory
 end

@@ -50,7 +50,9 @@ let log_function ~loc (source : Source.t) (level : Logs.level) =
 
 let tags ~loc =
   [%expr
-    Logs.Tag.add Ppx_brassaia_internal_lib.Source_code_position.tag __POS__
+    Logs.Tag.add
+      Ppx_brassaia_internal_lib.Source_code_position.tag
+      __POS__
       Logs.Tag.empty]
 
 let expansion_function source level ~loc ~path:_ payload =
@@ -74,27 +76,31 @@ let expansion_function source level ~loc ~path:_ payload =
          the first argument of a function [debug]. *)
       let input_args =
         match payload with
-        | { pexp_desc = Pexp_constant (Pconst_string _); _ } ->
-            [ (Nolabel, payload) ]
+        | {pexp_desc = Pexp_constant (Pconst_string _); _} ->
+            [(Nolabel, payload)]
         (* Special case for ( @@ ), e.g. [%log.err "%d" @@ 1 + 2] *)
-        | [%expr [%e? fmt] @@ [%e? args]] -> [ (Nolabel, fmt); (Nolabel, args) ]
-        | { pexp_desc = Pexp_apply (fmt, args); _ } -> (Nolabel, fmt) :: args
+        | [%expr [%e? fmt] @@ [%e? args]] -> [(Nolabel, fmt); (Nolabel, args)]
+        | {pexp_desc = Pexp_apply (fmt, args); _} -> (Nolabel, fmt) :: args
         | _ -> Location.raise_errorf ~loc "%s: invalid payload" rewriter_name
       in
-      let args = input_args @ [ (Labelled "tags", tags ~loc) ] in
+      let args = input_args @ [(Labelled "tags", tags ~loc)] in
       [%expr [%e log_fn] (fun f -> [%e pexp_apply ~loc [%expr f] args])]
 
 let ( let* ) x f = List.concat_map f x
 
 let rules =
-  let* source = [ Source.Logs; Log ] in
-  let* level = [ Logs.App; Error; Warning; Info; Debug ] in
+  let* source = [Source.Logs; Log] in
+  let* level = [Logs.App; Error; Warning; Info; Debug] in
   let extension_name =
-    Format.sprintf "brassaia.%s.%s" (Source.to_string source)
+    Format.sprintf
+      "brassaia.%s.%s"
+      (Source.to_string source)
       (level_to_function_name level)
   in
   [
-    Extension.declare extension_name Extension.Context.expression
+    Extension.declare
+      extension_name
+      Extension.Context.expression
       Ast_pattern.(single_expr_payload __)
       (expansion_function source level)
     |> Context_free.Rule.extension;

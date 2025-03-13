@@ -25,7 +25,7 @@ module Slot_keyed_vector : Indexable.Maker_concrete_key1 = struct
     slot : int;
     hash : 'h;
     (* Sanity check that keys are used only w/ the stores that created them: *)
-    store_id : < >;
+    store_id : < >; 
   }
 
   let key_t hash_t =
@@ -43,30 +43,35 @@ module Slot_keyed_vector : Indexable.Maker_concrete_key1 = struct
 
   module Key (Hash : Hash.S) = struct
     type t = Hash.t key [@@deriving brassaia]
+
     type hash = Hash.t
 
     let to_hash t = t.hash
   end
 
   module Make (Hash : Hash.S) (Value : Type.S) = struct
-    type instance = { data : (Hash.t * Value.t) option Vector.t; id : < > }
-    type _ t = { instance : instance option ref }
+    type instance = {data : (Hash.t * Value.t) option Vector.t; id : < > }
+
+    type _ t = {instance : instance option ref}
 
     let v =
       (* NOTE: at time of writing, [brassaia-test] relies on the fact that the
          store constructor is memoised (modulo [close] semantics, which must be
          non-memoised), so we must use a singleton here. *)
-      let singleton = { data = Vector.create ~dummy:None; id = object end } in
-      fun _ -> { instance = ref (Some singleton) }
+      let singleton = {data = Vector.create ~dummy:None; id = object end} in
+      fun _ -> {instance = ref (Some singleton)}
 
     type nonrec key = Hash.t key [@@deriving brassaia]
+
     type value = Value.t
+
     type hash = Hash.t [@@deriving brassaia ~equal]
 
     let index _ _ = None
 
     module Key = struct
       type t = key [@@deriving brassaia]
+
       type hash = Hash.t
 
       let to_hash t = t.hash
@@ -82,38 +87,41 @@ module Slot_keyed_vector : Indexable.Maker_concrete_key1 = struct
       let r = key_store_id == expected_id in
       if not r then
         Alcotest.(check ~pos int)
-          "Key ID matches the given store ID" (Oo.id expected_id)
+          "Key ID matches the given store ID"
+          (Oo.id expected_id)
           (Oo.id key_store_id)
 
     let check_hash_is_consistent pos k recovered_hash =
       let r = equal_hash k.hash recovered_hash in
       if not r then
         Alcotest.(check ~pos (Brassaia_test.testable Hash.t))
-          "Recovered hash is consistent with the key" k.hash recovered_hash
+          "Recovered hash is consistent with the key"
+          k.hash
+          recovered_hash
 
     let unsafe_add t hash v =
       let t = check_not_closed t in
-      Vector.push t.data (Some (hash, v));
-      let key = { slot = Vector.length t.data - 1; hash; store_id = t.id } in
+      Vector.push t.data (Some (hash, v)) ;
+      let key = {slot = Vector.length t.data - 1; hash; store_id = t.id} in
       key
 
     let add t v = unsafe_add t (Hash.hash v) v
 
     let find t k =
       let t = check_not_closed t in
-      check_key_belongs_to_store __POS__ k t;
+      check_key_belongs_to_store __POS__ k t ;
       match Vector.get t.data k.slot with
       | exception Not_found -> None
       | None ->
           Alcotest.failf "Invalid key slot %d. No data contained here." k.slot
       | Some (recovered_hash, data) ->
-          check_hash_is_consistent __POS__ k recovered_hash;
+          check_hash_is_consistent __POS__ k recovered_hash ;
           Some data
 
     let mem t k =
       let t = check_not_closed t in
-      check_key_belongs_to_store __POS__ k t;
-      assert (k.slot < Vector.length t.data);
+      check_key_belongs_to_store __POS__ k t ;
+      assert (k.slot < Vector.length t.data) ;
       true
 
     let batch t f =
@@ -136,5 +144,9 @@ module Store = Store_maker.Make (Schema.KV (Contents.String))
 let suite =
   let store = (module Store : Brassaia_test.Generic_key) in
   let config = Brassaia_mem.config () in
-  Brassaia_test.Suite.create_generic_key ~name:"store_offset" ~store ~config
-    ~import_supported:false ()
+  Brassaia_test.Suite.create_generic_key
+    ~name:"store_offset"
+    ~store
+    ~config
+    ~import_supported:false
+    ()

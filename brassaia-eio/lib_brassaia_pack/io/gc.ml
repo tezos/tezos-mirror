@@ -62,8 +62,11 @@ module Make (Args : Gc_args.S) = struct
                previous.latest_gc_target_offset >= latest_gc_target_offset) ->
           Error
             (`Gc_disallowed
-              (Fmt.str "%a is less than or equal to previous GC offset of %a"
-                 Int63.pp latest_gc_target_offset Int63.pp
+              (Fmt.str
+                 "%a is less than or equal to previous GC offset of %a"
+                 Int63.pp
+                 latest_gc_target_offset
+                 Int63.pp
                  previous.latest_gc_target_offset))
       | _ -> Ok ()
     in
@@ -74,7 +77,7 @@ module Make (Args : Gc_args.S) = struct
        [new_suffix_start_offset] that is older than our current starting offset. *)
     let new_suffix_start_offset =
       match status with
-      | Gced { suffix_start_offset; _ }
+      | Gced {suffix_start_offset; _}
         when Int63.Syntax.(suffix_start_offset >= latest_gc_target_offset) ->
           suffix_start_offset
       | _ -> new_suffix_start_offset
@@ -85,8 +88,12 @@ module Make (Args : Gc_args.S) = struct
         Dispatcher.suffix_start_offset dispatcher
       in
       let before_suffix_end_offset = Dispatcher.end_offset dispatcher in
-      Gc_stats_main.create "worker startup" ~commit_offset ~generation
-        ~before_suffix_start_offset ~before_suffix_end_offset
+      Gc_stats_main.create
+        "worker startup"
+        ~commit_offset
+        ~generation
+        ~before_suffix_start_offset
+        ~before_suffix_end_offset
         ~after_suffix_start_offset:new_suffix_start_offset
     in
     let unlink_result_file () =
@@ -98,18 +105,23 @@ module Make (Args : Gc_args.S) = struct
               [%log.warn
                 "Unlinking temporary files from previous failed gc. Failed \
                  with error %s"
-                (Printexc.to_string exn)])
+                  (Printexc.to_string exn)])
             result_file
       | `Directory | `No_such_file_or_directory | `Other -> ()
     in
     (* Unlink next gc's result file, in case it is on disk, for instance
        after a failed gc. *)
-    unlink_result_file ();
+    unlink_result_file () ;
     (* start worker task *)
     let task =
       Async.async (fun () ->
-          Worker.run_and_output_result root commit_key new_suffix_start_offset
-            ~lower_root ~generation ~new_files_path)
+          Worker.run_and_output_result
+            root
+            commit_key
+            new_suffix_start_offset
+            ~lower_root
+            ~generation
+            ~new_files_path)
     in
     let partial_stats =
       Gc_stats_main.finish_current_step partial_stats "before finalise"
@@ -131,7 +143,7 @@ module Make (Args : Gc_args.S) = struct
 
   let swap_and_purge t (gc_results : Worker.gc_results) =
     let removable_chunk_num = List.length gc_results.removable_chunk_idxs in
-    let { generation; latest_gc_target_offset; _ } = t in
+    let {generation; latest_gc_target_offset; _} = t in
     let Worker.
           {
             start_offset = suffix_start_offset;
@@ -147,13 +159,20 @@ module Make (Args : Gc_args.S) = struct
     let chunk_num = Fm.Suffix.chunk_num suffix - removable_chunk_num in
     (* Assert that we have at least one chunk (the appendable chunk), which
        is guaranteed by the GC process. *)
-    assert (chunk_num >= 1);
+    assert (chunk_num >= 1) ;
 
-    Fm.swap t.fm ~generation ~mapping_size:gc_results.mapping_size
-      ~suffix_start_offset ~chunk_start_idx ~chunk_num ~suffix_dead_bytes
-      ~latest_gc_target_offset ~volume:gc_results.modified_volume
+    Fm.swap
+      t.fm
+      ~generation
+      ~mapping_size:gc_results.mapping_size
+      ~suffix_start_offset
+      ~chunk_start_idx
+      ~chunk_num
+      ~suffix_dead_bytes
+      ~latest_gc_target_offset
+      ~volume:gc_results.modified_volume
 
-  let unlink_all { root; generation; _ } removable_chunk_idxs =
+  let unlink_all {root; generation; _} removable_chunk_idxs =
     (* Unlink suffix chunks *)
     let () =
       removable_chunk_idxs
@@ -176,7 +195,7 @@ module Make (Args : Gc_args.S) = struct
           [%log.warn
             "Unlinking previous prefix after gc, failed with error %s"
               (Printexc.to_string exn)])
-        prefix;
+        prefix ;
 
       (* Unlink previous mapping. *)
       let mapping =
@@ -187,7 +206,7 @@ module Make (Args : Gc_args.S) = struct
           [%log.warn
             "Unlinking previous mapping after gc, failed with error %s"
               (Printexc.to_string exn)])
-        mapping);
+        mapping) ;
 
     (* Unlink current gc's result.*)
     let result = Brassaia_pack.Layout.V4.gc_result ~root ~generation in
@@ -257,33 +276,36 @@ module Make (Args : Gc_args.S) = struct
             match (status, gc_output) with
             | `Success, Ok gc_results ->
                 let partial_stats =
-                  Gc_stats_main.finish_current_step partial_stats
+                  Gc_stats_main.finish_current_step
+                    partial_stats
                     "swap and purge"
                 in
                 let* () = swap_and_purge t gc_results in
                 let partial_stats =
                   Gc_stats_main.finish_current_step partial_stats "unlink"
                 in
-                if t.unlink then unlink_all t gc_results.removable_chunk_idxs;
+                if t.unlink then unlink_all t gc_results.removable_chunk_idxs ;
 
                 let stats =
                   let after_suffix_end_offset =
                     Dispatcher.end_offset t.dispatcher
                   in
-                  Gc_stats_main.finalise partial_stats gc_results.stats
+                  Gc_stats_main.finalise
+                    partial_stats
+                    gc_results.stats
                     ~after_suffix_end_offset
                 in
-                Stats.report_latest_gc stats;
-                t.resulting_stats <- Some stats;
+                Stats.report_latest_gc stats ;
+                t.resulting_stats <- Some stats ;
 
                 [%log.debug
                   "Gc ended successfully. %a"
                     (Brassaia.Type.pp Stats.Latest_gc.stats_t)
-                    stats];
+                    stats] ;
                 let () = t.on_finalise (Ok stats) in
                 Ok (`Finalised stats)
             | _ ->
-                clean_after_abort t;
+                clean_after_abort t ;
                 let err = gc_errors status gc_output in
                 let () = t.on_finalise err in
                 err
@@ -319,6 +341,6 @@ module Make (Args : Gc_args.S) = struct
 
   let cancel t =
     let cancelled = Async.cancel t.task in
-    if cancelled then clean_after_abort t;
+    if cancelled then clean_after_abort t ;
     cancelled
 end

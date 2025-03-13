@@ -25,12 +25,17 @@ functor
     module S = M (K) (V)
 
     type 'a t = S.t
+
     type key = S.key
+
     type value = S.value
 
     let v = S.v
+
     let mem = S.mem
+
     let find = S.find
+
     let close = S.close
   end
 
@@ -51,6 +56,7 @@ functor
       key
 
     let equal_hash = Type.(equal H.t |> unstage)
+
     let pp_hash = Type.(pp H.t)
 
     let unsafe_add t k v =
@@ -59,7 +65,10 @@ functor
       else
         Fmt.failwith
           "[unsafe_append] %a is not a valid key. Expecting %a instead.\n"
-          pp_hash k pp_hash hash'
+          pp_hash
+          k
+          pp_hash
+          hash'
   end
 
 module Append_only (M : Make) : Append_only.Maker =
@@ -71,6 +80,7 @@ functor
     include Read_only (M) (Key) (Value)
 
     let batch = S.batch
+
     let add = S.set
   end
 
@@ -84,20 +94,25 @@ functor
     module W = Watch.Make (Key) (Value)
     module L = Lock.Make (Key)
 
-    type t = { t : S.t; w : W.t; l : L.t }
+    type t = {t : S.t; w : W.t; l : L.t}
+
     type key = S.key
+
     type value = S.value
+
     type watch = W.watch
 
     let watches = W.v ()
+
     let lock = L.v ()
 
     let v config =
       let t = S.v config in
-      { t; w = watches; l = lock }
+      {t; w = watches; l = lock}
 
-    let find { t; _ } = S.find t
-    let mem { t; _ } = S.mem t
+    let find {t; _} = S.find t
+
+    let mem {t; _} = S.mem t
 
     module Internal = struct
       let set t w key value =
@@ -109,17 +124,17 @@ functor
         W.notify w key None
     end
 
-    let list { t; _ } = S.keys t
+    let list {t; _} = S.keys t
 
-    let set { t; l; w } key value =
+    let set {t; l; w} key value =
       L.with_lock l key @@ fun () -> Internal.set t w key value
 
-    let remove { t; l; w } key =
+    let remove {t; l; w} key =
       L.with_lock l key @@ fun () -> Internal.remove t w key
 
     let test_and_set =
       let value_equal = Type.(unstage (equal (option Value.t))) in
-      fun { t; l; w } key ~test ~set:set_value ->
+      fun {t; l; w} key ~test ~set:set_value ->
         L.with_lock l key @@ fun () ->
         let v = S.find t key in
         if value_equal v test then
@@ -131,15 +146,17 @@ functor
           true
         else false
 
-    let watch_key { w; _ } key = W.watch_key w key
-    let watch { w; _ } = W.watch w
-    let unwatch { w; _ } = W.unwatch w
+    let watch_key {w; _} key = W.watch_key w key
 
-    let clear { t; w; _ } =
+    let watch {w; _} = W.watch w
+
+    let unwatch {w; _} = W.unwatch w
+
+    let clear {t; w; _} =
       let () = W.clear w in
       S.clear t
 
-    let close { t; w; _ } =
+    let close {t; w; _} =
       let () = W.clear w in
       S.close t
   end

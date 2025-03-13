@@ -21,13 +21,14 @@ module Make
     (Args : Gc_args.S) : sig
   module Args : Gc_args.S
 
-  type t
   (** A running GC process. *)
+  type t
 
+  (** Creates and starts a new GC process. *)
   val v :
     root:string ->
     lower_root:string option ->
-    output:[ `External of string | `Root ] ->
+    output:[`External of string | `Root] ->
     generation:int ->
     unlink:bool ->
     dispatcher:Args.Dispatcher.t ->
@@ -36,27 +37,26 @@ module Make
     node:read Args.Node_store.t ->
     commit:read Args.Commit_store.t ->
     Args.key ->
-    (t, [> `Gc_disallowed of string ]) result
-  (** Creates and starts a new GC process. *)
+    (t, [> `Gc_disallowed of string]) result
 
-  val finalise :
-    wait:bool ->
-    t ->
-    ([> `Running | `Finalised of Stats.Latest_gc.stats ], Args.Errs.t) result
   (** [finalise ~wait t] returns the state of the GC process.
 
       If [wait = true], the call will block until GC finishes. *)
+  val finalise :
+    wait:bool ->
+    t ->
+    ([> `Running | `Finalised of Stats.Latest_gc.stats], Args.Errs.t) result
 
-  val on_finalise :
-    t -> ((Stats.Latest_gc.stats, Args.Errs.t) result -> unit) -> unit
   (** Attaches a callback to the GC process, which will be called when the GC
       finalises. *)
+  val on_finalise :
+    t -> ((Stats.Latest_gc.stats, Args.Errs.t) result -> unit) -> unit
 
   val cancel : t -> bool
 
-  val finalise_without_swap : t -> Control_file_intf.Payload.Upper.Latest.gced
   (** Waits for the current gc to finish and returns immediately without
       swapping the files and doing the other finalisation steps from [finalise].
       Returns the [gced] status to create a fresh control file for the snapshot. *)
+  val finalise_without_swap : t -> Control_file_intf.Payload.Upper.Latest.gced
 end
 with module Args = Args

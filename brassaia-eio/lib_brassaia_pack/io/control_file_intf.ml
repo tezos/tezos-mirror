@@ -18,15 +18,13 @@ open! Import
 module Payload = struct
   module Upper = struct
     module V3 = struct
-      type from_v1_v2_post_upgrade = { entry_offset_at_upgrade_to_v3 : int63 }
-      [@@deriving brassaia]
       (** [entry_offset_at_upgrade_to_v3] is the offset of the first entry that
           is known to have been created using [brassaia_pack_version = `V2] or
           more. The entries before that point may be v1 entries. V1 entries need
           an entry in index because it is the only place their lenght is stored. *)
-
-      type from_v3_gced = { suffix_start_offset : int63; generation : int }
+      type from_v1_v2_post_upgrade = {entry_offset_at_upgrade_to_v3 : int63}
       [@@deriving brassaia]
+
       (** [suffix_start_offset] is 0 if the suffix file was never garbage
           collected. Otherwise it is the offset of the very first entry of the
           suffix file. Note that offsets in the suffix file are virtual. The
@@ -34,6 +32,8 @@ module Payload = struct
 
           [generation] is the number of past GCs. A suffix file, a prefix file
           and a mapping containing that integer in their filename exist. *)
+      type from_v3_gced = {suffix_start_offset : int63; generation : int}
+      [@@deriving brassaia]
 
       (** [From_v1_v2_post_upgrade] corresponds to a pack store that was
           upgraded to [`V3]. It contains infos related to backward
@@ -74,12 +74,6 @@ module Payload = struct
         | T15
       [@@deriving brassaia]
 
-      type t = {
-        dict_end_poff : int63;
-        suffix_end_poff : int63;
-        status : status; (* must be last to allow extensions *)
-      }
-      [@@deriving brassaia]
       (** The [`V3] payload of the brassaia-pack control file. [`V3] is a major
           version. If [`V4] ever exists, it will have its own dedicated payload,
           but the [`V3] definition will still have to stick in the codebase for
@@ -110,16 +104,15 @@ module Payload = struct
           [status] is a variant that encode the state of the brassaia-pack
           directory. This field MUST be the last field of the record, in order
           to allow extensions *)
+      type t = {
+        dict_end_poff : int63;
+        suffix_end_poff : int63;
+        status : status; (* must be last to allow extensions *)
+      }
+      [@@deriving brassaia]
     end
 
     module V4 = struct
-      type gced = {
-        suffix_start_offset : int63;
-        generation : int;
-        latest_gc_target_offset : int63;
-        suffix_dead_bytes : int63;
-      }
-      [@@deriving brassaia]
       (** Similar to [from_v3_gced]. New fields:
 
           [latest_gc_target_offset] is the commit on which the latest gc was
@@ -127,6 +120,13 @@ module Payload = struct
 
           [suffix_dead_bytes] is the number of bytes at the beginning of the
           suffix that should be considered unreachable after a GC. *)
+      type gced = {
+        suffix_start_offset : int63;
+        generation : int;
+        latest_gc_target_offset : int63;
+        suffix_dead_bytes : int63;
+      }
+      [@@deriving brassaia]
 
       (** [From_v1_v2_post_upgrade] similar to [V3.From_v1_v2_post_upgrade]
 
@@ -165,16 +165,6 @@ module Payload = struct
         | T15
       [@@deriving brassaia]
 
-      type t = {
-        dict_end_poff : int63;
-        appendable_chunk_poff : int63;
-        upgraded_from_v3_to_v4 : bool;
-        checksum : int63;
-        chunk_start_idx : int;
-        chunk_num : int;
-        status : status; (* must be last to allow extensions *)
-      }
-      [@@deriving brassaia]
       (** The same as {!V3.t}, with the following modifications:
 
           New fields
@@ -190,6 +180,16 @@ module Payload = struct
           Removed fields
 
           - [suffix_end_poff] is replaced by [appendable_chunk_poff] *)
+      type t = {
+        dict_end_poff : int63;
+        appendable_chunk_poff : int63;
+        upgraded_from_v3_to_v4 : bool;
+        checksum : int63;
+        chunk_start_idx : int;
+        chunk_num : int;
+        status : status; (* must be last to allow extensions *)
+      }
+      [@@deriving brassaia]
     end
 
     module V5 = struct
@@ -224,17 +224,6 @@ module Payload = struct
         | T15
       [@@deriving brassaia]
 
-      type t = {
-        dict_end_poff : int63;
-        appendable_chunk_poff : int63;
-        upgraded_from : int option;
-        checksum : int63;
-        chunk_start_idx : int;
-        chunk_num : int;
-        volume_num : int;
-        status : status; (* must be last to allow extensions *)
-      }
-      [@@deriving brassaia]
       (** The same as {!V4.t}, with the following modifications:
 
           New fields
@@ -249,6 +238,17 @@ module Payload = struct
             to track version upgrades. Note, it is an [int option] since
             [Version.t option] has a bug somewhere in repr that needs further
             investigation. *)
+      type t = {
+        dict_end_poff : int63;
+        appendable_chunk_poff : int63;
+        upgraded_from : int option;
+        checksum : int63;
+        chunk_start_idx : int;
+        chunk_num : int;
+        volume_num : int;
+        status : status; (* must be last to allow extensions *)
+      }
+      [@@deriving brassaia]
     end
 
     type version = V3 of V3.t | V4 of V4.t | V5 of V5.t [@@deriving brassaia]
@@ -261,13 +261,6 @@ module Payload = struct
 
   module Volume = struct
     module V5 = struct
-      type t = {
-        start_offset : int63;
-        end_offset : int63;
-        mapping_end_poff : int63;
-        checksum : int63;
-      }
-      [@@deriving brassaia]
       (** The payload for a control file of a volume.
 
           Fields
@@ -278,6 +271,13 @@ module Payload = struct
             Used for routing reads.
           - [mapping_end_poff] is the end offset for the mapping file. Used when
             writing. *)
+      type t = {
+        start_offset : int63;
+        end_offset : int63;
+        mapping_end_poff : int63;
+        checksum : int63;
+      }
+      [@@deriving brassaia]
     end
 
     type version = V5 of V5.t [@@deriving brassaia]
@@ -300,16 +300,18 @@ module type S = sig
   module Io : Io_intf.S
 
   type payload
+
   type raw_payload
+
   type t
 
+  (** Create a rw instance of [t] by creating a control file. *)
   val create_rw :
     path:string ->
     tmp_path:string option ->
     overwrite:bool ->
     payload ->
-    (t, [> Io.create_error | Io.write_error ]) result
-  (** Create a rw instance of [t] by creating a control file. *)
+    (t, [> Io.create_error | Io.write_error]) result
 
   type open_error :=
     [ `Corrupted_control_file of string
@@ -319,27 +321,26 @@ module type S = sig
     | `Closed
     | `Unknown_major_pack_version of string ]
 
+  (** Create a rw instance of [t] by reading an existing file at [path].
+      [tmp_path] will be used by RW instances when updating it's content, it is
+      not required for RO instances or RW instances which will never be updated. *)
   val open_ :
     path:string ->
     tmp_path:string option ->
     readonly:bool ->
-    (t, [> open_error ]) result
-  (** Create a rw instance of [t] by reading an existing file at [path].
-      [tmp_path] will be used by RW instances when updating it's content, it is
-      not required for RO instances or RW instances which will never be updated. *)
+    (t, [> open_error]) result
 
-  val close : t -> (unit, [> Io.close_error ]) result
+  val close : t -> (unit, [> Io.close_error]) result
 
-  val read_payload :
-    path:string -> (payload, [> open_error | Io.close_error ]) result
   (** [read_payload ~path] reads the payload at [path]. It is a convenient way
       to read the payload without needing to call {!open_}, {!payload},
       {!close}. *)
+  val read_payload :
+    path:string -> (payload, [> open_error | Io.close_error]) result
 
   val read_raw_payload :
-    path:string -> (raw_payload, [> open_error | Io.close_error ]) result
+    path:string -> (raw_payload, [> open_error | Io.close_error]) result
 
-  val payload : t -> payload
   (** [payload t] is the payload in [t].
 
       That function doesn't perform IO.
@@ -352,10 +353,10 @@ module type S = sig
 
       [payload t] is the [payload], as it was seen during [open_] or during the
       most recent [reload]. *)
+  val payload : t -> payload
 
-  type reload_error := [ `Rw_not_allowed | open_error | Io.close_error ]
+  type reload_error := [`Rw_not_allowed | open_error | Io.close_error]
 
-  val reload : t -> (unit, [> reload_error ]) result
   (** {3 RW mode}
 
       Always returns an error.
@@ -366,8 +367,9 @@ module type S = sig
 
       If the file changed since the last read, the payload in [t] is updated to
       match the content of the file. *)
+  val reload : t -> (unit, [> reload_error]) result
 
-  type move_error := [ `Sys_error of string ]
+  type move_error := [`Sys_error of string]
 
   type set_error :=
     [ `No_tmp_path_provided
@@ -376,7 +378,6 @@ module type S = sig
     | move_error
     | Io.close_error ]
 
-  val set_payload : t -> payload -> (unit, [> set_error ]) result
   (** {3 RW mode}
 
       Write a new payload on disk.
@@ -384,10 +385,10 @@ module type S = sig
       {3 RO mode}
 
       Always returns an error. *)
+  val set_payload : t -> payload -> (unit, [> set_error]) result
 
   val readonly : t -> bool
 
-  val fsync : t -> (unit, [> Io.write_error ]) result
   (** {3 RW mode}
 
       Tell the OS to fush its internal buffers.
@@ -395,6 +396,7 @@ module type S = sig
       {3 RO mode}
 
       Always returns [Error `Ro_not_allowed]. *)
+  val fsync : t -> (unit, [> Io.write_error]) result
 end
 
 module type Upper = sig
@@ -415,9 +417,12 @@ module type Sigs = sig
   module Payload = Payload
 
   module type S = S
+
   module type Upper = Upper
+
   module type Volume = Volume
 
   module Upper (Io : Io_intf.S) : Upper with module Io = Io
+
   module Volume (Io : Io_intf.S) : Volume with module Io = Io
 end

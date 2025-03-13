@@ -18,6 +18,7 @@ open! Import
 include Pack_key_intf
 
 type safe = SAFE
+
 type unsafe = UNSAFE
 
 type (_, _) unsafe_state =
@@ -32,7 +33,8 @@ type (_, _) unsafe_state =
   | Offset : int63 -> ('hash, unsafe) unsafe_state
 
 type 'hash state = ('hash, safe) unsafe_state
-type 'hash t = State : { state : ('hash, _) unsafe_state Atomic.t } -> 'hash t
+
+type 'hash t = State : {state : ('hash, _) unsafe_state Atomic.t} -> 'hash t
 
 let inspect (State t) =
   match Atomic.get t.state with
@@ -61,12 +63,12 @@ let to_length (State t) =
 let rec promote_exn ~offset ~length ?volume_identifier (State t) =
   match Atomic.get t.state with
   | Direct d ->
-      assert (d.offset = offset);
-      assert (d.length = length);
+      assert (d.offset = offset) ;
+      assert (d.length = length) ;
       assert (d.volume_identifier = volume_identifier)
   | Offset _ -> failwith "Attempted to promote an offset without hash"
   | Indexed hash as old ->
-      let direct = Direct { hash; offset; length; volume_identifier } in
+      let direct = Direct {hash; offset; length; volume_identifier} in
       if not (Atomic.compare_and_set t.state old direct) then
         promote_exn ~offset ~length ?volume_identifier (State t)
 
@@ -76,8 +78,8 @@ let rec set_volume_identifier_exn ~volume_identifier (State t) =
       failwith "Attempted to set volume identifier to a key that is Indexed"
   | Offset _ ->
       failwith "Attempted to set volume identifier to an offset without hash"
-  | Direct { hash; offset; length; _ } as old ->
-      let direct = Direct { hash; offset; length; volume_identifier } in
+  | Direct {hash; offset; length; _} as old ->
+      let direct = Direct {hash; offset; length; volume_identifier} in
       if not (Atomic.compare_and_set t.state old direct) then
         set_volume_identifier_exn ~volume_identifier (State t)
 
@@ -86,17 +88,17 @@ let t : type h. h Brassaia.Type.t -> h t Brassaia.Type.t =
   let open Brassaia.Type in
   variant "t" (fun direct indexed t ->
       match inspect t with
-      | Direct { hash; offset; length; _ } -> direct (hash, offset, length)
+      | Direct {hash; offset; length; _} -> direct (hash, offset, length)
       | Indexed x1 -> indexed x1)
   |~ case1 "Direct" [%typ: hash * int63 * int] (fun (hash, offset, length) ->
          State
            {
              state =
                Atomic.make
-                 (Direct { hash; offset; length; volume_identifier = None });
+                 (Direct {hash; offset; length; volume_identifier = None});
            })
   |~ case1 "Indexed" [%typ: hash] (fun x1 ->
-         State { state = Atomic.make (Indexed x1) })
+         State {state = Atomic.make (Indexed x1)})
   |> sealv
 
 let t (type hash) (hash_t : hash Brassaia.Type.t) =
@@ -105,6 +107,7 @@ let t (type hash) (hash_t : hash Brassaia.Type.t) =
     [@@deriving brassaia ~equal ~compare ~pre_hash ~encode_bin ~decode_bin]
 
     let unboxed_encode_bin = Brassaia.Type.(unstage (Unboxed.encode_bin t))
+
     let unboxed_decode_bin = Brassaia.Type.(unstage (Unboxed.decode_bin t))
 
     let encoded_size =
@@ -130,23 +133,26 @@ let t (type hash) (hash_t : hash Brassaia.Type.t) =
   let encode_bin t f = Hash.encode_bin (to_hash t) f in
   let unboxed_encode_bin t f = Hash.unboxed_encode_bin (to_hash t) f in
   let decode_bin buf pos_ref =
-    State { state = Atomic.make (Indexed (Hash.decode_bin buf pos_ref)) }
+    State {state = Atomic.make (Indexed (Hash.decode_bin buf pos_ref))}
   in
   let unboxed_decode_bin buf pos_ref =
-    State
-      { state = Atomic.make (Indexed (Hash.unboxed_decode_bin buf pos_ref)) }
+    State {state = Atomic.make (Indexed (Hash.unboxed_decode_bin buf pos_ref))}
   in
   let size_of = Brassaia.Type.Size.custom_static Hash.encoded_size in
-  Brassaia.Type.like (t hash_t) ~pre_hash ~equal ~compare
+  Brassaia.Type.like
+    (t hash_t)
+    ~pre_hash
+    ~equal
+    ~compare
     ~bin:(encode_bin, decode_bin, size_of)
     ~unboxed_bin:(unboxed_encode_bin, unboxed_decode_bin, size_of)
 
 let v_direct ~offset ~length ?volume_identifier hash =
-  State
-    { state = Atomic.make (Direct { hash; offset; length; volume_identifier }) }
+  State {state = Atomic.make (Direct {hash; offset; length; volume_identifier})}
 
-let v_indexed hash = State { state = Atomic.make (Indexed hash) }
-let v_offset offset = State { state = Atomic.make (Offset offset) }
+let v_indexed hash = State {state = Atomic.make (Indexed hash)}
+
+let v_offset offset = State {state = Atomic.make (Offset offset)}
 
 module type S = sig
   type hash
@@ -156,10 +162,13 @@ end
 
 module Make (Hash : Brassaia.Hash.S) = struct
   type nonrec t = Hash.t t [@@deriving brassaia]
+
   type hash = Hash.t [@@deriving brassaia ~of_bin_string]
 
   let to_hash = to_hash
+
   let null_offset = Int63.minus_one
+
   let null_length = -1
 
   let null =
@@ -175,7 +184,9 @@ end
 
 module type Store_spec = sig
   type ('h, _) contents_key = 'h t
+
   type 'h node_key = 'h t
+
   type 'h commit_key = 'h t
 end
 

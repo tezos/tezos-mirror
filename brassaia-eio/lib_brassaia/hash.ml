@@ -20,6 +20,7 @@ module Make (H : Digestif.S) = struct
   type t = H.t
 
   external get_64 : string -> int -> int64 = "%caml_string_get64u"
+
   external swap64 : int64 -> int64 = "%bswap_int64"
 
   let get_64_little_endian str idx =
@@ -40,12 +41,17 @@ module Make (H : Digestif.S) = struct
   let pp_hex ppf x = Fmt.string ppf (H.to_hex x)
 
   let t =
-    Type.map ~pp:pp_hex ~of_string:of_hex
+    Type.map
+      ~pp:pp_hex
+      ~of_string:of_hex
       Type.(string_of (`Fixed hash_size))
-      H.of_raw_string H.to_raw_string
+      H.of_raw_string
+      H.to_raw_string
 
   let hash s = H.digesti_string s
+
   let to_raw_string s = H.to_raw_string s
+
   let unsafe_of_raw_string s = H.of_raw_string s
 end
 
@@ -53,12 +59,10 @@ module Make_BLAKE2B (D : sig
   val digest_size : int
 end) =
   Make (Digestif.Make_BLAKE2B (D))
-
 module Make_BLAKE2S (D : sig
   val digest_size : int
 end) =
   Make (Digestif.Make_BLAKE2S (D))
-
 module SHA1 = Make (Digestif.SHA1)
 module RMD160 = Make (Digestif.RMD160)
 module SHA224 = Make (Digestif.SHA224)
@@ -80,23 +84,31 @@ module V1 (K : S) : S with type t = K.t = struct
   type t = K.t [@@deriving brassaia ~encode_bin ~decode_bin]
 
   let hash = K.hash
+
   let short_hash = K.short_hash
+
   let short_hash_substring = K.short_hash_substring
+
   let hash_size = K.hash_size
+
   let int64_to_bin_string = Type.(unstage (to_bin_string int64))
+
   let hash_size_str = int64_to_bin_string (Int64.of_int K.hash_size)
+
   let to_raw_string = K.to_raw_string
+
   let unsafe_of_raw_string = K.unsafe_of_raw_string
 
   let encode_bin e f =
-    f hash_size_str;
+    f hash_size_str ;
     encode_bin e f
 
   let decode_bin buf pos_ref =
-    pos_ref := !pos_ref + 8;
+    pos_ref := !pos_ref + 8 ;
     decode_bin buf pos_ref
 
   let size_of = Type.Size.custom_static (8 + hash_size)
+
   let t = Type.like K.t ~bin:(encode_bin, decode_bin, size_of)
 end
 
@@ -111,6 +123,7 @@ module Set = struct
       create ~elt_length ~initial_slots ~hash ~hash_substring ()
 
     let add t h = add t (Hash.to_raw_string h)
+
     let mem t h = mem t (Hash.to_raw_string h)
   end
 

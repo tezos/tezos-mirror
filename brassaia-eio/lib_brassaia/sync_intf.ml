@@ -17,64 +17,62 @@
 module type S = sig
   (** {1 Native Synchronization} *)
 
-  type db
   (** Type type for store handles. *)
+  type db
 
-  type commit
   (** The type for store heads. *)
+  type commit
 
-  type status = [ `Empty | `Head of commit ]
   (** The type for remote status. *)
+  type status = [`Empty | `Head of commit]
 
-  type info
   (** The type for commit info. *)
+  type info
 
-  val status_t : db -> status Type.t
   (** [status_t db] is the value type for {!status} of remote [db]. *)
+  val status_t : db -> status Type.t
 
-  val pp_status : status Fmt.t
   (** [pp_status] pretty-prints return statuses. *)
+  val pp_status : status Fmt.t
 
-  val fetch :
-    db -> ?depth:int -> Remote.t -> (status, [ `Msg of string ]) result
   (** [fetch t ?depth r] populate the local store [t] with objects from the
       remote store [r], using [t]'s current branch. The [depth] parameter limits
       the history depth. Return [`Empty] if either the local or remote store do
       not have a valid head. *)
+  val fetch : db -> ?depth:int -> Remote.t -> (status, [`Msg of string]) result
 
-  val fetch_exn : db -> ?depth:int -> Remote.t -> status
   (** Same as {!fetch} but raise [Invalid_argument] if either the local or
       remote store do not have a valid head. *)
+  val fetch_exn : db -> ?depth:int -> Remote.t -> status
 
-  type pull_error = [ `Msg of string | Merge.conflict ]
   (** The type for pull errors. *)
+  type pull_error = [`Msg of string | Merge.conflict]
 
-  val pp_pull_error : pull_error Fmt.t
   (** [pp_pull_error] pretty-prints pull errors. *)
+  val pp_pull_error : pull_error Fmt.t
 
-  val pull :
-    db ->
-    ?depth:int ->
-    Remote.t ->
-    [ `Merge of unit -> info | `Set ] ->
-    (status, pull_error) result
   (** [pull t ?depth r s] is similar to {{!Sync.fetch} fetch} but it also
       updates [t]'s current branch. [s] is the update strategy:
 
       - [`Merge] uses [Head.merge]. Can return a conflict.
       - [`Set] uses [S.Head.set]. *)
+  val pull :
+    db ->
+    ?depth:int ->
+    Remote.t ->
+    [`Merge of unit -> info | `Set] ->
+    (status, pull_error) result
 
-  val pull_exn :
-    db -> ?depth:int -> Remote.t -> [ `Merge of unit -> info | `Set ] -> status
   (** Same as {!pull} but raise [Invalid_arg] in case of conflict. *)
+  val pull_exn :
+    db -> ?depth:int -> Remote.t -> [`Merge of unit -> info | `Set] -> status
 
-  type push_error = [ `Msg of string | `Detached_head ]
   (** The type for push errors. *)
+  type push_error = [`Msg of string | `Detached_head]
 
-  val pp_push_error : push_error Fmt.t
   (** [pp_push_error] pretty-prints push errors. *)
+  val pp_push_error : push_error Fmt.t
 
-  val push : db -> ?depth:int -> Remote.t -> (status, push_error) result
   (** [push t ?depth r] populates the remote store [r] with objects from the
       current store [t], using [t]'s current branch. If [b] is [t]'s current
       branch, [push] also updates the head of [b] in [r] to be the same as in
@@ -82,9 +80,10 @@ module type S = sig
 
       {b Note:} {e Git} semantics is to update [b] only if the new head if more
       recent. This is not the case in {e Brassaia}. *)
+  val push : db -> ?depth:int -> Remote.t -> (status, push_error) result
 
-  val push_exn : db -> ?depth:int -> Remote.t -> status
   (** Same as {!push} but raise [Invalid_argument] if an error happens. *)
+  val push_exn : db -> ?depth:int -> Remote.t -> status
 end
 
 module type Sigs = sig

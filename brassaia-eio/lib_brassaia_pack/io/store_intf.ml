@@ -22,38 +22,38 @@ module type S = sig
   (** An [brassaia-pack-unix] store. This provides the common {!Brassaia} interface
       with [brassaia-pack-unix] specific extensions. *)
 
-  include Brassaia.Generic_key.S
   (** @inline *)
+  include Brassaia.Generic_key.S
 
   (** {1 Integrity Check} *)
 
+  (** Checks the integrity of the repository. if [auto_repair] is [true], will
+      also try to fix the issues. [ppf] is a formatter for progressive
+      reporting. [`Fixed] and [`Corrupted] report the number of fixed/corrupted
+      entries. *)
   val integrity_check :
     ?ppf:Format.formatter ->
     ?heads:commit list ->
     auto_repair:bool ->
     repo ->
-    ( [> `Fixed of int | `No_error ],
-      [> `Cannot_fix of string | `Corrupted of int ] )
+    ( [> `Fixed of int | `No_error],
+      [> `Cannot_fix of string | `Corrupted of int] )
     result
-  (** Checks the integrity of the repository. if [auto_repair] is [true], will
-      also try to fix the issues. [ppf] is a formatter for progressive
-      reporting. [`Fixed] and [`Corrupted] report the number of fixed/corrupted
-      entries. *)
 
   val integrity_check_inodes :
     ?heads:commit list ->
     repo ->
-    ([> `No_error ], [> `Cannot_fix of string ]) result
+    ([> `No_error], [> `Cannot_fix of string]) result
 
   val traverse_pack_file :
-    [ `Reconstruct_index of [ `In_place | `Output of string ]
+    [ `Reconstruct_index of [`In_place | `Output of string]
     | `Check_index
     | `Check_and_fix_index ] ->
     Brassaia.config ->
     unit
 
   val test_traverse_pack_file :
-    [ `Reconstruct_index of [ `In_place | `Output of string ]
+    [ `Reconstruct_index of [`In_place | `Output of string]
     | `Check_index
     | `Check_and_fix_index ] ->
     Brassaia.config ->
@@ -61,7 +61,6 @@ module type S = sig
 
   (** {1 Chunking} *)
 
-  val split : repo -> unit
   (** [split t] starts a fresh chunk file for appending data. Only allowed on
       stores that allow gc.
 
@@ -75,14 +74,14 @@ module type S = sig
       Raises [Split_disallowed] if {!is_split_allowed} is false.
 
       TODO: Detail exceptions raised. *)
+  val split : repo -> unit
 
-  val is_split_allowed : repo -> bool
   (** [is_split_allowed repo] returns if split is supported. Currently returns
       the same value as {!Gc.is_allowed}. *)
+  val is_split_allowed : repo -> bool
 
   (** {1 Lower layer} *)
 
-  val add_volume : repo -> unit
   (** [add_volume t] creates a new empty volume in the lower layer.
 
       Raises [RO_Not_Allowed] if called by a readonly instance.
@@ -90,18 +89,18 @@ module type S = sig
       Raises [Add_volume_forbidden_during_gc] if called while a GC is running.
 
       Raises [Multiple_empty_volumes] if there is already an empty volume. *)
+  val add_volume : repo -> unit
 
   (** {1 On-disk} *)
 
-  val reload : repo -> unit
   (** [reload t] reloads a readonly pack with the files on disk. Raises
       [invalid_argument] if called by a read-write pack.*)
+  val reload : repo -> unit
 
-  val flush : repo -> unit
   (** [flush t] flush read-write pack on disk. Raises [RO_Not_Allowed] if called
       by a readonly instance.*)
+  val flush : repo -> unit
 
-  val create_one_commit_store : repo -> commit_key -> string -> unit
   (** [create_one_commit_store t key path] creates a new store at [path] from
       the existing one, containing only one commit, specified by the [key]. Note
       that this operation is blocking.
@@ -109,17 +108,16 @@ module type S = sig
       It requires that the files existing on disk when the operation is
       launched, remain on disk until the operation completes. In particular, a
       Gc running in a different process could remove files from disk. *)
+  val create_one_commit_store : repo -> commit_key -> string -> unit
 
   (** {1 Garbage Collection} *)
 
   module Gc : sig
-    type process_state =
-      [ `Idle | `Running | `Finalised of Stats.Latest_gc.stats ]
     (** The state of the GC process after calling {!finalise_exn} *)
+    type process_state = [`Idle | `Running | `Finalised of Stats.Latest_gc.stats]
 
     (** {1 Low-level API} *)
 
-    val start_exn : ?unlink:bool -> repo -> commit_key -> bool
     (** [start_exn] tries to start the GC process and returns true if the GC is
         launched. If a GC is already running, a new one is not started.
 
@@ -131,8 +129,8 @@ module type S = sig
         useful for debugging. The default is [true].
 
         TODO: Detail exceptions raised. *)
+    val start_exn : ?unlink:bool -> repo -> commit_key -> bool
 
-    val finalise_exn : ?wait:bool -> repo -> process_state
     (** [finalise_exn ?wait repo] waits for the GC process to finish in order to
         finalise it. It returns the state of the GC process from the point of
         view of the function call; subsequent calls of [finalise_exn] after a
@@ -149,18 +147,14 @@ module type S = sig
         If there are no running GCs, the call is a no-op and it returns [`Idle].
 
         TODO: Detail exceptions raised. *)
+    val finalise_exn : ?wait:bool -> repo -> process_state
 
     (** {1 High-level API} *)
 
-    type msg = [ `Msg of string ]
     (** Pretty-print error messages meant for informational purposes, like
         logging *)
+    type msg = [`Msg of string]
 
-    val run :
-      ?finished:((Stats.Latest_gc.stats, msg) result -> unit) ->
-      repo ->
-      commit_key ->
-      (bool, msg) result
     (** [run repo commit_key] attempts to start a GC process for a [repo] by
         discarding or archiving all data prior to [commit_key] (depending on
         {!behaviour}. If a GC process is already running, a new one will not be
@@ -179,8 +173,12 @@ module type S = sig
         All exceptions that [Brassaia_pack] knows how to handle are caught and
         returned as pretty-print error messages; others are re-raised. The error
         messages should be used only for informational purposes, like logging. *)
+    val run :
+      ?finished:((Stats.Latest_gc.stats, msg) result -> unit) ->
+      repo ->
+      commit_key ->
+      (bool, msg) result
 
-    val wait : repo -> (Stats.Latest_gc.stats option, msg) result
     (** [wait repo] blocks until GC is finished or is idle.
 
         If a GC finalises, its stats are returned.
@@ -188,29 +186,30 @@ module type S = sig
         All exceptions that [Brassaia_pack] knows how to handle are caught and
         returned as pretty-print error messages; others are re-raised. The error
         messages should be used only for informational purposes, like logging. *)
+    val wait : repo -> (Stats.Latest_gc.stats option, msg) result
 
-    val cancel : repo -> bool
     (** [cancel repo] aborts the current GC and returns [true], or returns
         [false] if no GC was running. *)
+    val cancel : repo -> bool
 
-    val is_finished : repo -> bool
     (** [is_finished repo] is [true] if a GC is finished (or idle) and [false]
         if a GC is running for the given [repo]. *)
+    val is_finished : repo -> bool
 
-    val behaviour : repo -> [ `Archive | `Delete ]
     (** [behaviour repo] returns the behaviour that the GC will have during
         finalization.
 
         This depends on the presence of a lower layer in the store: if a lower
         layer is present, the GC will archive old data into that lower layer.
         Else, it will delete that data. *)
+    val behaviour : repo -> [`Archive | `Delete]
 
-    val is_allowed : repo -> bool
     (** [is_allowed repo] returns true if a gc can be run on the store. *)
+    val is_allowed : repo -> bool
 
-    val latest_gc_target : repo -> commit_key option
     (** [latest_gc_target] returns the commit key on which the latest, finished
         gc was called on. *)
+    val latest_gc_target : repo -> commit_key option
   end
 
   (** {1 Snapshots} *)
@@ -219,29 +218,19 @@ module type S = sig
     type kinded_hash = Contents of hash * metadata | Node of hash
     [@@deriving brassaia]
 
-    type entry = { step : string; hash : kinded_hash } [@@deriving brassaia]
+    type entry = {step : string; hash : kinded_hash} [@@deriving brassaia]
 
-    type inode_tree = {
-      depth : int;
-      length : int;
-      pointers : (int * hash) list;
-    }
+    type inode_tree = {depth : int; length : int; pointers : (int * hash) list}
     [@@deriving brassaia]
 
     type v = Inode_tree of inode_tree | Inode_value of entry list
     [@@deriving brassaia]
 
-    type inode = { v : v; root : bool } [@@deriving brassaia]
+    type inode = {v : v; root : bool} [@@deriving brassaia]
 
     type t = Inode of inode | Blob of Backend.Contents.Val.t
     [@@deriving brassaia]
 
-    val export :
-      ?on_disk:[ `Path of string ] ->
-      repo ->
-      (t -> unit) ->
-      root_key:Tree.kinded_key ->
-      int
     (** [export ?on_disk repo f ~root_key] applies [f] to all inodes and
         contents in a rooted tree, with root specified by [root_key].
 
@@ -263,23 +252,29 @@ module type S = sig
         the same way.
 
         Returns the total number of elements visited. *)
+    val export :
+      ?on_disk:[`Path of string] ->
+      repo ->
+      (t -> unit) ->
+      root_key:Tree.kinded_key ->
+      int
 
     module Import : sig
       type process
 
-      val v : ?on_disk:[ `Path of string | `Reuse ] -> repo -> process
       (** [v ?on_disk repo] create a [snaphot] instance. The traversal requires
           an index to keep track of visited elements.
 
           - if [on_disk] is not specified, the index is in memory.
           - if [on_disk] is [`Path path], a temporary index is created at path.
           - if [on_disk] is [`Reuse] the store's index is reused. *)
+      val v : ?on_disk:[`Path of string | `Reuse] -> repo -> process
 
-      val save_elt : process -> t -> node_key
       (** [save_elt snapshot elt] saves [elt] to the store. *)
+      val save_elt : process -> t -> node_key
 
-      val close : process -> repo -> unit
       (** [close snapshot] close the [snaphot] instance.*)
+      val close : process -> repo -> unit
     end
   end
 
@@ -294,7 +289,9 @@ module type S = sig
         to implement or test inodes. *)
 
     module Io : Io_intf.S
+
     module Errs : Io_errors.S with module Io = Io
+
     module Index : Pack_index.S with type key = hash
 
     module File_manager :
@@ -316,8 +313,11 @@ module type S = sig
     module XKey : Pack_key.S with type hash = Schema.Hash.t
 
     val suffix_commit_mem : repo -> XKey.t -> bool
+
     val suffix_node_mem : repo -> XKey.t -> bool
+
     val suffix_contents_mem : repo -> XKey.t -> bool
+
     val kill_gc : repo -> bool
   end
 end
@@ -355,6 +355,7 @@ with type ('h, _) contents_key = 'h Pack_key.t
 
 module type KV = sig
   type endpoint = unit
+
   type hash = Brassaia.Schema.default_hash
 
   include Pack_key.Store_spec
@@ -377,6 +378,8 @@ end
 
 module type Sigs = sig
   module type S = S
+
   module type Maker = Maker
+
   module type KV = KV
 end

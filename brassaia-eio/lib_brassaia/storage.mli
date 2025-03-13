@@ -14,10 +14,13 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Storage_intf.Sigs
 (** @inline *)
+include Storage_intf.Sigs
 
 module Read_only (M : Make) : Read_only.Maker
+
 module Content_addressable (M : Make) : Content_addressable.Maker
+
 module Append_only (M : Make) : Append_only.Maker
+
 module Atomic_write (M : Make) : Atomic_write.Maker

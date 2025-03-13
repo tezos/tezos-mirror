@@ -20,17 +20,17 @@ module Ranges = Brassaia_pack_unix.Ranges
 
 let test () =
   let input =
-    [ (90, 10); (80, 5); (70, 10); (87, 1); (60, 5); (50, 5); (65, 2); (55, 5) ]
+    [(90, 10); (80, 5); (70, 10); (87, 1); (60, 5); (50, 5); (65, 2); (55, 5)]
   in
   let ranges = Ranges.make () in
   List.iter
     (fun (off, len) -> Ranges.add ~off:(Int63.of_int off) ~len ranges)
-    input;
+    input ;
   let output = ref [] in
   Ranges.iter
     (fun ~off ~len -> output := (Int63.to_int off, Int63.to_int len) :: !output)
-    ranges;
-  let expected = [ (90, 10); (87, 1); (70, 15); (50, 17) ] in
+    ranges ;
+  let expected = [(90, 10); (87, 1); (70, 15); (50, 17)] in
   Alcotest.(check (list (pair int int))) "out of order" expected !output
 
-let tests = [ Alcotest.test_case "test ranges" `Quick test ]
+let tests = [Alcotest.test_case "test ranges" `Quick test]

@@ -19,18 +19,24 @@ include Path_intf
 
 module String_list = struct
   type step = string [@@deriving brassaia]
+
   type t = step list
 
   let empty = []
+
   let is_empty l = l = []
+
   let cons s t = s :: t
-  let rcons t s = t @ [ s ]
+
+  let rcons t s = t @ [s]
+
   let decons = function [] -> None | h :: t -> Some (h, t)
 
   let rdecons l =
     match List.rev l with [] -> None | h :: t -> Some (List.rev t, h)
 
   let map l f = List.map f l
+
   let v x = x
 
   let pp ppf t =
@@ -38,11 +44,12 @@ module String_list = struct
     let buf = Buffer.create len in
     List.iter
       (fun s ->
-        Buffer.add_char buf '/';
+        Buffer.add_char buf '/' ;
         Buffer.add_string buf s)
-      t;
+      t ;
     Fmt.string ppf (Buffer.contents buf)
 
   let of_string s = Ok (List.filter (( <> ) "") (String.cuts s ~sep:"/"))
+
   let t = Type.like ~pp ~of_string Type.(list step_t)
 end

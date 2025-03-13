@@ -16,5 +16,5 @@
 
 (** Graphs. *)
 
-include Object_graph_intf.Sigs
 (** @inline *)
+include Object_graph_intf.Sigs

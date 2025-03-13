@@ -31,7 +31,8 @@ module Util = struct
       else
         (aux [@tailcall])
           Int63.Syntax.(fd_offset + Int63.of_int w)
-          (buffer_offset + w) (length - w)
+          (buffer_offset + w)
+          (length - w)
     in
     aux fd_offset buffer_offset length
 
@@ -43,7 +44,8 @@ module Util = struct
       else
         (aux [@tailcall])
           Int63.Syntax.(fd_offset + Int63.of_int r)
-          (buffer_offset + r) (length - r)
+          (buffer_offset + r)
+          (length - r)
     in
     aux fd_offset 0 length
 end
@@ -56,21 +58,17 @@ module Unix = struct
 
   let misc_error_t = Brassaia.Type.(triple unix_error_t string string)
 
-  type create_error = [ `Io_misc of misc_error | `File_exists of string ]
+  type create_error = [`Io_misc of misc_error | `File_exists of string]
 
   type open_error =
-    [ `Io_misc of misc_error
-    | `No_such_file_or_directory of string
-    | `Not_a_file ]
+    [`Io_misc of misc_error | `No_such_file_or_directory of string | `Not_a_file]
 
   type read_error =
-    [ `Io_misc of misc_error
-    | `Read_out_of_bounds
-    | `Closed
-    | `Invalid_argument ]
+    [`Io_misc of misc_error | `Read_out_of_bounds | `Closed | `Invalid_argument]
 
-  type write_error = [ `Io_misc of misc_error | `Ro_not_allowed | `Closed ]
-  type close_error = [ `Io_misc of misc_error | `Double_close ]
+  type write_error = [`Io_misc of misc_error | `Ro_not_allowed | `Closed]
+
+  type close_error = [`Io_misc of misc_error | `Double_close]
 
   type mkdir_error =
     [ `Io_misc of misc_error
@@ -101,8 +99,11 @@ module Unix = struct
       with _ -> `No_such_file_or_directory)
 
   let readdir p = Sys.readdir p |> Array.to_list
+
   let default_create_perm = 0o644
+
   let default_open_perm = 0o644
+
   let default_mkdir_perm = 0o755
 
   let create ~path ~overwrite =
@@ -111,11 +112,12 @@ module Unix = struct
       | false ->
           let fd =
             Unix.(
-              openfile path
-                [ O_CREAT; O_RDWR; O_EXCL; O_CLOEXEC ]
+              openfile
+                path
+                [O_CREAT; O_RDWR; O_EXCL; O_CLOEXEC]
                 default_create_perm)
           in
-          Ok { fd; closed = false; readonly = false; path }
+          Ok {fd; closed = false; readonly = false; path}
       | true -> (
           match overwrite with
           | true ->
@@ -123,11 +125,9 @@ module Unix = struct
                  triggered if we don't have the permissions *)
               let fd =
                 Unix.(
-                  openfile path
-                    [ O_RDWR; O_CLOEXEC; O_TRUNC ]
-                    default_create_perm)
+                  openfile path [O_RDWR; O_CLOEXEC; O_TRUNC] default_create_perm)
               in
-              Ok { fd; closed = false; readonly = false; path }
+              Ok {fd; closed = false; readonly = false; path}
           | false -> Error (`File_exists path))
     with
     | Unix.Unix_error (e, s1, s2) -> Error (`Io_misc (e, s1, s2))
@@ -140,24 +140,24 @@ module Unix = struct
     | `File -> (
         let mode = Unix.(if readonly then O_RDONLY else O_RDWR) in
         try
-          let fd = Unix.(openfile path [ mode; O_CLOEXEC ] default_open_perm) in
-          Ok { fd; closed = false; readonly; path }
+          let fd = Unix.(openfile path [mode; O_CLOEXEC] default_open_perm) in
+          Ok {fd; closed = false; readonly; path}
         with Unix.Unix_error (e, s1, s2) -> Error (`Io_misc (e, s1, s2)))
 
   let close t =
     match t.closed with
     | true -> Error `Double_close
     | false -> (
-        t.closed <- true;
+        t.closed <- true ;
         (* mark [t] as closed, even if [Unix.close] fails, since it is recommended
            to not retry after an error. see: https://man7.org/linux/man-pages/man2/close.2.html *)
         try
-          Unix.close t.fd;
+          Unix.close t.fd ;
           Ok ()
         with Unix.Unix_error (e, s1, s2) -> Error (`Io_misc (e, s1, s2)))
 
   let write_exn t ~off ~len s =
-    if String.length s < len then raise (Errors.Pack_error `Invalid_argument);
+    if String.length s < len then raise (Errors.Pack_error `Invalid_argument) ;
     match (t.closed, t.readonly) with
     | true, _ -> raise Errors.Closed
     | _, true -> raise Errors.RO_not_allowed
@@ -184,12 +184,12 @@ module Unix = struct
     | _, true -> Error `Ro_not_allowed
     | _ -> (
         try
-          Unix.fsync t.fd;
+          Unix.fsync t.fd ;
           Ok ()
         with Unix.Unix_error (e, s1, s2) -> Error (`Io_misc (e, s1, s2)))
 
   let read_exn t ~off ~len buf =
-    if len > Bytes.length buf then raise (Errors.Pack_error `Invalid_argument);
+    if len > Bytes.length buf then raise (Errors.Pack_error `Invalid_argument) ;
     match t.closed with
     | true -> raise Errors.Closed
     | false ->
@@ -205,7 +205,7 @@ module Unix = struct
   let read_to_string t ~off ~len =
     let buf = Bytes.create len in
     try
-      read_exn t ~off ~len buf;
+      read_exn t ~off ~len buf ;
       (* Bytes.unsafe_to_string usage: buf is local to this function, so uniquely
          owned. We assume read_exn returns unique ownership of buf to this function. Then
          at the call to Bytes.unsafe_to_string we give up unique ownership of buf for
@@ -227,17 +227,21 @@ module Unix = struct
     let bytes = Bytes.create len in
     let rec aux ~off =
       let nread =
-        Syscalls.pread ~fd:t.fd ~fd_offset:off ~buffer:bytes ~buffer_offset:0
+        Syscalls.pread
+          ~fd:t.fd
+          ~fd_offset:off
+          ~buffer:bytes
+          ~buffer_offset:0
           ~length:len
       in
       if nread > 0 then (
         (* TODO: Index.Stats is not domain-safe
            Index.Stats.add_read nread; *)
-        Buffer.add_subbytes buf bytes 0 nread;
+        Buffer.add_subbytes buf bytes 0 nread ;
         if nread = len then aux ~off:Int63.(add off (of_int nread)))
     in
     try
-      aux ~off:Int63.zero;
+      aux ~off:Int63.zero ;
       Ok (Buffer.contents buf)
     with Unix.Unix_error (e, s1, s2) -> Error (`Io_misc (e, s1, s2))
 
@@ -263,16 +267,17 @@ module Unix = struct
     | Ok () -> res
 
   let readonly t = t.readonly
+
   let path t = t.path
 
   let move_file ~src ~dst =
     try
-      Sys.rename src dst;
+      Sys.rename src dst ;
       Ok ()
     with Sys_error msg -> Error (`Sys_error msg)
 
   let copy_file ~src ~dst =
-    let cmd = Filename.quote_command "cp" [ "-p"; src; dst ] in
+    let cmd = Filename.quote_command "cp" ["-p"; src; dst] in
     match Sys.command cmd with
     | 0 -> Ok ()
     | n -> Error (`Sys_error (Int.to_string n))
@@ -281,7 +286,7 @@ module Unix = struct
     match (classify_path (Filename.dirname path), classify_path path) with
     | `Directory, `No_such_file_or_directory -> (
         try
-          Unix.mkdir path default_mkdir_perm;
+          Unix.mkdir path default_mkdir_perm ;
           Ok ()
         with Unix.Unix_error (e, s1, s2) -> Error (`Io_misc (e, s1, s2)))
     | `Directory, (`File | `Directory | `Other) -> Error (`File_exists path)
@@ -293,7 +298,7 @@ module Unix = struct
 
   let unlink path =
     try
-      Sys.remove path;
+      Sys.remove path ;
       Ok ()
     with Sys_error msg -> Error (`Sys_error msg)
 
@@ -314,18 +319,18 @@ module Unix = struct
       (Mtime_clock.now () |> Mtime.to_uint64_ns |> Int64.to_float) /. 1e9
 
     let get_stime () = Rusage.((get Self).stime)
+
     let get_utime () = Rusage.((get Self).utime)
 
     let get_rusage () =
-      let Rusage.{ maxrss; minflt; majflt; inblock; oublock; nvcsw; nivcsw; _ }
-          =
+      let Rusage.{maxrss; minflt; majflt; inblock; oublock; nvcsw; nivcsw; _} =
         Rusage.(get Self)
       in
       let maxrss =
         if Lazy.force is_darwin then Int64.div maxrss 1000L else maxrss
       in
       Brassaia_pack_io.Stats_intf.Latest_gc.
-        { maxrss; minflt; majflt; inblock; oublock; nvcsw; nivcsw }
+        {maxrss; minflt; majflt; inblock; oublock; nvcsw; nivcsw}
   end
 
   module Clock = Mtime_clock

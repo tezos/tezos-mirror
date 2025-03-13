@@ -17,10 +17,15 @@
 
 module type S = sig
   module Hash : Hash.S
+
   module Branch : Branch.S
+
   module Info : Info.S
+
   module Metadata : Metadata.S
+
   module Path : Path.S
+
   module Contents : Contents.S
 end
 

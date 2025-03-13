@@ -20,6 +20,7 @@ exception RO_not_allowed
 
 module type Checkable = sig
   type 'a t
+
   type hash
 
   val integrity_check :
@@ -27,7 +28,7 @@ module type Checkable = sig
     length:int ->
     hash ->
     _ t ->
-    (unit, [ `Wrong_hash | `Absent_value ]) result
+    (unit, [`Wrong_hash | `Absent_value]) result
 end
 
 module type S = Brassaia.Generic_key.S
@@ -69,6 +70,7 @@ module type Sigs = sig
   module Indexing_strategy = Indexing_strategy
   module Conf = Conf
 
+  (** Configuration options for stores. See {!Brassaia_pack.Conf} for more details. *)
   val config :
     ?fresh:bool ->
     ?readonly:bool ->
@@ -82,7 +84,6 @@ module type Sigs = sig
     ?lower_root:string option ->
     string ->
     Brassaia.config
-  (** Configuration options for stores. See {!Brassaia_pack.Conf} for more details. *)
 
   (** {1 Inode} *)
 
@@ -98,6 +99,7 @@ module type Sigs = sig
   exception RO_not_allowed
 
   module type S = S
+
   module type Maker = Maker
 
   (** {1 Integrity Check} *)

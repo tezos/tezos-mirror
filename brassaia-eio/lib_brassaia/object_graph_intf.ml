@@ -15,23 +15,28 @@
  *)
 
 module type S = sig
-  include Graph.Sig.I
   (** Directed graph *)
+  include Graph.Sig.I
 
-  include Graph.Oper.S with type g := t
   (** Basic operations. *)
+  include Graph.Oper.S with type g := t
 
   (** Topological traversal *)
   module Topological : sig
     val fold : (vertex -> 'a -> 'a) -> t -> 'a -> 'a
   end
 
-  val vertex : t -> vertex list
   (** Get all the vertices. *)
+  val vertex : t -> vertex list
 
-  val edges : t -> (vertex * vertex) list
   (** Get all the relations. *)
+  val edges : t -> (vertex * vertex) list
 
+  (** [closure depth pred min max ()] creates the transitive closure graph of
+      [max] using the predecessor relation [pred]. The graph is bounded by the
+      [min] nodes and by [depth].
+
+      {b Note:} Both [min] and [max] are subsets of [n]. *)
   val closure :
     ?depth:int ->
     pred:(vertex -> vertex list) ->
@@ -39,24 +44,7 @@ module type S = sig
     max:vertex list ->
     unit ->
     t
-  (** [closure depth pred min max ()] creates the transitive closure graph of
-      [max] using the predecessor relation [pred]. The graph is bounded by the
-      [min] nodes and by [depth].
 
-      {b Note:} Both [min] and [max] are subsets of [n]. *)
-
-  val iter :
-    ?cache_size:int ->
-    ?depth:int ->
-    pred:(vertex -> vertex list) ->
-    min:vertex list ->
-    max:vertex list ->
-    node:(vertex -> unit) ->
-    ?edge:(vertex -> vertex -> unit) ->
-    skip:(vertex -> bool) ->
-    rev:bool ->
-    unit ->
-    unit
   (** [iter depth min max node edge skip rev ()] iterates in topological order
       over the closure graph starting with the [max] nodes and bounded by the
       [min] nodes and by [depth].
@@ -73,7 +61,22 @@ module type S = sig
       [cache_size] is the size of the LRU cache used to store nodes already
       seen. If [None] (by default) every traversed nodes is stored (and thus no
       entries are never removed from the LRU). *)
+  val iter :
+    ?cache_size:int ->
+    ?depth:int ->
+    pred:(vertex -> vertex list) ->
+    min:vertex list ->
+    max:vertex list ->
+    node:(vertex -> unit) ->
+    ?edge:(vertex -> vertex -> unit) ->
+    skip:(vertex -> bool) ->
+    rev:bool ->
+    unit ->
+    unit
 
+  (** [breadth_first_traversal ?cache_size pred max node ()] traverses the
+      closure graph in breadth-first order starting with the [max] nodes. It
+      applies [node] on the nodes of the graph while traversing it. *)
   val breadth_first_traversal :
     ?cache_size:int ->
     pred:(vertex -> vertex list) ->
@@ -81,37 +84,34 @@ module type S = sig
     node:(vertex -> unit) ->
     unit ->
     unit
-  (** [breadth_first_traversal ?cache_size pred max node ()] traverses the
-      closure graph in breadth-first order starting with the [max] nodes. It
-      applies [node] on the nodes of the graph while traversing it. *)
 
+  (** [output ppf vertex edges name] create aand dumps the graph contents on
+      [ppf]. The graph is defined by its [vertex] and [edges]. [name] is the
+      name of the output graph.*)
   val output :
     Format.formatter ->
     (vertex * Graph.Graphviz.DotAttributes.vertex list) list ->
     (vertex * Graph.Graphviz.DotAttributes.edge list * vertex) list ->
     string ->
     unit
-  (** [output ppf vertex edges name] create aand dumps the graph contents on
-      [ppf]. The graph is defined by its [vertex] and [edges]. [name] is the
-      name of the output graph.*)
 
-  val min : t -> vertex list
   (** Compute the minimum vertex. *)
+  val min : t -> vertex list
 
-  val max : t -> vertex list
   (** Compute the maximun vertex. *)
+  val max : t -> vertex list
 
-  type dump = vertex list * (vertex * vertex) list
   (** Expose the graph internals. *)
+  type dump = vertex list * (vertex * vertex) list
 
-  val export : t -> dump
   (** Expose the graph as a pair of vertices and edges. *)
+  val export : t -> dump
 
-  val import : dump -> t
   (** Import a graph. *)
+  val import : dump -> t
 
-  module Dump : Type.S with type t = dump
   (** The base functions over graph internals. *)
+  module Dump : Type.S with type t = dump
 end
 
 module type HASH = sig
@@ -122,6 +122,7 @@ end
 
 module type Sigs = sig
   module type S = S
+
   module type HASH = HASH
 
   (** Build a graph. *)

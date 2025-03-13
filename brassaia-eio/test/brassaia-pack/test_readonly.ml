@@ -18,6 +18,7 @@ open! Import
 open Common
 
 let root = Filename.concat "_build" "test-readonly"
+
 let src = Logs.Src.create "tests.readonly" ~doc:"Tests read-only stores"
 
 module Log = (val Logs.src_log src : Logs.LOG)
@@ -35,21 +36,21 @@ let config ?(readonly = false) ?(fresh = true) root =
 let info () = S.Info.empty
 
 let open_ro_after_rw_closed () =
-  rm_dir root;
+  rm_dir root ;
   let rw = S.Repo.v (config ~readonly:false ~fresh:true root) in
   let t = S.main rw in
-  let tree = S.Tree.singleton [ "a" ] "x" in
-  S.set_tree_exn ~parents:[] ~info t [] tree;
+  let tree = S.Tree.singleton ["a"] "x" in
+  S.set_tree_exn ~parents:[] ~info t [] tree ;
   let ro = S.Repo.v (config ~readonly:true ~fresh:false root) in
-  S.Repo.close rw;
+  S.Repo.close rw ;
   let t = S.main ro in
   let c = S.Head.get t in
   match S.Commit.of_hash ro (S.Commit.hash c) with
   | None -> Alcotest.fail "no hash"
   | Some commit ->
       let tree = S.Commit.tree commit in
-      let x = S.Tree.find tree [ "a" ] in
-      Alcotest.(check (option string)) "RO find" (Some "x") x;
+      let x = S.Tree.find tree ["a"] in
+      Alcotest.(check (option string)) "RO find" (Some "x") x ;
       S.Repo.close ro
 
 let check_binding ?msg repo commit key value =
@@ -72,48 +73,49 @@ let ro_reload_after_add () =
     | None -> Alcotest.failf "commit not found"
     | Some commit ->
         let tree = S.Commit.tree commit in
-        let x = S.Tree.find tree [ k ] in
+        let x = S.Tree.find tree [k] in
         Alcotest.(check (option string)) "RO find" (Some v) x
   in
-  rm_dir root;
+  rm_dir root ;
   let rw = S.Repo.v (config ~readonly:false ~fresh:true root) in
   let ro = S.Repo.v (config ~readonly:true ~fresh:false root) in
-  let tree = S.Tree.singleton [ "a" ] "x" in
+  let tree = S.Tree.singleton ["a"] "x" in
   let c1 = S.Commit.v rw ~parents:[] ~info:(info ()) tree in
-  S.reload ro;
-  check ro c1 "a" "x";
-  let tree = S.Tree.singleton [ "a" ] "y" in
+  S.reload ro ;
+  check ro c1 "a" "x" ;
+  let tree = S.Tree.singleton ["a"] "y" in
   let c2 = S.Commit.v rw ~parents:[] ~info:(info ()) tree in
-  check ro c1 "a" "x";
+  check ro c1 "a" "x" ;
   let () =
     S.Commit.of_hash ro (S.Commit.hash c2) |> function
     | None -> ()
     | Some _ -> Alcotest.failf "should not find branch by"
   in
-  S.reload ro;
-  check ro c2 "a" "y";
-  S.Repo.close ro;
+  S.reload ro ;
+  check ro c2 "a" "y" ;
+  S.Repo.close ro ;
   S.Repo.close rw
 
 let ro_reload_after_close () =
-  let binding f = f [ "a" ] "x" in
-  rm_dir root;
+  let binding f = f ["a"] "x" in
+  rm_dir root ;
   let rw = S.Repo.v (config ~readonly:false ~fresh:true root) in
   let ro = S.Repo.v (config ~readonly:true ~fresh:false root) in
   let tree = binding (S.Tree.singleton ?metadata:None) in
   let c1 = S.Commit.v rw ~parents:[] ~info:(info ()) tree in
-  S.Repo.close rw;
-  S.reload ro;
-  binding (check_binding ro c1);
+  S.Repo.close rw ;
+  S.reload ro ;
+  binding (check_binding ro c1) ;
   S.Repo.close ro
 
 let ro_batch () =
   let rw = S.Repo.v (config ~readonly:false ~fresh:true root) in
   let ro = S.Repo.v (config ~readonly:true ~fresh:false root) in
-  Alcotest.check_raises "Read-only store throws RO_not_allowed exception"
-    Brassaia_pack_unix.Errors.RO_not_allowed (fun () ->
-      S.Backend.Repo.batch ro (fun _ _ _ -> ()));
-  S.Repo.close ro;
+  Alcotest.check_raises
+    "Read-only store throws RO_not_allowed exception"
+    Brassaia_pack_unix.Errors.RO_not_allowed
+    (fun () -> S.Backend.Repo.batch ro (fun _ _ _ -> ())) ;
+  S.Repo.close ro ;
   S.Repo.close rw
 
 let tests =

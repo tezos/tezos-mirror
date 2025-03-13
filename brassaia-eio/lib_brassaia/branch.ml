@@ -20,6 +20,7 @@ module String = struct
   type t = string
 
   let t = Type.string
+
   let main = "main"
 
   let is_valid s =
@@ -29,8 +30,8 @@ module String = struct
     while !i < n do
       (match s.[!i] with
       | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '-' | '_' | '.' -> ()
-      | _ -> ok := false);
+      | _ -> ok := false) ;
       incr i
-    done;
+    done ;
     !ok
 end

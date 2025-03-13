@@ -25,7 +25,7 @@ module M = struct
 
   let bindings t =
     let all = ref [] in
-    iter t (fun k v -> all := (k, v) :: !all);
+    iter t (fun k v -> all := (k, v) :: !all) ;
     List.sort compare !all
 end
 
@@ -34,24 +34,27 @@ module M' = struct
 
   let bindings t =
     let all = ref [] in
-    iter (fun k v -> all := (k, v) :: !all) t;
+    iter (fun k v -> all := (k, v) :: !all) t ;
     List.sort compare !all
 end
 
 type key = int
+
 type action = Add of key * int | Clear
 
 let add k v = Add (k, v)
+
 let clear = Clear
 
 let gen_action =
-  QCheck.Gen.(frequency [ (5, map2 add small_int nat); (1, pure clear) ])
+  QCheck.Gen.(frequency [(5, map2 add small_int nat); (1, pure clear)])
 
 let print_action = function
   | Add (k, v) -> Fmt.str "add %d %d" k v
   | Clear -> Fmt.str "clear"
 
 let apply t = function Add (k, v) -> M.add t k v | Clear -> M.clear t
+
 let apply' t = function Add (k, v) -> M'.replace t k v | Clear -> M'.clear t
 
 let run_aux create apply t =
@@ -59,20 +62,25 @@ let run_aux create apply t =
   let rec aux = function
     | [] -> ()
     | h :: rest ->
-        apply state h;
+        apply state h ;
         aux rest
   in
-  aux t;
+  aux t ;
   state
 
 let run = run_aux (fun () -> M.create 100) apply
+
 let run' = run_aux (fun () -> M'.create 100) apply'
+
 let eq m m' = M.bindings m = M'.bindings m'
+
 let arbitrary_action = QCheck.make gen_action ~print:print_action
 
 let test_map =
-  QCheck.Test.make ~name:"Maps" ~count:10_000
+  QCheck.Test.make
+    ~name:"Maps"
+    ~count:10_000
     QCheck.(list arbitrary_action)
     (fun t -> eq (run t) (run' t))
 
-let suite = List.map QCheck_alcotest.to_alcotest [ test_map ]
+let suite = List.map QCheck_alcotest.to_alcotest [test_map]

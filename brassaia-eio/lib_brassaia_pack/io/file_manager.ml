@@ -35,8 +35,9 @@ struct
   module Sparse = Sparse_file.Make (Io)
   module Lower = Lower.Make (Io) (Errs)
 
-  type after_reload_consumer = { after_reload : unit -> (unit, Errs.t) result }
-  type after_flush_consumer = { after_flush : unit -> unit }
+  type after_reload_consumer = {after_reload : unit -> (unit, Errs.t) result}
+
+  type after_flush_consumer = {after_flush : unit -> unit}
 
   type t = {
     dict : Dict.t;
@@ -53,10 +54,15 @@ struct
   }
 
   let control t = t.control
+
   let dict t = t.dict
+
   let suffix t = t.suffix
+
   let index t = t.index
+
   let prefix t = t.prefix
+
   let lower t = t.lower
 
   let close t =
@@ -69,10 +75,10 @@ struct
     ()
 
   let register_prefix_consumer t ~after_reload =
-    t.prefix_consumers <- { after_reload } :: t.prefix_consumers
+    t.prefix_consumers <- {after_reload} :: t.prefix_consumers
 
   let register_suffix_consumer t ~after_flush =
-    t.suffix_consumers <- { after_flush } :: t.suffix_consumers
+    t.suffix_consumers <- {after_flush} :: t.suffix_consumers
 
   let get_gced = function Payload.Gced x -> Some x | _ -> None
 
@@ -84,9 +90,10 @@ struct
 
   let notify_reload_consumers consumers =
     List.fold_left
-      (fun acc { after_reload } -> Result.bind acc after_reload)
-      (Ok ()) consumers
-    |> Result.map_error (fun err -> (err : Errs.t :> [> Errs.t ]))
+      (fun acc {after_reload} -> Result.bind acc after_reload)
+      (Ok ())
+      consumers
+    |> Result.map_error (fun err -> (err : Errs.t :> [> Errs.t]))
 
   (** Flush stages *************************************************************
 
@@ -103,7 +110,7 @@ struct
     let* () =
       if Dict.empty_buffer t.dict then Ok ()
       else (
-        Stats.incr_fm_field Dict_flushes;
+        Stats.incr_fm_field Dict_flushes ;
         Dict.flush t.dict)
     in
     if t.use_fsync then Dict.fsync t.dict else Ok ()
@@ -113,7 +120,7 @@ struct
     let* () =
       if Suffix.empty_buffer t.suffix then Ok ()
       else (
-        Stats.incr_fm_field Suffix_flushes;
+        Stats.incr_fm_field Suffix_flushes ;
         Suffix.flush t.suffix)
     in
     if t.use_fsync then Suffix.fsync t.suffix else Ok ()
@@ -131,7 +138,7 @@ struct
             [%log.warn
               "Updating the control file to \
                [Used_non_minimal_indexing_strategy]. It won't be possible to \
-               GC this brassaia-pack store anymore."];
+               GC this brassaia-pack store anymore."] ;
             Payload.Used_non_minimal_indexing_strategy)
       | Used_non_minimal_indexing_strategy -> pl.status
       | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8 | T9 | T10 | T11 | T12 | T13 | T14
@@ -156,18 +163,18 @@ struct
   let flush_suffix_and_its_deps ?hook t =
     let open Result_syntax in
     let* () = flush_dict t in
-    (match hook with Some h -> h `After_dict | None -> ());
+    (match hook with Some h -> h `After_dict | None -> ()) ;
     let* () = flush_suffix t in
     let+ () = flush_control t in
-    List.iter (fun { after_flush } -> after_flush ()) t.suffix_consumers
+    List.iter (fun {after_flush} -> after_flush ()) t.suffix_consumers
 
   (** Flush stage 3 *)
   let flush_index_and_its_deps ?hook t =
     let open Result_syntax in
     let* () = flush_suffix_and_its_deps ?hook t in
-    (match hook with Some h -> h `After_suffix | None -> ());
+    (match hook with Some h -> h `After_suffix | None -> ()) ;
     let+ () =
-      Stats.incr_fm_field Index_flushes;
+      Stats.incr_fm_field Index_flushes ;
       Index.flush ~with_fsync:t.use_fsync t.index
     in
     ()
@@ -178,14 +185,14 @@ struct
       that the dependendies of index are flushes. When the function returns,
       index will flush itself. *)
   let index_is_about_to_auto_flush_exn _t =
-    Stats.incr_fm_field Auto_index;
+    Stats.incr_fm_field Auto_index ;
     (* TODO: remove? flush_suffix_and_its_deps t |> Errs.raise_if_error *)
     ()
 
   (* Explicit flush ********************************************************* *)
 
   let flush ?hook t =
-    Stats.incr_fm_field Flush;
+    Stats.incr_fm_field Flush ;
     flush_index_and_its_deps ?hook t
 
   (* Explicit fsync ********************************************************* *)
@@ -223,7 +230,7 @@ struct
     | None -> Ok ()
     | Some _ ->
         let prev_prefix = t.prefix in
-        t.prefix <- some_prefix;
+        t.prefix <- some_prefix ;
         let* () = notify_reload_consumers t.prefix_consumers in
         Option.might Sparse.close prev_prefix
 
@@ -234,22 +241,31 @@ struct
     let dead_header_size = 0 in
     [%log.debug
       "reopen_suffix chunk_start_idx:%d chunk_num:%d appendable_chunk_poff:%d"
-        chunk_start_idx chunk_num
-        (Int63.to_int appendable_chunk_poff)];
+        chunk_start_idx
+        chunk_num
+        (Int63.to_int appendable_chunk_poff)] ;
     let readonly = Suffix.readonly t.suffix in
     let* suffix1 =
       let root = t.root in
       let start_idx = chunk_start_idx in
-      [%log.debug "reload: generation changed, opening suffix"];
+      [%log.debug "reload: generation changed, opening suffix"] ;
       if readonly then
-        Suffix.open_ro ~root ~appendable_chunk_poff ~dead_header_size ~start_idx
+        Suffix.open_ro
+          ~root
+          ~appendable_chunk_poff
+          ~dead_header_size
+          ~start_idx
           ~chunk_num
       else
-        Suffix.open_rw ~root ~appendable_chunk_poff ~dead_header_size ~start_idx
+        Suffix.open_rw
+          ~root
+          ~appendable_chunk_poff
+          ~dead_header_size
+          ~start_idx
           ~chunk_num
     in
     let suffix0 = t.suffix in
-    t.suffix <- suffix1;
+    t.suffix <- suffix1 ;
     Suffix.close suffix0
 
   let reload_lower t ~volume_num =
@@ -269,7 +285,7 @@ struct
              | `Reachable _ | `Sorted _ | `Gc_result _ | `Control_tmp -> true)
       |> List.iter (fun residual ->
              let filename = Filename.concat root residual in
-             [%log.debug "Remove residual file %s" filename];
+             [%log.debug "Remove residual file %s" filename] ;
              match Io.unlink filename with
              | Ok () -> ()
              | Error (`Sys_error error) ->
@@ -284,8 +300,8 @@ struct
     let* _ = Lower.add_volume lower in
     (* Step 2. Update control file *)
     let pl = Control.payload control in
-    let pl = { pl with volume_num = Lower.volume_num lower } in
-    [%log.debug "add_volume: update control_file volume_num:%d" pl.volume_num];
+    let pl = {pl with volume_num = Lower.volume_num lower} in
+    [%log.debug "add_volume: update control_file volume_num:%d" pl.volume_num] ;
     Control.set_payload control pl
 
   let finish_constructing_rw config control ~make_dict ~make_suffix ~make_index
@@ -315,10 +331,11 @@ struct
           [%log.warn
             "%s: instance was accessed whilst None; this is unexpected during \
              normal node operation"
-            __FILE__];
+              __FILE__] ;
           [%log.warn
-            "%s: the stack trace is %s" __FILE__
-              Printexc.(get_callstack 20 |> raw_backtrace_to_string)];
+            "%s: the stack trace is %s"
+              __FILE__
+              Printexc.(get_callstack 20 |> raw_backtrace_to_string)] ;
           (* get_instance is used by the callback functions below; if we reach this point, a
              callback was invoked whilst instance was None; it should be the case that we
              can ignore the callback *)
@@ -367,7 +384,7 @@ struct
         root;
       }
     in
-    instance := Some t;
+    instance := Some t ;
     Ok t
 
   let create_control_file ~overwrite config pl =
@@ -382,11 +399,11 @@ struct
     let open Result_syntax in
     (* Step 1. Reread index *)
     let* () = Index.reload t.index in
-    (match hook with Some h -> h `After_index | None -> ());
+    (match hook with Some h -> h `After_index | None -> ()) ;
     let pl0 = Control.payload t.control in
     (* Step 2. Reread control file *)
     let* () = Control.reload t.control in
-    (match hook with Some h -> h `After_control | None -> ());
+    (match hook with Some h -> h `After_control | None -> ()) ;
     let pl1 : Payload.t = Control.payload t.control in
     if pl0 = pl1 then Ok ()
     else
@@ -403,15 +420,20 @@ struct
           if chunk_num0 <> chunk_num1 || chunk_start_idx0 <> chunk_start_idx1
           then
             let appendable_chunk_poff = pl1.appendable_chunk_poff in
-            reopen_suffix t ~chunk_start_idx:chunk_start_idx1
-              ~appendable_chunk_poff ~chunk_num:chunk_num1
+            reopen_suffix
+              t
+              ~chunk_start_idx:chunk_start_idx1
+              ~appendable_chunk_poff
+              ~chunk_num:chunk_num1
           else Ok ()
         in
         (* Step 3.2. Potentially reload prefix *)
         let* () =
           if gen0 = gen1 then Ok ()
           else
-            reopen_prefix t ~generation:gen1
+            reopen_prefix
+              t
+              ~generation:gen1
               ~mapping_size:(mapping_size pl1.status)
         in
         (* Step 3.3. Potentially reload lower *)
@@ -422,7 +444,7 @@ struct
       let* () =
         Suffix.refresh_appendable_chunk_poff t.suffix pl1.appendable_chunk_poff
       in
-      (match hook with Some h -> h `After_suffix | None -> ());
+      (match hook with Some h -> h `After_suffix | None -> ()) ;
       let* () = Dict.refresh_end_poff t.dict pl1.dict_end_poff in
       Ok ()
 
@@ -488,7 +510,12 @@ struct
           let+ _ = add_volume_and_update_control l control in
           Some l
     in
-    finish_constructing_rw config control ~make_dict ~make_suffix ~make_index
+    finish_constructing_rw
+      config
+      control
+      ~make_dict
+      ~make_suffix
+      ~make_index
       ~make_lower
 
   (* Open rw **************************************************************** *)
@@ -519,7 +546,10 @@ struct
     let dead_header_size = dead_header_size_of_status payload.status in
     let end_offset = payload.appendable_chunk_poff in
     let* () =
-      Lower.create_from ~src:suffix_file ~dead_header_size ~size:end_offset
+      Lower.create_from
+        ~src:suffix_file
+        ~dead_header_size
+        ~size:end_offset
         lower_root
     in
     (* Step 2. Create a new empty suffix for the upper. *)
@@ -545,11 +575,12 @@ struct
         let* tmp_dict_file = Io.open_ ~path:tmp_dict_path ~readonly:false in
         let contents_len = Int63.to_int len - dead_header_size in
         let* contents =
-          Io.read_to_string dict_file
+          Io.read_to_string
+            dict_file
             ~off:(Int63.of_int dead_header_size)
             ~len:contents_len
         in
-        Io.write_exn tmp_dict_file ~off:Int63.zero ~len:contents_len contents;
+        Io.write_exn tmp_dict_file ~off:Int63.zero ~len:contents_len contents ;
         let* _ = Io.close dict_file in
         let* _ = Io.close tmp_dict_file in
         (* Delay moving the temp file until after the payload is written so
@@ -619,7 +650,8 @@ struct
       | From_v1_v2_post_upgrade _ -> Ok legacy_io_header_size
       | Gced _ ->
           let indexing_strategy = Conf.indexing_strategy config in
-          if Brassaia_pack.Indexing_strategy.is_minimal indexing_strategy then Ok 0
+          if Brassaia_pack.Indexing_strategy.is_minimal indexing_strategy then
+            Ok 0
           else Error `Only_minimal_indexing_strategy_allowed
       | No_gc_yet | Used_non_minimal_indexing_strategy -> Ok 0
       | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8 | T9 | T10 | T11 | T12 | T13 | T14
@@ -630,7 +662,11 @@ struct
       Dict.open_rw ~size:dict_end_poff ~dead_header_size path
     in
     let make_suffix () =
-      Suffix.open_rw ~root ~appendable_chunk_poff ~start_idx ~chunk_num
+      Suffix.open_rw
+        ~root
+        ~appendable_chunk_poff
+        ~start_idx
+        ~chunk_num
         ~dead_header_size
     in
     let make_index ~flush_callback ~readonly ~throttle ~log_size root =
@@ -640,11 +676,16 @@ struct
       match lower_root with
       | None -> Ok None
       | Some lower_root ->
-          assert (volume_num > 0);
+          assert (volume_num > 0) ;
           let+ l = Lower.v ~readonly:false ~volume_num lower_root in
           Some l
     in
-    finish_constructing_rw config control ~make_dict ~make_suffix ~make_index
+    finish_constructing_rw
+      config
+      control
+      ~make_dict
+      ~make_suffix
+      ~make_index
       ~make_lower
 
   let read_offset_from_legacy_file path =
@@ -687,7 +728,7 @@ struct
       let open Payload in
       let status =
         From_v1_v2_post_upgrade
-          { entry_offset_at_upgrade_to_v3 = suffix_end_poff }
+          {entry_offset_at_upgrade_to_v3 = suffix_end_poff}
       in
       let pl =
         {
@@ -742,13 +783,13 @@ struct
       Control.open_ ~readonly:true ~path ~tmp_path:None
       (* If no control file, then check whether the store is in v1 or v2. *)
       |> Result.map_error (function
-           | `No_such_file_or_directory _ -> (
-               let pack = Brassaia_pack.Layout.V1_and_v2.pack ~root in
-               match Io.classify_path pack with
-               | `File -> `Migration_needed
-               | `No_such_file_or_directory -> `No_such_file_or_directory pack
-               | `Directory | `Other -> `Invalid_layout)
-           | error -> error)
+             | `No_such_file_or_directory _ -> (
+                 let pack = Brassaia_pack.Layout.V1_and_v2.pack ~root in
+                 match Io.classify_path pack with
+                 | `File -> `Migration_needed
+                 | `No_such_file_or_directory -> `No_such_file_or_directory pack
+                 | `Directory | `Other -> `Invalid_layout)
+             | error -> error)
     in
     let Payload.
           {
@@ -766,7 +807,11 @@ struct
     let generation = generation status in
     (* 2. Open the other files *)
     let* suffix =
-      Suffix.open_ro ~root ~appendable_chunk_poff ~start_idx ~chunk_num
+      Suffix.open_ro
+        ~root
+        ~appendable_chunk_poff
+        ~start_idx
+        ~chunk_num
         ~dead_header_size
     in
     let* prefix =
@@ -841,8 +886,13 @@ struct
     [%log.debug
       "Gc in main: swap gen %d; suffix start %a; chunk start idx %d; chunk num \
        %d; suffix dead bytes %a"
-      generation Int63.pp suffix_start_offset chunk_start_idx chunk_num Int63.pp
-        suffix_dead_bytes];
+        generation
+        Int63.pp
+        suffix_start_offset
+        chunk_start_idx
+        chunk_num
+        Int63.pp
+        suffix_dead_bytes] ;
     let c0 = Io.Clock.counter () in
     let pl = Control.payload t.control in
 
@@ -850,7 +900,10 @@ struct
     let mapping_size = Some mapping_size in
     let* () = reopen_prefix t ~generation ~mapping_size in
     let* () =
-      reopen_suffix t ~chunk_start_idx ~chunk_num
+      reopen_suffix
+        t
+        ~chunk_start_idx
+        ~chunk_num
         ~appendable_chunk_poff:pl.appendable_chunk_poff
     in
     let span1 = Io.Clock.count c0 |> Mtime.span_to_us in
@@ -877,9 +930,9 @@ struct
                 }
         in
 
-        { pl with status; chunk_start_idx; chunk_num }
+        {pl with status; chunk_start_idx; chunk_num}
       in
-      [%log.debug "GC: writing new control_file"];
+      [%log.debug "GC: writing new control_file"] ;
       Control.set_payload t.control pl
     in
 
@@ -898,7 +951,7 @@ struct
 
     let span2 = Io.Clock.count c0 |> Mtime.span_to_us in
     [%log.debug
-      "Gc reopen files, update control: %.0fus, %.0fus" span1 (span2 -. span1)];
+      "Gc reopen files, update control: %.0fus, %.0fus" span1 (span2 -. span1)] ;
     Ok ()
 
   let readonly t = Suffix.readonly t.suffix
@@ -949,11 +1002,12 @@ struct
       (* Update the control file with the poff of the last chunk. As last chunk
          is fresh, the poff is zero. *)
       let appendable_chunk_poff = Int63.zero in
-      { pl with chunk_num; appendable_chunk_poff }
+      {pl with chunk_num; appendable_chunk_poff}
     in
     [%log.debug
       "split: update control_file chunk_start_idx:%d chunk_num:%d"
-        pl.chunk_start_idx pl.chunk_num];
+        pl.chunk_start_idx
+        pl.chunk_num] ;
     Control.set_payload t.control pl
 
   let add_volume t =
@@ -1005,13 +1059,18 @@ struct
     let* index =
       let log_size = Conf.index_log_size config in
       let throttle = Conf.merge_throttle config in
-      Index.v ~fresh:true ~flush_callback:Fun.id ~readonly:false ~throttle
-        ~log_size dst_root
+      Index.v
+        ~fresh:true
+        ~flush_callback:Fun.id
+        ~readonly:false
+        ~throttle
+        ~log_size
+        dst_root
     in
     (* Step 5. Add the commit to the index, close the index. *)
     let () =
       match Pack_key.inspect commit_key with
-      | Pack_key.Direct { hash; offset; length; _ } ->
+      | Pack_key.Direct {hash; offset; length; _} ->
           Index.add index hash (offset, length, Pack_value.Kind.Commit_v2)
       | Indexed _ -> assert false
     in

@@ -18,14 +18,19 @@ let toplevel name ~root = Filename.(concat root name)
 
 module V1_and_v2 = struct
   let pack = toplevel "store.pack"
+
   let branch = toplevel "store.branches"
+
   let dict = toplevel "store.dict"
-  let all ~root = [ pack ~root; branch ~root; dict ~root ]
+
+  let all ~root = [pack ~root; branch ~root; dict ~root]
 end
 
 module V3 = struct
   let branch = toplevel "store.branches"
+
   let dict = toplevel "store.dict"
+
   let control = toplevel "store.control"
 
   let suffix ~generation =
@@ -47,13 +52,16 @@ module V3 = struct
     toplevel ("store." ^ string_of_int generation ^ ".prefix")
 
   let all ~generation ~root =
-    [ suffix ~generation ~root; branch ~root; dict ~root; control ~root ]
+    [suffix ~generation ~root; branch ~root; dict ~root; control ~root]
 end
 
 module V4 = struct
   let branch = toplevel "store.branches"
+
   let dict = toplevel "store.dict"
+
   let control = toplevel "store.control"
+
   let control_tmp = toplevel "store.control.tmp"
 
   let suffix_chunk ~chunk_idx =
@@ -80,12 +88,14 @@ module V5 = struct
 
   module Volume = struct
     let directory ~idx = toplevel ("volume." ^ string_of_int idx)
+
     let control = toplevel "volume.control"
 
     let control_gc_tmp ~generation =
       toplevel ("volume." ^ string_of_int generation ^ ".control")
 
     let mapping = toplevel "volume.mapping"
+
     let data = toplevel "volume.data"
   end
 end
@@ -101,7 +111,8 @@ let is_number s =
         (fun acc char ->
           let is_digit = match char with '0' .. '9' -> true | _ -> false in
           acc && is_digit)
-        true l
+        true
+        l
 
 module Classification = struct
   module Upper = struct
@@ -122,32 +133,32 @@ module Classification = struct
 
     let v s : t =
       match String.split_on_char '.' s with
-      | [ "store"; "pack" ] -> `V1_or_v2_pack
-      | [ "store"; "branches" ] -> `Branch
-      | [ "store"; "control" ] -> `Control
-      | [ "store"; "control"; "tmp" ] -> `Control_tmp
-      | [ "store"; "dict" ] -> `Dict
-      | [ "store"; g; "out" ] when is_number g -> `Gc_result (int_of_string g)
-      | [ "store"; g; "reachable" ] when is_number g ->
+      | ["store"; "pack"] -> `V1_or_v2_pack
+      | ["store"; "branches"] -> `Branch
+      | ["store"; "control"] -> `Control
+      | ["store"; "control"; "tmp"] -> `Control_tmp
+      | ["store"; "dict"] -> `Dict
+      | ["store"; g; "out"] when is_number g -> `Gc_result (int_of_string g)
+      | ["store"; g; "reachable"] when is_number g ->
           `Reachable (int_of_string g)
-      | [ "store"; g; "sorted" ] when is_number g -> `Sorted (int_of_string g)
-      | [ "store"; g; "mapping" ] when is_number g -> `Mapping (int_of_string g)
-      | [ "store"; g; "prefix" ] when is_number g -> `Prefix (int_of_string g)
-      | [ "store"; g; "suffix" ] when is_number g -> `Suffix (int_of_string g)
+      | ["store"; g; "sorted"] when is_number g -> `Sorted (int_of_string g)
+      | ["store"; g; "mapping"] when is_number g -> `Mapping (int_of_string g)
+      | ["store"; g; "prefix"] when is_number g -> `Prefix (int_of_string g)
+      | ["store"; g; "suffix"] when is_number g -> `Suffix (int_of_string g)
       | _ -> `Unknown
   end
 
   module Volume = struct
-    type t = [ `Mapping | `Data | `Control | `Control_tmp of int | `Unknown ]
+    type t = [`Mapping | `Data | `Control | `Control_tmp of int | `Unknown]
     [@@deriving brassaia]
 
     let v s : t =
       match String.split_on_char '.' s with
-      | [ "volume"; "control" ] -> `Control
-      | [ "volume"; g; "control" ] when is_number g ->
+      | ["volume"; "control"] -> `Control
+      | ["volume"; g; "control"] when is_number g ->
           `Control_tmp (int_of_string g)
-      | [ "volume"; "mapping" ] -> `Mapping
-      | [ "volume"; "data" ] -> `Data
+      | ["volume"; "mapping"] -> `Mapping
+      | ["volume"; "data"] -> `Data
       | _ -> `Unknown
   end
 end

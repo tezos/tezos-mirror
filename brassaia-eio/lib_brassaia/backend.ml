@@ -20,16 +20,17 @@ open Store_properties
 
 open struct
   module type Node_portable = Node.Portable.S
+
   module type Commit_portable = Commit.Portable.S
 end
 
 (** [S] is what a backend must define in order to be made an brassaia store. *)
 module type S = sig
-  module Schema : Schema.S
   (** A store schema, meant to be provided by the user. *)
+  module Schema : Schema.S
 
-  module Hash : Hash.S with type t = Schema.Hash.t
   (** Hashing implementation. *)
+  module Hash : Hash.S with type t = Schema.Hash.t
 
   (** A contents store. *)
   module Contents :
@@ -84,28 +85,31 @@ module type S = sig
 
     (** Repo opening and closing functions *)
 
+    (** @inline *)
     include Of_config with type _ t := t
-    (** @inline *)
 
-    include Closeable with type _ t := t
     (** @inline *)
+    include Closeable with type _ t := t
 
     (** Getters from repo to backend store in ro mode *)
 
     val contents_t : t -> read Contents.t
+
     val node_t : t -> read Node.t
+
     val commit_t : t -> read Commit.t
+
     val config : t -> Conf.t
 
+    (** A getter from repo to backend stores in rw mode. *)
     val batch :
       ?lock:bool ->
       t ->
       (read_write Contents.t -> read_write Node.t -> read_write Commit.t -> 'a) ->
       'a
-    (** A getter from repo to backend stores in rw mode. *)
 
-    val branch_t : t -> Branch.t
     (** A branch store getter from repo *)
+    val branch_t : t -> Branch.t
   end
 
   (** URI-based low-level remote synchronisation. *)

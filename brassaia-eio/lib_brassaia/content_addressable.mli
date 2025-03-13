@@ -14,5 +14,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Content_addressable_intf.Sigs
 (** @inline *)
+include Content_addressable_intf.Sigs

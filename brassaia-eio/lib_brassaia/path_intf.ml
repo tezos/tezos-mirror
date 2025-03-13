@@ -17,50 +17,50 @@
 module type S = sig
   (** {1 Path} *)
 
-  type t
   (** The type for path values. *)
+  type t
 
-  type step
   (** Type type for path's steps. *)
+  type step
 
-  val empty : t
   (** The empty path. *)
+  val empty : t
 
-  val v : step list -> t
   (** Create a path from a list of steps. *)
+  val v : step list -> t
 
-  val is_empty : t -> bool
   (** Check if the path is empty. *)
+  val is_empty : t -> bool
 
-  val cons : step -> t -> t
   (** Prepend a step to the path. *)
+  val cons : step -> t -> t
 
-  val rcons : t -> step -> t
   (** Append a step to the path. *)
+  val rcons : t -> step -> t
 
-  val decons : t -> (step * t) option
   (** Deconstruct the first element of the path. Return [None] if the path is
       empty. *)
+  val decons : t -> (step * t) option
 
-  val rdecons : t -> (t * step) option
   (** Deconstruct the last element of the path. Return [None] if the path is
       empty. *)
+  val rdecons : t -> (t * step) option
 
-  val map : t -> (step -> 'a) -> 'a list
   (** [map t f] maps [f] over all steps of [t]. *)
+  val map : t -> (step -> 'a) -> 'a list
 
   (** {1 Value Types} *)
 
-  val t : t Type.t
   (** [t] is the value type for {!type-t}. *)
+  val t : t Type.t
 
-  val step_t : step Type.t
   (** [step_t] is the value type for {!step}. *)
+  val step_t : step Type.t
 end
 
 module type Sigs = sig
-  module type S = S
   (** Signature for path implementations.*)
+  module type S = S
 
   (** An implementation of paths as string lists. *)
   module String_list : S with type step = string and type t = string list

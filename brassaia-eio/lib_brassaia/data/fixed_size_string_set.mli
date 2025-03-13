@@ -14,19 +14,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-type t
 (** The type of mutable sets of fixed-length strings. *)
+type t
 
 type elt := string
 
-val create :
-  elt_length:int ->
-  ?initial_slots:int ->
-  ?hash:(elt -> int) ->
-  ?hash_substring:(Bigstringaf.t -> off:int -> len:int -> int) ->
-  ?null:string ->
-  unit ->
-  t
 (** [create] builds an empty set of fixed-length strings. The parameters are as
     follows:
 
@@ -48,13 +40,21 @@ val create :
     - [null]: a string of size [elt_length] that is guaranteed to never be added
       to the hashset. Passing this string to {!add} or {!mem} after creating the
       hashset will result in an exception being raised. *)
+val create :
+  elt_length:int ->
+  ?initial_slots:int ->
+  ?hash:(elt -> int) ->
+  ?hash_substring:(Bigstringaf.t -> off:int -> len:int -> int) ->
+  ?null:string ->
+  unit ->
+  t
 
 include Hashset.S with type t := t and type elt := elt
 
-val invariant : (elt -> unit) -> t -> unit
 (** [invariant f t] checks the internal invariants of [t] and calls [f] on every
     element contained within. Exposed for testing. *)
+val invariant : (elt -> unit) -> t -> unit
 
-val reachable_words : t -> int
 (** [reachable_words t] is the total number of words of data kept alive by [t]
     (on both the C and OCaml heaps). *)
+val reachable_words : t -> int

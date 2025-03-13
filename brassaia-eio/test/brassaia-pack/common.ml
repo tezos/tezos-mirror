@@ -18,21 +18,28 @@ open Brassaia.Export_for_backends
 module Int63 = Optint.Int63
 
 let get = function Some x -> x | None -> Alcotest.fail "None"
+
 let sha1 x = Brassaia.Hash.SHA1.hash (fun f -> f x)
+
 let sha1_contents x = sha1 ("B" ^ x)
 
 let rm_dir root =
   if Sys.file_exists root then (
     let cmd = Printf.sprintf "rm -rf %s" root in
-    [%logs.info "exec: %s\n%!" cmd];
+    [%logs.info "exec: %s\n%!" cmd] ;
     let _ = Sys.command cmd in
     ())
 
 let index_log_size = Some 1_000
+
 let () = Random.self_init ()
+
 let random_char () = char_of_int (Random.int 256)
+
 let random_string n = String.init n (fun _i -> random_char ())
+
 let random_letter () = char_of_int (Char.code 'a' + Random.int 26)
+
 let random_letters n = String.init n (fun _i -> random_letter ())
 
 module Conf = Brassaia_tezos.Conf
@@ -57,16 +64,23 @@ module Contents = struct
   type Brassaia_pack.Pack_value.kinded += Contents of t
 
   let to_kinded t = Contents t
+
   let of_kinded = function Contents c -> c | _ -> assert false
 
   module H = Brassaia.Hash.Typed (Brassaia.Hash.SHA1) (Brassaia.Contents.String)
 
   let hash = H.hash
+
   let magic = 'B'
+
   let weight _ = Brassaia_pack.Pack_value.Immediate 1
+
   let encode_triple = Brassaia.Type.(unstage (encode_bin (triple H.t char t)))
+
   let decode_triple = Brassaia.Type.(unstage (decode_bin (triple H.t char t)))
+
   let length_header = Fun.const (Some `Varint)
+
   let encode_bin ~dict:_ ~offset_of_key:_ k x = encode_triple (k, magic, x)
 
   let decode_bin ~dict:_ ~key_of_offset:_ ~key_of_hash:_ x pos_ref =
@@ -87,12 +101,10 @@ module Errs = Brassaia_pack_unix.Io_errors.Make (Io)
 module File_manager = Brassaia_pack_unix.File_manager.Make (Io) (Index) (Errs)
 module Dict = File_manager.Dict
 module Dispatcher = Brassaia_pack_unix.Dispatcher.Make (File_manager)
-
 module Pack =
   Brassaia_pack_unix.Pack_store.Make (File_manager) (Dispatcher) (Schema.Hash)
     (Contents)
     (Errs)
-
 module Branch =
   Brassaia_pack_unix.Atomic_write.Make_persistent (Io) (Brassaia.Branch.String)
     (Brassaia_pack.Atomic_write.Value.Of_hash (Schema.Hash))
@@ -104,28 +116,32 @@ struct
   let fresh_name =
     let c = ref 0 in
     fun object_type ->
-      incr c;
+      incr c ;
 
       let name = Filename.concat Config.root ("pack_" ^ string_of_int !c) in
-      [%logs.info "Constructing %s context object: %s" object_type name];
+      [%logs.info "Constructing %s context object: %s" object_type name] ;
       name
 
   let mkdir_dash_p dirname =
     let rec aux dir =
       if Sys.file_exists dir && Sys.is_directory dir then ()
       else (
-        if Sys.file_exists dir then Unix.unlink dir;
-        aux (Filename.dirname dir);
+        if Sys.file_exists dir then Unix.unlink dir ;
+        aux (Filename.dirname dir) ;
         Unix.mkdir dir 0o755)
     in
     aux dirname
 
-  type d = { name : string; fm : File_manager.t; dict : Dict.t }
+  type d = {name : string; fm : File_manager.t; dict : Dict.t}
 
   (* TODO : test the indexing_strategy minimal. *)
   let config ~readonly ~fresh name =
-    Brassaia_pack.Conf.init ~fresh ~readonly
-      ~indexing_strategy:Brassaia_pack.Indexing_strategy.always ~lru_size:0 name
+    Brassaia_pack.Conf.init
+      ~fresh
+      ~readonly
+      ~indexing_strategy:Brassaia_pack.Indexing_strategy.always
+      ~lru_size:0
+      name
 
   (* TODO : remove duplication with brassaia_pack/ext.ml *)
   let get_fm config =
@@ -135,7 +151,7 @@ struct
       let fresh = Brassaia_pack.Conf.fresh config in
       if fresh then (
         let root = Brassaia_pack.Conf.root config in
-        mkdir_dash_p root;
+        mkdir_dash_p root ;
         File_manager.create_rw ~overwrite:true config |> Errs.raise_if_error)
       else File_manager.open_rw config |> Errs.raise_if_error
 
@@ -143,7 +159,7 @@ struct
     let name = Option.value name ~default:(fresh_name "dict") in
     let fm = config ~readonly ~fresh name |> get_fm in
     let dict = File_manager.dict fm in
-    { name; dict; fm }
+    {name; dict; fm}
 
   let close_dict d = File_manager.close d.fm |> Errs.raise_if_error
 
@@ -165,14 +181,15 @@ struct
     let dict = File_manager.dict fm in
     let lru = Brassaia_pack_unix.Lru.create config in
     let pack = Pack.v ~config ~fm ~dict ~dispatcher ~lru in
-    (f := fun () -> File_manager.flush fm |> Errs.raise_if_error);
-    { name; index; pack; dict; fm }
+    (f := fun () -> File_manager.flush fm |> Errs.raise_if_error) ;
+    {name; index; pack; dict; fm}
 
   let get_rw_pack () =
     let name = fresh_name "" in
     create ~readonly:false ~fresh:true name
 
   let get_ro_pack name = create ~readonly:true ~fresh:false name
+
   let reopen_rw name = create ~readonly:false ~fresh:false name
 
   let close_pack t =
@@ -189,7 +206,8 @@ module Alcotest = struct
     match f () with
     | _ ->
         Alcotest.failf
-          "Fail %s: expected function to raise, but it returned instead." msg
+          "Fail %s: expected function to raise, but it returned instead."
+          msg
     | exception exn -> (
         match exn with
         | Brassaia_pack_unix.Errors.Pack_error e -> (
@@ -197,34 +215,42 @@ module Alcotest = struct
             | true -> ()
             | false ->
                 Alcotest.failf
-                  "Fail %s: function raised unexpected exception %s" msg
+                  "Fail %s: function raised unexpected exception %s"
+                  msg
                   (Printexc.to_string exn))
         | _ ->
             Alcotest.failf
               "Fail %s: expected function to raise Pack_error, but it raised \
                %s instead"
-              msg (Printexc.to_string exn))
+              msg
+              (Printexc.to_string exn))
 
   (** TODO: upstream this to Alcotest *)
   let check_raises msg exn (type a) (f : unit -> a) =
     try
       let (_ : a) = f () in
       Alcotest.failf
-        "Fail %s: expected function to raise %s, but it returned instead." msg
+        "Fail %s: expected function to raise %s, but it returned instead."
+        msg
         (Printexc.to_string exn)
     with
     | e when e = exn -> ()
     | e ->
         Alcotest.failf
           "Fail %s: expected function to raise %s, but it raised %s instead."
-          msg (Printexc.to_string exn) (Printexc.to_string e)
+          msg
+          (Printexc.to_string exn)
+          (Printexc.to_string e)
 
   let testable_repr t =
     Alcotest.testable (Brassaia.Type.pp t) Brassaia.Type.(unstage (equal t))
 
   let check_repr ?pos t = Alcotest.check ?pos (testable_repr t)
+
   let kind = testable_repr Brassaia_pack.Pack_value.Kind.t
+
   let hash = testable_repr Schema.Hash.t
+
   let quick_tc name f = test_case name `Quick f
 end
 
@@ -236,12 +262,12 @@ module Filename = struct
   let generic_quote quotequote s =
     let l = String.length s in
     let b = Buffer.create (l + 20) in
-    Buffer.add_char b '\'';
+    Buffer.add_char b '\'' ;
     for i = 0 to l - 1 do
       if s.[i] = '\'' then Buffer.add_string b quotequote
       else Buffer.add_char b s.[i]
-    done;
-    Buffer.add_char b '\'';
+    done ;
+    Buffer.add_char b '\'' ;
     Buffer.contents b
 
   let quote_command =
@@ -250,7 +276,7 @@ module Filename = struct
         let quote s =
           let l = String.length s in
           let b = Buffer.create (l + 20) in
-          Buffer.add_char b '\"';
+          Buffer.add_char b '\"' ;
           let rec loop i =
             if i = l then Buffer.add_char b '\"'
             else
@@ -258,28 +284,28 @@ module Filename = struct
               | '\"' -> loop_bs 0 i
               | '\\' -> loop_bs 0 i
               | c ->
-                  Buffer.add_char b c;
+                  Buffer.add_char b c ;
                   loop (i + 1)
           and loop_bs n i =
             if i = l then (
-              Buffer.add_char b '\"';
+              Buffer.add_char b '\"' ;
               add_bs n)
             else
               match s.[i] with
               | '\"' ->
-                  add_bs ((2 * n) + 1);
-                  Buffer.add_char b '\"';
+                  add_bs ((2 * n) + 1) ;
+                  Buffer.add_char b '\"' ;
                   loop (i + 1)
               | '\\' -> loop_bs (n + 1) (i + 1)
               | _ ->
-                  add_bs n;
+                  add_bs n ;
                   loop i
           and add_bs n =
             for _j = 1 to n do
               Buffer.add_char b '\\'
             done
           in
-          loop 0;
+          loop 0 ;
           Buffer.contents b
         in
         let quote_cmd s =
@@ -288,10 +314,10 @@ module Filename = struct
             (fun c ->
               match c with
               | '(' | ')' | '!' | '^' | '%' | '\"' | '<' | '>' | '&' | '|' ->
-                  Buffer.add_char b '^';
+                  Buffer.add_char b '^' ;
                   Buffer.add_char b c
               | _ -> Buffer.add_char b c)
-            s;
+            s ;
           Buffer.contents b
         in
         let quote_cmd_filename f =
@@ -301,7 +327,8 @@ module Filename = struct
           else f
         in
         fun cmd ?stdin ?stdout ?stderr args ->
-          String.concat ""
+          String.concat
+            ""
             [
               "\"";
               quote_cmd_filename cmd;
@@ -334,7 +361,7 @@ end
 
 (** Exec a command, and return [Ok ()] or [Error n] if return code is n <> 0 *)
 let exec_cmd cmd =
-  [%logs.info "exec: %s" cmd];
+  [%logs.info "exec: %s" cmd] ;
   match Sys.command cmd with 0 -> Ok () | n -> Error n
 
 let rec repeat = function
@@ -358,7 +385,7 @@ let rec unlink_path path =
   | `Directory ->
       Sys.readdir path
       |> Array.map (fun p -> Filename.concat path p)
-      |> Array.iter unlink_path;
+      |> Array.iter unlink_path ;
       Unix.rmdir path
   | _ -> Unix.unlink path
 
@@ -367,19 +394,20 @@ let create_lower_root =
   let ( let$ ) res f = f @@ Result.get_ok res in
   fun ?(mkdir = true) () ->
     let lower_root = "test_lower_" ^ string_of_int !counter in
-    incr counter;
+    incr counter ;
     let lower_path = Filename.concat "_build" lower_root in
-    unlink_path lower_path;
+    unlink_path lower_path ;
     let$ _ =
-      if mkdir then Brassaia_pack_unix.Io.Unix.mkdir lower_path else Result.ok ()
+      if mkdir then Brassaia_pack_unix.Io.Unix.mkdir lower_path
+      else Result.ok ()
     in
     lower_path
 
 let setup_test_env ~root_archive ~root_local_build =
-  goto_project_root ();
-  rm_dir root_local_build;
+  goto_project_root () ;
+  rm_dir root_local_build ;
   let cmd =
-    Filename.quote_command "cp" [ "-R"; "-p"; root_archive; root_local_build ]
+    Filename.quote_command "cp" ["-R"; "-p"; root_archive; root_local_build]
   in
   exec_cmd cmd |> function
   | Ok () -> ()
@@ -387,4 +415,5 @@ let setup_test_env ~root_archive ~root_local_build =
       Fmt.failwith
         "Failed to set up the test environment: command `%s' exited with \
          non-zero exit code %d"
-        cmd n
+        cmd
+        n

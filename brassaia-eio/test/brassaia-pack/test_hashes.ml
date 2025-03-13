@@ -27,7 +27,7 @@ let zero = Bytes.make 10 '0'
 let hash_zero =
   "d81e60258ecc8bd7064c8703888aececfc54e29ff94f7a2d9a84667a500548e1"
 
-let bindings steps = List.map (fun x -> ([ x ], zero)) steps
+let bindings steps = List.map (fun x -> ([x], zero)) steps
 
 let check_string ~msg ~expected ~got =
   let got = Hex.of_string got |> Hex.show in
@@ -40,8 +40,8 @@ let check_iter iter_type (iter : 'a -> (string -> unit) -> unit) v checks =
       | None -> Alcotest.failf "No more calls to %s left" iter_type
       | Some (msg, expected) ->
           let msg = Fmt.str "Check %s:%s" iter_type msg in
-          check_string ~msg ~expected ~got:x;
-          incr counter);
+          check_string ~msg ~expected ~got:x ;
+          incr counter) ;
   if !counter <> List.length checks then
     Alcotest.failf "More calls to %s expected" iter_type
 
@@ -73,13 +73,20 @@ struct
   let persist_tree tree =
     let repo = Repo.v conf in
     let init_commit =
-      Commit.v ~parents:[] ~info:Info.empty repo
-        (Tree.singleton [ "singleton-step" ] (Bytes.of_string "singleton-val"))
+      Commit.v
+        ~parents:[]
+        ~info:Info.empty
+        repo
+        (Tree.singleton ["singleton-step"] (Bytes.of_string "singleton-val"))
     in
     let h = Commit.hash init_commit in
     let info = Info.v ~author:"Tezos" 0L in
     let commit =
-      Commit.v ~parents:[ Brassaia_pack_unix.Pack_key.v_indexed h ] ~info repo tree
+      Commit.v
+        ~parents:[Brassaia_pack_unix.Pack_key.v_indexed h]
+        ~info
+        repo
+        tree
     in
     let tree = Commit.tree commit in
     (repo, tree, commit)
@@ -88,7 +95,8 @@ struct
     let got = (Brassaia.Type.to_string Store.Hash.t) got in
     Alcotest.(check string)
       (Fmt.str "Check hardcoded hash: %s" msg)
-      expected got
+      expected
+      got
 end
 
 module Test_tezos_conf = struct
@@ -102,25 +110,25 @@ module Test_tezos_conf = struct
 
   let contents_hash () =
     let h0 = Contents.Hash.hash zero in
-    let encode_bin_hash = Brassaia.Type.(unstage (encode_bin Contents.Hash.t)) in
-    encode_bin_hash h0 (fun x ->
-        check_string ~msg:"Check encode_bin: h0" ~expected:hash_zero ~got:x);
-    let encode_bin_val = Brassaia.Type.(unstage (encode_bin Contents.Val.t)) in
-    let checks =
-      [ ("header of zero", "0a"); ("zero", "30303030303030303030") ]
+    let encode_bin_hash =
+      Brassaia.Type.(unstage (encode_bin Contents.Hash.t))
     in
-    check_iter "encode_bin" encode_bin_val zero checks;
+    encode_bin_hash h0 (fun x ->
+        check_string ~msg:"Check encode_bin: h0" ~expected:hash_zero ~got:x) ;
+    let encode_bin_val = Brassaia.Type.(unstage (encode_bin Contents.Val.t)) in
+    let checks = [("header of zero", "0a"); ("zero", "30303030303030303030")] in
+    check_iter "encode_bin" encode_bin_val zero checks ;
     let pre_hash_val = Brassaia.Type.(unstage (pre_hash Contents.Val.t)) in
     let checks =
-      [
-        ("header of zero", "000000000000000a"); ("zero", "30303030303030303030");
-      ]
+      [("header of zero", "000000000000000a"); ("zero", "30303030303030303030")]
     in
-    check_iter "pre_hash" pre_hash_val zero checks;
-    Store.check_hardcoded_hash "contents hash"
-      "CoWHVKM5r2eiHQxhicqakkr5FwJfabahGBwCCWzRPCNPs79CoZty" h0
+    check_iter "pre_hash" pre_hash_val zero checks ;
+    Store.check_hardcoded_hash
+      "contents hash"
+      "CoWHVKM5r2eiHQxhicqakkr5FwJfabahGBwCCWzRPCNPs79CoZty"
+      h0
 
-  let some_steps = [ "00"; "01" ]
+  let some_steps = ["00"; "01"]
 
   let checks_bindings_pre_hash steps =
     let nb_steps = Fmt.str "%016x" (List.length steps) in
@@ -139,7 +147,8 @@ module Test_tezos_conf = struct
             |> List.rev
           in
           check_step @ acc)
-        [] steps
+        []
+        steps
       |> List.rev
     in
     ("len of values", nb_steps) :: checks
@@ -155,13 +164,17 @@ module Test_tezos_conf = struct
     let h = Node.Hash.hash root_node in
     let encode_bin_hash = Brassaia.Type.(unstage (encode_bin Node.Hash.t)) in
     encode_bin_hash h (fun x ->
-        check_string ~msg:"Check encode_bin: node hash"
-          ~expected:hash_root_small_tree ~got:x);
+        check_string
+          ~msg:"Check encode_bin: node hash"
+          ~expected:hash_root_small_tree
+          ~got:x) ;
     let pre_hash_val = Brassaia.Type.(unstage (pre_hash Node.Val.t)) in
     let checks = checks_bindings_pre_hash some_steps in
-    check_iter "pre_hash" pre_hash_val root_node checks;
-    Store.check_hardcoded_hash "node hash"
-      "CoVeCU4o3dqmfdwqt2vh8LDz9X6qGbTUyLhgVvFReyzAvTf92AKx" h;
+    check_iter "pre_hash" pre_hash_val root_node checks ;
+    Store.check_hardcoded_hash
+      "node hash"
+      "CoVeCU4o3dqmfdwqt2vh8LDz9X6qGbTUyLhgVvFReyzAvTf92AKx"
+      h ;
     Store.Repo.close repo
 
   let commit_hash () =
@@ -171,10 +184,11 @@ module Test_tezos_conf = struct
     let h = Commit.Hash.hash commit_val in
     let encode_bin_hash = Brassaia.Type.(unstage (encode_bin Commit.Hash.t)) in
     encode_bin_hash h (fun x ->
-        check_string ~msg:"commit hash"
+        check_string
+          ~msg:"commit hash"
           ~expected:
             "c20860adda3c3d40d8d03fab22b07e889979cdac880d979711aa852a0896ae30"
-          ~got:x);
+          ~got:x) ;
     let checks =
       [
         ("hash of root node", hash_root_small_tree);
@@ -189,7 +203,7 @@ module Test_tezos_conf = struct
       ]
     in
     let encode_bin_val = Brassaia.Type.(unstage (encode_bin Commit.Val.t)) in
-    check_iter "encode_bin" encode_bin_val commit_val checks;
+    check_iter "encode_bin" encode_bin_val commit_val checks ;
     let checks =
       [
         ("len of node hash", "0000000000000020");
@@ -206,25 +220,31 @@ module Test_tezos_conf = struct
       ]
     in
     let pre_hash_val = Brassaia.Type.(unstage (pre_hash Commit.Val.t)) in
-    check_iter "pre_hash" pre_hash_val commit_val checks;
-    Store.check_hardcoded_hash "commit hash"
-      "CoW7mALEs2vue5cfTMdJfSAjNmjmALYS1YyqSsYr9siLcNEcrvAm" h;
+    check_iter "pre_hash" pre_hash_val commit_val checks ;
+    Store.check_hardcoded_hash
+      "commit hash"
+      "CoW7mALEs2vue5cfTMdJfSAjNmjmALYS1YyqSsYr9siLcNEcrvAm"
+      h ;
     Store.Repo.close repo
 end
 
 module Test_small_conf = struct
   module Conf = struct
     let entries = 2
+
     let stable_hash = 3
+
     let contents_length_header = Some `Varint
+
     let inode_child_order = `Seeded_hash
+
     let forbid_empty_dir_persistence = true
   end
 
   module Store = Test (Conf) (Brassaia_tezos.Schema)
   module Node = Store.Backend.Node
 
-  let many_steps = [ "00"; "01"; "02"; "03"; "04"; "05" ]
+  let many_steps = ["00"; "01"; "02"; "03"; "04"; "05"]
 
   let checks =
     [
@@ -250,14 +270,17 @@ module Test_small_conf = struct
     let h = Node.Hash.hash root_node in
     let pre_hash_hash = Brassaia.Type.(unstage (pre_hash Node.Hash.t)) in
     pre_hash_hash h (fun x ->
-        check_string ~msg:"node hash"
+        check_string
+          ~msg:"node hash"
           ~expected:
             "e670a325ac78b2b6949b8f9fa448b17aa708ef39eb29c9e364be473f988329ea"
-          ~got:x);
+          ~got:x) ;
     let pre_hash_val = Brassaia.Type.(unstage (pre_hash Node.Val.t)) in
-    check_iter "pre_hash" pre_hash_val root_node checks;
-    Store.check_hardcoded_hash "node hash"
-      "CoWPo8s8h81q8skRqfPLTAJvq4ioFKS6rQhdRcY5nd6HQz2upwp4" h;
+    check_iter "pre_hash" pre_hash_val root_node checks ;
+    Store.check_hardcoded_hash
+      "node hash"
+      "CoWPo8s8h81q8skRqfPLTAJvq4ioFKS6rQhdRcY5nd6HQz2upwp4"
+      h ;
     Store.Repo.close repo
 end
 
@@ -278,7 +301,7 @@ module Test_V1 = struct
   module Store = Test (Conf) (Schema)
   module Commit = Store.Backend.Commit
 
-  let many_steps = [ "00"; "01"; "02"; "03"; "04"; "05" ]
+  let many_steps = ["00"; "01"; "02"; "03"; "04"; "05"]
 
   let commit_hash () =
     let tree = Store.build_tree many_steps in
@@ -301,7 +324,7 @@ module Test_V1 = struct
       ]
     in
     let encode_bin_val = Brassaia.Type.(unstage (encode_bin Commit.Val.t)) in
-    check_iter "encode_bin" encode_bin_val commit_val checks;
+    check_iter "encode_bin" encode_bin_val commit_val checks ;
     Store.Repo.close repo
 end
 

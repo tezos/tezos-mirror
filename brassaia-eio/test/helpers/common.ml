@@ -23,8 +23,11 @@ let random_ascii () =
   chars.[Random.int @@ String.length chars]
 
 let random_string n = String.init n (fun _i -> random_char ())
+
 let long_random_string = random_string (* 1024_000 *) 10
+
 let random_ascii_string n = String.init n (fun _i -> random_ascii ())
+
 let long_random_ascii_string = random_ascii_string 1024_000
 
 let merge_exn msg x =
@@ -59,7 +62,8 @@ module Schema = struct
   module Contents = Brassaia.Contents.String
 end
 
-let store : (module Brassaia.Maker) -> (module Brassaia.Metadata.S) -> (module S) =
+let store :
+    (module Brassaia.Maker) -> (module Brassaia.Metadata.S) -> (module S) =
  fun (module B) (module M) ->
   let module Schema = struct
     include Schema
@@ -110,16 +114,18 @@ module Suite = struct
       ?(import_supported = true) () =
     let store = S store in
     let clean = Option.value clean ~default:(default_clean ~store) in
-    { name; init; clean; config; store; stats; import_supported }
+    {name; init; clean; config; store; stats; import_supported}
 
   let create_generic_key ~name ?(init = fun ~config:_ -> ()) ?clean ~config
       ~store ?stats ?(import_supported = true) () =
     let store = Generic_key store in
     let clean = Option.value clean ~default:(default_clean ~store) in
-    { name; init; clean; config; store; stats; import_supported }
+    {name; init; clean; config; store; stats; import_supported}
 
   let name t = t.name
+
   let config t = t.config
+
   let store t = match t.store with S x -> Some x | Generic_key _ -> None
 
   let store_generic_key t =
@@ -128,6 +134,7 @@ module Suite = struct
     | S (module S) -> (module S : Generic_key)
 
   let init t = t.init
+
   let clean t = t.clean
 end
 
@@ -157,43 +164,59 @@ module Make_helpers (S : Generic_key) = struct
   type x = int [@@deriving brassaia]
 
   let v repo = B.Repo.contents_t repo
+
   let n repo = B.Repo.node_t repo
+
   let ct repo = B.Repo.commit_t repo
+
   let g repo = B.Repo.node_t repo
+
   let h repo = B.Repo.commit_t repo
+
   let b repo = B.Repo.branch_t repo
+
   let v1 = long_random_string
+
   let v2 = ""
+
   let with_contents repo f = B.Repo.batch repo (fun t _ _ -> f t)
+
   let with_node repo f = B.Repo.batch repo (fun _ t _ -> f t)
+
   let with_commit repo f = B.Repo.batch repo (fun _ _ t -> f t)
+
   let with_info repo n f = with_commit repo (fun h -> f h ~info:(info n))
+
   let kv1 ~repo = with_contents repo (fun t -> B.Contents.add t v1)
+
   let kv2 ~repo = with_contents repo (fun t -> B.Contents.add t v2)
+
   let normal x = `Contents (x, S.Metadata.default)
+
   let b1 = "foo"
+
   let b2 = "bar/toto"
 
   let n1 ~repo =
     let kv1 = kv1 ~repo in
-    with_node repo (fun t -> Graph.v t [ ("x", normal kv1) ])
+    with_node repo (fun t -> Graph.v t [("x", normal kv1)])
 
   let n2 ~repo =
     let kn1 = n1 ~repo in
-    with_node repo (fun t -> Graph.v t [ ("b", `Node kn1) ])
+    with_node repo (fun t -> Graph.v t [("b", `Node kn1)])
 
   let n3 ~repo =
     let kn2 = n2 ~repo in
-    with_node repo (fun t -> Graph.v t [ ("a", `Node kn2) ])
+    with_node repo (fun t -> Graph.v t [("a", `Node kn2)])
 
   let n4 ~repo =
     let kn1 = n1 ~repo in
     let kv2 = kv2 ~repo in
-    let kn4 = with_node repo (fun t -> Graph.v t [ ("x", normal kv2) ]) in
+    let kn4 = with_node repo (fun t -> Graph.v t [("x", normal kv2)]) in
     let kn5 =
-      with_node repo (fun t -> Graph.v t [ ("b", `Node kn1); ("c", `Node kn4) ])
+      with_node repo (fun t -> Graph.v t [("b", `Node kn1); ("c", `Node kn4)])
     in
-    with_node repo (fun t -> Graph.v t [ ("a", `Node kn5) ])
+    with_node repo (fun t -> Graph.v t [("a", `Node kn5)])
 
   let r1 ~repo =
     let kn2 = n2 ~repo in
@@ -208,8 +231,10 @@ module Make_helpers (S : Generic_key) = struct
     match S.Tree.of_key repo (`Node kn3) with
     | None -> Alcotest.fail "r2"
     | Some t3 ->
-        S.Commit.v repo ~info:S.Info.empty
-          ~parents:[ S.Commit.key kr1 ]
+        S.Commit.v
+          repo
+          ~info:S.Info.empty
+          ~parents:[S.Commit.key kr1]
           (t3 :> S.tree)
 
   let ignore_thunk_errors f = try f () with _ -> ()
@@ -230,10 +255,10 @@ module Make_helpers (S : Generic_key) = struct
         Conf.add config root_key root_value
       in
       let config = generate_random_root x.config in
-      config_ptr := Some config;
+      config_ptr := Some config ;
       let () = x.init ~config in
       let repo = S.Repo.v config in
-      repo_ptr := Some repo;
+      repo_ptr := Some repo ;
       let () = test repo in
       let () =
         (* [test] might have already closed the repo. That
@@ -261,7 +286,9 @@ end
 
 let filter_src src =
   not
-    (List.mem ~equal:String.equal (Logs.Src.name src)
+    (List.mem
+       ~equal:String.equal
+       (Logs.Src.name src)
        [
          "git.inflater.decoder";
          "git.deflater.encoder";
@@ -273,11 +300,13 @@ let filter_src src =
        ])
 
 let reporter ?prefix () =
-  Brassaia.Export_for_backends.Logging.reporter ~filter_src ?prefix
+  Brassaia.Export_for_backends.Logging.reporter
+    ~filter_src
+    ?prefix
     (module Mtime_clock)
 
 let () =
-  Logs.set_level (Some Logs.Debug);
+  Logs.set_level (Some Logs.Debug) ;
   Logs.set_reporter (reporter ())
 
 let line ppf ?color c =
@@ -288,8 +317,8 @@ let line ppf ?color c =
 
 let line msg =
   let line () = line Fmt.stderr ~color:`Yellow '-' in
-  line ();
-  [%logs.info "ASSERT %s" msg];
+  line () ;
+  [%logs.info "ASSERT %s" msg] ;
   line ()
 
 let ( / ) = Filename.concat
@@ -308,14 +337,17 @@ let check_raises_lwt msg exn (type a) (f : unit -> a) =
   try
     let (_ : a) = f () in
     Alcotest.failf
-      "Fail %s: expected function to raise %s, but it returned instead." msg
+      "Fail %s: expected function to raise %s, but it returned instead."
+      msg
       (Printexc.to_string exn)
   with
   | e when e = exn -> ()
   | e ->
       Alcotest.failf
-        "Fail %s: expected function to raise %s, but it raised %s instead." msg
-        (Printexc.to_string exn) (Printexc.to_string e)
+        "Fail %s: expected function to raise %s, but it raised %s instead."
+        msg
+        (Printexc.to_string exn)
+        (Printexc.to_string e)
 
 module T = Brassaia.Type
 

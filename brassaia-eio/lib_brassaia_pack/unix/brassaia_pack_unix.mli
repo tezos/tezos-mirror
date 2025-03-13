@@ -27,6 +27,7 @@ open Brassaia_pack_io
 module type S = Brassaia_pack_io.S
 
 module Maker (Config : Brassaia_pack.Conf.S) : Store_intf.Maker
+
 module KV (Config : Brassaia_pack.Conf.S) : Store_intf.KV
 
 (** {1 Key and Values} *)

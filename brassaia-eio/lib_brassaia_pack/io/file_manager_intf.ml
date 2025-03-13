@@ -59,12 +59,19 @@ module type S = sig
       3. and 5. are highly critical. *)
 
   module Io : Io_intf.S
+
   module Control : Control_file.Upper with module Io = Io
+
   module Dict : Dict.S with module Io = Io
+
   module Suffix : Chunked_suffix.S with module Io = Io
+
   module Index : Pack_index.S
+
   module Errs : Io_errors.S with module Io = Io
+
   module Sparse : Sparse_file.S with module Io = Io
+
   module Lower : Lower.S with module Io = Io
 
   type t
@@ -72,10 +79,15 @@ module type S = sig
   (** A series of getters to the underlying files managed. *)
 
   val control : t -> Control.t
+
   val dict : t -> Dict.t
+
   val suffix : t -> Suffix.t
+
   val index : t -> Index.t
+
   val prefix : t -> Sparse.t option
+
   val lower : t -> Lower.t option
 
   type create_error :=
@@ -94,8 +106,6 @@ module type S = sig
     | `Sys_error of string
     | `No_tmp_path_provided ]
 
-  val create_rw :
-    overwrite:bool -> Brassaia.Backend.Conf.t -> (t, [> create_error ]) result
   (** Create a rw instance of [t] by creating the files.
 
       Note on SWMR consistency: It is undefined for a reader to attempt an
@@ -106,6 +116,8 @@ module type S = sig
 
       Note on errors: If [create_rw] returns an error, the storage is left in an
       undefined state and some file descriptors might not be closed. *)
+  val create_rw :
+    overwrite:bool -> Brassaia.Backend.Conf.t -> (t, [> create_error]) result
 
   type open_rw_error :=
     [ `Corrupted_control_file of string
@@ -137,7 +149,6 @@ module type S = sig
     | `Invalid_parent_directory
     | `Pending_flush ]
 
-  val open_rw : Brassaia.Backend.Conf.t -> (t, [> open_rw_error ]) result
   (** Create a rw instance of [t] by opening existing files.
 
       If the pack store has already been garbage collected, opening with a
@@ -156,6 +167,7 @@ module type S = sig
       Note on errors: If [open_rw] returns an error during a major version
       upgrade, the storage is left in an undefined state. Otherwise the storage
       is unaffected. Anyhow, some file descriptors might not be closed. *)
+  val open_rw : Brassaia.Backend.Conf.t -> (t, [> open_rw_error]) result
 
   type open_ro_error :=
     [ `Corrupted_control_file of string
@@ -175,7 +187,6 @@ module type S = sig
     | `Invalid_layout
     | `Volume_missing of string ]
 
-  val open_ro : Brassaia.Backend.Conf.t -> (t, [> open_ro_error ]) result
   (** Create a ro instance of [t] by opening existing files.
 
       Note on SWMR consistency: [open_ro] is supposed to work whichever the
@@ -188,6 +199,7 @@ module type S = sig
 
       Note on errors: The storage is never mutated. Some file descriptors might
       not be closed. *)
+  val open_ro : Brassaia.Backend.Conf.t -> (t, [> open_ro_error]) result
 
   type close_error :=
     [ `Double_close
@@ -196,12 +208,12 @@ module type S = sig
     | `Pending_flush
     | `Ro_not_allowed ]
 
-  val close : t -> (unit, [> close_error ]) result
   (** Close all the files.
 
       This call fails if the append buffers are not in a flushed stated. This
       situation will most likely never occur because the append buffers will
       contain data only during the scope of a batch function. *)
+  val close : t -> (unit, [> close_error]) result
 
   type flush_error :=
     [ `Index_failure of string
@@ -213,29 +225,30 @@ module type S = sig
     | `Sys_error of string
     | `No_tmp_path_provided ]
 
-  type flush_stages := [ `After_dict | `After_suffix ]
+  type flush_stages := [`After_dict | `After_suffix]
+
   type 'a hook := 'a -> unit
 
-  val flush : ?hook:flush_stages hook -> t -> (unit, [> flush_error ]) result
   (** Execute the flush routine. Note that this routine may be automatically
       triggered when buffers are filled. *)
+  val flush : ?hook:flush_stages hook -> t -> (unit, [> flush_error]) result
 
   type fsync_error := flush_error
 
-  val fsync : t -> (unit, [> fsync_error ]) result
   (** [fsync] executes an fsync for all files of the file manager.
 
       Note: This function exists primarily for operations like snapshot imports.
       If fsync is enabled for the store (see {!Brassaia_pack.Config.use_fsync}),
       calls to {!flush} will also call fsync and therefore there is little need
       to call this function directly. *)
+  val fsync : t -> (unit, [> fsync_error]) result
 
-  type reload_stages := [ `After_index | `After_control | `After_suffix ]
+  type reload_stages := [`After_index | `After_control | `After_suffix]
 
-  val reload : ?hook:reload_stages hook -> t -> (unit, [> Errs.t ]) result
   (** Execute the reload routine.
 
       Is a no-op if the control file did not change. *)
+  val reload : ?hook:reload_stages hook -> t -> (unit, [> Errs.t]) result
 
   val register_prefix_consumer :
     t -> after_reload:(unit -> (unit, Errs.t) result) -> unit
@@ -251,12 +264,17 @@ module type S = sig
     | `Not_a_directory of string
     | `Unknown_major_pack_version of string ]
 
-  val version : root:string -> (Import.Version.t, [> version_error ]) result
   (** [version ~root] is the version of the pack stores at [root]. *)
+  val version : root:string -> (Import.Version.t, [> version_error]) result
 
-  val cleanup : t -> (unit, [> `Sys_error of string ]) result
   (** [cleanup t] performs cleanup operations for files related to GC. *)
+  val cleanup : t -> (unit, [> `Sys_error of string]) result
 
+  (** Swaps to using files from the GC [generation]. The values
+      [suffix_start_offset], [chunk_start_idx], [chunk_num], and
+      [suffix_dead_bytes] are used to properly load and read the suffix after a
+      GC. The value [volume] is used to reload the lower if it was modified by
+      the GC. The control file is also updated on disk. *)
   val swap :
     t ->
     generation:int ->
@@ -267,36 +285,35 @@ module type S = sig
     suffix_dead_bytes:int63 ->
     latest_gc_target_offset:int63 ->
     volume:Lower.volume_identifier option ->
-    (unit, [> Errs.t ]) result
-  (** Swaps to using files from the GC [generation]. The values
-      [suffix_start_offset], [chunk_start_idx], [chunk_num], and
-      [suffix_dead_bytes] are used to properly load and read the suffix after a
-      GC. The value [volume] is used to reload the lower if it was modified by
-      the GC. The control file is also updated on disk. *)
+    (unit, [> Errs.t]) result
 
   val readonly : t -> bool
-  val generation : t -> int
-  val gc_allowed : t -> bool
-  val split : t -> (unit, [> Errs.t ]) result
-  val add_volume : t -> (unit, [> Errs.t ]) result
 
-  val gc_behaviour : t -> [ `Delete | `Archive ]
+  val generation : t -> int
+
+  val gc_allowed : t -> bool
+
+  val split : t -> (unit, [> Errs.t]) result
+
+  val add_volume : t -> (unit, [> Errs.t]) result
+
   (** Decides if the GC will delete or archive the garbage data, depending on
       the presence of a lower layer. *)
+  val gc_behaviour : t -> [`Delete | `Archive]
 
-  val gc_destination : t -> [ `Delete | `Archive of Lower.t ]
   (** Returns where data discarded by the GC will end up. (see {!gc_behaviour}). *)
+  val gc_destination : t -> [`Delete | `Archive of Lower.t]
 
+  (** [create_one_commit_store t conf generation new_store_root key] is called
+      when creating a new store at [new_store_root] from the existing one,
+      containing only one commit, specified by the [key]. Ths new store will use
+      configuration options from [conf] and set to [generation]. *)
   val create_one_commit_store :
     t ->
     Brassaia.Backend.Conf.t ->
     Control_file.Payload.Upper.Latest.gced ->
     Index.key Pack_key.t ->
-    (unit, [> open_rw_error | close_error ]) result
-  (** [create_one_commit_store t conf generation new_store_root key] is called
-      when creating a new store at [new_store_root] from the existing one,
-      containing only one commit, specified by the [key]. Ths new store will use
-      configuration options from [conf] and set to [generation]. *)
+    (unit, [> open_rw_error | close_error]) result
 end
 
 module type Sigs = sig

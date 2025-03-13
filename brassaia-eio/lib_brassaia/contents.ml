@@ -25,16 +25,16 @@ let rec encode_json e = function
   | `String s -> lexeme e (`String s)
   | `Float f -> lexeme e (`Float f)
   | `A a ->
-      lexeme e `As;
-      List.iter (encode_json e) a;
+      lexeme e `As ;
+      List.iter (encode_json e) a ;
       lexeme e `Ae
   | `O o ->
-      lexeme e `Os;
+      lexeme e `Os ;
       List.iter
         (fun (k, v) ->
-          lexeme e (`Name k);
+          lexeme e (`Name k) ;
           encode_json e v)
-        o;
+        o ;
       lexeme e `Oe
 
 let decode_json d =
@@ -81,8 +81,8 @@ module Json_value = struct
   let pp fmt x =
     let buffer = Buffer.create 32 in
     let encoder = Jsonm.encoder (`Buffer buffer) in
-    encode_json encoder x;
-    ignore @@ Jsonm.encode encoder `End;
+    encode_json encoder x ;
+    ignore @@ Jsonm.encode encoder `End ;
     let s = Buffer.contents buffer in
     Fmt.pf fmt "%s" s
 
@@ -91,6 +91,7 @@ module Json_value = struct
     match decode_json decoder with Ok obj -> Ok obj | Error _ as err -> err
 
   let equal_bool = Type.(unstage (equal bool))
+
   let equal_float = Type.(unstage (equal float))
 
   let rec equal a b =
@@ -107,7 +108,8 @@ module Json_value = struct
         try
           List.for_all2
             (fun (k, v) (k', v') -> k = k' && equal v v')
-            (List.sort compare_fst a) (List.sort compare_fst b)
+            (List.sort compare_fst a)
+            (List.sort compare_fst b)
         with Invalid_argument _ -> false)
     | _, _ -> false
 
@@ -162,6 +164,7 @@ module Json_value = struct
     | _, _, _ -> Merge.conflict "Conflicting JSON datatypes"
 
   let merge_json = Merge.(v t merge_value)
+
   let merge = Merge.(option merge_json)
 end
 
@@ -171,8 +174,8 @@ module Json = struct
   let pp fmt x =
     let buffer = Buffer.create 32 in
     let encoder = Jsonm.encoder (`Buffer buffer) in
-    encode_json encoder (`O x);
-    ignore @@ Jsonm.encode encoder `End;
+    encode_json encoder (`O x) ;
+    ignore @@ Jsonm.encode encoder `End ;
     let s = Buffer.contents buffer in
     Fmt.pf fmt "%s" s
 
@@ -184,6 +187,7 @@ module Json = struct
     | Error _ as err -> err
 
   let equal a b = Json_value.equal (`O a) (`O b)
+
   let t = Type.like ~equal ~pp ~of_string t
 
   let merge =
@@ -205,10 +209,11 @@ module String = struct
      collision between contents and nodes or commits (see
      https://github.com/mirage/brassaia/issues/1304). *)
   let pre_hash_prefixed x f =
-    f "B";
+    f "B" ;
     pre_hash x f
 
   let t = Type.(like t ~pre_hash:pre_hash_prefixed)
+
   let merge = Merge.idempotent Type.(option string)
 end
 
@@ -222,6 +227,7 @@ struct
   include S
 
   let read_opt t = function None -> None | Some k -> find t k
+
   let add_opt t = function None -> None | Some v -> Some (add t v)
 
   let merge t =
@@ -243,6 +249,7 @@ module V1 = struct
     type nonrec t = t [@@deriving brassaia ~encode_bin ~decode_bin ~pre_hash]
 
     let size_of = Type.Size.t t
+
     let t = Type.like t ~bin:(encode_bin, decode_bin, size_of) ~pre_hash
   end
 end

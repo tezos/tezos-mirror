@@ -4,14 +4,17 @@ open Brassaia
     keys. The store itself keeps no information, except for the bookkeeping
     needed to handle [clear]-ing the in-memory keys. *)
 module Keyed_by_value = struct
-  type (_, 'v) key = { value : 'v }
+  type (_, 'v) key = {value : 'v}
 
   module Key (Hash : Hash.S) (Value : Type.S) = struct
     type t = (Hash.t, Value.t) key
+
     type hash = Hash.t [@@deriving brassaia ~pre_hash]
+
     type value = Value.t [@@deriving brassaia ~pre_hash]
 
     let value_to_hash t = Hash.hash (fun f -> pre_hash_value t f)
+
     let to_hash t = value_to_hash t.value
 
     let (t : t Type.t) =
@@ -27,8 +30,10 @@ module Keyed_by_value = struct
   end
 
   module Make (Hash : Hash.S) (Value : Type.S) = struct
-    type _ t = { instance : unit option ref }
+    type _ t = {instance : unit option ref}
+
     type hash = Hash.t
+
     type value = Value.t
 
     module Key = Key (Hash) (Value)
@@ -38,7 +43,7 @@ module Keyed_by_value = struct
     let check_not_closed t =
       match !(t.instance) with None -> raise Closed | Some t -> t
 
-    let v _ = { instance = ref (Some ()) }
+    let v _ = {instance = ref (Some ())}
 
     let mem t _ =
       let _ = check_not_closed t in
@@ -46,7 +51,7 @@ module Keyed_by_value = struct
 
     let unsafe_add t _ value =
       let _ = check_not_closed t in
-      { value }
+      {value}
 
     let add t v = unsafe_add t () v
 
@@ -55,7 +60,9 @@ module Keyed_by_value = struct
       Some k.value
 
     let index _ _ = None
+
     let batch t f = f (t :> Perms.read_write t)
+
     let close t = t.instance := None
   end
 end
@@ -67,8 +74,8 @@ module Plain = struct
 
   module Make (H : Hash.S) (V : Type.S) = struct
     module CA =
-      Content_addressable.Check_closed (Brassaia_mem.Content_addressable) (H) (V)
-
+      Content_addressable.Check_closed (Brassaia_mem.Content_addressable) (H)
+        (V)
     include Indexable.Of_content_addressable (H) (CA)
 
     let v = CA.v
@@ -87,5 +94,9 @@ module Store = Store_maker.Make (Schema.KV (Contents.String))
 let suite =
   let store = (module Store : Brassaia_test.Generic_key) in
   let config = Brassaia_mem.config () in
-  Brassaia_test.Suite.create_generic_key ~name:"inlined_contents" ~store ~config
-    ~import_supported:false ()
+  Brassaia_test.Suite.create_generic_key
+    ~name:"inlined_contents"
+    ~store
+    ~config
+    ~import_supported:false
+    ()

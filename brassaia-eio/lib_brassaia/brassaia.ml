@@ -41,15 +41,21 @@ exception Closed = Store_properties.Closed
 
 module type Maker_generic_key_args = sig
   module Contents_store : Indexable.Maker_concrete_key2
+
   module Node_store : Indexable.Maker_concrete_key1
+
   module Commit_store : Indexable.Maker_concrete_key1
+
   module Branch_store : Atomic_write.Maker
 end
 
 module Maker_generic_key (Backend : Maker_generic_key_args) = struct
   type endpoint = unit
+
   type ('h, 'v) contents_key = ('h, 'v) Backend.Contents_store.key
+
   type 'h node_key = 'h Backend.Node_store.key
+
   type 'h commit_key = 'h Backend.Commit_store.key
 
   module Make (S : Schema.S) = struct
@@ -69,9 +75,7 @@ module Maker_generic_key (Backend : Maker_generic_key_args) = struct
         module Value =
           Node.Generic_key.Make (S.Hash) (S.Path) (S.Metadata) (Contents_key)
             (Node_key)
-
         module Backend = Backend.Node_store.Make (S.Hash) (Value)
-
         include
           Node.Generic_key.Store (Contents) (Backend) (S.Hash) (Value)
             (S.Metadata)
@@ -84,7 +88,6 @@ module Maker_generic_key (Backend : Maker_generic_key_args) = struct
         module Commit_maker = Commit.Generic_key.Maker (Schema.Info)
         module Value = Commit_maker.Make (S.Hash) (Node_key) (Commit_key)
         module Backend = Backend.Commit_store.Make (S.Hash) (Value)
-
         include
           Commit.Generic_key.Store (S.Info) (Node) (Backend) (S.Hash) (Value)
       end
@@ -110,9 +113,13 @@ module Maker_generic_key (Backend : Maker_generic_key_args) = struct
         }
 
         let contents_t t = t.contents
+
         let node_t t = t.nodes
+
         let commit_t t = t.commits
+
         let branch_t t = t.branch
+
         let config t = t.config
 
         let batch ?lock:_ t f =
@@ -131,12 +138,12 @@ module Maker_generic_key (Backend : Maker_generic_key_args) = struct
           let nodes = (contents, nodes) in
           let commits = (nodes, commits) in
           let branch = Branch.v config in
-          { contents; nodes; commits; branch; config }
+          {contents; nodes; commits; branch; config}
 
         let close t =
-          Contents.Backend.close t.contents;
-          Node.Backend.close (snd t.nodes);
-          Commit.Backend.close (snd t.commits);
+          Contents.Backend.close t.contents ;
+          Node.Backend.close (snd t.nodes) ;
+          Commit.Backend.close (snd t.commits) ;
           Branch.close t.branch
       end
     end
@@ -172,7 +179,9 @@ end
 module KV_maker (CA : Content_addressable.Maker) (AW : Atomic_write.Maker) =
 struct
   type metadata = unit
+
   type hash = Schema.default_hash
+
   type info = Info.default
 
   module Maker = Maker (CA) (AW)
@@ -183,13 +192,17 @@ end
 module Of_backend = Store.Make
 
 module type Tree = Tree.S
+
 module type S = Store.S
 
 type config = Conf.t
+
 type 'a diff = 'a Diff.t
 
 module type Maker = Store.Maker
+
 module type KV = Store.KV
+
 module type KV_maker = Store.KV_maker
 
 module Generic_key = struct

@@ -24,30 +24,30 @@ let test_conf () =
   let conf_a = add (empty spec_a) x 1 in
   let () = Alcotest.(check int) "x" 1 (get conf_a x) in
   let () =
-    Alcotest.check_raises "Wrong spec"
-      (Invalid_argument "invalid config key: x") (fun () ->
-        ignore (add (empty spec_b) x 1))
+    Alcotest.check_raises
+      "Wrong spec"
+      (Invalid_argument "invalid config key: x")
+      (fun () -> ignore (add (empty spec_b) x 1))
   in
   let specs =
     Spec.list () |> Seq.map Spec.name |> List.of_seq |> List.sort String.compare
   in
-  let () =
-    Alcotest.(check (list string)) "Spec list" [ "a"; "b"; "mem" ] specs
-  in
+  let () = Alcotest.(check (list string)) "Spec list" ["a"; "b"; "mem"] specs in
   let keys =
     Spec.keys spec_a
     |> Seq.map (fun (K k) -> name k)
-    |> List.of_seq
-    |> List.sort String.compare
+    |> List.of_seq |> List.sort String.compare
   in
-  let () = Alcotest.(check (list string)) "Key list" [ "x"; "y" ] keys in
+  let () = Alcotest.(check (list string)) "Key list" ["x"; "y"] keys in
   ()
 
 let test_duplicate_key_names () =
   let spec = Spec.v "test" in
   let name = "name" in
   let _ = key ~spec name Brassaia.Type.char 'Z' in
-  Alcotest.check_raises "Duplicate key" (Invalid_argument "duplicate key: name")
+  Alcotest.check_raises
+    "Duplicate key"
+    (Invalid_argument "duplicate key: name")
     (fun () -> ignore (key ~spec name Brassaia.Type.bool false))
 
 let suite =

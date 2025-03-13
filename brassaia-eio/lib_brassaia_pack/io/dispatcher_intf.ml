@@ -21,15 +21,8 @@ module type S = sig
 
   type t
 
-  val v : Fm.t -> (t, [> Fm.Errs.t ]) result
+  val v : Fm.t -> (t, [> Fm.Errs.t]) result
 
-  val read_exn :
-    t ->
-    off:int63 ->
-    len:int ->
-    ?volume_identifier:Lower.volume_identifier ->
-    bytes ->
-    Lower.volume_identifier option
   (** [read_exn t ~off ~len buffer] writes into [buffer] the bytes from [off] to
       [off+len]. If the read occurred, in a lower volume, its identifier is
       returned.
@@ -39,7 +32,18 @@ module type S = sig
 
       Note: [read_exn] is the only read function that supports reading in the
       lower. *)
+  val read_exn :
+    t ->
+    off:int63 ->
+    len:int ->
+    ?volume_identifier:Lower.volume_identifier ->
+    bytes ->
+    Lower.volume_identifier option
 
+  (** Same as [read_exn], the amount read is [max_len] if possible or at least
+      [min_len] if reading more would step over a hole in the sparse file.
+      Returns the actually read length and optionnaly the volume where the data
+      was found. *)
   val read_range_exn :
     t ->
     off:int63 ->
@@ -48,31 +52,26 @@ module type S = sig
     ?volume_identifier:Lower.volume_identifier ->
     bytes ->
     int * Lower.volume_identifier option
-  (** Same as [read_exn], the amount read is [max_len] if possible or at least
-      [min_len] if reading more would step over a hole in the sparse file.
-      Returns the actually read length and optionnaly the volume where the data
-      was found. *)
 
-  val end_offset : t -> int63
   (** [end_offset] is the end offsets of the pack entries, counting that the
       prefix doesn't start at 0. It counts the entries not yet flushed from the
       prefix. *)
+  val end_offset : t -> int63
 
-  val suffix_start_offset : t -> int63
   (** [suffix_start_offset] is the offsets of the first pack entry in the
       suffix. All pack entries in the prefix fit below [suffix_start_offset]. *)
+  val suffix_start_offset : t -> int63
 
-  val offset_of_soff : t -> int63 -> int63
   (** [offset_of_soff t suffix_off] converts a suffix offset into a (global)
       offset. *)
+  val offset_of_soff : t -> int63 -> int63
 
-  val soff_of_offset : t -> int63 -> int63
   (** [soff_of_offset t global_offset] converts a global offset to a suffix
       offset. *)
+  val soff_of_offset : t -> int63 -> int63
 
   val read_seq_exn : t -> off:int63 -> len:int63 -> string Seq.t
 
-  val read_bytes_exn : t -> f:(string -> unit) -> off:int63 -> len:int63 -> unit
   (** [read_bytes_exn] reads a slice of the global offset space defined by [off]
       and [len].
 
@@ -90,11 +89,12 @@ module type S = sig
       - If the range designates a slice of contiguous live bytes that starts in
         the prefix and ends in the suffix. This implies that the last chunk of
         the prefix is contiguous to the start of the suffix. *)
+  val read_bytes_exn : t -> f:(string -> unit) -> off:int63 -> len:int63 -> unit
 
-  val next_valid_offset : t -> off:int63 -> int63 option
   (** [next_valid_offset t ~off] returns an offset greater or equal to [off]
       that can be read. Used to iterate over the entries while skipping over the
       holes in the sparse file. *)
+  val next_valid_offset : t -> off:int63 -> int63 option
 end
 
 module type Sigs = sig

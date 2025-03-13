@@ -14,8 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include module type of Repr
 (** @inline *)
+include module type of Repr
 
 module type Defaultable = sig
   include S

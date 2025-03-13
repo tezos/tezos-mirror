@@ -15,5 +15,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Indexable_intf.Sigs
 (** @inline *)
+include Indexable_intf.Sigs

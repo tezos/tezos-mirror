@@ -17,14 +17,14 @@
 module type S = sig
   (** {1 Signature for Branches} *)
 
-  type t [@@deriving brassaia]
   (** The type for branches. *)
+  type t [@@deriving brassaia]
 
-  val main : t
   (** The name of the main branch. *)
+  val main : t
 
-  val is_valid : t -> bool
   (** Check if the branch is valid. *)
+  val is_valid : t -> bool
 end
 
 module Brassaia_key = Key
@@ -34,29 +34,29 @@ module type Store = sig
 
   include Atomic_write.S
 
-  module Key : S with type t = key
   (** Base functions on keys. *)
+  module Key : S with type t = key
 
-  module Val : Brassaia_key.S with type t = value
   (** Base functions on values. *)
+  module Val : Brassaia_key.S with type t = value
 end
 
 module type Sigs = sig
   (** {1 Branches} *)
 
-  module type S = S
   (** The signature for branches. Brassaia branches are similar to Git branches:
       they are used to associated user-defined names to head commits. Branches
       have a default value: the {{!Branch.S.main} main} branch. *)
+  module type S = S
 
-  module String : S with type t = string
   (** [String] is an implementation of {{!Branch.S} S} where branches are
       strings. The [main] branch is ["main"]. Valid branch names contain only
       alpha-numeric characters, [-], [_], [.], and [/]. *)
+  module String : S with type t = string
 
-  module type Store = Store
   (** [Store] specifies the signature for branch stores.
 
       A {i branch store} is a mutable and reactive key / value store, where keys
       are branch names created by users and values are keys are head commmits. *)
+  module type Store = Store
 end

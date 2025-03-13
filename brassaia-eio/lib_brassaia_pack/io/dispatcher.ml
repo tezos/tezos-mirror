@@ -27,10 +27,10 @@ module Make (Fm : File_manager.S) : S with module Fm = Fm = struct
   module Errs = Fm.Errs
   module Control = Fm.Control
 
-  type t = { fm : Fm.t }
+  type t = {fm : Fm.t}
 
   let v fm =
-    let t = { fm } in
+    let t = {fm} in
     Ok t
 
   let get_prefix t =
@@ -49,7 +49,7 @@ module Make (Fm : File_manager.S) : S with module Fm = Fm = struct
     | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8 | T9 | T10 | T11 | T12 | T13 | T14
     | T15 ->
         assert false
-    | Gced { suffix_start_offset; _ } -> suffix_start_offset
+    | Gced {suffix_start_offset; _} -> suffix_start_offset
 
   let suffix_dead_bytes t =
     let pl = Control.payload (Fm.control t.fm) in
@@ -60,7 +60,7 @@ module Make (Fm : File_manager.S) : S with module Fm = Fm = struct
     | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8 | T9 | T10 | T11 | T12 | T13 | T14
     | T15 ->
         assert false
-    | Gced { suffix_dead_bytes; _ } -> suffix_dead_bytes
+    | Gced {suffix_dead_bytes; _} -> suffix_dead_bytes
 
   (* Adjust the read in suffix, as the global offset [off] is
      [off] = [suffix_start_offset] + [soff] - [suffix_dead_bytes]. *)
@@ -86,8 +86,11 @@ module Make (Fm : File_manager.S) : S with module Fm = Fm = struct
 
   let read_range_exn t ~off ~min_len ~max_len ?volume_identifier buf =
     [%log.debug
-      "read_range_exn ~off:%a ~min_len:%i ~max_len:%i" Int63.pp off min_len
-        max_len];
+      "read_range_exn ~off:%a ~min_len:%i ~max_len:%i"
+        Int63.pp
+        off
+        min_len
+        max_len] ;
     let read_lower ?volume lower =
       let len, volume =
         Lower.read_range_exn lower ?volume ~off ~min_len ~max_len buf

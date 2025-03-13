@@ -16,5 +16,5 @@
 
 (** Offline stats for Brassaia stores. *)
 
-include Checks_intf.Sigs
 (** @inline *)
+include Checks_intf.Sigs

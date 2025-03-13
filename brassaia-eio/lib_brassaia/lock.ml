@@ -18,10 +18,13 @@ open! Import
 
 module type S = sig
   type key
+
   type t
 
   val v : unit -> t
+
   val with_lock : t -> key -> (unit -> 'a) -> 'a
+
   val stats : t -> int
 end
 
@@ -30,15 +33,18 @@ module Make (K : Type.S) = struct
     type t = K.t
 
     let hash = Hashtbl.hash
+
     let equal = Type.(unstage (equal K.t))
   end
 
   module KHashtbl = Hashtbl.Make (K)
 
   type key = K.t
-  type t = { global : Eio.Mutex.t; locks : Eio.Mutex.t KHashtbl.t }
 
-  let v () = { global = Eio.Mutex.create (); locks = KHashtbl.create 1024 }
+  type t = {global : Eio.Mutex.t; locks : Eio.Mutex.t KHashtbl.t}
+
+  let v () = {global = Eio.Mutex.create (); locks = KHashtbl.create 1024}
+
   let stats t = KHashtbl.length t.locks
 
   let lock t key () =
@@ -46,7 +52,7 @@ module Make (K : Type.S) = struct
       try KHashtbl.find t.locks key
       with Not_found ->
         let lock = Eio.Mutex.create () in
-        KHashtbl.add t.locks key lock;
+        KHashtbl.add t.locks key lock ;
         lock
     in
     lock
@@ -60,6 +66,6 @@ module Make (K : Type.S) = struct
   let with_lock t k fn =
     let lock = Eio.Mutex.use_rw ~protect:true t.global (lock t k) in
     let r = Eio.Mutex.use_rw ~protect:true lock fn in
-    Eio.Mutex.use_rw ~protect:true t.global (unlock t k);
+    Eio.Mutex.use_rw ~protect:true t.global (unlock t k) ;
     r
 end

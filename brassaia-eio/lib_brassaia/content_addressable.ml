@@ -22,7 +22,9 @@ module Make (AO : Append_only.Maker) (K : Hash.S) (V : Type.S) = struct
   module H = Hash.Typed (K) (V)
 
   let hash = H.hash
+
   let pp_key = Type.pp K.t
+
   let equal_hash = Type.(unstage (equal K.t))
 
   let find t k =
@@ -32,52 +34,59 @@ module Make (AO : Append_only.Maker) (K : Hash.S) (V : Type.S) = struct
         let k' = hash v in
         if equal_hash k k' then r
         else
-          Fmt.kstr invalid_arg "corrupted value: got %a, expecting %a" pp_key k'
-            pp_key k
+          Fmt.kstr
+            invalid_arg
+            "corrupted value: got %a, expecting %a"
+            pp_key
+            k'
+            pp_key
+            k
 
   let unsafe_add t k v = add t k v
 
   let add t v =
     let k = hash v in
-    add t k v;
+    add t k v ;
     k
 end
 
 module Check_closed (CA : Maker) (K : Hash.S) (V : Type.S) = struct
   module S = CA (K) (V)
 
-  type 'a t = { closed : bool ref; t : 'a S.t }
+  type 'a t = {closed : bool ref; t : 'a S.t}
+
   type key = S.key
+
   type value = S.value
 
   let check_not_closed t = if !(t.closed) then raise Store_properties.Closed
 
   let mem t k =
-    check_not_closed t;
+    check_not_closed t ;
     S.mem t.t k
 
   let find t k =
-    check_not_closed t;
+    check_not_closed t ;
     S.find t.t k
 
   let add t v =
-    check_not_closed t;
+    check_not_closed t ;
     S.add t.t v
 
   let unsafe_add t k v =
-    check_not_closed t;
+    check_not_closed t ;
     S.unsafe_add t.t k v
 
   let batch t f =
-    check_not_closed t;
-    S.batch t.t (fun w -> f { t = w; closed = t.closed })
+    check_not_closed t ;
+    S.batch t.t (fun w -> f {t = w; closed = t.closed})
 
   let v conf =
     let t = S.v conf in
-    { closed = ref false; t }
+    {closed = ref false; t}
 
   let close t =
     if not !(t.closed) then (
-      t.closed := true;
+      t.closed := true ;
       S.close t.t)
 end

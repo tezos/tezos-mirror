@@ -17,33 +17,42 @@
 include Atomic_write_intf
 
 module Check_closed_store (AW : S) = struct
-  type t = { closed : bool ref; t : AW.t }
+  type t = {closed : bool ref; t : AW.t}
+
   type key = AW.key
+
   type value = AW.value
+
   type watch = AW.watch
 
-  let make_closeable t = { closed = ref false; t }
+  let make_closeable t = {closed = ref false; t}
 
   let get_if_open_exn t =
     if !(t.closed) then raise Store_properties.Closed else t.t
 
   let mem t k = (get_if_open_exn t |> AW.mem) k
+
   let find t k = (get_if_open_exn t |> AW.find) k
+
   let set t k v = (get_if_open_exn t |> AW.set) k v
 
   let test_and_set t k ~test ~set =
     (get_if_open_exn t |> AW.test_and_set) k ~test ~set
 
   let remove t k = (get_if_open_exn t |> AW.remove) k
+
   let list t = get_if_open_exn t |> AW.list
+
   let watch t ?init f = (get_if_open_exn t |> AW.watch) ?init f
+
   let watch_key t k ?init f = (get_if_open_exn t |> AW.watch_key) k ?init f
+
   let unwatch t w = (get_if_open_exn t |> AW.unwatch) w
 
   let close t =
     if !(t.closed) then ()
     else (
-      t.closed := true;
+      t.closed := true ;
       AW.close t.t)
 
   let clear t = get_if_open_exn t |> AW.clear
@@ -56,5 +65,5 @@ struct
 
   let v conf =
     let t = AW.v conf in
-    { closed = ref false; t }
+    {closed = ref false; t}
 end

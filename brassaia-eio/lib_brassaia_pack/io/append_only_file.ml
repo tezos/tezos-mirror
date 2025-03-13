@@ -23,12 +23,12 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
 
   let auto_flush_threshold = 16_384
 
+  (** [rw_perm] contains the data necessary to operate in readwrite mode. *)
   type rw_perm = {
     fsync_required : bool Atomic.t;
     buf : Buffer.t;
     buf_length : int Atomic.t;
   }
-  (** [rw_perm] contains the data necessary to operate in readwrite mode. *)
 
   type t = {
     io : Io.t;
@@ -79,7 +79,11 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
         [%log.warn
           "The end offset in the control file %a is smaller than the offset on \
            disk %a for %s; the store was closed in a inconsistent state."
-          Int63.pp end_poff Int63.pp real_offset_without_header (Io.path io)];
+            Int63.pp
+            end_poff
+            Int63.pp
+            real_offset_without_header
+            (Io.path io)] ;
       Ok ())
 
   let open_rw ~path ~end_poff ~dead_header_size =
@@ -88,7 +92,7 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
     let+ () = check_consistent_store ~end_poff ~dead_header_size io in
     let persisted_end_poff = Atomic.make end_poff in
     let dead_header_size = Int63.of_int dead_header_size in
-    { io; persisted_end_poff; dead_header_size; rw_perm = create_rw_perm () }
+    {io; persisted_end_poff; dead_header_size; rw_perm = create_rw_perm ()}
 
   let open_ro ~path ~end_poff ~dead_header_size =
     let open Result_syntax in
@@ -96,16 +100,17 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
     let+ () = check_consistent_store ~end_poff ~dead_header_size io in
     let persisted_end_poff = Atomic.make end_poff in
     let dead_header_size = Int63.of_int dead_header_size in
-    { io; persisted_end_poff; dead_header_size; rw_perm = None }
+    {io; persisted_end_poff; dead_header_size; rw_perm = None}
 
   let empty_buffer = function
-    | { rw_perm = Some { buf_length; _ }; _ } -> Atomic.get buf_length = 0
+    | {rw_perm = Some {buf_length; _}; _} -> Atomic.get buf_length = 0
     | _ -> true
 
   let close t =
     if not @@ empty_buffer t then Error `Pending_flush else Io.close t.io
 
   let readonly t = Io.readonly t.io
+
   let path t = Io.path t.io
 
   let end_poff t =
@@ -120,7 +125,7 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
     match t.rw_perm with
     | Some _ -> Error `Rw_not_allowed
     | None ->
-        Atomic.set t.persisted_end_poff new_end_poff;
+        Atomic.set t.persisted_end_poff new_end_poff ;
         Ok ()
 
   let flush t =
@@ -133,20 +138,21 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
         let persisted_end_poff = Atomic.get t.persisted_end_poff in
         let off = persisted_end_poff + t.dead_header_size in
         let+ () = Io.write_string t.io ~off s in
-        Atomic.set rw_perm.buf_length 0;
-        Atomic.set t.persisted_end_poff
-          (persisted_end_poff + (String.length s |> Int63.of_int));
+        Atomic.set rw_perm.buf_length 0 ;
+        Atomic.set
+          t.persisted_end_poff
+          (persisted_end_poff + (String.length s |> Int63.of_int)) ;
         (* [truncate] is semantically identical to [clear], except that
            [truncate] doesn't deallocate the internal buffer. We use
            [clear] in legacy_io. *)
-        Buffer.truncate rw_perm.buf 0;
+        Buffer.truncate rw_perm.buf 0 ;
         Atomic.set rw_perm.fsync_required true
 
   let fsync t =
     match t.rw_perm with
     | None -> Error `Ro_not_allowed
     | Some rw ->
-        assert (Buffer.length rw.buf = 0);
+        assert (Buffer.length rw.buf = 0) ;
         if Atomic.get rw.fsync_required then
           let open Result_syntax in
           let+ () = Io.fsync t.io in
@@ -157,7 +163,7 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
     let open Int63.Syntax in
     let off' = off + Int63.of_int len in
     if off' > Atomic.get t.persisted_end_poff then
-      raise (Errors.Pack_error `Read_out_of_bounds);
+      raise (Errors.Pack_error `Read_out_of_bounds) ;
     let off = off + t.dead_header_size in
     Io.read_exn t.io ~off ~len b
 
@@ -173,8 +179,8 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
     match t.rw_perm with
     | None -> raise Errors.RO_not_allowed
     | Some rw_perm ->
-        assert (Atomic.get rw_perm.buf_length < auto_flush_threshold);
-        Buffer.add_string rw_perm.buf s;
+        assert (Atomic.get rw_perm.buf_length < auto_flush_threshold) ;
+        Buffer.add_string rw_perm.buf s ;
         let (_ : int) =
           Atomic.fetch_and_add rw_perm.buf_length (String.length s)
         in

@@ -19,11 +19,17 @@ open! Import
 
 module type S = sig
   type path [@@deriving brassaia]
+
   type step [@@deriving brassaia]
+
   type metadata [@@deriving brassaia]
+
   type contents [@@deriving brassaia]
+
   type contents_key [@@deriving brassaia]
+
   type node [@@deriving brassaia]
+
   type hash [@@deriving brassaia]
 
   (** [Tree] provides immutable, in-memory partial mirror of the store, with
@@ -35,36 +41,35 @@ module type S = sig
       needed on commit: if you modify a key twice, only the last change will be
       written to the store when you commit. *)
 
-  type t [@@deriving brassaia]
   (** The type of trees. *)
+  type t [@@deriving brassaia]
 
   (** {1 Constructors} *)
 
-  val empty : unit -> t
   (** [empty ()] is the empty tree. The empty tree does not have associated
       backend configuration values, as they can perform in-memory operation,
       independently of any given backend. *)
+  val empty : unit -> t
 
-  val singleton : path -> ?metadata:metadata -> contents -> t
   (** [singleton k c] is the tree with a single binding mapping the key [k] to
       the contents [c]. *)
+  val singleton : path -> ?metadata:metadata -> contents -> t
 
-  val of_contents : ?metadata:metadata -> contents -> t
   (** [of_contents c] is the subtree built from the contents [c]. *)
+  val of_contents : ?metadata:metadata -> contents -> t
 
-  val of_node : node -> t
   (** [of_node n] is the subtree built from the node [n]. *)
+  val of_node : node -> t
 
-  type elt = [ `Node of node | `Contents of contents * metadata ]
   (** The type for tree elements. *)
+  type elt = [`Node of node | `Contents of contents * metadata]
 
-  val v : elt -> t
   (** General-purpose constructor for trees. *)
+  val v : elt -> t
 
-  type kinded_hash = [ `Contents of hash * metadata | `Node of hash ]
+  type kinded_hash = [`Contents of hash * metadata | `Node of hash]
   [@@deriving brassaia]
 
-  val pruned : kinded_hash -> t
   (** [pruned h] is a purely in-memory tree with the hash [h]. Such trees can be
       used as children of other in-memory tree nodes, for instance in order to
       compute the hash of the parent, but they cannot be dereferenced.
@@ -73,63 +78,63 @@ module type S = sig
       (e.g. calling {!find} on one of its children) will instead raise a
       {!Pruned_hash} exception. Attempting to export a tree containing pruned
       sub-trees to a repository will fail similarly. *)
+  val pruned : kinded_hash -> t
 
-  val kind : t -> path -> [ `Contents | `Node ] option
   (** [kind t k] is the type of [s] in [t]. It could either be a tree node or
       some file contents. It is [None] if [k] is not present in [t]. *)
+  val kind : t -> path -> [`Contents | `Node] option
 
-  val is_empty : t -> bool
   (** [is_empty t] is true iff [t] is {!empty} (i.e. a tree node with no
       children). Trees with {!kind} = [`Contents] are never considered empty. *)
+  val is_empty : t -> bool
 
   (** {1 Diffs} *)
 
-  val diff : t -> t -> (path * (contents * metadata) Diff.t) list
   (** [diff x y] is the difference of contents between [x] and [y]. *)
+  val diff : t -> t -> (path * (contents * metadata) Diff.t) list
 
   (** {1 Manipulating Contents} *)
 
-  exception Dangling_hash of { context : string; hash : hash }
   (** The exception raised by functions that can force lazy tree nodes but do
       not return an explicit {!or_error}. *)
+  exception Dangling_hash of {context : string; hash : hash}
 
-  exception Pruned_hash of { context : string; hash : hash }
   (** The exception raised by functions that attempts to load {!pruned} tree
       nodes. *)
+  exception Pruned_hash of {context : string; hash : hash}
 
-  exception Portable_value of { context : string }
   (** The exception raised by functions that attemps to perform IO on a portable
       tree. *)
+  exception Portable_value of {context : string}
 
-  type error =
-    [ `Dangling_hash of hash | `Pruned_hash of hash | `Portable_value ]
+  type error = [`Dangling_hash of hash | `Pruned_hash of hash | `Portable_value]
 
   type 'a or_error = ('a, error) result
 
   (** Operations on lazy tree contents. *)
   module Contents : sig
-    type t
     (** The type of lazy tree contents. *)
+    type t
 
-    val hash : ?cache:bool -> t -> hash
     (** [hash t] is the hash of the {!contents} value returned when [t] is
         {!val-force}d successfully. See {!caching} for an explanation of the
         [cache] parameter. *)
+    val hash : ?cache:bool -> t -> hash
 
-    val key : t -> contents_key option
     (** [key t] is the key of the {!contents} value returned when [t] is
         {!val-force}d successfully. *)
+    val key : t -> contents_key option
 
-    val force : t -> contents or_error
     (** [force t] forces evaluation of the lazy content value [t], or returns an
         error if no such value exists in the underlying repository. *)
+    val force : t -> contents or_error
 
-    val force_exn : t -> contents
     (** Equivalent to {!val-force}, but raises an exception if the lazy content
         value is not present in the underlying repository. *)
+    val force_exn : t -> contents
 
-    val clear : t -> unit
     (** [clear t] clears [t]'s cache. *)
+    val clear : t -> unit
 
     (** {2:caching caching}
 
@@ -143,14 +148,13 @@ module type S = sig
         storing of new data, it doesn't discard the existing one. *)
   end
 
-  val mem : t -> path -> bool
   (** [mem t k] is true iff [k] is associated to some contents in [t]. *)
+  val mem : t -> path -> bool
 
-  val find_all : t -> path -> (contents * metadata) option
   (** [find_all t k] is [Some (b, m)] if [k] is associated to the contents [b]
       and metadata [m] in [t] and [None] if [k] is not present in [t]. *)
+  val find_all : t -> path -> (contents * metadata) option
 
-  val length : t -> ?cache:bool -> path -> int
   (** [length t key] is the number of files and sub-nodes stored under [key] in
       [t].
 
@@ -159,15 +163,14 @@ module type S = sig
 
       [cache] defaults to [true], see {!caching} for an explanation of the
       parameter.*)
+  val length : t -> ?cache:bool -> path -> int
 
-  val find : t -> path -> contents option
   (** [find] is similar to {!find_all} but it discards metadata. *)
+  val find : t -> path -> contents option
 
-  val get_all : t -> path -> contents * metadata
   (** Same as {!find_all} but raise [Invalid_arg] if [k] is not present in [t]. *)
+  val get_all : t -> path -> contents * metadata
 
-  val list :
-    t -> ?offset:int -> ?length:int -> ?cache:bool -> path -> (step * t) list
   (** [list t key] is the list of files and sub-nodes stored under [k] in [t].
       The result order is not specified but is stable.
 
@@ -175,88 +178,88 @@ module type S = sig
 
       [cache] defaults to [true], see {!Contents.caching} for an explanation of
       the parameter. *)
+  val list :
+    t -> ?offset:int -> ?length:int -> ?cache:bool -> path -> (step * t) list
 
+  (** [seq t key] follows the same behavior as {!list} but returns a sequence. *)
   val seq :
     t -> ?offset:int -> ?length:int -> ?cache:bool -> path -> (step * t) Seq.t
-  (** [seq t key] follows the same behavior as {!list} but returns a sequence. *)
 
-  val get : t -> path -> contents
   (** Same as {!get_all} but ignore the metadata. *)
+  val get : t -> path -> contents
 
-  val add : t -> path -> ?metadata:metadata -> contents -> t
   (** [add t k c] is the tree where the key [k] is bound to the contents [c] but
       is similar to [t] for other bindings. *)
+  val add : t -> path -> ?metadata:metadata -> contents -> t
 
-  val update :
-    t -> path -> ?metadata:metadata -> (contents option -> contents option) -> t
   (** [update t k f] is the tree [t'] that is the same as [t] for all keys
       except [k], and whose binding for [k] is determined by [f (find t k)].
 
       If [k] refers to an internal node of [t], [f] is called with [None] to
       determine the value with which to replace it. *)
+  val update :
+    t -> path -> ?metadata:metadata -> (contents option -> contents option) -> t
 
-  val remove : t -> path -> t
   (** [remove t k] is the tree where [k] bindings has been removed but is
       similar to [t] for other bindings. *)
+  val remove : t -> path -> t
 
   (** {1 Manipulating Subtrees} *)
 
-  val mem_tree : t -> path -> bool
   (** [mem_tree t k] is false iff [find_tree k = None]. *)
+  val mem_tree : t -> path -> bool
 
-  val find_tree : t -> path -> t option
   (** [find_tree t k] is [Some v] if [k] is associated to [v] in [t]. It is
       [None] if [k] is not present in [t]. *)
+  val find_tree : t -> path -> t option
 
-  val get_tree : t -> path -> t
   (** [get_tree t k] is [v] if [k] is associated to [v] in [t]. Raise
       [Invalid_arg] if [k] is not present in [t].*)
+  val get_tree : t -> path -> t
 
-  val add_tree : t -> path -> t -> t
   (** [add_tree t k v] is the tree where the key [k] is bound to the non-empty
       tree [v] but is similar to [t] for other bindings.
 
       If [v] is empty, this is equivalent to [remove t k]. *)
+  val add_tree : t -> path -> t -> t
 
-  val update_tree : t -> path -> (t option -> t option) -> t
   (** [update_tree t k f] is the tree [t'] that is the same as [t] for all
       subtrees except under [k], and whose subtree at [k] is determined by
       [f (find_tree t k)].
 
       [f] returning either [None] or [Some empty] causes the subtree at [k] to
       be unbound (i.e. it is equivalent to [remove t k]). *)
+  val update_tree : t -> path -> (t option -> t option) -> t
 
-  val merge : t Merge.t
   (** [merge] is the 3-way merge function for trees. *)
+  val merge : t Merge.t
 
   (** {1 Folds} *)
 
-  val destruct : t -> [ `Node of node | `Contents of Contents.t * metadata ]
   (** General-purpose destructor for trees. *)
+  val destruct : t -> [`Node of node | `Contents of Contents.t * metadata]
 
-  type marks
   (** The type for fold marks. *)
+  type marks
 
-  val empty_marks : unit -> marks
   (** [empty_marks ()] is an empty collection of marks. *)
+  val empty_marks : unit -> marks
 
-  type 'a force = [ `True | `False of path -> 'a -> 'a ]
   (** The type for {!fold}'s [force] parameter. [`True] forces the fold to read
       the objects of the lazy nodes and contents. [`False f] is applying [f] on
       every lazy node and content value instead. *)
+  type 'a force = [`True | `False of path -> 'a -> 'a]
 
-  type uniq = [ `False | `True | `Marks of marks ]
   (** The type for {!fold}'s [uniq] parameters. [`False] folds over all the
       nodes. [`True] does not recurse on nodes already seen. [`Marks m] uses the
       collection of marks [m] to store the cache of keys: the fold will modify
       [m]. This can be used for incremental folds. *)
+  type uniq = [`False | `True | `Marks of marks]
 
-  type ('a, 'b) folder = path -> 'b -> 'a -> 'a
   (** The type for {!fold}'s folders: [pre], [post], [contents], [node], and
       [tree], where ['a] is the accumulator and ['b] is the item folded. *)
+  type ('a, 'b) folder = path -> 'b -> 'a -> 'a
 
-  type depth = [ `Eq of int | `Le of int | `Lt of int | `Ge of int | `Gt of int ]
-  [@@deriving brassaia]
   (** The type for fold depths.
 
       - [Eq d] folds over nodes and contents of depth exactly [d].
@@ -264,21 +267,9 @@ module type S = sig
       - [Gt d] folds over nodes and contents of depth strictly more than [d].
 
       [Le d] is [Eq d] and [Lt d]. [Ge d] is [Eq d] and [Gt d]. *)
+  type depth = [`Eq of int | `Le of int | `Lt of int | `Ge of int | `Gt of int]
+  [@@deriving brassaia]
 
-  val fold :
-    ?order:[ `Sorted | `Undefined | `Random of Random.State.t ] ->
-    ?force:'a force ->
-    ?cache:bool ->
-    ?uniq:uniq ->
-    ?pre:('a, step list) folder ->
-    ?post:('a, step list) folder ->
-    ?depth:depth ->
-    ?contents:('a, contents) folder ->
-    ?node:('a, node) folder ->
-    ?tree:('a, t) folder ->
-    t ->
-    'a ->
-    'a
   (** [fold t acc] folds over [t]'s nodes with node-specific folders:
       [contents], [node], and [tree], based on a node's {!kind}.
 
@@ -312,9 +303,24 @@ module type S = sig
       lexicographic order of their keys. If [`Random state], they are traversed
       in a random order. For large nodes, these two modes are memory-consuming,
       use [`Undefined] for a more memory efficient [fold]. *)
+  val fold :
+    ?order:[`Sorted | `Undefined | `Random of Random.State.t] ->
+    ?force:'a force ->
+    ?cache:bool ->
+    ?uniq:uniq ->
+    ?pre:('a, step list) folder ->
+    ?post:('a, step list) folder ->
+    ?depth:depth ->
+    ?contents:('a, contents) folder ->
+    ?node:('a, node) folder ->
+    ?tree:('a, t) folder ->
+    t ->
+    'a ->
+    'a
 
   (** {1 Stats} *)
 
+  (** The type for tree stats. *)
   type stats = {
     nodes : int;  (** Number of node. *)
     leafs : int;  (** Number of leafs. *)
@@ -323,27 +329,26 @@ module type S = sig
     width : int;  (** Maximal width. *)
   }
   [@@deriving brassaia]
-  (** The type for tree stats. *)
 
-  val stats : ?force:bool -> t -> stats
   (** [stats ~force t] are [t]'s statistics. If [force] is true, this will force
       the reading of lazy nodes. By default it is [false]. *)
+  val stats : ?force:bool -> t -> stats
 
   (** {1 Concrete Trees} *)
 
-  type concrete =
-    [ `Tree of (step * concrete) list | `Contents of contents * metadata ]
-  [@@deriving brassaia]
   (** The type for concrete trees. *)
+  type concrete =
+    [`Tree of (step * concrete) list | `Contents of contents * metadata]
+  [@@deriving brassaia]
 
-  val of_concrete : concrete -> t
   (** [of_concrete c] is the subtree equivalent of the concrete tree [c].
 
       @raise Invalid_argument
         if [c] contains duplicate bindings for a given path. *)
+  val of_concrete : concrete -> t
 
-  val to_concrete : t -> concrete
   (** [to_concrete t] is the concrete tree equivalent of the subtree [t]. *)
+  val to_concrete : t -> concrete
 
   (** {1 Proofs} *)
 
@@ -357,21 +362,21 @@ module type S = sig
 
     type brassaia_tree
 
-    val to_tree : t -> brassaia_tree
     (** [to_tree p] is the tree [t] representing the tree proof [p]. Blinded
         parts of the proof will raise [Dangling_hash] when traversed. *)
+    val to_tree : t -> brassaia_tree
   end
   with type brassaia_tree := t
 
   (** {1 Caches} *)
 
-  val clear : ?depth:int -> t -> unit
   (** [clear ?depth t] clears all caches in the tree [t] for subtrees with a
       depth higher than [depth]. If [depth] is not set, all of the subtrees are
       cleared.
 
       A call to [clear] doesn't discard the subtrees of [t], only their cache
       are discarded. Even the lazily loaded and unmodified subtrees remain. *)
+  val clear : ?depth:int -> t -> unit
 
   (** {1 Performance counters} *)
 
@@ -391,12 +396,11 @@ module type S = sig
   }
 
   val counters : unit -> counters
+
   val dump_counters : unit Fmt.t
+
   val reset_counters : unit -> unit
 
-  val inspect :
-    t ->
-    [ `Contents | `Node of [ `Map | `Key | `Value | `Portable_dirty | `Pruned ] ]
   (** [inspect t] is similar to {!kind}, with additional state information for
       nodes. It is primarily useful for debugging and testing.
 
@@ -409,6 +413,9 @@ module type S = sig
         {!Node.Portable}. Currently only used with {!Proof}.
       - [`Pruned], if [t] is from {!pruned}.
       - Otherwise [`Key], the default state for a node loaded from a store. *)
+  val inspect :
+    t ->
+    [`Contents | `Node of [`Map | `Key | `Value | `Portable_dirty | `Pruned]]
 
   module Private : sig
     module Env : sig
@@ -423,8 +430,8 @@ end
 
 module type Sigs = sig
   module type S = sig
-    include S
     (** @inline *)
+    include S
   end
 
   module Make (B : Backend.S) : sig
@@ -438,38 +445,47 @@ module type Sigs = sig
          and type hash = B.Hash.t
 
     type kinded_key =
-      [ `Contents of B.Contents.Key.t * metadata | `Node of B.Node.Key.t ]
+      [`Contents of B.Contents.Key.t * metadata | `Node of B.Node.Key.t]
     [@@deriving brassaia]
 
     val import : B.Repo.t -> kinded_key -> t option
+
     val import_no_check : B.Repo.t -> kinded_key -> t
 
     val export :
       ?clear:bool ->
       B.Repo.t ->
-      [> write ] B.Contents.t ->
-      [> read_write ] B.Node.t ->
+      [> write] B.Contents.t ->
+      [> read_write] B.Node.t ->
       node ->
       B.Node.key
 
     val dump : t Fmt.t
+
     val equal : t -> t -> bool
+
     val key : t -> kinded_key option
+
     val hash : ?cache:bool -> t -> kinded_hash
+
     val to_backend_node : node -> B.Node.Val.t
+
     val to_backend_portable_node : node -> B.Node_portable.t
+
     val of_backend_node : B.Repo.t -> B.Node.value -> node
 
     type 'result producer :=
       B.Repo.t -> kinded_key -> (t -> t * 'result) -> Proof.t * 'result
 
-    type verifier_error = [ `Proof_mismatch of string ] [@@deriving brassaia]
+    type verifier_error = [`Proof_mismatch of string] [@@deriving brassaia]
 
     type 'result verifier :=
       Proof.t -> (t -> t * 'result) -> (t * 'result, verifier_error) result
 
     val produce_proof : 'a producer
+
     val verify_proof : 'a verifier
+
     val hash_of_proof_state : Proof.tree -> kinded_hash
   end
 end

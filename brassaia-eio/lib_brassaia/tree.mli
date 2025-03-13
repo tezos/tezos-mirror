@@ -15,5 +15,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Tree_intf.Sigs
 (** @inline *)
+include Tree_intf.Sigs

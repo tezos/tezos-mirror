@@ -18,22 +18,25 @@
 (* Extensions to the default namespace, opened throughout the Brassaia codebase. *)
 
 type read = Perms.read
+
 type write = Perms.write
+
 type read_write = Perms.read_write
 
 (** {2 Dependency extensions} *)
 
 module Option = struct
-  include Option
   (** @closed *)
+  include Option
 
   let of_result = function Ok x -> Some x | Error _ -> None
+
   let might f = function Some x -> f x | None -> Ok ()
 end
 
 module List = struct
-  include List
   (** @closed *)
+  include List
 
   let rec is_longer_than : type a. int -> a list -> bool =
    fun len l ->
@@ -51,7 +54,7 @@ module List = struct
     let rec aux acc curr l =
       match (curr, l) with
       | [], [] -> List.rev acc
-      | [], [ l ] -> List.rev_append acc l
+      | [], [l] -> List.rev_append acc l
       | [], h :: t -> (aux [@tailcall]) acc h t
       | h :: t, l -> (aux [@tailcall]) (h :: acc) t l
     in
@@ -79,7 +82,7 @@ module List = struct
   let insert_exn : type a. a list -> int -> a -> a list =
    fun l idx v ->
     (* [list_insert l 0 v] is [v :: l] *)
-    assert (idx >= 0);
+    assert (idx >= 0) ;
     let rec aux l i acc =
       if i = 0 then List.rev_append acc (v :: l)
       else
@@ -94,12 +97,13 @@ module Mtime = struct
   include Mtime
 
   let span_to_s span = Mtime.Span.to_float_ns span *. 1e-9
+
   let span_to_us span = Mtime.Span.to_float_ns span *. 1e-3
 end
 
 module Seq = struct
-  include Seq
   (** @closed *)
+  include Seq
 
   let rec drop : type a. int -> a t -> a t =
    fun n l () ->
@@ -148,10 +152,10 @@ let shuffle state arr =
     if n > 1 then (
       let k = Random.State.int state (n + 1) in
       let temp = arr.(n) in
-      arr.(n) <- arr.(k);
-      arr.(k) <- temp;
+      arr.(n) <- arr.(k) ;
+      arr.(k) <- temp ;
       aux (n - 1))
   in
   let len = Array.length arr in
-  aux (len - 1);
+  aux (len - 1) ;
   ()

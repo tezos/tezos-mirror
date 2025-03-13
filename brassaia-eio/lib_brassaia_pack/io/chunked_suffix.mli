@@ -14,5 +14,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Chunked_suffix_intf.Sigs
 (** @inline *)
+include Chunked_suffix_intf.Sigs

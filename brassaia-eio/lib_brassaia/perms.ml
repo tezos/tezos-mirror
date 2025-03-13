@@ -45,22 +45,22 @@
     safe to discard permissions, but not to gain new ones. *)
 
 module Read = struct
-  type t = [ `Read ]
+  type t = [`Read]
 end
 
 module Write = struct
-  type t = [ `Write ]
+  type t = [`Write]
 end
 
 module Read_write = struct
-  type t = [ Read.t | Write.t ]
+  type t = [Read.t | Write.t]
 end
 
-type read = Read.t
 (** The type parameter of a handle with [read] permissions. *)
+type read = Read.t
 
-type write = Write.t
 (** The type parameter of a handle with [write] permissions. *)
+type write = Write.t
 
-type read_write = Read_write.t
 (** The type parameter of a handle with both {!read} and {!write} permissions. *)
+type read_write = Read_write.t

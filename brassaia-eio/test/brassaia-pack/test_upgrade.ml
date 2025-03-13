@@ -18,9 +18,13 @@ open! Import
 open Common
 
 let ( / ) = Filename.concat
+
 let archive_v2_minimal = "test" / "brassaia-pack" / "data" / "version_2_minimal"
+
 let archive_v2_always = "test" / "brassaia-pack" / "data" / "version_2_always"
+
 let archive_v3_minimal = "test" / "brassaia-pack" / "data" / "version_3_minimal"
+
 let archive_v3_always = "test" / "brassaia-pack" / "data" / "version_3_always"
 
 let archive_v3_minimal_gced =
@@ -28,13 +32,8 @@ let archive_v3_minimal_gced =
 
 let root_local_build = "_build" / "test-upgrade"
 
-type pack_entry = {
-  h : Schema.Hash.t;
-  o : Int63.t;
-  l : int;
-  k : [ `b | `n | `c ];
-}
 (** [pack_entry]: hash / offset / length / kind *)
+type pack_entry = {h : Schema.Hash.t; o : Int63.t; l : int; k : [`b | `n | `c]}
 
 let e h o l k =
   let h =
@@ -43,15 +42,19 @@ let e h o l k =
     | Ok h -> h
   in
   let o = Int63.of_int o in
-  { h; o; l; k }
+  {h; o; l; k}
 
 (* Objects inserted during preload
 
    borphan | b01 <- n01 <- n0 <- c0 *)
 let borphan = e "c9bfadf2d211aa6da8e2d00732628a0880b7ee98" 0 29 `b
+
 let b01 = e "5368d2c2f4fc5521fe8e8acd17cdd7349aa8f753" 29 25 `b
+
 let n01 = e "9b120e5019dcc6cd90b4d9c9826c9ebbebdc0023" 54 34 `n
+
 let n0 = e "fe0084f902d55464e9e6dbd82fb60fcf058bb6b1" 88 34 `n
+
 let c0 = e "22e159de13b427226e5901defd17f0c14e744205" 122 42 `c
 
 (* Objects inserted during write1
@@ -60,8 +63,11 @@ let c0 = e "22e159de13b427226e5901defd17f0c14e744205" 122 42 `c
             \           \
         b1 <- n1 <------- c1 | borphan' *)
 let b1 = e "7e83ca2a65d6f90a809c8570c6c905a941b87732" 164 24 `b
+
 let n1 = e "2cc1191a4cfbf869c62da4649961455df6e6b424" 188 44 `n
+
 let c1 = e "09468f13334d3120d8798e27a28d23baba628710" 232 51 `c
+
 let borphan' = e "945bcf284cb6f4735eb8eb74553637b43fde996b" 283 30 `b
 
 (* Objects inserted during write2
@@ -70,14 +76,15 @@ let borphan' = e "945bcf284cb6f4735eb8eb74553637b43fde996b" 283 30 `b
              \
    b2 <- n2 <- c2 *)
 let b2 = e "32f28ea03b1b20126629d2ca63fc6665b0bbb604" 313 24 `b
+
 let n2 = e "bbca871beaebb1b556e498a8e1ccae7817f5f4ff" 337 34 `n
+
 let c2 = e "6d6c9fcf882f1473f5e2bd0cd4b475611c3a5b60" 371 51 `c
 
-let pack_entries =
-  [ n0; b1; borphan; c2; c1; b01; borphan'; n1; n2; n01; c0; b2 ]
+let pack_entries = [n0; b1; borphan; c2; c1; b01; borphan'; n1; n2; n01; c0; b2]
 
 let dict_entries =
-  [ ("step-n01", 1); ("step-b01", 0); ("step-b1", 2); ("step-b2", 3) ]
+  [("step-n01", 1); ("step-b01", 0); ("step-b1", 2); ("step-b2", 3)]
 
 let dict_entries = List.to_seq dict_entries |> Hashtbl.of_seq
 
@@ -91,7 +98,7 @@ type start_mode = From_v2 | From_v3 | From_scratch | From_v3_c0_gced
 [@@deriving brassaia]
 
 type setup = {
-  indexing_strategy : [ `always | `minimal ];
+  indexing_strategy : [`always | `minimal];
   start_mode : start_mode;
   lru_size : int;
 }
@@ -119,74 +126,74 @@ module Model = struct
     let dict = Hashtbl.create 5 in
     let suffix = Hashtbl.create 5 in
     let index = Hashtbl.create 5 in
-    { setup; dict; suffix; index }
+    {setup; dict; suffix; index}
 
   let preload_dict t =
-    Hashtbl.replace t.dict "step-b01" ();
+    Hashtbl.replace t.dict "step-b01" () ;
     Hashtbl.replace t.dict "step-n01" ()
 
   let preload_suffix t =
     if t.setup.start_mode <> From_v3_c0_gced then
-      Hashtbl.replace t.suffix borphan.o ();
-    Hashtbl.replace t.suffix b01.o ();
-    Hashtbl.replace t.suffix n01.o ();
-    Hashtbl.replace t.suffix n0.o ();
+      Hashtbl.replace t.suffix borphan.o () ;
+    Hashtbl.replace t.suffix b01.o () ;
+    Hashtbl.replace t.suffix n01.o () ;
+    Hashtbl.replace t.suffix n0.o () ;
     Hashtbl.replace t.suffix c0.o ()
 
   let preload_index t =
     if t.setup.indexing_strategy = `always then (
-      Hashtbl.replace t.index borphan.h ();
-      Hashtbl.replace t.index b01.h ();
-      Hashtbl.replace t.index n01.h ();
-      Hashtbl.replace t.index n0.h ());
+      Hashtbl.replace t.index borphan.h () ;
+      Hashtbl.replace t.index b01.h () ;
+      Hashtbl.replace t.index n01.h () ;
+      Hashtbl.replace t.index n0.h ()) ;
     Hashtbl.replace t.index c0.h ()
 
   let preload t =
-    preload_suffix t;
-    preload_index t;
+    preload_suffix t ;
+    preload_index t ;
     preload_dict t
 
   let write1_dict t = Hashtbl.replace t.dict "step-b1" ()
 
   let write1_suffix t =
-    Hashtbl.replace t.suffix b1.o ();
-    Hashtbl.replace t.suffix n1.o ();
-    Hashtbl.replace t.suffix c1.o ();
+    Hashtbl.replace t.suffix b1.o () ;
+    Hashtbl.replace t.suffix n1.o () ;
+    Hashtbl.replace t.suffix c1.o () ;
     Hashtbl.replace t.suffix borphan'.o ()
 
   let write1_index t =
     if t.setup.indexing_strategy = `always then (
-      Hashtbl.replace t.index b1.h ();
-      Hashtbl.replace t.index n1.h ();
-      Hashtbl.replace t.index borphan'.h ());
+      Hashtbl.replace t.index b1.h () ;
+      Hashtbl.replace t.index n1.h () ;
+      Hashtbl.replace t.index borphan'.h ()) ;
     Hashtbl.replace t.index c1.h ()
 
   let write1 t =
-    write1_suffix t;
-    write1_index t;
+    write1_suffix t ;
+    write1_index t ;
     write1_dict t
 
   let gc t =
-    Hashtbl.remove t.suffix borphan.o;
-    Hashtbl.remove t.suffix n0.o;
+    Hashtbl.remove t.suffix borphan.o ;
+    Hashtbl.remove t.suffix n0.o ;
     Hashtbl.remove t.suffix c0.o
 
   let write2_dict t = Hashtbl.replace t.dict "step-b2" ()
 
   let write2_suffix t =
-    Hashtbl.replace t.suffix b2.o ();
-    Hashtbl.replace t.suffix n2.o ();
+    Hashtbl.replace t.suffix b2.o () ;
+    Hashtbl.replace t.suffix n2.o () ;
     Hashtbl.replace t.suffix c2.o ()
 
   let write2_index t =
     if t.setup.indexing_strategy = `always then (
-      Hashtbl.replace t.index b2.h ();
-      Hashtbl.replace t.index n2.h ());
+      Hashtbl.replace t.index b2.h () ;
+      Hashtbl.replace t.index n2.h ()) ;
     Hashtbl.replace t.index c2.h ()
 
   let write2 t =
-    write2_suffix t;
-    write2_index t;
+    write2_suffix t ;
+    write2_index t ;
     write2_dict t
 
   (** The 5 different states in which a model may be *)
@@ -195,28 +202,28 @@ module Model = struct
 
     let create_after_preload setup =
       let m = v setup in
-      preload m;
+      preload m ;
       m
 
     let create_after_write1 setup =
       let m = v setup in
-      preload m;
-      write1 m;
+      preload m ;
+      write1 m ;
       m
 
     let create_after_gc setup =
       let m = v setup in
-      preload m;
-      write1 m;
-      gc m;
+      preload m ;
+      write1 m ;
+      gc m ;
       m
 
     let create_after_write2 setup =
       let m = v setup in
-      preload m;
-      write1 m;
-      gc m;
-      write2 m;
+      preload m ;
+      write1 m ;
+      gc m ;
+      write2 m ;
       m
   end
 end
@@ -243,12 +250,13 @@ module Store = struct
     S.Repo.v (config setup ~readonly ~fresh root)
 
   let close = S.Repo.close
+
   let reload = S.reload
 
   let gc repo =
     let k = key_of_entry c1 in
     let launched = S.Gc.start_exn ~unlink:true repo k in
-    assert launched;
+    assert launched ;
     let result = S.Gc.finalise_exn ~wait:true repo in
     match result with
     | `Idle | `Running -> Alcotest.fail "expected finalised gc"
@@ -274,37 +282,37 @@ module Store = struct
 
   let put_borphan bstore =
     let k = S.Backend.Contents.add bstore "borphan" in
-    assert (k = key_of_entry borphan);
+    assert (k = key_of_entry borphan) ;
     k
 
   let put_b01 bstore =
     let k = S.Backend.Contents.add bstore "b01" in
-    assert (k = key_of_entry b01);
+    assert (k = key_of_entry b01) ;
     k
 
   let put_n01 bstore nstore =
     let k_b01 = put_b01 bstore in
     let step = "step-b01" in
-    let childs = [ (step, `Contents (k_b01, ())) ] in
+    let childs = [(step, `Contents (k_b01, ()))] in
     let n = S.Backend.Node.Val.of_list childs in
     let k = S.Backend.Node.add nstore n in
-    assert (k = key_of_entry n01);
+    assert (k = key_of_entry n01) ;
     k
 
   let put_n0 bstore nstore =
     let k_n01 = put_n01 bstore nstore in
     let step = "step-n01" in
-    let childs = [ (step, `Node k_n01) ] in
+    let childs = [(step, `Node k_n01)] in
     let n = S.Backend.Node.Val.of_list childs in
     let k = S.Backend.Node.add nstore n in
-    assert (k = key_of_entry n0);
+    assert (k = key_of_entry n0) ;
     k
 
   let put_c0 bstore nstore cstore =
     let k_n0 = put_n0 bstore nstore in
     let c = S.Backend.Commit.Val.v ~info:S.Info.empty ~node:k_n0 ~parents:[] in
     let k = S.Backend.Commit.add cstore c in
-    assert (k = key_of_entry c0);
+    assert (k = key_of_entry c0) ;
     k
 
   let put_b1 bstore =
@@ -316,49 +324,49 @@ module Store = struct
     let k_n01 = key_of_entry n01 in
     let step = "step-b1" in
     let step' = "step-b01" in
-    let childs = [ (step, `Contents (k_b1, ())); (step', `Node k_n01) ] in
+    let childs = [(step, `Contents (k_b1, ())); (step', `Node k_n01)] in
     let n = S.Backend.Node.Val.of_list childs in
     let k = S.Backend.Node.add nstore n in
-    assert (k = key_of_entry n1);
+    assert (k = key_of_entry n1) ;
     k
 
   let put_c1 bstore nstore cstore =
     let k_n1 = put_n1 bstore nstore in
     let k_c0 = key_of_entry c0 in
     let c =
-      S.Backend.Commit.Val.v ~info:S.Info.empty ~node:k_n1 ~parents:[ k_c0 ]
+      S.Backend.Commit.Val.v ~info:S.Info.empty ~node:k_n1 ~parents:[k_c0]
     in
     let k = S.Backend.Commit.add cstore c in
-    assert (k = key_of_entry c1);
+    assert (k = key_of_entry c1) ;
     k
 
   let put_borphan' bstore =
     let k = S.Backend.Contents.add bstore "borphan'" in
-    assert (k = key_of_entry borphan');
+    assert (k = key_of_entry borphan') ;
     k
 
   let put_b2 bstore =
     let k = S.Backend.Contents.add bstore "b2" in
-    assert (k = key_of_entry b2);
+    assert (k = key_of_entry b2) ;
     k
 
   let put_n2 bstore nstore =
     let k_b2 = put_b2 bstore in
     let step = "step-b2" in
-    let childs = [ (step, `Contents (k_b2, ())) ] in
+    let childs = [(step, `Contents (k_b2, ()))] in
     let n = S.Backend.Node.Val.of_list childs in
     let k = S.Backend.Node.add nstore n in
-    assert (k = key_of_entry n2);
+    assert (k = key_of_entry n2) ;
     k
 
   let put_c2 bstore nstore cstore =
     let k_n2 = put_n2 bstore nstore in
     let k_c1 = key_of_entry c1 in
     let c =
-      S.Backend.Commit.Val.v ~info:S.Info.empty ~node:k_n2 ~parents:[ k_c1 ]
+      S.Backend.Commit.Val.v ~info:S.Info.empty ~node:k_n2 ~parents:[k_c1]
     in
     let k = S.Backend.Commit.add cstore c in
-    assert (k = key_of_entry c2);
+    assert (k = key_of_entry c2) ;
     k
 
   let preload repo =
@@ -403,7 +411,9 @@ let check_dict repo model =
           Alcotest.failf
             "Dict entry with id:%d step:%s shouldn't be there (it's under step \
              %s)"
-            idx step step'
+            idx
+            step
+            step'
       | None, true ->
           Alcotest.failf "Dict entry with id:%d step:%s missing" idx step)
     dict_entries
@@ -422,10 +432,16 @@ let check_index repo model =
           Alcotest.failf
             "Index entry with hash:%a offset:%d shouldn't be there (it \
              contains offset %d)"
-            pp_hash hash (Int63.to_int off) (Int63.to_int off')
+            pp_hash
+            hash
+            (Int63.to_int off)
+            (Int63.to_int off')
       | None, true ->
-          Alcotest.failf "Index entry with hash:%a off:%d is missing" pp_hash
-            hash (Int63.to_int off))
+          Alcotest.failf
+            "Index entry with hash:%a off:%d is missing"
+            pp_hash
+            hash
+            (Int63.to_int off))
     index_entries
 
 let check_suffix repo model =
@@ -437,23 +453,29 @@ let check_suffix repo model =
       | false, false -> ()
       | true, true -> ()
       | true, false ->
-          Alcotest.failf "Pack entry with hash:%a off:%d shouldn't be there"
-            pp_hash e.h (Int63.to_int e.o)
+          Alcotest.failf
+            "Pack entry with hash:%a off:%d shouldn't be there"
+            pp_hash
+            e.h
+            (Int63.to_int e.o)
       | false, true ->
-          Alcotest.failf "Pack entry with hash:%a off:%d is missing" pp_hash e.h
+          Alcotest.failf
+            "Pack entry with hash:%a off:%d is missing"
+            pp_hash
+            e.h
             (Int63.to_int e.o))
     pack_entries
 
 let check t =
   List.iter
     (fun (model, repo) ->
-      check_dict repo model;
-      check_index repo model;
+      check_dict repo model ;
+      check_index repo model ;
       check_suffix repo model)
     (Option.to_list t.ro @ Option.to_list t.rw)
 
 let create_test_env setup =
-  rm_dir root_local_build;
+  rm_dir root_local_build ;
   let () =
     match setup.start_mode with
     | From_scratch -> ()
@@ -477,11 +499,11 @@ let create_test_env setup =
         setup_test_env ~root_archive ~root_local_build
   in
 
-  { setup; rw = None; ro = None }
+  {setup; rw = None; ro = None}
 
 (** One of the 4 rw mutations *)
 let start_rw t =
-  [%logs.app "*** start_rw %a" pp_setup t.setup];
+  [%logs.app "*** start_rw %a" pp_setup t.setup] ;
   let rw =
     match t.rw with
     | Some _ -> assert false
@@ -491,7 +513,7 @@ let start_rw t =
           | From_v2 | From_v3 | From_v3_c0_gced ->
               (* Model with pre-loaded data. *)
               let m = Model.v t.setup in
-              Model.preload m;
+              Model.preload m ;
               m
           | From_scratch -> Model.v t.setup
         in
@@ -504,11 +526,11 @@ let start_rw t =
 
 (** One of the 4 rw mutations *)
 let write1_rw t =
-  [%logs.app "*** write1_rw %a" pp_setup t.setup];
+  [%logs.app "*** write1_rw %a" pp_setup t.setup] ;
   match t.rw with
   | None -> assert false
   | Some (_, repo) ->
-      t.rw <- Some (Model.create_after_write1 t.setup, repo);
+      t.rw <- Some (Model.create_after_write1 t.setup, repo) ;
       let () =
         (* If the preload commit is not yet in the store, add it. Note that
            adding the same commit twice is not idempotent in indexing strategy
@@ -523,16 +545,17 @@ let write1_rw t =
 
 (** One of the 4 rw mutations *)
 let gc_rw t =
-  [%logs.app "*** gc_rw %a" pp_setup t.setup];
+  [%logs.app "*** gc_rw %a" pp_setup t.setup] ;
   match t.rw with
   | None -> assert false
   | Some (_, repo) ->
-      t.rw <- Some (Model.create_after_gc t.setup, repo);
+      t.rw <- Some (Model.create_after_gc t.setup, repo) ;
       let () =
         match (t.setup.start_mode, t.setup.indexing_strategy) with
         | From_v2, _ | _, `always ->
             let () =
-              Alcotest.check_raises "GC on V2/always"
+              Alcotest.check_raises
+                "GC on V2/always"
                 (Brassaia_pack_unix.Errors.Pack_error
                    (`Gc_disallowed "Store does not support GC"))
                 (fun () -> Store.gc repo)
@@ -544,17 +567,17 @@ let gc_rw t =
 
 (** One of the 4 rw mutations *)
 let write2_rw t =
-  [%logs.app "*** write2_rw %a" pp_setup t.setup];
+  [%logs.app "*** write2_rw %a" pp_setup t.setup] ;
   match t.rw with
   | None -> assert false
   | Some (_, repo) ->
-      t.rw <- Some (Model.create_after_write2 t.setup, repo);
+      t.rw <- Some (Model.create_after_write2 t.setup, repo) ;
       let _ = Store.write2 repo in
       ()
 
 (** One of the 2 ro mutations *)
 let open_ro t current_phase =
-  [%logs.app "*** open_ro %a, %a" pp_setup t.setup pp_phase current_phase];
+  [%logs.app "*** open_ro %a, %a" pp_setup t.setup pp_phase current_phase] ;
   let ro =
     match t.ro with
     | Some _ -> assert false
@@ -578,8 +601,10 @@ let open_ro t current_phase =
         in
         let fail_and_skip error =
           let () =
-            Alcotest.check_raises "open empty/V2 store in RO"
-              (Brassaia_pack_unix.Errors.Pack_error error) (fun () ->
+            Alcotest.check_raises
+              "open empty/V2 store in RO"
+              (Brassaia_pack_unix.Errors.Pack_error error)
+              (fun () ->
                 let repo =
                   Store.v t.setup ~readonly:true ~fresh:false root_local_build
                 in
@@ -604,7 +629,7 @@ let open_ro t current_phase =
 
 (** One of the 2 ro mutations *)
 let sync_ro t current_phase =
-  [%logs.app "*** sync_ro %a, %a" pp_setup t.setup pp_phase current_phase];
+  [%logs.app "*** sync_ro %a, %a" pp_setup t.setup pp_phase current_phase] ;
   match t.ro with
   | None -> assert false
   | Some (_, repo) ->
@@ -628,7 +653,7 @@ let test_one t ~ro_open_at ~ro_sync_at =
     let () = check t in
     let () = if ro_open_at = phase then open_ro t phase else () in
     let () = check t in
-    if ro_sync_at = phase then sync_ro t phase;
+    if ro_sync_at = phase then sync_ro t phase ;
     check t
   in
 
@@ -649,14 +674,14 @@ let test_one_guarded setup ~ro_open_at ~ro_sync_at =
     close_everything t
   with
   | Skip_the_rest_of_that_test ->
-      [%logs.app "*** skip rest of %a" pp_setup setup];
+      [%logs.app "*** skip rest of %a" pp_setup setup] ;
       close_everything t
   | exn -> raise exn
 
 (** All possible interleaving of the ro calls (open and sync) with the rw calls
     (open, write1, gc and write2). *)
 let test start_mode indexing_strategy lru_size =
-  let setup = { start_mode; indexing_strategy; lru_size } in
+  let setup = {start_mode; indexing_strategy; lru_size} in
   let t = test_one_guarded setup in
 
   let () = t ~ro_open_at:S1_before_start ~ro_sync_at:S1_before_start in
@@ -682,14 +707,14 @@ let test start_mode indexing_strategy lru_size =
 
 (** Product on lru_size *)
 let test start_mode indexing_strategy =
-  test start_mode indexing_strategy 0;
+  test start_mode indexing_strategy 0 ;
   test start_mode indexing_strategy 100
 
 let test_gced_store () = test From_v3_c0_gced `minimal
 
 (** Product on indexing_strategy *)
 let test start_mode () =
-  test start_mode `minimal;
+  test start_mode `minimal ;
   test start_mode `always
 
 (** Product on start_mode *)

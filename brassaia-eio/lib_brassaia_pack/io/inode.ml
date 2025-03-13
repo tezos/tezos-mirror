@@ -37,7 +37,9 @@ struct
   module Pack = Pack
 
   type file_manager = Pack.file_manager
+
   type dict = Pack.dict
+
   type dispatcher = Pack.dispatcher
 
   let to_snapshot = Inter.to_snapshot
@@ -54,8 +56,11 @@ struct
     Inter.Val.of_snapshot ~index v find
 
   let v = Pack.v
+
   let integrity_check = Pack.integrity_check
+
   let purge_lru = Pack.purge_lru
+
   let key_of_offset = Pack.key_of_offset
 
   let unsafe_find_no_prefetch t key =
@@ -70,5 +75,6 @@ struct
         Some v
 
   let get_offset t k = Pack.get_offset t k
+
   let get_length t k = Pack.get_length t k
 end

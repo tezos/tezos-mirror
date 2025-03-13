@@ -14,29 +14,42 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-type length_header = [ `Varint ] option
+type length_header = [`Varint] option
 
 type inode_child_order =
-  [ `Seeded_hash | `Hash_bits | `Custom of depth:int -> bytes -> int ]
+  [`Seeded_hash | `Hash_bits | `Custom of depth:int -> bytes -> int]
 
 module type S = sig
   val entries : int
+
   val stable_hash : int
+
   val contents_length_header : length_header
+
   val inode_child_order : inode_child_order
+
   val forbid_empty_dir_persistence : bool
 end
 
 module Default = struct
   let fresh = false
+
   let lru_size = 100_000
+
   let lru_max_memory = None
+
   let index_log_size = 2_500_000
+
   let readonly = false
+
   let merge_throttle = `Block_writes
+
   let indexing_strategy = Indexing_strategy.default
+
   let use_fsync = false
+
   let no_migrate = false
+
   let lower_root = None
 end
 
@@ -44,48 +57,75 @@ open Brassaia.Backend.Conf
 
 let spec = Spec.v "pack"
 
-type merge_throttle = [ `Block_writes | `Overcommit_memory ] [@@deriving brassaia]
+type merge_throttle = [`Block_writes | `Overcommit_memory] [@@deriving brassaia]
 
 module Key = struct
   let fresh =
-    key ~spec ~doc:"Start with a fresh disk." "fresh" Brassaia.Type.bool
+    key
+      ~spec
+      ~doc:"Start with a fresh disk."
+      "fresh"
+      Brassaia.Type.bool
       Default.fresh
 
   let lru_size =
-    key ~spec ~doc:"Maximum size of the LRU cache for pack entries." "lru-size"
-      Brassaia.Type.int Default.lru_size
+    key
+      ~spec
+      ~doc:"Maximum size of the LRU cache for pack entries."
+      "lru-size"
+      Brassaia.Type.int
+      Default.lru_size
 
   let lru_max_memory =
-    key ~spec ~doc:"Maximum memory in bytes of the LRU cache for pack entries."
+    key
+      ~spec
+      ~doc:"Maximum memory in bytes of the LRU cache for pack entries."
       "lru-max-memory"
       Brassaia.Type.(option int)
       Default.lru_max_memory
 
   let index_log_size =
-    key ~spec ~doc:"Size of index logs." "index-log-size" Brassaia.Type.int
+    key
+      ~spec
+      ~doc:"Size of index logs."
+      "index-log-size"
+      Brassaia.Type.int
       Default.index_log_size
 
   let readonly =
-    key ~spec ~doc:"Start with a read-only disk." "readonly" Brassaia.Type.bool
+    key
+      ~spec
+      ~doc:"Start with a read-only disk."
+      "readonly"
+      Brassaia.Type.bool
       Default.readonly
 
   let merge_throttle =
-    key ~spec
+    key
+      ~spec
       ~doc:"Strategy to use for large writes when index caches are full."
-      "merge-throttle" merge_throttle_t Default.merge_throttle
+      "merge-throttle"
+      merge_throttle_t
+      Default.merge_throttle
 
   let root = root spec
 
   let lower_root =
-    key ~spec ~doc:"Optional path for lower layer directory." "lower-root"
+    key
+      ~spec
+      ~doc:"Optional path for lower layer directory."
+      "lower-root"
       Brassaia.Type.(option string)
       Default.lower_root
 
   let indexing_strategy =
-    let serialisable_t = [%typ: [ `Always | `Minimal ]] in
-    key ~spec ~doc:"Strategy to use for adding objects to the index"
+    let serialisable_t = [%typ: [`Always | `Minimal]] in
+    key
+      ~spec
+      ~doc:"Strategy to use for adding objects to the index"
       "indexing-strategy"
-      (Brassaia.Type.map serialisable_t
+      (Brassaia.Type.map
+         serialisable_t
          (function
            | `Always -> Indexing_strategy.always
            | `Minimal -> Indexing_strategy.minimal)
@@ -93,20 +133,32 @@ module Key = struct
       Default.indexing_strategy
 
   let use_fsync =
-    key ~spec
+    key
+      ~spec
       ~doc:"Whether fsync should be used to ensure persistence order of files"
-      "use-fsync" Brassaia.Type.bool Default.use_fsync
+      "use-fsync"
+      Brassaia.Type.bool
+      Default.use_fsync
 
   let no_migrate =
-    key ~spec ~doc:"Prevent migration of V1 and V2 stores" "no-migrate"
-      Brassaia.Type.bool Default.no_migrate
+    key
+      ~spec
+      ~doc:"Prevent migration of V1 and V2 stores"
+      "no-migrate"
+      Brassaia.Type.bool
+      Default.no_migrate
 end
 
 let fresh config = get config Key.fresh
+
 let lru_size config = get config Key.lru_size
+
 let lru_max_memory config = get config Key.lru_max_memory
+
 let readonly config = get config Key.readonly
+
 let index_log_size config = get config Key.index_log_size
+
 let merge_throttle config = get config Key.merge_throttle
 
 let root config =
@@ -118,8 +170,11 @@ let root config =
   | Some root -> root
 
 let lower_root config = get config Key.lower_root
+
 let indexing_strategy config = get config Key.indexing_strategy
+
 let use_fsync config = get config Key.use_fsync
+
 let no_migrate config = get config Key.no_migrate
 
 let init ?(fresh = Default.fresh) ?(readonly = Default.readonly)

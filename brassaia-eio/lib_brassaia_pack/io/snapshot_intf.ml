@@ -18,7 +18,9 @@ open! Import
 
 module type Args = sig
   module Hash : Brassaia.Hash.S
+
   module Fm : File_manager.S with type Index.key = Hash.t
+
   module Dispatcher : Dispatcher.S with module Fm = Fm
 
   module Inode :
@@ -47,7 +49,7 @@ module type Sigs = sig
       val v : Brassaia.config -> read Contents_pack.t -> read Inode.Pack.t -> t
 
       val run :
-        ?on_disk:[ `Path of string ] ->
+        ?on_disk:[`Path of string] ->
         t ->
         (Contents_pack.value -> unit) ->
         (Inode.Snapshot.inode -> unit) ->
@@ -69,14 +71,16 @@ module type Sigs = sig
       type t
 
       val v :
-        ?on_disk:[ `Path of string | `Reuse ] ->
+        ?on_disk:[`Path of string | `Reuse] ->
         int ->
         read Contents_pack.t ->
         read Inode.Pack.t ->
         t
 
       val save_contents : t -> Contents_pack.value -> Hash.t Pack_key.t
+
       val save_inodes : t -> Inode.Snapshot.inode -> Hash.t Pack_key.t
+
       val close : t -> unit
     end
   end

@@ -35,29 +35,31 @@ module Make (Args : Gc_args.S) = struct
       type t = int63
 
       let equal = Int63.equal
+
       let hash (t : t) = Hashtbl.hash t
+
       let compare a b = Int63.compare b a
     end
 
     module Table = Hashtbl.Make (Offset_rev)
     module Pq = Binary_heap.Make (Offset_rev)
 
-    type 'a t = { pq : Pq.t; marks : 'a Table.t }
+    type 'a t = {pq : Pq.t; marks : 'a Table.t}
 
     let create size =
-      { pq = Pq.create ~dummy:Int63.zero size; marks = Table.create size }
+      {pq = Pq.create ~dummy:Int63.zero size; marks = Table.create size}
 
     let is_empty t = Pq.is_empty t.pq
 
-    let pop { pq; marks } =
+    let pop {pq; marks} =
       let elt = Pq.pop_minimum pq in
       let payload = Table.find marks elt in
-      Table.remove marks elt;
+      Table.remove marks elt ;
       (elt, payload)
 
-    let add { pq; marks } elt payload =
+    let add {pq; marks} elt payload =
       if not (Table.mem marks elt) then (
-        Table.add marks elt payload;
+        Table.add marks elt payload ;
         Pq.add pq elt)
   end
 
@@ -79,13 +81,13 @@ module Make (Args : Gc_args.S) = struct
     let rec loop () =
       if not (Priority_queue.is_empty todos) then (
         let offset, kind = Priority_queue.pop todos in
-        iter_node offset kind;
+        iter_node offset kind ;
         loop ())
     and iter_node off = function
       | (Contents | Node) as kind -> (
           let node_key = Node_store.key_of_offset node_store off in
           let len = Node_store.get_length node_store node_key in
-          Ranges.add live ~off ~len;
+          Ranges.add live ~off ~len ;
           if kind = Node then
             match Node_store.unsafe_find_no_prefetch node_store node_key with
             | None ->
@@ -97,15 +99,17 @@ module Make (Args : Gc_args.S) = struct
       | Commit -> (
           let commit_key = Commit_store.key_of_offset commit_store off in
           let len = Commit_store.get_length commit_store commit_key in
-          Ranges.add live ~off ~len;
+          Ranges.add live ~off ~len ;
           match
-            Commit_store.unsafe_find ~check_integrity:false commit_store
+            Commit_store.unsafe_find
+              ~check_integrity:false
+              commit_store
               commit_key
           with
           | None ->
               raise (Pack_error (`Dangling_key (string_of_key commit_key)))
           | Some commit ->
-              List.iter schedule_commit (Commit_value.parents commit);
+              List.iter schedule_commit (Commit_value.parents commit) ;
               schedule_kinded (`Node (Commit_value.node commit)))
     and schedule_kinded kinded_key =
       let key, kind =
@@ -134,15 +138,19 @@ module Make (Args : Gc_args.S) = struct
       if offset >= min_offset then Priority_queue.add todos offset kind
     in
     let offset = Commit_store.get_offset commit_store commit_key in
-    schedule ~offset Commit;
-    loop ();
+    schedule ~offset Commit ;
+    loop () ;
     live
 
   (** [snaphshot_commit commit_key commit_store node_store] returns the list of
       compacted [(offset, length)] of the reachable tree objects and its direct
       parent commits. *)
   let snapshot_commit commit_key commit_store node_store =
-    iter_reachable ~parents:false ~min_offset:Int63.zero commit_key commit_store
+    iter_reachable
+      ~parents:false
+      ~min_offset:Int63.zero
+      commit_key
+      commit_store
       node_store
 
   (** [traverse_range ~min_offset commit_key commit_store node_store] returns
@@ -164,7 +172,7 @@ module Make (Args : Gc_args.S) = struct
     | Indexed _ ->
         (* Its possible that some parents are referenced by hash. *)
         ()
-    | Direct { offset = off; _ } ->
+    | Direct {offset = off; _} ->
         (* Targeted write to change the parent commit kind to dangling. *)
         let off = Int63.(Syntax.(off + of_int Hash.hash_size)) in
         write_exn ~off ~len:1 magic_parent
@@ -184,13 +192,13 @@ module Make (Args : Gc_args.S) = struct
   let report_old_file_sizes ~root ~generation stats =
     let open Result_syntax in
     let+ mapping_size, prefix_size = prefix_file_sizes ~root ~generation in
-    stats := Gc_stats_worker.add_file_size !stats "old_prefix" prefix_size;
+    stats := Gc_stats_worker.add_file_size !stats "old_prefix" prefix_size ;
     stats := Gc_stats_worker.add_file_size !stats "old_mapping" mapping_size
 
   let report_new_file_sizes ~root ~generation stats =
     let open Result_syntax in
     let+ mapping_size, prefix_size = prefix_file_sizes ~root ~generation in
-    stats := Gc_stats_worker.add_file_size !stats "prefix" prefix_size;
+    stats := Gc_stats_worker.add_file_size !stats "prefix" prefix_size ;
     stats := Gc_stats_worker.add_file_size !stats "mapping" mapping_size
 
   type suffix_params = {
@@ -215,12 +223,16 @@ module Make (Args : Gc_args.S) = struct
       new_suffix_start_offset =
     let open Result_syntax in
     let config =
-      Brassaia_pack.Conf.init ~fresh:false ~readonly:true ~lru_size:0 ~lower_root
+      Brassaia_pack.Conf.init
+        ~fresh:false
+        ~readonly:true
+        ~lru_size:0
+        ~lower_root
         root
     in
 
     (* Step 1. Open the files *)
-    [%log.debug "GC: opening files in RO mode"];
+    [%log.debug "GC: opening files in RO mode"] ;
     let stats = ref (Gc_stats_worker.create "open files") in
     let () =
       report_old_file_sizes ~root ~generation:(generation - 1) stats |> ignore
@@ -238,7 +250,7 @@ module Make (Args : Gc_args.S) = struct
 
     (* Step 2. Load commit which will make [commit_key] [Direct] if it's not
        already the case. *)
-    stats := Gc_stats_worker.finish_current_step !stats "load commit";
+    stats := Gc_stats_worker.finish_current_step !stats "load commit" ;
     let commit =
       match
         Commit_store.unsafe_find ~check_integrity:false commit_store commit_key
@@ -251,27 +263,29 @@ module Make (Args : Gc_args.S) = struct
     (* Step 3. Compute the list of [offset, length] ranges of live objects
        reachable from the GC commit. *)
     let live_entries =
-      stats := Gc_stats_worker.finish_current_step !stats "mapping: start";
+      stats := Gc_stats_worker.finish_current_step !stats "mapping: start" ;
       let live_entries = snapshot_commit commit_key commit_store node_store in
       stats :=
-        Gc_stats_worker.finish_current_step !stats "mapping: of reachable";
+        Gc_stats_worker.finish_current_step !stats "mapping: of reachable" ;
       stats :=
-        Gc_stats_worker.set_objects_traversed !stats (Ranges.count live_entries);
+        Gc_stats_worker.set_objects_traversed !stats (Ranges.count live_entries) ;
       live_entries
     in
 
     let mapping_size =
       (* Step 4. Create the new prefix. *)
-      stats := Gc_stats_worker.finish_current_step !stats "prefix: start";
+      stats := Gc_stats_worker.finish_current_step !stats "prefix: start" ;
       let mapping =
         Brassaia_pack.Layout.V4.mapping ~root:new_files_path ~generation
       in
-      let data = Brassaia_pack.Layout.V4.prefix ~root:new_files_path ~generation in
+      let data =
+        Brassaia_pack.Layout.V4.prefix ~root:new_files_path ~generation
+      in
       let mapping_size =
         let prefix = Sparse.Ao.create ~mapping ~data |> Errs.raise_if_error in
         (* Step 5. Transfer to the new prefix, flush and close. *)
-        [%log.debug "GC: transfering to the new prefix"];
-        stats := Gc_stats_worker.finish_current_step !stats "prefix: transfer";
+        [%log.debug "GC: transfering to the new prefix"] ;
+        stats := Gc_stats_worker.finish_current_step !stats "prefix: transfer" ;
         Errors.finalise_exn (fun _ ->
             Sparse.Ao.flush prefix
             >>= (fun _ -> Sparse.Ao.close prefix)
@@ -282,7 +296,7 @@ module Make (Args : Gc_args.S) = struct
           (fun ~off ~len ->
             let str = Dispatcher.read_seq_exn dispatcher ~off ~len in
             Sparse.Ao.append_seq_exn prefix ~off str)
-          live_entries;
+          live_entries ;
         Int63.to_int (Sparse.Ao.mapping_size prefix)
       in
       let () =
@@ -290,8 +304,9 @@ module Make (Args : Gc_args.S) = struct
            prefix, this time in write-only as we have to
            modify data inside the file. *)
         stats :=
-          Gc_stats_worker.finish_current_step !stats
-            "prefix: rewrite commit parents";
+          Gc_stats_worker.finish_current_step
+            !stats
+            "prefix: rewrite commit parents" ;
         let prefix =
           Sparse.Wo.open_wo ~mapping_size ~mapping ~data |> Errs.raise_if_error
         in
@@ -312,14 +327,15 @@ module Make (Args : Gc_args.S) = struct
     (* Step 6. Calculate post-GC suffix parameters. *)
     let suffix_params, mapping_size, removable_chunk_idxs =
       stats :=
-        Gc_stats_worker.finish_current_step !stats
-          "suffix: calculate new values";
+        Gc_stats_worker.finish_current_step
+          !stats
+          "suffix: calculate new values" ;
       let suffix = Fm.suffix fm in
       let soff = Dispatcher.soff_of_offset dispatcher new_suffix_start_offset in
-      assert (Int63.Syntax.(soff >= Int63.zero));
+      assert (Int63.Syntax.(soff >= Int63.zero)) ;
       (* Step 6.1. Calculate chunks that we have GCed. *)
       let open struct
-        type chunk = { idx : int; end_suffix_off : int63 }
+        type chunk = {idx : int; end_suffix_off : int63}
       end in
       let removable_chunks =
         match Fm.Suffix.chunk_num suffix with
@@ -334,12 +350,12 @@ module Make (Args : Gc_args.S) = struct
                 let is_empty = start_suffix_off = end_suffix_off in
                 let ends_with_or_is_before_soff = end_suffix_off <= soff in
                 let is_removable =
-                  (not is_appendable)
-                  && (not is_empty)
+                  (not is_appendable) && (not is_empty)
                   && ends_with_or_is_before_soff
                 in
-                if is_removable then { idx; end_suffix_off } :: acc else acc)
-              [] suffix
+                if is_removable then {idx; end_suffix_off} :: acc else acc)
+              []
+              suffix
       in
       (* Step 6.2. Calculate the new chunk starting idx. *)
       let chunk_start_idx =
@@ -363,7 +379,7 @@ module Make (Args : Gc_args.S) = struct
             Int63.Syntax.(new_suffix_start_offset - removed_end_offset)
       in
       (* Step 6.4. Assertions and record construction. *)
-      assert (Int63.Syntax.(suffix_dead_bytes >= Int63.zero));
+      assert (Int63.Syntax.(suffix_dead_bytes >= Int63.zero)) ;
       let removable_chunk_idxs =
         removable_chunks |> List.map (fun c -> c.idx)
       in
@@ -381,9 +397,9 @@ module Make (Args : Gc_args.S) = struct
       match Fm.gc_destination fm with
       | `Delete -> None
       | `Archive lower ->
-          [%log.debug "GC: archiving into lower"];
+          [%log.debug "GC: archiving into lower"] ;
           stats :=
-            Gc_stats_worker.finish_current_step !stats "archive: iter reachable";
+            Gc_stats_worker.finish_current_step !stats "archive: iter reachable" ;
           let min_offset = Dispatcher.suffix_start_offset dispatcher in
           let to_archive = ref [] in
           Ranges.iter
@@ -391,27 +407,21 @@ module Make (Args : Gc_args.S) = struct
               to_archive :=
                 (off, Dispatcher.read_seq_exn dispatcher ~off ~len)
                 :: !to_archive)
-            (traverse_range ~min_offset commit_key commit_store node_store);
+            (traverse_range ~min_offset commit_key commit_store node_store) ;
           let to_archive = List.rev !to_archive in
           stats :=
-            Gc_stats_worker.finish_current_step !stats "archive: copy to lower";
-          Lower.set_readonly lower false;
+            Gc_stats_worker.finish_current_step !stats "archive: copy to lower" ;
+          Lower.set_readonly lower false ;
           let vol =
             Lower.archive_seq_exn ~upper_root:root ~generation ~to_archive lower
           in
-          Lower.set_readonly lower true;
+          Lower.set_readonly lower true ;
           Some vol
     in
 
     (* Step 8. Finalise stats and return. *)
     let stats = Gc_stats_worker.finalise !stats in
-    {
-      suffix_params;
-      mapping_size;
-      removable_chunk_idxs;
-      modified_volume;
-      stats;
-    }
+    {suffix_params; mapping_size; removable_chunk_idxs; modified_volume; stats}
 
   let write_gc_output ~root ~generation output =
     let open Result_syntax in
@@ -428,10 +438,15 @@ module Make (Args : Gc_args.S) = struct
       commit_key new_suffix_start_offset =
     let result =
       Errs.catch (fun () ->
-          run ~lower_root ~generation ~new_files_path root commit_key
+          run
+            ~lower_root
+            ~generation
+            ~new_files_path
+            root
+            commit_key
             new_suffix_start_offset)
     in
-    Errs.log_if_error "gc run" result;
+    Errs.log_if_error "gc run" result ;
     let write_result = write_gc_output ~root ~generation result in
     write_result |> Errs.log_if_error "writing gc output"
   (* No need to raise or log if [result] is [Error _], we've written it in

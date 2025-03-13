@@ -21,6 +21,7 @@ module Atomic_write (K : Brassaia.Type.S) (V : Brassaia.Hash.S) = struct
   include AW
 
   let v () = AW.v (Brassaia_mem.config ())
+
   let flush _t = ()
 end
 
@@ -64,7 +65,6 @@ module Maker (Config : Brassaia_pack.Conf.S) = struct
       module Contents = struct
         module Pack_value =
           Brassaia_pack.Pack_value.Of_contents (Config) (H) (XKey) (C)
-
         module Indexable = Indexable_mem (H) (Pack_value)
         include Brassaia.Contents.Store_indexable (Indexable) (H) (C)
       end
@@ -75,7 +75,6 @@ module Maker (Config : Brassaia_pack.Conf.S) = struct
         module Indexable = struct
           module Inter =
             Brassaia_pack.Inode.Make_internal (Config) (H) (XKey) (Value)
-
           module CA = Pack.Make (Inter.Raw)
           include Brassaia_pack.Inode.Make (H) (XKey) (Value) (Inter) (CA)
 
@@ -99,11 +98,12 @@ module Maker (Config : Brassaia_pack.Conf.S) = struct
           type hash = Hash.t [@@deriving brassaia]
         end
 
-        module Pack_value = Brassaia_pack.Pack_value.Of_commit (H) (XKey) (Value)
+        module Pack_value =
+          Brassaia_pack.Pack_value.Of_commit (H) (XKey) (Value)
         module Indexable = Indexable_mem (H) (Pack_value)
-
         include
-          Brassaia.Commit.Generic_key.Store (Info) (Node) (Indexable) (H) (Value)
+          Brassaia.Commit.Generic_key.Store (Info) (Node) (Indexable) (H)
+            (Value)
       end
 
       module Commit_portable = Brassaia.Commit.Portable.Of_commit (Commit.Value)
@@ -135,9 +135,13 @@ module Maker (Config : Brassaia_pack.Conf.S) = struct
         }
 
         let contents_t t : 'a Contents.t = t.contents
+
         let node_t t : 'a Node.t = (contents_t t, t.node)
+
         let commit_t t : 'a Commit.t = (node_t t, t.commit)
+
         let branch_t t = t.branch
+
         let config t = t.config
 
         let batch ?lock:_ t f =
@@ -155,12 +159,12 @@ module Maker (Config : Brassaia_pack.Conf.S) = struct
           let node = Node.Indexable.v root in
           let commit = Commit.Indexable.v root in
           let branch = Branch.v () in
-          { contents; node; commit; branch; config }
+          {contents; node; commit; branch; config}
 
         let close t =
-          Contents.Indexable.close (contents_t t);
-          Node.Indexable.close (snd (node_t t));
-          Commit.Indexable.close (snd (commit_t t));
+          Contents.Indexable.close (contents_t t) ;
+          Node.Indexable.close (snd (node_t t)) ;
+          Commit.Indexable.close (snd (commit_t t)) ;
           Branch.close t.branch
       end
     end

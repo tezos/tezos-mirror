@@ -26,10 +26,13 @@ module type S = sig
         file name and how many files there are. *)
 
   module Io : Io_intf.S
+
   module Errs : Io_errors.S
+
   module Ao : Append_only_file.S
 
   type t
+
   type create_error = Io.create_error
 
   type open_error =
@@ -50,7 +53,7 @@ module type S = sig
     root:string ->
     start_idx:int ->
     overwrite:bool ->
-    (t, [> create_error ]) result
+    (t, [> create_error]) result
 
   val open_rw :
     root:string ->
@@ -58,7 +61,7 @@ module type S = sig
     start_idx:int ->
     chunk_num:int ->
     dead_header_size:int ->
-    (t, [> open_error ]) result
+    (t, [> open_error]) result
 
   val open_ro :
     root:string ->
@@ -66,17 +69,22 @@ module type S = sig
     dead_header_size:int ->
     start_idx:int ->
     chunk_num:int ->
-    (t, [> open_error ]) result
+    (t, [> open_error]) result
 
-  val add_chunk : t -> (unit, [> add_new_error ]) result
+  val add_chunk : t -> (unit, [> add_new_error]) result
+
   val start_idx : t -> int
-  val chunk_num : t -> int
-  val close : t -> (unit, [> Io.close_error | `Pending_flush ]) result
-  val empty_buffer : t -> bool
-  val flush : t -> (unit, [> Io.write_error ]) result
-  val fsync : t -> (unit, [> Io.write_error ]) result
 
-  val appendable_chunk_poff : t -> int63
+  val chunk_num : t -> int
+
+  val close : t -> (unit, [> Io.close_error | `Pending_flush]) result
+
+  val empty_buffer : t -> bool
+
+  val flush : t -> (unit, [> Io.write_error]) result
+
+  val fsync : t -> (unit, [> Io.write_error]) result
+
   (** [appendable_chunk_poff t] is the number of bytes of the chunk file that is
       currently appendable. It does not perform IO.
 
@@ -88,20 +96,21 @@ module type S = sig
 
       This information originates from the latest reload of the control file.
       Calling [refresh_appendable_chunk_poff t] updates [appendable_chunk_poff]. *)
+  val appendable_chunk_poff : t -> int63
 
-  val refresh_appendable_chunk_poff :
-    t -> int63 -> (unit, [> `Rw_not_allowed ]) result
   (** Ingest the new end offset of the appendable chunk file. Typically happens
       in RO mode when the control file has been re-read.
 
       {3 RW mode}
 
       Always returns [Error `Rw_not_allowed]. *)
+  val refresh_appendable_chunk_poff :
+    t -> int63 -> (unit, [> `Rw_not_allowed]) result
 
-  val end_soff : t -> int63
   (** [end_soff t] is the end offset for the chunked suffix. The valid range of
       offsets is 0 <= off < end_soff. Therefore, [end_soff] also represents the
       length of the chunked suffix. *)
+  val end_soff : t -> int63
 
   val read_exn : t -> off:int63 -> len:int -> bytes -> unit
 
@@ -109,6 +118,7 @@ module type S = sig
     t -> off:int63 -> min_len:int -> max_len:int -> bytes -> int
 
   val append_exn : t -> string -> unit
+
   val readonly : t -> bool
 
   val fold_chunks :

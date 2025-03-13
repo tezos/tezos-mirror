@@ -14,5 +14,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Store_properties_intf.Sigs
 (** @inline *)
+include Store_properties_intf.Sigs

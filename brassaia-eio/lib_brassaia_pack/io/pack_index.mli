@@ -14,5 +14,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Pack_index_intf.Sigs
 (** @inline *)
+include Pack_index_intf.Sigs

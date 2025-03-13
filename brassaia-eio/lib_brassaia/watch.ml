@@ -22,30 +22,34 @@ let src = Logs.Src.create "brassaia.watch" ~doc:"Brassaia watch notifications"
 module Log = (val Logs.src_log src : Logs.LOG)
 
 let none _ _ =
-  Printf.eprintf "Listen hook not set!\n%!";
+  Printf.eprintf "Listen hook not set!\n%!" ;
   assert false
 
 let listen_dir_hook = ref none
+
 let watch_switch = ref None
 
 type hook = int -> string -> (string -> unit) -> unit -> unit
 
 let set_listen_dir_hook (h : hook) = listen_dir_hook := h
+
 let set_watch_switch sw = watch_switch := Some sw
 
 let id () =
   let c = ref 0 in
   fun () ->
-    incr c;
+    incr c ;
     !c
 
 let global = id ()
+
 let workers_r = ref 0
+
 let workers () = !workers_r
 
 (* Not sure this is right *)
 let rec stream_iter f s =
-  (match Eio.Stream.take s with Some v -> f v | None -> ());
+  (match Eio.Stream.take s with Some v -> f v | None -> ()) ;
   stream_iter f s
 
 let scheduler () =
@@ -60,23 +64,23 @@ let scheduler () =
           let s = Eio.Stream.create max_int in
           (s, Eio.Stream.add s)
         in
-        incr workers_r;
+        incr workers_r ;
         let sw =
           try Option.get !watch_switch with _ -> failwith "Big Yikes"
         in
-        (Eio.Fiber.fork ~sw @@ fun () -> stream_iter (fun f -> f ()) stream);
+        (Eio.Fiber.fork ~sw @@ fun () -> stream_iter (fun f -> f ()) stream) ;
         (* Lwt.async (fun () ->
             (* FIXME: we would like to skip some updates if more recent ones
                are at the back of the queue. *)
             Eio.Stream.take (fun f -> f ()) stream); *)
-        p := Some push;
-        (c := fun () -> push None);
+        p := Some push ;
+        (c := fun () -> push None) ;
         push elt
   in
   let clean () =
-    !c ();
-    decr workers_r;
-    c := niet;
+    !c () ;
+    decr workers_r ;
+    c := niet ;
     p := None
   in
   let enqueue v = push (Some v) in
@@ -93,7 +97,9 @@ end) (V : sig
 end) =
 struct
   type key = K.t
+
   type value = V.t
+
   type watch = int
 
   module KMap = Map.Make (struct
@@ -109,10 +115,13 @@ struct
   end)
 
   type key_handler = value Diff.t -> unit
+
   type all_handler = key -> value Diff.t -> unit
 
   let pp_value = Type.pp V.t
+
   let equal_opt_values = Type.(unstage (equal (option V.t)))
+
   let equal_keys = Type.(unstage (equal K.t))
 
   type t = {
@@ -145,14 +154,14 @@ struct
 
   let next t =
     let id = t.next in
-    t.next <- id + 1;
+    t.next <- id + 1 ;
     id
 
   let is_empty t = IMap.is_empty t.keys && IMap.is_empty t.glob
 
   let clear_unsafe t =
-    t.keys <- IMap.empty;
-    t.glob <- IMap.empty;
+    t.keys <- IMap.empty ;
+    t.glob <- IMap.empty ;
     t.next <- 0
 
   let clear t = Eio.Mutex.use_rw ~protect:true t.lock (fun () -> clear_unsafe t)
@@ -174,15 +183,15 @@ struct
     }
 
   let unwatch_unsafe t id =
-    [%log.debug "unwatch %s: id=%d" (to_string t) id];
+    [%log.debug "unwatch %s: id=%d" (to_string t) id] ;
     let glob = IMap.remove id t.glob in
     let keys = IMap.remove id t.keys in
-    t.glob <- glob;
+    t.glob <- glob ;
     t.keys <- keys
 
   let unwatch t id =
     Eio.Mutex.use_rw ~protect:true t.lock (fun () ->
-        unwatch_unsafe t id;
+        unwatch_unsafe t id ;
         if is_empty t then t.clean ())
 
   let mk old value =
@@ -199,6 +208,7 @@ struct
         "watch callback got: %a\n%s" Fmt.exn e (Printexc.get_backtrace ())]
 
   let pp_option = Fmt.option ~none:(Fmt.any "<none>")
+
   let pp_key = Type.pp K.t
 
   let notify_all_unsafe t key value =
@@ -210,12 +220,19 @@ struct
             todo :=
               protect (fun () ->
                   [%log.debug
-                    "notify-all[%d.%d:%a]: %d firing! (%a -> %a)" t.id id pp_key
-                      key t.notifications (pp_option pp_value) old_value
-                      (pp_option pp_value) value];
-                  t.notifications <- t.notifications + 1;
+                    "notify-all[%d.%d:%a]: %d firing! (%a -> %a)"
+                      t.id
+                      id
+                      pp_key
+                      key
+                      t.notifications
+                      (pp_option pp_value)
+                      old_value
+                      (pp_option pp_value)
+                      value] ;
+                  t.notifications <- t.notifications + 1 ;
                   f key (mk old_value value))
-              :: !todo;
+              :: !todo ;
             let init =
               match value with
               | None -> KMap.remove key init
@@ -228,12 +245,13 @@ struct
           in
           if equal_opt_values old_value value then (
             [%log.debug
-              "notify-all[%d:%d:%a]: same value, skipping." t.id id pp_key key];
+              "notify-all[%d:%d:%a]: same value, skipping." t.id id pp_key key] ;
             IMap.add id arg acc)
           else fire old_value)
-        t.glob IMap.empty
+        t.glob
+        IMap.empty
     in
-    t.glob <- glob;
+    t.glob <- glob ;
     match !todo with
     | [] -> ()
     | ts ->
@@ -248,22 +266,30 @@ struct
           if not (equal_keys key k) then IMap.add id arg acc
           else if equal_opt_values value old_value then (
             [%log.debug
-              "notify-key[%d.%d:%a]: same value, skipping." t.id id pp_key key];
+              "notify-key[%d.%d:%a]: same value, skipping." t.id id pp_key key] ;
             IMap.add id arg acc)
           else (
             todo :=
               protect (fun () ->
                   [%log.debug
-                    "notify-key[%d:%d:%a] %d firing! (%a -> %a)" t.id id pp_key
-                      key t.notifications (pp_option pp_value) old_value
-                      (pp_option pp_value) value];
-                  t.notifications <- t.notifications + 1;
+                    "notify-key[%d:%d:%a] %d firing! (%a -> %a)"
+                      t.id
+                      id
+                      pp_key
+                      key
+                      t.notifications
+                      (pp_option pp_value)
+                      old_value
+                      (pp_option pp_value)
+                      value] ;
+                  t.notifications <- t.notifications + 1 ;
                   f (mk old_value value))
-              :: !todo;
+              :: !todo ;
             IMap.add id (k, value, f) acc))
-        t.keys IMap.empty
+        t.keys
+        IMap.empty
     in
-    t.keys <- keys;
+    t.keys <- keys ;
     match !todo with
     | [] -> ()
     | ts ->
@@ -274,13 +300,13 @@ struct
     Eio.Mutex.use_rw ~protect:true t.lock (fun () ->
         if is_empty t then ()
         else (
-          notify_all_unsafe t key value;
+          notify_all_unsafe t key value ;
           notify_key_unsafe t key value))
 
   let watch_key_unsafe t key ?init f =
     let id = next t in
-    [%log.debug "watch-key %s: id=%d" (to_string t) id];
-    t.keys <- IMap.add id (key, init, f) t.keys;
+    [%log.debug "watch-key %s: id=%d" (to_string t) id] ;
+    t.keys <- IMap.add id (key, init, f) t.keys ;
     id
 
   let watch_key t key ?init f =
@@ -293,8 +319,8 @@ struct
 
   let watch_unsafe t ?(init = []) f =
     let id = next t in
-    [%log.debug "watch %s: id=%d" (to_string t) id];
-    t.glob <- IMap.add id (kmap_of_alist init, f) t.glob;
+    [%log.debug "watch %s: id=%d" (to_string t) id] ;
+    t.glob <- IMap.add id (kmap_of_alist init, f) t.glob ;
     id
 
   let watch t ?init f =
@@ -305,7 +331,7 @@ struct
   let listen_dir t dir ~key ~value =
     let init () =
       if t.listeners = 0 then (
-        [%log.debug "%s: start listening to %s" (to_string t) dir];
+        [%log.debug "%s: start listening to %s" (to_string t) dir] ;
         let f =
           !listen_dir_hook t.id dir (fun file ->
               match key file with
@@ -316,7 +342,7 @@ struct
                     let n' = t.notifications in
                     if n = n' then notify t key value
                     else (
-                      [%log.debug "Stale event, trying reading again"];
+                      [%log.debug "Stale event, trying reading again"] ;
                       read n')
                   in
                   read t.notifications)
@@ -324,13 +350,13 @@ struct
         t.stop_listening <- f)
       else [%log.debug "%s: already listening on %s" (to_string t) dir]
     in
-    init ();
-    t.listeners <- t.listeners + 1;
+    init () ;
+    t.listeners <- t.listeners + 1 ;
     function
     | () ->
-        if t.listeners > 0 then t.listeners <- t.listeners - 1;
+        if t.listeners > 0 then t.listeners <- t.listeners - 1 ;
         if t.listeners <> 0 then ()
         else (
-          [%log.debug "%s: stop listening to %s" (to_string t) dir];
+          [%log.debug "%s: stop listening to %s" (to_string t) dir] ;
           t.stop_listening ())
 end

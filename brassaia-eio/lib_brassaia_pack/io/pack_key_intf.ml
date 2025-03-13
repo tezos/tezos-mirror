@@ -17,11 +17,12 @@
 open! Import
 
 module type Sigs = sig
-  type 'hash t
   (** The type of {i keys} referencing values stored in the [brassaia-pack]
       backend. *)
+  type 'hash t
 
   type safe = SAFE
+
   and unsafe = UNSAFE
 
   (** The internal state of a key (read with {!inspect}).
@@ -93,6 +94,7 @@ module type Sigs = sig
     'h t
 
   val v_indexed : 'h -> 'h t
+
   val v_offset : int63 -> 'h t
 
   val promote_exn :
@@ -106,7 +108,9 @@ module type Sigs = sig
     volume_identifier:Lower.volume_identifier option -> 'h t -> unit
 
   val to_offset : 'h t -> int63 option
+
   val to_hash : 'h t -> 'h
+
   val to_length : 'h t -> int option
 
   module type S = sig
@@ -120,7 +124,9 @@ module type Sigs = sig
 
   module type Store_spec = sig
     type ('h, _) contents_key = 'h t
+
     type 'h node_key = 'h t
+
     type 'h commit_key = 'h t
   end
 

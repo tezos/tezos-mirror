@@ -31,7 +31,7 @@ let reporter :
   let start_time = Clock.counter () in
   let report src level ~over k msgf =
     let k _ =
-      over ();
+      over () ;
       k ()
     in
     let ppf = match level with Logs.App -> Fmt.stdout | _ -> Fmt.stderr in
@@ -48,14 +48,19 @@ let reporter :
             in
             (text, `Faint)
       in
-      Fmt.kpf k ppf
+      Fmt.kpf
+        k
+        ppf
         ("%s%+04.0fus %a %a @[" ^^ fmt ^^ "@]@.")
-        prefix dt
+        prefix
+        dt
         Fmt.(styled source_pos_colour string)
-        (pad 35 source_pos_text) Logs_fmt.pp_header (level, h)
+        (pad 35 source_pos_text)
+        Logs_fmt.pp_header
+        (level, h)
     in
     msgf @@ fun ?header ?tags fmt ->
     if filter_src src then with_stamp header tags k fmt
     else Format.ikfprintf k ppf fmt
   in
-  { Logs.report }
+  {Logs.report}

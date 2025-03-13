@@ -23,6 +23,7 @@ module Object_counter (Progress : Progress_engine.S) : sig
     Format.formatter -> t * ((unit -> unit) * (unit -> unit) * (unit -> unit))
 
   val finalise : t -> unit
+
   val finalise_with_stats : t -> int * int * int
 end = struct
   type t =
@@ -42,27 +43,30 @@ end = struct
     let bar =
       let open Progress.Line in
       let count_to_string (contents, nodes, commits) =
-        Fmt.str "%dk contents / %dk nodes / %d commits" (contents / 1000)
-          (nodes / 1000) commits
+        Fmt.str
+          "%dk contents / %dk nodes / %d commits"
+          (contents / 1000)
+          (nodes / 1000)
+          commits
       in
       using count_to_string string
     in
     let display = Progress.Display.start ~config (Progress.Multi.line bar) in
-    let [ reporter ] = Progress.Display.reporters display in
+    let [reporter] = Progress.Display.reporters display in
     let update_fn count () =
-      incr count;
+      incr count ;
       reporter (!nb_contents, !nb_nodes, !nb_commits)
     in
     let contents = update_fn nb_contents
     and nodes = update_fn nb_nodes
     and commits = update_fn nb_commits in
-    ( Object_counter { display; nb_contents; nb_nodes; nb_commits },
+    ( Object_counter {display; nb_contents; nb_nodes; nb_commits},
       (contents, nodes, commits) )
 
   let finalise (Object_counter t) = Progress.Display.finalise t.display
 
   let finalise_with_stats (Object_counter t as t_outer) =
-    finalise t_outer;
+    finalise t_outer ;
     (!(t.nb_contents), !(t.nb_nodes), !(t.nb_commits))
 end
 
@@ -78,8 +82,8 @@ let nearest_geq ~arr ~get ~lo ~hi ~key =
     | _ when get arr lo >= key -> Some lo
     | _ ->
         let rec search lo hi =
-          assert (lo < hi);
-          assert (get arr lo < key && key < get arr hi);
+          assert (lo < hi) ;
+          assert (get arr lo < key && key < get arr hi) ;
           if lo + 1 = hi then Some hi
           else
             let mid = (lo + hi) / 2 in

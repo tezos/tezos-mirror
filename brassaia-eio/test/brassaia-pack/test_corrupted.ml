@@ -44,41 +44,47 @@ let write_file path contents =
   Fun.protect
     (fun () -> output_string ch contents)
     ~finally:(fun () ->
-      flush ch;
+      flush ch ;
       close_out ch)
 
 let test_corrupted_control_file () =
-  rm_dir root;
+  rm_dir root ;
   let control_file_path = Filename.concat root "store.control" in
   let repo = Store.Repo.v (config ~fresh:true root) in
   let control_file_blob0 = read_file control_file_path in
   let store = Store.main repo in
-  let () = Store.set_exn ~info store [ "a" ] "b" in
+  let () = Store.set_exn ~info store ["a"] "b" in
   let () = Store.Repo.close repo in
   let control_file_blob1 = read_file control_file_path in
-  assert (not (String.equal control_file_blob0 control_file_blob1));
-  assert (String.length control_file_blob0 = String.length control_file_blob1);
+  assert (not (String.equal control_file_blob0 control_file_blob1)) ;
+  assert (String.length control_file_blob0 = String.length control_file_blob1) ;
   let split_write_at = 3 * String.length control_file_blob1 / 4 in
   let control_file_mix =
     String.sub control_file_blob1 0 split_write_at
-    ^ String.sub control_file_blob0 split_write_at
+    ^ String.sub
+        control_file_blob0
+        split_write_at
         (String.length control_file_blob0 - split_write_at)
   in
-  assert (String.length control_file_mix = String.length control_file_blob1);
-  assert (not (String.equal control_file_blob0 control_file_mix));
-  assert (not (String.equal control_file_blob1 control_file_mix));
-  write_file control_file_path control_file_mix;
+  assert (String.length control_file_mix = String.length control_file_blob1) ;
+  assert (not (String.equal control_file_blob0 control_file_mix)) ;
+  assert (not (String.equal control_file_blob1 control_file_mix)) ;
+  write_file control_file_path control_file_mix ;
   let error =
     try Ok (Store.Repo.v (config ~fresh:false root)) with exn -> Error exn
   in
   match error with
   | Error (Brassaia_pack_unix.Errors.Pack_error (`Corrupted_control_file s)) ->
       Alcotest.(check string)
-        "path is corrupted" s "_build/test-corrupted/store.control"
+        "path is corrupted"
+        s
+        "_build/test-corrupted/store.control"
   | _ -> Alcotest.fail "unexpected error"
 
 let tests =
   [
-    Alcotest.test_case "Corrupted control file" `Quick
+    Alcotest.test_case
+      "Corrupted control file"
+      `Quick
       test_corrupted_control_file;
   ]

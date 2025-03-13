@@ -46,10 +46,15 @@ struct
     [@@deriving brassaia]
 
     let equal = Type.(unstage (equal t))
+
     let compare = Type.(unstage (compare t))
+
     let hash_contents = Type.(unstage (short_hash Contents_key.t))
+
     let hash_commit = Type.(unstage (short_hash Commit_key.t))
+
     let hash_node = Type.(unstage (short_hash Node_key.t))
+
     let hash_branch = Type.(unstage (short_hash Branch.t))
 
     (* we are using cryptographic hashes here, so the first bytes
@@ -70,7 +75,9 @@ struct
     type t
 
     val create : int option -> t
+
     val add : t -> X.t -> int -> unit
+
     val mem : t -> X.t -> bool
   end = struct
     module Lru = Lru.Make (X)
@@ -83,6 +90,7 @@ struct
       | Some n -> L (Lru.create n)
 
     let add t k v = match t with L t -> Lru.add t k v | T t -> Tbl.add t k v
+
     let mem t k = match t with L t -> Lru.mem t k | T t -> Tbl.mem t k
   end
 
@@ -99,8 +107,11 @@ struct
   end
 
   let vertex g = G.fold_vertex (fun k set -> k :: set) g []
+
   let edges g = G.fold_edges (fun k1 k2 list -> (k1, k2) :: list) g []
+
   let pp_vertices = Fmt.Dump.list (Type.pp X.t)
+
   let pp_depth ppf d = if d <> max_int then Fmt.pf ppf "depth=%d,@ " d
 
   type action = Visit of (X.t * int) | Treat of X.t
@@ -108,10 +119,16 @@ struct
   let iter ?cache_size ?(depth = max_int) ~pred ~min ~max ~node ?edge ~skip ~rev
       () =
     [%log.debug
-      "@[<2>iter:@ %arev=%b,@ min=%a,@ max=%a@, cache=%a@]" pp_depth depth rev
-        pp_vertices min pp_vertices max
+      "@[<2>iter:@ %arev=%b,@ min=%a,@ max=%a@, cache=%a@]"
+        pp_depth
+        depth
+        rev
+        pp_vertices
+        min
+        pp_vertices
+        max
         Fmt.(Dump.option int)
-        cache_size];
+        cache_size] ;
     let marks = Table.create cache_size in
     let mark key level = Table.add marks key level in
     let todo = Stack.create () in
@@ -121,14 +138,15 @@ struct
         (fun acc -> function
           | `Branch _ as x -> (x :: pred x) @ acc
           | x -> x :: acc)
-        [] min
+        []
+        min
     in
     let min = Set.of_list min in
     let has_mark key = Table.mem marks key in
-    List.iter (fun k -> Stack.push (Visit (k, 0)) todo) max;
+    List.iter (fun k -> Stack.push (Visit (k, 0)) todo) max ;
     let treat key =
-      [%log.debug "TREAT %a" Type.(pp X.t) key];
-      node key;
+      [%log.debug "TREAT %a" Type.(pp X.t) key] ;
+      node key ;
       if not (Set.mem key min) then
         (* the edge function is optional to prevent an unnecessary computation
            of the preds .*)
@@ -157,9 +175,9 @@ struct
         | true -> ()
         | false ->
             let () =
-              [%log.debug "VISIT %a %d" Type.(pp X.t) key level];
-              mark key level;
-              if rev then Stack.push (Treat key) todo;
+              [%log.debug "VISIT %a %d" Type.(pp X.t) key level] ;
+              mark key level ;
+              if rev then Stack.push (Treat key) todo ;
               match key with
               | `Commit _ ->
                   visit_predecessors ~filter_history:(Set.mem key min) key level
@@ -182,9 +200,9 @@ struct
     let mark key level = Table.add marks key level in
     let todo = Queue.create () in
     let has_mark key = Table.mem marks key in
-    List.iter (fun k -> Queue.push (Visit (k, 0)) todo) max;
+    List.iter (fun k -> Queue.push (Visit (k, 0)) todo) max ;
     let treat key =
-      [%log.debug "TREAT %a" Type.(pp X.t) key];
+      [%log.debug "TREAT %a" Type.(pp X.t) key] ;
       node key
     in
     let visit_predecessors key level =
@@ -194,9 +212,9 @@ struct
     let visit key level =
       if has_mark key then ()
       else (
-        [%log.debug "VISIT %a" Type.(pp X.t) key];
-        mark key level;
-        treat key;
+        [%log.debug "VISIT %a" Type.(pp X.t) key] ;
+        mark key level ;
+        treat key ;
         visit_predecessors key level)
     in
     let rec pop () =
@@ -210,33 +228,38 @@ struct
 
   let closure ?(depth = max_int) ~pred ~min ~max () =
     let g = G.create ~size:1024 () in
-    List.iter (G.add_vertex g) max;
+    List.iter (G.add_vertex g) max ;
     let node key =
       if not (G.mem_vertex g key) then G.add_vertex g key else ()
     in
     let edge node pred = G.add_edge g pred node in
     let skip _ = false in
-    iter ~depth ~pred ~min ~max ~node ~edge ~skip ~rev:false ();
+    iter ~depth ~pred ~min ~max ~node ~edge ~skip ~rev:false () ;
     g
 
   let min g =
     G.fold_vertex
       (fun v acc -> if G.in_degree g v = 0 then v :: acc else acc)
-      g []
+      g
+      []
 
   let max g =
     G.fold_vertex
       (fun v acc -> if G.out_degree g v = 0 then v :: acc else acc)
-      g []
+      g
+      []
 
   let vertex_attributes = ref (fun _ -> [])
+
   let edge_attributes = ref (fun _ -> [])
+
   let graph_name = ref None
 
   module Dot = Graph.Graphviz.Dot (struct
     include G
 
     let edge_attributes k = !edge_attributes k
+
     let default_edge_attributes _ = []
 
     let vertex_name k =
@@ -248,26 +271,28 @@ struct
       | `Branch b -> str Branch.t b
 
     let vertex_attributes k = !vertex_attributes k
+
     let default_vertex_attributes _ = []
+
     let get_subgraph _ = None
 
     let graph_attributes _ =
-      match !graph_name with None -> [] | Some n -> [ `Label n ]
+      match !graph_name with None -> [] | Some n -> [`Label n]
   end)
 
   let export t = (vertex t, edges t)
 
   let import (vs, es) =
     let g = G.create ~size:(List.length vs) () in
-    List.iter (G.add_vertex g) vs;
-    List.iter (fun (v1, v2) -> G.add_edge g v1 v2) es;
+    List.iter (G.add_vertex g) vs ;
+    List.iter (fun (v1, v2) -> G.add_edge g v1 v2) es ;
     g
 
   let output ppf vertex edges name =
-    [%log.debug "output %s" name];
+    [%log.debug "output %s" name] ;
     let g = G.create ~size:(List.length vertex) () in
-    List.iter (fun (v, _) -> G.add_vertex g v) vertex;
-    List.iter (fun (v1, _, v2) -> G.add_edge g v1 v2) edges;
+    List.iter (fun (v, _) -> G.add_vertex g v) vertex ;
+    List.iter (fun (v1, _, v2) -> G.add_edge g v1 v2) edges ;
     let eattrs (v1, v2) =
       try
         let l = List.filter (fun (x, _, y) -> x = v1 && y = v2) edges in
@@ -277,13 +302,13 @@ struct
         in
         match labels with
         | [] -> others
-        | [ l ] -> `Label l :: others
+        | [l] -> `Label l :: others
         | _ -> `Label (String.concat "," labels) :: others
       with Not_found -> []
     in
     let vattrs v = try List.assoc v vertex with Not_found -> [] in
-    vertex_attributes := vattrs;
-    edge_attributes := eattrs;
-    graph_name := Some name;
+    vertex_attributes := vattrs ;
+    edge_attributes := eattrs ;
+    graph_name := Some name ;
     Dot.fprint_graph ppf g
 end

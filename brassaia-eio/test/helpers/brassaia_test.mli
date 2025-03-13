@@ -15,6 +15,7 @@
  *)
 
 module type S = Common.S
+
 module type Generic_key = Common.Generic_key
 
 val reporter : ?prefix:string -> unit -> Logs.reporter
@@ -45,9 +46,13 @@ module Suite : sig
     t
 
   val name : t -> string
+
   val config : t -> Brassaia.config
+
   val store : t -> (module S) option
+
   val init : t -> config:Brassaia.config -> unit
+
   val clean : t -> config:Brassaia.config -> unit
 end
 
@@ -55,9 +60,13 @@ val line : string -> unit
 
 module Schema = Common.Schema
 
-val store : (module Brassaia.Maker) -> (module Brassaia.Metadata.S) -> (module S)
+val store :
+  (module Brassaia.Maker) -> (module Brassaia.Metadata.S) -> (module S)
+
 val testable : 'a Brassaia.Type.t -> 'a Alcotest.testable
+
 val check : 'a Brassaia.Type.t -> string -> 'a -> 'a -> unit
+
 val checks : 'a Brassaia.Type.t -> string -> 'a list -> 'a list -> unit
 
 module Store : sig

@@ -16,24 +16,28 @@
 
 open Import
 
-type t
 (** An LRU that support memory-bound capacity via configuration key
     [lru_max_memory]. Falls back to entry-based capacity via [lru_size]
     configuration key, if max memory is not configured. *)
+type t
 
 type key = int63
+
 type value = Brassaia_pack.Pack_value.kinded
 
 val create : Brassaia.Backend.Conf.t -> t
 
-val add : t -> int63 -> Brassaia_pack.Pack_value.weight -> value -> unit
 (** [add t key weight value] maps [value] with [weight] to [key] in [t].
 
     Note: {!Brassaia_pack.Pack_value.Immediate} weights will be checked to see if
     they exceed an entry weight limit. The current hard-coded entry weight limit
     is 20kB. *)
+val add : t -> int63 -> Brassaia_pack.Pack_value.weight -> value -> unit
 
 val find : t -> key -> value
+
 val mem : t -> key -> bool
+
 val clear : t -> unit
+
 val iter : t -> (key -> value -> unit) -> unit

@@ -23,35 +23,36 @@ module type S = sig
       Read-only stores are store where it is only possible to read existing
       values. *)
 
-  type -'a t
   (** The type for stores. The ['a] phantom type carries information about the
       store mutability. *)
+  type -'a t
 
-  type key
   (** The type for keys. *)
+  type key
 
-  type value
   (** The type for raw values. *)
+  type value
 
-  val mem : [> read ] t -> key -> bool
   (** [mem t k] is true iff [k] is present in [t]. *)
+  val mem : [> read] t -> key -> bool
 
-  val find : [> read ] t -> key -> value option
   (** [find t k] is [Some v] if [k] is associated to [v] in [t] and [None] is
       [k] is not present in [t]. *)
+  val find : [> read] t -> key -> value option
 
-  include Closeable with type 'a t := 'a t
   (** @inline *)
+  include Closeable with type 'a t := 'a t
 end
 
 module type Maker = functor (Key : Type.S) (Value : Type.S) -> sig
   include S with type key = Key.t and type value = Value.t
 
-  include Of_config with type 'a t := 'a t
   (** @inline *)
+  include Of_config with type 'a t := 'a t
 end
 
 module type Sigs = sig
   module type S = S
+
   module type Maker = Maker
 end

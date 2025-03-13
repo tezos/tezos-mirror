@@ -14,5 +14,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Dispatcher_intf.Sigs
 (** @inline *)
+include Dispatcher_intf.Sigs

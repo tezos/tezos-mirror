@@ -21,7 +21,9 @@ module type Persistent = sig
   include S
 
   type file_manager
+
   type dict
+
   type dispatcher
 
   val v :
@@ -35,7 +37,7 @@ module type Persistent = sig
   include Brassaia_pack.Checkable with type 'a t := 'a t and type hash := hash
 
   (* val reload : 'a t -> unit *)
-  val integrity_check_inodes : [ `Read ] t -> key -> (unit, string) result
+  val integrity_check_inodes : [`Read] t -> key -> (unit, string) result
 
   module Pack :
     Pack_store.S
@@ -56,16 +58,23 @@ module type Persistent = sig
     Snapshot with type hash = hash and type metadata = Val.metadata
 
   val to_snapshot : Raw.t -> Snapshot.inode
+
   val of_snapshot : 'a t -> index:(hash -> key) -> Snapshot.inode -> value
+
   val purge_lru : 'a t -> unit
+
   val key_of_offset : 'a t -> int63 -> key
+
   val unsafe_find_no_prefetch : 'a t -> key -> value option
+
   val get_offset : 'a t -> key -> int63
+
   val get_length : 'a t -> key -> int
 end
 
 module type Sigs = sig
   module type S = S
+
   module type Persistent = Persistent
 
   module Make_persistent

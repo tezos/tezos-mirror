@@ -17,45 +17,47 @@
 module type S = sig
   (** {1 Watch Helpers} *)
 
-  type key
   (** The type for store keys. *)
+  type key
 
-  type value
   (** The type for store values. *)
+  type value
 
-  type watch
   (** The type for watch handlers. *)
+  type watch
 
-  type t
   (** The type for watch state. *)
+  type t
 
-  val stats : t -> int * int
   (** [stats t] is a tuple [(k,a)] represeting watch stats. [k] is the number of
       single key watchers for the store [t] and [a] the number of global
       watchers for [t]. *)
+  val stats : t -> int * int
 
-  val notify : t -> key -> value option -> unit
   (** Notify all listeners in the given watch state that a key has changed, with
       the new value associated to this key. [None] means the key has been
       removed. *)
+  val notify : t -> key -> value option -> unit
 
-  val v : unit -> t
   (** Create a watch state. *)
+  val v : unit -> t
 
-  val clear : t -> unit
   (** Clear all register listeners in the given watch state. *)
+  val clear : t -> unit
 
-  val watch_key : t -> key -> ?init:value -> (value Diff.t -> unit) -> watch
   (** Watch a given key for changes. More efficient than {!watch}. *)
+  val watch_key : t -> key -> ?init:value -> (value Diff.t -> unit) -> watch
 
-  val watch :
-    t -> ?init:(key * value) list -> (key -> value Diff.t -> unit) -> watch
   (** Add a watch handler. To watch a specific key, use {!watch_key} which is
       more efficient. *)
+  val watch :
+    t -> ?init:(key * value) list -> (key -> value Diff.t -> unit) -> watch
 
-  val unwatch : t -> watch -> unit
   (** Remove a watch handler. *)
+  val unwatch : t -> watch -> unit
 
+  (** Register a thread looking for changes in the given directory and return a
+      function to stop watching and free up resources. *)
   val listen_dir :
     t ->
     string ->
@@ -63,31 +65,29 @@ module type S = sig
     value:(key -> value option) ->
     unit ->
     unit
-  (** Register a thread looking for changes in the given directory and return a
-      function to stop watching and free up resources. *)
 end
 
 module type Sigs = sig
-  module type S = S
   (** The signature for watch helpers. *)
+  module type S = S
 
-  val workers : unit -> int
   (** [workers ()] is the number of background worker threads managing event
       notification currently active. *)
+  val workers : unit -> int
 
-  type hook = int -> string -> (string -> unit) -> unit -> unit
   (** The type for watch hooks. *)
+  type hook = int -> string -> (string -> unit) -> unit -> unit
 
-  val none : hook
   (** [none] is the hooks which asserts false. *)
+  val none : hook
 
-  val set_watch_switch : Eio.Switch.t -> unit
   (** A terrible hack that will need fixed... *)
+  val set_watch_switch : Eio.Switch.t -> unit
 
-  val set_listen_dir_hook : hook -> unit
   (** Register a function which looks for file changes in a directory and return
       a function to stop watching. It is probably best to use
       {!Brassaia_watcher.hook} there. By default, it uses {!none}. *)
+  val set_listen_dir_hook : hook -> unit
 
   (** [Make] builds an implementation of watch helpers. *)
   module Make (K : Type.S) (V : Type.S) :

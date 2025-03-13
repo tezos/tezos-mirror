@@ -44,7 +44,7 @@ module Make (Io : Io_intf.S) = struct
     let from = t.last_refill_offset in
     let new_size = Ao.end_poff t.ao in
     let len = Int63.to_int Int63.Syntax.(new_size - from) in
-    t.last_refill_offset <- new_size;
+    t.last_refill_offset <- new_size ;
     let+ raw = Ao.read_to_string t.ao ~off:from ~len in
     let pos_ref = ref 0 in
     let rec aux n =
@@ -53,9 +53,9 @@ module Make (Io : Io_intf.S) = struct
         let v = decode_bin_int32 raw pos_ref in
         let len = Int32.to_int v in
         let v = String.sub raw !pos_ref len in
-        pos_ref := !pos_ref + len;
-        Hashtbl.add t.cache v n;
-        Hashtbl.add t.index n v;
+        pos_ref := !pos_ref + len ;
+        Hashtbl.add t.cache v n ;
+        Hashtbl.add t.index n v ;
         (aux [@tailcall]) (n + 1)
     in
     (aux [@tailcall]) (Hashtbl.length t.cache)
@@ -66,19 +66,19 @@ module Make (Io : Io_intf.S) = struct
     refill t
 
   let index t v =
-    [%log.debug "[dict] index %S" v];
+    [%log.debug "[dict] index %S" v] ;
     try Some (Hashtbl.find t.cache v)
     with Not_found ->
       let id = Hashtbl.length t.cache in
       if id > t.capacity then None
       else (
-        append_string t v;
-        Hashtbl.add t.cache v id;
-        Hashtbl.add t.index id v;
+        append_string t v ;
+        Hashtbl.add t.cache v id ;
+        Hashtbl.add t.index id v ;
         Some id)
 
   let find t id =
-    [%log.debug "[dict] find %d" id];
+    [%log.debug "[dict] find %d" id] ;
     let v = try Some (Hashtbl.find t.index id) with Not_found -> None in
     v
 
@@ -88,7 +88,7 @@ module Make (Io : Io_intf.S) = struct
     let cache = Hashtbl.create 997 in
     let index = Hashtbl.create 997 in
     let last_refill_offset = Int63.zero in
-    { capacity = default_capacity; index; cache; ao; last_refill_offset }
+    {capacity = default_capacity; index; cache; ao; last_refill_offset}
 
   let create_rw ~overwrite ~path:filename =
     let open Result_syntax in
@@ -112,7 +112,10 @@ module Make (Io : Io_intf.S) = struct
     v_filled ao
 
   let end_poff t = Ao.end_poff t.ao
+
   let flush t = Ao.flush t.ao
+
   let fsync t = Ao.fsync t.ao
+
   let close t = Ao.close t.ao
 end

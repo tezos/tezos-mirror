@@ -18,8 +18,10 @@ include Key_intf
 
 module Of_hash (Hash : Type.S) = struct
   type t = Hash.t [@@deriving brassaia]
+
   type hash = Hash.t
 
   let to_hash x = x [@@inline]
+
   let of_hash x = x [@@inline]
 end

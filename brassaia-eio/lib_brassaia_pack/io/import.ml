@@ -49,13 +49,21 @@ module Int63 = struct
 
   module Syntax = struct
     let ( + ) = add
+
     let ( - ) = sub
+
     let ( * ) = mul
+
     let ( / ) = div
+
     let ( < ) a b = compare a b < 0
+
     let ( <= ) a b = compare a b <= 0
+
     let ( > ) a b = compare a b > 0
+
     let ( >= ) a b = compare a b >= 0
+
     let ( = ) = equal
   end
 end
@@ -72,7 +80,9 @@ module Indexable = Brassaia_pack.Indexable
 
 module Result_syntax = struct
   let ( let+ ) res f = Result.map f res
+
   let ( let* ) = Result.bind
+
   let ( >>= ) = Result.bind
 end
 
@@ -91,6 +101,7 @@ module Mtime = struct
     include Mtime.Span
 
     let to_s span = Mtime.Span.to_float_ns span *. 1e-9
+
     let to_us span = Mtime.Span.to_float_ns span *. 1e-3
   end
 end

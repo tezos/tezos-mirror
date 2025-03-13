@@ -26,7 +26,7 @@ let suite =
   ]
 
 let () =
-  Logs.set_level (Some Debug);
-  Logs.set_reporter (Brassaia_test.reporter ());
-  Random.self_init ();
+  Logs.set_level (Some Debug) ;
+  Logs.set_reporter (Brassaia_test.reporter ()) ;
+  Random.self_init () ;
   Eio_main.run @@ fun _ -> Alcotest.run "brassaia" suite

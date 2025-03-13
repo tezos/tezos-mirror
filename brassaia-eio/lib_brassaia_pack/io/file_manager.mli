@@ -14,5 +14,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include File_manager_intf.Sigs
 (** @inline *)
+include File_manager_intf.Sigs

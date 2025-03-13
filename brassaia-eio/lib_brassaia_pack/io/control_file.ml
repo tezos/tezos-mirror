@@ -23,7 +23,7 @@ module Checksum = struct
     let open Checkseum in
     let result = ref Adler32.default in
     encode_bin (set_checksum payload Int63.zero) (fun str ->
-        result := Adler32.digest_string str 0 (String.length str) !result);
+        result := Adler32.digest_string str 0 (String.length str) !result) ;
     Int63.of_int (Optint.to_int !result)
 
   let calculate_and_set ~encode_bin ~set_checksum ~payload =
@@ -38,6 +38,7 @@ end
 module Serde = struct
   module type S = sig
     type payload
+
     type raw_payload
 
     val of_bin_string :
@@ -90,7 +91,7 @@ module Serde = struct
 
         let is_checksum_valid payload =
           let encode_bin = Brassaia.Type.(unstage (pre_hash t)) in
-          let set_checksum payload checksum = { payload with checksum } in
+          let set_checksum payload checksum = {payload with checksum} in
           let get_checksum payload = payload.checksum in
           Checksum.is_valid ~payload ~encode_bin ~set_checksum ~get_checksum
 
@@ -101,18 +102,26 @@ module Serde = struct
         include Payload.Upper.V5
 
         let checksum_encode_bin = Brassaia.Type.(unstage (pre_hash t))
-        let set_checksum payload checksum = { payload with checksum }
+
+        let set_checksum payload checksum = {payload with checksum}
+
         let get_checksum payload = payload.checksum
 
         let is_checksum_valid payload =
-          Checksum.is_valid ~payload ~encode_bin:checksum_encode_bin
-            ~set_checksum ~get_checksum
+          Checksum.is_valid
+            ~payload
+            ~encode_bin:checksum_encode_bin
+            ~set_checksum
+            ~get_checksum
 
         let set_checksum payload =
-          Checksum.calculate_and_set ~encode_bin:checksum_encode_bin
-            ~set_checksum ~payload
+          Checksum.calculate_and_set
+            ~encode_bin:checksum_encode_bin
+            ~set_checksum
+            ~payload
 
         let of_bin_string = Brassaia.Type.(unstage (of_bin_string t))
+
         let to_bin_string = Brassaia.Type.(unstage (to_bin_string t))
       end
 
@@ -160,6 +169,7 @@ module Serde = struct
     module Latest = Data.Plv5
 
     type payload = Latest.t
+
     type raw_payload = Data.t
 
     let upgrade_from_v3 (pl : Payload.Upper.V3.t) : payload =
@@ -171,7 +181,7 @@ module Serde = struct
         | From_v3_used_non_minimal_indexing_strategy ->
             Used_non_minimal_indexing_strategy
         | From_v3_gced x ->
-            chunk_start_idx := x.generation;
+            chunk_start_idx := x.generation ;
             Gced
               {
                 suffix_start_offset = x.suffix_start_offset;
@@ -241,6 +251,7 @@ module Serde = struct
 
     (* Similar yo [of_bin_string] but skips version upgrade *)
     let raw_of_bin_string = Data.of_bin_string
+
     let to_bin_string payload = Data.(to_bin_string (Valid (V5 payload)))
   end
 
@@ -253,18 +264,26 @@ module Serde = struct
         include Payload.Volume.V5
 
         let checksum_encode_bin = Brassaia.Type.(unstage (pre_hash t))
-        let set_checksum payload checksum = { payload with checksum }
+
+        let set_checksum payload checksum = {payload with checksum}
+
         let get_checksum payload = payload.checksum
 
         let is_checksum_valid payload =
-          Checksum.is_valid ~payload ~encode_bin:checksum_encode_bin
-            ~set_checksum ~get_checksum
+          Checksum.is_valid
+            ~payload
+            ~encode_bin:checksum_encode_bin
+            ~set_checksum
+            ~get_checksum
 
         let set_checksum payload =
-          Checksum.calculate_and_set ~encode_bin:checksum_encode_bin
-            ~set_checksum ~payload
+          Checksum.calculate_and_set
+            ~encode_bin:checksum_encode_bin
+            ~set_checksum
+            ~payload
 
         let of_bin_string = Brassaia.Type.(unstage (of_bin_string t))
+
         let to_bin_string = Brassaia.Type.(unstage (to_bin_string t))
       end
 
@@ -301,6 +320,7 @@ module Serde = struct
     module Payload = Data.Plv5
 
     type payload = Payload.t
+
     type raw_payload = Data.t
 
     let of_bin_string ctx string =
@@ -311,6 +331,7 @@ module Serde = struct
       | Valid (V5 payload) -> Ok payload
 
     let raw_of_bin_string = Data.of_bin_string
+
     let to_bin_string payload = Data.(to_bin_string (Valid (V5 payload)))
   end
 end
@@ -342,7 +363,7 @@ module Make (Serde : Serde.S) (Io : Io_intf.S) = struct
       | Some tmp_path ->
           let* () = Io.close t.io in
           let* io_tmp = Io.create ~path:tmp_path ~overwrite:true in
-          t.io <- io_tmp;
+          t.io <- io_tmp ;
           let* () = write io_tmp payload in
           let+ () = Io.move_file ~src:tmp_path ~dst:t.path in
           Atomic.set t.payload payload
@@ -357,14 +378,14 @@ module Make (Serde : Serde.S) (Io : Io_intf.S) = struct
     let lock = Eio.Mutex.create () in
     let* io = Io.create ~path ~overwrite in
     let+ () = write io payload in
-    { io; payload = Atomic.make payload; path; tmp_path; lock }
+    {io; payload = Atomic.make payload; path; tmp_path; lock}
 
   let open_ ~path ~tmp_path ~readonly =
     let open Result_syntax in
     let lock = Eio.Mutex.create () in
     let* io = Io.open_ ~path ~readonly in
     let+ payload = read io in
-    { io; payload = Atomic.make payload; path; tmp_path; lock }
+    {io; payload = Atomic.make payload; path; tmp_path; lock}
 
   let close t = Eio.Mutex.use_rw ~protect:true t.lock @@ fun () -> Io.close t.io
 
@@ -380,7 +401,7 @@ module Make (Serde : Serde.S) (Io : Io_intf.S) = struct
     else
       let* () = Io.close t.io in
       let* io = Io.open_ ~path:t.path ~readonly:true in
-      t.io <- io;
+      t.io <- io ;
       let+ payload = read io in
       Atomic.set t.payload payload
 

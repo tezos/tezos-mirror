@@ -33,18 +33,26 @@ module Slot : sig
   type t
 
   val of_elt : hashset -> elt -> t
+
   val of_elt_substring : hashset -> src:Bigstringaf.t -> src_off:int -> t
+
   val contains : hashset -> t -> elt -> bool
 
   val contains_substring :
     hashset -> t -> src:Bigstringaf.t -> src_off:int -> bool
 
   val is_empty : hashset -> t -> bool
+
   val get : hashset -> t -> elt
+
   val set : hashset -> t -> elt -> unit
+
   val set_substring : hashset -> t -> src:Bigstringaf.t -> src_off:int -> unit
+
   val next : hashset -> t -> t
+
   val iter_all : hashset -> f:(t -> unit) -> unit
+
   val to_offset : t -> int
 end = struct
   type t = Offset of int [@@ocaml.unboxed]
@@ -70,7 +78,11 @@ end = struct
     Bigstringaf.substring h.data ~off:offset ~len:h.elt_length
 
   let set h (Offset offset) elt =
-    Bigstringaf.blit_from_string elt ~src_off:0 h.data ~dst_off:offset
+    Bigstringaf.blit_from_string
+      elt
+      ~src_off:0
+      h.data
+      ~dst_off:offset
       ~len:h.elt_length
 
   let set_substring h (Offset offset) ~src ~src_off =
@@ -79,12 +91,12 @@ end = struct
   let next h (Offset offset) = Offset ((offset + h.elt_length) mod h.data_length)
 
   let iter_all hashset ~f =
-    assert (hashset.data_length <> 0);
-    f (Offset 0);
+    assert (hashset.data_length <> 0) ;
+    f (Offset 0) ;
     let rec aux = function
       | Offset 0 -> ()
       | offset ->
-          f offset;
+          f offset ;
           aux (next hashset offset)
     in
     aux (next hashset (Offset 0))
@@ -97,14 +109,17 @@ let empty_all_slots t =
 
 module Default = struct
   let hash : string -> int = Hashtbl.hash
+
   let hash_substring t ~off ~len = hash (Bigstringaf.substring t ~off ~len)
+
   let null ~elt_length = String.make elt_length '\000'
 end
 
 let create ~elt_length ?(initial_slots = 0) ?hash ?hash_substring ?null () =
   if elt_length <= 0 then
-    Fmt.invalid_arg "%s.create: element length must be strictly positive"
-      __MODULE__;
+    Fmt.invalid_arg
+      "%s.create: element length must be strictly positive"
+      __MODULE__ ;
   let empty_slot =
     match null with Some x -> x | None -> Default.null ~elt_length
   in
@@ -140,19 +155,19 @@ let create ~elt_length ?(initial_slots = 0) ?hash ?hash_substring ?null () =
       cardinal = 0;
     }
   in
-  empty_all_slots t;
+  empty_all_slots t ;
   t
 
 let load_factor t =
   let slots_available = Bigstringaf.length t.data / t.elt_length in
   Float.of_int t.cardinal /. Float.of_int slots_available
 
-type ok_or_duplicate = [ `Ok | `Duplicate ]
+type ok_or_duplicate = [`Ok | `Duplicate]
 
 let rec unguarded_add t slot elt : ok_or_duplicate =
   if Slot.is_empty t slot then (
     (* Write the element to this slot *)
-    Slot.set t slot elt;
+    Slot.set t slot elt ;
     `Ok)
   else if Slot.contains t slot elt then `Duplicate
   else unguarded_add t (Slot.next t slot) elt
@@ -160,7 +175,7 @@ let rec unguarded_add t slot elt : ok_or_duplicate =
 let rec unguarded_add_substring t slot ~src ~src_off : ok_or_duplicate =
   if Slot.is_empty t slot then (
     (* Write the element to this slot *)
-    Slot.set_substring t slot ~src ~src_off;
+    Slot.set_substring t slot ~src ~src_off ;
     `Ok)
   else if Slot.contains_substring t slot ~src ~src_off then `Duplicate
   else unguarded_add_substring t (Slot.next t slot) ~src ~src_off
@@ -170,11 +185,11 @@ let resize t =
   let old_data = t.data in
   let new_len = old_len + (t.slot_count / 2 * t.elt_length) in
   let new_data = Bigstringaf.create new_len in
-  let old_t = { t with data = old_data; data_length = old_len } in
-  t.data <- new_data;
-  t.data_length <- new_len;
-  t.slot_count <- new_len / t.elt_length;
-  empty_all_slots t;
+  let old_t = {t with data = old_data; data_length = old_len} in
+  t.data <- new_data ;
+  t.data_length <- new_len ;
+  t.slot_count <- new_len / t.elt_length ;
+  empty_all_slots t ;
   Slot.iter_all old_t ~f:(fun old_slot ->
       if not (Slot.is_empty old_t old_slot) then
         let src_off = Slot.to_offset old_slot in
@@ -189,15 +204,16 @@ let max_load_factor = 0.9
 
 let add t elt =
   if String.length elt <> t.elt_length then
-    Fmt.invalid_arg "%s.add: cannot write string of incorrect size to hashset"
-      __MODULE__;
+    Fmt.invalid_arg
+      "%s.add: cannot write string of incorrect size to hashset"
+      __MODULE__ ;
   if String.equal elt t.empty_slot then
-    Fmt.invalid_arg "%s.add: cannot write null value to hashset" __MODULE__;
+    Fmt.invalid_arg "%s.add: cannot write null value to hashset" __MODULE__ ;
 
-  if Float.compare (load_factor t) max_load_factor >= 0 then resize t;
+  if Float.compare (load_factor t) max_load_factor >= 0 then resize t ;
   let slot = Slot.of_elt t elt in
   let result = unguarded_add t slot elt in
-  if result = `Ok then t.cardinal <- t.cardinal + 1;
+  if result = `Ok then t.cardinal <- t.cardinal + 1 ;
   result
 
 let add_exn t elt =
@@ -208,10 +224,11 @@ let add_exn t elt =
 
 let mem t elt =
   if String.length elt <> t.elt_length then
-    Fmt.invalid_arg "%s.mem: cannot read string of incorrect size from hashset"
-      __MODULE__;
+    Fmt.invalid_arg
+      "%s.mem: cannot read string of incorrect size from hashset"
+      __MODULE__ ;
   if String.equal elt t.empty_slot then
-    Fmt.failwith "%s.mem: cannot read null value from hashset" __MODULE__;
+    Fmt.failwith "%s.mem: cannot read null value from hashset" __MODULE__ ;
 
   let rec probe_loop slot =
     if Slot.contains t slot elt then true
@@ -224,8 +241,8 @@ let invariant invariant_elt t =
   let element_count = ref 0 in
   Slot.iter_all t ~f:(fun slot ->
       if not (Slot.is_empty t slot) then (
-        incr element_count;
-        invariant_elt (Slot.get t slot)));
+        incr element_count ;
+        invariant_elt (Slot.get t slot))) ;
   assert (t.cardinal = !element_count)
 
 (* Using [Obj.reachable_words] directly on values of type [t] will give

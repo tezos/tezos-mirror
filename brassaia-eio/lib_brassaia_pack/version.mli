@@ -34,23 +34,25 @@
 
     See `doc/brassaia-pack/version-history.md` for other documentation. *)
 
-type t = [ `V1 | `V2 | `V3 | `V4 | `V5 ] [@@deriving brassaia]
 (** The type for version numbers. *)
+type t = [`V1 | `V2 | `V3 | `V4 | `V5] [@@deriving brassaia]
 
 val to_int : t -> int
+
 val compare : t -> t -> int
+
 val latest : t
 
-val pp : t Fmt.t
 (** [pp] is the pretty-format for version numbers. *)
+val pp : t Fmt.t
 
-val to_bin : t -> string
 (** [to_bin t] is the 8-bytes binary representation of [t]. *)
+val to_bin : t -> string
 
-val of_bin : string -> t option
 (** [of_bin s] is [Some t] is [to_bin t] is [s] and [None] otherwise. *)
+val of_bin : string -> t option
 
-val invalid_arg : string -> 'a
 (** [invalid_arg str] raises [Invalid_argument]. *)
+val invalid_arg : string -> 'a
 
-exception Invalid of { expected : t; found : t }
+exception Invalid of {expected : t; found : t}

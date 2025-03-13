@@ -34,14 +34,16 @@ module type S = sig
         of the first peer. *)
 
   type contents
+
   type hash
+
   type step
+
   type metadata
 
-  type kinded_hash = [ `Contents of hash * metadata | `Node of hash ]
+  type kinded_hash = [`Contents of hash * metadata | `Node of hash]
   [@@deriving brassaia]
 
-  type 'a inode = { length : int; proofs : (int * 'a) list } [@@deriving brassaia]
   (** The type for (internal) inode proofs.
 
       These proofs encode large directories into a tree-like structure.
@@ -61,9 +63,8 @@ module type S = sig
       {e For [brassaia-pack]}: [proofs] have a length of at most [Conf.entries]
       entries. For binary trees, this boolean index is a step of the left-right
       sequence / decision proof corresponding to the path in that binary tree. *)
+  type 'a inode = {length : int; proofs : (int * 'a) list} [@@deriving brassaia]
 
-  type 'a inode_extender = { length : int; segments : int list; proof : 'a }
-  [@@deriving brassaia]
   (** The type for inode extenders.
 
       An extender is a compact representation of a sequence of [inode] which
@@ -75,6 +76,8 @@ module type S = sig
       then it is compressed into the inode extender
       [{length=l; segment = [i_0;..;i_n]; proof=p}] sharing the same length [l]
       and final proof [p]. *)
+  type 'a inode_extender = {length : int; segments : int list; proof : 'a}
+  [@@deriving brassaia]
 
   (** The type for compressed and partial Merkle tree proofs.
 
@@ -120,27 +123,27 @@ module type S = sig
     | Inode_extender of inode_tree inode_extender
   [@@deriving brassaia]
 
-  type t [@@deriving brassaia]
   (** The type for Merkle proofs.
 
       A proof [p] proves that the state advanced from [before p] to [after p].
       [state p]'s hash is [before p], and [state p] contains the minimal
       information for the computation to reach [after p]. *)
+  type t [@@deriving brassaia]
 
-  val v : before:kinded_hash -> after:kinded_hash -> tree -> t
   (** [v ~before ~after p] proves that the state advanced from [before] to
       [after]. [p]'s hash is [before], and [p] contains the minimal information
       for the computation to reach [after]. *)
+  val v : before:kinded_hash -> after:kinded_hash -> tree -> t
 
-  val before : t -> kinded_hash
   (** [before t] it the state's hash at the beginning of the computation. *)
+  val before : t -> kinded_hash
 
-  val after : t -> kinded_hash
   (** [after t] is the state's hash at the end of the computation. *)
+  val after : t -> kinded_hash
 
-  val state : t -> tree
   (** [state t] is a subset of the initial state needed to prove that the proven
       computation could run without performing any I/O. *)
+  val state : t -> tree
 end
 
 (** Environment that tracks side effects during the production/consumption of
@@ -206,42 +209,56 @@ end
     [Backend.Node_portable.t]. *)
 module type Env = sig
   type mode = Produce | Serialise | Deserialise | Consume
+
   type t [@@deriving brassaia]
+
   type hash
+
   type node
+
   type pnode
+
   type contents
 
   val is_empty : t -> bool
+
   val empty : unit -> t
+
   val copy : into:t -> t -> unit
 
   (** {2 Modes} *)
 
   val set_mode : t -> mode -> unit
+
   val with_produce : (t -> start_serialise:(unit -> unit) -> 'a) -> 'a
+
   val with_consume : (t -> stop_deserialise:(unit -> unit) -> 'a) -> 'a
 
   (** {2 Interactions With [Tree]} *)
 
   val add_contents_from_store : t -> hash -> contents -> unit
 
-  val add_node_from_store : t -> hash -> node -> node
   (** [add_node_from_store] returns a [node] and not [unit] because [Env] may
       take the opportunity to wrap the input node in [Node.Val.with_handler]. *)
+  val add_node_from_store : t -> hash -> node -> node
 
   val add_contents_from_proof : t -> hash -> contents -> unit
+
   val add_pnode_from_proof : t -> hash -> pnode -> unit
+
   val find_contents : t -> hash -> contents option
+
   val find_node : t -> hash -> node option
+
   val find_pnode : t -> hash -> pnode option
 end
 
 module type Proof = sig
   module type S = S
+
   module type Env = Env
 
-  exception Bad_proof of { context : string }
+  exception Bad_proof of {context : string}
 
   val bad_proof_exn : string -> 'a
 

@@ -14,7 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-type t = value_length:int -> Pack_value.Kind.t -> bool
 (** The type of configurations for [brassaia-pack]'s indexing strategy, which
     dictates whether or not newly-appended pack entries should also be added to
     the index. Strategies are parameterised over:
@@ -26,22 +25,23 @@ type t = value_length:int -> Pack_value.Kind.t -> bool
     Indexing more than the {!minimal} strategy only impacts performance and not
     correctness: more indexing results in a larger index and a smaller pack
     file. *)
+type t = value_length:int -> Pack_value.Kind.t -> bool
 
-val always : t
 (** The strategy that indexes all objects. *)
+val always : t
 
-val minimal : t
 (** The strategy that indexes as few objects as possible while still maintaing
     store integrity. *)
+val minimal : t
 
-val minimal_with_contents : t
 (** The strategy that is similar to the minimal strategy but it also indexes
     contents objects. *)
+val minimal_with_contents : t
 
-val default : t
 (** [default] is the indexing strategy used by [brassaia-pack] instances that do
     not explicitly set an indexing strategy in {!Brassaia_pack.config}. Currently
     set to {!always}. *)
+val default : t
 
-val is_minimal : t -> bool
 (** [is_minimal t] is true if [t] is {!minimal}. *)
+val is_minimal : t -> bool

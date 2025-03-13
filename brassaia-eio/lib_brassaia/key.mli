@@ -88,5 +88,5 @@
     given [h = Key.to_hash k] then [Brassaia.Type.pre_hash key_t k] must equal
     [Brassaia.Type.pre_hash hash_t h]. *)
 
-include Key_intf.Sigs
 (** @inline *)
+include Key_intf.Sigs

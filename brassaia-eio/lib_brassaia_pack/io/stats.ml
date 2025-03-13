@@ -21,6 +21,7 @@ module Pack_store = struct
   include Stats_intf.Pack_store
 
   type Metrics.origin += Pack_store_stats
+
   type stat = t Metrics.t
 
   let create_pack_store () =
@@ -36,7 +37,10 @@ module Pack_store = struct
 
   let init () =
     let initial_state = create_pack_store () in
-    Metrics.v ~origin:Pack_store_stats ~name:"pack_store_metric" ~initial_state
+    Metrics.v
+      ~origin:Pack_store_stats
+      ~name:"pack_store_metric"
+      ~initial_state
       t
 
   let clear m =
@@ -58,12 +62,11 @@ module Pack_store = struct
   let update ~field finds =
     let f v =
       match field with
-      | Appended_hashes -> { v with appended_hashes = succ v.appended_hashes }
-      | Appended_offsets ->
-          { v with appended_offsets = succ v.appended_offsets }
+      | Appended_hashes -> {v with appended_hashes = succ v.appended_hashes}
+      | Appended_offsets -> {v with appended_offsets = succ v.appended_offsets}
       | Staging ->
-          { v with total = succ v.total; from_staging = succ v.from_staging }
-      | Lru -> { v with total = succ v.total; from_lru = succ v.from_lru }
+          {v with total = succ v.total; from_staging = succ v.from_staging}
+      | Lru -> {v with total = succ v.total; from_lru = succ v.from_lru}
       | Pack_direct ->
           {
             v with
@@ -76,7 +79,7 @@ module Pack_store = struct
             total = succ v.total;
             from_pack_indexed = succ v.from_pack_indexed;
           }
-      | Not_found -> { v with total = succ v.total }
+      | Not_found -> {v with total = succ v.total}
     in
     let mut = Metrics.Replace f in
     Metrics.update finds mut
@@ -97,6 +100,7 @@ module Index = struct
   include Stats_intf.Index
 
   type Metrics.origin += Index_stats
+
   type stat = t Metrics.t
 
   let create_index () =
@@ -117,18 +121,18 @@ module Index = struct
 
   let clear (data : stat) =
     let s = Metrics.state data in
-    Index.Stats.reset_stats ();
-    s.bytes_read <- 0;
-    s.nb_reads <- 0;
-    s.bytes_written <- 0;
-    s.nb_writes <- 0;
-    s.nb_merge <- 0;
-    s.merge_durations <- [];
-    s.nb_replace <- 0;
-    s.replace_durations <- [];
-    s.nb_sync <- 0;
-    s.time_sync <- 0.0;
-    s.lru_hits <- 0;
+    Index.Stats.reset_stats () ;
+    s.bytes_read <- 0 ;
+    s.nb_reads <- 0 ;
+    s.bytes_written <- 0 ;
+    s.nb_writes <- 0 ;
+    s.nb_merge <- 0 ;
+    s.merge_durations <- [] ;
+    s.nb_replace <- 0 ;
+    s.replace_durations <- [] ;
+    s.nb_sync <- 0 ;
+    s.time_sync <- 0.0 ;
+    s.lru_hits <- 0 ;
     s.lru_misses <- 0
 
   let init () =
@@ -171,9 +175,9 @@ module File_manager = struct
 
   (* support [reset_stats] function below *)
   let clear' (t : t) =
-    t.dict_flushes <- 0;
-    t.suffix_flushes <- 0;
-    t.index_flushes <- 0;
+    t.dict_flushes <- 0 ;
+    t.suffix_flushes <- 0 ;
+    t.index_flushes <- 0 ;
     ()
 
   let clear (t : stat) = clear' (export t)
@@ -193,13 +197,13 @@ module File_manager = struct
   let update ~field t =
     let f t =
       match field with
-      | Dict_flushes -> { t with dict_flushes = succ t.dict_flushes }
-      | Suffix_flushes -> { t with suffix_flushes = succ t.suffix_flushes }
-      | Index_flushes -> { t with index_flushes = succ t.index_flushes }
-      | Auto_dict -> { t with auto_dict = succ t.auto_dict }
-      | Auto_suffix -> { t with auto_suffix = succ t.auto_suffix }
-      | Auto_index -> { t with auto_index = succ t.auto_index }
-      | Flush -> { t with flush = succ t.flush }
+      | Dict_flushes -> {t with dict_flushes = succ t.dict_flushes}
+      | Suffix_flushes -> {t with suffix_flushes = succ t.suffix_flushes}
+      | Index_flushes -> {t with index_flushes = succ t.index_flushes}
+      | Auto_dict -> {t with auto_dict = succ t.auto_dict}
+      | Auto_suffix -> {t with auto_suffix = succ t.auto_suffix}
+      | Auto_index -> {t with auto_index = succ t.auto_index}
+      | Flush -> {t with flush = succ t.flush}
     in
     Metrics.update t (Metrics.Replace f)
 end
@@ -208,6 +212,7 @@ module Latest_gc = struct
   include Stats_intf.Latest_gc
 
   type Metrics.origin += Latest_gc
+
   type stat = t Metrics.t
 
   (* [stats] is the latest_gc stats.
@@ -270,14 +275,16 @@ let s =
   }
 
 let reset_stats () =
-  Pack_store.clear s.pack_store;
-  Index.clear s.index;
-  File_manager.clear s.file_manager;
-  Latest_gc.clear s.latest_gc;
+  Pack_store.clear s.pack_store ;
+  Index.clear s.index ;
+  File_manager.clear s.file_manager ;
+  Latest_gc.clear s.latest_gc ;
   ()
 
 let get () = s
+
 let report_pack_store ~field = Pack_store.update ~field s.pack_store
+
 let report_index () = Index.report s.index
 
 let incr_appended_hashes () =
@@ -286,25 +293,28 @@ let incr_appended_hashes () =
 let incr_appended_offsets () =
   Pack_store.update ~field:Pack_store.Appended_offsets s.pack_store
 
-type cache_stats = { cache_misses : float }
-type offset_stats = { offset_ratio : float; offset_significance : int }
+type cache_stats = {cache_misses : float}
+
+type offset_stats = {offset_ratio : float; offset_significance : int}
 
 let div_or_zero a b = if b = 0 then 0. else float_of_int a /. float_of_int b
 
 let get_cache_stats () =
   let pack_store = Metrics.state s.pack_store in
   let cache_misses = Pack_store.cache_misses pack_store in
-  { cache_misses = div_or_zero cache_misses pack_store.total }
+  {cache_misses = div_or_zero cache_misses pack_store.total}
 
 let get_offset_stats () =
   let pack_store = Metrics.state s.pack_store in
   {
     offset_ratio =
-      div_or_zero pack_store.appended_offsets
+      div_or_zero
+        pack_store.appended_offsets
         (pack_store.appended_offsets + pack_store.appended_hashes);
     offset_significance =
       pack_store.appended_offsets + pack_store.appended_hashes;
   }
 
 let incr_fm_field field = File_manager.update ~field s.file_manager
+
 let report_latest_gc x = Latest_gc.update x s.latest_gc

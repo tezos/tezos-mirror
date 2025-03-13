@@ -23,17 +23,17 @@ module type S = sig
       Append-only stores are store where it is possible to read and add new
       values. *)
 
+  (** @inline *)
   include Read_only.S
-  (** @inline *)
 
-  val add : [> write ] t -> key -> value -> unit
   (** Write the contents of a value to the store. *)
+  val add : [> write] t -> key -> value -> unit
 
+  (** @inline *)
   include Closeable with type 'a t := 'a t
-  (** @inline *)
 
-  include Batch with type 'a t := 'a t
   (** @inline *)
+  include Batch with type 'a t := 'a t
 end
 
 module Append_only_is_a_read_only (X : S) : Read_only.S = X
@@ -41,11 +41,12 @@ module Append_only_is_a_read_only (X : S) : Read_only.S = X
 module type Maker = functor (K : Type.S) (V : Type.S) -> sig
   include S with type key = K.t and type value = V.t
 
-  include Of_config with type 'a t := 'a t
   (** @inline *)
+  include Of_config with type 'a t := 'a t
 end
 
 module type Sigs = sig
   module type S = S
+
   module type Maker = Maker
 end

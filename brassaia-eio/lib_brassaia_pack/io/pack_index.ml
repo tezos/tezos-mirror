@@ -18,16 +18,23 @@
 open! Import
 include Pack_index_intf
 
-module Make_io (Io : Io_intf.S) (Io_index : Index.Platform.S) (K : Brassaia.Hash.S) =
+module Make_io
+    (Io : Io_intf.S)
+    (Io_index : Index.Platform.S)
+    (K : Brassaia.Hash.S) =
 struct
   module Key = struct
     type t = K.t
     [@@deriving brassaia ~short_hash ~equal ~to_bin_string ~decode_bin]
 
     let hash = short_hash ?seed:None
+
     let hash_size = 30
+
     let encode = to_bin_string
+
     let encoded_size = K.hash_size
+
     let decode s off = decode_bin s (ref off)
   end
 
@@ -38,9 +45,9 @@ struct
 
     let encode ((off, len, kind) : t) =
       let buf = Bytes.create encoded_size in
-      Bytes.set_int64_be buf 0 (Int63.to_int64 off);
-      Bytes.set_int32_be buf 8 (Int32.of_int len);
-      Bytes.set buf 12 (Pack_value.Kind.to_magic kind);
+      Bytes.set_int64_be buf 0 (Int63.to_int64 off) ;
+      Bytes.set_int32_be buf 8 (Int32.of_int len) ;
+      Bytes.set buf 12 (Pack_value.Kind.to_magic kind) ;
       (* Bytes.unsafe_to_string usage: buf is local, uniquely owned. We assume the various
          functions above return unique ownership of buf. Then in the call to
          Bytes.unsafe_to_string we give up unique ownership of buf for ownership of the
@@ -72,7 +79,13 @@ struct
   let v ?flush_callback ?fresh ?readonly ?throttle ?lru_size ~log_size root =
     try
       Ok
-        (v_exn ?flush_callback ?fresh ?readonly ?throttle ?lru_size ~log_size
+        (v_exn
+           ?flush_callback
+           ?fresh
+           ?readonly
+           ?throttle
+           ?lru_size
+           ~log_size
            root)
     with
     | I.RO_not_allowed ->
@@ -90,12 +103,14 @@ struct
     | Failure msg -> Error (`Index_failure msg)
 
   let add ?overcommit t k v = replace ?overcommit t k v
+
   let find t k = match find t k with exception Not_found -> None | h -> Some h
+
   let close_exn t = Index_raw.close t
 
   let close t =
     try
-      close_exn t;
+      close_exn t ;
       Ok ()
     with
     | I.RO_not_allowed -> Error `Ro_not_allowed
@@ -105,7 +120,7 @@ struct
 
   let reload t =
     try
-      Index_raw.sync t;
+      Index_raw.sync t ;
       Ok ()
     with
     | I.RO_not_allowed -> Error `Ro_not_allowed
@@ -115,7 +130,7 @@ struct
 
   let flush t ~with_fsync =
     try
-      Index_raw.flush ~no_callback:() ~with_fsync t;
+      Index_raw.flush ~no_callback:() ~with_fsync t ;
       Ok ()
     with
     | I.RO_not_allowed -> Error `Ro_not_allowed

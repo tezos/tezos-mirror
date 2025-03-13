@@ -15,8 +15,8 @@
  *)
 
 module type S = sig
-  type t [@@deriving brassaia]
   (** The type for keys. *)
+  type t [@@deriving brassaia]
 
   type hash
 
@@ -32,7 +32,9 @@ end
 module Store_spec = struct
   module type S = sig
     type ('h, 'v) contents_key
+
     type 'h node_key
+
     type 'h commit_key
   end
 
@@ -47,6 +49,7 @@ end
 
 module type Sigs = sig
   module type S = S
+
   module type Hash_like = Hash_like
 
   (** The simplest possible [Key] implementation is just a hash of the
@@ -55,6 +58,7 @@ module type Sigs = sig
 
   module Store_spec : sig
     module type S = Store_spec.S
+
     module type Hash_keyed = Store_spec.Hash_keyed
 
     module Hash_keyed : Hash_keyed

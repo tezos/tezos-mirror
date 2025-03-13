@@ -19,8 +19,8 @@ open Common
 
 let test_dir = Filename.concat "_build" "test-db-pack"
 
-module Brassaia_pack_store (Config : Brassaia_pack.Conf.S) : Brassaia_test.Generic_key =
-struct
+module Brassaia_pack_store (Config : Brassaia_pack.Conf.S) :
+  Brassaia_test.Generic_key = struct
   open Brassaia_pack_unix.Maker (Config)
 
   include Make (struct
@@ -31,9 +31,11 @@ struct
   end)
 end
 
-let suite_pack name_suffix indexing_strategy (module Config : Brassaia_pack.Conf.S)
-    =
-  let store = (module Brassaia_pack_store (Config) : Brassaia_test.Generic_key) in
+let suite_pack name_suffix indexing_strategy
+    (module Config : Brassaia_pack.Conf.S) =
+  let store =
+    (module Brassaia_pack_store (Config) : Brassaia_test.Generic_key)
+  in
   let config =
     Brassaia_pack.config ~fresh:false ~lru_size:0 ~indexing_strategy test_dir
   in
@@ -44,8 +46,14 @@ let suite_pack name_suffix indexing_strategy (module Config : Brassaia_pack.Conf
     rm_dir test_dir
   in
   let clean = init in
-  Brassaia_test.Suite.create_generic_key ~name:("PACK" ^ name_suffix)
-    ~import_supported:false ~init ~store ~config ~clean ()
+  Brassaia_test.Suite.create_generic_key
+    ~name:("PACK" ^ name_suffix)
+    ~import_supported:false
+    ~init
+    ~store
+    ~config
+    ~clean
+    ()
 
 module Brassaia_tezos_conf = struct
   include Brassaia_tezos.Conf
@@ -68,17 +76,25 @@ end
 let suite_mem =
   let store = (module Brassaia_pack_mem_maker : Brassaia_test.Generic_key) in
   let config = Brassaia_pack.config ~fresh:false ~lru_size:0 test_dir in
-  Brassaia_test.Suite.create_generic_key ~import_supported:false ~name:"PACK MEM"
-    ~store ~config ()
+  Brassaia_test.Suite.create_generic_key
+    ~import_supported:false
+    ~name:"PACK MEM"
+    ~store
+    ~config
+    ()
 
 let suite =
   let module Index = Brassaia_pack.Indexing_strategy in
   let module Conf_small_nodes = struct
     (* Parameters chosen to be different from those in [Brassaia_tezos.Conf]: *)
     let entries = 2
+
     let stable_hash = 3
+
     let contents_length_header = None
+
     let inode_child_order = `Hash_bits
+
     let forbid_empty_dir_persistence = false
   end in
   [
@@ -92,42 +108,43 @@ module Context = Make_context (struct
 end)
 
 let flush fm = File_manager.flush fm |> Errs.raise_if_error
+
 let reload fm = File_manager.reload fm |> Errs.raise_if_error
 
 module Dict = struct
   let test_dict () =
     let (d : Context.d) = Context.get_dict ~readonly:false ~fresh:true () in
     let x1 = Dict.index d.dict "foo" in
-    Alcotest.(check (option int)) "foo" (Some 0) x1;
+    Alcotest.(check (option int)) "foo" (Some 0) x1 ;
     let x1 = Dict.index d.dict "foo" in
-    Alcotest.(check (option int)) "foo" (Some 0) x1;
+    Alcotest.(check (option int)) "foo" (Some 0) x1 ;
     let x2 = Dict.index d.dict "bar" in
-    Alcotest.(check (option int)) "bar" (Some 1) x2;
+    Alcotest.(check (option int)) "bar" (Some 1) x2 ;
     let x3 = Dict.index d.dict "toto" in
-    Alcotest.(check (option int)) "toto" (Some 2) x3;
+    Alcotest.(check (option int)) "toto" (Some 2) x3 ;
     let x4 = Dict.index d.dict "titiabc" in
-    Alcotest.(check (option int)) "titiabc" (Some 3) x4;
+    Alcotest.(check (option int)) "titiabc" (Some 3) x4 ;
     let x1 = Dict.index d.dict "foo" in
-    Alcotest.(check (option int)) "foo" (Some 0) x1;
-    flush d.fm;
+    Alcotest.(check (option int)) "foo" (Some 0) x1 ;
+    flush d.fm ;
     let (d2 : Context.d) =
       Context.get_dict ~name:d.name ~readonly:false ~fresh:false ()
     in
     let x4 = Dict.index d2.dict "titiabc" in
-    Alcotest.(check (option int)) "titiabc" (Some 3) x4;
+    Alcotest.(check (option int)) "titiabc" (Some 3) x4 ;
     let v1 = Dict.find d2.dict (get x1) in
-    Alcotest.(check (option string)) "find x1" (Some "foo") v1;
+    Alcotest.(check (option string)) "find x1" (Some "foo") v1 ;
     let v2 = Dict.find d2.dict (get x2) in
-    Alcotest.(check (option string)) "find x2" (Some "bar") v2;
+    Alcotest.(check (option string)) "find x2" (Some "bar") v2 ;
     let v3 = Dict.find d2.dict (get x3) in
-    Alcotest.(check (option string)) "find x3" (Some "toto") v3;
-    Context.close_dict d;
+    Alcotest.(check (option string)) "find x3" (Some "toto") v3 ;
+    Context.close_dict d ;
     let (d3 : Context.d) =
       Context.get_dict ~name:d.name ~readonly:false ~fresh:false ()
     in
     let v1 = Dict.find d3.dict (get x1) in
-    Alcotest.(check (option string)) "find x1" (Some "foo") v1;
-    Context.close_dict d2;
+    Alcotest.(check (option string)) "find x1" (Some "foo") v1 ;
+    Context.close_dict d2 ;
     Context.close_dict d3
 
   let ignore_int (_ : int option) = ()
@@ -148,30 +165,30 @@ module Dict = struct
     in
     let check_raise k =
       try
-        ignore_int (Dict.index d2.dict k);
+        ignore_int (Dict.index d2.dict k) ;
         Alcotest.fail "RO dict should not be writable"
       with Brassaia_pack.RO_not_allowed -> ()
     in
-    ignore_int (Dict.index d.dict "foo");
-    ignore_int (Dict.index d.dict "foo");
-    ignore_int (Dict.index d.dict "bar");
-    ignore_int (Dict.index d.dict "toto");
-    ignore_int (Dict.index d.dict "titiabc");
-    ignore_int (Dict.index d.dict "foo");
-    flush d.fm;
-    reload d2.fm;
-    check_index "titiabc" 3;
-    check_index "bar" 1;
-    check_index "toto" 2;
-    check_find "foo" 0;
-    check_raise "xxx";
-    ignore_int (Dict.index d.dict "hello");
-    check_raise "hello";
-    check_none "hello" 4;
-    flush d.fm;
-    reload d2.fm;
-    check_find "hello" 4;
-    Context.close_dict d;
+    ignore_int (Dict.index d.dict "foo") ;
+    ignore_int (Dict.index d.dict "foo") ;
+    ignore_int (Dict.index d.dict "bar") ;
+    ignore_int (Dict.index d.dict "toto") ;
+    ignore_int (Dict.index d.dict "titiabc") ;
+    ignore_int (Dict.index d.dict "foo") ;
+    flush d.fm ;
+    reload d2.fm ;
+    check_index "titiabc" 3 ;
+    check_index "bar" 1 ;
+    check_index "toto" 2 ;
+    check_find "foo" 0 ;
+    check_raise "xxx" ;
+    ignore_int (Dict.index d.dict "hello") ;
+    check_raise "hello" ;
+    check_none "hello" 4 ;
+    flush d.fm ;
+    reload d2.fm ;
+    check_find "hello" 4 ;
+    Context.close_dict d ;
     Context.close_dict d2
 
   let tests =
@@ -196,26 +213,26 @@ module Pack = struct
       Pack.batch t.Context.pack (fun w ->
           List.map
             (fun (k, v) -> Pack.unsafe_add w k v)
-            [ (h1, x1); (h2, x2); (h3, x3); (h4, x4) ])
+            [(h1, x1); (h2, x2); (h3, x3); (h4, x4)])
       |> function
-      | [ k1; k2; k3; k4 ] -> (k1, k2, k3, k4)
+      | [k1; k2; k3; k4] -> (k1, k2, k3, k4)
       | _ -> assert false
     in
 
     let test t =
       let y1 = Pack.find t k1 |> get in
-      Alcotest.(check string) "x1" x1 y1;
+      Alcotest.(check string) "x1" x1 y1 ;
       let y3 = Pack.find t k3 |> get in
-      Alcotest.(check string) "x3" x3 y3;
+      Alcotest.(check string) "x3" x3 y3 ;
       let y2 = Pack.find t k2 |> get in
-      Alcotest.(check string) "x2" x2 y2;
+      Alcotest.(check string) "x2" x2 y2 ;
       let y4 = Pack.find t k4 |> get in
       Alcotest.(check string) "x4" x4 y4
     in
-    test t.pack;
+    test t.pack ;
     let t' = Context.get_ro_pack t.name in
-    test t'.pack;
-    Context.close_pack t;
+    test t'.pack ;
+    Context.close_pack t ;
     Context.close_pack t'
 
   let test_readonly_pack () =
@@ -232,26 +249,26 @@ module Pack = struct
       let x2 = "bar" in
       let h1 = sha1_contents x1 in
       let h2 = sha1_contents x2 in
-      let[@warning "-8"] [ _k1; k2 ] = adds [ (h1, x1); (h2, x2) ] in
+      let[@warning "-8"] [_k1; k2] = adds [(h1, x1); (h2, x2)] in
       let y2 = Pack.find t'.pack k2 in
-      Alcotest.(check (option string)) "before reload" None y2;
-      flush t.fm;
-      reload t'.fm;
+      Alcotest.(check (option string)) "before reload" None y2 ;
+      flush t.fm ;
+      reload t'.fm ;
       let y2 = Pack.find t'.pack k2 in
-      Alcotest.(check (option string)) "after reload" (Some x2) y2;
+      Alcotest.(check (option string)) "after reload" (Some x2) y2 ;
       let x3 = "otoo" in
       let x4 = "sdadsadas" in
       let h3 = sha1_contents x3 in
       let h4 = sha1_contents x4 in
-      let[@warning "-8"] [ k3; _k4 ] = adds [ (h3, x3); (h4, x4) ] in
-      flush t.fm;
-      reload t'.fm;
+      let[@warning "-8"] [k3; _k4] = adds [(h3, x3); (h4, x4)] in
+      flush t.fm ;
+      reload t'.fm ;
       let y2 = Pack.find t'.pack k2 in
-      Alcotest.(check (option string)) "y2" (Some x2) y2;
+      Alcotest.(check (option string)) "y2" (Some x2) y2 ;
       let y3 = Pack.find t'.pack k3 in
       Alcotest.(check (option string)) "y3" (Some x3) y3
     in
-    Context.close_pack t;
+    Context.close_pack t ;
     Context.close_pack t'
 
   let test_close_pack_more () =
@@ -262,22 +279,22 @@ module Pack = struct
     let k1 =
       Pack.unsafe_append ~ensure_unique:true ~overcommit:false t.pack h1 x1
     in
-    flush t.fm;
-    Context.close_pack t;
+    flush t.fm ;
+    Context.close_pack t ;
     (*open and close in ro*)
     let t1 = Context.get_ro_pack t.name in
     let y1 = Pack.find t1.pack k1 |> get in
-    Alcotest.(check string) "x1.1" x1 y1;
-    Context.close_pack t1;
+    Alcotest.(check string) "x1.1" x1 y1 ;
+    Context.close_pack t1 ;
     (* reopen in rw *)
     let t2 = Context.reopen_rw t.name in
     let y1 = Pack.find t2.pack k1 |> get in
-    Alcotest.(check string) "x1.2" x1 y1;
+    Alcotest.(check string) "x1.2" x1 y1 ;
     (*reopen in ro *)
     let t3 = Context.get_ro_pack t.name in
     let y1 = Pack.find t3.pack k1 |> get in
-    Alcotest.(check string) "x1.3" x1 y1;
-    Context.close_pack t2;
+    Alcotest.(check string) "x1.3" x1 y1 ;
+    Context.close_pack t2 ;
     Context.close_pack t3
 
   let test_close_pack () =
@@ -289,39 +306,39 @@ module Pack = struct
     let h2 = sha1_contents x2 in
     let k1, k2 =
       Pack.batch w (fun w ->
-          List.map (fun (k, v) -> Pack.unsafe_add w k v) [ (h1, x1); (h2, x2) ])
+          List.map (fun (k, v) -> Pack.unsafe_add w k v) [(h1, x1); (h2, x2)])
       |> function
-      | [ k1; k2 ] -> (k1, k2)
+      | [k1; k2] -> (k1, k2)
       | _ -> assert false
     in
-    Context.close_pack t;
+    Context.close_pack t ;
     (*reopen in rw *)
     let t' = Context.reopen_rw t.name in
     let y2 = Pack.find t'.pack k2 |> get in
-    Alcotest.(check string) "x2.1" x2 y2;
+    Alcotest.(check string) "x2.1" x2 y2 ;
     let y1 = Pack.find t'.pack k1 |> get in
-    Alcotest.(check string) "x1.1" x1 y1;
+    Alcotest.(check string) "x1.1" x1 y1 ;
     let x3 = "toto" in
     let h3 = sha1_contents x3 in
     let k3 =
       Pack.unsafe_append ~ensure_unique:true ~overcommit:false t'.pack h3 x3
     in
-    Context.close_pack t';
+    Context.close_pack t' ;
     (*reopen in rw *)
     let t2 = Context.reopen_rw t.name in
     let y2 = Pack.find t2.pack k2 |> get in
-    Alcotest.(check string) "x2.2" x2 y2;
+    Alcotest.(check string) "x2.2" x2 y2 ;
     let y3 = Pack.find t2.pack k3 |> get in
-    Alcotest.(check string) "x3.2" x3 y3;
+    Alcotest.(check string) "x3.2" x3 y3 ;
     let y1 = Pack.find t2.pack k1 |> get in
-    Alcotest.(check string) "x1.2" x1 y1;
-    Context.close_pack t2;
+    Alcotest.(check string) "x1.2" x1 y1 ;
+    Context.close_pack t2 ;
     (*reopen in ro *)
     let t' = Context.get_ro_pack t.name in
     let y1 = Pack.find t'.pack k1 |> get in
-    Alcotest.(check string) "x1.3" x1 y1;
+    Alcotest.(check string) "x1.3" x1 y1 ;
     let y2 = Pack.find t'.pack k2 |> get in
-    Alcotest.(check string) "x2.3" x2 y2;
+    Alcotest.(check string) "x2.3" x2 y2 ;
     Context.close_pack t'
 
   (** Index can be flushed to disk independently of pack, we simulate this in
@@ -336,25 +353,25 @@ module Pack = struct
       let k1 =
         Pack.unsafe_append ~ensure_unique:true ~overcommit:false w h1 x1
       in
-      reload t'.fm;
+      reload t'.fm ;
       let y1 = Pack.find t'.pack k1 in
-      Alcotest.(check (option string)) "reload before filter" None y1;
-      Index.filter t.index (fun _ -> true);
-      flush t.fm;
-      reload t'.fm;
+      Alcotest.(check (option string)) "reload before filter" None y1 ;
+      Index.filter t.index (fun _ -> true) ;
+      flush t.fm ;
+      reload t'.fm ;
       let y1 = Pack.find t'.pack k1 in
-      Alcotest.(check (option string)) "reload after filter" (Some x1) y1;
+      Alcotest.(check (option string)) "reload after filter" (Some x1) y1 ;
       let x2 = "foo" in
       let h2 = sha1_contents x2 in
       let k2 =
         Pack.unsafe_append ~ensure_unique:true ~overcommit:false w h2 x2
       in
-      Index.flush t.index ~with_fsync:false |> Errs.raise_if_error;
+      Index.flush t.index ~with_fsync:false |> Errs.raise_if_error ;
       let y2 = Pack.find t'.pack k2 in
       Alcotest.(check (option string)) "reload after flush" (Some x2) y2
     in
-    test t.pack;
-    Context.close_pack t;
+    test t.pack ;
+    Context.close_pack t ;
     Context.close_pack t'
 
   let readonly_find_index_flush () =
@@ -370,32 +387,32 @@ module Pack = struct
       let k1 =
         Pack.unsafe_append ~ensure_unique:true ~overcommit:false w h1 x1
       in
-      flush t.fm;
-      reload t'.fm;
-      check k1 x1 "find before filter";
-      Index.filter t.index (fun _ -> true);
-      check k1 x1 "find after filter";
+      flush t.fm ;
+      reload t'.fm ;
+      check k1 x1 "find before filter" ;
+      Index.filter t.index (fun _ -> true) ;
+      check k1 x1 "find after filter" ;
       let x2 = "bar" in
       let h2 = sha1_contents x2 in
       let k2 =
         Pack.unsafe_append ~ensure_unique:true ~overcommit:false w h2 x2
       in
-      flush t.fm;
-      reload t'.fm;
-      check k2 x2 "find before flush";
+      flush t.fm ;
+      reload t'.fm ;
+      check k2 x2 "find before flush" ;
       let x3 = "toto" in
       let h3 = sha1_contents x3 in
       let k3 =
         Pack.unsafe_append ~ensure_unique:true ~overcommit:false w h3 x3
       in
-      Index.flush t.index ~with_fsync:false |> Errs.raise_if_error;
-      check k2 x2 "find after flush";
-      flush t.fm;
-      reload t'.fm;
+      Index.flush t.index ~with_fsync:false |> Errs.raise_if_error ;
+      check k2 x2 "find after flush" ;
+      flush t.fm ;
+      reload t'.fm ;
       check k3 x3 "find after flush new values"
     in
-    test t.pack;
-    Context.close_pack t;
+    test t.pack ;
+    Context.close_pack t ;
     Context.close_pack t'
 
   let tests =
@@ -404,9 +421,13 @@ module Pack = struct
       Alcotest.test_case "RO pack" `Quick test_readonly_pack;
       Alcotest.test_case "close" `Quick test_close_pack;
       Alcotest.test_case "close readonly" `Quick test_close_pack_more;
-      Alcotest.test_case "readonly reload, index flush" `Quick
+      Alcotest.test_case
+        "readonly reload, index flush"
+        `Quick
         readonly_reload_index_flush;
-      Alcotest.test_case "readonly find, index flush" `Quick
+      Alcotest.test_case
+        "readonly find, index flush"
+        `Quick
         readonly_find_index_flush;
     ]
 end
@@ -421,9 +442,9 @@ module Branch = struct
   let pp_hash = Brassaia.Type.pp Brassaia.Hash.SHA1.t
 
   let test_branch () =
-    let branches = [ "foo"; "bar/toto"; "titi" ] in
+    let branches = ["foo"; "bar/toto"; "titi"] in
     let test t =
-      List.iter (fun k -> Branch.set t k (sha1 k)) branches;
+      List.iter (fun k -> Branch.set t k (sha1 k)) branches ;
       let check h () =
         let v = Branch.find t h in
         Alcotest.(check (option hash)) h (Some (sha1 h)) v
@@ -431,22 +452,22 @@ module Branch = struct
       List.map check branches |> Eio.Fiber.all
     in
     let name = Context.fresh_name "branch" in
-    Branch.v ~fresh:true name |> test;
-    Branch.v ~fresh:true name |> test;
-    Branch.v ~fresh:true name |> test;
+    Branch.v ~fresh:true name |> test ;
+    Branch.v ~fresh:true name |> test ;
+    Branch.v ~fresh:true name |> test ;
     let t = Branch.v ~fresh:false name in
-    test t;
+    test t ;
     let x = sha1 "XXX" in
-    Branch.set t "foo" x;
+    Branch.set t "foo" x ;
     let t = Branch.v ~fresh:false name in
     let v = Branch.find t "foo" in
-    Alcotest.(check (option hash)) "foo" (Some x) v;
+    Alcotest.(check (option hash)) "foo" (Some x) v ;
     let br = Branch.list t in
-    Alcotest.(check (slist string compare)) "branches" branches br;
-    Branch.remove t "foo";
+    Alcotest.(check (slist string compare)) "branches" branches br ;
+    Branch.remove t "foo" ;
     let t = Branch.v ~fresh:false name in
     let v = Branch.find t "foo" in
-    Alcotest.(check (option hash)) "foo none" None v;
+    Alcotest.(check (option hash)) "foo none" None v ;
     let br = Branch.list t in
     Alcotest.(check (slist string compare))
       "branches"
@@ -454,11 +475,11 @@ module Branch = struct
       br
 
   let test_close_branch () =
-    let branches = [ "foo"; "bar/toto"; "titi" ] in
+    let branches = ["foo"; "bar/toto"; "titi"] in
     let add t =
       List.iter
         (fun k ->
-          [%logs.debug "k = %s, v= %a" k pp_hash (sha1 k)];
+          [%logs.debug "k = %s, v= %a" k pp_hash (sha1 k)] ;
           Branch.set t k (sha1 k))
         branches
     in
@@ -471,17 +492,17 @@ module Branch = struct
     in
     let name = Context.fresh_name "branch" in
     let t = Branch.v ~fresh:true name in
-    add t;
-    test t;
-    Branch.close t;
+    add t ;
+    test t ;
+    Branch.close t ;
     let t = Branch.v ~fresh:false ~readonly:true name in
-    test t;
-    Branch.close t;
+    test t ;
+    Branch.close t ;
     let name = Context.fresh_name "branch" in
     let t1 = Branch.v ~fresh:true ~readonly:false name in
     let t2 = Branch.v ~fresh:false ~readonly:true name in
-    add t1;
-    Branch.close t1;
+    add t1 ;
+    Branch.close t1 ;
     test t2
 
   let tests =
@@ -498,24 +519,24 @@ module Layout = struct
     let module Classification = Brassaia_pack.Layout.Classification.Upper in
     let c = Alcotest.(check (testable_repr Classification.t)) "" in
     let classif = Classification.v in
-    c `V1_or_v2_pack (V1_and_v2.pack ~root:"" |> classif);
-    c `Branch (V4.branch ~root:"" |> classif);
-    c `Control (V4.control ~root:"" |> classif);
-    c `Control_tmp (V4.control_tmp ~root:"" |> classif);
-    c `Dict (V4.dict ~root:"" |> classif);
-    c (`Gc_result 0) (V4.gc_result ~generation:0 ~root:"" |> classif);
-    c (`Reachable 1) (V4.reachable ~generation:1 ~root:"" |> classif);
-    c (`Sorted 10) (V4.sorted ~generation:10 ~root:"" |> classif);
-    c (`Mapping 100) (V4.mapping ~generation:100 ~root:"" |> classif);
-    c (`Prefix 1000) (V4.prefix ~generation:1000 ~root:"" |> classif);
-    c (`Suffix 42) (V4.suffix_chunk ~chunk_idx:42 ~root:"" |> classif);
-    c `Unknown (V4.prefix ~generation:(-1) ~root:"" |> classif);
-    c `Unknown (classif "store.toto");
-    c `Unknown (classif "store.");
-    c `Unknown (classif "store");
-    c `Unknown (classif "store.00.prefix");
-    c `Unknown (classif "store.01.prefix");
-    c `Unknown (classif "./store.0.prefix");
+    c `V1_or_v2_pack (V1_and_v2.pack ~root:"" |> classif) ;
+    c `Branch (V4.branch ~root:"" |> classif) ;
+    c `Control (V4.control ~root:"" |> classif) ;
+    c `Control_tmp (V4.control_tmp ~root:"" |> classif) ;
+    c `Dict (V4.dict ~root:"" |> classif) ;
+    c (`Gc_result 0) (V4.gc_result ~generation:0 ~root:"" |> classif) ;
+    c (`Reachable 1) (V4.reachable ~generation:1 ~root:"" |> classif) ;
+    c (`Sorted 10) (V4.sorted ~generation:10 ~root:"" |> classif) ;
+    c (`Mapping 100) (V4.mapping ~generation:100 ~root:"" |> classif) ;
+    c (`Prefix 1000) (V4.prefix ~generation:1000 ~root:"" |> classif) ;
+    c (`Suffix 42) (V4.suffix_chunk ~chunk_idx:42 ~root:"" |> classif) ;
+    c `Unknown (V4.prefix ~generation:(-1) ~root:"" |> classif) ;
+    c `Unknown (classif "store.toto") ;
+    c `Unknown (classif "store.") ;
+    c `Unknown (classif "store") ;
+    c `Unknown (classif "store.00.prefix") ;
+    c `Unknown (classif "store.01.prefix") ;
+    c `Unknown (classif "./store.0.prefix") ;
     ()
 
   let test_classify_volume_filename () =
@@ -524,22 +545,26 @@ module Layout = struct
     let module Classification = Brassaia_pack.Layout.Classification.Volume in
     let c = Alcotest.(check (testable_repr Classification.t)) "" in
     let classif = Classification.v in
-    c `Control (V5.control ~root:"" |> classif);
-    c `Mapping (V5.mapping ~root:"" |> classif);
-    c `Data (V5.data ~root:"" |> classif);
-    c `Unknown (classif "store.toto");
-    c `Unknown (classif "store.");
-    c `Unknown (classif "store");
-    c `Unknown (classif "store.00.prefix");
-    c `Unknown (classif "store.01.prefix");
-    c `Unknown (classif "./store.0.prefix");
+    c `Control (V5.control ~root:"" |> classif) ;
+    c `Mapping (V5.mapping ~root:"" |> classif) ;
+    c `Data (V5.data ~root:"" |> classif) ;
+    c `Unknown (classif "store.toto") ;
+    c `Unknown (classif "store.") ;
+    c `Unknown (classif "store") ;
+    c `Unknown (classif "store.00.prefix") ;
+    c `Unknown (classif "store.01.prefix") ;
+    c `Unknown (classif "./store.0.prefix") ;
     ()
 
   let tests =
     [
-      Alcotest.test_case "classify upper files" `Quick
+      Alcotest.test_case
+        "classify upper files"
+        `Quick
         test_classify_upper_filename;
-      Alcotest.test_case "classify volume files" `Quick
+      Alcotest.test_case
+        "classify volume files"
+        `Quick
         test_classify_volume_filename;
     ]
 end

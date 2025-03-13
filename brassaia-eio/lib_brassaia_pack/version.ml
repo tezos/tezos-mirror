@@ -17,7 +17,7 @@
 (* For every new version, update the [version] type and [versions]
    headers. *)
 
-type t = [ `V1 | `V2 | `V3 | `V4 | `V5 ] [@@deriving brassaia]
+type t = [`V1 | `V2 | `V3 | `V4 | `V5] [@@deriving brassaia]
 
 let latest = `V5
 
@@ -32,15 +32,18 @@ let enum =
 
 let pp =
   Fmt.of_to_string (function
-    | `V1 -> "v1"
-    | `V2 -> "v2"
-    | `V3 -> "v3"
-    | `V4 -> "v4"
-    | `V5 -> "v5")
+      | `V1 -> "v1"
+      | `V2 -> "v2"
+      | `V3 -> "v3"
+      | `V4 -> "v4"
+      | `V5 -> "v5")
 
 let to_bin v = List.assoc v enum
+
 let to_int = function `V1 -> 1 | `V2 -> 2 | `V3 -> 3 | `V4 -> 4 | `V5 -> 5
+
 let compare a b = Int.compare (to_int a) (to_int b)
+
 let encode_bin t f = to_bin t |> f
 
 let decode_bin s offref =
@@ -54,27 +57,36 @@ let decode_bin s offref =
     | "00000005" -> `V5
     | _ -> failwith "Couldn't decode pack version"
   in
-  offref := !offref + 8;
+  offref := !offref + 8 ;
   res
 
 let size_of = Brassaia.Type.Size.custom_static 8
+
 let bin = (encode_bin, decode_bin, size_of)
+
 let t = Brassaia.Type.like ~bin ~unboxed_bin:bin ~compare ~pp t
 
 let invalid_arg v =
   let pp_full_version ppf v = Fmt.pf ppf "%a (%S)" pp v (to_bin v) in
-  Fmt.invalid_arg "invalid version: got %S, expecting %a" v
+  Fmt.invalid_arg
+    "invalid version: got %S, expecting %a"
+    v
     Fmt.(Dump.list pp_full_version)
     (List.map fst enum)
 
 let of_bin b = try Some (decode_bin b (ref 0)) with Failure _ -> None
 
-exception Invalid of { expected : t; found : t }
+exception Invalid of {expected : t; found : t}
 
 let () =
   Printexc.register_printer (function
-    | Invalid { expected; found } ->
-        Some
-          (Fmt.str "%s.Invalid { expected = %a; found = %a }" __MODULE__ pp
-             expected pp found)
-    | _ -> None)
+      | Invalid {expected; found} ->
+          Some
+            (Fmt.str
+               "%s.Invalid { expected = %a; found = %a }"
+               __MODULE__
+               pp
+               expected
+               pp
+               found)
+      | _ -> None)

@@ -26,6 +26,15 @@ module Inode : sig
     | Inode_decode_bin
     | Inode_encode_bin
 
+  (** The type for stats for a store S.
+
+      - [inode_add + inode_remove + inode_of_seq + inode_of_raw] is the total
+        number of [Inode.Val.t] built;
+      - [inode_rec_add + inode_rec_remove] are witnesses of the quantity of work
+        that is done modifying inodes;
+      - [inode_to_binv] is the number of [Inode.Bin.v] built;
+      - [inode_encode_bin] is the number of [Bin] to [Compress] conversions;
+      - [inode_decode_bin] is the number of [Compress] to [Bin] conversions; *)
   type t = private {
     inode_add : int;
     inode_remove : int;
@@ -38,31 +47,32 @@ module Inode : sig
     inode_encode_bin : int;
   }
   [@@deriving brassaia]
-  (** The type for stats for a store S.
-
-      - [inode_add + inode_remove + inode_of_seq + inode_of_raw] is the total
-        number of [Inode.Val.t] built;
-      - [inode_rec_add + inode_rec_remove] are witnesses of the quantity of work
-        that is done modifying inodes;
-      - [inode_to_binv] is the number of [Inode.Bin.v] built;
-      - [inode_encode_bin] is the number of [Bin] to [Compress] conversions;
-      - [inode_decode_bin] is the number of [Compress] to [Bin] conversions; *)
 
   type stat
 
   val export : stat -> t
 end
 
-type t = { inode : Inode.stat }
+type t = {inode : Inode.stat}
 
 val reset_stats : unit -> unit
+
 val get : unit -> t
+
 val incr_inode_add : unit -> unit
+
 val incr_inode_remove : unit -> unit
+
 val incr_inode_of_seq : unit -> unit
+
 val incr_inode_of_raw : unit -> unit
+
 val incr_inode_rec_add : unit -> unit
+
 val incr_inode_rec_remove : unit -> unit
+
 val incr_inode_to_binv : unit -> unit
+
 val incr_inode_decode_bin : unit -> unit
+
 val incr_inode_encode_bin : unit -> unit

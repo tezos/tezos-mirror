@@ -23,6 +23,7 @@
 (** {1 Store} *)
 
 module type S = Store.S
+
 module type Io_s = Io_intf.S
 
 module Store_intf = Store_intf

@@ -29,13 +29,14 @@ end
 module type Value = sig
   include Brassaia.Type.S
 
-  val null : t
   (** A special value that is reserved for use by the implementation of
       {!Make_persistent} (and must never be passed by the user). *)
+  val null : t
 end
 
 module type Sigs = sig
   module type S = S
+
   module type Persistent = Persistent
 
   module Value : sig

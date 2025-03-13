@@ -21,34 +21,35 @@ module type S = sig
   (** A {i content-addressable} store is an indexed read-write store in which
       values are keyed directly by their hashes. *)
 
-  include Read_only.S
   (** @inline *)
+  include Read_only.S
 
-  val add : [> write ] t -> value -> key
   (** Write the contents of a value to the store. It's the responsibility of the
       content-addressable store to generate a consistent key. *)
+  val add : [> write] t -> value -> key
 
-  val unsafe_add : [> write ] t -> key -> value -> unit
   (** Same as {!add} but allows specifying the key directly. The backend might
       choose to discard that key and/or can be corrupt if the key scheme is not
       consistent. *)
+  val unsafe_add : [> write] t -> key -> value -> unit
 
+  (** @inline *)
   include Closeable with type 'a t := 'a t
-  (** @inline *)
 
-  include Batch with type 'a t := 'a t
   (** @inline *)
+  include Batch with type 'a t := 'a t
 end
 
 module type Maker = functor (Hash : Hash.S) (Value : Type.S) -> sig
   include S with type value = Value.t and type key = Hash.t
 
-  include Of_config with type 'a t := 'a t
   (** @inline *)
+  include Of_config with type 'a t := 'a t
 end
 
 module type Sigs = sig
   module type S = S
+
   module type Maker = Maker
 
   module Make
@@ -61,8 +62,8 @@ module type Sigs = sig
          and type value = Value.t
          and type key = Hash.t
 
-    include Of_config with type 'a t := 'a t
     (** @inline *)
+    include Of_config with type 'a t := 'a t
   end
 
   module Check_closed (M : Maker) : Maker

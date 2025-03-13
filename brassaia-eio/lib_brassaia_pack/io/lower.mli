@@ -14,5 +14,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Lower_intf.Sigs
 (** @inline *)
+include Lower_intf.Sigs

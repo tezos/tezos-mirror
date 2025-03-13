@@ -19,37 +19,37 @@ type t = ..
 module type S = sig
   (** {1 Remote synchronization} *)
 
-  type t
   (** The type for store handles. *)
+  type t
 
-  type commit
   (** The type for store heads. *)
+  type commit
 
-  type branch
   (** The type for branch IDs. *)
+  type branch
 
-  type endpoint
   (** The type for sync endpoints. *)
+  type endpoint
 
+  (** [fetch t uri] fetches the contents of the remote store located at [uri]
+      into the local store [t]. Return the head of the remote branch with the
+      same name, which is now in the local store. [No_head] means no such branch
+      exists. *)
   val fetch :
     t ->
     ?depth:int ->
     endpoint ->
     branch ->
-    (commit option, [ `Msg of string ]) result
-  (** [fetch t uri] fetches the contents of the remote store located at [uri]
-      into the local store [t]. Return the head of the remote branch with the
-      same name, which is now in the local store. [No_head] means no such branch
-      exists. *)
+    (commit option, [`Msg of string]) result
 
+  (** [push t uri] pushes the contents of the local store [t] into the remote
+      store located at [uri]. *)
   val push :
     t ->
     ?depth:int ->
     endpoint ->
     branch ->
-    (unit, [ `Msg of string | `Detached_head ]) result
-  (** [push t uri] pushes the contents of the local store [t] into the remote
-      store located at [uri]. *)
+    (unit, [`Msg of string | `Detached_head]) result
 end
 
 module type Sigs = sig
@@ -63,7 +63,7 @@ module type Sigs = sig
     include
       S with type commit = H.t and type branch = R.t and type endpoint = unit
 
-    val v : 'a -> t
     (** Create a remote store handle. *)
+    val v : 'a -> t
   end
 end

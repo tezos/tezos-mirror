@@ -18,6 +18,7 @@ open! Import
 open Common
 
 let root = Filename.concat "_build" "test-inode"
+
 let src = Logs.Src.create "tests.instances" ~doc:"Tests"
 
 module Log = (val Logs.src_log src : Logs.LOG)
@@ -32,18 +33,17 @@ module Inode_modules
     (Schema : Brassaia.Schema.S)
     (Contents : sig
       val foo : Schema.Contents.t
+
       val bar : Schema.Contents.t
     end) =
 struct
   module Key = Brassaia_pack_unix.Pack_key.Make (Schema.Hash)
-
   module Node =
-    Brassaia.Node.Generic_key.Make_v2 (Schema.Hash) (Schema.Path) (Schema.Metadata)
+    Brassaia.Node.Generic_key.Make_v2 (Schema.Hash) (Schema.Path)
+      (Schema.Metadata)
       (Key)
       (Key)
-
   module Index = Brassaia_pack_unix.Index.Make (Schema.Hash)
-
   module Inter =
     Brassaia_pack.Inode.Make_internal (Conf) (Schema.Hash) (Key) (Node)
 
@@ -62,28 +62,22 @@ struct
   module File_manager = Brassaia_pack_unix.File_manager.Make (Io) (Index) (Errs)
   module Dict = File_manager.Dict
   module Dispatcher = Brassaia_pack_unix.Dispatcher.Make (File_manager)
-
   module Pack =
     Brassaia_pack_unix.Pack_store.Make (File_manager) (Dispatcher) (Schema.Hash)
       (Inter.Raw)
       (Errs)
-
   module Pack_mock =
     Brassaia_pack_unix.Pack_store.Make (File_manager) (Dispatcher) (Schema.Hash)
       (Inter_mock.Raw)
       (Errs)
-
   module Inode =
     Brassaia_pack_unix.Inode.Make_persistent (Schema.Hash) (Node) (Inter) (Pack)
-
   module Inode_mock =
     Brassaia_pack_unix.Inode.Make_persistent (Schema.Hash) (Node) (Inter_mock)
       (Pack_mock)
-
   module Contents_value =
     Brassaia_pack.Pack_value.Of_contents (Conf) (Schema.Hash) (Key)
       (Schema.Contents)
-
   module Contents_store =
     Brassaia_pack_unix.Pack_store.Make (File_manager) (Dispatcher) (Schema.Hash)
       (Contents_value)
@@ -108,7 +102,12 @@ struct
       let indexing_strategy =
         if indexing_strategy = `always then Index.always else Index.minimal
       in
-      Brassaia_pack.Conf.init ~fresh ~readonly ~indexing_strategy ~lru_size:0 name
+      Brassaia_pack.Conf.init
+        ~fresh
+        ~readonly
+        ~indexing_strategy
+        ~lru_size:0
+        name
 
     (* TODO : remove duplication with brassaia_pack/ext.ml *)
     let get_fm config =
@@ -135,8 +134,8 @@ struct
         | (`File | `Other), _ -> Errs.raise_error (`Not_a_directory root)
 
     let get_store ~indexing_strategy () =
-      [%log.app "Constructing a fresh context for use by the test"];
-      rm_dir root;
+      [%log.app "Constructing a fresh context for use by the test"] ;
+      rm_dir root ;
       let config = config ~indexing_strategy ~readonly:false ~fresh:true root in
       let fm = get_fm config in
       let dict = File_manager.dict fm in
@@ -152,8 +151,8 @@ struct
             let bar = Contents_store.add writer Contents.bar in
             (foo, bar))
       in
-      [%log.app "Test context constructed"];
-      { store; fm; foo; bar }
+      [%log.app "Test context constructed"] ;
+      {store; fm; foo; bar}
 
     let close t = File_manager.close t.fm |> Errs.raise_if_error
     (* closes dict, inodes and contents store. *)
@@ -165,14 +164,19 @@ end
 
 module Conf = struct
   let entries = 2
+
   let stable_hash = 3
+
   let contents_length_header = Some `Varint
+
   let inode_child_order = `Seeded_hash
+
   let forbid_empty_dir_persistence = false
 end
 
 module String_contents = struct
   let foo = "foo"
+
   let bar = "bar"
 end
 
@@ -180,7 +184,7 @@ module S = Inode_modules (Conf) (Schema) (String_contents)
 open S
 open Schema
 
-type pred = [ `Contents of Key.t | `Inode of Key.t | `Node of Key.t ]
+type pred = [`Contents of Key.t | `Inode of Key.t | `Node of Key.t]
 [@@deriving brassaia]
 
 let pp_pred = Brassaia.Type.pp pred_t
@@ -188,8 +192,11 @@ let pp_pred = Brassaia.Type.pp pred_t
 module H_contents = Brassaia.Hash.Typed (Hash) (Schema.Contents)
 
 let normal x = `Contents (x, Metadata.default)
+
 let node x = `Node x
+
 let check_hash = Alcotest.check_repr Inode.Val.hash_t
+
 let check_values = Alcotest.check_repr Inode.Val.t
 
 let check_int pos ?(msg = "") ~expected actual =
@@ -198,7 +205,9 @@ let check_int pos ?(msg = "") ~expected actual =
 (* Exhaustive inode structure generator *)
 module Inode_permutations_generator = struct
   type step = string
+
   type content = Inode.Val.value
+
   type inode = Inode.value
 
   module StepMap = Map.Make (struct
@@ -238,7 +247,8 @@ module Inode_permutations_generator = struct
     let letters_per_step = (max_brute_force_iterations + 25) / 26 in
     fun inter indices ->
       let module Inter =
-        (val inter : Brassaia_pack.Inode.Internal with type Val.step = Path.step)
+        (val inter
+            : Brassaia_pack.Inode.Internal with type Val.step = Path.step)
       in
       let rec aux i =
         if i > max_brute_force_iterations then
@@ -256,7 +266,7 @@ module Inode_permutations_generator = struct
       | Some s -> s
       | None ->
           let s = aux 0 in
-          Hashtbl.add tbl indices s;
+          Hashtbl.add tbl indices s ;
           s
 
   (** List all the steps that would fill a tree of depth [maxdepth_of_test]. *)
@@ -271,9 +281,7 @@ module Inode_permutations_generator = struct
     |> List.map (gen_step (module Inter))
 
   let powerset xs =
-    List.fold_left
-      (fun acc x -> acc @ List.map (fun ys -> x :: ys) acc)
-      [ [] ] xs
+    List.fold_left (fun acc x -> acc @ List.map (fun ys -> x :: ys) acc) [[]] xs
 
   let v ~entries ~maxdepth_of_test =
     let ( ** ) a b = float_of_int a ** float_of_int b |> int_of_float in
@@ -282,8 +290,7 @@ module Inode_permutations_generator = struct
       List.map
         (fun s -> (s, H_contents.hash s |> Key.unfindable_of_hash |> normal))
         steps
-      |> List.to_seq
-      |> StepMap.of_seq
+      |> List.to_seq |> StepMap.of_seq
     in
     let steps_per_tree : StepSet.t list =
       powerset steps |> List.map List.to_seq |> List.map StepSet.of_seq
@@ -291,7 +298,7 @@ module Inode_permutations_generator = struct
     Alcotest.(check int)
       "Size of the powerset"
       (List.length steps_per_tree)
-      (2 ** entries ** maxdepth_of_test);
+      (2 ** entries ** maxdepth_of_test) ;
     let trees : Inode.value list =
       List.map
         (fun steps ->
@@ -305,15 +312,15 @@ module Inode_permutations_generator = struct
     let tree_per_steps : Inode.value StepSetMap.t =
       List.combine steps_per_tree trees |> List.to_seq |> StepSetMap.of_seq
     in
-    { steps; content_per_step; steps_per_tree; trees; tree_per_steps }
+    {steps; content_per_step; steps_per_tree; trees; tree_per_steps}
 
   (** [steps t] is a list of length [entries ^ maxdepth_of_test] (8) containing
       the necessary steps to fill a tree of depth equal to [maxdepth_of_test]
       (3). *)
-  let steps : t -> step list = fun { steps; _ } -> steps
+  let steps : t -> step list = fun {steps; _} -> steps
 
   let content_of_step : t -> step -> content =
-   fun { content_per_step; _ } s -> StepMap.find s content_per_step
+   fun {content_per_step; _} s -> StepMap.find s content_per_step
 
   (** [trees t] is a list of length [2 ^ (entries ^ maxdepth_of_test)] (256)
       containing pairs of steps set/inode tree. This list is formed from the
@@ -321,13 +328,13 @@ module Inode_permutations_generator = struct
       permutations for an inode tree of depth equal to [maxdepth_of_test] and
       width equal to [entries]. *)
   let trees : t -> (StepSet.t * Inode.value) list =
-   fun { trees; steps_per_tree; _ } -> List.combine steps_per_tree trees
+   fun {trees; steps_per_tree; _} -> List.combine steps_per_tree trees
 
   (** [tree_of_steps t ss] is the inode tree associated to [ss] in [trees t].
 
       E.g, [tree_of_steps t StepSet.empty] is the empty inode. *)
   let tree_of_steps : t -> StepSet.t -> Inode.value =
-   fun { tree_per_steps; _ } steps -> StepSetMap.find steps tree_per_steps
+   fun {tree_per_steps; _} steps -> StepSetMap.find steps tree_per_steps
 end
 
 let check_node msg v t =
@@ -343,16 +350,16 @@ let check_hardcoded_hash msg h v =
 
 (** Test add values from an empty node. *)
 let test_add_values ~indexing_strategy =
-  rm_dir root;
+  rm_dir root ;
   let t = Context.get_store ~indexing_strategy () in
-  let { Context.foo; bar; _ } = t in
-  check_node "hash empty node" (Inode.Val.empty ()) t;
+  let {Context.foo; bar; _} = t in
+  check_node "hash empty node" (Inode.Val.empty ()) t ;
   let v1 = Inode.Val.add (Inode.Val.empty ()) "x" (normal foo) in
   let v2 = Inode.Val.add v1 "y" (normal bar) in
-  check_node "node x+y" v2 t;
-  check_hardcoded_hash "hash v2" "d4b55db5d2d806283766354f0d7597d332156f74" v2;
-  let v3 = Inode.Val.of_list [ ("x", normal foo); ("y", normal bar) ] in
-  check_values "add x+y vs v x+y" v2 v3;
+  check_node "node x+y" v2 t ;
+  check_hardcoded_hash "hash v2" "d4b55db5d2d806283766354f0d7597d332156f74" v2 ;
+  let v3 = Inode.Val.of_list [("x", normal foo); ("y", normal bar)] in
+  check_values "add x+y vs v x+y" v2 v3 ;
   Context.close t
 
 let test_add_values () =
@@ -360,27 +367,27 @@ let test_add_values () =
   test_add_values ~indexing_strategy:`minimal
 
 let integrity_check ?(stable = true) v =
-  Alcotest.(check bool) "check stable" (Inter.Val.stable v) stable;
+  Alcotest.(check bool) "check stable" (Inter.Val.stable v) stable ;
   if not (Inter.Val.integrity_check v) then
-    Alcotest.failf "node does not satisfy stability invariants %a"
+    Alcotest.failf
+      "node does not satisfy stability invariants %a"
       (Brassaia.Type.pp Inode.Val.t)
       v
 
 (** Test add to inodes. *)
 let test_add_inodes ~indexing_strategy =
-  rm_dir root;
+  rm_dir root ;
   let t = Context.get_store ~indexing_strategy () in
-  let { Context.foo; bar; _ } = t in
-  let v1 = Inode.Val.of_list [ ("x", normal foo); ("y", normal bar) ] in
+  let {Context.foo; bar; _} = t in
+  let v1 = Inode.Val.of_list [("x", normal foo); ("y", normal bar)] in
   let v2 = Inode.Val.add v1 "z" (normal foo) in
   let v3 =
-    Inode.Val.of_list
-      [ ("x", normal foo); ("z", normal foo); ("y", normal bar) ]
+    Inode.Val.of_list [("x", normal foo); ("z", normal foo); ("y", normal bar)]
   in
-  check_values "add x+y+z vs v x+z+y" v2 v3;
-  check_hardcoded_hash "hash v3" "46fe6c68a11a6ecd14cbe2d15519b6e5f3ba2864" v3;
-  integrity_check v1;
-  integrity_check v2;
+  check_values "add x+y+z vs v x+z+y" v2 v3 ;
+  check_hardcoded_hash "hash v3" "46fe6c68a11a6ecd14cbe2d15519b6e5f3ba2864" v3 ;
+  integrity_check v1 ;
+  integrity_check v2 ;
   let v4 = Inode.Val.add v2 "a" (normal foo) in
   let v5 =
     Inode.Val.of_list
@@ -391,9 +398,9 @@ let test_add_inodes ~indexing_strategy =
         ("y", normal bar);
       ]
   in
-  check_values "add x+y+z+a vs v x+z+a+y" v4 v5;
-  check_hardcoded_hash "hash v4" "c330c08571d088141dfc82f644bffcfcf6696539" v4;
-  integrity_check v4 ~stable:false;
+  check_values "add x+y+z+a vs v x+z+a+y" v4 v5 ;
+  check_hardcoded_hash "hash v4" "c330c08571d088141dfc82f644bffcfcf6696539" v4 ;
+  integrity_check v4 ~stable:false ;
   Context.close t
 
 let test_add_inodes () =
@@ -402,20 +409,20 @@ let test_add_inodes () =
 
 (** Test remove values on an empty node. *)
 let test_remove_values ~indexing_strategy =
-  rm_dir root;
+  rm_dir root ;
   let t = Context.get_store ~indexing_strategy () in
-  let { Context.foo; bar; _ } = t in
-  let v1 = Inode.Val.of_list [ ("x", normal foo); ("y", normal bar) ] in
+  let {Context.foo; bar; _} = t in
+  let v1 = Inode.Val.of_list [("x", normal foo); ("y", normal bar)] in
   let v2 = Inode.Val.remove v1 "y" in
-  let v3 = Inode.Val.of_list [ ("x", normal foo) ] in
-  check_values "node x obtained two ways" v2 v3;
-  check_hardcoded_hash "hash v2" "a1996f4309ea31cc7ba2d4c81012885aa0e08789" v2;
+  let v3 = Inode.Val.of_list [("x", normal foo)] in
+  check_values "node x obtained two ways" v2 v3 ;
+  check_hardcoded_hash "hash v2" "a1996f4309ea31cc7ba2d4c81012885aa0e08789" v2 ;
   let v4 = Inode.Val.remove v2 "x" in
-  check_node "remove results in an empty node" (Inode.Val.empty ()) t;
+  check_node "remove results in an empty node" (Inode.Val.empty ()) t ;
   let v5 = Inode.Val.remove v4 "x" in
-  check_values "remove on an already empty node" v4 v5;
-  check_hardcoded_hash "hash v4" "5ba93c9db0cff93f52b521d7420e43f6eda2784f" v4;
-  Alcotest.(check bool) "v5 is empty" (Inode.Val.is_empty v5) true;
+  check_values "remove on an already empty node" v4 v5 ;
+  check_hardcoded_hash "hash v4" "5ba93c9db0cff93f52b521d7420e43f6eda2784f" v4 ;
+  Alcotest.(check bool) "v5 is empty" (Inode.Val.is_empty v5) true ;
   Context.close t
 
 let test_remove_values () =
@@ -424,18 +431,17 @@ let test_remove_values () =
 
 (** Test remove and add values to go from stable to unstable inodes. *)
 let test_remove_inodes ~indexing_strategy =
-  rm_dir root;
+  rm_dir root ;
   let t = Context.get_store ~indexing_strategy () in
-  let { Context.foo; bar; _ } = t in
+  let {Context.foo; bar; _} = t in
   let v1 =
-    Inode.Val.of_list
-      [ ("x", normal foo); ("y", normal bar); ("z", normal foo) ]
+    Inode.Val.of_list [("x", normal foo); ("y", normal bar); ("z", normal foo)]
   in
-  check_hardcoded_hash "hash v1" "46fe6c68a11a6ecd14cbe2d15519b6e5f3ba2864" v1;
+  check_hardcoded_hash "hash v1" "46fe6c68a11a6ecd14cbe2d15519b6e5f3ba2864" v1 ;
   let v2 = Inode.Val.remove v1 "x" in
-  let v3 = Inode.Val.of_list [ ("y", normal bar); ("z", normal foo) ] in
-  check_values "node y+z obtained two ways" v2 v3;
-  check_hardcoded_hash "hash v2" "ea22a2936eed53978bde62f0185cee9d8bbf9489" v2;
+  let v3 = Inode.Val.of_list [("y", normal bar); ("z", normal foo)] in
+  check_values "node y+z obtained two ways" v2 v3 ;
+  check_hardcoded_hash "hash v2" "ea22a2936eed53978bde62f0185cee9d8bbf9489" v2 ;
   let v4 =
     Inode.Val.of_list
       [
@@ -446,9 +452,9 @@ let test_remove_inodes ~indexing_strategy =
       ]
   in
   let v5 = Inode.Val.remove v4 "a" in
-  check_values "node x+y+z obtained two ways" v1 v5;
-  integrity_check v1;
-  integrity_check v5;
+  check_values "node x+y+z obtained two ways" v1 v5 ;
+  integrity_check v1 ;
+  integrity_check v5 ;
   Context.close t
 
 let test_remove_inodes () =
@@ -488,7 +494,8 @@ let test_representation_uniqueness_maxdepth_3 () =
       check_values
         "The representation of the received tree obtained through [remove] \
          differs from the expected one obtained through [v]."
-        tree'_ref tree'_new
+        tree'_ref
+        tree'_new
     else
       let steps' = P.StepSet.add s steps in
       let c = P.content_of_step p s in
@@ -497,7 +504,8 @@ let test_representation_uniqueness_maxdepth_3 () =
       check_values
         "The representation of the received tree obtained through [remove] \
          differs from the expected one obtained through [v]."
-        tree'_ref tree'_new
+        tree'_ref
+        tree'_new
   in
   List.iter
     (fun (ss, t) -> List.iter (fun s -> f ss t s) (P.steps p))
@@ -505,7 +513,7 @@ let test_representation_uniqueness_maxdepth_3 () =
 
 let test_truncated_inodes ~indexing_strategy =
   let t = Context.get_store ~indexing_strategy () in
-  let { Context.foo; bar; _ } = t in
+  let {Context.foo; bar; _} = t in
   let to_truncated inode =
     let encode, decode =
       let t = Inode.Val.t in
@@ -513,7 +521,7 @@ let test_truncated_inodes ~indexing_strategy =
     in
     let encode inode =
       let buf = Buffer.create 0 in
-      encode inode (Buffer.add_string buf);
+      encode inode (Buffer.add_string buf) ;
       Buffer.contents buf
     in
     let decode str = decode str (ref 0) in
@@ -524,46 +532,46 @@ let test_truncated_inodes ~indexing_strategy =
       "Iteration on that Truncated inode with broken pointers was expected to \
        fail."
       (Failure
-         "Impossible to load the subtree on an inode deserialized using Repr") f
+         "Impossible to load the subtree on an inode deserialized using Repr")
+      f
   in
   let gen_step = Inode_permutations_generator.gen_step (module Inter) in
   let s00, s01, s11, s10 =
-    (gen_step [ 0; 0 ], gen_step [ 0; 1 ], gen_step [ 1; 1 ], gen_step [ 1; 0 ])
+    (gen_step [0; 0], gen_step [0; 1], gen_step [1; 1], gen_step [1; 0])
   in
   let iter_steps f =
-    List.iter (fun step -> f step |> ignore) [ s00; s01; s11; s10 ]
+    List.iter (fun step -> f step |> ignore) [s00; s01; s11; s10]
   in
   let iter_steps_with_failure f =
     List.iter
       (fun step -> with_failure (fun () -> f step |> ignore))
-      [ s00; s01; s11; s10 ]
+      [s00; s01; s11; s10]
   in
   (* v1 is a Truncated inode of tag Values. No pointers. *)
   let v1 =
-    Inode.Val.of_list [ (s00, normal foo); (s10, normal foo) ] |> to_truncated
+    Inode.Val.of_list [(s00, normal foo); (s10, normal foo)] |> to_truncated
   in
-  Inode.Val.list v1 |> ignore;
-  (iter_steps @@ fun step -> Inode.Val.find v1 step);
-  (iter_steps @@ fun step -> Inode.Val.add v1 step (normal bar));
-  (iter_steps @@ fun step -> Inode.Val.remove v1 step);
+  Inode.Val.list v1 |> ignore ;
+  (iter_steps @@ fun step -> Inode.Val.find v1 step) ;
+  (iter_steps @@ fun step -> Inode.Val.add v1 step (normal bar)) ;
+  (iter_steps @@ fun step -> Inode.Val.remove v1 step) ;
   (* v2 is just a Truncated inode of tag Tree. The pointers are built after
      the call to [to_truncated], they are [Intact]. *)
   let v2 = Inode.Val.add v1 s01 (normal foo) in
-  Inode.Val.list v2 |> ignore;
-  (iter_steps @@ fun step -> Inode.Val.find v1 step);
-  (iter_steps @@ fun step -> Inode.Val.add v1 step (normal bar));
-  (iter_steps @@ fun step -> Inode.Val.remove v1 step);
+  Inode.Val.list v2 |> ignore ;
+  (iter_steps @@ fun step -> Inode.Val.find v1 step) ;
+  (iter_steps @@ fun step -> Inode.Val.add v1 step (normal bar)) ;
+  (iter_steps @@ fun step -> Inode.Val.remove v1 step) ;
   (* v3 is just a Truncated inode of tag Tree. The pointers are built before
      the call to [to_truncated], they are [Broken]. *)
   let v3 =
-    Inode.Val.of_list
-      [ (s00, normal foo); (s10, normal bar); (s01, normal bar) ]
+    Inode.Val.of_list [(s00, normal foo); (s10, normal bar); (s01, normal bar)]
     |> to_truncated
   in
-  (with_failure @@ fun () -> Inode.Val.list v3 |> ignore);
-  (iter_steps_with_failure @@ fun step -> Inode.Val.find v3 step);
-  (iter_steps_with_failure @@ fun step -> Inode.Val.add v3 step (normal bar));
-  (iter_steps_with_failure @@ fun step -> Inode.Val.remove v3 step);
+  (with_failure @@ fun () -> Inode.Val.list v3 |> ignore) ;
+  (iter_steps_with_failure @@ fun step -> Inode.Val.find v3 step) ;
+  (iter_steps_with_failure @@ fun step -> Inode.Val.add v3 step (normal bar)) ;
+  (iter_steps_with_failure @@ fun step -> Inode.Val.remove v3 step) ;
   Context.close t
 
 let test_truncated_inodes () =
@@ -572,25 +580,26 @@ let test_truncated_inodes () =
 
 let test_intermediate_inode_as_root ~indexing_strategy =
   let t = Context.get_store ~indexing_strategy () in
-  let { Context.foo; bar; _ } = t in
+  let {Context.foo; bar; _} = t in
   let gen_step = Inode_permutations_generator.gen_step (module Inter) in
   let s000, s001, s010 =
-    (gen_step [ 0; 0; 0 ], gen_step [ 0; 0; 1 ], gen_step [ 0; 1; 0 ])
+    (gen_step [0; 0; 0], gen_step [0; 0; 1], gen_step [0; 1; 0])
   in
   let v0 =
     Inode.Val.of_list
-      [ (s000, normal foo); (s001, normal bar); (s010, normal foo) ]
+      [(s000, normal foo); (s001, normal bar); (s010, normal foo)]
   in
   let h_depth0 = Inode.batch t.store @@ fun store -> Inode.add store v0 in
   let (`Inode h_depth1) =
     match Inode.Val.pred v0 with
-    | [ (_, (`Inode _ as pred)) ] -> pred
+    | [(_, (`Inode _ as pred))] -> pred
     | l ->
         let l = List.map snd l in
         Alcotest.failf
           "Expected one `Inode predecessors, got [%a], a list of length %d."
           Fmt.(list ~sep:(any " ; ") pp_pred)
-          l (List.length l)
+          l
+          (List.length l)
   in
 
   (* On inode with depth=0 *)
@@ -600,7 +609,7 @@ let test_intermediate_inode_as_root ~indexing_strategy =
     | Some v -> v
   in
   if Inode.Val.list v |> List.length <> 3 then
-    Alcotest.fail "Failed to list entries of loaded inode";
+    Alcotest.fail "Failed to list entries of loaded inode" ;
   let _ = Inode.Val.remove v s000 in
   let _ = Inode.Val.add v s000 (normal foo) in
   let _ = Inode.batch t.store @@ fun store -> Inode.add store v in
@@ -612,28 +621,28 @@ let test_intermediate_inode_as_root ~indexing_strategy =
     | Some v -> v
   in
   if Inode.Val.list v |> List.length <> 3 then
-    Alcotest.fail "Failed to list entries of loaded inode";
+    Alcotest.fail "Failed to list entries of loaded inode" ;
   let with_exn f =
     Alcotest.check_raises
       "Write-only operation is forbiden on intermediate inode"
-      (Failure "Cannot perform operation on non-root inode value.") (fun () ->
-        f () |> ignore)
+      (Failure "Cannot perform operation on non-root inode value.")
+      (fun () -> f () |> ignore)
   in
-  with_exn (fun () -> Inode.Val.remove v s000);
-  with_exn (fun () -> Inode.Val.add v s000 (normal foo));
+  with_exn (fun () -> Inode.Val.remove v s000) ;
+  with_exn (fun () -> Inode.Val.add v s000 (normal foo)) ;
   Inode.batch t.store (fun store -> with_exn (fun () -> Inode.add store v))
 
 let test_invalid_depth_intermediate_inode ~indexing_strategy =
   let t = Context_mock.get_store ~indexing_strategy () in
-  let { Context_mock.foo; bar; _ } = t in
+  let {Context_mock.foo; bar; _} = t in
   let gen_step = Inode_permutations_generator.gen_step (module Inter_mock) in
   let s000, s001, s010 =
-    (gen_step [ 0; 0; 0 ], gen_step [ 0; 0; 1 ], gen_step [ 0; 1; 0 ])
+    (gen_step [0; 0; 0], gen_step [0; 0; 1], gen_step [0; 1; 0])
   in
 
   let v0 =
     Inode_mock.Val.of_list
-      [ (s000, normal foo); (s001, normal bar); (s010, normal foo) ]
+      [(s000, normal foo); (s001, normal bar); (s010, normal foo)]
   in
   let h_depth0 =
     Inode_mock.batch t.store @@ fun store -> Inode_mock.add store v0
@@ -652,7 +661,7 @@ let test_invalid_depth_intermediate_inode ~indexing_strategy =
       let _ = Inode_mock.Val.list v in
       Alcotest.fail "Should have raised Invalid_depth"
     with
-    | Inter_mock.Raw.Invalid_depth { expected; got; _ } ->
+    | Inter_mock.Raw.Invalid_depth {expected; got; _} ->
         let _ = Alcotest.(check int) "expected depth" expected 1 in
         let _ = Alcotest.(check int) "actual depth" got wrong_depth in
         ()
@@ -668,7 +677,7 @@ let test_intermediate_inode_as_root () =
 
 let test_concrete_inodes ~indexing_strategy =
   let t = Context.get_store ~indexing_strategy () in
-  let { Context.foo; bar; _ } = t in
+  let {Context.foo; bar; _} = t in
   let pp_concrete = Brassaia.Type.pp_json ~minify:false Inter.Val.Concrete.t in
   let result_t = Brassaia.Type.result Inode.Val.t Inter.Val.Concrete.error_t in
   let testable =
@@ -678,27 +687,25 @@ let test_concrete_inodes ~indexing_strategy =
   in
   let check v =
     let len = Inter.Val.length v in
-    integrity_check ~stable:(len <= Conf.stable_hash) v;
+    integrity_check ~stable:(len <= Conf.stable_hash) v ;
     let c = Inter.Val.to_concrete v in
     let r = Inter.Val.of_concrete c in
     let msg = Fmt.str "%a" pp_concrete c in
     Alcotest.check testable msg (Ok v) r
   in
-  let v = Inode.Val.of_list [ ("a", normal foo) ] in
-  check v;
-  let v = Inode.Val.of_list [ ("a", normal foo); ("y", node bar) ] in
-  check v;
+  let v = Inode.Val.of_list [("a", normal foo)] in
+  check v ;
+  let v = Inode.Val.of_list [("a", normal foo); ("y", node bar)] in
+  check v ;
   let v =
-    Inode.Val.of_list [ ("x", node foo); ("a", normal foo); ("y", node bar) ]
+    Inode.Val.of_list [("x", node foo); ("a", normal foo); ("y", node bar)]
   in
-  check v;
+  check v ;
   let v =
     Inode.Val.of_list
-      [
-        ("x", normal foo); ("z", normal foo); ("a", normal foo); ("y", node bar);
-      ]
+      [("x", normal foo); ("z", normal foo); ("a", normal foo); ("y", node bar)]
   in
-  check v;
+  check v ;
   Context.close t
 
 let test_invalid_depth_concrete_inodes ~indexing_strategy =
@@ -721,12 +728,12 @@ let test_invalid_depth_concrete_inodes ~indexing_strategy =
 
   (* subtrees need to be non-empty *)
   let v = C.Blinded in
-  let ptr = { C.index = 0; pointer = H_contents.hash ""; tree = v } in
-  let tree_bad_depth = C.Tree { depth = 2; length = 1; pointers = [ ptr ] } in
+  let ptr = {C.index = 0; pointer = H_contents.hash ""; tree = v} in
+  let tree_bad_depth = C.Tree {depth = 2; length = 1; pointers = [ptr]} in
   let ptr =
-    { C.index = 1; pointer = H_contents.hash ""; tree = tree_bad_depth }
+    {C.index = 1; pointer = H_contents.hash ""; tree = tree_bad_depth}
   in
-  let tree_top = C.Tree { depth = 0; length = 1; pointers = [ ptr ] } in
+  let tree_top = C.Tree {depth = 0; length = 1; pointers = [ptr]} in
   let _ =
     match Inter.Val.of_concrete tree_top with
     | Error (`Invalid_depth _) -> ()
@@ -749,6 +756,7 @@ module Inode_tezos = struct
     Inode_modules (Conf) (Brassaia_tezos.Schema)
       (struct
         let foo = Bytes.make 10 '0'
+
         let bar = Bytes.make 10 '1'
       end)
 
@@ -757,15 +765,16 @@ module Inode_tezos = struct
     S.Inter.Raw.encode_bin
       ~dict:(fun _ -> None)
       ~offset_of_key:(fun _ -> None)
-      h v1
+      h
+      v1
 
   let hex_encode s = Hex.of_string s |> Hex.show
 
   let test_encode_bin_values ~indexing_strategy =
-    rm_dir root;
+    rm_dir root ;
     let t = S.Context.get_store ~indexing_strategy () in
-    let { S.Context.foo; _ } = t in
-    let v = S.Inode.Val.of_list [ ("x", normal foo); ("z", normal foo) ] in
+    let {S.Context.foo; _} = t in
+    let v = S.Inode.Val.of_list [("x", normal foo); ("z", normal foo)] in
     let h = S.Inter.Val.hash_exn v in
     let hash_to_bin_string =
       Brassaia.Type.(unstage (to_bin_string S.Inode.Val.hash_t))
@@ -792,7 +801,7 @@ module Inode_tezos = struct
         ("hash of contents", hex_of_foo);
       ]
     in
-    check_iter "encode_bin" (encode_bin h) v checks;
+    check_iter "encode_bin" (encode_bin h) v checks ;
     S.Context.close t
 
   let test_encode_bin_values () =
@@ -800,9 +809,9 @@ module Inode_tezos = struct
     test_encode_bin_values ~indexing_strategy:`minimal
 
   let test_encode_bin_tree ~indexing_strategy =
-    rm_dir root;
+    rm_dir root ;
     let t = S.Context.get_store ~indexing_strategy () in
-    let { S.Context.foo; bar; _ } = t in
+    let {S.Context.foo; bar; _} = t in
     let v =
       S.Inode.Val.of_list
         [
@@ -837,7 +846,7 @@ module Inode_tezos = struct
           "461a30b373e7d98e23dc963934a417d7c5aceb14fa2fb6da6950438fd54c9aa9" );
       ]
     in
-    check_iter "encode_bin" (encode_bin h) v checks;
+    check_iter "encode_bin" (encode_bin h) v checks ;
     S.Context.close t
 
   let test_encode_bin_tree () =
@@ -874,6 +883,7 @@ module Child_ordering = struct
       include Brassaia_tezos.Conf
 
       let entries = entries'
+
       let inode_child_order = t
     end in
     let module T = Inode_modules (Conf) (Schema) (String_contents) in
@@ -889,10 +899,12 @@ module Child_ordering = struct
   let check_max_depth_exception pos (module Order : S) ~step ~depth =
     match Order.key step |> Order.index ~depth with
     | index ->
-        Alcotest.failf ~pos
+        Alcotest.failf
+          ~pos
           "Expected [Max_depth %d] to be raised, but got a computed index of \
            %d instead"
-          depth index
+          depth
+          index
     | exception Brassaia_pack.Inode.Max_depth _ -> ()
 
   (* Get the bit at index [n] in a string: *)
@@ -903,7 +915,7 @@ module Child_ordering = struct
     let mask = 1 lsl (7 - bit_index_in_byte) in
     let masked_byte = chosen_byte land mask in
     let chosen_bit = masked_byte lsr (7 - bit_index_in_byte) in
-    assert (chosen_bit = 0 || chosen_bit = 1);
+    assert (chosen_bit = 0 || chosen_bit = 1) ;
     chosen_bit
 
   let test_seeded_hash () =
@@ -914,9 +926,9 @@ module Child_ordering = struct
     let (module Order) = make `Seeded_hash in
 
     (* Test some hard-coded samples to ensure stablility: *)
-    check_child_index __POS__ (module Order) ~expected:23 ~step:"a" ~depth:1;
-    check_child_index __POS__ (module Order) ~expected:2 ~step:"b" ~depth:2;
-    check_child_index __POS__ (module Order) ~expected:10 ~step:"foo" ~depth:42;
+    check_child_index __POS__ (module Order) ~expected:23 ~step:"a" ~depth:1 ;
+    check_child_index __POS__ (module Order) ~expected:2 ~step:"b" ~depth:2 ;
+    check_child_index __POS__ (module Order) ~expected:10 ~step:"foo" ~depth:42 ;
 
     (* Should match reference implementation for some random samples too: *)
     for _ = 1 to 1_000 do
@@ -946,7 +958,9 @@ module Child_ordering = struct
       [%log.app
         "Testing hash_bits with { log_entries = %d; entries = %d; max_depth = \
          %d }"
-        log2_entries entries max_depth];
+          log2_entries
+          entries
+          max_depth] ;
 
       (* Index is computed by reading [log2_entries] consecutive bits from the
          hash of the step, starting at the [log2_entries * depth]-th byte. *)
@@ -956,7 +970,7 @@ module Child_ordering = struct
         for i = 0 to log2_entries - 1 do
           let selected_bit = get_bit hash ((log2_entries * depth) + i) in
           index := (!index lsl 1) lor selected_bit
-        done;
+        done ;
         !index
       in
 
@@ -967,11 +981,13 @@ module Child_ordering = struct
         for depth = 0 to max_depth do
           let expected = reference ~depth step in
           check_child_index __POS__ (module Order) ~expected ~step ~depth
-        done;
+        done ;
         (* Beyond [max_depth], the index computation should fail: *)
-        check_max_depth_exception __POS__
+        check_max_depth_exception
+          __POS__
           (module Order)
-          ~step ~depth:(max_depth + 1)
+          ~step
+          ~depth:(max_depth + 1)
       done
     done
 
@@ -982,9 +998,9 @@ module Child_ordering = struct
       a * b
     in
     let (module Order) = make ~entries (`Custom square_index) in
-    check_child_index __POS__ (module Order) ~depth:1 ~step:"1" ~expected:1;
-    check_child_index __POS__ (module Order) ~depth:2 ~step:"2" ~expected:4;
-    check_child_index __POS__ (module Order) ~depth:3 ~step:"3" ~expected:9;
+    check_child_index __POS__ (module Order) ~depth:1 ~step:"1" ~expected:1 ;
+    check_child_index __POS__ (module Order) ~depth:2 ~step:"2" ~expected:4 ;
+    check_child_index __POS__ (module Order) ~depth:3 ~step:"3" ~expected:9 ;
     ()
 end
 
@@ -1001,7 +1017,8 @@ let tests =
     tc "remove values" test_remove_values;
     tc "remove inodes" test_remove_inodes;
     tc "test concrete inodes" test_concrete_inodes;
-    tc "test representation uniqueness"
+    tc
+      "test representation uniqueness"
       test_representation_uniqueness_maxdepth_3;
     tc "test encode bin of values" Inode_tezos.test_encode_bin_values;
     tc "test intermediate inode as root" test_intermediate_inode_as_root;

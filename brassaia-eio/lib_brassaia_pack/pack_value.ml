@@ -73,14 +73,14 @@ module Kind = struct
 
   let pp =
     Fmt.of_to_string (function
-      | Commit_v1 -> "Commit_v1"
-      | Commit_v2 -> "Commit_v2"
-      | Contents -> "Contents"
-      | Inode_v1_unstable -> "Inode_v1_unstable"
-      | Inode_v1_stable -> "Inode_v1_stable"
-      | Inode_v2_root -> "Inode_v2_root"
-      | Inode_v2_nonroot -> "Inode_v2_nonroot"
-      | Dangling_parent_commit -> "Dangling_parent_commit")
+        | Commit_v1 -> "Commit_v1"
+        | Commit_v2 -> "Commit_v2"
+        | Contents -> "Contents"
+        | Inode_v1_unstable -> "Inode_v1_unstable"
+        | Inode_v1_stable -> "Inode_v1_stable"
+        | Inode_v2_root -> "Inode_v2_root"
+        | Inode_v2_nonroot -> "Inode_v2_nonroot"
+        | Dangling_parent_commit -> "Dangling_parent_commit")
 
   let length_header_exn : t -> length_header =
     let some_varint = Some `Varint in
@@ -95,7 +95,7 @@ module Kind = struct
   let t = Brassaia.Type.map ~pp Brassaia.Type.char of_magic_exn to_magic
 end
 
-type ('h, 'a) value = { hash : 'h; kind : Kind.t; v : 'a } [@@deriving brassaia]
+type ('h, 'a) value = {hash : 'h; kind : Kind.t; v : 'a} [@@deriving brassaia]
 
 module type S = S with type kind := Kind.t
 
@@ -103,8 +103,10 @@ let get_dynamic_sizer_exn : type a. a Brassaia.Type.t -> string -> int -> int =
  fun typ ->
   match Brassaia.Type.(Size.of_encoding typ) with
   | Unknown ->
-      Fmt.failwith "Type must have a recoverable encoded length: %a"
-        Brassaia.Type.pp_ty typ
+      Fmt.failwith
+        "Type must have a recoverable encoded length: %a"
+        Brassaia.Type.pp_ty
+        typ
   | Static n -> fun _ _ -> n
   | Dynamic f -> f
 
@@ -117,27 +119,38 @@ struct
   module Hash = Brassaia.Hash.Typed (Hash) (Data)
 
   type t = Data.t [@@deriving brassaia ~size_of]
+
   type key = Key.t
+
   type hash = Hash.t
+
   type kinded += Contents of t
 
   let to_kinded t = Contents t
+
   let of_kinded = function Contents c -> c | _ -> assert false
+
   let hash = Hash.hash
+
   let kind = Kind.Contents
+
   let length_header = Fun.const Conf.contents_length_header
+
   let value = [%typ: (Hash.t, Data.t) value]
+
   let encode_value = Brassaia.Type.(unstage (encode_bin value))
+
   let decode_value = Brassaia.Type.(unstage (decode_bin value))
 
   let encode_bin ~dict:_ ~offset_of_key:_ hash v f =
-    encode_value { kind; hash; v } f
+    encode_value {kind; hash; v} f
 
   let decode_bin ~dict:_ ~key_of_offset:_ ~key_of_hash:_ s off =
     let t = decode_value s off in
     t.v
 
   let decode_bin_length = get_dynamic_sizer_exn value
+
   let kind _ = kind
 
   let weight =
@@ -155,13 +168,19 @@ struct
   module Hash = Brassaia.Hash.Typed (Hash) (Commit)
 
   type t = Commit.t [@@deriving brassaia]
+
   type key = Key.t
+
   type hash = Hash.t [@@deriving brassaia ~encode_bin ~decode_bin]
+
   type kinded += Commit of t
 
   let to_kinded t = Commit t
+
   let of_kinded = function Commit c -> c | _ -> assert false
+
   let hash = Hash.hash
+
   let kind _ = Kind.Commit_v2
 
   let weight =
@@ -191,7 +210,8 @@ struct
     end
 
     module V2 = struct
-      type data = { length : int; v : Commit_direct.t } [@@deriving brassaia]
+      type data = {length : int; v : Commit_direct.t} [@@deriving brassaia]
+
       type t = (hash, data) value [@@deriving brassaia ~encode_bin ~decode_bin]
     end
   end
@@ -210,10 +230,10 @@ struct
       let info = Commit.info v in
       let node_offset = address_of_key (Commit.node v) in
       let parent_offsets = List.map address_of_key (Commit.parents v) in
-      { Commit_direct.node_offset; parent_offsets; info }
+      {Commit_direct.node_offset; parent_offsets; info}
     in
     let length = Commit_direct.size_of v in
-    Entry.V2.encode_bin { hash; kind = Commit_v2; v = { length; v } } f
+    Entry.V2.encode_bin {hash; kind = Commit_v2; v = {length; v}} f
 
   let decode_bin ~dict:_ ~key_of_offset ~key_of_hash s off =
     let key_of_address : Commit_direct.address -> Key.t = function
@@ -223,7 +243,7 @@ struct
     match Kind.of_magic_exn s.[!off + Hash.hash_size] with
     | Commit_v1 -> (Entry.V1.decode_bin s off).v
     | Commit_v2 | Dangling_parent_commit ->
-        let { v = { Entry.V2.v = commit; _ }; _ } = Entry.V2.decode_bin s off in
+        let {v = {Entry.V2.v = commit; _}; _} = Entry.V2.decode_bin s off in
         let info = commit.info in
         let node = key_of_address commit.node_offset in
         let parents = List.map key_of_address commit.parent_offsets in

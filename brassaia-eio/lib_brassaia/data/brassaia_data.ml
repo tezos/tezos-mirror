@@ -18,5 +18,5 @@
     implementation of Brassaia. It is exposed only for internal use, and does not
     provide a stable API. *)
 
-module Fixed_size_string_set = Fixed_size_string_set
 (** Mutable sets of strings with a common length. *)
+module Fixed_size_string_set = Fixed_size_string_set

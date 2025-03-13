@@ -48,25 +48,31 @@ end)
 module Spec = struct
   module M = Map.Make (String)
 
-  type t = { name : string; mutable keys : k M.t }
+  type t = {name : string; mutable keys : k M.t}
 
   let all = Hashtbl.create 8
 
   let v name =
     let keys = M.empty in
     if Hashtbl.mem all name then
-      Fmt.failwith "Config spec already exists: %s" name;
-    let x = { name; keys } in
-    Hashtbl.replace all name x;
+      Fmt.failwith "Config spec already exists: %s" name ;
+    let x = {name; keys} in
+    Hashtbl.replace all name x ;
     x
 
-  let name { name; _ } = name
+  let name {name; _} = name
+
   let update spec name k = spec.keys <- M.add name k spec.keys
+
   let list () = Hashtbl.to_seq_values all
+
   let find name = Hashtbl.find_opt all name
+
   let find_key spec name = M.find_opt name spec.keys
+
   let keys spec = M.to_seq spec.keys |> Seq.map snd
-  let clone { name; keys } = { name; keys }
+
+  let clone {name; keys} = {name; keys}
 
   let join dest src =
     let dest = clone dest in
@@ -78,9 +84,10 @@ module Spec = struct
           else
             let () = name := !name ^ "-" ^ spec.name in
             M.add_seq (M.to_seq spec.keys) acc)
-        dest.keys src
+        dest.keys
+        src
     in
-    { name = !name; keys }
+    {name = !name; keys}
 end
 
 type t = Spec.t * Univ.t M.t
@@ -100,19 +107,28 @@ let key ?docs ?docv ?doc ?(allow_duplicate = false) ~spec name ty default =
       Fmt.invalid_arg "duplicate key: %s" name
   | _ ->
       let to_univ, of_univ = Univ.create () in
-      let k = { name; ty; default; to_univ; of_univ; doc; docv; docs } in
-      Spec.update spec name (K k);
+      let k = {name; ty; default; to_univ; of_univ; doc; docv; docs} in
+      Spec.update spec name (K k) ;
       k
 
 let name t = t.name
+
 let doc t = t.doc
+
 let docv t = t.docv
+
 let docs t = t.docs
+
 let ty t = t.ty
+
 let default t = t.default
+
 let empty spec = (spec, M.empty)
+
 let singleton spec k v = (spec, M.singleton (K k) (k.to_univ v))
+
 let is_empty (_, t) = M.is_empty t
+
 let mem (_, d) k = M.mem (K k) d
 
 let validate_key spec k =
@@ -121,19 +137,21 @@ let validate_key spec k =
   | Some _ -> ()
 
 let add (spec, d) k v =
-  validate_key spec k;
+  validate_key spec k ;
   (spec, M.add (K k) (k.to_univ v) d)
 
 let verify (spec, d) =
-  M.iter (fun (K k) _ -> validate_key spec k) d;
+  M.iter (fun (K k) _ -> validate_key spec k) d ;
   (spec, d)
 
 let union (rs, r) (ss, s) =
-  let spec = Spec.join rs [ ss ] in
+  let spec = Spec.join rs [ss] in
   (spec, M.fold M.add r s)
 
 let rem (s, d) k = (s, M.remove (K k) d)
+
 let find (_, d) k = try k.of_univ (M.find (K k) d) with Not_found -> None
+
 let uri = Type.(map string) Uri.of_string Uri.to_string
 
 let get (_, d) k =
@@ -144,11 +162,11 @@ let get (_, d) k =
   with Not_found -> k.default
 
 let keys (_, conf) = M.to_seq conf |> Seq.map (fun (k, _) -> k)
+
 let with_spec (_, conf) spec = (spec, conf)
 
 let to_strings (_, conf) =
-  conf
-  |> M.to_seq
+  conf |> M.to_seq
   |> Seq.map (fun (K k, v) ->
          ( k.name,
            match k.of_univ v with
@@ -162,12 +180,17 @@ let equal t1 t2 =
   t1 == t2
   || Seq.for_all2
        (fun (k1, v1) (k2, v2) -> String.equal k1 k2 && String.equal v1 v2)
-       (to_strings t1) (to_strings t2)
+       (to_strings t1)
+       (to_strings t2)
 
 (* ~root *)
 let root spec =
-  key ~allow_duplicate:true ~spec ~docv:"ROOT"
-    ~doc:"The location of the Brassaia store on disk." ~docs:"COMMON OPTIONS"
+  key
+    ~allow_duplicate:true
+    ~spec
+    ~docv:"ROOT"
+    ~doc:"The location of the Brassaia store on disk."
+    ~docs:"COMMON OPTIONS"
     "root"
     Type.(string)
     "."
@@ -185,5 +208,6 @@ module Env = struct
     | Net : _ Eio.Net.t Effect.t
 
   let fs () = Effect.perform Fs
+
   let net () = Effect.perform Net
 end

@@ -17,9 +17,10 @@
 
 module Plugins = Ppx_repr_lib.Plugins.Make (struct
   let default_library = "Brassaia.Type"
+
   let namespace = "brassaia"
 end)
 
 let () =
-  Plugins.register_deriver ();
+  Plugins.register_deriver () ;
   Plugins.register_extension ~no_reserve_namespace:() ()

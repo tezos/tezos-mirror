@@ -20,29 +20,30 @@ module S = Test_gc.Store
 module Dispatcher = Brassaia_pack_unix.Dispatcher.Make (File_manager)
 
 let root = Filename.concat "_build" "test-dispatcher"
+
 let src = Logs.Src.create "tests.dispatcher" ~doc:"Test dispatcher"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
 let setup_store () =
-  rm_dir root;
+  rm_dir root ;
   let config = S.config root in
   let t = S.init_with_config config in
   let _ = S.commit_1 t in
   let t, c2 = S.commit_2 t in
   let t = S.checkout_exn t c2 in
   let t, _c3 = S.commit_3 t in
-  [%log.debug "Gc c1, keep c2, c3"];
+  [%log.debug "Gc c1, keep c2, c3"] ;
   let () = S.start_gc t c2 in
   let () = S.finalise_gc t in
   let () = S.close t in
   config
 
-type t = { off : Int63.t; len : int; hex : string }
+type t = {off : Int63.t; len : int; hex : string}
 
 (* predefined values based on [setup_store]. *)
 (* node_1 belongs to commit_1, it is removed from the store. *)
-let node_1 = { off = Int63.of_int 30; len = 26; hex = "" }
+let node_1 = {off = Int63.of_int 30; len = 26; hex = ""}
 
 (* node_2 belongs to commit_2, it is in the prefix. *)
 let node_2 =
@@ -72,7 +73,8 @@ let node_3 =
 
 let check_hex msg buf expected =
   Alcotest.(check string)
-    msg expected
+    msg
+    expected
     (Bytes.to_string buf |> Hex.of_string |> Hex.show)
 
 let test_read () =
@@ -80,7 +82,8 @@ let test_read () =
   let fm = File_manager.open_ro config |> Errs.raise_if_error in
   let dsp = Dispatcher.v fm |> Errs.raise_if_error in
   let _ =
-    Alcotest.check_raises "cannot read node_1"
+    Alcotest.check_raises
+      "cannot read node_1"
       (Brassaia_pack_unix.Errors.Pack_error
          (`Invalid_sparse_read (`Before, Int63.of_int 30)))
       (fun () ->
@@ -93,10 +96,10 @@ let test_read () =
     let _ = Dispatcher.read_exn dsp ~off:obj.off ~len:obj.len buf in
     check_hex msg buf obj.hex
   in
-  test_accessor "node_2" node_2;
-  test_accessor "commit_2" commit_2;
-  test_accessor "node_3" node_3;
+  test_accessor "node_2" node_2 ;
+  test_accessor "commit_2" commit_2 ;
+  test_accessor "node_3" node_3 ;
 
   File_manager.close fm |> Errs.raise_if_error
 
-let tests = [ Alcotest.test_case "read" `Quick test_read ]
+let tests = [Alcotest.test_case "read" `Quick test_read]

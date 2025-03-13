@@ -17,6 +17,7 @@
 (** {1 Store} *)
 
 module type S = Store_intf.S
+
 module type Io_s = Io_intf.S
 
 module Store_intf = Store_intf
@@ -29,6 +30,7 @@ module KV
     (Config : Brassaia_pack.Conf.S) =
 struct
   type endpoint = unit
+
   type hash = Brassaia.Schema.default_hash
 
   include Pack_key.Store_spec

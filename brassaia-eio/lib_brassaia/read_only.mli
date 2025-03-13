@@ -14,5 +14,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Read_only_intf.Sigs
 (** @inline *)
+include Read_only_intf.Sigs

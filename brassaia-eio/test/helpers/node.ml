@@ -16,21 +16,31 @@
 
 let check pos typ ~expected actual =
   let typ =
-    Alcotest.testable Brassaia.Type.(pp_dump typ) Brassaia.Type.(unstage (equal typ))
+    Alcotest.testable
+      Brassaia.Type.(pp_dump typ)
+      Brassaia.Type.(unstage (equal typ))
   in
   Alcotest.(check ~pos typ) "" expected actual
 
 module type Map = sig
   type t [@@deriving brassaia]
+
   type data [@@deriving brassaia]
+
   type key := string
 
   val empty : unit -> t
+
   val is_empty : t -> bool
+
   val length : t -> int
+
   val list : ?offset:int -> ?length:int -> ?cache:bool -> t -> (key * data) list
+
   val find : ?cache:bool -> t -> key -> data option
+
   val add : t -> key -> data -> t
+
   val remove : t -> key -> t
 
   (* Generators for use by the tests: *)
@@ -47,9 +57,12 @@ module Suite (Map : Map) = struct
     List.fold_left (fun t (k, v) -> Map.add t k v) (Map.empty ()) kvs
 
   let test_empty () =
-    check __POS__ [%typ: bool] ~expected:true Map.(is_empty (empty ()));
-    check __POS__ [%typ: int] ~expected:0 Map.(length (empty ()));
-    check __POS__ [%typ: (key * Map.data) list] ~expected:[]
+    check __POS__ [%typ: bool] ~expected:true Map.(is_empty (empty ())) ;
+    check __POS__ [%typ: int] ~expected:0 Map.(length (empty ())) ;
+    check
+      __POS__
+      [%typ: (key * Map.data) list]
+      ~expected:[]
       Map.(list (empty ()))
 
   let test_add () =
@@ -60,7 +73,10 @@ module Suite (Map : Map) = struct
 
   let test_remove () =
     (* Remove is a no-op on an empty node *)
-    check __POS__ [%typ: Map.t] ~expected:(Map.empty ())
+    check
+      __POS__
+      [%typ: Map.t]
+      ~expected:(Map.empty ())
       Map.(remove (empty ()) "foo")
 
   let test_find () =
@@ -68,23 +84,27 @@ module Suite (Map : Map) = struct
     let node = map_of_bindings bindings in
     bindings
     |> List.iter (fun (k, v) ->
-           check __POS__ [%typ: Map.data option] ~expected:(Some v)
+           check
+             __POS__
+             [%typ: Map.data option]
+             ~expected:(Some v)
              (Map.find node k))
 
   let test_equal () =
     let module Map = struct
       include Map
 
-      type nonrec t = t [@@deriving brassaia ~equal ~to_bin_string ~of_bin_string]
+      type nonrec t = t
+      [@@deriving brassaia ~equal ~to_bin_string ~of_bin_string]
     end in
     let bindings = random_bindings 256 in
     let m = map_of_bindings bindings in
 
     let m_rev = map_of_bindings (List.rev bindings) in
-    check __POS__ [%typ: bool] ~expected:true (Map.equal m m_rev);
+    check __POS__ [%typ: bool] ~expected:true (Map.equal m m_rev) ;
 
     let m_subset = map_of_bindings (List.tl bindings) in
-    check __POS__ [%typ: bool] ~expected:false (Map.equal m m_subset);
+    check __POS__ [%typ: bool] ~expected:false (Map.equal m m_subset) ;
 
     let m_serialised =
       m |> Map.to_bin_string |> Map.of_bin_string |> Result.get_ok
@@ -115,7 +135,7 @@ end = struct
   type key = Key.t [@@deriving brassaia]
 
   module Extras = struct
-    type data = [ `Node of Key.t | `Contents of Key.t * unit ]
+    type data = [`Node of Key.t | `Contents of Key.t * unit]
     [@@deriving brassaia]
 
     let random_data =

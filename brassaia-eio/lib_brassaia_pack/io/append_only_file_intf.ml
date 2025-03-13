@@ -26,25 +26,15 @@ module type S = sig
       automatically shifting offsets to deal with legacy file headers. *)
 
   module Io : Io_intf.S
+
   module Errs : Io_errors.S
 
   type t
 
-  val create_rw :
-    path:string -> overwrite:bool -> (t, [> Io.create_error ]) result
   (** Create a rw instance of [t] by creating the file at [path]. *)
+  val create_rw :
+    path:string -> overwrite:bool -> (t, [> Io.create_error]) result
 
-  val open_rw :
-    path:string ->
-    end_poff:int63 ->
-    dead_header_size:int ->
-    ( t,
-      [> Io.open_error
-      | `Closed
-      | `Invalid_argument
-      | `Read_out_of_bounds
-      | `Inconsistent_store ] )
-    result
   (** Create a rw instance of [t] by opening an existing file at [path].
 
       {3 End Offset}
@@ -65,7 +55,19 @@ module type S = sig
 
       This concept exists in order to keep supporting [`V1] and [`V2] pack
       stores with [`V3]. *)
+  val open_rw :
+    path:string ->
+    end_poff:int63 ->
+    dead_header_size:int ->
+    ( t,
+      [> Io.open_error
+      | `Closed
+      | `Invalid_argument
+      | `Read_out_of_bounds
+      | `Inconsistent_store ] )
+    result
 
+  (** Create a ro instance of [t] by opening an existing file at [path] *)
   val open_ro :
     path:string ->
     end_poff:int63 ->
@@ -77,15 +79,13 @@ module type S = sig
       | `Invalid_argument
       | `Read_out_of_bounds ] )
     result
-  (** Create a ro instance of [t] by opening an existing file at [path] *)
 
-  val close : t -> (unit, [> Io.close_error | `Pending_flush ]) result
   (** Close the underlying file.
 
       The internal buffer is expected to be in a flushed state when [close] is
       called. Otherwise, an error is returned. *)
+  val close : t -> (unit, [> Io.close_error | `Pending_flush]) result
 
-  val end_poff : t -> int63
   (** [end_poff t] is the number of bytes of the file. That function doesn't
       perform IO.
 
@@ -97,11 +97,11 @@ module type S = sig
 
       This information originates from the latest reload of the control file.
       Calling [refresh_end_poff t] updates [end_poff]. *)
+  val end_poff : t -> int63
 
   val read_to_string :
-    t -> off:int63 -> len:int -> (string, [> Io.read_error ]) result
+    t -> off:int63 -> len:int -> (string, [> Io.read_error]) result
 
-  val read_exn : t -> off:int63 -> len:int -> bytes -> unit
   (** [read_exn t ~off ~len b] puts the [len] bytes of [t] at [off] to [b].
 
       [read_to_string] should always be favored over [read_exn], except when
@@ -116,8 +116,8 @@ module type S = sig
       Attempting to read from the append buffer results in an
       [`Read_out_of_bounds] error. This feature could easily be implemented in
       the future if ever needed. *)
+  val read_exn : t -> off:int63 -> len:int -> bytes -> unit
 
-  val append_exn : t -> string -> unit
   (** [append_exn t ~off b] writes [b] to the end of [t]. Might trigger an auto
       flush.
 
@@ -131,31 +131,34 @@ module type S = sig
       {3 RW mode}
 
       Always raises [Errors.RO_not_allowed] *)
+  val append_exn : t -> string -> unit
 
-  val flush : t -> (unit, [> Io.write_error ]) result
   (** Flush the append buffer. Does not call [fsync].
 
       {3 RO mode}
 
       Always returns [Error `Ro_not_allowed]. *)
+  val flush : t -> (unit, [> Io.write_error]) result
 
-  val fsync : t -> (unit, [> Io.write_error ]) result
   (** Tell the os to fush its internal buffers. Does not call [flush].
 
       {3 RO mode}
 
       Always returns [Error `Ro_not_allowed]. *)
+  val fsync : t -> (unit, [> Io.write_error]) result
 
-  val refresh_end_poff : t -> int63 -> (unit, [> `Rw_not_allowed ]) result
   (** Ingest the new end offset of the file. Typically happens in RO mode when
       the control file has been re-read.
 
       {3 RW mode}
 
       Always returns [Error `Rw_not_allowed]. *)
+  val refresh_end_poff : t -> int63 -> (unit, [> `Rw_not_allowed]) result
 
   val readonly : t -> bool
+
   val empty_buffer : t -> bool
+
   val path : t -> string
 end
 

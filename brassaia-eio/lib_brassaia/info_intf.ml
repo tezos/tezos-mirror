@@ -18,15 +18,15 @@
 
 module type S = sig
   type author = string [@@deriving brassaia]
+
   type message = string [@@deriving brassaia]
 
-  type t [@@deriving brassaia]
   (** The type for commit info. *)
+  type t [@@deriving brassaia]
 
-  val v : ?author:author -> ?message:message -> int64 -> t
   (** Create a new commit info. *)
+  val v : ?author:author -> ?message:message -> int64 -> t
 
-  val date : t -> int64
   (** [date t] is [t]'s commit date.
 
       The date provided by the user when calling the {!v} function. Rounding
@@ -35,27 +35,28 @@ module type S = sig
       the Git backend, the date is translated into the commit {e Date} field and
       is expected to be the number of POSIX seconds (thus not counting leap
       seconds) since the Epoch. *)
+  val date : t -> int64
 
-  val author : t -> author
   (** [author t] is [t]'s commit author.
 
       The author identifies the entity (human, unikernel, process, thread, etc)
       performing an operation. For the Git backend, this will be directly
       translated into the {e Author} field. *)
+  val author : t -> author
 
-  val message : t -> message
   (** [message t] is [t]'s commit message. *)
+  val message : t -> message
 
-  val empty : t
   (** The empty commit info. *)
+  val empty : t
 
   (** {1 Info Functions} *)
 
-  type f = unit -> t
   (** Alias for functions which can build commit info. *)
+  type f = unit -> t
 
-  val none : f
   (** The empty info function. [none ()] is [empty] *)
+  val none : f
 end
 
 module type Sigs = sig

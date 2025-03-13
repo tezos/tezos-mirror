@@ -16,5 +16,9 @@
 
 let () =
   Eio_main.run @@ fun _ ->
-  Brassaia_test.Store.run "brassaia-mem" ~slow:true ~misc:[] ~sleep:Eio_unix.sleep
-    [ (`Quick, Test_mem.suite) ]
+  Brassaia_test.Store.run
+    "brassaia-mem"
+    ~slow:true
+    ~misc:[]
+    ~sleep:Eio_unix.sleep
+    [(`Quick, Test_mem.suite)]

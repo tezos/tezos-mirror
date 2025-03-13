@@ -22,9 +22,12 @@ module None (H : Type.S) (R : Type.S) = struct
   let v _ = ()
 
   type endpoint = unit
+
   type commit = H.t
+
   type branch = R.t
 
   let fetch () ?depth:_ _ _br = Error (`Msg "fetch operation is not available")
+
   let push () ?depth:_ _ _br = Error (`Msg "push operation is not available")
 end

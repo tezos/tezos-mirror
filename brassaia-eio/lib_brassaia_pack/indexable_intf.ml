@@ -19,11 +19,11 @@ open! Import
 module type S = sig
   include Brassaia.Indexable.S
 
-  val add : 'a t -> value -> key
   (** Overwrite [add] to work with a read-only database handler. *)
+  val add : 'a t -> value -> key
 
-  val unsafe_add : 'a t -> hash -> value -> key
   (** Overwrite [unsafe_add] to work with a read-only database handler. *)
+  val unsafe_add : 'a t -> hash -> value -> key
 
   val index_direct : _ t -> hash -> key option
 
@@ -31,6 +31,7 @@ module type S = sig
     ensure_unique:bool -> overcommit:bool -> 'a t -> hash -> value -> key
 
   val unsafe_mem : 'a t -> key -> bool
+
   val unsafe_find : check_integrity:bool -> 'a t -> key -> value option
 end
 
@@ -51,6 +52,7 @@ module type Sigs = sig
       S with type key = CA.key and type hash = CA.hash and type value = CA.value
 
     val make_closeable : 'a CA.t -> 'a t
+
     val get_if_open_exn : 'a t -> 'a CA.t
   end
 end

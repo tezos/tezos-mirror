@@ -31,29 +31,38 @@ module Hash : Brassaia.Hash.S = struct
     let s = H.to_raw_string t in
     Tezos_base58.pp ppf (Tezos_base58.encode ~prefix s)
 
-  let of_b58 : string -> (t, [ `Msg of string ]) result =
+  let of_b58 : string -> (t, [`Msg of string]) result =
    fun x ->
     match Tezos_base58.decode ~prefix (Base58 x) with
     | Some x -> Ok (H.of_raw_string x)
     | None -> Error (`Msg "Failed to read b58check_encoding data")
 
   let short_hash_string = Repr.(unstage (short_hash string))
+
   let short_hash ?seed t = short_hash_string ?seed (H.to_raw_string t)
 
   let t : t Repr.t =
-    Repr.map ~pp ~of_string:of_b58
+    Repr.map
+      ~pp
+      ~of_string:of_b58
       Repr.(string_of (`Fixed H.digest_size))
-      ~short_hash H.of_raw_string H.to_raw_string
+      ~short_hash
+      H.of_raw_string
+      H.to_raw_string
 
   let short_hash_string = short_hash_string ?seed:None
+
   let short_hash t = short_hash_string (H.to_raw_string t)
+
   let hash_size = H.digest_size
 
   let short_hash_substring t ~off =
     short_hash_string (Bigstringaf.substring t ~off ~len:hash_size)
 
   let hash = H.digesti_string
+
   let to_raw_string = H.to_raw_string
+
   let unsafe_of_raw_string = H.of_raw_string
 end
 
@@ -111,13 +120,15 @@ struct
       Brassaia.Type.(list ~len:`Int64 entry_t)
 
     let pre_hash_entries = Brassaia.Type.(unstage (pre_hash entries_t))
+
     let compare_entry (x, _) (y, _) = String.compare x y
+
     let step_to_string = Brassaia.Type.(unstage (to_bin_string Path.step_t))
+
     let str_key (k, v) = (step_to_string k, v)
 
     let pre_hash t =
-      M.list t
-      |> List.map str_key
+      M.list t |> List.map str_key
       |> List.fast_sort compare_entry
       |> pre_hash_entries
   end
@@ -136,7 +147,9 @@ struct
   include M
 
   let pre_hash_v1_t = Brassaia.Type.(unstage (pre_hash V1.t))
+
   let pre_hash_v1 t = pre_hash_v1_t (V1.import t)
+
   let t = Brassaia.Type.(like t ~pre_hash:pre_hash_v1)
 end
 
@@ -144,8 +157,12 @@ module Contents = struct
   type t = bytes
 
   let ty = Brassaia.Type.(pair (bytes_of `Int64) unit)
+
   let pre_hash_ty = Brassaia.Type.(unstage (pre_hash ty))
+
   let pre_hash_v1 x = pre_hash_ty (x, ())
+
   let t = Brassaia.Type.(like bytes ~pre_hash:pre_hash_v1)
+
   let merge = Brassaia.Merge.(idempotent (Brassaia.Type.option t))
 end

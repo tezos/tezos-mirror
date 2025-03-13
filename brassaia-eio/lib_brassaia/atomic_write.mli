@@ -14,5 +14,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Atomic_write_intf.Sigs
 (** @inline *)
+include Atomic_write_intf.Sigs

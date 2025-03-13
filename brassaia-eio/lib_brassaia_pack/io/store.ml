@@ -46,15 +46,13 @@ struct
     module X = struct
       module Hash = H
 
-      type 'a value = { hash : H.t; kind : Pack_value.Kind.t; v : 'a }
+      type 'a value = {hash : H.t; kind : Pack_value.Kind.t; v : 'a}
       [@@deriving brassaia]
 
       module Contents = struct
         module Pack_value = Pack_value.Of_contents (Config) (H) (XKey) (C)
-
         module CA =
           Pack_store.Make (File_manager) (Dispatcher) (H) (Pack_value) (Errs)
-
         include Brassaia.Contents.Store_indexable (CA) (H) (C)
       end
 
@@ -64,10 +62,8 @@ struct
         module CA = struct
           module Inter =
             Brassaia_pack.Inode.Make_internal (Config) (H) (XKey) (Value)
-
           module Pack' =
             Pack_store.Make (File_manager) (Dispatcher) (H) (Inter.Raw) (Errs)
-
           include Inode.Make_persistent (H) (Value) (Inter) (Pack')
         end
 
@@ -91,12 +87,11 @@ struct
         end
 
         module Pack_value = Pack_value.Of_commit (H) (XKey) (Value)
-
         module CA =
           Pack_store.Make (File_manager) (Dispatcher) (H) (Pack_value) (Errs)
-
         include
-          Brassaia.Commit.Generic_key.Store (Schema.Info) (Node) (CA) (H) (Value)
+          Brassaia.Commit.Generic_key.Store (Schema.Info) (Node) (CA) (H)
+            (Value)
       end
 
       module Commit_portable = struct
@@ -142,11 +137,12 @@ struct
         module Commit_store = Commit.CA
 
         type hash = Node_value.hash
+
         type key = Node_value.node_key [@@deriving brassaia]
       end)
 
       module Repo = struct
-        type running_gc = { gc : Gc.t; use_auto_finalisation : bool }
+        type running_gc = {gc : Gc.t; use_auto_finalisation : bool}
 
         type t = {
           config : Brassaia.Backend.Conf.t;
@@ -163,10 +159,15 @@ struct
         }
 
         let pp_key = Brassaia.Type.pp XKey.t
+
         let contents_t t : 'a Contents.t = t.contents
+
         let node_t t : 'a Node.t = (contents_t t, t.node)
+
         let commit_t t : 'a Commit.t = (node_t t, t.commit)
+
         let branch_t t = t.branch
+
         let config t = t.config
 
         let v config =
@@ -218,18 +219,21 @@ struct
           }
 
         let flush t = File_manager.flush ?hook:None t.fm |> Errs.raise_if_error
+
         let fsync t = File_manager.fsync t.fm |> Errs.raise_if_error
+
         let reload t = File_manager.reload t.fm |> Errs.raise_if_error
 
         module Gc = struct
-          let is_allowed { fm; _ } = File_manager.gc_allowed fm
-          let behaviour { fm; _ } = File_manager.gc_behaviour fm
+          let is_allowed {fm; _} = File_manager.gc_allowed fm
+
+          let behaviour {fm; _} = File_manager.gc_behaviour fm
 
           let unsafe_cancel t =
             match Atomic.get t.running_gc with
-            | Some { gc; _ } ->
+            | Some {gc; _} ->
                 let cancelled = Gc.cancel gc in
-                Atomic.set t.running_gc None;
+                Atomic.set t.running_gc None ;
                 cancelled
             | None -> false
 
@@ -250,7 +254,7 @@ struct
 
           let start ~unlink ~use_auto_finalisation ~output t commit_key =
             let open Result_syntax in
-            [%log.info "GC: Starting on %a" pp_key commit_key];
+            [%log.info "GC: Starting on %a" pp_key commit_key] ;
             let* () =
               if Atomic.get t.during_batch then Error `Gc_forbidden_during_batch
               else Ok ()
@@ -267,18 +271,27 @@ struct
             let next_generation = current_generation + 1 in
             let lower_root = Conf.lower_root t.config in
             let* gc =
-              Gc.v ~root ~lower_root ~generation:next_generation ~unlink
-                ~dispatcher:t.dispatcher ~fm:t.fm ~contents:t.contents
-                ~node:t.node ~commit:t.commit ~output commit_key
+              Gc.v
+                ~root
+                ~lower_root
+                ~generation:next_generation
+                ~unlink
+                ~dispatcher:t.dispatcher
+                ~fm:t.fm
+                ~contents:t.contents
+                ~node:t.node
+                ~commit:t.commit
+                ~output
+                commit_key
             in
-            Atomic.set t.running_gc (Some { gc; use_auto_finalisation });
+            Atomic.set t.running_gc (Some {gc; use_auto_finalisation}) ;
             Ok ()
 
           let start_exn ?(unlink = true) ?(output = `Root)
               ~use_auto_finalisation t commit_key =
             match Atomic.get t.running_gc with
             | Some _ ->
-                [%log.info "Repo is alreadying running GC. Skipping."];
+                [%log.info "Repo is alreadying running GC. Skipping."] ;
                 false
             | None -> (
                 let result =
@@ -290,18 +303,18 @@ struct
             let result =
               match Atomic.get t.running_gc with
               | None -> Ok `Idle
-              | Some { gc; _ } ->
+              | Some {gc; _} ->
                   if Atomic.get t.during_batch then
                     Error `Gc_forbidden_during_batch
                   else Gc.finalise ~wait gc
             in
             match result with
             | Ok (`Finalised _ as x) ->
-                Atomic.set t.running_gc None;
+                Atomic.set t.running_gc None ;
                 x
             | Ok waited -> waited
             | Error e ->
-                Atomic.set t.running_gc None;
+                Atomic.set t.running_gc None ;
                 Errs.raise_error e
 
           let is_finished t = Option.is_none (Atomic.get t.running_gc)
@@ -309,14 +322,14 @@ struct
           let on_finalise t f =
             match Atomic.get t.running_gc with
             | None -> ()
-            | Some { gc; _ } ->
+            | Some {gc; _} ->
                 Eio.Mutex.use_rw ~protect:true t.lock @@ fun () ->
                 Gc.on_finalise gc f
 
           let try_auto_finalise_exn t =
             match Atomic.get t.running_gc with
-            | None | Some { use_auto_finalisation = false; _ } -> ()
-            | Some { use_auto_finalisation = true; _ } ->
+            | None | Some {use_auto_finalisation = false; _} -> ()
+            | Some {use_auto_finalisation = true; _} ->
                 let _ = finalise_exn ~wait:false t in
                 ()
 
@@ -329,12 +342,13 @@ struct
             | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8 | T9 | T10 | T11 | T12 | T13
             | T14 | T15 ->
                 assert false
-            | Gced { latest_gc_target_offset = offset; _ }
+            | Gced {latest_gc_target_offset = offset; _}
               when offset = Int63.zero ->
                 None
-            | Gced { latest_gc_target_offset = offset; _ } -> (
+            | Gced {latest_gc_target_offset = offset; _} -> (
                 let entry =
-                  Commit.CA.read_and_decode_entry_prefix ~off:offset
+                  Commit.CA.read_and_decode_entry_prefix
+                    ~off:offset
                     t.dispatcher
                 in
                 match Commit.CA.Entry_prefix.total_entry_length entry with
@@ -360,7 +374,10 @@ struct
             (* The GC action here does not matter, since we'll not fully
                finalise it *)
             let launched =
-              start_exn ~use_auto_finalisation:false ~output:(`External path) t
+              start_exn
+                ~use_auto_finalisation:false
+                ~output:(`External path)
+                t
                 commit_key
             in
             let () =
@@ -369,11 +386,13 @@ struct
             let gced =
               match Atomic.get t.running_gc with
               | None -> assert false
-              | Some { gc; _ } ->
+              | Some {gc; _} ->
                   Eio.Mutex.use_rw ~protect:false t.lock @@ fun () ->
                   Gc.finalise_without_swap gc
             in
-            let config = Brassaia.Backend.Conf.add t.config Conf.Key.root path in
+            let config =
+              Brassaia.Backend.Conf.add t.config Conf.Key.root path
+            in
             let () =
               File_manager.create_one_commit_store t.fm config gced commit_key
               |> Errs.raise_if_error
@@ -407,21 +426,21 @@ struct
         let add_volume_exn t =
           let () =
             if Brassaia_pack.Conf.readonly t.config then
-              Errs.raise_error `Ro_not_allowed;
+              Errs.raise_error `Ro_not_allowed ;
             if Gc.is_finished t = false then
               Errs.raise_error `Add_volume_forbidden_during_gc
           in
           File_manager.add_volume t.fm |> Errs.raise_if_error
 
         let unsafe_batch t f =
-          [%log.debug "[pack] batch start"];
+          [%log.debug "[pack] batch start"] ;
           let readonly = Brassaia_pack.Conf.readonly t.config in
           if readonly then Errs.raise_error `Ro_not_allowed
           else
             let c0 = Io.Clock.counter () in
             let try_finalise () = Gc.try_auto_finalise_exn t in
             let _ = try_finalise () in
-            Atomic.set t.during_batch true;
+            Atomic.set t.during_batch true ;
             let contents = Contents.CA.cast t.contents in
             let node = Node.CA.Pack.cast t.node in
             let commit = Commit.CA.cast t.commit in
@@ -430,17 +449,17 @@ struct
             let commit : 'a Commit.t = (node, commit) in
             let on_success res =
               let s = Io.Clock.count c0 |> Mtime.span_to_s in
-              [%log.info "[pack] batch completed in %.6fs" s];
-              Atomic.set t.during_batch false;
-              File_manager.flush t.fm |> Errs.raise_if_error;
+              [%log.info "[pack] batch completed in %.6fs" s] ;
+              Atomic.set t.during_batch false ;
+              File_manager.flush t.fm |> Errs.raise_if_error ;
               let _ = try_finalise () in
               res
             in
             let on_fail exn =
-              Atomic.set t.during_batch false;
+              Atomic.set t.during_batch false ;
               [%log.info
                 "[pack] batch failed. calling flush. (%s)"
-                  (Printexc.to_string exn)];
+                  (Printexc.to_string exn)] ;
               let () =
                 match File_manager.flush t.fm with
                 | Ok () -> ()
@@ -448,7 +467,8 @@ struct
                     [%log.err
                       "[pack] batch failed and flush failed. Silencing flush \
                        fail. (%a)"
-                      (Brassaia.Type.pp Errs.t) err]
+                        (Brassaia.Type.pp Errs.t)
+                        err]
               in
               (* Kill gc process in at_exit. *)
               raise exn
@@ -467,11 +487,11 @@ struct
           let _ = Gc.unsafe_cancel t in
           (* Step 2 - Close the files *)
           let () = File_manager.close t.fm |> Errs.raise_if_error in
-          Branch.close t.branch;
+          Branch.close t.branch ;
           (* Step 3 - Close the in-memory abstractions *)
           (* Dict.close t.dict; *)
-          Contents.CA.close (contents_t t);
-          Node.CA.close (snd (node_t t));
+          Contents.CA.close (contents_t t) ;
+          Node.CA.close (snd (node_t t)) ;
           Commit.CA.close (snd (commit_t t))
       end
     end
@@ -483,8 +503,14 @@ struct
       let heads = match heads with None -> Repo.heads t | Some m -> m in
       let hashes = List.map (fun x -> `Commit (Commit.key x)) heads in
       let iter ~pred_node ~node ~commit t =
-        Repo.iter ~cache_size:1_000_000 ~min:[] ~max:hashes ~pred_node ~node
-          ~commit t
+        Repo.iter
+          ~cache_size:1_000_000
+          ~min:[]
+          ~max:hashes
+          ~pred_node
+          ~node
+          ~commit
+          t
       in
       let nodes = X.Repo.node_t t |> snd in
       let check = X.Node.CA.integrity_check_inodes nodes in
@@ -508,8 +534,15 @@ struct
       let heads = match heads with None -> Repo.heads t | Some m -> m in
       let hashes = List.map (fun x -> `Commit (Commit.key x)) heads in
       let iter ~contents ~node ~pred_node ~pred_commit repo =
-        Repo.iter ~cache_size:1_000_000 ~min:[] ~max:hashes ~contents ~node
-          ~pred_node ~pred_commit repo
+        Repo.iter
+          ~cache_size:1_000_000
+          ~min:[]
+          ~max:hashes
+          ~contents
+          ~node
+          ~pred_node
+          ~pred_commit
+          repo
       in
       let contents = X.Repo.contents_t t in
       let pred = X.Node.CA.Val.pred in
@@ -521,8 +554,7 @@ struct
 
     let integrity_check ?ppf ?heads ~auto_repair t =
       let is_minimal =
-        t.X.Repo.config
-        |> Conf.indexing_strategy
+        t.X.Repo.config |> Conf.indexing_strategy
         |> Brassaia_pack.Indexing_strategy.is_minimal
       in
       if is_minimal then integrity_check_minimal ?ppf ?heads t
@@ -550,15 +582,15 @@ struct
               let () =
                 preds
                 |> List.map (function
-                     | s, `Contents h -> (s, `Contents (XKey.to_hash h))
-                     | s, `Inode h -> (s, `Inode (XKey.to_hash h))
-                     | s, `Node h -> (s, `Node (XKey.to_hash h)))
+                       | s, `Contents h -> (s, `Contents (XKey.to_hash h))
+                       | s, `Inode h -> (s, `Inode (XKey.to_hash h))
+                       | s, `Node h -> (s, `Node (XKey.to_hash h)))
                 |> Stats.visit_node t (XKey.to_hash k) ~width ~nb_children
               in
               List.rev_map
                 (function
                   | s, `Inode x ->
-                      assert (s = None);
+                      assert (s = None) ;
                       `Node x
                   | _, `Node x -> `Node x
                   | _, `Contents x -> `Contents x)
@@ -570,41 +602,53 @@ struct
           | None -> []
           | Some c ->
               let node = X.Commit.Val.node c in
-              Stats.visit_commit t (XKey.to_hash node);
-              [ `Node node ]
+              Stats.visit_commit t (XKey.to_hash node) ;
+              [`Node node]
         in
         let pred_contents _repo k =
-          Stats.visit_contents t (XKey.to_hash k);
+          Stats.visit_contents t (XKey.to_hash k) ;
           []
         in
         (* We want to discover all paths to a node, so we don't cache nodes
            during traversal. *)
         let () =
-          Repo.breadth_first_traversal ~cache_size:0 ~pred_node ~pred_commit
-            ~pred_contents ~max:[ commit ] repo
+          Repo.breadth_first_traversal
+            ~cache_size:0
+            ~pred_node
+            ~pred_commit
+            ~pred_contents
+            ~max:[commit]
+            repo
         in
         Stats.pp_results ~dump_blob_paths_to t
 
       let run ~dump_blob_paths_to ~commit repo =
-        Printexc.record_backtrace true;
+        Printexc.record_backtrace true ;
         let key = `Commit (Commit.key commit) in
         traverse_inodes ~dump_blob_paths_to key repo
     end
 
     let stats = Stats_computation.run
+
     let reload = X.Repo.reload
+
     let flush = X.Repo.flush
+
     let fsync = X.Repo.fsync
+
     let is_split_allowed = X.Repo.is_split_allowed
+
     let split = X.Repo.split_exn
+
     let add_volume = X.Repo.add_volume_exn
+
     let create_one_commit_store = X.Repo.Gc.create_one_commit_store
 
     module Gc = struct
-      type msg = [ `Msg of string ]
+      type msg = [`Msg of string]
 
       type process_state =
-        [ `Idle | `Running | `Finalised of Stats.Latest_gc.stats ]
+        [`Idle | `Running | `Finalised of Stats.Latest_gc.stats]
 
       let catch_errors context error =
         let err =
@@ -623,7 +667,10 @@ struct
 
       let map_errors context (error : Errs.t) =
         let err_msg =
-          Fmt.str "[%s] resulted in error: %a" context (Brassaia.Type.pp Errs.t)
+          Fmt.str
+            "[%s] resulted in error: %a"
+            context
+            (Brassaia.Type.pp Errs.t)
             error
         in
         `Msg err_msg
@@ -636,13 +683,17 @@ struct
       let start repo commit_key =
         try
           let started =
-            X.Repo.Gc.start_exn ~unlink:true ~use_auto_finalisation:true repo
+            X.Repo.Gc.start_exn
+              ~unlink:true
+              ~use_auto_finalisation:true
+              repo
               commit_key
           in
           Ok started
         with exn -> catch_errors "Start GC" exn
 
       let is_finished = X.Repo.Gc.is_finished
+
       let behaviour = X.Repo.Gc.behaviour
 
       let wait repo =
@@ -665,12 +716,14 @@ struct
                   | Ok _ as stats -> finished stats
                   | Error err ->
                       let err_msg = map_errors "Finalise GC" err in
-                      finished @@ Error err_msg);
+                      finished @@ Error err_msg) ;
             Ok r
         | Error _ as e -> e
 
       let is_allowed = X.Repo.Gc.is_allowed
+
       let cancel repo = X.Repo.Gc.cancel repo
+
       let latest_gc_target = X.Repo.Gc.latest_gc_target
     end
 
@@ -686,6 +739,7 @@ struct
     end)
 
     let traverse_pack_file = Traverse_pack_file.run
+
     let test_traverse_pack_file = Traverse_pack_file.test
 
     module Snapshot = struct
@@ -707,7 +761,7 @@ struct
 
       module Export = struct
         let iter ?on_disk repo f ~root_key =
-          [%log.debug "Iterate over a tree"];
+          [%log.debug "Iterate over a tree"] ;
           let contents = X.Repo.contents_t repo in
           let nodes = X.Repo.node_t repo |> snd in
           let export = S.Export.v repo.config contents nodes in
@@ -717,10 +771,14 @@ struct
           | `Contents _ -> Fmt.failwith "[root_key] cannot be of type contents"
           | `Node key ->
               let total =
-                Export.run ?on_disk export f_contents f_nodes
+                Export.run
+                  ?on_disk
+                  export
+                  f_contents
+                  f_nodes
                   (key, Pack_value.Kind.Inode_v2_root)
               in
-              Export.close export |> Errs.raise_if_error;
+              Export.close export |> Errs.raise_if_error ;
               total
       end
 
@@ -741,8 +799,8 @@ struct
           | Inode x -> Import.save_inodes process x
 
         let close process repo =
-          flush repo;
-          fsync repo;
+          flush repo ;
+          fsync repo ;
           Import.close process
       end
     end
@@ -766,26 +824,30 @@ struct
       module XKey = XKey
 
       let suffix_commit_mem repo key =
-        X.Commit.CA.unsafe_find ~check_integrity:false
+        X.Commit.CA.unsafe_find
+          ~check_integrity:false
           (snd (X.Repo.commit_t repo))
           key
         |> Option.is_some
 
       let suffix_node_mem repo key =
-        X.Node.CA.unsafe_find ~check_integrity:false
+        X.Node.CA.unsafe_find
+          ~check_integrity:false
           (snd (X.Repo.node_t repo))
           key
         |> Option.is_some
 
       let suffix_contents_mem repo key =
-        X.Contents.CA.unsafe_find ~check_integrity:false
-          (X.Repo.contents_t repo) key
+        X.Contents.CA.unsafe_find
+          ~check_integrity:false
+          (X.Repo.contents_t repo)
+          key
         |> Option.is_some
 
       let kill_gc (repo : X.Repo.t) =
         match (Atomic.get repo.running_gc : X.Repo.running_gc option) with
         | None -> false
-        | Some { gc; _ } -> X.Gc.cancel gc
+        | Some {gc; _} -> X.Gc.cancel gc
     end
   end
 end

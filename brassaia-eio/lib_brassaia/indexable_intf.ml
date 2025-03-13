@@ -19,21 +19,20 @@ open! Import
 open Store_properties
 
 module type S_without_key_impl = sig
-  include Read_only.S
   (** @inline *)
+  include Read_only.S
 
-  type hash
   (** The type of hashes of [value]. *)
+  type hash
 
-  val add : [> write ] t -> value -> key
   (** Write the contents of a value to the store, and obtain its key. *)
+  val add : [> write] t -> value -> key
 
-  val unsafe_add : [> write ] t -> hash -> value -> key
   (** Same as {!add} but allows specifying the value's hash directly. The
       backend might choose to discard that hash and/or can be corrupt if the
       hash is not consistent. *)
+  val unsafe_add : [> write] t -> hash -> value -> key
 
-  val index : [> read ] t -> hash -> key option
   (** Indexing maps the hash of a value to a corresponding key of that value in
       the store. For stores that are addressed by hashes directly, this is
       typically [fun _t h -> Lwt.return (Key.of_hash h)]; for stores with more
@@ -49,9 +48,10 @@ module type S_without_key_impl = sig
       - [index t hash = None] doesn't guarantee that there is no [key] such that
         [mem t key] and [Key.to_hash key = hash]: the value may still be present
         in the store under a key that is not indexed. *)
+  val index : [> read] t -> hash -> key option
 
-  include Batch with type 'a t := 'a t
   (** @inline *)
+  include Batch with type 'a t := 'a t
 end
 
 module type S = sig
@@ -63,14 +63,15 @@ module type S = sig
       values they reference. *)
 
   include S_without_key_impl (* @inline *)
+
   module Key : Key.S with type t = key and type hash = hash
 end
 
 module type Maker = functor (Hash : Hash.S) (Value : Type.S) -> sig
   include S with type value = Value.t and type hash = Hash.t
 
-  include Of_config with type 'a t := 'a t
   (** @inline *)
+  include Of_config with type 'a t := 'a t
 end
 
 (** A {!Maker_concrete_key} is an indexable store in which the key type is
@@ -88,8 +89,8 @@ module type Maker_concrete_key1 = sig
          and type hash = Hash.t
          and type key = Hash.t key
 
-    include Of_config with type 'a t := 'a t
     (** @inline *)
+    include Of_config with type 'a t := 'a t
   end
 end
 
@@ -108,16 +109,20 @@ module type Maker_concrete_key2 = sig
          and type hash = Hash.t
          and type key = (Hash.t, Value.t) key
 
-    include Of_config with type 'a t := 'a t
     (** @inline *)
+    include Of_config with type 'a t := 'a t
   end
 end
 
 module type Sigs = sig
   module type S = S
+
   module type S_without_key_impl = S_without_key_impl
+
   module type Maker = Maker
+
   module type Maker_concrete_key1 = Maker_concrete_key1
+
   module type Maker_concrete_key2 = Maker_concrete_key2
 
   module Maker_concrete_key2_of_1 (X : Maker_concrete_key1) :
@@ -136,13 +141,13 @@ module type Sigs = sig
     include
       S with type key = CA.key and type hash = CA.hash and type value = CA.value
 
-    val make_closeable : 'a CA.t -> 'a t
     (** [make_closeable t] returns a version of [t] that raises {!Brassaia.Closed}
         if an operation is performed when it is already closed. *)
+    val make_closeable : 'a CA.t -> 'a t
 
-    val get_if_open_exn : 'a t -> 'a CA.t
     (** [get_if_open_exn t] returns the store (without close checks) if it is
         open; otherwise raises {!Brassaia.Closed} *)
+    val get_if_open_exn : 'a t -> 'a CA.t
   end
 
   module Check_closed (M : Maker) : Maker

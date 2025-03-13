@@ -23,24 +23,28 @@ type int64_bigarray = (int64, Bigarray.int64_elt, Bigarray.c_layout) BigArr1.t
 module Int64_mmap (Io : Io_intf.S) : sig
   type t
 
-  val open_ro : fn:string -> sz:int -> (t, [> Io.open_error ]) result
+  val open_ro : fn:string -> sz:int -> (t, [> Io.open_error]) result
+
   val length : t -> int
+
   val get : t -> int -> Int64.t
-  val close : t -> (unit, [> Io.close_error ]) result
+
+  val close : t -> (unit, [> Io.close_error]) result
 end = struct
-  type t = { fd : Io.t; loaded : bool array; arr : int64_bigarray }
+  type t = {fd : Io.t; loaded : bool array; arr : int64_bigarray}
 
   let sector_size = 512
+
   let length t = BigArr1.dim t.arr
 
   let open_ro ~fn ~sz =
     let open Result_syntax in
-    assert (Io.classify_path fn = `File);
+    assert (Io.classify_path fn = `File) ;
     let+ fd = Io.open_ ~path:fn ~readonly:true in
     let size = sz / 8 in
     let arr = BigArr1.create Bigarray.Int64 Bigarray.c_layout size in
     let loaded = Array.make (1 + (sz / sector_size)) false in
-    { fd; arr; loaded }
+    {fd; arr; loaded}
 
   let close t = Io.close t.fd
 
@@ -50,10 +54,10 @@ end = struct
       let nb = min sector_size (length t - sector_start) in
       let len = 8 * nb in
       let bytes = Bytes.create len in
-      Io.read_exn t.fd ~off:(Int63.of_int (8 * sector_start)) ~len bytes;
+      Io.read_exn t.fd ~off:(Int63.of_int (8 * sector_start)) ~len bytes ;
       for i = 0 to nb - 1 do
         t.arr.{sector_start + i} <- Bytes.get_int64_le bytes (8 * i)
-      done;
+      done ;
       t.loaded.(sector_id) <- true)
 
   let ensure_loaded t i =
@@ -61,7 +65,7 @@ end = struct
     if not t.loaded.(sector_id) then load t sector_id
 
   let get t i =
-    ensure_loaded t i;
+    ensure_loaded t i ;
     t.arr.{i}
 end
 
@@ -89,10 +93,15 @@ module Make (Io : Io_intf.S) = struct
       | _ -> Error (`No_such_file_or_directory path)
 
     let close = Int64_mmap.close
+
     let entry_count t = Int64_mmap.length t / 3
+
     let entry_idx i = i * 3
+
     let entry_off t i = t.%{entry_idx i} |> Int63.of_int64
+
     let entry_poff t i = t.%{entry_idx i + 1} |> Int63.of_int64
+
     let entry_len t i = t.%{entry_idx i + 2} |> Int64.to_int
 
     let iter_exn t f =
@@ -102,7 +111,7 @@ module Make (Io : Io_intf.S) = struct
 
     let iter t f = Errs.catch (fun () -> iter_exn t f)
 
-    type entry = { off : int63; poff : int63; len : int }
+    type entry = {off : int63; poff : int63; len : int}
 
     let find_nearest_geq arr off =
       let get arr i =
@@ -111,7 +120,10 @@ module Make (Io : Io_intf.S) = struct
         start + len - 1
       in
       match
-        Utils.nearest_geq ~arr ~get ~lo:0
+        Utils.nearest_geq
+          ~arr
+          ~get
+          ~lo:0
           ~hi:(entry_count arr - 1)
           ~key:(Int63.to_int off)
       with
@@ -127,13 +139,13 @@ module Make (Io : Io_intf.S) = struct
           if i == 0 && entry.off > off then `Before entry else `Inside entry
   end
 
-  type t = { mapping : Mapping_file.t; data : Io.t }
+  type t = {mapping : Mapping_file.t; data : Io.t}
 
   let open_ ~readonly ~mapping_size ~mapping ~data =
     let open Result_syntax in
     let* mapping = Mapping_file.open_map ~path:mapping ~size:mapping_size in
     let+ data = Io.open_ ~path:data ~readonly in
-    { mapping; data }
+    {mapping; data}
 
   let open_ro ~mapping_size ~mapping ~data =
     open_ ~readonly:true ~mapping_size ~mapping ~data
@@ -145,7 +157,7 @@ module Make (Io : Io_intf.S) = struct
 
   let iter t fn = Mapping_file.iter t.mapping fn
 
-  let get_poff { mapping; _ } ~off =
+  let get_poff {mapping; _} ~off =
     match Mapping_file.find_nearest_geq mapping off with
     | `After -> raise (Errors.Pack_error (`Invalid_sparse_read (`After, off)))
     | `Before _ ->
@@ -161,21 +173,24 @@ module Make (Io : Io_intf.S) = struct
 
   let read_exn t ~off ~len buf =
     let poff, max_entry_len = get_poff t ~off in
-    if max_entry_len < len then raise (Errors.Pack_error `Read_out_of_bounds);
+    if max_entry_len < len then raise (Errors.Pack_error `Read_out_of_bounds) ;
     Io.read_exn t.data ~off:poff ~len buf
 
   let read_range_exn t ~off ~min_len ~max_len buf =
     [%log.debug
-      "read_range_exn ~off:%a ~min_len:%i ~max_len:%i" Int63.pp off min_len
-        max_len];
+      "read_range_exn ~off:%a ~min_len:%i ~max_len:%i"
+        Int63.pp
+        off
+        min_len
+        max_len] ;
     let poff, max_entry_len = get_poff t ~off in
     if max_entry_len < min_len then
-      raise (Errors.Pack_error `Read_out_of_bounds);
+      raise (Errors.Pack_error `Read_out_of_bounds) ;
     let len = min max_len max_entry_len in
-    Io.read_exn t.data ~off:poff ~len buf;
+    Io.read_exn t.data ~off:poff ~len buf ;
     len
 
-  let next_valid_offset { mapping; _ } ~off =
+  let next_valid_offset {mapping; _} ~off =
     match Mapping_file.find_nearest_geq mapping off with
     | `After -> None
     | `Before entry -> Some entry.off
@@ -187,9 +202,9 @@ module Make (Io : Io_intf.S) = struct
     if Int64.(equal zero) len then ""
     else
       let buf = Bytes.create (3 * 8) in
-      Bytes.set_int64_le buf 0 off;
-      Bytes.set_int64_le buf 8 poff;
-      Bytes.set_int64_le buf 16 len;
+      Bytes.set_int64_le buf 0 off ;
+      Bytes.set_int64_le buf 8 poff ;
+      Bytes.set_int64_le buf 16 len ;
       Bytes.unsafe_to_string buf
 
   module Wo = struct
@@ -200,16 +215,18 @@ module Make (Io : Io_intf.S) = struct
 
     let write_exn t ~off ~len str =
       let poff, max_entry_len = get_poff t ~off in
-      assert (len <= max_entry_len);
+      assert (len <= max_entry_len) ;
       Io.write_exn t.data ~off:poff ~len str
 
     let fsync t = Io.fsync t.data
+
     let close = close
 
     let create_from_data ~mapping ~dead_header_size ~size ~data:_ =
       let open Result_syntax in
       let entry =
-        make_entry ~off:Int64.zero
+        make_entry
+          ~off:Int64.zero
           ~poff:(Int64.of_int dead_header_size)
           ~len:(Int63.to_int64 size)
       in
@@ -222,9 +239,10 @@ module Make (Io : Io_intf.S) = struct
   module Ao = struct
     module Ao = Append_only_file.Make (Io) (Errs)
 
-    type t = { mapping : Ao.t; data : Ao.t; mutable end_off : Int63.t }
+    type t = {mapping : Ao.t; data : Ao.t; mutable end_off : Int63.t}
 
     let end_off t = t.end_off
+
     let mapping_size t = Ao.end_poff t.mapping
 
     let create ~mapping ~data =
@@ -232,7 +250,7 @@ module Make (Io : Io_intf.S) = struct
       let ao_create path = Ao.create_rw ~path ~overwrite:false in
       let* mapping = ao_create mapping in
       let+ data = ao_create data in
-      { mapping; data; end_off = Int63.zero }
+      {mapping; data; end_off = Int63.zero}
 
     let open_ao ~mapping_size ~mapping ~data =
       let open Result_syntax in
@@ -245,7 +263,8 @@ module Make (Io : Io_intf.S) = struct
         else
           let entry_len = 3 * 8 in
           let+ entry =
-            Ao.read_to_string ao_mapping
+            Ao.read_to_string
+              ao_mapping
               ~off:Int63.(Syntax.(mapping_size - of_int entry_len))
               ~len:entry_len
           in
@@ -257,29 +276,35 @@ module Make (Io : Io_intf.S) = struct
           (end_off + len, end_poff + len)
       in
       let+ ao_data = ao_open ~end_poff data in
-      { mapping = ao_mapping; data = ao_data; end_off }
+      {mapping = ao_mapping; data = ao_data; end_off}
 
-    let check_offset_exn { end_off; _ } ~off =
+    let check_offset_exn {end_off; _} ~off =
       if Int63.Syntax.(end_off > off) then
         Fmt.failwith
           "Sparse.Ao.append_exn at offset %a, smaller than latest offset %a"
-          Int63.pp off Int63.pp end_off
+          Int63.pp
+          off
+          Int63.pp
+          end_off
 
     let append_seq_exn t ~off seq =
-      check_offset_exn t ~off;
+      check_offset_exn t ~off ;
       let poff = Ao.end_poff t.data in
       let len =
         Seq.fold_left
           (fun len str ->
-            Ao.append_exn t.data str;
+            Ao.append_exn t.data str ;
             len + String.length str)
-          0 seq
+          0
+          seq
       in
       let entry =
-        make_entry ~off:(Int63.to_int64 off) ~poff:(Int63.to_int64 poff)
+        make_entry
+          ~off:(Int63.to_int64 off)
+          ~poff:(Int63.to_int64 poff)
           ~len:(Int64.of_int len)
       in
-      Ao.append_exn t.mapping entry;
+      Ao.append_exn t.mapping entry ;
       t.end_off <- Int63.(Syntax.(off + of_int len))
 
     let flush t =

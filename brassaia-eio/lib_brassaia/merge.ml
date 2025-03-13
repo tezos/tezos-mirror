@@ -21,7 +21,8 @@ let src = Logs.Src.create "brassaia.merge" ~doc:"Brassaia merging"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
-type conflict = [ `Conflict of string ]
+type conflict = [`Conflict of string]
+
 type 'a promise = unit -> ('a option, conflict) result
 
 let promise t : 'a promise = fun () -> Ok (Some t)
@@ -33,23 +34,26 @@ let memo fn =
     | Some x -> x
     | None ->
         let x = fn () in
-        r := Some x;
+        r := Some x ;
         x
 
 type 'a f = old:'a promise -> 'a -> 'a -> ('a, conflict) result
+
 type 'a t = 'a Type.t * 'a f
 
 let v t f = (t, f)
+
 let f (x : 'a t) = snd x
 
 let conflict fmt =
   ksprintf
     (fun msg ->
-      [%log.debug "conflict: %s" msg];
+      [%log.debug "conflict: %s" msg] ;
       Error (`Conflict msg))
     fmt
 
 let bind x f = match x with Error e -> Error e | Ok x -> f x
+
 let map f x = match x with Error _ as x -> x | Ok x -> Ok (f x)
 
 let map_promise f t () =
@@ -68,8 +72,11 @@ let ok x = Ok x
 
 module Infix = struct
   let ( >>=* ) = bind
+
   let ( >|=* ) x f = map f x
+
   let ( >>=? ) = bind_promise
+
   let ( >|=? ) x f = map_promise f x
 end
 
@@ -80,11 +87,11 @@ let default (type a) (t : a Type.t) : a t =
   ( t,
     fun ~old t1 t2 ->
       let open Infix in
-      [%log.debug "default %a | %a" pp t1 pp t2];
+      [%log.debug "default %a | %a" pp t1 pp t2] ;
       old () >>=* function
       | None -> conflict "default: add/add and no common ancestor"
       | Some old ->
-          [%log.debug "default old=%a" pp t1];
+          [%log.debug "default old=%a" pp t1] ;
           if equal old t1 && equal t1 t2 then ok t1
           else if equal old t1 then ok t2
           else if equal old t2 then ok t1
@@ -113,7 +120,7 @@ let option (type a) ((a, t) : a t) : a option t =
   let pp = Type.pp dt in
   ( dt,
     fun ~old t1 t2 ->
-      [%log.debug "some %a | %a" pp t1 pp t2];
+      [%log.debug "some %a | %a" pp t1 pp t2] ;
       match f (default Type.(option a)) ~old t1 t2 with
       | Ok x -> ok x
       | Error _ -> (
@@ -125,7 +132,7 @@ let option (type a) ((a, t) : a t) : a option t =
                 old () >>=* function
                 | None -> ok None
                 | Some o ->
-                    [%log.debug "option old=%a" pp o];
+                    [%log.debug "option old=%a" pp o] ;
                     ok o
               in
               t ~old v1 v2 >|=* fun x -> Some x
@@ -134,7 +141,7 @@ let option (type a) ((a, t) : a t) : a option t =
               old () >>=* function
               | None | Some None -> ok (Some x)
               | Some (Some o) ->
-                  [%log.debug "option old=%a" pp_a o];
+                  [%log.debug "option old=%a" pp_a o] ;
                   if equal x o then ok (Some x) else conflict "option: add/del")
           ) )
 
@@ -143,7 +150,7 @@ let pair (da, a) (db, b) =
   let pp = Type.pp dt in
   ( dt,
     fun ~old x y ->
-      [%log.debug "pair %a | %a" pp x pp y];
+      [%log.debug "pair %a | %a" pp x pp y] ;
       match (snd (default dt)) ~old x y with
       | Ok x -> ok x
       | Error _ ->
@@ -158,7 +165,7 @@ let triple (da, a) (db, b) (dc, c) =
   let pp = Type.pp dt in
   ( dt,
     fun ~old x y ->
-      [%log.debug "triple %a | %a" pp x pp y];
+      [%log.debug "triple %a | %a" pp x pp y] ;
       match (snd (default dt)) ~old x y with
       | Ok x -> ok x
       | Error _ ->
@@ -193,14 +200,14 @@ let alist_iter2 compare_k f l1 l2 =
     | (k1, v1) :: t1, (k2, v2) :: t2 -> (
         match compare_k k1 k2 with
         | 0 ->
-            f k1 (`Both (v1, v2));
+            f k1 (`Both (v1, v2)) ;
             aux t1 t2
         | x ->
             if x < 0 then (
-              f k1 (`Left v1);
+              f k1 (`Left v1) ;
               aux t1 l2)
             else (
-              f k2 (`Right v2);
+              f k2 (`Right v2) ;
               aux l1 t2))
   in
   aux l1 l2
@@ -208,9 +215,11 @@ let alist_iter2 compare_k f l1 l2 =
 (* assume l1 and l2 are key-sorted *)
 let alist_iter2_lwt compare_k f l1 l2 =
   let l3 = ref [] in
-  alist_iter2 compare_k
+  alist_iter2
+    compare_k
     (fun left right -> l3 := (fun () -> f left right) :: !l3)
-    l1 l2;
+    l1
+    l2 ;
   Eio.Fiber.all (List.rev !l3)
 
 (* DO NOT assume l1 and l2 are key-sorted *)
@@ -222,7 +231,7 @@ let alist_merge_lwt compare_k f l1 l2 =
   let f key data =
     match f key data with None -> () | Some v -> l3 := (key, v) :: !l3
   in
-  alist_iter2_lwt compare_k f l1 l2;
+  alist_iter2_lwt compare_k f l1 l2 ;
   !l3
 
 let alist dx dy merge_v =
@@ -233,7 +242,7 @@ let alist dx dy merge_v =
   ( dt,
     fun ~old x y ->
       let pp = Type.pp dt in
-      [%log.debug "alist %a | %a" pp x pp y];
+      [%log.debug "alist %a | %a" pp x pp y] ;
       let sort = List.sort compare_pair in
       let x = sort x in
       let y = sort y in
@@ -259,6 +268,7 @@ struct
   module M = Map.Make (K)
 
   let of_alist l = List.fold_left (fun map (k, v) -> M.add k v map) M.empty l
+
   let t = Type.map Type.(list (pair K.t int64)) of_alist M.bindings
 
   let merge ~old m1 m2 =
@@ -272,9 +282,9 @@ struct
       | None -> M.empty (* no parent = parent with empty value *)
       | Some o -> o
     in
-    M.iter (fun k v -> keys := add k (Int64.neg v) !keys) old;
-    M.iter (fun k v -> keys := add k v !keys) m1;
-    M.iter (fun k v -> keys := add k v !keys) m2;
+    M.iter (fun k v -> keys := add k (Int64.neg v) !keys) old ;
+    M.iter (fun k v -> keys := add k v !keys) m1 ;
+    M.iter (fun k v -> keys := add k v !keys) m2 ;
     !keys
 
   let merge = (t, merge)
@@ -289,11 +299,13 @@ struct
   module S = Set.Make (K)
 
   let of_list l = List.fold_left (fun set elt -> S.add elt set) S.empty l
+
   let t = Type.(map @@ list K.t) of_list S.elements
+
   let pp = Type.pp t
 
   let merge ~old x y =
-    [%log.debug "merge %a %a" pp x pp y];
+    [%log.debug "merge %a %a" pp x pp y] ;
     old () >|=* fun old ->
     let old = match old with None -> S.empty | Some o -> o in
     let ( ++ ) = S.union and ( -- ) = S.diff in
@@ -313,12 +325,14 @@ struct
   module M = Map.Make (K)
 
   let of_alist l = List.fold_left (fun map (k, v) -> M.add k v map) M.empty l
+
   let t x = Type.map Type.(list @@ pair K.t x) of_alist M.bindings
+
   let iter2 f t1 t2 = alist_iter2 K.compare f (M.bindings t1) (M.bindings t2)
 
   let iter2 f m1 m2 =
     let m3 = ref [] in
-    iter2 (fun key data -> m3 := (fun () -> f key data) :: !m3) m1 m2;
+    iter2 (fun key data -> m3 := (fun () -> f key data) :: !m3) m1 m2 ;
     Eio.Fiber.all (List.rev !m3)
 
   let merge_maps f m1 m2 =
@@ -326,7 +340,7 @@ struct
     let f key data =
       match f key data with None -> () | Some v -> l3 := (key, v) :: !l3
     in
-    iter2 f m1 m2;
+    iter2 f m1 m2 ;
     of_alist !l3
 
   let merge dv (merge_v : K.t -> 'a option t) =
@@ -334,13 +348,13 @@ struct
     let merge_v k = f (merge_v k) in
     ( t dv,
       fun ~old m1 m2 ->
-        [%log.debug "assoc %a | %a" pp m1 pp m2];
+        [%log.debug "assoc %a | %a" pp m1 pp m2] ;
         try
           let old key =
             old () >>=* function
             | None -> ok None
             | Some old ->
-                [%log.debug "assoc old=%a" pp old];
+                [%log.debug "assoc old=%a" pp old] ;
                 let old = try Some (M.find key old) with Not_found -> None in
                 ok (Some old)
           in
@@ -353,7 +367,7 @@ end
 let like da t a_to_b b_to_a =
   let pp = Type.pp da in
   let merge ~old a1 a2 =
-    [%log.debug "biject %a | %a" pp a1 pp a2];
+    [%log.debug "biject %a | %a" pp a1 pp a2] ;
     try
       let b1 = a_to_b a1 in
       let b2 = a_to_b a2 in
@@ -361,12 +375,12 @@ let like da t a_to_b b_to_a =
       (f t) ~old b1 b2 >|=* b_to_a
     with Not_found -> conflict "biject"
   in
-  seq [ default da; (da, merge) ]
+  seq [default da; (da, merge)]
 
 let like_lwt (type a b) da (t : b t) (a_to_b : a -> b) (b_to_a : b -> a) : a t =
   let pp = Type.pp da in
   let merge ~old a1 a2 =
-    [%log.debug "biject' %a | %a" pp a1 pp a2];
+    [%log.debug "biject' %a | %a" pp a1 pp a2] ;
     try
       let b1 = a_to_b a1 in
       let b2 = a_to_b a2 in
@@ -381,14 +395,20 @@ let like_lwt (type a b) da (t : b t) (a_to_b : a -> b) (b_to_a : b -> a) : a t =
       bind ((f t) ~old b1 b2) @@ fun b3 -> ok (b_to_a b3)
     with Not_found -> conflict "biject'"
   in
-  seq [ default da; (da, merge) ]
+  seq [default da; (da, merge)]
 
 let unit = default Type.unit
+
 let bool = default Type.bool
+
 let char = default Type.char
+
 let int32 = default Type.int32
+
 let int64 = default Type.int64
+
 let float = default Type.float
+
 let string = default Type.string
 
 type counter = int64

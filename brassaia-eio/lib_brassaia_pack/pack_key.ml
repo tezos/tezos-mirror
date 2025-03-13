@@ -21,9 +21,9 @@ module type S = sig
 
   val null : t
 
-  val unfindable_of_hash : hash -> t
   (** [unfindable_of_hash h] is a key [k] such that [to_hash k = h], with an
       unspecified internal representation. This function enables an efficient
       implmentation of "portable" inodes, but is otherwise unused. Attempting to
       dereference a key constructed in this way results in undefined behaviour. *)
+  val unfindable_of_hash : hash -> t
 end

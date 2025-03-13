@@ -26,16 +26,19 @@ module Make
     (M : Type.S) =
 struct
   type contents = C.t [@@deriving brassaia]
+
   type hash = H.t [@@deriving brassaia]
+
   type step = S.step [@@deriving brassaia]
+
   type metadata = M.t [@@deriving brassaia]
 
-  type kinded_hash = [ `Contents of hash * metadata | `Node of hash ]
+  type kinded_hash = [`Contents of hash * metadata | `Node of hash]
   [@@deriving brassaia]
 
-  type 'a inode = { length : int; proofs : (int * 'a) list } [@@deriving brassaia]
+  type 'a inode = {length : int; proofs : (int * 'a) list} [@@deriving brassaia]
 
-  type 'a inode_extender = { length : int; segments : int list; proof : 'a }
+  type 'a inode_extender = {length : int; segments : int list; proof : 'a}
   [@@deriving brassaia]
 
   type tree =
@@ -63,18 +66,21 @@ struct
 
   type stream = elt Seq.t [@@deriving brassaia]
 
-  type t = { before : kinded_hash; after : kinded_hash; state : tree }
+  type t = {before : kinded_hash; after : kinded_hash; state : tree}
   [@@deriving brassaia]
 
   let before t = t.before
+
   let after t = t.after
+
   let state t = t.state
-  let v ~before ~after state = { after; before; state }
+
+  let v ~before ~after state = {after; before; state}
 end
 
-exception Bad_proof of { context : string }
+exception Bad_proof of {context : string}
 
-let bad_proof_exn context = raise (Bad_proof { context })
+let bad_proof_exn context = raise (Bad_proof {context})
 
 module Env
     (B : Backend.S)
@@ -91,27 +97,30 @@ struct
       type t = H.t
 
       let hash = H.short_hash
+
       let equal = Type.(unstage (equal H.t))
     end)
 
-    type 'a t = { lock : Eio.Mutex.t; data : 'a Unsafe.t }
+    type 'a t = {lock : Eio.Mutex.t; data : 'a Unsafe.t}
 
-    let of_unsafe data = { lock = Eio.Mutex.create (); data }
+    let of_unsafe data = {lock = Eio.Mutex.create (); data}
+
     let create size = of_unsafe (Unsafe.create size)
 
-    let mem { lock; data } k =
+    let mem {lock; data} k =
       Eio.Mutex.use_ro lock @@ fun () -> Unsafe.mem data k
 
-    let find_opt { lock; data } k =
+    let find_opt {lock; data} k =
       Eio.Mutex.use_ro lock @@ fun () -> Unsafe.find_opt data k
 
-    let add { lock; data } k v =
+    let add {lock; data} k v =
       Eio.Mutex.use_rw ~protect:true lock @@ fun () -> Unsafe.add data k v
 
-    let replace { lock; data } k v =
+    let replace {lock; data} k v =
       Eio.Mutex.use_rw ~protect:true lock @@ fun () -> Unsafe.replace data k v
 
     let of_seq s = of_unsafe (Unsafe.of_seq s)
+
     let of_list l = of_seq (List.to_seq l)
 
     let to_list t =
@@ -120,7 +129,8 @@ struct
     let t elt_t = Type.map [%typ: (H.t * elt) list] of_list to_list
   end
 
-  type mode = Produce | Serialise | Deserialise | Consume [@@deriving brassaia]
+  type mode = Produce | Serialise | Deserialise | Consume
+  [@@deriving brassaia]
 
   module Set = struct
     type produce = {
@@ -143,18 +153,22 @@ struct
     [@@deriving brassaia]
 
     let producer () =
-      Produce { contents = Hashes.create 13; nodes = Hashes.create 13 }
+      Produce {contents = Hashes.create 13; nodes = Hashes.create 13}
 
     let deserialiser () =
-      Deserialise { contents = Hashes.create 13; nodes = Hashes.create 13 }
+      Deserialise {contents = Hashes.create 13; nodes = Hashes.create 13}
   end
 
   type v = Empty | Set of Set.t [@@deriving brassaia]
+
   type t = v Atomic.t
 
   let t = Type.map v_t Atomic.make Atomic.get
+
   let empty () : t = Atomic.make Empty
+
   let is_empty t = Atomic.get t = Empty
+
   let copy ~into t = Atomic.set into (Atomic.get t)
 
   type hash = H.t [@@deriving brassaia ~equal ~pp]
@@ -171,18 +185,18 @@ struct
 
   let with_consume f =
     let t = Atomic.make Empty in
-    set_mode t Deserialise;
+    set_mode t Deserialise ;
     let stop_deserialise () = set_mode t Consume in
     let res = f t ~stop_deserialise in
-    Atomic.set t Empty;
+    Atomic.set t Empty ;
     res
 
   let with_produce f =
     let t = Atomic.make Empty in
-    set_mode t Produce;
+    set_mode t Produce ;
     let start_serialise () = set_mode t Serialise in
     let res = f t ~start_serialise in
-    Atomic.set t Empty;
+    Atomic.set t Empty ;
     res
 
   module Contents_hash = Hash.Typed (H) (B.Contents.Val)
@@ -210,7 +224,7 @@ struct
     | Empty -> ()
     | Set (Produce set) ->
         (* Registering in [set] for traversal during [Serialise]. *)
-        assert (not (Hashes.mem set.contents h));
+        assert (not (Hashes.mem set.contents h)) ;
         Hashes.add set.contents h v
     | Set (Serialise _) ->
         (* There shouldn't be new contents during this phase *)
@@ -269,8 +283,8 @@ struct
         (* Registering in [set] for sharing during [Produce] and traversal
            during [Serialise]. This assertion is guarenteed because
            [add_node_from_store] is guarded by a call to [find_node] in tree. *)
-        assert (not (Hashes.mem set.nodes h));
-        Hashes.add set.nodes h v;
+        assert (not (Hashes.mem set.nodes h)) ;
+        Hashes.add set.nodes h v ;
         v
     | Set (Serialise _) ->
         (* There shouldn't be new nodes during this phase *)

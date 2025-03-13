@@ -20,6 +20,7 @@ open Common
 let src = Logs.Src.create "tests.lower" ~doc:"Test lower"
 
 module Log = (val Logs.src_log src : Logs.LOG)
+
 module Io = Brassaia_pack_unix.Io.Unix
 
 let ( let$ ) res f = f @@ Result.get_ok res
@@ -37,7 +38,7 @@ module Direct_tc = struct
   let test_empty () =
     let lower_root = create_lower_root () in
     let$ lower = Lower.v ~readonly:false ~volume_num:0 lower_root in
-    Alcotest.(check int) "0 volumes" 0 (Lower.volume_num lower);
+    Alcotest.(check int) "0 volumes" 0 (Lower.volume_num lower) ;
     let _ = Lower.close lower in
     ()
 
@@ -52,9 +53,9 @@ module Direct_tc = struct
     let lower_root = create_lower_root () in
     let$ lower = Lower.v ~readonly:false ~volume_num:0 lower_root in
     let$ _ = Lower.add_volume lower in
-    Alcotest.(check int) "1 volume" 1 (Lower.volume_num lower);
+    Alcotest.(check int) "1 volume" 1 (Lower.volume_num lower) ;
     let$ _ = Lower.reload ~volume_num:1 lower in
-    Alcotest.(check int) "1 volume after reload" 1 (Lower.volume_num lower);
+    Alcotest.(check int) "1 volume after reload" 1 (Lower.volume_num lower) ;
     let _ = Lower.close lower in
     ()
 
@@ -99,10 +100,12 @@ module Direct_tc = struct
     let _ = create_control (Lower.Volume.path volume) payload in
     let volume = Lower.find_volume ~off:(Int63.of_int 21) lower in
     Alcotest.(check bool)
-      "volume not found before reload" false (Option.is_some volume);
+      "volume not found before reload"
+      false
+      (Option.is_some volume) ;
     let$ _ = Lower.reload ~volume_num:1 lower in
     let volume = Lower.find_volume ~off:(Int63.of_int 21) lower in
-    Alcotest.(check bool) "found volume" true (Option.is_some volume);
+    Alcotest.(check bool) "found volume" true (Option.is_some volume) ;
     let _ = Lower.close lower in
     ()
 
@@ -114,16 +117,20 @@ module Direct_tc = struct
 
        Then test that reloading and read_exn work as expected. *)
     let volume_path = Lower.Volume.path volume in
-    let mapping_path = Brassaia_pack.Layout.V5.Volume.mapping ~root:volume_path in
+    let mapping_path =
+      Brassaia_pack.Layout.V5.Volume.mapping ~root:volume_path
+    in
     let data_path = Brassaia_pack.Layout.V5.Volume.data ~root:volume_path in
     let test_str = "hello" in
     let len = String.length test_str in
     let$ sparse =
-      Sparse.Ao.open_ao ~mapping_size:Int63.zero ~mapping:mapping_path
+      Sparse.Ao.open_ao
+        ~mapping_size:Int63.zero
+        ~mapping:mapping_path
         ~data:data_path
     in
-    let seq = List.to_seq [ test_str ] in
-    Sparse.Ao.append_seq_exn sparse ~off:Int63.zero seq;
+    let seq = List.to_seq [test_str] in
+    Sparse.Ao.append_seq_exn sparse ~off:Int63.zero seq ;
     let end_offset = Sparse.Ao.end_off sparse in
     let$ _ = Sparse.Ao.flush sparse in
     let$ _ = Sparse.Ao.close sparse in
@@ -142,8 +149,9 @@ module Direct_tc = struct
     let buf = Bytes.create len in
     let _ = Lower.read_exn ~off:Int63.zero ~len lower buf in
     Alcotest.(check string)
-      "check volume read" test_str
-      (Bytes.unsafe_to_string buf);
+      "check volume read"
+      test_str
+      (Bytes.unsafe_to_string buf) ;
     let _ = Lower.close lower in
     ()
 end
@@ -159,20 +167,24 @@ module Store_tc = struct
   let fresh_roots =
     let c = ref 0 in
     fun ?(make_root = true) () ->
-      incr c;
+      incr c ;
       let name =
         Filename.concat test_dir ("test_lower_store_" ^ string_of_int !c)
       in
-      Common.rm_dir name;
+      Common.rm_dir name ;
       let$ _ = if make_root then Io.mkdir name else Ok () in
       let lower = Filename.concat name "lower" in
-      Common.rm_dir lower;
+      Common.rm_dir lower ;
       (name, lower)
 
   let config ?(readonly = false) ?(fresh = false) ?lower_root root =
     Brassaia_pack.(
-      config ~readonly ~indexing_strategy:Indexing_strategy.minimal ~fresh
-        ~lower_root root)
+      config
+        ~readonly
+        ~indexing_strategy:Indexing_strategy.minimal
+        ~fresh
+        ~lower_root
+        root)
 
   let init ?(readonly = false) ?(fresh = true) ?(include_lower = true) () =
     let root, lower_root = fresh_roots () in
@@ -181,8 +193,7 @@ module Store_tc = struct
 
   let count_volumes repo =
     let open Store.Internal in
-    file_manager repo
-    |> File_manager.lower
+    file_manager repo |> File_manager.lower
     |> Option.map File_manager.Lower.volume_num
     |> Option.value ~default:0
 
@@ -200,11 +211,11 @@ module Store_tc = struct
 
   let generation repo =
     let open Store.Internal in
-    let ({ status; _ } : Brassaia_pack_unix.Control_file.Payload.Upper.Latest.t) =
+    let ({status; _} : Brassaia_pack_unix.Control_file.Payload.Upper.Latest.t) =
       file_manager repo |> File_manager.control |> File_manager.Control.payload
     in
     match status with
-    | Gced { generation; _ } -> generation
+    | Gced {generation; _} -> generation
     | _ -> Alcotest.fail "expected gced status"
 
   (* Reads all objects from the repo by iterating its index and folding its commit trees. *)
@@ -216,13 +227,14 @@ module Store_tc = struct
       Store.Internal.Index.iter
         (fun hash (_offset, _len, kind) ->
           match kind with
-          | Brassaia_pack.Pack_value.Kind.Commit_v2 -> commits := hash :: !commits
+          | Brassaia_pack.Pack_value.Kind.Commit_v2 ->
+              commits := hash :: !commits
           | _ -> ())
         index
     in
     List.map
       (fun hash ->
-        [%log.debug "read %a" Brassaia.Type.(pp Store.Hash.t) hash];
+        [%log.debug "read %a" Brassaia.Type.(pp Store.Hash.t) hash] ;
         match Store.Commit.of_hash repo hash with
         | None -> Alcotest.fail "failed to read commit"
         | Some commit -> Store.Tree.fold (Store.Commit.tree commit) ())
@@ -232,14 +244,14 @@ module Store_tc = struct
     let repo = init () in
     (* A newly created store with a lower should have an empty volume. *)
     let volume_num = count_volumes repo in
-    Alcotest.(check int) "volume_num is 1" 1 volume_num;
+    Alcotest.(check int) "volume_num is 1" 1 volume_num ;
     Store.Repo.close repo
 
   let test_create_nested () =
     let root, lower_root = fresh_roots ~make_root:false () in
     let repo = config ~fresh:true ~lower_root root |> Store.Repo.v in
     let volume_num = count_volumes repo in
-    Alcotest.(check int) "volume_num is 1" 1 volume_num;
+    Alcotest.(check int) "volume_num is 1" 1 volume_num ;
     Store.Repo.close repo
 
   let test_open_rw_lower () =
@@ -248,7 +260,7 @@ module Store_tc = struct
     let () = Store.Repo.close repo in
     let repo = config ~fresh:false ~lower_root root |> Store.Repo.v in
     let volume_num = count_volumes repo in
-    Alcotest.(check int) "volume_num is 1" 1 volume_num;
+    Alcotest.(check int) "volume_num is 1" 1 volume_num ;
     Store.Repo.close repo
 
   let test_add_volume_during_gc () =
@@ -257,12 +269,15 @@ module Store_tc = struct
     let () =
       Store.set_exn
         ~info:(fun () -> Store.Info.v ~author:"tester" Int64.zero)
-        main [ "a" ] "a"
+        main
+        ["a"]
+        "a"
     in
     let c = Store.Head.get main in
     let _ = Store.Gc.start_exn repo (Store.Commit.key c) in
     let () =
-      Alcotest.check_raises "add volume during gc"
+      Alcotest.check_raises
+        "add volume during gc"
         (Brassaia_pack_unix.Errors.Pack_error `Add_volume_forbidden_during_gc)
         (fun () -> Store.add_volume repo |> Lwt.return)
     in
@@ -271,7 +286,8 @@ module Store_tc = struct
   let test_add_volume_wo_lower () =
     let repo = init ~include_lower:false () in
     let () =
-      Alcotest.check_raises "add volume w/o lower"
+      Alcotest.check_raises
+        "add volume w/o lower"
         (Brassaia_pack_unix.Errors.Pack_error `Add_volume_requires_lower)
         (fun () -> Store.add_volume repo |> Lwt.return)
     in
@@ -282,49 +298,50 @@ module Store_tc = struct
     let repo = Store.Repo.v (config ~fresh:true ~lower_root root) in
     let main = Store.main repo in
     let info () = Store.Info.v ~author:"test" Int64.zero in
-    let () = Store.set_exn ~info main [ "a" ] "a" in
+    let () = Store.set_exn ~info main ["a"] "a" in
     let c1 = Store.Head.get main in
     let _ = Store.Gc.start_exn repo (Store.Commit.key c1) in
     let _ = Store.Gc.finalise_exn ~wait:true repo in
     let () = Store.add_volume repo in
-    Alcotest.(check int) "two volumes" 2 (count_volumes repo);
+    Alcotest.(check int) "two volumes" 2 (count_volumes repo) ;
     let _ = Store.Repo.close repo in
     let repo = Store.Repo.v (config ~fresh:false ~lower_root root) in
-    Alcotest.(check int) "two volumes after re-open" 2 (count_volumes repo);
+    Alcotest.(check int) "two volumes after re-open" 2 (count_volumes repo) ;
     Store.Repo.close repo
 
   let test_migrate () =
     let root, lower_root = fresh_roots () in
     (* Create without a lower *)
     let repo = Store.Repo.v (config ~fresh:true root) in
-    Alcotest.(check int) "volume_num is 0" 0 (count_volumes repo);
+    Alcotest.(check int) "volume_num is 0" 0 (count_volumes repo) ;
     let main = Store.main repo in
     let info () = Store.Info.v ~author:"test" Int64.zero in
-    let () = Store.set_exn ~info main [ "a" ] "a" in
+    let () = Store.set_exn ~info main ["a"] "a" in
     let () = Store.Repo.close repo in
     (* Reopen with a lower to trigger the migration *)
     let repo = Store.Repo.v (config ~lower_root root) in
-    Alcotest.(check int) "volume_num is 1" 1 (count_volumes repo);
+    Alcotest.(check int) "volume_num is 1" 1 (count_volumes repo) ;
     let main = Store.main repo in
-    let a = Store.get main [ "a" ] in
-    Alcotest.(check string) "migrated commit" "a" a;
+    let a = Store.get main ["a"] in
+    Alcotest.(check string) "migrated commit" "a" a ;
     Alcotest.(check bool)
-      "no latest GC commit" true
-      (Option.is_none (Store.Gc.latest_gc_target repo));
-    let () = Store.set_exn ~info main [ "a" ] "b" in
+      "no latest GC commit"
+      true
+      (Option.is_none (Store.Gc.latest_gc_target repo)) ;
+    let () = Store.set_exn ~info main ["a"] "b" in
     let () = Store.Repo.close repo in
     (* Reopen with the same lower and check reads *)
     let repo = Store.Repo.v (config ~lower_root root) in
-    Alcotest.(check int) "volume_num is 1" 1 (count_volumes repo);
+    Alcotest.(check int) "volume_num is 1" 1 (count_volumes repo) ;
     let main = Store.main repo in
-    let b = Store.get main [ "a" ] in
-    Alcotest.(check string) "upper commit" "b" b;
+    let b = Store.get main ["a"] in
+    Alcotest.(check string) "upper commit" "b" b ;
     let main_commit = Store.Head.get main in
     let parent_key = List.hd @@ Store.Commit.parents main_commit in
     let parent = Store.Commit.of_key repo parent_key in
     let previous_tree = Store.Commit.tree @@ Option.get parent in
-    let a_opt = Store.Tree.find previous_tree [ "a" ] in
-    Alcotest.(check (option string)) "upper to lower" (Some "a") a_opt;
+    let a_opt = Store.Tree.find previous_tree ["a"] in
+    Alcotest.(check (option string)) "upper to lower" (Some "a") a_opt ;
     let _ = read_everything repo in
     Store.Repo.close repo
 
@@ -335,7 +352,7 @@ module Store_tc = struct
       "test" / "brassaia-pack" / "data" / "version_2_to_3_always"
     in
     let root = "_build" / "test_lower_migrate_v2" in
-    setup_test_env ~root_archive ~root_local_build:root;
+    setup_test_env ~root_archive ~root_local_build:root ;
     let lower_root = root / "lower" in
     (* Open store and trigger migration. This should succeed. *)
     let repo = Store.Repo.v (config ~fresh:false ~lower_root root) in
@@ -345,9 +362,11 @@ module Store_tc = struct
   let test_migrate_v3 () =
     (* minimal indexing *)
     let ( / ) = Filename.concat in
-    let root_archive = "test" / "brassaia-pack" / "data" / "version_3_minimal" in
+    let root_archive =
+      "test" / "brassaia-pack" / "data" / "version_3_minimal"
+    in
     let root = "_build" / "test_lower_migrate_v3_minimal" in
-    setup_test_env ~root_archive ~root_local_build:root;
+    setup_test_env ~root_archive ~root_local_build:root ;
     let lower_root = root / "lower" in
     (* Open store and trigger migration. This should succeed. *)
     let repo = Store.Repo.v (config ~fresh:false ~lower_root root) in
@@ -358,7 +377,7 @@ module Store_tc = struct
     let ( / ) = Filename.concat in
     let root_archive = "test" / "brassaia-pack" / "data" / "version_3_always" in
     let root = "_build" / "test_lower_migrate_v3_always" in
-    setup_test_env ~root_archive ~root_local_build:root;
+    setup_test_env ~root_archive ~root_local_build:root ;
     let lower_root = root / "lower" in
     (* Open store and trigger migration. This should succeed. *)
     let repo = Store.Repo.v (config ~fresh:false ~lower_root root) in
@@ -369,20 +388,20 @@ module Store_tc = struct
     let root, lower_root = fresh_roots () in
     (* Create without a lower *)
     let repo = Store.Repo.v (config ~fresh:true root) in
-    Alcotest.(check int) "volume_num is 0" 0 (count_volumes repo);
+    Alcotest.(check int) "volume_num is 0" 0 (count_volumes repo) ;
     let main = Store.main repo in
     let info () = Store.Info.v ~author:"test" Int64.zero in
-    let () = Store.set_exn ~info main [ "a" ] "a" in
+    let () = Store.set_exn ~info main ["a"] "a" in
     let () = Store.Repo.close repo in
     (* Reopen with a lower to trigger the migration *)
     let repo = Store.Repo.v (config ~lower_root root) in
-    Alcotest.(check int) "volume_num is 1" 1 (count_volumes repo);
+    Alcotest.(check int) "volume_num is 1" 1 (count_volumes repo) ;
     (* Add two commits *)
     let main = Store.main repo in
-    let () = Store.set_exn ~info main [ "b" ] "b" in
+    let () = Store.set_exn ~info main ["b"] "b" in
     let main = Store.main repo in
     let b_commit = Store.Head.get main in
-    let () = Store.set_exn ~info main [ "c" ] "c" in
+    let () = Store.set_exn ~info main ["c"] "c" in
     (* GC at [b] requires reading [a] data from the lower volume *)
     let _ = Store.Gc.start_exn repo (Store.Commit.key b_commit) in
     let _ = Store.Gc.finalise_exn ~wait:true repo in
@@ -393,16 +412,16 @@ module Store_tc = struct
     let root, lower_root = fresh_roots () in
     (* Create without a lower *)
     let repo = Store.Repo.v (config ~fresh:true root) in
-    Alcotest.(check int) "volume_num is 0" 0 (count_volumes repo);
+    Alcotest.(check int) "volume_num is 0" 0 (count_volumes repo) ;
     let main = Store.main repo in
     let info () = Store.Info.v ~author:"test" Int64.zero in
-    let () = Store.set_exn ~info main [ "a" ] "a" in
+    let () = Store.set_exn ~info main ["a"] "a" in
     let a_commit = Store.Head.get main in
-    let () = Store.set_exn ~info main [ "b" ] "b" in
+    let () = Store.set_exn ~info main ["b"] "b" in
     let () = Store.Repo.close repo in
     (* Reopen with a lower to trigger the migration *)
     let repo = Store.Repo.v (config ~lower_root root) in
-    Alcotest.(check int) "volume_num is 1" 1 (count_volumes repo);
+    Alcotest.(check int) "volume_num is 1" 1 (count_volumes repo) ;
     (* [a] is now in the lower but GC should still succeed
 
        Important: we call GC on a commit that is not the latest in
@@ -417,26 +436,26 @@ module Store_tc = struct
     let repo = Store.Repo.v (config ~fresh:true ~lower_root root) in
     let main = Store.main repo in
     let info () = Store.Info.v ~author:"test" Int64.zero in
-    [%log.debug "add c1"];
-    let () = Store.set_exn ~info main [ "c1" ] "a" in
+    [%log.debug "add c1"] ;
+    let () = Store.set_exn ~info main ["c1"] "a" in
     let c1 = Store.Head.get main in
-    [%log.debug "GC c1"];
+    [%log.debug "GC c1"] ;
     let _ = Store.Gc.start_exn repo (Store.Commit.key c1) in
     let _ = Store.Gc.finalise_exn ~wait:true repo in
     let () = Store.add_volume repo in
-    [%log.debug "add c2, c3, c4"];
-    let () = Store.set_exn ~info main [ "c2" ] "b" in
-    let () = Store.set_exn ~info main [ "c3" ] "c" in
+    [%log.debug "add c2, c3, c4"] ;
+    let () = Store.set_exn ~info main ["c2"] "b" in
+    let () = Store.set_exn ~info main ["c3"] "c" in
     let c3 = Store.Head.get main in
-    let () = Store.set_exn ~info main [ "c4" ] "d" in
-    let () = Store.set_exn ~info main [ "c5" ] "e" in
+    let () = Store.set_exn ~info main ["c4"] "d" in
+    let () = Store.set_exn ~info main ["c5"] "e" in
     let c5 = Store.Head.get main in
-    [%log.debug "GC c5"];
+    [%log.debug "GC c5"] ;
     let _ = Store.Gc.start_exn repo (Store.Commit.key c5) in
     let _ = Store.Gc.finalise_exn ~wait:true repo in
     let get_direct_key key =
       match Brassaia_pack_unix.Pack_key.inspect key with
-      | Direct { offset; hash; length; volume_identifier } ->
+      | Direct {offset; hash; length; volume_identifier} ->
           (offset, hash, length, volume_identifier)
       | _ -> assert false
     in
@@ -447,7 +466,7 @@ module Store_tc = struct
     let c3 = Option.get c3 in
     let _, _, _, identifier = get_direct_key (Store.Commit.key c3) in
     let identifier = Option.get identifier in
-    [%log.debug "Check c3 tree items are in volume %s" identifier];
+    [%log.debug "Check c3 tree items are in volume %s" identifier] ;
     let c3 = Store.Commit.of_key repo (Store.Commit.key c3) in
     let tree = Store.Commit.tree (Option.get c3) in
     let () =
@@ -467,30 +486,35 @@ module Store_tc = struct
             | Some (`Contents (k, _)) -> get_volume_identifier k
             | Some (`Node k) -> get_volume_identifier k
           in
-          [%log.debug "identifier: %s" key_identifier];
+          [%log.debug "identifier: %s" key_identifier] ;
           Alcotest.(check string)
-            "key is in expected volume" identifier key_identifier;
+            "key is in expected volume"
+            identifier
+            key_identifier ;
           a)
-        tree ()
+        tree
+        ()
     in
     Store.Repo.close repo
 
   let test_cleanup () =
     let root, lower_root = fresh_roots () in
-    [%log.debug "create store with data and run GC"];
+    [%log.debug "create store with data and run GC"] ;
     let repo = Store.Repo.v (config ~fresh:true ~lower_root root) in
     let main = Store.main repo in
     let info () = Store.Info.v ~author:"test" Int64.zero in
-    let () = Store.set_exn ~info main [ "a" ] "a" in
+    let () = Store.set_exn ~info main ["a"] "a" in
     let c1 = Store.Head.get main in
     let _ = Store.Gc.start_exn repo (Store.Commit.key c1) in
     let _ = Store.Gc.finalise_exn ~wait:true repo in
     let volume_root = volume_path repo Int63.zero in
     let generation = generation repo in
     let () = Store.Repo.close repo in
-    [%log.debug "test volume.1.control is moved to volume.control"];
+    [%log.debug "test volume.1.control is moved to volume.control"] ;
     let volume_cf_gen_path =
-      Brassaia_pack.Layout.V5.Volume.control_gc_tmp ~generation ~root:volume_root
+      Brassaia_pack.Layout.V5.Volume.control_gc_tmp
+        ~generation
+        ~root:volume_root
     in
     let volume_cf_path =
       Brassaia_pack.Layout.V5.Volume.control ~root:volume_root

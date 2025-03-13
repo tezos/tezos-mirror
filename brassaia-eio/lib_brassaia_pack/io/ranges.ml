@@ -16,34 +16,36 @@
 
 open! Import
 
-type range = { off : int63; len : int63 }
+type range = {off : int63; len : int63}
 
 module Stack = struct
-  type t = Empty | Stack of { mutable len : int; arr : int63 array; prev : t }
+  type t = Empty | Stack of {mutable len : int; arr : int63 array; prev : t}
 
   let capacity = 131_072 (* = 128*1024, a large but not too large chunk size *)
-  let make prev = Stack { len = 0; arr = Array.make capacity Int63.zero; prev }
+
+  let make prev = Stack {len = 0; arr = Array.make capacity Int63.zero; prev}
+
   let is_full = function Empty -> true | Stack s -> s.len >= capacity
 
   let rec push x t =
     match t with
     | Stack s when not (is_full t) ->
         let i = s.len in
-        s.len <- i + 2;
-        s.arr.(i) <- x.off;
-        s.arr.(i + 1) <- x.len;
+        s.len <- i + 2 ;
+        s.arr.(i) <- x.off ;
+        s.arr.(i + 1) <- x.len ;
         t
     | _ -> push x (make t)
 
   let rec to_seq t () =
     match t with
     | Empty -> Seq.Nil
-    | Stack { len; arr; prev } ->
-        assert (len mod 2 = 0);
+    | Stack {len; arr; prev} ->
+        assert (len mod 2 = 0) ;
         let rec go i () =
           if i < 0 then to_seq prev ()
           else
-            let range = { off = arr.(2 * i); len = arr.((2 * i) + 1) } in
+            let range = {off = arr.(2 * i); len = arr.((2 * i) + 1)} in
             Seq.Cons (range, go (i - 1))
         in
         go ((len / 2) - 1) ()
@@ -56,29 +58,28 @@ type t = {
   mutable out_of_order : range list;
 }
 
-let make () =
-  { last = None; ranges = Stack.Empty; count = 0; out_of_order = [] }
+let make () = {last = None; ranges = Stack.Empty; count = 0; out_of_order = []}
 
 let count t = t.count
 
 let add ~off ~len t =
-  t.count <- t.count + 1;
+  t.count <- t.count + 1 ;
   let open Int63.Syntax in
   let len = Int63.of_int len in
   match t.last with
-  | None -> t.last <- Some { off; len }
+  | None -> t.last <- Some {off; len}
   | Some last when off + len = last.off ->
       (* latest interval can be fused with the previous one *)
-      t.last <- Some { off; len = len + last.len }
+      t.last <- Some {off; len = len + last.len}
   | Some last when off + len < last.off ->
       (* disjoint and strictly smaller *)
-      t.last <- Some { off; len };
+      t.last <- Some {off; len} ;
       t.ranges <- Stack.push last t.ranges
   | Some _ ->
       (* latest range is not strictly smaller than previous,
        * this is only expected on legacy data with wrong object ordering
        * and is handled as a special case. *)
-      t.out_of_order <- { off; len } :: t.out_of_order
+      t.out_of_order <- {off; len} :: t.out_of_order
 
 let ranges_to_seq t () =
   match t.last with
@@ -95,7 +96,7 @@ let rec seq_merge xs ys () =
   | Seq.Cons (x, xs'), Seq.Cons (y, ys') -> (
       match Int63.compare x.off y.off with
       | 0 ->
-          assert (x.len = y.len);
+          assert (x.len = y.len) ;
           Seq.Cons (x, seq_merge xs' ys')
       | c when c < 0 -> Seq.Cons (x, seq_merge xs' ys)
       | _ -> Seq.Cons (y, seq_merge xs ys'))
@@ -111,7 +112,7 @@ let fuse fst snd =
   else
     let start = min fst.off snd.off in
     let stop = max fst_end snd_end in
-    Overlap { off = start; len = stop - start }
+    Overlap {off = start; len = stop - start}
 
 let rec seq_fuse ?prev s () =
   match (prev, s ()) with
@@ -130,4 +131,4 @@ let iter fn t =
     | [] -> in_order
     | _ -> seq_fuse (seq_merge in_order (out_of_order_to_seq t))
   in
-  Seq.iter (fun { off; len } -> fn ~off ~len) ranges
+  Seq.iter (fun {off; len} -> fn ~off ~len) ranges

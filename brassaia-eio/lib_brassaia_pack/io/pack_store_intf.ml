@@ -25,7 +25,9 @@ module type S = sig
   include Brassaia_pack.Indexable.S
 
   type file_manager
+
   type dict
+
   type dispatcher
 
   val v :
@@ -57,34 +59,35 @@ module type S = sig
     val total_entry_length : t -> int option
   end
 
-  val read_and_decode_entry_prefix : off:int63 -> dispatcher -> Entry_prefix.t
   (** Read the entry prefix at offset [off]. *)
+  val read_and_decode_entry_prefix : off:int63 -> dispatcher -> Entry_prefix.t
 
-  val index_direct_with_kind : 'a t -> hash -> (key * Pack_value.Kind.t) option
   (** Returns the key and the kind of an object indexed by hash. *)
+  val index_direct_with_kind : 'a t -> hash -> (key * Pack_value.Kind.t) option
 
   val purge_lru : 'a t -> unit
 
-  val key_of_offset : 'a t -> int63 -> key
   (** Returns the key associated with the offset. *)
+  val key_of_offset : 'a t -> int63 -> key
 
-  val unsafe_find_no_prefetch : 'a t -> key -> value option
   (** Similar to [unsafe_find], returns the value associated with the [key] in
       the store but without prefetching the [hash] and [length] of the children
       (or doing any integrity check). As a result, the produced children keys
       only contain their [offset] and are not usable without calling
       [key_of_offset] first. This function only exists to optimize the GC
       reachability traversal. *)
+  val unsafe_find_no_prefetch : 'a t -> key -> value option
 
-  val get_offset : 'a t -> key -> int63
   (** Returns the offset associated with the key. *)
+  val get_offset : 'a t -> key -> int63
 
-  val get_length : 'a t -> key -> int
   (** Returns the length of the object associated with the key. *)
+  val get_length : 'a t -> key -> int
 end
 
 module type Sigs = sig
   exception Invalid_read of string
+
   exception Dangling_hash
 
   module type S = S

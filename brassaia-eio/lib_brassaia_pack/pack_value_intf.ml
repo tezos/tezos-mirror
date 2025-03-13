@@ -16,26 +16,31 @@
 
 open! Import
 
-type length_header = [ `Varint ] option
+type length_header = [`Varint] option
+
 type weight = Immediate of int | Deferred of (unit -> int)
+
 type kinded = ..
 
 module type S = sig
   include Brassaia.Type.S
 
   type hash
+
   type key
+
   type kind
 
   val hash : t -> hash
+
   val kind : t -> kind
 
-  val length_header : kind -> length_header
   (** Describes the length header formats for the {i data} sections of pack
       entries. *)
+  val length_header : kind -> length_header
 
-  val weight : t -> weight
   (** [weight t] is the [t]'s LRU weight. *)
+  val weight : t -> weight
 
   val encode_bin :
     dict:(string -> int option) ->
@@ -51,14 +56,14 @@ module type S = sig
 
   val decode_bin_length : string -> int -> int
 
-  val to_kinded : t -> kinded
   (** [to_kinded t] returns a {!kinded} version of [t]. *)
+  val to_kinded : t -> kinded
 
-  val of_kinded : kinded -> t
   (** [of_kinded k] is the inverse of [to_kinded t].
 
       It is expected that an implementation only works for [k] that is returned
       from [to_kinded t] and will raise an exception otherwise. *)
+  val of_kinded : kinded -> t
 end
 
 module type T = sig
@@ -85,26 +90,31 @@ module type Sigs = sig
     [@@deriving brassaia]
 
     val all : t list
+
     val to_enum : t -> int
+
     val to_magic : t -> char
+
     val of_magic_exn : char -> t
+
     val pp : t Fmt.t
 
-    val length_header_exn : t -> length_header
     (** Raises an exception on [Contents], as the availability of a length
         header is user defined. *)
+    val length_header_exn : t -> length_header
   end
 
   type nonrec weight = weight = Immediate of int | Deferred of (unit -> int)
 
-  type nonrec kinded = kinded = ..
   (** [kinded] is an extenisble variant that each {!S} extends so that it can
       define {!S.to_kinded} and {!S.of_kinded}. Its purpose is to allow
       containers, such as {!Brassaia_pack_unix.Lru}, to store and return all types
       of {!S} and thus be usable by modules defined over {!S}, such as
       {!Brassaia_pack_unix.Pack_store}. *)
+  type nonrec kinded = kinded = ..
 
   module type S = S with type kind := Kind.t
+
   module type Config = Config
 
   module Of_contents

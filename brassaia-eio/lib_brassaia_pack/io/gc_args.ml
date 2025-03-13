@@ -18,11 +18,15 @@ open! Import
 
 module type S = sig
   module Fm : File_manager.S
+
   module Async : Async_intf.S
+
   module Errs : Io_errors.S with module Io = Fm.Io
+
   module Dispatcher : Dispatcher.S with module Fm = Fm
 
   type hash
+
   type key = hash Pack_key.t [@@deriving brassaia]
 
   module Hash : sig
@@ -37,11 +41,12 @@ module type S = sig
 
   module Node_value : sig
     type t
+
     type step
 
     val pred :
       t ->
-      (step option * [ `Contents of key | `Inode of key | `Node of key ]) list
+      (step option * [`Contents of key | `Inode of key | `Node of key]) list
   end
 
   module Node_store : sig
@@ -56,12 +61,16 @@ module type S = sig
       read t
 
     val unsafe_find :
-      check_integrity:bool -> [< read ] t -> key -> Node_value.t option
+      check_integrity:bool -> [< read] t -> key -> Node_value.t option
 
-    val key_of_offset : [< read ] t -> int63 -> key
+    val key_of_offset : [< read] t -> int63 -> key
+
     val unsafe_find_no_prefetch : 'a t -> key -> Node_value.t option
+
     val purge_lru : 'a t -> unit
+
     val get_offset : 'a t -> key -> int63
+
     val get_length : 'a t -> key -> int
   end
 
@@ -69,6 +78,7 @@ module type S = sig
     type t
 
     val node : t -> key
+
     val parents : t -> key list
   end
 

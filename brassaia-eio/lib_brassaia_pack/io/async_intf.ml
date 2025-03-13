@@ -17,29 +17,29 @@
 module type S = sig
   (** Basic abstraction for a worker. *)
 
-  type t
   (** A task *)
+  type t
 
-  type outcome = [ `Success | `Cancelled | `Failure of string ]
+  type outcome = [`Success | `Cancelled | `Failure of string]
   [@@deriving brassaia]
 
-  type status = [ outcome | `Running ] [@@deriving brassaia]
+  type status = [outcome | `Running] [@@deriving brassaia]
 
-  val async : (unit -> unit) -> t
   (** Start a task. *)
+  val async : (unit -> unit) -> t
 
-  val await : t -> [> outcome ]
   (** If running, wait for a task to finish and return its outcome.
 
       If not running, return the oucome of the task. *)
+  val await : t -> [> outcome]
 
-  val status : t -> [> status ]
   (** If running, refresh the status of the task, without blocking.
 
       If not running, return the oucome of the task. *)
+  val status : t -> [> status]
 
-  val cancel : t -> bool
   (** If running, cancel the task and return [true].
 
       If not running, do nothing and return [false]. *)
+  val cancel : t -> bool
 end

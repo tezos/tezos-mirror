@@ -17,18 +17,18 @@
 (** {1 Process locking helpers} *)
 
 module type S = sig
-  type t
   (** The type for lock manager. *)
+  type t
 
-  type key
   (** The type for key to be locked. *)
+  type key
 
-  val v : unit -> t
   (** Create a lock manager. *)
+  val v : unit -> t
 
-  val with_lock : t -> key -> (unit -> 'a) -> 'a
   (** [with_lock t k f] executes [f ()] while holding the exclusive lock
       associated to the key [k]. *)
+  val with_lock : t -> key -> (unit -> 'a) -> 'a
 
   val stats : t -> int
 end

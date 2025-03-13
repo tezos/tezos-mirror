@@ -17,7 +17,7 @@
 let uid =
   let id = ref (-1) in
   fun () ->
-    incr id;
+    incr id ;
     !id
 
 type origin = ..
@@ -32,6 +32,7 @@ type 'a t = {
 [@@warning "-unused-field"]
 
 let state m = Atomic.get m.state
+
 let set_state m v = Atomic.set m.state v
 
 type 'a update_mode = Mutate of ('a -> unit) | Replace of ('a -> 'a)
@@ -40,7 +41,7 @@ let v :
     type a. ?origin:origin -> name:string -> initial_state:a -> a Repr.ty -> a t
     =
  fun ?origin ~name ~initial_state repr ->
-  { uid = uid (); origin; name; repr; state = Atomic.make initial_state }
+  {uid = uid (); origin; name; repr; state = Atomic.make initial_state}
 
 let rec update m kind =
   let old = Atomic.get m.state in

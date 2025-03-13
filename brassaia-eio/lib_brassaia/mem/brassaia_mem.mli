@@ -24,17 +24,17 @@ module Conf : sig
   val spec : Brassaia.Backend.Conf.Spec.t
 end
 
-val config : unit -> Brassaia.config
 (** Configuration values. *)
+val config : unit -> Brassaia.config
 
-module Append_only : Brassaia.Append_only.Maker
 (** An in-memory store for append-only values. *)
+module Append_only : Brassaia.Append_only.Maker
 
-module Content_addressable : Brassaia.Content_addressable.Maker
 (** An in-memory store for content-addressable values. *)
+module Content_addressable : Brassaia.Content_addressable.Maker
 
-module Atomic_write : Brassaia.Atomic_write.Maker
 (** An in-memory store with atomic-write guarantees. *)
+module Atomic_write : Brassaia.Atomic_write.Maker
 
 (** Constructor for in-memory KV stores. *)
 module KV :
@@ -43,5 +43,5 @@ module KV :
      and type metadata = unit
      and type info = Brassaia.Info.default
 
-include Brassaia.Maker with type endpoint = unit
 (** Constructor for in-memory Brassaia store. *)
+include Brassaia.Maker with type endpoint = unit

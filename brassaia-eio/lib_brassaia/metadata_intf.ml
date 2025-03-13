@@ -19,13 +19,13 @@
 module type S = sig
   include Type.Defaultable
 
-  val merge : t Merge.t
   (** [merge] is the merge function for metadata. *)
+  val merge : t Merge.t
 end
 
 module type Sigs = sig
   module type S = S
 
-  module None : S with type t = unit
   (** A metadata definition for systems that don't use metadata. *)
+  module None : S with type t = unit
 end

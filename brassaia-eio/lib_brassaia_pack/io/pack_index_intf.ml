@@ -21,7 +21,9 @@ module type S = sig
       fits the brassaia-pack use case. *)
 
   type t
+
   type key
+
   type value = int63 * int * Pack_value.Kind.t
 
   module Index_raw :
@@ -33,37 +35,47 @@ module type S = sig
     ?flush_callback:(unit -> unit) ->
     ?fresh:bool ->
     ?readonly:bool ->
-    ?throttle:[ `Block_writes | `Overcommit_memory ] ->
+    ?throttle:[`Block_writes | `Overcommit_memory] ->
     ?lru_size:int ->
     log_size:int ->
     string ->
     t
 
-  type create_error := [ `Index_failure of string | `Io_misc of Io.misc_error ]
+  type create_error := [`Index_failure of string | `Io_misc of Io.misc_error]
 
   type write_error :=
-    [ `Index_failure of string | `Io_misc of Io.misc_error | `Ro_not_allowed ]
+    [`Index_failure of string | `Io_misc of Io.misc_error | `Ro_not_allowed]
 
   val v :
     ?flush_callback:(unit -> unit) ->
     ?fresh:bool ->
     ?readonly:bool ->
-    ?throttle:[ `Block_writes | `Overcommit_memory ] ->
+    ?throttle:[`Block_writes | `Overcommit_memory] ->
     ?lru_size:int ->
     log_size:int ->
     string ->
-    (t, [> create_error ]) result
+    (t, [> create_error]) result
 
-  val reload : t -> (unit, [> write_error ]) result
-  val close : t -> (unit, [> write_error ]) result
+  val reload : t -> (unit, [> write_error]) result
+
+  val close : t -> (unit, [> write_error]) result
+
   val close_exn : t -> unit
-  val flush : t -> with_fsync:bool -> (unit, [> write_error ]) result
+
+  val flush : t -> with_fsync:bool -> (unit, [> write_error]) result
+
   val find : t -> key -> value option
+
   val add : ?overcommit:bool -> t -> key -> value -> unit
+
   val merge : t -> unit
+
   val mem : t -> key -> bool
+
   val iter : (key -> value -> unit) -> t -> unit
+
   val filter : t -> (key * value -> bool) -> unit
+
   val try_merge : t -> unit
 
   module Key : Index.Key.S with type t = key

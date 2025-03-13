@@ -20,4 +20,5 @@ module KV = Brassaia_mem.KV.Make (Brassaia.Contents.String)
 module Bench = Brassaia_bench.Make (KV)
 
 let size ~root:_ = 0
+
 let () = Bench.run ~config ~size

@@ -16,18 +16,19 @@
 
 module type S = sig
   type t
+
   type elt
 
-  val add : t -> elt -> [ `Ok | `Duplicate ]
   (** [add t elt] adds [elt] to the set [t] and returns [`Ok] if [elt] is not
       already a member of [t], otherwise returns [`Duplicate] and leaves the
       hashset unchanged. *)
+  val add : t -> elt -> [`Ok | `Duplicate]
 
-  val add_exn : t -> elt -> unit
   (** [add_exn t elt] adds [elt] to the set [t].
 
       @raise Invalid_argument if [elt] is already a member of [t]. *)
+  val add_exn : t -> elt -> unit
 
-  val mem : t -> elt -> bool
   (** [mem t elt] is [true] iff [elt] has been added to the hashset. *)
+  val mem : t -> elt -> bool
 end

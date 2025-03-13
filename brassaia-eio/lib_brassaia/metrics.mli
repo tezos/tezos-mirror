@@ -19,18 +19,18 @@
 
     A {!t} can be modified in different ways, depending on the {!update_mode}. *)
 
-type origin = ..
 (** An extensible type to get the location of the definition. *)
+type origin = ..
 
-type 'a t
 (** {!t} is the object that describes how a {!t} is gathered and store. The ['a]
     parameter represents the type of the internal data. *)
+type 'a t
 
-val state : 'a t -> 'a
 (** The internal state extracted from a {!t}. *)
+val state : 'a t -> 'a
 
-val set_state : 'a t -> 'a -> unit
 (** [set_state m v] updates the value in the {!t} object. *)
+val set_state : 'a t -> 'a -> unit
 
 (** {!update_mode} describes how the data will be handled by the {!update}
     function.
@@ -42,13 +42,13 @@ val set_state : 'a t -> 'a -> unit
     It gives the possibility to handle the same metric in different ways. *)
 type 'a update_mode = Mutate of ('a -> unit) | Replace of ('a -> 'a)
 
-val v : ?origin:origin -> name:string -> initial_state:'a -> 'a Repr.ty -> 'a t
 (** [v ~origin ~name ~initial_state  repr ] create a new {!t}. The [origin] can
     be set to give an hint about where the data are gathered. [name] is a name
     to describe this metrics. [initial_state] is the first value to store in the
     metric object. [repr] describes the type representation to allow
     serialization. *)
+val v : ?origin:origin -> name:string -> initial_state:'a -> 'a Repr.ty -> 'a t
 
-val update : 'a t -> 'a update_mode -> unit
 (** [update metrics mode] updates the metric by taking in consideration [mode]
     to define how it acts on [t] according to their specication. *)
+val update : 'a t -> 'a update_mode -> unit

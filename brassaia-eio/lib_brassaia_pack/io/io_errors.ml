@@ -22,13 +22,17 @@ open Errors
 module type S = sig
   module Io : Io_intf.S
 
-  type t = [ Base.t | `Io_misc of Io.misc_error ] [@@deriving brassaia]
+  type t = [Base.t | `Io_misc of Io.misc_error] [@@deriving brassaia]
 
-  val raise_error : [< t ] -> 'a
-  val log_error : string -> [< t ] -> unit
+  val raise_error : [< t] -> 'a
+
+  val log_error : string -> [< t] -> unit
+
   val catch : (unit -> 'a) -> ('a, t) result
-  val raise_if_error : ('a, [< t ]) result -> 'a
-  val log_if_error : string -> ('a, [< t ]) result -> unit
+
+  val raise_if_error : ('a, [< t]) result -> 'a
+
+  val log_if_error : string -> ('a, [< t]) result -> unit
 end
 
 module Make (Io : Io_intf.S) : S with module Io = Io = struct
@@ -68,8 +72,8 @@ module Make (Io : Io_intf.S) : S with module Io = Io = struct
     | `Gc_process_died_without_result_file of string
     | `Gc_forbidden_on_32bit_platforms
     | `Invalid_prefix_read of string
-    | `Invalid_sparse_read of [ `After | `Before | `Hole ] * int63
-    | `Invalid_volume_read of [ `Empty | `Closed ] * int63
+    | `Invalid_sparse_read of [`After | `Before | `Hole] * int63
+    | `Invalid_volume_read of [`Empty | `Closed] * int63
     | `Inconsistent_store
     | `Closed
     | `Ro_not_allowed

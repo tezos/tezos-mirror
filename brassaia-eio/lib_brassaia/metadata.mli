@@ -14,5 +14,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Metadata_intf.Sigs
 (** @inline *)
+include Metadata_intf.Sigs

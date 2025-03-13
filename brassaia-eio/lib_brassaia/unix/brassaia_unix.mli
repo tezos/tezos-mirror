@@ -20,11 +20,11 @@
 
 module Info = Info.Make
 
-val info :
-  ?author:string ->
-  ('a, Format.formatter, unit, unit -> Brassaia.Info.default) format4 ->
-  'a
 (** [info fmt ()] creates a fresh commit info, with the {{!Brassaia.Info.S.date}
     date} set to [Unix.gettimeoday ()] and the {{!Brassaia.Info.S.author} author}
     built using [Unix.gethostname()] and [Unix.getpid()] if [author] is not
     provided. *)
+val info :
+  ?author:string ->
+  ('a, Format.formatter, unit, unit -> Brassaia.Info.default) format4 ->
+  'a

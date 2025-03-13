@@ -20,8 +20,8 @@
     The prinicipal concept is the {i store} (see {!S}), which provides access to
     persistently stored values, commits and branches. *)
 
-val version : string
 (** The version of the library. *)
+val version : string
 
 (** {1:stores Stores}
 
@@ -39,26 +39,25 @@ val version : string
     - Fast {{!Sync} synchronization} primitives between remote stores, using
       native backend protocols (as the Git protocol) when available. *)
 
-exception Closed
 (** The exception raised when any operation is attempted on a closed store,
     except for {!S.close}, which is idempotent. *)
+exception Closed
 
 (** Brassaia stores. *)
 module type S = sig
-  include Store.S
   (** @inline *)
+  include Store.S
 end
 
 (** {2 Schema} *)
 
-module Type = Repr
 (** Dynamic types for Brassaia values, supplied by
     {{:https://github.com/mirage/repr} [Repr]}. These values can be derived from
     type definitions via [[@@deriving brassaia]] (see the
     {{:https://github.com/mirage/brassaia/blob/main/README_PPX.md} documentation
       for [ppx_brassaia]})*)
+module Type = Repr
 
-module Hash = Hash
 (** Hashing functions.
 
     [Hash] provides user-defined hash functions to digest serialized contents.
@@ -67,30 +66,30 @@ module Hash = Hash
     {{!Hash.SHA1} SHA1}).
 
     A {{!Hash.SHA1} SHA1} implementation is available to pass to the backends. *)
+module Hash = Hash
 
 module Branch = Branch
 
-module Info = Info
 (** Commit info are used to keep track of the origin of write operations in the
     stores. [Info] models the metadata associated with commit objects in Git. *)
+module Info = Info
 
 module Node = Node
 module Commit = Commit
 
-module Metadata = Metadata
 (** [Metadata] defines metadata that is attached to contents but stored in
     nodes. For instance, the Git backend uses this to indicate the type of file
     (normal, executable or symlink). *)
+module Metadata = Metadata
 
-module Path = Path
 (** Store paths.
 
     An Brassaia {{!Brassaia.S} store} binds {{!Path.S.t} paths} to user-defined
     {{!Contents.S} contents}. Paths are composed by basic elements, that we call
     {{!Path.S.step} steps}. The following [Path] module provides functions to
     manipulate steps and paths. *)
+module Path = Path
 
-module Contents = Contents
 (** [Contents] specifies how user-defined contents need to be {e serializable}
     and {e mergeable}.
 
@@ -104,17 +103,18 @@ module Contents = Contents
 
     Default implementations for {{!Contents.String} idempotent string} and
     {{!Contents.Json} JSON} contents are provided. *)
+module Contents = Contents
 
-module Schema = Schema
 (** Store schemas *)
+module Schema = Schema
 
 (** {2 Common Stores} *)
 
 (** [KV] is similar to {!S} but chooses sensible implementations for path and
     branch. *)
 module type KV = sig
-  include Store.KV
   (** @inline *)
+  include Store.KV
 end
 
 module Json_tree : Store.Json_tree
@@ -125,16 +125,16 @@ module Json_tree : Store.Json_tree
     implementations. {!Maker.Make} is parameterised by {!Schema.S}. It does not
     use any native synchronization primitives. *)
 module type Maker = sig
-  include Store.Maker
   (** @inline *)
+  include Store.Maker
 end
 
 (** [KV_maker] is like {!Maker} but where everything except the contents is
     replaced by sensible default implementations. {!KV_maker.Make} is
     parameterised by {!Contents.S} *)
 module type KV_maker = sig
-  include Store.KV_maker
   (** @inline *)
+  include Store.KV_maker
 end
 
 (** {2 Generic Key Stores} *)
@@ -144,13 +144,16 @@ module Key = Key
 (** "Generic key" stores are Brassaia stores in which the backend may not be keyed
     directly by the hashes of stored values. See {!Key} for more details. *)
 module Generic_key : sig
-  include module type of Store.Generic_key
   (** @inline *)
+  include module type of Store.Generic_key
 
   module type Maker_args = sig
     module Contents_store : Indexable.Maker_concrete_key2
+
     module Node_store : Indexable.Maker_concrete_key1
+
     module Commit_store : Indexable.Maker_concrete_key1
+
     module Branch_store : Atomic_write.Maker
   end
 
@@ -166,11 +169,11 @@ end
     A backend is an implementation exposing either a concrete implementation of
     {!S} or a functor providing {!S} once applied. *)
 
-type config = Conf.t
 (** The type for backend-specific configuration values.
 
     Every backend has different configuration options, which are kept abstract
     to the user. *)
+type config = Conf.t
 
 (** {2 Low-level Stores} *)
 
@@ -178,20 +181,20 @@ type config = Conf.t
     implementing fewer operations, such as {{!Content_addressable.Store}
     content-addressable} and {{!Atomic_write.Store} atomic-write} stores. *)
 
-module Read_only = Read_only
 (** Read-only backend backends. *)
+module Read_only = Read_only
 
-module Append_only = Append_only
 (** Append-only backend backends. *)
+module Append_only = Append_only
 
-module Indexable = Indexable
 (** Indexable backend backends. *)
+module Indexable = Indexable
 
-module Content_addressable = Content_addressable
 (** Content-addressable backends. *)
+module Content_addressable = Content_addressable
 
-module Atomic_write = Atomic_write
 (** Atomic-write stores. *)
+module Atomic_write = Atomic_write
 
 (** [Maker] uses the same type for all internal keys and store all the values in
     the same store. *)
@@ -212,11 +215,11 @@ module KV_maker (CA : Content_addressable.Maker) (AW : Atomic_write.Maker) :
     are just using the library (and not developing a new backend), you should
     not use this module. *)
 module Backend : sig
-  module Conf : module type of Conf
   (** Backend configuration.
 
       A backend configuration is a set of {{!keys} keys} mapping to typed
       values. Backends define their own keys. *)
+  module Conf : module type of Conf
 
   module Watch = Watch
   module Lock = Lock
@@ -224,9 +227,9 @@ module Backend : sig
   module Slice = Slice
   module Remote = Remote
 
-  module type S = Backend.S
   (** The modules that define a complete Brassaia backend. Apply an implementation
       to {!Of_backend} to create an Brassaia store. *)
+  module type S = Backend.S
 end
 
 (** [Of_backend] gives full control over store creation through definining a
@@ -243,13 +246,13 @@ module Of_backend (B : Backend.S) :
 
 (** {2 Storage} *)
 
-module Storage = Storage
 (** [Storage] provides {!Storage.Make} for defining a custom storage layer that
     can be used to create Brassaia stores. Unlike {!Backend.S}, an implementation
     of {!Storage.Make} is only concerned with storing and retrieving keys and
     values. It can be used to create stores for {!Backend.S} through something
     like {!Storage.Content_addressable} or, primarily, with {!Of_storage} to
     automatically construct an Brassaia store. *)
+module Storage = Storage
 
 (** [Of_storage] uses a custom storage layer and chosen hash and contents type
     to create a key-value store. *)
@@ -260,23 +263,23 @@ module Of_storage (M : Storage.Make) (H : Hash.S) (V : Contents.S) :
 
 module Perms = Perms
 
-module Export_for_backends = Export_for_backends
 (** Helper module containing useful top-level types for defining Brassaia backends.
     This module is relatively unstable. *)
+module Export_for_backends = Export_for_backends
 
 (** {1 Advanced} *)
 
 (** {2 Custom Merge Operators} *)
 
-module Merge = Merge
 (** [Merge] provides functions to build custom 3-way merge operators for various
     user-defined contents. *)
+module Merge = Merge
 
-module Diff = Diff
 (** Differences between values. *)
+module Diff = Diff
 
-type 'a diff = 'a Diff.t
 (** The type for representing differences betwen values. *)
+type 'a diff = 'a Diff.t
 
 (** {3 Example} *)
 
@@ -452,17 +455,17 @@ type 'a diff = 'a Diff.t
 
 (** {2 Synchronization} *)
 
-type remote = Remote.t = ..
 (** The type for remote stores. *)
+type remote = Remote.t = ..
 
-val remote_store : (module Generic_key.S with type t = 'a) -> 'a -> remote
 (** [remote_store t] is the remote corresponding to the local store [t].
     Synchronization is done by importing and exporting store {{!BC.slice}
     slices}, so this is usually much slower than native synchronization using
     {!Store.remote} but it works for all backends. *)
+val remote_store : (module Generic_key.S with type t = 'a) -> 'a -> remote
 
-module Sync = Sync
 (** Remote synchronisation. *)
+module Sync = Sync
 
 (** {3 Example} *)
 
@@ -500,5 +503,5 @@ module Sync = Sync
 (** [Dot] provides functions to export a store to the Graphviz `dot` format. *)
 module Dot (S : Generic_key.S) : Dot.S with type db = S.t
 
-module Metrics = Metrics
 (** Type agnostics mechanisms to manipulate metrics. *)
+module Metrics = Metrics

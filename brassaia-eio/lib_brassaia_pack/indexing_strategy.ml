@@ -50,4 +50,5 @@ let minimal_with_contents : t =
   | Dangling_parent_commit -> assert false
 
 let default = always
+
 let is_minimal x = x == minimal

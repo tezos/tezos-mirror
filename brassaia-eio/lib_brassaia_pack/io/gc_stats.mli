@@ -43,9 +43,14 @@ module Worker (Io : Io_intf.S) : sig
   type t
 
   val create : string -> t
+
   val set_objects_traversed : t -> int -> t
+
   val add_suffix_transfer : t -> int63 -> t
+
   val add_file_size : t -> string -> int63 -> t
+
   val finish_current_step : t -> string -> t
+
   val finalise : t -> Stats.Latest_gc.worker
 end

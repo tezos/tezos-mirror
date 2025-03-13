@@ -14,5 +14,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Brassaia_pack_intf.Sigs
 (** @inline *)
+include Brassaia_pack_intf.Sigs

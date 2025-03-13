@@ -83,32 +83,36 @@ module Inode = struct
   let update ~field pack =
     let f v =
       match field with
-      | Inode_add -> { v with inode_add = succ v.inode_add }
-      | Inode_remove -> { v with inode_remove = succ v.inode_remove }
-      | Inode_of_seq -> { v with inode_of_seq = succ v.inode_of_seq }
-      | Inode_of_raw -> { v with inode_of_raw = succ v.inode_of_raw }
-      | Inode_rec_add -> { v with inode_rec_add = succ v.inode_rec_add }
-      | Inode_rec_remove ->
-          { v with inode_rec_remove = succ v.inode_rec_remove }
-      | Inode_to_binv -> { v with inode_to_binv = succ v.inode_to_binv }
-      | Inode_decode_bin ->
-          { v with inode_decode_bin = succ v.inode_decode_bin }
-      | Inode_encode_bin ->
-          { v with inode_encode_bin = succ v.inode_encode_bin }
+      | Inode_add -> {v with inode_add = succ v.inode_add}
+      | Inode_remove -> {v with inode_remove = succ v.inode_remove}
+      | Inode_of_seq -> {v with inode_of_seq = succ v.inode_of_seq}
+      | Inode_of_raw -> {v with inode_of_raw = succ v.inode_of_raw}
+      | Inode_rec_add -> {v with inode_rec_add = succ v.inode_rec_add}
+      | Inode_rec_remove -> {v with inode_rec_remove = succ v.inode_rec_remove}
+      | Inode_to_binv -> {v with inode_to_binv = succ v.inode_to_binv}
+      | Inode_decode_bin -> {v with inode_decode_bin = succ v.inode_decode_bin}
+      | Inode_encode_bin -> {v with inode_encode_bin = succ v.inode_encode_bin}
     in
     let mut = Metrics.Replace f in
     Metrics.update pack mut
 end
 
-type t = { inode : Inode.stat }
+type t = {inode : Inode.stat}
 
-let s = { inode = Inode.init () }
+let s = {inode = Inode.init ()}
+
 let get () = s
+
 let reset_stats () = Inode.clear s.inode
+
 let incr_inode_add () = Inode.update ~field:Inode.Inode_add s.inode
+
 let incr_inode_remove () = Inode.update ~field:Inode.Inode_remove s.inode
+
 let incr_inode_of_seq () = Inode.update ~field:Inode.Inode_of_seq s.inode
+
 let incr_inode_of_raw () = Inode.update ~field:Inode.Inode_of_raw s.inode
+
 let incr_inode_rec_add () = Inode.update ~field:Inode.Inode_rec_add s.inode
 
 let incr_inode_rec_remove () =

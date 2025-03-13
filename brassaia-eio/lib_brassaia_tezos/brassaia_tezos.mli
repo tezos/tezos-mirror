@@ -15,6 +15,7 @@
  *)
 
 module Schema = Schema
+
 module Conf : Brassaia_pack.Conf.S
 
 module Store :

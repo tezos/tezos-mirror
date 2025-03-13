@@ -41,7 +41,7 @@ let test_unique_when_switched () =
   in
   let get_direct_key key =
     match Brassaia_pack_unix.Pack_key.inspect key with
-    | Direct { offset; hash; length; _ } -> (offset, hash, length)
+    | Direct {offset; hash; length; _} -> (offset, hash, length)
     | _ -> assert false
   in
   let get_key_offset key =
@@ -57,19 +57,21 @@ let test_unique_when_switched () =
   (* 1. open store with always indexing, verify same offsets *)
   let repo =
     Store.Repo.v
-    @@ config ~indexing_strategy:Brassaia_pack.Indexing_strategy.always ~fresh:true
+    @@ config
+         ~indexing_strategy:Brassaia_pack.Indexing_strategy.always
+         ~fresh:true
          ()
   in
   let store = Store.main repo in
   let first_key =
-    let first_path = [ "hello" ] in
+    let first_path = ["hello"] in
     let () =
       Store.set_exn ~info:(fun () -> Store.Info.empty) store first_path value
     in
     get_contents_key store first_path
   in
   let second_key =
-    let second_path = [ "salut" ] in
+    let second_path = ["salut"] in
     let () =
       Store.set_exn ~info:(fun () -> Store.Info.empty) store second_path value
     in
@@ -78,37 +80,43 @@ let test_unique_when_switched () =
   Alcotest.(check int63)
     "offsets should be equal when using always indexing"
     (get_key_offset first_key)
-    (get_key_offset second_key);
+    (get_key_offset second_key) ;
 
-  Store.Repo.close repo;
+  Store.Repo.close repo ;
 
   (* 2. re-open store with minimal indexing, verify new offset *)
   let repo =
     Store.Repo.v
-    @@ config ~indexing_strategy:Brassaia_pack.Indexing_strategy.minimal
-         ~fresh:false ()
+    @@ config
+         ~indexing_strategy:Brassaia_pack.Indexing_strategy.minimal
+         ~fresh:false
+         ()
   in
   let store = Store.main repo in
   let third_key =
-    let third_path = [ "hola" ] in
-    Store.set_exn ~info:(fun () -> Store.Info.empty) store third_path value;
+    let third_path = ["hola"] in
+    Store.set_exn ~info:(fun () -> Store.Info.empty) store third_path value ;
     get_contents_key store third_path
   in
   Alcotest.(check bool)
-    "offsets (3rd, 1st) should not be equal when using minimal indexing" false
-    (Int63.equal (get_key_offset third_key) (get_key_offset first_key));
+    "offsets (3rd, 1st) should not be equal when using minimal indexing"
+    false
+    (Int63.equal (get_key_offset third_key) (get_key_offset first_key)) ;
   Alcotest.(check bool)
-    "offsets (3rd, 2nd) should not be equal when using minimal indexing" false
-    (Int63.equal (get_key_offset third_key) (get_key_offset second_key));
+    "offsets (3rd, 2nd) should not be equal when using minimal indexing"
+    false
+    (Int63.equal (get_key_offset third_key) (get_key_offset second_key)) ;
 
   (* 3. verify all hashes are equal *)
-  check_hash "hashes are equal (1st, 2nd)" first_key second_key;
-  check_hash "hashes are equal (2nd, 3rd)" second_key third_key;
+  check_hash "hashes are equal (1st, 2nd)" first_key second_key ;
+  check_hash "hashes are equal (2nd, 3rd)" second_key third_key ;
 
   Store.Repo.close repo
 
 let tests =
   [
-    Alcotest.test_case "test unique when switching strategies" `Quick
+    Alcotest.test_case
+      "test unique when switching strategies"
+      `Quick
       test_unique_when_switched;
   ]

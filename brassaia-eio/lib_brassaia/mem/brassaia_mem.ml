@@ -24,6 +24,7 @@ module Conf = struct
   include Brassaia.Backend.Conf
 
   let spec = Spec.v "mem"
+
   let root config = find_root config |> Option.value ~default:"."
 end
 
@@ -35,10 +36,12 @@ module Read_only (K : Brassaia.Type.S) (V : Brassaia.Type.S) = struct
   end)
 
   type key = K.t
-  type value = V.t
-  type 'a t = { mutable t : value KMap.t }
 
-  let new_instance _root = { t = KMap.empty }
+  type value = V.t
+
+  type 'a t = {mutable t : value KMap.t}
+
+  let new_instance _root = {t = KMap.empty}
 
   let v =
     let cache : (string, 'a t) Hashtbl.t = Hashtbl.create 0 in
@@ -48,30 +51,32 @@ module Read_only (K : Brassaia.Type.S) (V : Brassaia.Type.S) = struct
         match Hashtbl.find_opt cache root with
         | None ->
             let t = new_instance root in
-            Hashtbl.add cache root t;
+            Hashtbl.add cache root t ;
             t
         | Some t -> t
       in
       t
 
   let clear t =
-    [%log.debug "clear"];
+    [%log.debug "clear"] ;
     t.t <- KMap.empty
 
   let close _ =
-    [%log.debug "close"];
+    [%log.debug "close"] ;
     ()
 
   let cast t = (t :> read_write t)
+
   let batch t f = f (cast t)
+
   let pp_key = Brassaia.Type.pp K.t
 
-  let find { t; _ } key =
-    [%log.debug "find %a" pp_key key];
+  let find {t; _} key =
+    [%log.debug "find %a" pp_key key] ;
     try Some (KMap.find key t) with Not_found -> None
 
-  let mem { t; _ } key =
-    [%log.debug "mem %a" pp_key key];
+  let mem {t; _} key =
+    [%log.debug "mem %a" pp_key key] ;
     KMap.mem key t
 end
 
@@ -79,7 +84,7 @@ module Append_only (K : Brassaia.Type.S) (V : Brassaia.Type.S) = struct
   include Read_only (K) (V)
 
   let add t key value =
-    [%log.debug "add -> %a" pp_key key];
+    [%log.debug "add -> %a" pp_key key] ;
     t.t <- KMap.add key value t.t
 end
 
@@ -88,47 +93,55 @@ module Atomic_write (K : Brassaia.Type.S) (V : Brassaia.Type.S) = struct
   module W = Brassaia.Backend.Watch.Make (K) (V)
   module L = Brassaia.Backend.Lock.Make (K)
 
-  type t = { t : unit RO.t; w : W.t; lock : L.t }
+  type t = {t : unit RO.t; w : W.t; lock : L.t}
+
   type key = RO.key
+
   type value = RO.value
+
   type watch = W.watch
 
   let watches = W.v ()
+
   let lock = L.v ()
 
   let v config =
     let t = RO.v config in
-    { t; w = watches; lock }
+    {t; w = watches; lock}
 
   let close t =
-    W.clear t.w;
+    W.clear t.w ;
     RO.close t.t
 
   let find t = RO.find t.t
+
   let mem t = RO.mem t.t
+
   let watch_key t = W.watch_key t.w
+
   let watch t = W.watch t.w
+
   let unwatch t = W.unwatch t.w
 
   let list t =
-    [%log.debug "list"];
+    [%log.debug "list"] ;
     RO.KMap.fold (fun k _ acc -> k :: acc) t.t.RO.t []
 
   let set t key value =
-    [%log.debug "update"];
+    [%log.debug "update"] ;
     L.with_lock t.lock key (fun () ->
-        t.t.RO.t <- RO.KMap.add key value t.t.RO.t);
+        t.t.RO.t <- RO.KMap.add key value t.t.RO.t) ;
     W.notify t.w key (Some value)
 
   let remove t key =
-    [%log.debug "remove"];
-    L.with_lock t.lock key (fun () -> t.t.RO.t <- RO.KMap.remove key t.t.RO.t);
+    [%log.debug "remove"] ;
+    L.with_lock t.lock key (fun () -> t.t.RO.t <- RO.KMap.remove key t.t.RO.t) ;
     W.notify t.w key None
 
   let equal_v_opt = Brassaia.Type.(unstage (equal (option V.t)))
 
   let test_and_set t key ~test ~set =
-    [%log.debug "test_and_set"];
+    [%log.debug "test_and_set"] ;
     let updated =
       L.with_lock t.lock key (fun () ->
           let v = find t key in
@@ -141,11 +154,11 @@ module Atomic_write (K : Brassaia.Type.S) (V : Brassaia.Type.S) = struct
             true
           else false)
     in
-    if updated then W.notify t.w key set;
+    if updated then W.notify t.w key set ;
     updated
 
   let clear t =
-    W.clear t.w;
+    W.clear t.w ;
     RO.clear t.t
 end
 

@@ -21,19 +21,22 @@ open Import
     If the finaliser fails, it is recommended to log the error. *)
 let finalise finaliser f =
   let res = f () in
-  finaliser res;
+  finaliser res ;
   res
 
 (** Finaliser for a function that might raise exceptions. *)
 let finalise_exn finaliser f =
   try
     let res = f () in
-    finaliser (Some res);
+    finaliser (Some res) ;
     res
   with exn ->
-    finaliser None;
+    finaliser None ;
     raise exn
 
+(** [base_error] is the type of most errors that can occur in a [result], except
+    for errors that have associated exceptions (see below) and backend-specific
+    errors (see {!Io_errors}). *)
 type base_error =
   [ `Double_close
   | `File_exists of string
@@ -67,8 +70,8 @@ type base_error =
   | `Gc_process_died_without_result_file of string
   | `Gc_forbidden_on_32bit_platforms
   | `Invalid_prefix_read of string
-  | `Invalid_sparse_read of [ `After | `Before | `Hole ] * int63
-  | `Invalid_volume_read of [ `Empty | `Closed ] * int63
+  | `Invalid_sparse_read of [`After | `Before | `Hole] * int63
+  | `Invalid_volume_read of [`Empty | `Closed] * int63
   | `Inconsistent_store
   | `Split_forbidden_during_batch
   | `Split_disallowed
@@ -83,30 +86,38 @@ type base_error =
   | `Volume_not_found of string
   | `No_tmp_path_provided ]
 [@@deriving brassaia ~pp]
-(** [base_error] is the type of most errors that can occur in a [result], except
-    for errors that have associated exceptions (see below) and backend-specific
-    errors (see {!Io_errors}). *)
 
-type closed_error = [ `Closed ] [@@deriving brassaia ~pp]
-type read_only_error = [ `Ro_not_allowed ] [@@deriving brassaia ~pp]
-type error = [ base_error | closed_error | read_only_error ]
+type closed_error = [`Closed] [@@deriving brassaia ~pp]
+
+type read_only_error = [`Ro_not_allowed] [@@deriving brassaia ~pp]
+
+type error = [base_error | closed_error | read_only_error]
 
 exception Pack_error of base_error
+
 exception Closed = Brassaia.Closed
+
 exception RO_not_allowed = Brassaia_pack.RO_not_allowed
 
 (** Error manager *)
 module type S = sig
   type t = error
 
-  val pp : Format.formatter -> [< t ] -> unit
-  val raise_error : [< t ] -> 'a
-  val log_error : string -> [< t ] -> unit
-  val catch : (unit -> 'a) -> ('a, [> t ]) result
-  val raise_if_error : ('a, [< t ]) result -> 'a
-  val log_if_error : string -> (unit, [< t ]) result -> unit
-  val to_json_string : (int63, [< t ]) result -> string
-  val of_json_string : string -> (int63, [> t ]) result
+  val pp : Format.formatter -> [< t] -> unit
+
+  val raise_error : [< t] -> 'a
+
+  val log_error : string -> [< t] -> unit
+
+  val catch : (unit -> 'a) -> ('a, [> t]) result
+
+  val raise_if_error : ('a, [< t]) result -> 'a
+
+  val log_if_error : string -> (unit, [< t]) result -> unit
+
+  val to_json_string : (int63, [< t]) result -> string
+
+  val of_json_string : string -> (int63, [> t]) result
 end
 
 module Base : S with type t = error = struct
@@ -126,7 +137,7 @@ module Base : S with type t = error = struct
 
   let catch f =
     try Ok (f ()) with
-    | Pack_error e -> Error (e : base_error :> [> t ])
+    | Pack_error e -> Error (e : base_error :> [> t])
     | RO_not_allowed -> Error `Ro_not_allowed
     | Closed -> Error `Closed
 
@@ -147,7 +158,7 @@ module Base : S with type t = error = struct
   let err_to_t = function
     | Closed -> `Closed
     | Ro_not_allowed -> `Ro_not_allowed
-    | Pack_error e -> (e : base_error :> [> t ])
+    | Pack_error e -> (e : base_error :> [> t])
 
   let err_result = Brassaia.Type.(result int63 err_t)
 
@@ -163,7 +174,7 @@ end
 
 let () =
   Printexc.register_printer (function
-    | Pack_error e -> Some (Fmt.str "Pack_error: %a" pp_base_error e)
-    | RO_not_allowed -> Some "RO_not_allowed"
-    | Closed -> Some "Closed"
-    | _ -> None)
+      | Pack_error e -> Some (Fmt.str "Pack_error: %a" pp_base_error e)
+      | RO_not_allowed -> Some "RO_not_allowed"
+      | Closed -> Some "Closed"
+      | _ -> None)

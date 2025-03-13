@@ -14,5 +14,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-include Append_only_file_intf.Sigs
 (** @inline *)
+include Append_only_file_intf.Sigs

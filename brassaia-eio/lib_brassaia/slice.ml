@@ -22,10 +22,12 @@ module Make
     (Commit : Commit.Store) =
 struct
   type contents = Contents.Hash.t * Contents.Val.t [@@deriving brassaia]
+
   type node = Node.Hash.t * Node.Val.t [@@deriving brassaia]
+
   type commit = Commit.Hash.t * Commit.Val.t [@@deriving brassaia]
 
-  type value = [ `Contents of contents | `Node of node | `Commit of commit ]
+  type value = [`Contents of contents | `Node of node | `Commit of commit]
   [@@deriving brassaia]
 
   type t = {
@@ -35,7 +37,7 @@ struct
   }
   [@@deriving brassaia]
 
-  let empty () = { contents = []; nodes = []; commits = [] }
+  let empty () = {contents = []; nodes = []; commits = []}
 
   let add t = function
     | `Contents c -> t.contents <- c :: t.contents
@@ -43,7 +45,7 @@ struct
     | `Commit c -> t.commits <- c :: t.commits
 
   let iter t f =
-    List.map (fun c () -> f (`Contents c)) t.contents |> Eio.Fiber.all;
-    List.map (fun n () -> f (`Node n)) t.nodes |> Eio.Fiber.all;
+    List.map (fun c () -> f (`Contents c)) t.contents |> Eio.Fiber.all ;
+    List.map (fun n () -> f (`Node n)) t.nodes |> Eio.Fiber.all ;
     List.map (fun c () -> f (`Commit c)) t.commits |> Eio.Fiber.all
 end

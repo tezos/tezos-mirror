@@ -19,29 +19,29 @@ open! Import
 module type S_generic_key = sig
   (** {1 Commit values} *)
 
-  type t [@@deriving brassaia]
   (** The type for commit values. *)
+  type t [@@deriving brassaia]
 
-  type node_key [@@deriving brassaia]
   (** Type for node keys. *)
+  type node_key [@@deriving brassaia]
 
-  type commit_key [@@deriving brassaia]
   (** Type for commit keys. *)
+  type commit_key [@@deriving brassaia]
 
-  module Info : Info.S
   (** The type for commit info. *)
+  module Info : Info.S
 
-  val v : info:Info.t -> node:node_key -> parents:commit_key list -> t
   (** Create a commit. *)
+  val v : info:Info.t -> node:node_key -> parents:commit_key list -> t
 
-  val node : t -> node_key
   (** The underlying node key. *)
+  val node : t -> node_key
 
-  val parents : t -> commit_key list
   (** The commit parents. *)
+  val parents : t -> commit_key list
 
-  val info : t -> Info.t
   (** The commit info. *)
+  val info : t -> Info.t
 end
 
 module type S = sig
@@ -97,6 +97,7 @@ end
 
 module type Maker = sig
   module Info : Info.S
+
   module Make (H : Type.S) : S with type hash = H.t and module Info = Info
 end
 
@@ -105,8 +106,8 @@ module type Store = sig
 
   include Indexable.S
 
-  module Info : Info.S
   (** Commit info. *)
+  module Info : Info.S
 
   (** [Val] provides functions for commit values. *)
   module Val :
@@ -117,91 +118,93 @@ module type Store = sig
 
   module Hash : Hash.Typed with type t = hash and type value = value
 
-  module Node : Node.Store with type key = Val.node_key
   (** [Node] is the underlying node store. *)
+  module Node : Node.Store with type key = Val.node_key
 
-  val merge : [> read_write ] t -> info:Info.f -> key option Merge.t
   (** [merge] is the 3-way merge function for commit keys. *)
+  val merge : [> read_write] t -> info:Info.f -> key option Merge.t
 end
 
 module type History = sig
   (** {1 Commit History} *)
 
-  type 'a t
   (** The type for store handles. *)
+  type 'a t
 
-  type node_key [@@deriving brassaia]
   (** The type for node keys. *)
+  type node_key [@@deriving brassaia]
 
-  type commit_key [@@deriving brassaia]
   (** The type for commit keys. *)
+  type commit_key [@@deriving brassaia]
 
-  type v [@@deriving brassaia]
   (** The type for commit objects. *)
+  type v [@@deriving brassaia]
 
-  type info [@@deriving brassaia]
   (** The type for commit info. *)
+  type info [@@deriving brassaia]
 
+  (** Create a new commit. *)
   val v :
-    [> write ] t ->
+    [> write] t ->
     node:node_key ->
     parents:commit_key list ->
     info:info ->
     commit_key * v
-  (** Create a new commit. *)
 
-  val parents : [> read ] t -> commit_key -> commit_key list
   (** Get the commit parents.
 
       Commits form a append-only, fully functional, partial-order
       data-structure: every commit carries the list of its immediate
       predecessors. *)
+  val parents : [> read] t -> commit_key -> commit_key list
 
-  val merge : [> read_write ] t -> info:(unit -> info) -> commit_key Merge.t
   (** [merge t] is the 3-way merge function for commit. *)
+  val merge : [> read_write] t -> info:(unit -> info) -> commit_key Merge.t
 
-  val lcas :
-    [> read ] t ->
-    ?max_depth:int ->
-    ?n:int ->
-    commit_key ->
-    commit_key ->
-    (commit_key list, [ `Max_depth_reached | `Too_many_lcas ]) result
   (** Find the lowest common ancestors
       {{:http://en.wikipedia.org/wiki/Lowest_common_ancestor} lca} between two
       commits. *)
-
-  val lca :
-    [> read_write ] t ->
-    info:(unit -> info) ->
+  val lcas :
+    [> read] t ->
     ?max_depth:int ->
     ?n:int ->
-    commit_key list ->
-    (commit_key option, Merge.conflict) result
+    commit_key ->
+    commit_key ->
+    (commit_key list, [`Max_depth_reached | `Too_many_lcas]) result
+
   (** Compute the lowest common ancestors ancestor of a list of commits by
       recursively calling {!lcas} and merging the results.
 
       If one of the merges results in a conflict, or if a call to {!lcas}
       returns either [Error `Max_depth_reached] or [Error `Too_many_lcas] then
       the function returns the same error. *)
+  val lca :
+    [> read_write] t ->
+    info:(unit -> info) ->
+    ?max_depth:int ->
+    ?n:int ->
+    commit_key list ->
+    (commit_key option, Merge.conflict) result
 
+  (** Compute the {!lcas} of the two commit and 3-way merge the result. *)
   val three_way_merge :
-    [> read_write ] t ->
+    [> read_write] t ->
     info:(unit -> info) ->
     ?max_depth:int ->
     ?n:int ->
     commit_key ->
     commit_key ->
     (commit_key, Merge.conflict) result
-  (** Compute the {!lcas} of the two commit and 3-way merge the result. *)
 
-  val closure :
-    [> read ] t -> min:commit_key list -> max:commit_key list -> commit_key list
   (** Same as {{!Node.Graph.closure} Node.Graph.closure} but for the history
       graph. *)
+  val closure :
+    [> read] t -> min:commit_key list -> max:commit_key list -> commit_key list
 
+  (** Same as {{!Node.Graph.iter} Node.Graph.iter} but for traversing the
+      history graph. *)
   val iter :
-    [> read ] t ->
+    [> read] t ->
     min:commit_key list ->
     max:commit_key list ->
     ?commit:(commit_key -> unit) ->
@@ -210,12 +213,11 @@ module type History = sig
     ?rev:bool ->
     unit ->
     unit
-  (** Same as {{!Node.Graph.iter} Node.Graph.iter} but for traversing the
-      history graph. *)
 end
 
 module type Sigs = sig
   module type S = S
+
   module type Maker = Maker
 
   (** [Maker] provides a simple implementation of commit values, parameterized
@@ -226,6 +228,7 @@ module type Sigs = sig
       object keys that are not strictly equal to hashes. *)
   module Generic_key : sig
     module type S = S_generic_key
+
     module type Maker = Maker_generic_key
 
     module Maker (I : Info.S) : Maker with module Info = I
@@ -253,8 +256,8 @@ module type Sigs = sig
 
   (** V1 serialisation. *)
   module V1 : sig
-    module Info : Info.S with type t = Info.Default.t
     (** Serialisation format for V1 info. *)
+    module Info : Info.S with type t = Info.Default.t
 
     module Make
         (Hash : Hash.S)
@@ -266,6 +269,7 @@ module type Sigs = sig
            and type commit_key = C.commit_key
 
       val import : C.t -> t
+
       val export : t -> C.t
     end
   end
@@ -290,8 +294,8 @@ module type Sigs = sig
     module type S = Portable
   end
 
-  module type Store = Store
   (** [Store] specifies the signature for commit stores. *)
+  module type Store = Store
 
   (** [Store] creates a new commit store. *)
   module Store
@@ -308,13 +312,13 @@ module type Sigs = sig
        and module Info = I
        and module Val = V
 
-  module type History = History
   (** [History] specifies the signature for commit history. The history is
       represented as a partial-order of commits and basic functions to search
       through that history are provided.
 
       Every commit can point to an entry point in a node graph, where
       user-defined contents are stored. *)
+  module type History = History
 
   (** Build a commit history. *)
   module History (C : Store) :

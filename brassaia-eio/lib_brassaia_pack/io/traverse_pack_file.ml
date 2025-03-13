@@ -20,9 +20,13 @@ module Stats : sig
   type t
 
   val empty : unit -> t
+
   val add : t -> Pack_value.Kind.t -> unit
+
   val duplicate_entry : t -> unit
+
   val missing_hash : t -> unit
+
   val pp : t Fmt.t
 end = struct
   module Kind = Pack_value.Kind
@@ -35,11 +39,14 @@ end = struct
 
   let empty () =
     let pack_values = Array.make (List.length Kind.all) 0 in
-    { pack_values; duplicates = 0; missing_hashes = 0 }
+    {pack_values; duplicates = 0; missing_hashes = 0}
 
   let incr t n = t.pack_values.(n) <- t.pack_values.(n) + 1
+
   let add t k = incr t (Kind.to_enum k)
+
   let duplicate_entry t = t.duplicates <- t.duplicates + 1
+
   let missing_hash t = t.missing_hashes <- t.missing_hashes + 1
 
   let pp =
@@ -60,24 +67,30 @@ end
 
 module type Args = sig
   module File_manager : File_manager.S
+
   module Dispatcher : Dispatcher.S with module Fm = File_manager
+
   module Hash : Brassaia.Hash.S
+
   module Index : Pack_index.S with type key := Hash.t
+
   module Inode : Inode.S with type hash := Hash.t
+
   module Contents : Pack_value.S
+
   module Commit : Pack_value.S
 end
 
 module Make (Args : Args) : sig
   val run :
-    [ `Reconstruct_index of [ `In_place | `Output of string ]
+    [ `Reconstruct_index of [`In_place | `Output of string]
     | `Check_index
     | `Check_and_fix_index ] ->
     Brassaia.config ->
     unit
 
   val test :
-    [ `Reconstruct_index of [ `In_place | `Output of string ]
+    [ `Reconstruct_index of [`In_place | `Output of string]
     | `Check_index
     | `Check_and_fix_index ] ->
     Brassaia.config ->
@@ -89,7 +102,9 @@ end = struct
   module Progress = Io.Progress
 
   let pp_key = Brassaia.Type.pp Hash.t
+
   let decode_key = Brassaia.Type.(unstage (decode_bin Hash.t))
+
   let decode_kind = Brassaia.Type.(unstage (decode_bin Pack_value.Kind.t))
 
   (* [Repr] doesn't yet support buffered binary decoders, so we hack one
@@ -100,13 +115,22 @@ end = struct
   type index_value = int63 * int * Pack_value.Kind.t
   [@@deriving brassaia ~equal ~pp]
 
-  type index_binding = { key : Hash.t; data : index_value }
-  type missing_hash = { idx_pack : int; binding : index_binding }
+  type index_binding = {key : Hash.t; data : index_value}
+
+  type missing_hash = {idx_pack : int; binding : index_binding}
 
   let pp_binding ppf x =
     let off, len, kind = x.data in
-    Fmt.pf ppf "@[<v 0>%a with hash %a@,pack offset = %a, length = %d@]"
-      Pack_value.Kind.pp kind pp_key x.key Int63.pp off len
+    Fmt.pf
+      ppf
+      "@[<v 0>%a with hash %a@,pack offset = %a, length = %d@]"
+      Pack_value.Kind.pp
+      kind
+      pp_key
+      x.key
+      Int63.pp
+      off
+      len
 
   let to_index = function
     | Pack_value.Kind.Commit_v2 | Commit_v1 -> true
@@ -120,29 +144,29 @@ end = struct
         match dest with
         | `Output path ->
             if Io.classify_path path <> `No_such_file_or_directory then
-              Fmt.invalid_arg "Can't reconstruct index. File already exits.";
+              Fmt.invalid_arg "Can't reconstruct index. File already exits." ;
             path
         | `In_place ->
-            if Conf.readonly config then raise Brassaia_pack.RO_not_allowed;
+            if Conf.readonly config then raise Brassaia_pack.RO_not_allowed ;
             Conf.root config
       in
       let log_size = Conf.index_log_size config in
       [%log.app
         "Beginning index reconstruction with parameters: { log_size = %d }"
-          log_size];
+          log_size] ;
       let index = Index.v_exn ~fresh:true ~readonly:false ~log_size dest in
       index
 
     let iter_pack_entry ~always index key data =
       let _, _, kind = data in
-      if always || to_index kind then Index.add index key data;
+      if always || to_index kind then Index.add index key data ;
       Ok ()
 
     let finalise index () =
       (* Ensure that the log file is empty, so that subsequent opens with a
          smaller [log_size] don't immediately trigger a merge operation. *)
-      [%log.app "Completed indexing of pack entries. Running a final merge ..."];
-      Index.try_merge index;
+      [%log.app "Completed indexing of pack entries. Running a final merge ..."] ;
+      Index.try_merge index ;
       Index.close_exn index
   end
 
@@ -150,7 +174,7 @@ end = struct
     let create config =
       let log_size = Conf.index_log_size config in
       [%log.app
-        "Beginning index checking with parameters: { log_size = %d }" log_size];
+        "Beginning index checking with parameters: { log_size = %d }" log_size] ;
       let index =
         Index.v_exn ~fresh:false ~readonly:true ~log_size (Conf.root config)
       in
@@ -161,12 +185,11 @@ end = struct
       if always || to_index kind then (
         match Index.find index key with
         | None ->
-            Error
-              (`Missing_hash { idx_pack = !idx_ref; binding = { key; data } })
+            Error (`Missing_hash {idx_pack = !idx_ref; binding = {key; data}})
         | Some data' when not @@ equal_index_value data data' ->
             Error `Inconsistent_entry
         | Some _ ->
-            incr idx_ref;
+            incr idx_ref ;
             Ok ())
       else Ok ()
 
@@ -177,7 +200,7 @@ end = struct
     let create config =
       let log_size = Conf.index_log_size config in
       [%log.app
-        "Beginning index checking with parameters: { log_size = %d }" log_size];
+        "Beginning index checking with parameters: { log_size = %d }" log_size] ;
       let root = Conf.root config in
       let index = Index.v_exn ~fresh:false ~readonly:false ~log_size root in
       (index, ref 0)
@@ -187,19 +210,18 @@ end = struct
       if always || to_index kind then (
         match Index.find index key with
         | None ->
-            Index.add index key data;
-            Error
-              (`Missing_hash { idx_pack = !idx_ref; binding = { key; data } })
+            Index.add index key data ;
+            Error (`Missing_hash {idx_pack = !idx_ref; binding = {key; data}})
         | Some data' when not @@ equal_index_value data data' ->
             Error `Inconsistent_entry
         | Some _ ->
-            incr idx_ref;
+            incr idx_ref ;
             Ok ())
       else Ok ()
 
     let finalise (index, _) () =
-      [%log.app "Completed indexing of pack entries. Running a final merge ..."];
-      Index.try_merge index;
+      [%log.app "Completed indexing of pack entries. Running a final merge ..."] ;
+      Index.try_merge index ;
       Index.close_exn index
   end
 
@@ -214,12 +236,12 @@ end = struct
       let buffer_pos = ref buffer_off in
       (* Decode the key and kind by hand *)
       let key = decode_key buffer buffer_pos in
-      assert (!buffer_pos = buffer_off + Hash.hash_size);
+      assert (!buffer_pos = buffer_off + Hash.hash_size) ;
       let kind = decode_kind buffer buffer_pos in
-      assert (!buffer_pos = buffer_off + Hash.hash_size + 1);
+      assert (!buffer_pos = buffer_off + Hash.hash_size + 1) ;
       (* Get the length of the entire entry *)
       let entry_len = decode_entry_length kind buffer buffer_off in
-      { key; data = (off, entry_len, kind) }
+      {key; data = (off, entry_len, kind)}
     with
     | Invalid_argument msg when msg = "index out of bounds" ->
         raise Not_enough_buffer
@@ -243,9 +265,12 @@ end = struct
     in
     let buffer = Bytes.create max_bytes_needed_to_discover_length in
     let _len, _volume =
-      Dispatcher.read_range_exn dispatcher ~off
+      Dispatcher.read_range_exn
+        dispatcher
+        ~off
         ~min_len:min_bytes_needed_to_discover_length
-        ~max_len:max_bytes_needed_to_discover_length buffer
+        ~max_len:max_bytes_needed_to_discover_length
+        buffer
     in
     decode_entry_len buffer
 
@@ -260,15 +285,15 @@ end = struct
     in
     Dispatcher.read_exn dispatcher ~off ~len buffer
 
-  let on_entry { data; key } stats iter_pack_entry missing_hash =
-    [%log.debug "k = %a (off, len, kind) = %a" pp_key key pp_index_value data];
+  let on_entry {data; key} stats iter_pack_entry missing_hash =
+    [%log.debug "k = %a (off, len, kind) = %a" pp_key key pp_index_value data] ;
     match iter_pack_entry key data with
     | Ok () -> Option.map Fun.id missing_hash
     | Error `Inconsistent_entry ->
-        Stats.duplicate_entry stats;
+        Stats.duplicate_entry stats ;
         Option.map Fun.id missing_hash
     | Error (`Missing_hash x) ->
-        Stats.missing_hash stats;
+        Stats.missing_hash stats ;
         Some x
 
   let ingest_data_file_after_v3 ~initial_buffer_size ~progress dispatcher
@@ -277,19 +302,20 @@ end = struct
     let buffer = ref (Bytes.create initial_buffer_size) in
     let on_entry missing_hash off =
       let len = guess_entry_len dispatcher ~off in
-      if len > Bytes.length !buffer then buffer := Bytes.create (2 * len);
+      if len > Bytes.length !buffer then buffer := Bytes.create (2 * len) ;
       let _ = Dispatcher.read_exn dispatcher ~off ~len !buffer in
-      let { key; data } =
-        decode_entry_exn ~off
+      let {key; data} =
+        decode_entry_exn
+          ~off
           ~buffer:(Bytes.unsafe_to_string !buffer)
           ~buffer_off:0
       in
       let off', entry_len, kind = data in
       let entry_lenL = Int63.of_int entry_len in
-      assert (off = off');
-      Stats.add stats kind;
-      progress entry_lenL;
-      (entry_len, on_entry { key; data } stats iter_pack_entry missing_hash)
+      assert (off = off') ;
+      Stats.add stats kind ;
+      progress entry_lenL ;
+      (entry_len, on_entry {key; data} stats iter_pack_entry missing_hash)
     in
     let rec traverse off missing_hash =
       match Dispatcher.next_valid_offset dispatcher ~off with
@@ -319,9 +345,11 @@ end = struct
         Fmt.failwith
           "Couldn't decode the value at offset %a in %d of buffer space. \
            Corrupted data file?"
-          Int63.pp from length
+          Int63.pp
+          from
+          length
       else (
-        buffer := Bytes.create (2 * length);
+        buffer := Bytes.create (2 * length) ;
         refill_buffer ~from)
     in
     let stats = Stats.empty () in
@@ -333,19 +361,20 @@ end = struct
             (* Bytes.unsafe_to_string usage: possibly safe, depending on details of
                implementation of decode_entry_exn TODO either justify clearly that this is
                safe, or change to use safe Bytes.to_string *)
-            decode_entry_exn ~off
+            decode_entry_exn
+              ~off
               ~buffer:(Bytes.unsafe_to_string !buffer)
               ~buffer_off
           with
-          | { key; data } ->
+          | {key; data} ->
               let off', entry_len, kind = data in
               let entry_lenL = Int63.of_int entry_len in
-              assert (off = off');
-              Stats.add stats kind;
-              progress entry_lenL;
+              assert (off = off') ;
+              Stats.add stats kind ;
+              progress entry_lenL ;
               let off = Int63.Syntax.(off + entry_lenL) in
               let missing_hash =
-                on_entry { data; key } stats iter_pack_entry missing_hash
+                on_entry {data; key} stats iter_pack_entry missing_hash
               in
               (buffer_off + entry_len, off, missing_hash)
           | exception Not_enough_buffer ->
@@ -361,14 +390,13 @@ end = struct
         in
         loop_entries ~buffer_off off missing_hash
     in
-    refill_buffer ~from:Int63.zero;
+    refill_buffer ~from:Int63.zero ;
     loop_entries ~buffer_off:0 Int63.zero None
 
   let run_or_test ~initial_buffer_size mode config =
     let always =
       Conf.indexing_strategy config
-      |> Brassaia_pack.Indexing_strategy.is_minimal
-      |> not
+      |> Brassaia_pack.Indexing_strategy.is_minimal |> not
     in
     let iter_pack_entry, finalise, message =
       match mode with
@@ -391,22 +419,28 @@ end = struct
     let total = Dispatcher.end_offset dispatcher in
     let ingest_data progress =
       if File_manager.gc_allowed fm then
-        ingest_data_file_after_v3 ~initial_buffer_size dispatcher
-          iter_pack_entry ~progress
+        ingest_data_file_after_v3
+          ~initial_buffer_size
+          dispatcher
+          iter_pack_entry
+          ~progress
       else
-        ingest_data_file_before_v3 ~initial_buffer_size ~total dispatcher
-          iter_pack_entry ~progress
+        ingest_data_file_before_v3
+          ~initial_buffer_size
+          ~total
+          dispatcher
+          iter_pack_entry
+          ~progress
     in
     let stats, missing_hash =
       let bar =
         let open Progress.Line.Using_int63 in
-        list
-          [ const message; bytes; elapsed (); bar total; percentage_of total ]
+        list [const message; bytes; elapsed (); bar total; percentage_of total]
       in
       Progress.(with_reporter bar) ingest_data
     in
-    finalise ();
-    File_manager.close fm |> Errs.raise_if_error;
+    finalise () ;
+    File_manager.close fm |> Errs.raise_if_error ;
     let run_duration = Io.Clock.count run_duration in
     let store_stats fmt =
       Fmt.pf fmt "Store statistics:@,  @[<v 0>%a@]" Stats.pp stats
@@ -416,7 +450,10 @@ end = struct
         [%log.app
           "%a in %a. %t"
             Fmt.(styled `Green string)
-            "Success" Mtime.Span.pp run_duration store_stats]
+            "Success"
+            Mtime.Span.pp
+            run_duration
+            store_stats]
     | Some x ->
         let msg =
           match mode with
@@ -431,9 +468,15 @@ end = struct
           \  %a@,\
            %t"
             Fmt.(styled `Red string)
-            msg Mtime.Span.pp run_duration x.idx_pack pp_binding x.binding
+            msg
+            Mtime.Span.pp
+            run_duration
+            x.idx_pack
+            pp_binding
+            x.binding
             store_stats]
 
   let run = run_or_test ~initial_buffer_size:1024
+
   let test = run_or_test ~initial_buffer_size:100
 end

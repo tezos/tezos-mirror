@@ -21,10 +21,9 @@ module type S = Brassaia_pack_io.Store_intf.S
 module Maker (Config : Brassaia_pack.Conf.S) =
   Brassaia_pack_io.Maker_io (Io.Unix) (Index_unix.Private.Platform) (Async.Unix)
     (Config)
-
 module KV (Config : Brassaia_pack.Conf.S) =
-  Brassaia_pack_io.KV (Io.Unix) (Index_unix.Private.Platform) (Async.Unix) (Config)
-
+  Brassaia_pack_io.KV (Io.Unix) (Index_unix.Private.Platform) (Async.Unix)
+    (Config)
 open Brassaia_pack_io
 
 (** {1 Key and Values} *)

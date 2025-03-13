@@ -23,27 +23,27 @@ module Steps_timer (Io : Io_intf.S) = struct
     user : float;
   }
 
-  type t = { timer : duration; prev_stepname : string }
+  type t = {timer : duration; prev_stepname : string}
 
   let create first_stepname =
     let wall = Io.Stats.get_wtime () in
     let sys = Io.Stats.get_stime () in
     let user = Io.Stats.get_utime () in
-    let timer = { wall; sys; user } in
-    { timer; prev_stepname = first_stepname }
+    let timer = {wall; sys; user} in
+    {timer; prev_stepname = first_stepname}
 
   let progress prev next_stepname =
     let wall = Io.Stats.get_wtime () in
     let sys = Io.Stats.get_stime () in
     let user = Io.Stats.get_utime () in
-    let next = { wall; sys; user } in
+    let next = {wall; sys; user} in
 
     let wall = next.wall -. prev.timer.wall in
     let sys = next.sys -. prev.timer.sys in
     let user = next.user -. prev.timer.user in
-    let delta = (prev.prev_stepname, { wall; sys; user }) in
+    let delta = (prev.prev_stepname, {wall; sys; user}) in
 
-    let next = { timer = next; prev_stepname = next_stepname } in
+    let next = {timer = next; prev_stepname = next_stepname} in
     (next, delta)
 end
 
@@ -51,8 +51,8 @@ module Main (Io : Io_intf.S) = struct
   module S = Stats.Latest_gc
   module Steps_timer = Steps_timer (Io)
 
-  type t = { stats : S.stats; timer : Steps_timer.t }
   (** [t] is the running state while computing the stats *)
+  type t = {stats : S.stats; timer : Steps_timer.t}
 
   let create first_stepname ~generation ~commit_offset
       ~before_suffix_start_offset ~before_suffix_end_offset
@@ -74,12 +74,12 @@ module Main (Io : Io_intf.S) = struct
         }
     in
     let timer = Steps_timer.create first_stepname in
-    { stats; timer }
+    {stats; timer}
 
   let finish_current_step t next_stepname =
     let timer, prev_step = Steps_timer.progress t.timer next_stepname in
-    let stats = { t.stats with steps = prev_step :: t.stats.steps } in
-    { stats; timer }
+    let stats = {t.stats with steps = prev_step :: t.stats.steps} in
+    {stats; timer}
 
   let finalise t worker ~after_suffix_end_offset =
     let t = finish_current_step t "will not appear in the stats" in
@@ -94,6 +94,7 @@ end
 module Worker (Io : Io_intf.S) = struct
   module S = Stats.Latest_gc
 
+  (** [t] is the running state while computing the stats *)
   type t = {
     stats : S.worker;
     current_stepname : string;
@@ -103,7 +104,6 @@ module Worker (Io : Io_intf.S) = struct
     prev_rusage : S.rusage;
     prev_ocaml_gc : S.ocaml_gc;
   }
-  (** [t] is the running state while computing the stats *)
 
   let get_ocaml_gc : unit -> S.ocaml_gc =
    fun () ->
@@ -128,8 +128,8 @@ module Worker (Io : Io_intf.S) = struct
 
        Since the GC worker lives alone in a fork, these global variable mutations
        will not interfere with the rest of the world. *)
-    Stats.reset_stats ();
-    Brassaia_pack.Stats.reset_stats ();
+    Stats.reset_stats () ;
+    Brassaia_pack.Stats.reset_stats () ;
 
     let wtime = Io.Stats.get_wtime () in
     let stime = Io.Stats.get_stime () in
@@ -161,14 +161,14 @@ module Worker (Io : Io_intf.S) = struct
     }
 
   let set_objects_traversed t v =
-    let stats = { t.stats with objects_traversed = Int63.of_int v } in
-    { t with stats }
+    let stats = {t.stats with objects_traversed = Int63.of_int v} in
+    {t with stats}
 
   let add_suffix_transfer t count =
     let stats =
-      { t.stats with suffix_transfers = count :: t.stats.suffix_transfers }
+      {t.stats with suffix_transfers = count :: t.stats.suffix_transfers}
     in
-    { t with stats }
+    {t with stats}
 
   let finish_current_step t next_stepname =
     let wtime = Io.Stats.get_wtime () in
@@ -178,7 +178,7 @@ module Worker (Io : Io_intf.S) = struct
       let wall = wtime -. t.prev_wtime in
       let sys = stime -. t.prev_stime in
       let user = utime -. t.prev_utime in
-      S.{ wall; sys; user }
+      S.{wall; sys; user}
     in
 
     let prev_rusage, rusage =
@@ -224,20 +224,20 @@ module Worker (Io : Io_intf.S) = struct
     let pack_store =
       Stats.((get ()).pack_store |> Pack_store.export |> clone Pack_store.t)
     in
-    Stats.report_index ();
+    Stats.report_index () ;
     let index = Stats.((get ()).index |> Index.export |> clone Index.t) in
     let inode =
       Brassaia_pack.Stats.((get ()).inode |> Inode.export |> clone Inode.t)
     in
-    Stats.reset_stats ();
-    Brassaia_pack.Stats.reset_stats ();
+    Stats.reset_stats () ;
+    Brassaia_pack.Stats.reset_stats () ;
 
-    let step = S.{ duration; rusage; ocaml_gc; index; pack_store; inode } in
+    let step = S.{duration; rusage; ocaml_gc; index; pack_store; inode} in
 
     (* The [steps] list is built in reverse order and reversed in [finalise] *)
     let steps = (t.current_stepname, step) :: t.stats.steps in
 
-    let stats = { t.stats with steps } in
+    let stats = {t.stats with steps} in
     {
       current_stepname = next_stepname;
       stats;
@@ -249,8 +249,8 @@ module Worker (Io : Io_intf.S) = struct
     }
 
   let add_file_size t file_name size =
-    let stats = { t.stats with files = (file_name, size) :: t.stats.files } in
-    { t with stats }
+    let stats = {t.stats with files = (file_name, size) :: t.stats.files} in
+    {t with stats}
 
   let finalise : t -> S.worker =
    fun t ->
