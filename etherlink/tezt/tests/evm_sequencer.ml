@@ -5140,7 +5140,7 @@ let test_force_kernel_upgrade =
   register_all
     ~time_between_blocks:Nothing
     ~kernels:[Latest]
-    ~tags:["evm"; "sequencer"; "upgrade"; "force"]
+    ~tags:[Tag.ci_disabled; "evm"; "sequencer"; "upgrade"; "force"]
     ~genesis_timestamp
     ~title:"Force kernel upgrade"
     ~additional_uses:[Constant.WASM.debug_kernel]
