@@ -1143,21 +1143,23 @@ module Monitoring_app = struct
 
   module Tasks = struct
     let endpoint_from_prometheus_query ~query =
-      let fail =
+      let fail ~uri_part =
         Test.fail
-          "Dal.Tasks.endpoint_from_prometheus_query: expecting a prometheus %s"
+          "DAL.Monitoring_app.Tasks.endpoint_from_prometheus_query: expecting \
+           a prometheus %s"
+          uri_part
       in
       let uri =
         match Prometheus.get_query_endpoint ~query with
-        | None -> fail "endpoint"
+        | None -> fail ~uri_part:"endpoint"
         | Some endpoint -> endpoint
       in
       let scheme, host, port =
         match Uri.(scheme uri, host uri, port uri) with
         | Some scheme, Some host, Some port -> (scheme, host, port)
-        | None, _, _ -> fail "scheme"
-        | _, None, _ -> fail "host"
-        | _, _, None -> fail "port"
+        | None, _, _ -> fail ~uri_part:"scheme"
+        | _, None, _ -> fail ~uri_part:"host"
+        | _, _, None -> fail ~uri_part:"port"
       in
       let query_string =
         (* Fixme: warn about `k` being dropped in the second case. We
