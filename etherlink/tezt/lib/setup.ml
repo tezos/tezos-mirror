@@ -337,8 +337,16 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
           else bootstrap_accounts )
     | _ -> assert false
   in
+  (* In the kernel, the multichain notion was not introduced yet. *)
+  (* The kernel rely on its chain id to know the chain_family.    *)
+  (* We need to keep this as long as we register test as multichain
+     just for tezlink (and not real multichain) *)
+  let chain_id =
+    match l2_chain_ids with [chain_id] -> Some chain_id | _ -> None
+  in
   let*! () =
     Evm_node.make_kernel_installer_config
+      ?chain_id
       ~l2_chain_ids
       ?max_delayed_inbox_blueprint_length
       ~mainnet_compat
