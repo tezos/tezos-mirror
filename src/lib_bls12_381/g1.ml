@@ -382,6 +382,27 @@ module G1 = struct
        in
        assert (res = 0)) ;
     buffer
+
+  let pippenger_with_compressed_bytes_array_opt ~subgroup_check points_in_bytes
+      scalars =
+    let affine_points =
+      affine_array_of_compressed_bytes_opt ~subgroup_check points_in_bytes
+    in
+    Option.map
+      (fun affine_points ->
+        let res = pippenger_with_affine_array affine_points scalars in
+        to_compressed_bytes res)
+      affine_points
+
+  let add_bulk_with_compressed_bytes_array_opt ~subgroup_check points_in_bytes =
+    let affine_points =
+      affine_array_of_compressed_bytes_opt ~subgroup_check points_in_bytes
+    in
+    Option.map
+      (fun affine_points ->
+        let res = affine_add_bulk affine_points in
+        to_compressed_bytes res)
+      affine_points
 end
 
 include G1

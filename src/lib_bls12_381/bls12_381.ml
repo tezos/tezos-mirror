@@ -188,6 +188,27 @@ module type CURVE = sig
       {b Warning.} Undefined behavior if the point to infinity is in the array *)
   val pippenger_with_affine_array :
     ?start:int -> ?len:int -> affine_array -> Scalar.t array -> t
+
+  (** [pippenger_with_compressed_bytes_array_opt points scalars]
+      computes the multi-scalar multiplication, i.e., the sum of
+      [scalars[i] * points[i]].
+
+      If [subgroup_check] is set, the function also checks if the points
+      are in the prime subgroup.
+
+      Returns [None] if deserialization of points fails. *)
+  val pippenger_with_compressed_bytes_array_opt :
+    subgroup_check:bool -> Bytes.t array -> Scalar.t array -> Bytes.t option
+
+  (** [add_bulk_with_compressed_bytes_array_opt points]
+      computes the sum of [points[i]].
+
+      If [subgroup_check] is set, the function also checks if the points
+      are in the prime subgroup.
+
+      Returns [None] if deserialization of points fails. *)
+  val add_bulk_with_compressed_bytes_array_opt :
+    subgroup_check:bool -> Bytes.t array -> Bytes.t option
 end
 
 module Fr = Fr
