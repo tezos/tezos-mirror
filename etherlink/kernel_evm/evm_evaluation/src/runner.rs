@@ -238,7 +238,7 @@ fn execute_transaction(
         &block_constants,
         evm_account_storage,
         precompiles,
-        config.clone(),
+        config,
         address,
         caller,
         call_data,

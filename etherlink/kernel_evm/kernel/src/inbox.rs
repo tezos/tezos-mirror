@@ -29,6 +29,7 @@ use crate::tick_model::maximum_ticks_for_sequencer_chunk;
 use crate::upgrade::*;
 use crate::Error;
 use crate::{simulation, upgrade};
+use evm::Config;
 use evm_execution::fa_bridge::{deposit::FaDeposit, FA_DEPOSIT_PROXY_GAS_LIMIT};
 use evm_execution::EthereumError;
 use primitive_types::U256;
@@ -572,6 +573,7 @@ fn read_and_dispatch_input<Host: Runtime, Mode: Parsable + InputHandler>(
     res: &mut Mode::Inbox,
     enable_fa_bridge: bool,
     garbage_collect_blocks: bool,
+    evm_configuration: &Config,
 ) -> anyhow::Result<ReadStatus> {
     let input: InputResult<Mode> = read_input(
         host,
@@ -599,7 +601,7 @@ fn read_and_dispatch_input<Host: Runtime, Mode: Parsable + InputHandler>(
             // kernel enters in simulation mode, reading will be done by the
             // simulation and all the previous and next transactions are
             // discarded.
-            simulation::start_simulation_mode(host, enable_fa_bridge)?;
+            simulation::start_simulation_mode(host, enable_fa_bridge, evm_configuration)?;
             Ok(ReadStatus::FinishedIgnore)
         }
         InputResult::Input(input) => {
@@ -615,6 +617,7 @@ pub fn read_proxy_inbox<Host: Runtime>(
     tezos_contracts: &TezosContracts,
     enable_fa_bridge: bool,
     garbage_collect_blocks: bool,
+    evm_configuration: &Config,
 ) -> Result<Option<ProxyInboxContent>, anyhow::Error> {
     let mut res = ProxyInboxContent {
         transactions: vec![],
@@ -634,6 +637,7 @@ pub fn read_proxy_inbox<Host: Runtime>(
             &mut res,
             enable_fa_bridge,
             garbage_collect_blocks,
+            evm_configuration,
         ) {
             Err(err) =>
             // If we failed to read or dispatch the input.
@@ -685,6 +689,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
     enable_fa_bridge: bool,
     dal: Option<DalConfiguration>,
     garbage_collect_blocks: bool,
+    evm_configuration: &Config,
 ) -> Result<StageOneStatus, anyhow::Error> {
     // The mutable variable is used to retrieve the information of whether the
     // inbox was empty or not. As we consume all the inbox in one go, if the
@@ -727,6 +732,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
             delayed_inbox,
             enable_fa_bridge,
             garbage_collect_blocks,
+            evm_configuration,
         ) {
             Err(err) =>
             // If we failed to read or dispatch the input.

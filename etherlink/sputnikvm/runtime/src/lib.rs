@@ -188,7 +188,7 @@ impl Runtime {
 }
 
 /// Runtime configuration.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Config {
 	/// Gas paid for extcode.
 	pub gas_ext_code: u64,

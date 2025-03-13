@@ -206,7 +206,7 @@ pub fn execute_deposit<Host: Runtime>(
     host: &mut Host,
     evm_account_storage: &mut EthereumAccountStorage,
     deposit: &Deposit,
-    config: Config,
+    config: &Config,
 ) -> Result<ExecutionOutcome, EthereumError> {
     // We should be able to obtain an account for arbitrary H160 address
     // otherwise it is a fatal error.

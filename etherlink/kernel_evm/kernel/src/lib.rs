@@ -13,7 +13,6 @@ use crate::stage_one::fetch_blueprints;
 use crate::storage::{read_sequencer_pool_address, PRIVATE_FLAG_PATH};
 use anyhow::Context;
 use delayed_inbox::DelayedInbox;
-use evm_execution::Config;
 use fallback_upgrade::fallback_backup_kernel;
 use inbox::StageOneStatus;
 use migration::MigrationStatus;
@@ -68,19 +67,6 @@ mod tick_model;
 mod upgrade;
 
 extern crate alloc;
-
-/// The configuration for the EVM execution.
-const CONFIG: Config = Config {
-    // The current implementation doesn't support Cancun call stack limit of 256.
-    // We need to set a lower limit until we have switched to a head-based
-    // recursive calls.
-    //
-    // TODO: When this limitation is removed, some evm evaluation tests needs
-    // to be reactivated. As well as tests `call_too_deep_not_revert` and
-    // `multiple_call_all_the_way_to_1024` in the evm execution crate.
-    call_stack_limit: 256,
-    ..Config::cancun()
-};
 
 const KERNEL_VERSION: &str = env!("GIT_HASH");
 

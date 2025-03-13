@@ -7,6 +7,7 @@
 // SPDX-License-Identifier: MIT
 
 use ethereum::Log;
+use evm::Config;
 use evm_execution::account_storage::{EthereumAccount, EthereumAccountStorage};
 use evm_execution::fa_bridge::deposit::FaDeposit;
 use evm_execution::fa_bridge::{execute_fa_deposit, FA_DEPOSIT_PROXY_GAS_LIMIT};
@@ -35,7 +36,6 @@ use crate::bridge::{execute_deposit, Deposit};
 use crate::error::Error;
 use crate::fees::{tx_execution_gas_limit, FeeUpdates};
 use crate::inbox::{Transaction, TransactionContent};
-use crate::CONFIG;
 
 // This implementation of `Transaction` is used to share the logic of
 // transaction receipt and transaction object making. The functions
@@ -310,6 +310,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     retriable: bool,
     is_delayed: bool,
     tracer_input: Option<TracerInput>,
+    evm_configuration: &Config,
 ) -> Result<ExecutionResult<TransactionResult>, anyhow::Error> {
     let effective_gas_price = block_constants.base_fee_per_gas();
     let (caller, gas_limit) = match is_valid_ethereum_transaction_common(
@@ -336,7 +337,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         block_constants,
         evm_account_storage,
         precompiles,
-        CONFIG,
+        evm_configuration,
         to,
         caller,
         call_data,
@@ -427,9 +428,11 @@ fn apply_deposit<Host: Runtime>(
     deposit: &Deposit,
     transaction: &Transaction,
     tracer_input: Option<TracerInput>,
+    evm_configuration: &Config,
 ) -> Result<ExecutionResult<TransactionResult>, Error> {
-    let execution_outcome = execute_deposit(host, evm_account_storage, deposit, CONFIG)
-        .map_err(Error::InvalidRunTransaction)?;
+    let execution_outcome =
+        execute_deposit(host, evm_account_storage, deposit, evm_configuration)
+            .map_err(Error::InvalidRunTransaction)?;
 
     trace_deposit(
         host,
@@ -457,6 +460,7 @@ fn apply_fa_deposit<Host: Runtime>(
     allocated_ticks: u64,
     transaction: &Transaction,
     tracer_input: Option<TracerInput>,
+    evm_configuration: &Config,
 ) -> Result<ExecutionResult<TransactionResult>, Error> {
     let caller = H160::zero();
     // Prevent inner calls to XTZ/FA withdrawal precompiles
@@ -466,7 +470,7 @@ fn apply_fa_deposit<Host: Runtime>(
         block_constants,
         evm_account_storage,
         &precompiles,
-        CONFIG,
+        evm_configuration,
         caller,
         fa_deposit,
         allocated_ticks,
@@ -605,6 +609,7 @@ pub fn apply_transaction<Host: Runtime>(
     retriable: bool,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
+    evm_configuration: &Config,
 ) -> Result<ExecutionResult<ExecutionInfo>, anyhow::Error> {
     let tracer_input = get_tracer_configuration(H256(transaction.tx_hash), tracer_input);
     let apply_result = match &transaction.content {
@@ -618,6 +623,7 @@ pub fn apply_transaction<Host: Runtime>(
             retriable,
             false,
             tracer_input,
+            evm_configuration,
         )?,
         TransactionContent::EthereumDelayed(tx) => apply_ethereum_transaction_common(
             host,
@@ -629,6 +635,7 @@ pub fn apply_transaction<Host: Runtime>(
             retriable,
             true,
             tracer_input,
+            evm_configuration,
         )?,
         TransactionContent::Deposit(deposit) => {
             log!(host, Benchmarking, "Transaction type: DEPOSIT");
@@ -638,6 +645,7 @@ pub fn apply_transaction<Host: Runtime>(
                 deposit,
                 transaction,
                 tracer_input,
+                evm_configuration,
             )?
         }
         TransactionContent::FaDeposit(fa_deposit) => {
@@ -650,6 +658,7 @@ pub fn apply_transaction<Host: Runtime>(
                 allocated_ticks,
                 transaction,
                 tracer_input,
+                evm_configuration,
             )?
         }
     };

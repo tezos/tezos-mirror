@@ -25,6 +25,7 @@ use crate::Configuration;
 use crate::{block_in_progress, tick_model};
 use anyhow::Context;
 use block_in_progress::BlockInProgress;
+use evm::Config;
 use evm_execution::account_storage::{init_account_storage, EthereumAccountStorage};
 use evm_execution::precompiles;
 use evm_execution::precompiles::PrecompileBTreeMap;
@@ -121,6 +122,7 @@ fn compute<Host: Runtime>(
     sequencer_pool_address: Option<H160>,
     limits: &Limits,
     tracer_input: Option<TracerInput>,
+    evm_configuration: &Config,
 ) -> Result<BlockInProgressComputationResult, anyhow::Error> {
     log!(
         host,
@@ -192,6 +194,7 @@ fn compute<Host: Runtime>(
             retriable,
             sequencer_pool_address,
             tracer_input,
+            evm_configuration,
         )? {
             ExecutionResult::Valid(ExecutionInfo {
                 receipt_info,
@@ -344,6 +347,7 @@ fn compute_bip<Host: Runtime>(
     minimum_base_fee_per_gas: U256,
     da_fee_per_byte: U256,
     coinbase: H160,
+    evm_configuration: &Config,
 ) -> anyhow::Result<BlockComputationResult> {
     let constants: BlockConstants = block_in_progress.constants(
         chain_id,
@@ -362,6 +366,7 @@ fn compute_bip<Host: Runtime>(
         sequencer_pool_address,
         limits,
         tracer_input,
+        evm_configuration,
     )?;
     match result {
         BlockInProgressComputationResult::RebootNeeded => {
@@ -546,6 +551,7 @@ pub fn produce<Host: Runtime>(
         minimum_base_fee_per_gas,
         da_fee_per_byte,
         coinbase,
+        &config.chain_config.evm_configuration,
     ) {
         Ok(BlockComputationResult::Finished {
             included_delayed_transactions,
