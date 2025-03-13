@@ -3293,3 +3293,15 @@ val check_bls_proof : pk:string -> proof:string -> t -> unit Lwt.t
     Returns [(aggregated_public_key, aggregated_public_key_hash)]. *)
 val aggregate_bls_public_keys :
   t -> (string * string) list -> (string * string) Lwt.t
+
+(** Run [octez-client share bls secret key <sk> between <n> shares
+    with threshold <m>]. *)
+val share_bls_secret_key :
+  sk:string ->
+  n:int ->
+  m:int ->
+  t ->
+  (string * string * (int * string) list) Lwt.t
+
+(** Run [octez-client threshold bls signatures <id_signatures>]. *)
+val threshold_bls_signatures : t -> (int * string) list -> string Lwt.t

@@ -4559,3 +4559,54 @@ let aggregate_bls_public_keys client pks_with_proofs =
   let group_pk = JSON.(output |-> "public_key" |> as_string) in
   let group_pkh = JSON.(output |-> "public_key_hash" |> as_string) in
   return (group_pk, group_pkh)
+
+let spawn_share_bls_secret_key ~sk ~n ~m client =
+  spawn_command client
+  @@ [
+       "share";
+       "bls";
+       "secret";
+       "key";
+       sk;
+       "between";
+       string_of_int n;
+       "shares";
+       "with";
+       "threshold";
+       string_of_int m;
+     ]
+
+let share_bls_secret_key ~sk ~n ~m client =
+  let* client_output =
+    spawn_share_bls_secret_key ~sk ~n ~m client |> Process.check_and_read_stdout
+  in
+  let output = JSON.parse ~origin:"share_bls_secret_key" client_output in
+  let group_pk = JSON.(output |-> "public_key" |> as_string) in
+  let group_pkh = JSON.(output |-> "public_key_hash" |> as_string) in
+  let secret_shares_list = JSON.(output |-> "secret_shares" |> as_list) in
+  let secret_shares =
+    List.map
+      (fun s ->
+        let id = JSON.(s |-> "id" |> as_int) in
+        let sk = JSON.(s |-> "secret_key" |> as_string) in
+        (id, sk))
+      secret_shares_list
+  in
+  return (group_pk, group_pkh, secret_shares)
+
+let spawn_threshold_bls_signatures client id_signatures =
+  let id_signatures =
+    List.map
+      (fun (id, signature) ->
+        `O [("id", `Float (float_of_int id)); ("signature", `String signature)])
+      id_signatures
+  in
+  let json_batch = `A id_signatures |> JSON.encode_u in
+  spawn_command client @@ ["threshold"; "bls"; "signatures"; json_batch]
+
+let threshold_bls_signatures client id_signatures =
+  let* s =
+    spawn_threshold_bls_signatures client id_signatures
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim s)
