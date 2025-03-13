@@ -57,36 +57,6 @@ if [ -n "$DATADIR" ]; then
   echo "DATADIR=/custom/.tezos-node" >> /etc/default/octez-node
 fi
 
-sudo systemctl start octez-node.service
-sudo systemctl status octez-node.service
-
-# give some time to the node to create the identity
-# otherwise the octez-client call below will give an error
-/usr/share/octez-baker/wait-for-node-up.sh
-
-sudo su tezos -c "octez-client gen keys alice"
-key=$(sudo su tezos -c "octez-client show address alice" | grep Hash: | awk '{ print $2 }')
-echo "BAKER_KEY=$key" >> /etc/default/octez-baker
-
-sudo systemctl enable octez-baker
-sudo systemctl start octez-baker.service
-
-sudo systemctl status octez-baker.service
-
-sudo systemctl status octez-baker.service
-
-sudo su tezos -c "octez-node config show"
-
-echo "-----------------------"
-cat /etc/default/octez-node
-
-echo "-----------------------"
-cat /etc/default/octez-baker
-
-echo "-----------------------"
-tail /var/log/tezos/node.log
-
-echo "-----------------------"
-for logfile in /var/log/tezos/baker-P*.log; do
-  tail "$logfile"
-done
+# This file include the systemd tests and diagnistic common
+# to both rpm and deb
+. scripts/packaging/tests/tests-systemd-common.inc.sh

@@ -14,6 +14,8 @@ COPY scripts/ci/systemd-entrypoint.sh /entrypoint.sh
 COPY scripts/ci/octez-packages-version.sh scripts/ci/octez-packages-version.sh
 #hadolint ignore=DL3045
 COPY script-inputs/active_protocol_versions_without_number script-inputs/active_protocol_versions_without_number
+#hadolint ignore=DL3045
+COPY scripts/packaging/tests/tests-systemd-common.inc.sh scripts/packaging/tests/tests-systemd-common.inc.sh
 RUN chown root:root /entrypoint.sh \
     && chmod 755 /entrypoint.sh \
     && chown root:root /etc/systemd/system/bash.service \
