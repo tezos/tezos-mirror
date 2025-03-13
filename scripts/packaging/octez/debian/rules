@@ -38,6 +38,7 @@ override_dh_installsystemd:
 	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-baker-next
 	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-accuser-next
 	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-accuser-active
+	dh_installsystemd -p octez-baker --no-start
 
 override_dh_installlogrotate:
 	dh_installlogrotate --package=octez-node

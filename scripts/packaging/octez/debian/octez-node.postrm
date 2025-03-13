@@ -26,6 +26,7 @@ purge)
   db_get octez-node/purge_warning || true
   case "$RET" in
   true)
+    $debsystemctl stop octez-node.service || true
     echo "Removing data and tezos user"
     rm -Rf "$DATADIR"
     deluser --quiet tezos || true
@@ -33,8 +34,8 @@ purge)
     rm -Rf /var/log/tezos
     ;;
   *)
+    $debsystemctl stop octez-node.service || true
     echo "Keep user and datadir while $1"
-    echo "User said $RET"
     ;;
   esac
   rm -Rf /run/octez-node

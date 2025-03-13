@@ -15,24 +15,6 @@ Description: The baker key to associate to this baker:
  can also be added later while configuring the baker.
 Type: string
 
-Template: octez-baker/baker-active-protocol
-Description: The active protocol associated to the baker:
- Bakers use the current protocol of mainnet/ghostnet for production/staging, respectively.
-Type: select
-Choices: ${choices}
-
-Template: octez-baker/baker-next-protocol
-Description: The next protocol associated to the baker upon activation:
- This is the next adopted mainnet protocol. Upon activation
- both the baker for the active protocol and the next protocol must be running
- at the same time. You can choose the value "none" if you don't know
- what to choose now.
- .
- After activation you can re-configure the package to stop the baker for the
- old protocol and mark the freshly activated protocol as active.
-Type: select
-Choices: ${choices}
-
 Template: octez-baker/dal-node
 Type: boolean
 Default: true

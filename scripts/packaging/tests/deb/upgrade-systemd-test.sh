@@ -67,17 +67,19 @@ sudo apt-get update
 # parameters as part of the octez-node package.
 sudo apt-get upgrade -y -o DPkg::options::="--force-overwrite" octez-baker
 
-sudo systemctl enable octez-node
-sudo systemctl enable octez-baker-active
-
 cat /etc/default/octez-node
 cat /etc/default/octez-baker-active
 
 sudo systemctl restart octez-node.service
 sudo systemctl status octez-node.service
 
-sudo systemctl restart octez-baker-active.service
+sudo systemctl enable octez-baker-active
+sudo systemctl restart octez-baker.service
+
+sudo systemctl status octez-baker.service
+
 sudo systemctl status octez-baker-active.service
+sudo systemctl status octez-baker-next.service
 
 ERR=0
 
