@@ -92,6 +92,15 @@ let threshold_keys_encoding =
        (req "public_key_hash" Signature.Bls.Public_key_hash.encoding)
        (req "secret_shares" (list threshold_secret_key_encoding)))
 
+type threshold_signature = {id : int; signature : Signature.Bls.t}
+
+let threshold_signature_encoding =
+  let open Data_encoding in
+  conv
+    (fun {id; signature} -> (id, signature))
+    (fun (id, signature) -> {id; signature})
+    (obj2 (req "id" int8) (req "signature" Signature.Bls.encoding))
+
 let check_public_key_with_proof pk proof =
   let msg =
     Data_encoding.Binary.to_bytes_exn
@@ -232,4 +241,32 @@ let commands () =
         in
         let*! () = cctxt#message "%a@." Data_encoding.Json.pp json in
         return_unit);
+    command
+      ~group
+      ~desc:"Threshold BLS signatures"
+      no_options
+      (prefixes ["threshold"; "bls"; "signatures"]
+      @@ Client_proto_args.json_encoded_param
+           ~name:"list of BLS identifiers with signatures"
+           ~desc:"list of BLS identifier (int) and B58 encoded BLS signature"
+           (Data_encoding.list threshold_signature_encoding)
+      @@ stop)
+      (fun () sigs (cctxt : #Protocol_client_context.full) ->
+        let open Lwt_result_syntax in
+        let* sigs =
+          List.map_es
+            (fun (s : threshold_signature) -> return (s.id, s.signature))
+            sigs
+        in
+        let threshold_signature = Signature.Bls.threshold_signature_opt sigs in
+        match threshold_signature with
+        | Some threshold_signature ->
+            let*! () =
+              cctxt#message
+                "%a"
+                Signature.pp
+                (Signature.Bls threshold_signature)
+            in
+            return_unit
+        | None -> cctxt#error "Failed to produce the threshold signature");
   ]
