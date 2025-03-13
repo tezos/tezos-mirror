@@ -31,8 +31,6 @@ type ('msg, 'peer, 'conn) t = {
   greylister : motive:string -> unit Lwt.t;
   messages : (int * 'msg) Lwt_pipe.Maybe_bounded.t;
   conn : ('msg P2p_message.t, 'conn) P2p_socket.t;
-  peer_info : (('msg, 'peer, 'conn) t, 'peer, 'conn) P2p_peer_state.Info.t;
-  point_info : ('msg, 'peer, 'conn) t P2p_point_state.Info.t option;
   negotiated_version : Network_version.t;
   mutable last_sent_swap_request : (Time.System.t * P2p_peer.Id.t) option;
   mutable wait_close : bool;
@@ -121,16 +119,18 @@ let shutdown t =
       let* () = Error_monad.cancel_with_exceptions t.canceler in
       w
 
-let write_swap_ack t point peer_id =
-  let result = P2p_socket.write_now t.conn (Swap_ack (point, peer_id)) in
+let write_swap_ack conn point peer_id =
+  let result =
+    P2p_socket.write_now conn (P2p_message.Swap_ack (point, peer_id))
+  in
   Prometheus.Counter.inc_one P2p_metrics.Messages.swap_ack_sent ;
   result
 
-let write_advertise t points =
-  if t.disable_peer_discovery then
+let write_advertise ~disable_peer_discovery conn points =
+  if disable_peer_discovery then
     Result_syntax.tzfail P2p_errors.Peer_discovery_disabled
   else
-    let result = P2p_socket.write_now t.conn (Advertise points) in
+    let result = P2p_socket.write_now conn (P2p_message.Advertise points) in
     Prometheus.Counter.inc_one P2p_metrics.Messages.advertise_sent ;
     result
 
@@ -145,8 +145,6 @@ let create ~conn ~point_info ~peer_info ~messages ~canceler ~greylister
   let t =
     {
       conn;
-      point_info;
-      peer_info;
       messages;
       canceler;
       greylister;
@@ -164,10 +162,10 @@ let create ~conn ~point_info ~peer_info ~messages ~canceler ~greylister
   let conn_info =
     P2p_answerer.
       {
-        peer_id = t.peer_info |> P2p_peer_state.Info.peer_id;
+        peer_id = peer_info |> P2p_peer_state.Info.peer_id;
         is_private = P2p_socket.private_node t.conn;
-        write_advertise = write_advertise t;
-        write_swap_ack = write_swap_ack t;
+        write_advertise = write_advertise ~disable_peer_discovery conn;
+        write_swap_ack = write_swap_ack conn;
         messages;
       }
   in
@@ -179,6 +177,8 @@ let create ~conn ~point_info ~peer_info ~messages ~canceler ~greylister
          ~run:(fun () -> worker_loop t (callback conn_info))
          ~cancel:(fun () -> Error_monad.cancel_with_exceptions t.canceler)) ;
   t
+
+let write_swap_ack t = write_swap_ack t.conn
 
 let pipe_exn_handler = function
   | Lwt_pipe.Closed -> Lwt_result_syntax.tzfail P2p_errors.Connection_closed
