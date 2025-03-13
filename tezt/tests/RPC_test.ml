@@ -349,7 +349,7 @@ let test_contracts _test_mode_tag protocol ?endpoint client =
   in
   unit
 
-let test_delegates_on_registered_alpha ~contracts ?endpoint client =
+let test_delegates_on_registered_alpha protocol ~contracts ?endpoint client =
   Log.info "Test implicit baker contract" ;
 
   let bootstrap = List.hd contracts in
@@ -388,6 +388,19 @@ let test_delegates_on_registered_alpha ~contracts ?endpoint client =
   let* _ =
     Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_delegate_voting_power bootstrap
+  in
+  let* _ =
+    Client.RPC.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_consensus_key bootstrap
+  in
+  let* _ =
+    if Protocol.(number protocol >= 023) then
+      let* _ =
+        Client.RPC.call ?endpoint ~hooks client
+        @@ RPC.get_chain_block_context_delegate_companion_key bootstrap
+      in
+      unit
+    else unit
   in
   unit
 
@@ -507,7 +520,7 @@ let test_delegates_on_registered_hangzhou ~contracts ?endpoint client =
   unit
 
 (* Test the delegates RPC with unregistered baker for Tenderbake protocols. *)
-let test_delegates_on_unregistered_alpha ~contracts ?endpoint client =
+let test_delegates_on_unregistered_alpha protocol ~contracts ?endpoint client =
   Log.info "Test with a PKH that is not a registered baker contract" ;
 
   let unregistered_baker = "tz1c5BVkpwCiaPHJBzyjg7UHpJEMPTYA1bHG" in
@@ -551,6 +564,19 @@ let test_delegates_on_unregistered_alpha ~contracts ?endpoint client =
   let* () =
     check_failure
     @@ RPC.get_chain_block_context_delegate_voting_power unregistered_baker
+  in
+  let* () =
+    check_failure
+    @@ RPC.get_chain_block_context_delegate_consensus_key unregistered_baker
+  in
+  let* () =
+    if Protocol.(number protocol >= 023) then
+      let* () =
+        check_failure
+        @@ RPC.get_chain_block_context_delegate_companion_key unregistered_baker
+      in
+      unit
+    else unit
   in
   unit
 
@@ -623,10 +649,12 @@ let get_contracts ?endpoint client =
   Lwt.return contracts
 
 (* Test the delegates RPC for the specified protocol. *)
-let test_delegates _test_mode_tag _protocol ?endpoint client =
+let test_delegates _test_mode_tag protocol ?endpoint client =
   let* contracts = get_contracts ?endpoint client in
-  let* () = test_delegates_on_registered_alpha ~contracts ?endpoint client in
-  test_delegates_on_unregistered_alpha ~contracts ?endpoint client
+  let* () =
+    test_delegates_on_registered_alpha protocol ~contracts ?endpoint client
+  in
+  test_delegates_on_unregistered_alpha protocol ~contracts ?endpoint client
 
 (* Test the adaptive issuance RPC. *)
 let test_adaptive_issuance _test_mode_tag (_ : Protocol.t) ?endpoint client =

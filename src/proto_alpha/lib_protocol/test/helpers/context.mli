@@ -319,6 +319,9 @@ module Delegate : sig
   val consensus_key :
     t -> public_key_hash -> Delegate_services.consensus_keys_info tzresult Lwt.t
 
+  val companion_key :
+    t -> public_key_hash -> Delegate_services.companion_keys_info tzresult Lwt.t
+
   val participation :
     t -> public_key_hash -> Delegate.For_RPC.participation_info tzresult Lwt.t
 

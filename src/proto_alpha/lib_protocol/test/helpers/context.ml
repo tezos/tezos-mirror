@@ -583,6 +583,8 @@ module Delegate = struct
 
   let consensus_key ctxt pkh = Delegate_services.consensus_key rpc_ctxt ctxt pkh
 
+  let companion_key ctxt pkh = Delegate_services.companion_key rpc_ctxt ctxt pkh
+
   let participation ctxt pkh = Delegate_services.participation rpc_ctxt ctxt pkh
 
   let dal_participation ctxt pkh =

@@ -103,6 +103,44 @@ let consensus_key_info_encoding =
                 consensus_key_encoding))
           []))
 
+type companion_key = {
+  companion_key_pkh : Bls.Public_key_hash.t;
+  companion_key_pk : Bls.Public_key.t;
+}
+
+let companion_key_encoding =
+  let open Data_encoding in
+  conv
+    (fun {companion_key_pkh; companion_key_pk} ->
+      (companion_key_pkh, companion_key_pk))
+    (fun (companion_key_pkh, companion_key_pk) ->
+      {companion_key_pkh; companion_key_pk})
+    (obj2
+       (req "pkh" Bls.Public_key_hash.encoding)
+       (req "pk" Bls.Public_key.encoding))
+
+type companion_keys_info = {
+  active_companion_key : companion_key option;
+  pending_companion_keys : (Cycle.t * companion_key) list;
+}
+
+let companion_key_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun {active_companion_key; pending_companion_keys} ->
+      (active_companion_key, pending_companion_keys))
+    (fun (active_companion_key, pending_companion_keys) ->
+      {active_companion_key; pending_companion_keys})
+    (obj2
+       (req "active" (option companion_key_encoding))
+       (dft
+          "pendings"
+          (list
+             (merge_objs
+                (obj1 (req "cycle" Cycle.encoding))
+                companion_key_encoding))
+          []))
+
 let participation_info_encoding =
   let open Data_encoding in
   conv
@@ -872,6 +910,15 @@ module S = struct
       ~output:consensus_key_info_encoding
       RPC_path.(path / "consensus_key")
 
+  let companion_key =
+    RPC_service.get_service
+      ~description:
+        "The active companion key (if set) for a given delegate and the \
+         pending companion keys."
+      ~query:RPC_query.empty
+      ~output:companion_key_info_encoding
+      RPC_path.(path / "companion_key")
+
   let participation =
     RPC_service.get_service
       ~description:
@@ -1006,6 +1053,28 @@ let consensus_key ctxt pkh =
       pendings
   in
   return {active = {consensus_key_pk; consensus_key_pkh}; pendings}
+
+let companion_key ctxt pkh =
+  let open Lwt_result_syntax in
+  let* {companion_pk = companion_key_pk; companion_pkh = companion_key_pkh; _} =
+    Delegate.Consensus_key.active_pubkey ctxt pkh
+  in
+  let* pending_companion_keys =
+    Delegate.Consensus_key.pending_companion_updates ctxt pkh
+  in
+  let pending_companion_keys =
+    List.map
+      (fun (cycle, companion_key_pkh, companion_key_pk) ->
+        (cycle, {companion_key_pk; companion_key_pkh}))
+      pending_companion_keys
+  in
+  let active_companion_key =
+    match (companion_key_pk, companion_key_pkh) with
+    | Some companion_key_pk, Some companion_key_pkh ->
+        Some {companion_key_pk; companion_key_pkh}
+    | _ -> None
+  in
+  return {active_companion_key; pending_companion_keys}
 
 let contract_stake ctxt ~delegator_contract ~delegate =
   let open Alpha_context in
@@ -1416,6 +1485,8 @@ let register () =
       Vote.get_delegate_info ctxt pkh) ;
   register1 ~chunked:false S.consensus_key (fun ctxt pkh () () ->
       consensus_key ctxt pkh) ;
+  register1 ~chunked:false S.companion_key (fun ctxt pkh () () ->
+      companion_key ctxt pkh) ;
   register1 ~chunked:false S.participation (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.For_RPC.participation_info ctxt pkh) ;
@@ -1509,6 +1580,9 @@ let voting_info ctxt block pkh =
 
 let consensus_key ctxt block pkh =
   RPC_context.make_call1 S.consensus_key ctxt block pkh () ()
+
+let companion_key ctxt block pkh =
+  RPC_context.make_call1 S.companion_key ctxt block pkh () ()
 
 let participation ctxt block pkh =
   RPC_context.make_call1 S.participation ctxt block pkh () ()

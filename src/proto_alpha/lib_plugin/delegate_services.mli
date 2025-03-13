@@ -56,6 +56,16 @@ type consensus_keys_info = {
   pendings : (Cycle.t * consensus_key) list;
 }
 
+type companion_key = {
+  companion_key_pkh : Bls.Public_key_hash.t;
+  companion_key_pk : Bls.Public_key.t;
+}
+
+type companion_keys_info = {
+  active_companion_key : companion_key option;
+  pending_companion_keys : (Cycle.t * companion_key) list;
+}
+
 type deposit_per_cycle = {cycle : Cycle.t; deposit : Tez.t}
 
 val deposit_per_cycle_encoding : deposit_per_cycle Data_encoding.t
@@ -165,6 +175,12 @@ val consensus_key :
   'a ->
   Signature.Public_key_hash.t ->
   consensus_keys_info shell_tzresult Lwt.t
+
+val companion_key :
+  'a #RPC_context.simple ->
+  'a ->
+  Signature.Public_key_hash.t ->
+  companion_keys_info shell_tzresult Lwt.t
 
 val participation :
   'a #RPC_context.simple ->
