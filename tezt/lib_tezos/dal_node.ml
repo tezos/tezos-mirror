@@ -258,7 +258,7 @@ let wait_for_ready dal_node =
       let promise, resolver = Lwt.task () in
       dal_node.persistent_state.pending_ready <-
         resolver :: dal_node.persistent_state.pending_ready ;
-      check_event dal_node "dal_node_is_ready.v0" promise
+      check_event dal_node "dal_is_ready.v0" promise
 
 let wait_for_connections node connections =
   let counter = ref 0 in
@@ -277,7 +277,7 @@ let wait_for_disconnection node ~peer_id =
       if JSON.(event |-> "peer" |> as_string) = peer_id then Some () else None)
 
 let handle_event dal_node {name; value = _; timestamp = _} =
-  match name with "dal_node_is_ready.v0" -> set_ready dal_node | _ -> ()
+  match name with "dal_is_ready.v0" -> set_ready dal_node | _ -> ()
 
 let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
     ?name ?color ?data_dir ?event_pipe ?(rpc_host = Constant.default_host)

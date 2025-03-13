@@ -214,12 +214,17 @@ module Simple : sig
         let inject =
           Internal_event.Simple.declare_2
             ~name: "inject"
+            ~section:["foo"; "bar"]
+            ~prefix_name_with_sections:false
             ~msg: "injected block {hash}"
             ("level", int)
             ("hash", string)
       ]
       You must declare events only once for a given name.
       Usually you should thus declare them as global variables.
+
+      A way to enforce name uniqueness is to set [prefix_name_with_sections] to [true]. 
+      In the example above, this would compute a new event name of the form "foo.bar.inject".
 
       There is one [declare_n] function for each number [n] of parameters.
       For instance, the above example uses [declare_2] because
@@ -276,6 +281,7 @@ module Simple : sig
   val declare_0 :
     ?alternative_color:alternative_color ->
     ?section:string list ->
+    ?prefix_name_with_section:bool ->
     name:string ->
     msg:string ->
     ?level:level ->
@@ -286,6 +292,7 @@ module Simple : sig
   val declare_1 :
     ?alternative_color:alternative_color ->
     ?section:string list ->
+    ?prefix_name_with_section:bool ->
     name:string ->
     msg:string ->
     ?level:level ->
@@ -297,6 +304,7 @@ module Simple : sig
   val declare_2 :
     ?alternative_color:alternative_color ->
     ?section:string list ->
+    ?prefix_name_with_section:bool ->
     name:string ->
     msg:string ->
     ?level:level ->
@@ -310,6 +318,7 @@ module Simple : sig
   val declare_3 :
     ?alternative_color:alternative_color ->
     ?section:string list ->
+    ?prefix_name_with_section:bool ->
     name:string ->
     msg:string ->
     ?level:level ->
@@ -325,6 +334,7 @@ module Simple : sig
   val declare_4 :
     ?alternative_color:alternative_color ->
     ?section:string list ->
+    ?prefix_name_with_section:bool ->
     name:string ->
     msg:string ->
     ?level:level ->
@@ -342,6 +352,7 @@ module Simple : sig
   val declare_5 :
     ?alternative_color:alternative_color ->
     ?section:string list ->
+    ?prefix_name_with_section:bool ->
     name:string ->
     msg:string ->
     ?level:level ->
@@ -361,6 +372,7 @@ module Simple : sig
   val declare_6 :
     ?alternative_color:alternative_color ->
     ?section:string list ->
+    ?prefix_name_with_section:bool ->
     name:string ->
     msg:string ->
     ?level:level ->
@@ -382,6 +394,7 @@ module Simple : sig
   val declare_7 :
     ?alternative_color:alternative_color ->
     ?section:string list ->
+    ?prefix_name_with_section:bool ->
     name:string ->
     msg:string ->
     ?level:level ->
@@ -405,6 +418,7 @@ module Simple : sig
   val declare_8 :
     ?alternative_color:alternative_color ->
     ?section:string list ->
+    ?prefix_name_with_section:bool ->
     name:string ->
     msg:string ->
     ?level:level ->
