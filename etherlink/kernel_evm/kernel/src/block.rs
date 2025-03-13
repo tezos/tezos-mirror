@@ -8,10 +8,9 @@
 use crate::apply::{
     apply_transaction, ExecutionInfo, ExecutionResult, Validity, WITHDRAWAL_OUTBOX_QUEUE,
 };
-use crate::block_storage;
 use crate::blueprint_storage::{
-    drop_blueprint, read_blueprint, store_current_block_header, BlockHeader,
-    BlueprintHeader, EVMBlockHeader,
+    drop_blueprint, read_blueprint, read_current_block_header,
+    store_current_block_header, BlockHeader, BlueprintHeader, EVMBlockHeader,
 };
 use crate::configuration::ConfigurationMode;
 use crate::configuration::Limits;
@@ -261,7 +260,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
         previous_timestamp,
         receipts_root,
         transactions_root,
-    ) = match block_storage::read_current(host).map(|block| block.into()) {
+    ) = match read_current_block_header(host) {
         Ok(BlockHeader {
             blueprint_header: BlueprintHeader { number, timestamp },
             evm_block_header:
