@@ -6678,6 +6678,7 @@ let test_reset =
     Evm_node.create
       ~mode:(Evm_node.mode sequencer)
       ~data_dir:(Evm_node.data_dir sequencer)
+      ?config_file:(Evm_node.config_file sequencer)
       ~rpc_port:(Evm_node.rpc_port sequencer)
       ?spawn_rpc:(Evm_node.spawn_rpc sequencer)
       (Sc_rollup_node.endpoint sc_rollup_node)
@@ -6687,6 +6688,7 @@ let test_reset =
     Evm_node.create
       ~mode:(Evm_node.mode observer)
       ~data_dir:(Evm_node.data_dir observer)
+      ?config_file:(Evm_node.config_file observer)
       ~rpc_port:(Evm_node.rpc_port observer)
       (Evm_node.endpoint sequencer)
   in
