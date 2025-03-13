@@ -512,58 +512,81 @@ module Handler = struct
                    index = slot_index
                    && Signature.Public_key_hash.equal delegate pkh)
       in
-      let*! () =
-        List.iter_s
-          (fun (_, delegate_opt, _attestation_op, dal_attestation_opt) ->
-            match delegate_opt with
-            | Some delegate
-              when Signature.Public_key_hash.Set.mem delegate attesters -> (
-                match dal_attestation_opt with
-                | None ->
-                    let in_committee =
-                      match
-                        Signature.Public_key_hash.Map.find delegate committee
-                      with
-                      | Some (_ :: _) -> true
-                      | _ -> false
-                    in
-                    if in_committee then
-                      Event.emit_warn_attester_not_dal_attesting
-                        ~attester:delegate
-                        ~attested_level:block_level
-                    else (* no assigned shards... *)
-                      Lwt.return_unit
-                | Some bitset ->
-                    List.iter_s
-                      (fun index ->
-                        if
-                          should_be_attested index
-                          && not (is_attested bitset index)
+      let check_attester delegate =
+        let attestation_opt =
+          List.find
+            (fun (_tb_slot, delegate_opt, _attestation_op, _dal_attestation_opt) ->
+              match delegate_opt with
+              | Some pkh -> Signature.Public_key_hash.equal delegate pkh
+              | None -> false)
+            attestations
+        in
+        match attestation_opt with
+        | None ->
+            Event.emit_warn_no_attestation
+              ~attester:delegate
+              ~attested_level:block_level
+        | Some (_tb_slot, _delegate_opt, _attestation_op, dal_attestation_opt)
+          -> (
+            match dal_attestation_opt with
+            | None ->
+                Event.emit_warn_attester_not_dal_attesting
+                  ~attester:delegate
+                  ~attested_level:block_level
+            | Some bitset ->
+                let attested, not_attested, not_attested_with_traps =
+                  List.fold_left
+                    (fun (attested, not_attested, not_attested_with_traps) index ->
+                      if should_be_attested index then
+                        if is_attested bitset index then
+                          ( index :: attested,
+                            not_attested,
+                            not_attested_with_traps )
+                        else if
+                          parameters.incentives_enable
+                          && contains_traps delegate index
                         then
-                          if
-                            parameters.incentives_enable
-                            && contains_traps delegate index
-                          then
-                            Event
-                            .emit_attester_did_not_attest_slot_because_of_traps
-                              ~attester:delegate
-                              ~slot_index:index
-                              ~attested_level:block_level
-                          else
-                            Event.emit_warn_attester_did_not_attest_slot
-                              ~attester:delegate
-                              ~slot_index:index
-                              ~attested_level:block_level
-                        else Lwt.return_unit)
-                      (0 -- (parameters.number_of_slots - 1)))
-            | None | Some _ ->
-                (* None = the receipt does not contain the delegate (which
-                   probably should not happen; if it can happen, we should use
-                   the Tenderbake slot instead)...
-                   Some _ = the delegate who signed the operation is not among
-                   the registered attesters *)
-                Lwt.return_unit)
-          attestations
+                          ( attested,
+                            not_attested,
+                            index :: not_attested_with_traps )
+                        else
+                          ( attested,
+                            index :: not_attested,
+                            not_attested_with_traps )
+                      else (attested, not_attested, not_attested_with_traps))
+                    ([], [], [])
+                    (parameters.number_of_slots - 1 --- 0)
+                in
+                let*! () =
+                  if attested <> [] then
+                    Event.emit_attester_attested
+                      ~attester:delegate
+                      ~attested_level:block_level
+                      ~slot_indexes:attested
+                  else Lwt.return_unit
+                in
+                let*! () =
+                  if not_attested <> [] then
+                    Event.emit_warn_attester_did_not_attest
+                      ~attester:delegate
+                      ~attested_level:block_level
+                      ~slot_indexes:not_attested
+                  else Lwt.return_unit
+                in
+                if not_attested_with_traps <> [] then
+                  Event.emit_attester_did_not_attest_because_of_traps
+                    ~attester:delegate
+                    ~attested_level:block_level
+                    ~slot_indexes:not_attested_with_traps
+                else Lwt.return_unit)
+      in
+      let*! () =
+        Signature.Public_key_hash.Set.iter_s
+          (fun delegate ->
+            if Signature.Public_key_hash.Map.mem delegate committee then
+              check_attester delegate
+            else Lwt.return_unit)
+          attesters
       in
       return_unit
 

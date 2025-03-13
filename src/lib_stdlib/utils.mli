@@ -26,6 +26,9 @@
 module Infix : sig
   (** Sequence: [i--j] is the sequence [i;i+1;...;j-1;j] *)
   val ( -- ) : int -> int -> int list
+
+  (** Sequence: [j---i] is the sequence [j;j-1;...;i+1;i] *)
+  val ( --- ) : int -> int -> int list
 end
 
 (** [cut ?copy size bytes] cut [bytes] the in a list of successive

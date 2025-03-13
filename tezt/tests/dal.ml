@@ -8824,10 +8824,10 @@ let test_producer_attester (_protocol : Protocol.t)
       ~error_msg:"Published slot was supposed to be attested.") ;
   unit
 
-(* Check if the [attester_did_not_attest_slot] warning is correctly emitted.
+(* Check if the [attester_did_not_attest] warning is correctly emitted.
    This test is a variation of [test_producer_attester] where an attestation
    not attesting the published DAL slot is injected. *)
-let test_attester_did_not_attest_slot (_protocol : Protocol.t)
+let test_attester_did_not_attest (_protocol : Protocol.t)
     (dal_params : Dal_common.Parameters.t) (_cryptobox : Cryptobox.t)
     (node : Node.t) (client : Client.t) (_dal_node : Dal_node.t) : unit Lwt.t =
   let log_step = init_logger () in
@@ -8850,7 +8850,7 @@ let test_attester_did_not_attest_slot (_protocol : Protocol.t)
     "We promise the attester_did_not_attest_slot will be emitted by the \
      [attester node]" ;
   let not_attested_by_bootstrap2_promise =
-    Dal_node.wait_for attester_node "attester_did_not_attest_slot.v0" (fun _ ->
+    Dal_node.wait_for attester_node "attester_did_not_attest.v0" (fun _ ->
         Some ())
   in
   log_step "The producer crafts a commitment and publish it" ;
@@ -10199,8 +10199,8 @@ let register ~protocols =
     ~attestation_threshold:1
     ~l1_history_mode:Default_with_refutation
     ~event_sections_levels:[("prevalidator", `Debug)]
-    "attetster_did_not_attest_slot warning is emitted"
-    test_attester_did_not_attest_slot
+    "attester_did_not_attest warning is emitted"
+    test_attester_did_not_attest
     protocols ;
   scenario_with_layer1_and_dal_nodes
     "baker registers profiles with dal node"
