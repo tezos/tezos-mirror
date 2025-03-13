@@ -124,6 +124,8 @@ module Consensus = struct
     | Aggregate_disabled
     | Aggregate_in_mempool
     | Aggregate_not_implemented
+    | Non_bls_key_in_aggregate
+    | Public_key_aggregation_failure
 
   let () =
     register_error_kind
@@ -382,7 +384,28 @@ module Consensus = struct
         Format.fprintf ppf "Aggregate operations are not implemented yet")
       Data_encoding.empty
       (function Aggregate_not_implemented -> Some () | _ -> None)
-      (fun () -> Aggregate_not_implemented)
+      (fun () -> Aggregate_not_implemented) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.non_bls_key_in_aggregate"
+      ~title:"Non BLS key in aggregate"
+      ~description:"Non Bls key in a consensus aggregate operation"
+      ~pp:(fun ppf () ->
+        Format.fprintf
+          ppf
+          "Ill-formed aggregation : a slot owner doesn't own a BLS key")
+      Data_encoding.empty
+      (function Non_bls_key_in_aggregate -> Some () | _ -> None)
+      (fun () -> Non_bls_key_in_aggregate) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.public_key_aggregation_failure"
+      ~title:"Public key aggregation failure"
+      ~description:"Public key aggregation failed"
+      ~pp:(fun ppf () -> Format.fprintf ppf "Public key aggregation failed")
+      Data_encoding.empty
+      (function Public_key_aggregation_failure -> Some () | _ -> None)
+      (fun () -> Public_key_aggregation_failure)
 end
 
 module Voting = struct

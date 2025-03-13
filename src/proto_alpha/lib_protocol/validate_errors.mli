@@ -82,6 +82,8 @@ module Consensus : sig
     | Aggregate_disabled
     | Aggregate_in_mempool
     | Aggregate_not_implemented
+    | Non_bls_key_in_aggregate
+    | Public_key_aggregation_failure
 end
 
 (** Errors that may arise while validating a voting operation. *)
