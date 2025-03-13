@@ -33,7 +33,7 @@
 let mock_conn ?(reader = Lwt_pipe.Maybe_bounded.create ())
     ?(writer = Lwt_pipe.Maybe_bounded.create ()) () =
   let open Lwt_result_syntax in
-  let+ socket =
+  let* socket =
     let* auth_connection =
       P2p_socket.Internal_for_tests.mock_authenticated_connection ()
     in
@@ -108,7 +108,7 @@ let check_message_consumption_without_peer_discovery () =
   let* () = P2p_conn.close ~reason:(User "end of the tests") conn in
 
   match res with
-  | Ok () -> unit
+  | Ok () -> Lwt.return_unit
   | Error [Timeout] ->
       Test.fail
         "Timeout reached. The message has not been processed. The connection \
