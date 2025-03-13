@@ -418,7 +418,8 @@ let warn_if_argv0_name_not_octez () =
         executable_name
 
 (* Main (lwt) entry *)
-let main (module C : M) ~select_commands ?cmd_args () =
+let main (module C : M) ~select_commands ?cmd_args ?(disable_logging = false) ()
+    =
   let open Lwt_result_syntax in
   let global_options = C.global_options () in
   let executable_name = Filename.basename Sys.executable_name in
@@ -475,36 +476,39 @@ let main (module C : M) ~select_commands ?cmd_args () =
                 | None -> C.default_base_dir
                 | Some p -> p.Client_config.Cfg_file.base_dir)
           in
-          let daily_logs_path =
-            C.default_daily_logs_path
-            |> Option.map
-                 Filename.Infix.(fun logdir -> base_dir // "logs" // logdir)
-          in
           let require_auth = parsed.Client_config.require_auth in
           let*! () =
-            let open Tezos_base_unix.Internal_event_unix in
-            (* Update config with color logging switch *)
-            let log_cfg =
-              match parsed_args with
-              | None -> Tezos_base_unix.Logs_simple_config.default_cfg
-              | Some parsed_args ->
-                  {
-                    Tezos_base_unix.Logs_simple_config.default_cfg with
-                    colors = Option.value parsed_args.log_coloring ~default:true;
-                  }
-            in
-            let config =
-              make_with_defaults
-                ?enable_default_daily_logs_at:daily_logs_path
-                ~log_cfg
-                ()
-            in
-            match parsed_config_file with
-            | None -> init ~config ()
-            | Some cf -> (
-                match cf.Client_config.Cfg_file.internal_events with
-                | None -> init ~config ()
-                | Some config -> init ~config ())
+            if disable_logging then Lwt.return_unit
+            else
+              let open Tezos_base_unix.Internal_event_unix in
+              let daily_logs_path =
+                C.default_daily_logs_path
+                |> Option.map
+                     Filename.Infix.(fun logdir -> base_dir // "logs" // logdir)
+              in
+              (* Update config with color logging switch *)
+              let log_cfg =
+                match parsed_args with
+                | None -> Tezos_base_unix.Logs_simple_config.default_cfg
+                | Some parsed_args ->
+                    {
+                      Tezos_base_unix.Logs_simple_config.default_cfg with
+                      colors =
+                        Option.value parsed_args.log_coloring ~default:true;
+                    }
+              in
+              let config =
+                make_with_defaults
+                  ?enable_default_daily_logs_at:daily_logs_path
+                  ~log_cfg
+                  ()
+              in
+              match parsed_config_file with
+              | None -> init ~config ()
+              | Some cf -> (
+                  match cf.Client_config.Cfg_file.internal_events with
+                  | None -> init ~config ()
+                  | Some config -> init ~config ())
           in
           let rpc_config =
             let rpc_config : RPC_client_unix.config =
@@ -633,7 +637,10 @@ let main (module C : M) ~select_commands ?cmd_args () =
   in
   Format.pp_print_flush Format.err_formatter () ;
   Format.pp_print_flush Format.std_formatter () ;
-  let*! () = Tezos_base_unix.Internal_event_unix.close () in
+  let*! () =
+    if disable_logging then Lwt.return_unit
+    else Tezos_base_unix.Internal_event_unix.close ()
+  in
   Lwt.return retcode
 
 (* Where all the user friendliness starts *)
@@ -650,7 +657,8 @@ let lwt_run (module M : M)
     ~(select_commands :
        RPC_client_unix.http_ctxt ->
        Client_config.cli_args ->
-       Client_context.full Tezos_clic.command list tzresult Lwt.t) ?cmd_args ()
-    =
+       Client_context.full Tezos_clic.command list tzresult Lwt.t) ?cmd_args
+    ?disable_logging () =
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
-  Lwt_exit.wrap_and_forward @@ main (module M) ~select_commands ?cmd_args ()
+  Lwt_exit.wrap_and_forward
+  @@ main (module M) ~select_commands ?cmd_args ?disable_logging ()
