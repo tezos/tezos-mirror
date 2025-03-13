@@ -46,3 +46,22 @@ module Chain_family = struct
 
   let pp fmt cf = Format.fprintf fmt "%s" (to_string cf)
 end
+
+type 'a block = Eth of 'a Ethereum_types.block
+
+let decode_block_hash ~chain_family bytes =
+  match chain_family with
+  | EVM -> Ethereum_types.decode_block_hash bytes
+  | Michelson -> raise (Invalid_argument "TODO tezos")
+
+let genesis_parent_hash ~chain_family =
+  match chain_family with
+  | EVM -> Ethereum_types.genesis_parent_hash
+  | Michelson -> raise (Invalid_argument "TODO tezos")
+
+let block_from_bytes ~chain_family bytes =
+  match chain_family with
+  | EVM ->
+      let eth_block = Ethereum_types.block_from_rlp bytes in
+      Eth eth_block
+  | Michelson -> raise (Invalid_argument "TODO tezos")

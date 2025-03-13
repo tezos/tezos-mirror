@@ -43,3 +43,15 @@ module Chain_family : sig
 
   val pp : Format.formatter -> chain_family -> unit
 end
+
+type 'a block = Eth of 'a Ethereum_types.block
+
+val decode_block_hash :
+  chain_family:chain_family -> bytes -> Ethereum_types.block_hash
+
+val genesis_parent_hash : chain_family:chain_family -> Ethereum_types.block_hash
+
+val block_from_bytes :
+  chain_family:chain_family ->
+  bytes ->
+  Ethereum_types.legacy_transaction_object block
