@@ -48,31 +48,31 @@ let normalize_addr str =
   | Some str -> str
   | None -> str
 
-let interpolate str (vars : (char * [`Available of string | `Disabled]) list) =
+let interpolate str
+    (vars : (char * [`Available of string | `Disabled of string]) list) =
+  let open Result_syntax in
   let vars = ('%', `Available "%") :: vars in
   let buf = Buffer.create (String.length str) in
-  let look =
-    String.fold_left
-      (fun look c ->
-        if look then
-          match List.assoc_opt ~equal:( = ) c vars with
-          | Some (`Available substitute) ->
-              Buffer.add_string buf substitute ;
-              false
-          | Some `Disabled ->
-              raise
-                (Invalid_argument
-                   Format.(sprintf "interpolate: %%%c is disabled" c))
-          | None -> raise (Invalid_argument "interpolate")
-        else if c = '%' then true
-        else (
-          Buffer.add_char buf c ;
-          false))
-      false
-      str
+  let* look =
+    String.to_seq str
+    |> Seq.E.fold_left
+         (fun look c ->
+           if look then
+             match List.assoc_opt ~equal:( = ) c vars with
+             | Some (`Available substitute) ->
+                 Buffer.add_string buf substitute ;
+                 return false
+             | Some (`Disabled reason) ->
+                 error_with "Cannot use %%%c in this context (%s)" c reason
+             | None -> error_with "%%%c is not a valid variable" c
+           else if c = '%' then return true
+           else (
+             Buffer.add_char buf c ;
+             return false))
+         false
   in
-  assert (not look) ;
-  Buffer.contents buf
+  if not look then return (Buffer.contents buf)
+  else error_with "Trailing %% are not supported"
 
 let rec download_file ~keep_alive ~working_dir url =
   let open Lwt_syntax in
