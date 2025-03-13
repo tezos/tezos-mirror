@@ -102,7 +102,6 @@ let () =
       bls12_381_archive;
       bls12_381;
       tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
-      Octez.tezt_riscv_sandbox;
       tezt_tx_kernel;
       Data_encoding.data_encoding;
       octez_base;

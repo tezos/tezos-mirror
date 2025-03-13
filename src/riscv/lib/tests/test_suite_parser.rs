@@ -201,7 +201,7 @@ fn should_skip_rv_test(file: &DirEntry) -> bool {
 
 #[test]
 fn parser_riscv_test_suite() {
-    let tests_dir = "../../../tezt/tests/riscv-tests/generated/";
+    let tests_dir = "../assets/generated";
 
     for f in std::fs::read_dir(tests_dir).unwrap() {
         let file = f.unwrap();

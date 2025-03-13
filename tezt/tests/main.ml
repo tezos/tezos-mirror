@@ -63,8 +63,7 @@ let register_protocol_independent_tests () =
   Scheduled_pipeline_check.register_protocol_independent () ;
   Snoop_codegen.register_protocol_independent () ;
   Snoop_protocol_codegen.register_protocol_independent () ;
-  Sc_rollup.register_protocol_independent () ;
-  Riscv_sandbox.register ()
+  Sc_rollup.register_protocol_independent ()
 
 (* Tests related to protocol migration. *)
 let register_protocol_migration_tests () =

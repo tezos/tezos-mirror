@@ -23,7 +23,7 @@ use octez_riscv::stepper::test::TestStepper;
 use octez_riscv::stepper::test::TestStepperResult::*;
 use paste::paste;
 
-const TESTS_DIR: &str = "../../../tezt/tests/riscv-tests/generated";
+const TESTS_DIR: &str = "../assets/generated";
 const GOLDEN_DIR: &str = "tests/expected";
 const MAX_STEPS: usize = 1_000_000;
 

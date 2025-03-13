@@ -161,7 +161,6 @@ tezos_internal_brassaia_tests: brassaia/test, brassaia/test/brassaia, brassaia/t
 tezos_internal_irmin_tests: irmin/test, irmin/test/irmin, irmin/test/irmin-mem, irmin/test/irmin-pack, irmin/test/irmin-tezos, irmin/test/irmin/data, irmin/test/irmin/generic-key
 tezt-cloud: tezt/lib_cloud
 tezt-etherlink: etherlink/tezt/lib, etherlink/tezt/tests
-tezt-riscv-sandbox: tezt/lib_riscv_sandbox
 tezt-tests-cloud: tezt/tests/cloud
 tezt-tezos: tezt/lib_performance_regression, tezt/lib_tezos, tezt/self_tests
 tezt-tx-kernel: tezt/lib_tx_kernel

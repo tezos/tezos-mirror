@@ -26,7 +26,6 @@ NIGHTLY_VERSION = nightly-2025-01-30
 build: riscv-dummy.elf riscv-dummy-sdk.elf riscv-sandbox
 	@cargo build --release --workspace $(NATIVE_OPT)
 	@make -C jstz build
-	@make -C tests build
 
 .PHONY: riscv-sandbox
 riscv-sandbox::
@@ -116,7 +115,6 @@ check:
 	@make -C supervised_dummy_kernel check
 	@make -C dummy_sdk_kernel check
 	@make -C jstz check
-	@make -C tests check
 
 .PHONY: audit
 audit:
@@ -135,5 +133,4 @@ clean:
 	@make -C supervised_dummy_kernel clean
 	@make -C dummy_sdk_kernel clean
 	@make -C jstz clean
-	@make -C tests clean
 	@rm -f riscv-sandbox riscv-dummy.elf riscv-dummy-sdk.elf

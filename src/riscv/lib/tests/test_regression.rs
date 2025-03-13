@@ -5,6 +5,8 @@
 use std::fs;
 use std::io::Write;
 use std::ops::Bound;
+use std::path::Path;
+use std::path::PathBuf;
 
 use octez_riscv::jit::JIT;
 use octez_riscv::machine_state::DefaultCacheLayouts;
@@ -20,8 +22,6 @@ use octez_riscv::stepper::StepperStatus;
 use octez_riscv::stepper::pvm::PvmStepper;
 use tezos_smart_rollup_utils::inbox::InboxBuilder;
 
-const GOLDEN_DIR: &str = "tests/expected/jstz";
-
 fn capture_debug_log(mint: &mut goldenfile::Mint) -> PvmHooks<'_> {
     let mut log_capture = mint.new_goldenfile("log").unwrap();
     let hooks = PvmHooks::new(move |c| log_capture.write_all(&[c]).unwrap());
@@ -29,35 +29,95 @@ fn capture_debug_log(mint: &mut goldenfile::Mint) -> PvmHooks<'_> {
 }
 
 #[test]
-fn test_jstz_regression_interpreted() {
-    let block_builder = InterpretedBlockBuilder;
-    test_jstz_regression::<Interpreted<M64M, Owned>>(block_builder);
+fn regression_frozen_jstz() {
+    test_regression(
+        "tests/expected/jstz",
+        "../assets/jstz",
+        "../assets/regression-inbox.json",
+        true,
+    )
 }
 
 #[test]
-fn test_jstz_regression_inline_jit() {
-    let block_buider = (JIT::<M64M, Owned>::new().unwrap(), InterpretedBlockBuilder);
-    test_jstz_regression::<InlineJit<_, _>>(block_buider)
+fn regression_frozen_dummy_kernel() {
+    test_regression(
+        "tests/expected/dummy",
+        "../assets/riscv-dummy.elf",
+        "../assets/dummy-kernel-inbox.json",
+        true,
+    )
 }
 
-fn test_jstz_regression<B: Block<M64M, Owned>>(block_builder: B::BlockBuilder) {
-    let mut mint = goldenfile::Mint::new(GOLDEN_DIR);
+#[test]
+fn regression_dummy_kernel() {
+    test_regression(
+        "tests/expected/dummy_volatile",
+        "../riscv-dummy.elf",
+        "../assets/dummy-kernel-inbox.json",
+        false,
+    )
+}
+
+#[test]
+fn regression_dummy_sdk_kernel() {
+    test_regression(
+        "tests/expected/dummy_sdk_volatile",
+        "../riscv-dummy-sdk.elf",
+        "../assets/dummy-kernel-inbox.json",
+        false,
+    )
+}
+
+fn test_regression(
+    golden_dir: impl AsRef<Path>,
+    kernel_path: impl AsRef<Path>,
+    inbox_path: impl AsRef<Path>,
+    capture_volatile_properties: bool,
+) {
+    test_regression_for_block::<Interpreted<M64M, Owned>>(
+        InterpretedBlockBuilder,
+        &golden_dir,
+        &kernel_path,
+        &inbox_path,
+        capture_volatile_properties,
+    );
+
+    // This needs to run *after* the previous interpreted test. Otherwise, we run into trouble when
+    // checking and updating the golden files.
+    test_regression_for_block::<InlineJit<_, _>>(
+        (JIT::<M64M, Owned>::new().unwrap(), InterpretedBlockBuilder),
+        golden_dir,
+        kernel_path,
+        inbox_path,
+        capture_volatile_properties,
+    );
+}
+
+fn test_regression_for_block<B: Block<M64M, Owned>>(
+    block_builder: B::BlockBuilder,
+    golden_dir: impl AsRef<Path>,
+    kernel_path: impl AsRef<Path>,
+    inbox_path: impl AsRef<Path>,
+    capture_volatile_properties: bool,
+) {
+    let mut mint = goldenfile::Mint::new(golden_dir);
 
     let (result, initial_hash, final_hash) = {
         let boot_program = fs::read("../assets/hermit-loader").unwrap();
-        let main_program = fs::read("../assets/jstz").unwrap();
+        let main_program = fs::read(kernel_path).unwrap();
 
         let inbox = {
             let mut inbox = InboxBuilder::new();
-            inbox
-                .load_from_file("../assets/regression-inbox.json")
-                .unwrap();
+            inbox.load_from_file(inbox_path).unwrap();
             inbox.build()
         };
 
         let hooks = capture_debug_log(&mut mint);
 
-        const ROLLUP_ADDRESS: [u8; 20] = [0; 20];
+        const ROLLUP_ADDRESS: [u8; 20] = [
+            244, 228, 124, 179, 196, 58, 104, 176, 212, 142, 48, 148, 9, 44, 164, 45, 113, 58, 221,
+            181,
+        ];
         const ORIGINATION_LEVEL: u32 = 1;
 
         let mut stepper = PvmStepper::<'_, M64M, DefaultCacheLayouts, Owned, B>::new(
@@ -67,7 +127,7 @@ fn test_jstz_regression<B: Block<M64M, Owned>>(block_builder: B::BlockBuilder) {
             hooks,
             ROLLUP_ADDRESS,
             ORIGINATION_LEVEL,
-            None,
+            Some(PathBuf::from("../assets/preimages").into_boxed_path()),
             block_builder,
         )
         .unwrap();
@@ -80,14 +140,19 @@ fn test_jstz_regression<B: Block<M64M, Owned>>(block_builder: B::BlockBuilder) {
         (result, initial_hash, final_hash)
     };
 
-    assert!(matches!(result, StepperStatus::Exited { .. }));
+    assert!(
+        matches!(result, StepperStatus::Exited { .. }),
+        "Unexpected result: {result:?}"
+    );
 
-    let mut initial_hash_capture = mint.new_goldenfile("state_hash_initial").unwrap();
-    writeln!(initial_hash_capture, "{initial_hash:?}").unwrap();
+    if capture_volatile_properties {
+        let mut initial_hash_capture = mint.new_goldenfile("state_hash_initial").unwrap();
+        writeln!(initial_hash_capture, "{initial_hash:?}").unwrap();
 
-    let mut result_capture = mint.new_goldenfile("result").unwrap();
-    writeln!(result_capture, "{result:#?}").unwrap();
+        let mut result_capture = mint.new_goldenfile("result").unwrap();
+        writeln!(result_capture, "{result:#?}").unwrap();
 
-    let mut final_hash_capture = mint.new_goldenfile("state_hash_final").unwrap();
-    writeln!(final_hash_capture, "{final_hash:?}").unwrap();
+        let mut final_hash_capture = mint.new_goldenfile("state_hash_final").unwrap();
+        writeln!(final_hash_capture, "{final_hash:?}").unwrap();
+    }
 }

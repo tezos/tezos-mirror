@@ -31,7 +31,7 @@ done < <(cargo test -- test_suite_rv64 2> /dev/null | grep 'test_suite_rv64')
 # Collect all 'passing' instructions
 echo "[INFO]: collecting tested instructions"
 
-generated_path=${top_level}/tezt/tests/riscv-tests/generated
+generated_path=${top_level}/src/riscv/assets/generated
 
 declare -A working
 
