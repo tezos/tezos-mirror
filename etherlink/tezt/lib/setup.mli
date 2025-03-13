@@ -16,6 +16,21 @@ type l1_contracts = {
   ticket_router_tester : string;
 }
 
+type multichain_sequencer_setup = {
+  node : Node.t;
+  client : Client.t;
+  sc_rollup_address : string;
+  sc_rollup_node : Sc_rollup_node.t;
+  observers : Evm_node.t list;
+  sequencer : Evm_node.t;
+  proxys : Evm_node.t list;
+  l1_contracts : l1_contracts;
+  boot_sector : string;
+  kernel : Uses.t;
+  enable_dal : bool;
+  enable_multichain : bool;
+}
+
 type sequencer_setup = {
   node : Node.t;
   client : Client.t;
@@ -99,6 +114,54 @@ val register_test :
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
+  title:string ->
+  tags:string list ->
+  Protocol.t list ->
+  unit
+
+val register_multichain_test :
+  __FILE__:string ->
+  ?max_delayed_inbox_blueprint_length:int ->
+  ?sequencer_rpc_port:int ->
+  ?sequencer_private_rpc_port:int ->
+  ?genesis_timestamp:Client.timestamp ->
+  ?time_between_blocks:Evm_node.time_between_blocks ->
+  ?max_blueprints_lag:int ->
+  ?max_blueprints_ahead:int ->
+  ?max_blueprints_catchup:int ->
+  ?catchup_cooldown:int ->
+  ?delayed_inbox_timeout:int ->
+  ?delayed_inbox_min_levels:int ->
+  ?max_number_of_chunks:int ->
+  ?bootstrap_accounts:string list ->
+  ?sequencer:Account.key ->
+  ?sequencer_pool_address:string ->
+  kernel:Kernel.t ->
+  ?da_fee:Wei.t ->
+  ?minimum_base_fee_per_gas:Wei.t ->
+  ?preimages_dir:string ->
+  ?maximum_allowed_ticks:int64 ->
+  ?maximum_gas_per_transaction:int64 ->
+  ?max_blueprint_lookahead_in_seconds:int64 ->
+  ?enable_fa_bridge:bool ->
+  ?enable_fast_withdrawal:bool ->
+  ?commitment_period:int ->
+  ?challenge_window:int ->
+  ?threshold_encryption:bool ->
+  ?uses:(Protocol.t -> Uses.t list) ->
+  ?additional_uses:Uses.t list ->
+  ?rollup_history_mode:Sc_rollup_node.history_mode ->
+  enable_dal:bool ->
+  ?dal_slots:int list option ->
+  enable_multichain:bool ->
+  number_of_chains:int ->
+  ?rpc_server:Evm_node.rpc_server ->
+  ?websockets:bool ->
+  ?history_mode:Evm_node.history_mode ->
+  ?enable_tx_queue:bool ->
+  ?spawn_rpc:int ->
+  ?periodic_snapshot_path:string ->
+  (multichain_sequencer_setup -> Protocol.t -> unit Lwt.t) ->
   title:string ->
   tags:string list ->
   Protocol.t list ->

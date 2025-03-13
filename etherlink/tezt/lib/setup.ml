@@ -3,7 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -17,6 +17,21 @@ type l1_contracts = {
   admin : string;
   sequencer_governance : string;
   ticket_router_tester : string;
+}
+
+type multichain_sequencer_setup = {
+  node : Node.t;
+  client : Client.t;
+  sc_rollup_address : string;
+  sc_rollup_node : Sc_rollup_node.t;
+  observers : Evm_node.t list;
+  sequencer : Evm_node.t;
+  proxys : Evm_node.t list;
+  l1_contracts : l1_contracts;
+  boot_sector : string;
+  kernel : Uses.t;
+  enable_dal : bool;
+  enable_multichain : bool;
 }
 
 type sequencer_setup = {
@@ -33,6 +48,47 @@ type sequencer_setup = {
   enable_dal : bool;
   enable_multichain : bool;
 }
+
+type l2_setup = {
+  l2_chain_id : int;
+  world_state_path : string option;
+  bootstrap_accounts : string list option;
+  sequencer_pool_address : string option;
+  minimum_base_fee_per_gas : Wei.t option;
+  da_fee_per_byte : Wei.t option;
+  maximum_gas_per_transaction : int64 option;
+}
+
+let default_l2_setup ~l2_chain_id =
+  {
+    l2_chain_id;
+    world_state_path = None;
+    bootstrap_accounts = None;
+    sequencer_pool_address = None;
+    minimum_base_fee_per_gas = None;
+    da_fee_per_byte = None;
+    maximum_gas_per_transaction = None;
+  }
+
+let multichain_setup_to_single ~(setup : multichain_sequencer_setup) =
+  let observer =
+    match setup.observers with [observer] -> observer | _ -> assert false
+  in
+  let proxy = match setup.proxys with [proxy] -> proxy | _ -> assert false in
+  {
+    node = setup.node;
+    client = setup.client;
+    sc_rollup_address = setup.sc_rollup_address;
+    sc_rollup_node = setup.sc_rollup_node;
+    observer;
+    sequencer = setup.sequencer;
+    proxy;
+    l1_contracts = setup.l1_contracts;
+    boot_sector = setup.boot_sector;
+    kernel = setup.kernel;
+    enable_dal = setup.enable_dal;
+    enable_multichain = setup.enable_multichain;
+  }
 
 let uses _protocol =
   [
@@ -187,24 +243,165 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
   in
   return observer
 
-let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
-    ?sequencer_rpc_port ?sequencer_private_rpc_port ~mainnet_compat
-    ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
-    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
-    ?commitment_period ?challenge_window
+let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
+    ~mainnet_compat ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?(bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
-        (Array.to_list Eth_account.bootstrap_accounts))
-    ?(sequencer = Constant.bootstrap1) ?sequencer_pool_address
-    ?(kernel = Constant.WASM.evm_kernel) ?da_fee ?minimum_base_fee_per_gas
-    ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
+        (Array.to_list Eth_account.bootstrap_accounts)) ?sequencer_pool_address
+    ?da_fee_per_byte ?minimum_base_fee_per_gas ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
+    ?enable_fa_bridge ?enable_fast_withdrawal ~enable_dal ?dal_slots ~sequencer
+    ~preimages_dir ~kernel () =
+  let output_config = Temp.file "config.yaml" in
+  let*! () =
+    Evm_node.make_kernel_installer_config
+      ?max_delayed_inbox_blueprint_length
+      ~mainnet_compat
+      ~sequencer
+      ~delayed_bridge:l1_contracts.delayed_transaction_bridge
+      ~ticketer:l1_contracts.exchanger
+      ~administrator:l1_contracts.admin
+      ~sequencer_governance:l1_contracts.sequencer_governance
+      ?minimum_base_fee_per_gas
+      ?da_fee_per_byte
+      ?delayed_inbox_timeout
+      ?delayed_inbox_min_levels
+      ?sequencer_pool_address
+      ?maximum_allowed_ticks
+      ?maximum_gas_per_transaction
+      ~enable_dal
+      ?enable_fast_withdrawal
+      ?dal_slots
+      ~enable_multichain:false
+      ?max_blueprint_lookahead_in_seconds
+      ~bootstrap_accounts
+      ~output:output_config
+      ?enable_fa_bridge
+      ()
+  in
+  let* {output; _} =
+    prepare_installer_kernel ~preimages_dir ~config:(`Path output_config) kernel
+  in
+  return output
+
+let generate_l2_kernel_config l2_setup =
+  let l2_config =
+    Temp.file (Format.sprintf "l2-%d-config.yaml" l2_setup.l2_chain_id)
+  in
+  let*! () =
+    Evm_node.make_l2_kernel_installer_config
+      ~chain_id:l2_setup.l2_chain_id
+      ?maximum_gas_per_transaction:l2_setup.maximum_gas_per_transaction
+      ?sequencer_pool_address:l2_setup.sequencer_pool_address
+      ?minimum_base_fee_per_gas:l2_setup.minimum_base_fee_per_gas
+      ?da_fee_per_byte:l2_setup.da_fee_per_byte
+      ?bootstrap_accounts:l2_setup.bootstrap_accounts
+      ?world_state_path:l2_setup.world_state_path
+      ~output:l2_config
+      ()
+  in
+  return l2_config
+
+let setup_kernel_multichain ~l2_setups ~l1_contracts
+    ?max_delayed_inbox_blueprint_length ~mainnet_compat ?delayed_inbox_timeout
+    ?delayed_inbox_min_levels ?maximum_allowed_ticks
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
+    ?enable_fast_withdrawal ~enable_dal ?dal_slots ~sequencer ~preimages_dir
+    ~kernel () =
+  let l2_chain_ids = List.map (fun l2 -> l2.l2_chain_id) l2_setups in
+  let* l2_configs = Lwt_list.map_s generate_l2_kernel_config l2_setups in
+  let rollup_config = Temp.file "rollup-config.yaml" in
+  let*! () =
+    Evm_node.make_kernel_installer_config
+      ~l2_chain_ids
+      ?max_delayed_inbox_blueprint_length
+      ~mainnet_compat
+      ~sequencer
+      ~delayed_bridge:l1_contracts.delayed_transaction_bridge
+      ~ticketer:l1_contracts.exchanger
+      ~administrator:l1_contracts.admin
+      ~sequencer_governance:l1_contracts.sequencer_governance
+      ?delayed_inbox_timeout
+      ?delayed_inbox_min_levels
+      ?maximum_allowed_ticks
+      ~enable_dal
+      ?enable_fast_withdrawal
+      ?dal_slots
+      ~enable_multichain:true
+      ?max_blueprint_lookahead_in_seconds
+      ~output:rollup_config
+      ?enable_fa_bridge
+      ()
+  in
+  let* {output; _} =
+    prepare_installer_kernel_with_multiple_setup_file
+      ~preimages_dir
+      ~configs:(rollup_config :: l2_configs)
+      (Uses.path kernel)
+  in
+  return output
+
+let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
+    ?max_delayed_inbox_blueprint_length ~mainnet_compat ~sequencer
+    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?maximum_allowed_ticks
+    ~enable_dal ?enable_fast_withdrawal ?dal_slots
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ~preimages_dir ~kernel
+    () =
+  if not enable_multichain then (
+    assert (List.length l2_chains = 1) ;
+    let chain_config = List.hd l2_chains in
+    setup_kernel_singlechain
+      ~l1_contracts
+      ?max_delayed_inbox_blueprint_length
+      ~mainnet_compat
+      ~sequencer:sequencer.Account.public_key
+      ?minimum_base_fee_per_gas:chain_config.minimum_base_fee_per_gas
+      ?da_fee_per_byte:chain_config.da_fee_per_byte
+      ?delayed_inbox_timeout
+      ?delayed_inbox_min_levels
+      ?sequencer_pool_address:chain_config.sequencer_pool_address
+      ?maximum_allowed_ticks
+      ?maximum_gas_per_transaction:chain_config.maximum_gas_per_transaction
+      ~enable_dal
+      ?enable_fast_withdrawal
+      ?dal_slots
+      ?max_blueprint_lookahead_in_seconds
+      ?bootstrap_accounts:chain_config.bootstrap_accounts
+      ?enable_fa_bridge
+      ~preimages_dir
+      ~kernel
+      ())
+  else
+    setup_kernel_multichain
+      ~l2_setups:l2_chains
+      ~l1_contracts
+      ?max_delayed_inbox_blueprint_length
+      ~mainnet_compat
+      ~sequencer:sequencer.Account.public_key
+      ?delayed_inbox_timeout
+      ?delayed_inbox_min_levels
+      ?maximum_allowed_ticks
+      ~enable_dal
+      ?enable_fast_withdrawal
+      ?dal_slots
+      ?max_blueprint_lookahead_in_seconds
+      ~preimages_dir
+      ~kernel
+      ()
+
+let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
+    ?next_wasm_runtime ?sequencer_rpc_port ?sequencer_private_rpc_port
+    ~mainnet_compat ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
+    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
+    ?commitment_period ?challenge_window ?(sequencer = Constant.bootstrap1)
+    ?(kernel = Constant.WASM.evm_kernel) ?preimages_dir ?maximum_allowed_ticks
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?enable_fast_withdrawal ?(threshold_encryption = false)
     ?(drop_duplicate_when_injection = true)
     ?(blueprints_publisher_order_enabled = true) ?rollup_history_mode
-    ~enable_dal ?dal_slots ~enable_multichain ?rpc_server ?websockets
+    ~enable_dal ?dal_slots ~enable_multichain ~l2_chains ?rpc_server ?websockets
     ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path protocol =
   let* node, client =
     setup_l1
@@ -239,35 +436,25 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ~default:(Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0")
       preimages_dir
   in
-  let output_config = Temp.file "config.yaml" in
-  let*! () =
-    Evm_node.make_kernel_installer_config
+  let* output =
+    setup_kernel
+      ~l1_contracts
       ?max_delayed_inbox_blueprint_length
       ~mainnet_compat
-      ~sequencer:sequencer.public_key
-      ~delayed_bridge:l1_contracts.delayed_transaction_bridge
-      ~ticketer:l1_contracts.exchanger
-      ~administrator:l1_contracts.admin
-      ~sequencer_governance:l1_contracts.sequencer_governance
-      ?minimum_base_fee_per_gas
-      ?da_fee_per_byte:da_fee
+      ~sequencer
       ?delayed_inbox_timeout
       ?delayed_inbox_min_levels
-      ?sequencer_pool_address
       ?maximum_allowed_ticks
-      ?maximum_gas_per_transaction
       ~enable_dal
       ?enable_fast_withdrawal
       ?dal_slots
       ~enable_multichain
+      ~l2_chains
       ?max_blueprint_lookahead_in_seconds
-      ~bootstrap_accounts
-      ~output:output_config
       ?enable_fa_bridge
+      ~preimages_dir
+      ~kernel
       ()
-  in
-  let* {output; _} =
-    prepare_installer_kernel ~preimages_dir ~config:(`Path output_config) kernel
   in
   let* sc_rollup_address =
     originate_sc_rollup
@@ -364,28 +551,34 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ?spawn_rpc
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
-  let* observer =
-    run_new_observer_node
-      ~patch_config:obs_patch_config
-      ~sc_rollup_node
-      ?rpc_server
-      ?websockets
-      ?history_mode
-      sequencer
+  let* observers =
+    Lwt_list.map_s
+      (fun _l2 ->
+        run_new_observer_node
+          ~patch_config:obs_patch_config
+          ~sc_rollup_node
+          ?rpc_server
+          ?websockets
+          ?history_mode
+          sequencer)
+      l2_chains
   in
-  let* proxy =
-    Evm_node.init
-      ~patch_config:obs_patch_config
-      ~mode:Proxy
-      (Sc_rollup_node.endpoint sc_rollup_node)
+  let* proxys =
+    Lwt_list.map_s
+      (fun _l2 ->
+        Evm_node.init
+          ~patch_config:obs_patch_config
+          ~mode:Proxy
+          (Sc_rollup_node.endpoint sc_rollup_node))
+      l2_chains
   in
   return
     {
       node;
       client;
       sequencer;
-      proxy;
-      observer;
+      proxys;
+      observers;
       l1_contracts;
       sc_rollup_address;
       sc_rollup_node;
@@ -395,8 +588,76 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       enable_multichain;
     }
 
-(* Register a single variant of a test but for all protocols. *)
-let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
+let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
+    ?sequencer_rpc_port ?sequencer_private_rpc_port ~mainnet_compat
+    ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
+    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
+    ?commitment_period ?challenge_window ?bootstrap_accounts ?sequencer
+    ?sequencer_pool_address ?kernel ?da_fee ?minimum_base_fee_per_gas
+    ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
+    ?enable_fast_withdrawal ?threshold_encryption ?drop_duplicate_when_injection
+    ?blueprints_publisher_order_enabled ?rollup_history_mode ~enable_dal
+    ?dal_slots ~enable_multichain ?rpc_server ?websockets ?history_mode
+    ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path protocol =
+  (* Note that the chain_id is not important (it will become important later) *)
+  let l2_chains =
+    [
+      {
+        (default_l2_setup ~l2_chain_id:1) with
+        sequencer_pool_address;
+        bootstrap_accounts;
+        da_fee_per_byte = da_fee;
+        minimum_base_fee_per_gas;
+        maximum_gas_per_transaction;
+      };
+    ]
+  in
+  let* sequencer_setup =
+    setup_sequencer_internal
+      ?max_delayed_inbox_blueprint_length
+      ?next_wasm_runtime
+      ?sequencer_rpc_port
+      ?sequencer_private_rpc_port
+      ~mainnet_compat
+      ?commitment_period
+      ?challenge_window
+      ?genesis_timestamp
+      ?time_between_blocks
+      ?max_blueprints_lag
+      ?max_blueprints_ahead
+      ?max_blueprints_catchup
+      ?catchup_cooldown
+      ?delayed_inbox_timeout
+      ?delayed_inbox_min_levels
+      ?max_number_of_chunks
+      ?sequencer
+      ?kernel
+      ?preimages_dir
+      ?maximum_allowed_ticks
+      ?max_blueprint_lookahead_in_seconds
+      ?enable_fa_bridge
+      ?enable_fast_withdrawal
+      ?blueprints_publisher_order_enabled
+      ?drop_duplicate_when_injection
+      ?threshold_encryption
+      ?rollup_history_mode
+      ?websockets
+      ?history_mode
+      ~enable_dal
+      ?dal_slots
+      ~enable_multichain
+      ~l2_chains
+      ?rpc_server
+      ?enable_tx_queue
+      ?spawn_rpc
+      ?periodic_snapshot_path
+      protocol
+  in
+  return (multichain_setup_to_single ~setup:sequencer_setup)
+
+let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?sequencer_rpc_port ?sequencer_private_rpc_port ?genesis_timestamp
     ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
     ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
@@ -408,8 +669,9 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?(threshold_encryption = false) ?(uses = uses) ?(additional_uses = [])
     ?rollup_history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None)
-    ~enable_multichain ?rpc_server ?websockets ?history_mode ?enable_tx_queue
-    ?spawn_rpc ?periodic_snapshot_path body ~title ~tags protocols =
+    ~enable_multichain ~number_of_chains ?rpc_server ?websockets ?history_mode
+    ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path body ~title ~tags
+    protocols =
   let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
   let tags = kernel_tag :: tags in
   let additional_uses =
@@ -424,9 +686,20 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     | _, (Mainnet | Ghostnet) -> None (* default *)
     | _, Latest -> Some Evm_node.Dream (* test with Dream for latest kernel *)
   in
+  let l2_chains =
+    List.init number_of_chains (fun l2_chain_id ->
+        {
+          (default_l2_setup ~l2_chain_id) with
+          sequencer_pool_address;
+          da_fee_per_byte = da_fee;
+          minimum_base_fee_per_gas;
+          maximum_gas_per_transaction;
+          bootstrap_accounts;
+        })
+  in
   let body protocol =
     let* sequencer_setup =
-      setup_sequencer
+      setup_sequencer_internal
         ?max_delayed_inbox_blueprint_length
         ?sequencer_rpc_port
         ?sequencer_private_rpc_port
@@ -442,15 +715,10 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?delayed_inbox_timeout
         ?delayed_inbox_min_levels
         ?max_number_of_chunks
-        ?bootstrap_accounts
         ?sequencer
-        ?sequencer_pool_address
         ~kernel:kernel_use
-        ?da_fee
-        ?minimum_base_fee_per_gas
         ?preimages_dir
         ?maximum_allowed_ticks
-        ?maximum_gas_per_transaction
         ?max_blueprint_lookahead_in_seconds
         ?enable_fa_bridge
         ?enable_fast_withdrawal
@@ -461,6 +729,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ~enable_dal
         ?dal_slots
         ~enable_multichain
+        ~l2_chains
         ?rpc_server
         ?enable_tx_queue
         ?spawn_rpc
@@ -497,6 +766,70 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
       ~title
       ~tags
       protocols
+
+(* Register a single variant of a test but for all protocols. *)
+let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
+    ?sequencer_rpc_port ?sequencer_private_rpc_port ?genesis_timestamp
+    ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
+    ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
+    ?delayed_inbox_min_levels ?max_number_of_chunks ?bootstrap_accounts
+    ?sequencer ?sequencer_pool_address ~kernel ?da_fee ?minimum_base_fee_per_gas
+    ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
+    ?enable_fast_withdrawal ?commitment_period ?challenge_window
+    ?threshold_encryption ?uses ?additional_uses ?rollup_history_mode
+    ~enable_dal ?dal_slots ~enable_multichain ?rpc_server ?websockets
+    ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path body
+    ~title ~tags protocols =
+  let body sequencer_setup =
+    body (multichain_setup_to_single ~setup:sequencer_setup)
+  in
+  register_multichain_test
+    ~__FILE__
+    ?max_delayed_inbox_blueprint_length
+    ?sequencer_rpc_port
+    ?sequencer_private_rpc_port
+    ?genesis_timestamp
+    ?time_between_blocks
+    ?max_blueprints_lag
+    ?max_blueprints_ahead
+    ?max_blueprints_catchup
+    ?catchup_cooldown
+    ?delayed_inbox_timeout
+    ?delayed_inbox_min_levels
+    ?max_number_of_chunks
+    ?bootstrap_accounts
+    ?sequencer
+    ?sequencer_pool_address
+    ~kernel
+    ?da_fee
+    ?minimum_base_fee_per_gas
+    ?preimages_dir
+    ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds
+    ?enable_fa_bridge
+    ?enable_fast_withdrawal
+    ?commitment_period
+    ?challenge_window
+    ?threshold_encryption
+    ?uses
+    ?additional_uses
+    ?rollup_history_mode
+    ~enable_dal
+    ?dal_slots
+    ~enable_multichain
+    ~number_of_chains:1
+    ?rpc_server
+    ?websockets
+    ?history_mode
+    ?enable_tx_queue
+    ?spawn_rpc
+    ?periodic_snapshot_path
+    body
+    ~title
+    ~tags
+    protocols
 
 let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?sequencer_rpc_port ?sequencer_private_rpc_port ?genesis_timestamp
