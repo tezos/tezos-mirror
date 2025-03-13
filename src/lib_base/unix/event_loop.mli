@@ -24,6 +24,15 @@ val env : unit -> Eio_unix.Stdenv.base option
     [main_run]. *)
 val env_exn : unit -> Eio_unix.Stdenv.base
 
+(** Retrieve the main switch for the current [main_run] being executed.
+    The returned switch must not escape the scope of this [main_run]
+    execution. *)
+val main_switch : unit -> Eio.Switch.t option
+
+(** Same as [main_switch] but raises [Not_initialized] if called outside
+    of [main_run] execution. *)
+val main_switch_exn : unit -> Eio.Switch.t
+
 (** [main_run] should be used as a replacement for [Lwt_main.run], as it also
     handles `Eio` env initialization internal calls to the `Eio` event loop
     if [~eio] is set to [true] ([false] by default).
