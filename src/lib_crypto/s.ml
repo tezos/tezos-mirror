@@ -473,6 +473,32 @@ module type AGGREGATE_SIGNATURE = sig
     ?subgroup_check:bool -> (Z.t * Public_key.t) list -> Public_key.t option
 end
 
+module type THRESHOLD_SIGNATURE = sig
+  include SIGNATURE
+
+  (** [share_secret_key sk m n] shares a secret key [sk] between [n]
+      participants so that any [m] participants can collaboratively sign
+      messages, while fewer than [m] participants cannot produce a valid
+      signature. Each participant is assigned a unique identifier [id_i]
+      in range [1; n]. *)
+  val share_secret_key :
+    Secret_key.t -> m:int -> n:int -> (int * Secret_key.t) list
+
+  (** [generate_threshold_key sk m n] is the same as [share_secret_key
+      sk m n] but also returns a public key and a public key hash
+      corresponding to a secret key [sk]. *)
+  val generate_threshold_key :
+    Secret_key.t ->
+    m:int ->
+    n:int ->
+    Public_key.t * Public_key_hash.t * (int * Secret_key.t) list
+
+  (** [threshold_signature_opt [(id_x, s_x);(id_y, s_y);...] ]
+      reconstructs a signature if at least [m] valid signatures [s_i]
+      produced by participants [id_i] are provided. *)
+  val threshold_signature_opt : (int * t) list -> t option
+end
+
 module type SPLIT_SIGNATURE = sig
   include SIGNATURE
 
