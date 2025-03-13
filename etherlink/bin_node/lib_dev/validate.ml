@@ -94,12 +94,12 @@ let validate_pay_for_fees (transaction : Transaction.transaction) ~balance =
   if balance >= cost then return (Ok ())
   else return (Error "Cannot prepay transaction.")
 
-let validate_total_cost (tx_object : legacy_transaction_object) ~balance =
+let validate_total_cost (transaction : Transaction.transaction) ~balance =
   let open Lwt_result_syntax in
   let total_cost =
-    let (Qty gas) = tx_object.gas in
-    let (Qty gas_price) = tx_object.gasPrice in
-    let (Qty value) = tx_object.value in
+    let gas = transaction.gas_limit in
+    let gas_price = transaction.max_fee_per_gas in
+    let value = transaction.value in
     Z.add (Z.mul gas gas_price) value
   in
   if total_cost > balance then return (Error "Not enough funds")
@@ -113,16 +113,16 @@ let validate_stateless ~next_nonce backend_rpc transaction ~caller =
   return (Ok ())
 
 let validate_with_state (module Backend_rpc : Services_backend_sig.S)
-    transaction (tx_object : legacy_transaction_object) =
+    transaction ~caller =
   let open Lwt_result_syntax in
   let* (Qty balance) =
-    Backend_rpc.balance tx_object.from Block_parameter.(Block_parameter Latest)
+    Backend_rpc.balance caller Block_parameter.(Block_parameter Latest)
   in
   let backend_rpc = (module Backend_rpc : Services_backend_sig.S) in
   let** () = validate_max_fee_per_gas backend_rpc transaction in
   let** () = validate_pay_for_fees transaction ~balance in
   let** () = validate_gas_limit backend_rpc transaction in
-  let** () = validate_total_cost tx_object ~balance in
+  let** () = validate_total_cost transaction ~balance in
   return (Ok ())
 
 type validation_mode = Stateless | With_state | Full
@@ -130,23 +130,21 @@ type validation_mode = Stateless | With_state | Full
 let valid_transaction_object ~backend_rpc ~hash ~mode tx =
   let open Lwt_result_syntax in
   let**? tx_object = Transaction.to_transaction_object ~hash tx in
+  let caller = tx_object.from in
   let* next_nonce =
     let (module Backend_rpc : Services_backend_sig.S) = backend_rpc in
-    Backend_rpc.nonce tx_object.from Block_parameter.(Block_parameter Latest)
+    Backend_rpc.nonce caller Block_parameter.(Block_parameter Latest)
   in
   let next_nonce =
     match next_nonce with None -> Qty Z.zero | Some next_nonce -> next_nonce
   in
   let** () =
     match mode with
-    | Stateless ->
-        validate_stateless backend_rpc ~next_nonce tx ~caller:tx_object.from
-    | With_state -> validate_with_state backend_rpc tx tx_object
+    | Stateless -> validate_stateless backend_rpc ~next_nonce tx ~caller
+    | With_state -> validate_with_state backend_rpc tx ~caller
     | Full ->
-        let** () =
-          validate_stateless ~next_nonce backend_rpc tx ~caller:tx_object.from
-        in
-        let** () = validate_with_state backend_rpc tx tx_object in
+        let** () = validate_stateless ~next_nonce backend_rpc tx ~caller in
+        let** () = validate_with_state backend_rpc tx ~caller in
         return (Ok ())
   in
 
