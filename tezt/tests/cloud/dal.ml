@@ -1532,6 +1532,16 @@ module Monitoring_app = struct
                 ~cycle
                 ~lost_dal_rewards
 
+    let check_for_lost_dal_rewards t ~metadata =
+      Lwt.catch
+        (fun () -> check_for_lost_dal_rewards t ~metadata)
+        (fun exn ->
+          Log.warn
+            "Monitor_app.Alert.check_for_lost_dal_rewards: unexpected error: \
+             '%s'"
+            (Printexc.to_string exn) ;
+          unit)
+
     let report_dal_accusations ~webhook ~network ~level ~cycle dal_accusations =
       let data =
         let header =
@@ -1651,6 +1661,17 @@ module Monitoring_app = struct
               ~cycle
               ~level
               dal_accusations
+
+    let check_for_dal_accusations t ~cycle ~level ~operations ~endpoint =
+      Lwt.catch
+        (fun () ->
+          check_for_dal_accusations t ~cycle ~level ~operations ~endpoint)
+        (fun exn ->
+          Log.warn
+            "Monitor_app.Alert.check_for_dal_accusations: unexpected error: \
+             '%s'"
+            (Printexc.to_string exn) ;
+          unit)
   end
 end
 
