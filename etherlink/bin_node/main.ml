@@ -149,12 +149,16 @@ module Params = struct
                    the {!Time.Protocol.epoch}."))
 
   let l2_address =
-    Tezos_clic.parameter (fun _ s ->
-        let hex_addr =
-          Option.value ~default:s @@ String.remove_prefix ~prefix:"0x" s
+    Tezos_clic.parameter (fun _ address ->
+        let open Lwt_result_syntax in
+        let hex = Evm_node_lib_dev.Misc.normalize_addr address in
+        let* () =
+          when_
+            (Option.is_none (Hex.to_string (`Hex hex))
+            || String.length hex <> 40)
+            (fun () -> failwith "%s is not a valid address" address)
         in
-        Lwt.return_ok
-        @@ Evm_node_lib_dev_encoding.Ethereum_types.(Address (Hex hex_addr)))
+        return (Evm_node_lib_dev_encoding.Ethereum_types.Address (Hex hex)))
 
   let snapshot_file next =
     Tezos_clic.param
@@ -1787,9 +1791,7 @@ let config_key_flag ~name =
 let bootstrap_account_arg =
   let long = "bootstrap-account" in
   let doc = Format.sprintf "add a bootstrap account in the installer config." in
-  Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x..."
-  @@ Tezos_clic.parameter (fun _ address ->
-         Lwt.return_ok @@ Evm_node_lib_dev.Misc.normalize_addr address)
+  Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x..." Params.l2_address
 
 let set_account_code =
   let long = "set-code" in
@@ -2095,17 +2097,7 @@ let fund_arg =
     "The address of an account to provide with funds in the sandbox (can be \
      repeated to fund multiple accounts)"
   in
-  Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x..."
-  @@ Tezos_clic.parameter (fun _ address ->
-         let open Lwt_result_syntax in
-         let hex = Evm_node_lib_dev.Misc.normalize_addr address in
-         let* () =
-           when_
-             (Option.is_none (Hex.to_string (`Hex hex))
-             || String.length hex <> 40)
-             (fun () -> failwith "%s is not a valid address" address)
-         in
-         return (Evm_node_lib_dev_encoding.Ethereum_types.Address (Hex hex)))
+  Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x..." Params.l2_address
 
 let sandbox_config_args =
   Tezos_clic.args13

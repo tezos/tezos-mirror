@@ -93,9 +93,10 @@ let make_l2 ~boostrap_balance ?bootstrap_accounts ?minimum_base_fee_per_gas
     match bootstrap_accounts with
     | None -> []
     | Some bootstrap_accounts ->
+        let open Ethereum_types in
         let balance = padded_32_le_int_bytes boostrap_balance in
         List.map
-          (fun address ->
+          (fun (Address (Hex address)) ->
             make_instr
               ~path_prefix:(world_state_prefix @ ["eth_accounts"; address])
               (Some ("balance", balance)))
@@ -158,12 +159,13 @@ let make ~mainnet_compat ~boostrap_balance ?l2_chain_ids ?bootstrap_accounts
     ?enable_fast_withdrawal ?enable_multichain ?set_account_code
     ?max_delayed_inbox_blueprint_length ~output () =
   let bootstrap_accounts =
+    let open Ethereum_types in
     match bootstrap_accounts with
     | None -> []
     | Some bootstrap_accounts ->
         let balance = padded_32_le_int_bytes boostrap_balance in
         List.map
-          (fun address ->
+          (fun (Address (Hex address)) ->
             make_instr
               ~path_prefix:["evm"; "world_state"; "eth_accounts"; address]
               (Some ("balance", balance)))

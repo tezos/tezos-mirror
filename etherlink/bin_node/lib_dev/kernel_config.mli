@@ -13,7 +13,7 @@ val make :
   mainnet_compat:bool ->
   boostrap_balance:Ethereum_types.NonceMap.key ->
   ?l2_chain_ids:Ethereum_types.chain_id list ->
-  ?bootstrap_accounts:string list ->
+  ?bootstrap_accounts:Ethereum_types.address list ->
   ?kernel_root_hash:string * string ->
   ?chain_id:string * string ->
   ?sequencer:string * string ->
@@ -48,7 +48,7 @@ val make :
     where [bootstrap_accounts] are provisioned with [bootstrap_balance]. *)
 val make_l2 :
   boostrap_balance:Z.t ->
-  ?bootstrap_accounts:string list ->
+  ?bootstrap_accounts:Ethereum_types.address list ->
   ?minimum_base_fee_per_gas:string * string ->
   ?da_fee_per_byte:string * string ->
   ?sequencer_pool_address:string * string ->
