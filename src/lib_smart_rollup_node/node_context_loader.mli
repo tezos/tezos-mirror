@@ -55,10 +55,10 @@ val init :
 val close : _ t -> unit tzresult Lwt.t
 
 module For_snapshots : sig
-  (** [create_node_context cctxt protocol store context ~data_dir] creates a
-      node context which does not monitor the L1 chain but which can be used to
-      reconstruct the context from historical data. This function is used by the
-      {!Snapshots} module. *)
+  (** [create_node_context cctxt protocol store context ~data_dir
+      ~apply_unsafe_patches] creates a node context which does not monitor the
+      L1 chain but which can be used to reconstruct the context from historical
+      data. This function is used by the {!Snapshots} module. *)
   val create_node_context :
     #Client_context.full ->
     current_protocol ->
