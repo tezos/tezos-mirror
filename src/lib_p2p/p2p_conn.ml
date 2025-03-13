@@ -30,14 +30,8 @@ type ('msg, 'conn) inner_state = {
   canceler : Lwt_canceler.t;
   greylister : motive:string -> unit Lwt.t;
   conn : ('msg P2p_message.t, 'conn) P2p_socket.t;
-  negotiated_version : Network_version.t;
   mutable last_sent_swap_request : (Time.System.t * P2p_peer.Id.t) option;
-  mutable wait_close : bool;
-  mutable disconnect_reason : P2p_disconnection_reason.t option;
-  mutable worker : unit Lwt.t option;
   peer_id : P2p_peer.Id.t;
-  trusted_node : bool;
-  private_node : bool;
   disable_peer_discovery : bool;
   callback : 'msg P2p_answerer.callback;
 }
@@ -128,11 +122,9 @@ module Types = struct
         greylister : motive:string -> unit Lwt.t;
         messages : (int * 'msg) Lwt_pipe.Maybe_bounded.t;
         conn : ('msg P2p_message.t, 'conn) P2p_socket.t;
-        negotiated_version : Network_version.t;
         disable_peer_discovery : bool;
         callback : 'msg P2p_answerer.t;
         peer_id : P2p_peer.Error_table.key;
-        trusted_node : bool;
       }
         -> parameters
 end
@@ -143,6 +135,13 @@ type ('msg, 'peer, 'conn) t = {
   worker : Worker.callback Worker.t;
   messages : (int * 'msg) Lwt_pipe.Maybe_bounded.t;
   conn : ('msg P2p_message.t, 'conn) P2p_socket.t;
+  mutable disconnect_reason : P2p_disconnection_reason.t option;
+  mutable wait_close : bool;
+  peer_id : P2p_peer.Id.t;
+  trusted_node : bool;
+  private_node : bool;
+  negotiated_version : Network_version.t;
+  disable_peer_discovery : bool;
 }
 
 let write_swap_ack conn point peer_id =
@@ -178,13 +177,10 @@ module Handlers = struct
            messages;
            canceler;
            greylister;
-           negotiated_version;
            disable_peer_discovery;
            callback;
-           trusted_node;
            peer_id;
          }) ->
-    let private_node = P2p_socket.private_node conn in
     let conn_info =
       P2p_answerer.
         {
@@ -200,14 +196,8 @@ module Handlers = struct
         conn;
         canceler;
         greylister;
-        wait_close = false;
-        disconnect_reason = None;
         last_sent_swap_request = None;
-        negotiated_version;
-        worker = None;
         peer_id;
-        private_node;
-        trusted_node;
         disable_peer_discovery;
         callback = callback conn_info;
       }
@@ -257,6 +247,7 @@ let create (type msg peer conn) ~(conn : (msg P2p_message.t, conn) P2p_socket.t)
   let callback_buffer () =
     Lwt.return (Worker.Any_request (P2p_workers.Loop, {scope = None}))
   in
+  let private_node = P2p_socket.private_node conn in
   let trusted_node =
     P2p_peer_state.Info.trusted peer_info
     || Option.fold ~none:false ~some:P2p_point_state.Info.trusted point_info
@@ -272,23 +263,34 @@ let create (type msg peer conn) ~(conn : (msg P2p_message.t, conn) P2p_socket.t)
            messages;
            canceler;
            greylister;
-           negotiated_version;
            disable_peer_discovery;
            callback;
-           trusted_node;
            peer_id;
          })
       (module Handlers)
   in
-  return {worker; messages; conn}
+  return
+    {
+      worker;
+      messages;
+      conn;
+      disconnect_reason = None;
+      wait_close = false;
+      private_node;
+      trusted_node;
+      peer_id;
+      negotiated_version;
+      disable_peer_discovery : bool;
+    }
 
 let disconnect ?(wait = false) ~reason t =
   let open Lwt_syntax in
-  let (S w) = Worker.state t.worker in
-  let* () = Events.(emit disconnect) w.peer_id in
-  w.wait_close <- wait ;
-  w.disconnect_reason <- Some reason ;
-  shutdown t
+  let* () = Events.(emit disconnect) t.peer_id in
+  t.wait_close <- wait ;
+  t.disconnect_reason <- Some reason ;
+  match Worker.status t.worker with
+  | Tezos_base.Worker_types.Closed (_, _, _) | Closing (_, _) -> return_unit
+  | _ -> shutdown t
 
 let write_swap_ack t = write_swap_ack t.conn
 
@@ -300,13 +302,12 @@ let pipe_exn_handler = function
 
 let read t =
   let open Lwt_syntax in
-  let (S wst) = Worker.state t.worker in
   Lwt.catch
     (fun () ->
       let* s, msg = Lwt_pipe.Maybe_bounded.pop t.messages in
       let* () =
         Events.(emit bytes_popped_from_queue)
-          (s, (P2p_socket.info wst.conn).peer_id)
+          (s, (P2p_socket.info t.conn).peer_id)
       in
       return_ok msg)
     (fun e ->
@@ -352,8 +353,7 @@ let write_swap_request (t : (_, _, _) t) point peer_id =
   result
 
 let write_bootstrap t =
-  let (S wst) = Worker.state t.worker in
-  if wst.disable_peer_discovery then (
+  if t.disable_peer_discovery then (
     Events.(emit__dont_wait__use_with_care peer_discovery_disabled) () ;
     Result_syntax.return_false)
   else
@@ -369,31 +369,19 @@ let local_metadata t = P2p_socket.local_metadata t.conn
 
 let remote_metadata t = P2p_socket.remote_metadata t.conn
 
-let close ~reason t =
-  let (S wst) = Worker.state t.worker in
-  P2p_socket.close ~wait:wst.wait_close ~reason t.conn
+let close ~reason t = P2p_socket.close ~wait:t.wait_close ~reason t.conn
 
-let disconnect_reason t =
-  let (S wst) = Worker.state t.worker in
-  wst.disconnect_reason
+let disconnect_reason t = t.disconnect_reason
 
 let equal_sock t t' = P2p_socket.equal t.conn t'.conn
 
-let private_node t =
-  let (S wst) = Worker.state t.worker in
-  wst.private_node
+let private_node t = t.private_node
 
-let peer_id t =
-  let (S wst) = Worker.state t.worker in
-  wst.peer_id
+let peer_id t = t.peer_id
 
-let trusted_node t =
-  let (S wst) = Worker.state t.worker in
-  wst.trusted_node
+let trusted_node t = t.trusted_node
 
-let negotiated_version t =
-  let (S wst) = Worker.state t.worker in
-  wst.negotiated_version
+let negotiated_version t = t.negotiated_version
 
 module Internal_for_tests = struct
   let raw_write_sync t buf =
