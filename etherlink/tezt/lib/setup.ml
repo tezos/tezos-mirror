@@ -53,6 +53,7 @@ let default_l2_setup ~l2_chain_id =
   Evm_node.
     {
       l2_chain_id;
+      l2_chain_family = "EVM";
       world_state_path = None;
       bootstrap_accounts = None;
       sequencer_pool_address = None;
@@ -294,6 +295,7 @@ let generate_l2_kernel_config (l2_setup : Evm_node.l2_setup) =
   let*! () =
     Evm_node.make_l2_kernel_installer_config
       ~chain_id:l2_setup.l2_chain_id
+      ~chain_family:l2_setup.l2_chain_family
       ?maximum_gas_per_transaction:l2_setup.maximum_gas_per_transaction
       ?sequencer_pool_address:l2_setup.sequencer_pool_address
       ?minimum_base_fee_per_gas:l2_setup.minimum_base_fee_per_gas

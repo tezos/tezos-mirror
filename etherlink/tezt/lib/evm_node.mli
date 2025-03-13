@@ -31,6 +31,7 @@ type t
 
 type l2_setup = {
   l2_chain_id : int;
+  l2_chain_family : string;
   world_state_path : string option;
   bootstrap_accounts : string list option;
   sequencer_pool_address : string option;
