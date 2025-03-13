@@ -282,6 +282,28 @@ struct
            binary_name
            default)
       ~default
+      (Tezos_clic.parameter (fun (_cctxt : Client_context.full) data_dir ->
+           let open Lwt_result_syntax in
+           let open Filename.Infix in
+           (* Check if the data directory of the smart rollup node is not the
+              one of Octez node *)
+           let*! identity_file_in_data_dir_exists =
+             Lwt_unix.file_exists (data_dir // "identity.json")
+           in
+           if identity_file_in_data_dir_exists then
+             failwith
+               "Invalid data directory. This is a data directory for an Octez \
+                node, please choose a different directory for the smart rollup \
+                node data."
+           else return data_dir))
+
+  let config_file_arg =
+    Tezos_clic.arg
+      ~long:"config-file"
+      ~placeholder:"config.json"
+      ~doc:
+        "Location of the configuration file for the rollup node. Defaults to \
+         `<data-dir>/config.json`."
       string_parameter
 
   let boot_sector_file_arg =
