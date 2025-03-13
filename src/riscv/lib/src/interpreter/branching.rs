@@ -6,6 +6,8 @@
 // TODO: RV-520: Update remaining 'jump' handlers in the file to work over the ICB.
 
 use crate::instruction_context::ICB;
+use crate::instruction_context::Predicate;
+use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::hart_state::HartState;
 use crate::machine_state::memory::Address;
 use crate::machine_state::registers::NonZeroXRegister;
@@ -121,6 +123,39 @@ pub fn run_add_immediate_to_pc(icb: &mut impl ICB, imm: i64, rd: NonZeroXRegiste
     let rhs = icb.xvalue_of_imm(imm);
     let result = icb.xvalue_wrapping_add(lhs, rhs);
     icb.xregister_write_nz(rd, result);
+}
+
+#[inline(always)]
+pub fn run_branch<I: ICB>(
+    icb: &mut I,
+    predicate: Predicate,
+    imm: i64,
+    rs1: NonZeroXRegister,
+    rs2: NonZeroXRegister,
+    width: InstrWidth,
+) -> ProgramCounterUpdate<<I as ICB>::XValue> {
+    let lhs = icb.xregister_read_nz(rs1);
+    let rhs = icb.xregister_read_nz(rs2);
+
+    let cond = icb.xvalue_compare(predicate, lhs, rhs);
+
+    icb.branch(cond, imm, width)
+}
+
+#[inline(always)]
+pub fn run_branch_compare_zero<I: ICB>(
+    icb: &mut I,
+    predicate: Predicate,
+    imm: i64,
+    rs1: NonZeroXRegister,
+    width: InstrWidth,
+) -> ProgramCounterUpdate<<I as ICB>::XValue> {
+    let lhs = icb.xregister_read_nz(rs1);
+    let rhs = icb.xvalue_of_imm(0);
+
+    let cond = icb.xvalue_compare(predicate, lhs, rhs);
+
+    icb.branch(cond, imm, width)
 }
 
 #[cfg(test)]

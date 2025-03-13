@@ -20,8 +20,10 @@ use super::state_access::JitStateAccess;
 use super::state_access::JsaCalls;
 use crate::instruction_context::ICB;
 use crate::instruction_context::Predicate;
+use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::registers::NonZeroXRegister;
+use crate::parser::instruction::InstrWidth;
 
 pub(super) mod block_state;
 
@@ -247,6 +249,36 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
         // See
         // <https://docs.rs/cranelift-codegen/0.117.2/cranelift_codegen/ir/trait.InstBuilder.html#method.icmp>
         self.builder.ins().icmp(comparison, lhs, rhs)
+    }
+
+    fn branch(
+        &mut self,
+        condition: Self::Bool,
+        offset: i64,
+        instr_width: InstrWidth,
+    ) -> ProgramCounterUpdate<Self::XValue> {
+        let branch_block = self.builder.create_block();
+        let fallthrough_block = self.builder.create_block();
+
+        self.builder
+            .ins()
+            .brif(condition, branch_block, &[], fallthrough_block, &[]);
+
+        let snapshot = self.dynamic;
+
+        // Handle branching block
+        self.builder.switch_to_block(branch_block);
+
+        let snapshot = self.dynamic;
+        self.complete_step(block_state::PCUpdate::Offset(offset));
+        self.jump_to_end();
+        self.builder.seal_block(branch_block);
+
+        // Continue on the fallthrough block
+        self.dynamic = snapshot;
+        self.builder.switch_to_block(fallthrough_block);
+
+        ProgramCounterUpdate::Next(instr_width)
     }
 
     fn ok<Value>(&mut self, val: Value) -> Self::IResult<Value> {
