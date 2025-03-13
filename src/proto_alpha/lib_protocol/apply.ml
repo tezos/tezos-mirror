@@ -2356,6 +2356,38 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
       in
       return (ctxt, mk_attestation_result consensus_key 0 (* Fake power. *))
 
+let record_attestations_aggregate ctxt (mode : mode) (committee : Slot.t list) :
+    (context * Kind.attestations_aggregate contents_result_list) tzresult Lwt.t
+    =
+  let open Lwt_result_syntax in
+  match mode with
+  | Application _ | Full_construction _ ->
+      let slot_map = Consensus.allowed_attestations ctxt in
+      let*? ctxt, committee, consensus_power =
+        let open Result_syntax in
+        List.fold_left_e
+          (fun (ctxt, consensus_keys, consensus_power) slot ->
+            let* {delegate; consensus_pkh; _}, power, _ =
+              find_in_slot_map slot slot_map
+            in
+            let* ctxt =
+              Consensus.record_attestation ctxt ~initial_slot:slot ~power
+            in
+            let key = ({delegate; consensus_pkh} : Consensus_key.t) in
+            return (ctxt, key :: consensus_keys, power + consensus_power))
+          (ctxt, [], 0)
+          committee
+      in
+      let result =
+        Attestations_aggregate_result
+          {balance_updates = []; committee; consensus_power}
+      in
+      return (ctxt, Single_result result)
+  | Partial_construction _ ->
+      (* Attestations_aggregate are built at baking time and shouldn't be
+         propagated between mempools.*)
+      tzfail Validate_errors.Consensus.Aggregate_in_mempool
+
 let apply_manager_contents_list ctxt ~payload_producer chain_id
     ~gas_cost_for_sig_check fees_updated_contents_list =
   let open Lwt_syntax in
@@ -2494,10 +2526,13 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       record_preattestation ctxt mode consensus_content
   | Single (Attestation {consensus_content; dal_content}) ->
       record_attestation ctxt mode consensus_content dal_content
-  | Single (Attestations_aggregate _) ->
-      if Constants.aggregate_attestation ctxt then
-        tzfail Validate_errors.Consensus.Aggregate_not_implemented
-      else tzfail Validate_errors.Consensus.Aggregate_disabled
+  | Single (Attestations_aggregate {committee; _}) ->
+      let*? () =
+        error_unless
+          (Constants.aggregate_attestation ctxt)
+          Validate_errors.Consensus.(Aggregate_disabled)
+      in
+      record_attestations_aggregate ctxt mode committee
   | Single (Seed_nonce_revelation {level; nonce}) ->
       let level = Level.from_raw ctxt level in
       let* ctxt = Nonce.reveal ctxt level nonce in

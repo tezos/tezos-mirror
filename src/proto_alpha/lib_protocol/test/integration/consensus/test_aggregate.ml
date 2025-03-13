@@ -56,8 +56,6 @@ let test_aggregate_feature_flag_enabled () =
   Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
     ~loc:__LOC__
     ~attested_block
-    ~application_error:aggregate_unimplemented_error
-    ~construction_error:aggregate_unimplemented_error
     ~mempool_error:aggregate_in_mempool_error
     Aggregate
 
