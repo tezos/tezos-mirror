@@ -443,6 +443,8 @@ type etherlink_configuration = {
   chain_id : int option;
 }
 
+type monitor_app_configuration = {dal_slack_webhook : Uri.t}
+
 type configuration = {
   with_dal : bool;
   stake : int list;
@@ -468,6 +470,7 @@ type configuration = {
   bootstrap_dal_node_identity_file : string option;
   external_rpc : bool;
   dal_incentives : bool;
+  monitor_app_configuration : monitor_app_configuration option;
 }
 
 type bootstrap = {
@@ -1082,7 +1085,610 @@ let get_metrics t infos_per_level metrics =
       infos_per_level.etherlink_operator_balance_sum;
   }
 
-let get_infos_per_level ~client ~endpoint ~level ~etherlink_operators =
+module Monitoring_app = struct
+  (** [network_to_image_url network] return an image for each monitored network. *)
+  let network_to_image_url : Network.t -> string = function
+    | `Rionet ->
+        "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/rionet.png"
+    | `Mainnet ->
+        "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/mainnet.png"
+    | `Ghostnet ->
+        "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/ghostnet.png"
+    | `Sandbox | `Weeklynet _ | `Nextnet _ -> "no_image_yet"
+
+  let endpoint_of_webhook webhook =
+    let host =
+      (* Default to slack hooks host. *)
+      Option.value ~default:"hooks.slack.com" (Uri.host webhook)
+    in
+    let scheme =
+      (* Default to https scheme. *)
+      Option.value ~default:"https" (Uri.scheme webhook)
+    in
+    let port =
+      (* Default to https default https port. *)
+      match scheme with "https" -> 443 | "http" -> 80 | _ -> 443
+    in
+    Endpoint.{host; scheme; port}
+
+  module Format_app = struct
+    (* Helper for Slack App message format block-kit
+       See: https://api.slack.com/reference/block-kit/
+    *)
+
+    let image ~url ~alt =
+      let open Ezjsonm in
+      `O
+        [
+          ("type", string "image");
+          ("image_url", string url);
+          ("alt_text", string alt);
+        ]
+
+    (* [section content ?accessory] creates Slack App message blocks
+       with an optional accessory.
+
+       The function joins content strings with newlines, formats them
+       using mrkdwn, and returns properly structured JSON objects for
+       Slack's Block Kit. *)
+    let section content ?accessory () =
+      let open Ezjsonm in
+      if List.is_empty content then []
+      else
+        let text = String.concat "\n" content in
+        [
+          `O
+            (("type", string "section")
+            :: ("text", `O [("type", string "mrkdwn"); ("text", string text)])
+            :: Option.fold
+                 ~none:[]
+                 ~some:(fun data -> [("accessory", data)])
+                 accessory);
+        ]
+  end
+
+  module Tasks = struct
+    let endpoint_from_prometheus_query ~query =
+      let fail ~uri_part =
+        Test.fail
+          "DAL.Monitoring_app.Tasks.endpoint_from_prometheus_query: expecting \
+           a prometheus %s"
+          uri_part
+      in
+      let uri =
+        match Prometheus.get_query_endpoint ~query with
+        | None -> fail ~uri_part:"endpoint"
+        | Some endpoint -> endpoint
+      in
+      let scheme, host, port =
+        match Uri.(scheme uri, host uri, port uri) with
+        | Some scheme, Some host, Some port -> (scheme, host, port)
+        | None, _, _ -> fail ~uri_part:"scheme"
+        | _, None, _ -> fail ~uri_part:"host"
+        | _, _, None -> fail ~uri_part:"port"
+      in
+      let query_string =
+        (* Fixme: warn about `k` being dropped in the second case. We
+           need to keep only list of size 1 because of the way RPC_core
+           is implemented. Should probably be fixed soon or later. *)
+        List.filter_map
+          (function k, [v] -> Some (k, v) | _k, _ -> None)
+          (Uri.query uri)
+      in
+      let path = String.split_on_char '/' (Uri.path uri) in
+      let endpoint = Endpoint.{host; scheme; port} in
+      (`endpoint endpoint, `query query_string, `path path)
+
+    let fetch ~origin ~query ~decoder =
+      let open RPC_core in
+      let `endpoint endpoint, `query query_string, `path path =
+        endpoint_from_prometheus_query ~query
+      in
+      let rpc = make ~query_string GET path decoder in
+      Lwt.catch
+        (fun () ->
+          let* response = call_raw endpoint rpc in
+          Lwt.return (decode_raw ~origin rpc response.body))
+        (fun exn ->
+          Log.warn
+            "Unexpected error while fetching prometheus query (origin : %s): \
+             '%s'"
+            origin
+            (Printexc.to_string exn) ;
+          Lwt.return_none)
+
+    let decoder_prometheus_float json =
+      let open JSON in
+      let status = json |-> "status" |> as_string in
+      if not (String.equal status "success") then (* fixme: warning *)
+        None
+      else
+        let opt =
+          json |-> "data" |-> "result" |> as_list |> Fun.flip List.nth_opt 0
+        in
+        match opt with
+        | None -> None
+        | Some x ->
+            x |-> "value" |> as_list |> Fun.flip List.nth_opt 1
+            |> Option.map as_float
+
+    let view_ratio_attested_over_published
+        (`attested attested, `published published) =
+      let open Format in
+      match (attested, published) with
+      | Some 0., Some 0. -> None
+      | Some attested, Some 0. ->
+          let s = sprintf "`unk` (`%d`/`0`)" (Int.of_float attested) in
+          Some s
+      | Some attested, None ->
+          let s = sprintf "`unk` (`%d`/`?`)" (Int.of_float attested) in
+          Some s
+      | None, Some published ->
+          let s = sprintf "`unk` (`?`/`%d`)" (Int.of_float published) in
+          Some s
+      | Some attested, Some published ->
+          let ratio = attested /. published *. 100. in
+          let s =
+            sprintf
+              "`%s` (`%d/%d`)"
+              (sprintf "%.2f%%" ratio)
+              (Int.of_float attested)
+              (Int.of_float published)
+          in
+          Some s
+      | None, None ->
+          let s = sprintf "`unk` (`?`/`?`)" in
+          Some s
+
+    let fetch_slot_info ~slot_index =
+      let query s =
+        Format.sprintf
+          "increase(tezt_total_%s_commitments_per_slot{slot_index=\"%d\"}[6h])"
+          s
+          slot_index
+      in
+      let decoder = decoder_prometheus_float in
+      let* attested =
+        fetch
+          ~origin:"fetch_slot_info.attested"
+          ~decoder
+          ~query:(query "attested")
+      in
+      let* published =
+        fetch
+          ~origin:"fetch_slot_info.published"
+          ~decoder
+          ~query:(query "published")
+      in
+      Lwt.return
+        (`slot_index slot_index, `attested attested, `published published)
+
+    let view_slot_info slot_info =
+      let slots_info =
+        List.filter_map
+          (fun (`slot_index slot_index, attested, published) ->
+            view_ratio_attested_over_published (attested, published)
+            |> Option.map (Format.sprintf "▪ `%02d` : %s" slot_index))
+          slot_info
+      in
+      if List.is_empty slots_info then []
+      else
+        "• Percentage of attested over published DAL commitments per slot:"
+        :: slots_info
+
+    let fetch_dal_commitments_total_info () =
+      let query s =
+        Format.sprintf {|increase(tezt_dal_commitments_total{kind="%s"}[6h])|} s
+      in
+      let decoder = decoder_prometheus_float in
+      let* attested =
+        fetch
+          ~origin:"fetch_dal_commitments_total.attested"
+          ~decoder
+          ~query:(query "attested")
+      in
+      let* published =
+        fetch
+          ~origin:"fetch_dal_commitments_total.published"
+          ~decoder
+          ~query:(query "published")
+      in
+      let ratio =
+        view_ratio_attested_over_published
+          (`attested attested, `published published)
+      in
+      let view =
+        (Format.sprintf
+           "• Percentage of attested over published DAL commitments: %s")
+          (Option.value ~default:"unk" ratio)
+      in
+      Lwt.return view
+
+    let view_bakers bakers =
+      List.map
+        (fun (`address address, `alias alias, v) ->
+          Format.sprintf
+            "▪ `%s` - `%s` : `%s`"
+            (Option.fold ~none:"unk" ~some:(Format.sprintf "%.2f%%") v)
+            (String.sub address 0 7)
+            (Option.value ~default:"no alias" alias))
+        bakers
+
+    let fetch_baker_info ~tz1 =
+      let query =
+        Format.sprintf
+          "avg_over_time(tezt_dal_commitments_attested_ratio{attester=\"%s\"}[6h])"
+          tz1
+      in
+      fetch ~decoder:decoder_prometheus_float ~query
+
+    (* fixme: use the stdlib List.take once we use OCaml 5.3 *)
+    let take n l =
+      let rec loop acc = function
+        | 0, _ | _, [] -> List.rev acc
+        | n, x :: xs -> loop (x :: acc) (pred n, xs)
+      in
+      loop [] (n, l)
+
+    let fetch_bakers_info network =
+      let* bakers = Network.delegates network in
+      let* bakers_info =
+        match bakers with
+        | None -> Lwt.return_nil
+        | Some bakers ->
+            Lwt_list.filter_map_p
+              (fun (alias, address, _) ->
+                let* info =
+                  fetch_baker_info
+                    ~origin:(Format.sprintf "fetch_baker_info.%s" address)
+                    ~tz1:address
+                in
+                Lwt.return_some (`address address, `alias alias, info))
+              bakers
+      in
+      let sorted_bakers =
+        List.sort
+          (fun (_, _, x) (_, _, y) -> Option.compare Float.compare x y)
+          bakers_info
+      in
+      if network = `Mainnet then
+        Lwt.return ["• Baker performance not displayed for the mainnet network"]
+        (* fixme: remove the clause above when we start producing slots
+           on Mainnet. Before, it does not make sense to report baker
+           performances for this network. *)
+      else
+        let worst_bakers = take 5 sorted_bakers in
+        let best_bakers = List.rev (take 5 (List.rev sorted_bakers)) in
+        Lwt.return
+          ("• Baker performance ranked from worst to best (truncated to 10 \
+            bakers):" :: view_bakers worst_bakers
+          @ ("..." :: view_bakers best_bakers))
+
+    let fetch_slots_info network =
+      if network = `Mainnet then
+        (* fixme: remove the clause above when we start producing slots
+           on Mainnet. Before, it does not make sense to report slots
+           info for this network. *)
+        Lwt.return ["• Slots info not displayed for the mainnet network"]
+      else
+        let* data =
+          (* fixme: should use protocol parameterized number of slots *)
+          Lwt_list.map_p
+            (fun slot_index -> fetch_slot_info ~slot_index)
+            (List.init 32 Fun.id)
+        in
+        Lwt.return (view_slot_info data)
+
+    let action ~webhook ~configuration () =
+      let network = configuration.network in
+      let title_info =
+        Format.sprintf
+          "*DAL report* for the *%s* network over the last 6 hours."
+          (String.capitalize_ascii (Network.to_string network))
+      in
+      let network_info =
+        Format.sprintf
+          "• Network: %s"
+          (String.capitalize_ascii (Network.to_string network))
+      in
+      let* ratio_dal_commitments_total_info =
+        fetch_dal_commitments_total_info ()
+      in
+      let* slots_info = fetch_slots_info configuration.network in
+      let network_overview_info =
+        network_info :: ratio_dal_commitments_total_info :: slots_info
+      in
+      let* bakers_info = fetch_bakers_info network in
+      let data =
+        let open Ezjsonm in
+        let open Format_app in
+        `O
+          [
+            ("text", string "DAL reporting");
+            ( "blocks",
+              `A
+                (section [title_info] ()
+                @ section ["*Network overview*"] ()
+                @ section
+                    network_overview_info
+                    ~accessory:
+                      (Format_app.image
+                         ~url:(network_to_image_url network)
+                         ~alt:(Network.to_string network))
+                    ()
+                @ section ["*Baker performance overview*"] ()
+                @ section bakers_info ()) );
+          ]
+      in
+      let rpc =
+        RPC_core.make
+          ~data:(Data data)
+          POST
+          (String.split_on_char '/' (Uri.path webhook))
+          (fun _json -> ())
+      in
+      let endpoint = endpoint_of_webhook webhook in
+      let* _response = RPC_core.call_raw endpoint rpc in
+      Lwt.return_unit
+
+    (* Relies on UTC (Universal Time Coordinated).
+       Paris operates on Central European Time (CET), which is UTC+1
+       during standard time (winter months). During daylight saving
+       time (summer months), Paris switches to Central European Summer
+       Time (CEST), which is UTC+2.
+    *)
+    let tasks ~dal_slack_webhook ~configuration =
+      match dal_slack_webhook with
+      | None -> []
+      | Some webhook ->
+          let webhook = Uri.of_string webhook in
+          let action () = action ~webhook ~configuration () in
+          [Chronos.task ~name:"network-overview" ~tm:"0 0-23/6 * * *" ~action]
+  end
+
+  module Alert = struct
+    let report_lost_dal_rewards ~webhook ~network ~level ~cycle
+        ~lost_dal_rewards =
+      let data =
+        let header =
+          Format.sprintf
+            "*[lost-dal-rewards]* On network `%s`, delegates have lost DAL \
+             rewards at cycle `%d`, level `%d`. \
+             <https://%s.tzkt.io/%d/implicit_operations/dal_attestation_reward \
+             |See online>"
+            (Network.to_string network)
+            cycle
+            level
+            (Network.to_string network)
+            level
+        in
+        let content =
+          List.map
+            (fun (`delegate delegate, `change change) ->
+              Format.sprintf
+                "▪ `%s` has missed ~%d tez DAL attestation rewards"
+                (String.sub delegate 0 7)
+                (change / 100_000))
+            lost_dal_rewards
+        in
+        `O [("blocks", `A (Format_app.section (header :: content) ()))]
+      in
+      let endpoint = endpoint_of_webhook webhook in
+      let rpc =
+        RPC_core.make
+          ~data:(Data data)
+          POST
+          (String.split_on_char '/' (Uri.path webhook))
+          (fun _json -> ())
+      in
+      let* _response = RPC_core.call_raw endpoint rpc in
+      Lwt.return_unit
+
+    let check_for_lost_dal_rewards t ~metadata =
+      match t.configuration.monitor_app_configuration with
+      | None -> unit
+      | Some {dal_slack_webhook = webhook} ->
+          (* We don't have access to the `blocks_per_cycle` proto
+             constant here. To check whether we are at the end of the
+             cycle, we use the following condition:
+             (cycle + 1) * (cycle_position + 1) = level_position + 1.
+          *)
+          let cycle, cycle_position, level_position =
+            let open JSON in
+            let level_info = metadata |-> "level_info" in
+            ( level_info |-> "cycle" |> as_int,
+              level_info |-> "cycle_position" |> as_int,
+              level_info |-> "level_position" |> as_int )
+          in
+          if (cycle + 1) * (cycle_position + 1) <> level_position + 1 then unit
+          else
+            let level =
+              JSON.(metadata |-> "level_info" |-> "level" |> as_int)
+            in
+            let balance_updates =
+              JSON.(metadata |-> "balance_updates" |> as_list)
+            in
+            let lost_dal_rewards =
+              List.filter_map
+                (fun balance_update ->
+                  let category =
+                    JSON.(balance_update |-> "category" |> as_string_opt)
+                  in
+                  match category with
+                  | None -> None
+                  | Some category ->
+                      if String.equal category "lost DAL attesting rewards" then
+                        let delegate =
+                          JSON.(balance_update |-> "delegate" |> as_string)
+                        in
+                        let change =
+                          JSON.(balance_update |-> "change" |> as_int)
+                        in
+                        Some (`delegate delegate, `change change)
+                      else None)
+                balance_updates
+            in
+            if List.is_empty lost_dal_rewards then unit
+            else
+              let network = t.configuration.network in
+              report_lost_dal_rewards
+                ~webhook
+                ~network
+                ~level
+                ~cycle
+                ~lost_dal_rewards
+
+    let check_for_lost_dal_rewards t ~metadata =
+      Lwt.catch
+        (fun () -> check_for_lost_dal_rewards t ~metadata)
+        (fun exn ->
+          Log.warn
+            "Monitor_app.Alert.check_for_lost_dal_rewards: unexpected error: \
+             '%s'"
+            (Printexc.to_string exn) ;
+          unit)
+
+    let report_dal_accusations ~webhook ~network ~level ~cycle dal_accusations =
+      let data =
+        let header =
+          Format.sprintf
+            "*[dal-accusations]* On network `%s`, delegates have been accused \
+             at cycle `%d`, level `%d`."
+            (Network.to_string network)
+            cycle
+            level
+        in
+        let content =
+          List.map
+            (fun ( `attestation_level attestation_level,
+                   `slot_index slot_index,
+                   `delegate delegate,
+                   `op_hash hash ) ->
+              Format.sprintf
+                "▪ `%s` for attesting slot index `%d` at level `%d`. \
+                 <https://%s.tzkt.io/%s|See online>"
+                (String.sub delegate 0 7)
+                slot_index
+                attestation_level
+                (Network.to_string network)
+                hash)
+            dal_accusations
+        in
+        `O [("blocks", `A (Format_app.section (header :: content) ()))]
+      in
+      let endpoint = endpoint_of_webhook webhook in
+      let rpc =
+        RPC_core.make
+          ~data:(Data data)
+          POST
+          (String.split_on_char '/' (Uri.path webhook))
+          (fun _json -> ())
+      in
+      let* _response = RPC_core.call_raw endpoint rpc in
+      Lwt.return_unit
+
+    let check_for_dal_accusations t ~cycle ~level ~operations ~endpoint =
+      match t.configuration.monitor_app_configuration with
+      | None -> unit
+      | Some {dal_slack_webhook = webhook} ->
+          let open JSON in
+          let accusations =
+            operations |> as_list |> Fun.flip List.nth 2 |> as_list
+          in
+          let dal_entrapments =
+            List.filter_map
+              (fun accusation ->
+                let contents =
+                  accusation |-> "contents" |> as_list |> Fun.flip List.nth 0
+                in
+                match contents |-> "kind" |> as_string_opt with
+                | Some "dal_entrapment_evidence" ->
+                    let attestation_level =
+                      contents |-> "attestation" |-> "operations" |-> "level"
+                      |> as_int
+                    in
+                    let slot_index = contents |-> "slot_index" |> as_int in
+                    let shard =
+                      contents |-> "shard_with_proof" |-> "shard" |> as_list
+                      |> Fun.flip List.nth 0 |> as_int
+                    in
+                    let hash = accusation |-> "hash" |> as_string in
+                    Some
+                      ( `attestation_level attestation_level,
+                        `shard shard,
+                        `slot_index slot_index,
+                        `op_hash hash )
+                | None | Some _ -> None)
+              accusations
+          in
+          (* todo: optimize to avoid too many RPC calls (?) *)
+          let* dal_accusations =
+            Lwt_list.map_p
+              (fun ( `attestation_level attestation_level,
+                     `shard shard,
+                     `slot_index slot_index,
+                     `op_hash hash ) ->
+                let* json =
+                  RPC_core.call
+                    endpoint
+                    (RPC.get_chain_block_context_dal_shards
+                       ~level:attestation_level
+                       ())
+                in
+                let assignment =
+                  let open JSON in
+                  List.find_opt
+                    (fun assignment ->
+                      let indexes =
+                        assignment |-> "indexes" |> as_list |> List.map as_int
+                      in
+                      List.mem shard indexes)
+                    (json |> as_list)
+                in
+                let delegate =
+                  Option.fold
+                    ~none:"should_not_happen"
+                    ~some:(fun x -> x |-> "delegate" |> as_string)
+                    assignment
+                in
+                return
+                  ( `attestation_level attestation_level,
+                    `slot_index slot_index,
+                    `delegate delegate,
+                    `op_hash hash ))
+              dal_entrapments
+          in
+          if List.is_empty dal_accusations then unit
+          else
+            let network = t.configuration.network in
+            report_dal_accusations
+              ~webhook
+              ~network
+              ~cycle
+              ~level
+              dal_accusations
+
+    let check_for_dal_accusations t ~cycle ~level ~operations ~endpoint =
+      Lwt.catch
+        (fun () ->
+          check_for_dal_accusations t ~cycle ~level ~operations ~endpoint)
+        (fun exn ->
+          Log.warn
+            "Monitor_app.Alert.check_for_dal_accusations: unexpected error: \
+             '%s'"
+            (Printexc.to_string exn) ;
+          unit)
+  end
+end
+
+let get_infos_per_level t ~level =
+  let client = t.bootstrap.client in
+  let endpoint = t.bootstrap.node_rpc_endpoint in
+  let etherlink_operators =
+    match t.etherlink with
+    | None -> []
+    | Some setup -> setup.operator.account :: setup.operator.batching_operators
+  in
   let block = string_of_int level in
   let* header =
     RPC_core.call endpoint @@ RPC.get_chain_block_header_shell ~block ()
@@ -1156,6 +1762,21 @@ let get_infos_per_level ~client ~endpoint ~level ~etherlink_operators =
         return Tez.(acc + balance))
       (return Tez.zero)
       etherlink_operators
+  in
+  let* () =
+    (* None of these actions are performed if `--dal-slack-webhook` is
+       not provided. *)
+    let* () = Monitoring_app.Alert.check_for_lost_dal_rewards t ~metadata in
+    let* () =
+      let cycle = JSON.(metadata |-> "level_info" |-> "cycle" |> as_int) in
+      Monitoring_app.Alert.check_for_dal_accusations
+        t
+        ~cycle
+        ~level
+        ~operations
+        ~endpoint:t.bootstrap.node_rpc_endpoint
+    in
+    unit
   in
   Lwt.return
     {
@@ -2274,355 +2895,6 @@ let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
       | [], [], [], None -> bootstrap.node_rpc_endpoint)
   | _ -> bootstrap.node_rpc_endpoint
 
-module Tasks = struct
-  module Network = struct
-    include Network
-
-    (** [to_image network] return an image for each monitored network. *)
-    let to_image_url : Network.t -> string = function
-      | `Rionet ->
-          "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/rionet.png"
-      | `Mainnet ->
-          "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/mainnet.png"
-      | `Ghostnet ->
-          "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/ghostnet.png"
-      | `Sandbox | `Weeklynet _ | `Nextnet _ -> "no_image_yet"
-  end
-
-  (* Helper for Slack App message format block-kit
-     See: https://api.slack.com/reference/block-kit/
-  *)
-
-  let image ~url ~alt =
-    let open Ezjsonm in
-    `O
-      [
-        ("type", string "image");
-        ("image_url", string url);
-        ("alt_text", string alt);
-      ]
-
-  let section content ?accessory () =
-    let open Ezjsonm in
-    if List.is_empty content then []
-    else
-      let text = String.concat "\n" content in
-      [
-        `O
-          (("type", string "section")
-          :: ("text", `O [("type", string "mrkdwn"); ("text", string text)])
-          :: Option.fold
-               ~none:[]
-               ~some:(fun data -> [("accessory", data)])
-               accessory);
-      ]
-
-  let endpoint_from_prometheus_query ~query =
-    let fail =
-      Test.fail
-        "Dal.Tasks.endpoint_from_prometheus_query: expecting a prometheus %s"
-    in
-    let uri =
-      match Prometheus.get_query_endpoint ~query with
-      | None -> fail "endpoint"
-      | Some endpoint -> endpoint
-    in
-    let scheme, host, port =
-      match Uri.(scheme uri, host uri, port uri) with
-      | Some scheme, Some host, Some port -> (scheme, host, port)
-      | None, _, _ -> fail "scheme"
-      | _, None, _ -> fail "host"
-      | _, _, None -> fail "port"
-    in
-    let query_string =
-      (* Fixme: warn about `k` being dropped in the second case. We
-         need to keep only list of size 1 because of the way RPC_core
-         is implemented. Should probably be fixed soon or later. *)
-      List.filter_map
-        (function k, [v] -> Some (k, v) | _k, _ -> None)
-        (Uri.query uri)
-    in
-    let path = String.split_on_char '/' (Uri.path uri) in
-    let endpoint = Endpoint.{host; scheme; port} in
-    (`endpoint endpoint, `query query_string, `path path)
-
-  let fetch ~origin ~query ~decoder =
-    let open RPC_core in
-    let `endpoint endpoint, `query query_string, `path path =
-      endpoint_from_prometheus_query ~query
-    in
-    let rpc = make ~query_string GET path decoder in
-    Lwt.catch
-      (fun () ->
-        let* response = call_raw endpoint rpc in
-        Lwt.return (decode_raw ~origin rpc response.body))
-      (fun exn ->
-        Log.warn
-          "Unexpected error while fetching prometheus query (origin : %s): '%s'"
-          origin
-          (Printexc.to_string exn) ;
-        Lwt.return_none)
-
-  let decoder_prometheus_float json =
-    let open JSON in
-    let status = json |-> "status" |> as_string in
-    if not (String.equal status "success") then (* fixme: warning *)
-      None
-    else
-      let opt =
-        json |-> "data" |-> "result" |> as_list |> Fun.flip List.nth_opt 0
-      in
-      match opt with
-      | None -> None
-      | Some x ->
-          x |-> "value" |> as_list |> Fun.flip List.nth_opt 1
-          |> Option.map as_float
-
-  let view_ratio_attested_over_published
-      (`attested attested, `published published) =
-    let open Format in
-    match (attested, published) with
-    | Some 0., Some 0. -> None
-    | Some attested, Some 0. ->
-        let s = sprintf "`unk` (`%d`/`0`)" (Int.of_float attested) in
-        Some s
-    | Some attested, None ->
-        let s = sprintf "`unk` (`%d`/`?`)" (Int.of_float attested) in
-        Some s
-    | None, Some published ->
-        let s = sprintf "`unk` (`?`/`%d`)" (Int.of_float published) in
-        Some s
-    | Some attested, Some published ->
-        let ratio = attested /. published *. 100. in
-        let s =
-          sprintf
-            "`%s` (`%d/%d`)"
-            (sprintf "%.2f%%" ratio)
-            (Int.of_float attested)
-            (Int.of_float published)
-        in
-        Some s
-    | None, None ->
-        let s = sprintf "`unk` (`?`/`?`)" in
-        Some s
-
-  let fetch_slot_info ~slot_index =
-    let query s =
-      Format.sprintf
-        "increase(tezt_total_%s_commitments_per_slot{slot_index=\"%d\"}[6h])"
-        s
-        slot_index
-    in
-    let decoder = decoder_prometheus_float in
-    let* attested =
-      fetch
-        ~origin:"fetch_slot_info.attested"
-        ~decoder
-        ~query:(query "attested")
-    in
-    let* published =
-      fetch
-        ~origin:"fetch_slot_info.published"
-        ~decoder
-        ~query:(query "published")
-    in
-    Lwt.return (`slot_index slot_index, `attested attested, `published published)
-
-  let view_slot_info slot_info =
-    let slots_info =
-      List.filter_map
-        (fun (`slot_index slot_index, attested, published) ->
-          view_ratio_attested_over_published (attested, published)
-          |> Option.map (Format.sprintf "▪ `%02d` : %s" slot_index))
-        slot_info
-    in
-    if List.is_empty slots_info then []
-    else
-      "• Percentage of attested over published DAL commitments per slot:"
-      :: slots_info
-
-  let fetch_dal_commitments_total_info () =
-    let query s =
-      Format.sprintf {|increase(tezt_dal_commitments_total{kind="%s"}[6h])|} s
-    in
-    let decoder = decoder_prometheus_float in
-    let* attested =
-      fetch
-        ~origin:"fetch_dal_commitments_total.attested"
-        ~decoder
-        ~query:(query "attested")
-    in
-    let* published =
-      fetch
-        ~origin:"fetch_dal_commitments_total.published"
-        ~decoder
-        ~query:(query "published")
-    in
-    let ratio =
-      view_ratio_attested_over_published
-        (`attested attested, `published published)
-    in
-    let view =
-      (Format.sprintf
-         "• Percentage of attested over published DAL commitments: %s")
-        (Option.value ~default:"unk" ratio)
-    in
-    Lwt.return view
-
-  let view_bakers bakers =
-    List.map
-      (fun (`address address, `alias alias, v) ->
-        Format.sprintf
-          "▪ `%s` - `%s` : `%s`"
-          (Option.fold ~none:"unk" ~some:(Format.sprintf "%.2f%%") v)
-          (String.sub address 0 7)
-          (Option.value ~default:"no alias" alias))
-      bakers
-
-  let fetch_baker_info ~tz1 =
-    let query =
-      Format.sprintf
-        "avg_over_time(tezt_dal_commitments_attested_ratio{attester=\"%s\"}[6h])"
-        tz1
-    in
-    fetch ~decoder:decoder_prometheus_float ~query
-
-  (* fixme: use the stdlib List.take once we use OCaml 5.3 *)
-  let take n l =
-    let rec loop acc = function
-      | 0, _ | _, [] -> List.rev acc
-      | n, x :: xs -> loop (x :: acc) (pred n, xs)
-    in
-    loop [] (n, l)
-
-  let fetch_bakers_info network =
-    let* bakers = Network.delegates network in
-    let* bakers_info =
-      match bakers with
-      | None -> Lwt.return_nil
-      | Some bakers ->
-          Lwt_list.filter_map_p
-            (fun (alias, address, _) ->
-              let* info =
-                fetch_baker_info
-                  ~origin:(Format.sprintf "fetch_baker_info.%s" address)
-                  ~tz1:address
-              in
-              Lwt.return_some (`address address, `alias alias, info))
-            bakers
-    in
-    let sorted_bakers =
-      List.sort
-        (fun (_, _, x) (_, _, y) -> Option.compare Float.compare x y)
-        bakers_info
-    in
-    if network = `Mainnet then
-      Lwt.return ["• Baker performance not displayed for the mainnet network"]
-      (* fixme: remove the clause above when we start producing slots
-         on Mainnet. Before, it does not make sense to report baker
-         performances for this network. *)
-    else
-      let worst_bakers = take 5 sorted_bakers in
-      let best_bakers = List.rev (take 5 (List.rev sorted_bakers)) in
-      Lwt.return
-        ("• Baker performance ranked from worst to best (truncated to 10 \
-          bakers):" :: view_bakers worst_bakers
-        @ ("..." :: view_bakers best_bakers))
-
-  let fetch_slots_info network =
-    if network = `Mainnet then
-      (* fixme: remove the clause above when we start producing slots
-         on Mainnet. Before, it does not make sense to report slots
-         info for this network. *)
-      Lwt.return ["• Slots info not displayed for the mainnet network"]
-    else
-      let* data =
-        (* fixme: should use protocol parameterized number of slots *)
-        Lwt_list.map_p
-          (fun slot_index -> fetch_slot_info ~slot_index)
-          (List.init 32 Fun.id)
-      in
-      Lwt.return (view_slot_info data)
-
-  let endpoint_of_webhook webhook =
-    Endpoint.
-      {
-        host =
-          (* Default to slack hooks host *)
-          Option.value ~default:"hooks.slack.com" (Uri.host webhook);
-        scheme =
-          (* Default to https scheme *)
-          Option.value ~default:"https" (Uri.scheme webhook);
-        port =
-          (* Default to https default post port 443 *)
-          Option.value ~default:443 (Uri.port webhook);
-      }
-
-  let action ~webhook ~configuration () =
-    let network = configuration.network in
-    let title_info =
-      Format.sprintf
-        "*DAL report* for the *%s* network over the last 6 hours."
-        (String.capitalize_ascii (Network.to_string network))
-    in
-    let network_info =
-      Format.sprintf
-        "• Network: %s"
-        (String.capitalize_ascii (Network.to_string network))
-    in
-    let* ratio_dal_commitments_total_info =
-      fetch_dal_commitments_total_info ()
-    in
-    let* slots_info = fetch_slots_info configuration.network in
-    let network_overview_info =
-      network_info :: ratio_dal_commitments_total_info :: slots_info
-    in
-    let* bakers_info = fetch_bakers_info network in
-    let data =
-      let open Ezjsonm in
-      `O
-        [
-          ("text", string "DAL reporting");
-          ( "blocks",
-            `A
-              (section [title_info] ()
-              @ section ["*Network overview*"] ()
-              @ section
-                  network_overview_info
-                  ~accessory:
-                    (image
-                       ~url:(Network.to_image_url network)
-                       ~alt:(Network.to_string network))
-                  ()
-              @ section ["*Baker performance overview*"] ()
-              @ section bakers_info ()) );
-        ]
-    in
-    let rpc =
-      RPC_core.make
-        ~data:(Data data)
-        POST
-        (String.split_on_char '/' (Uri.path webhook))
-        (fun _json -> ())
-    in
-    let endpoint = endpoint_of_webhook webhook in
-    let* _response = RPC_core.call_raw endpoint rpc in
-    Lwt.return_unit
-
-  (* Relies on GMT for time.
-
-     /!\ Remember Paris is (UTC+1).
-  *)
-
-  let tasks ~dal_slack_webhook ~configuration =
-    match dal_slack_webhook with
-    | None -> []
-    | Some webhook ->
-        let webhook = Uri.of_string webhook in
-        let action () = action ~webhook ~configuration () in
-        [Chronos.task ~name:"network-overview" ~tm:"0 0-23/6 * * *" ~action]
-end
-
 let init ~(configuration : configuration) etherlink_configuration cloud
     next_agent =
   let () = toplog "Init" in
@@ -2882,17 +3154,7 @@ let on_new_level t level =
   let* () =
     if level mod 1_000 = 0 then update_bakers_infos t else Lwt.return_unit
   in
-  let* infos_per_level =
-    get_infos_per_level
-      ~client:t.bootstrap.client
-      ~endpoint:t.bootstrap.node_rpc_endpoint
-      ~level
-      ~etherlink_operators:
-        (match t.etherlink with
-        | None -> []
-        | Some setup ->
-            setup.operator.account :: setup.operator.batching_operators)
-  in
+  let* infos_per_level = get_infos_per_level t ~level in
   toplog "Level info processed" ;
   Hashtbl.replace t.infos level infos_per_level ;
   let metrics =
@@ -3069,6 +3331,12 @@ let register (module Cli : Scenarios_cli.Dal) =
     let bakers = Cli.bakers in
     let external_rpc = Cli.node_external_rpc_server in
     let dal_incentives = Cli.dal_incentives in
+    let monitor_app_configuration =
+      Option.map
+        (fun dal_slack_webhook ->
+          {dal_slack_webhook = Uri.of_string dal_slack_webhook})
+        Cli.Alerts.dal_slack_webhook
+    in
     let t =
       {
         with_dal;
@@ -3093,6 +3361,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         bootstrap_dal_node_identity_file;
         external_rpc;
         dal_incentives;
+        monitor_app_configuration;
       }
     in
     (t, etherlink)
@@ -3197,7 +3466,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     ~__FILE__
     ~title:"DAL node benchmark"
     ~tasks:
-      (Tasks.tasks
+      (Monitoring_app.Tasks.tasks
          ~dal_slack_webhook:Cli.Alerts.dal_slack_webhook
          ~configuration)
     ~tags:[]
