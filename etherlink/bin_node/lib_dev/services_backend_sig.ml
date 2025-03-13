@@ -187,7 +187,7 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
       Executor.replay ~log_file:"replay_rpc" ~profile:false number
     in
     match result with
-    | Apply_success {block; _} -> return block
+    | Apply_success {block = Eth block; _} -> return block
     | Apply_failure -> failwith "Could not replay the block"
 
   let smart_rollup_address = Backend.smart_rollup_address

@@ -165,6 +165,7 @@ let blueprint_injection_failed level trace =
 
 let blueprint_applied block process_time =
   let open Ethereum_types in
+  let block = match block with L2_types.Eth block -> block in
   let count_txs = function
     | TxHash l -> List.length l
     | TxFull l -> List.length l

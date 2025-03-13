@@ -49,6 +49,20 @@ end
 
 type 'a block = Eth of 'a Ethereum_types.block
 
+let block_hash block = match block with Eth block -> block.hash
+
+let block_number block = match block with Eth block -> block.number
+
+let block_number_of_transactions block =
+  match block with
+  | Eth block ->
+      let number_of_transactions =
+        match block.transactions with
+        | TxHash l -> List.length l
+        | TxFull l -> List.length l
+      in
+      number_of_transactions
+
 let decode_block_hash ~chain_family bytes =
   match chain_family with
   | EVM -> Ethereum_types.decode_block_hash bytes

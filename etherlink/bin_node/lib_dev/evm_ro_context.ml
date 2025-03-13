@@ -166,8 +166,8 @@ let get_irmin_hash_from_block_hash ctxt hash =
   in
   match res with
   | Some block_bytes ->
-      let block = Ethereum_types.block_from_rlp block_bytes in
-      get_irmin_hash_from_number ctxt block.number
+      let block = L2_types.block_from_bytes ~chain_family:EVM block_bytes in
+      get_irmin_hash_from_number ctxt (L2_types.block_number block)
   | None -> failwith "Unknown block %a" Ethereum_types.pp_block_hash hash
 
 let find_irmin_hash ctxt (block : Ethereum_types.Block_parameter.extended) =

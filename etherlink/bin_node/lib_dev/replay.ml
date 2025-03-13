@@ -64,7 +64,7 @@ let main ?profile ?kernel ?kernel_verbosity ~data_dir config number =
         Ethereum_types.pp_quantity
         number
         Ethereum_types.pp_block_hash
-        block.hash ;
+        (L2_types.block_hash block) ;
       return_unit
   | Apply_failure ->
       failwith "Could not replay blueprint %a" Ethereum_types.pp_quantity number

@@ -304,7 +304,7 @@ let execute_and_inspect ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint ~config
 type apply_result =
   | Apply_success of {
       evm_state : t;
-      block : Ethereum_types.legacy_transaction_object Ethereum_types.block;
+      block : Ethereum_types.legacy_transaction_object L2_types.block;
     }
   | Apply_failure
 
@@ -334,12 +334,14 @@ let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir ~config
     let*! bytes =
       inspect evm_state (Durable_storage_path.Block.by_hash block_hash)
     in
-    return (Option.map Ethereum_types.block_from_rlp bytes)
+    return (Option.map (L2_types.block_from_bytes ~chain_family:EVM) bytes)
   in
   match block with
-  | Some ({number = Qty after_height; _} as block)
-    when Z.(equal (succ before_height) after_height) ->
-      return (Apply_success {evm_state; block})
+  | Some block ->
+      let (Qty after_height) = L2_types.block_number block in
+      if Z.(equal (succ before_height) after_height) then
+        return (Apply_success {evm_state; block})
+      else return Apply_failure
   | _ -> return Apply_failure
 
 let delete ~kind evm_state path =
@@ -388,7 +390,7 @@ let get_delayed_inbox_item evm_state hash =
       return res
   | _ -> failwith "invalid delayed inbox item"
 
-let clear_block_storage block evm_state =
+let clear_block_storage (L2_types.Eth block) evm_state =
   let open Lwt_syntax in
   (* We have 2 path to clear related to block storage:
      1. The predecessor block.
