@@ -179,7 +179,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
           ~transactions:[]
           ~delayed_transactions:[]
           ~number:Ethereum_types.(Qty Z.zero)
-          ~parent_hash:Ethereum_types.genesis_parent_hash
+          ~parent_hash:(L2_types.genesis_parent_hash ~chain_family:EVM)
       in
       let genesis_payload =
         Sequencer_blueprint.create_inbox_payload

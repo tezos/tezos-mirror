@@ -270,7 +270,7 @@ module State = struct
           ( store,
             context,
             Ethereum_types.Qty Z.zero,
-            Ethereum_types.genesis_parent_hash,
+            L2_types.genesis_parent_hash ~chain_family:EVM,
             Created )
 
   let commit store (context : Irmin_context.rw) evm_state number =

@@ -231,7 +231,7 @@ let current_block_hash evm_state =
   in
   match current_hash with
   | Some h -> return (decode_block_hash h)
-  | None -> return genesis_parent_hash
+  | None -> return (L2_types.genesis_parent_hash ~chain_family:EVM)
 
 (* The Fast Execution engine relies on Lwt_preemptive to execute Wasmer in
    dedicated worker threads (`Lwt_preemptive.detach`), while pushing to lwt
