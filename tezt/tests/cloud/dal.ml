@@ -1097,18 +1097,19 @@ module Monitoring_app = struct
     | `Sandbox | `Weeklynet _ | `Nextnet _ -> "no_image_yet"
 
   let endpoint_of_webhook webhook =
-    Endpoint.
-      {
-        host =
-          (* Default to slack hooks host *)
-          Option.value ~default:"hooks.slack.com" (Uri.host webhook);
-        scheme =
-          (* Default to https scheme *)
-          Option.value ~default:"https" (Uri.scheme webhook);
-        port =
-          (* Default to https default post port 443 *)
-          Option.value ~default:443 (Uri.port webhook);
-      }
+    let host =
+      (* Default to slack hooks host. *)
+      Option.value ~default:"hooks.slack.com" (Uri.host webhook)
+    in
+    let scheme =
+      (* Default to https scheme. *)
+      Option.value ~default:"https" (Uri.scheme webhook)
+    in
+    let port =
+      (* Default to https default https port. *)
+      match scheme with "https" -> 443 | "http" -> 80 | _ -> 443
+    in
+    Endpoint.{host; scheme; port}
 
   module Format_app = struct
     (* Helper for Slack App message format block-kit
