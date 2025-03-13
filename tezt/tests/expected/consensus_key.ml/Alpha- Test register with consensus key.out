@@ -96,7 +96,8 @@ This sequence of operations was run:
       "pendings":
         [ { "cycle": 2, "pkh": "[PUBLIC_KEY_HASH]",
             "pk": "[PUBLIC_KEY]" } ] },
-  "stakers": [], "delegators": [ "[PUBLIC_KEY_HASH]" ] }
+  "companion_key": { "active": null }, "stakers": [],
+  "delegators": [ "[PUBLIC_KEY_HASH]" ] }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 { "balance": "0", "counter": "4" }
@@ -135,6 +136,7 @@ This sequence of operations was run:
     { "active":
         { "pkh": "[PUBLIC_KEY_HASH]",
           "pk": "[PUBLIC_KEY]" } },
+  "companion_key": { "active": null },
   "stakers":
     [ { "staker": "[PUBLIC_KEY_HASH]",
         "frozen_deposits": "500000000000" } ],
