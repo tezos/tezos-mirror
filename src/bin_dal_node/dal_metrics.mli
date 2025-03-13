@@ -33,6 +33,10 @@ val slot_waiting_for_attestation : set:bool -> int -> unit
     value is set to 1 if [set] is true, and -1 otherwise. *)
 val slot_attested : set:bool -> int -> unit
 
+(** Update the "attestation" ratio for the baker *)
+val attested_slots_for_baker_per_level_ratio :
+  delegate:Signature.Public_key_hash.t -> float -> unit
+
 (** Update the seen layer1 heads with the given value. *)
 val new_layer1_head : head_level:int32 -> unit
 

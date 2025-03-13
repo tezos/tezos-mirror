@@ -76,6 +76,8 @@ module type T = sig
 
   val is_attested : dal_attestation -> slot_index -> bool
 
+  val number_of_attested_slots : dal_attestation -> int
+
   val get_round : Fitness.t -> int32 tzresult
 
   val block_shell_header : block_info -> Block_header.shell_header
