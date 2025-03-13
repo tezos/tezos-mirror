@@ -1125,6 +1125,12 @@ module Monitoring_app = struct
           ("alt_text", string alt);
         ]
 
+    (* [section content ?accessory] creates Slack App message blocks
+       with an optional accessory.
+
+       The function joins content strings with newlines, formats them
+       using mrkdwn, and returns properly structured JSON objects for
+       Slack's Block Kit. *)
     let section content ?accessory () =
       let open Ezjsonm in
       if List.is_empty content then []
