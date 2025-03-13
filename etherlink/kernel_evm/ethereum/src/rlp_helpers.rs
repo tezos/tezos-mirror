@@ -376,3 +376,14 @@ pub trait VersionedEncoding: std::marker::Sized {
         bytes
     }
 }
+
+// This type carries no information, it is useful to efficiently skip
+// some fields when deserializing an RLP-encoded structure.
+#[derive(Debug, PartialEq, Clone)]
+pub struct IgnoredField();
+
+impl Decodable for IgnoredField {
+    fn decode(_decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
+        Ok(Self())
+    }
+}

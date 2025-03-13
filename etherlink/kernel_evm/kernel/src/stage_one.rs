@@ -5,8 +5,8 @@
 
 use crate::blueprint::Blueprint;
 use crate::blueprint_storage::{
-    clear_all_blueprints, read_current_block_header, store_forced_blueprint,
-    store_inbox_blueprint, BlockHeader,
+    clear_all_blueprints, read_current_blueprint_header, store_forced_blueprint,
+    store_inbox_blueprint,
 };
 use crate::configuration::{
     Configuration, ConfigurationMode, DalConfiguration, TezosContracts,
@@ -59,10 +59,10 @@ fn fetch_delayed_transactions<Host: Runtime>(
 ) -> anyhow::Result<()> {
     let timestamp = read_last_info_per_level_timestamp(host)?;
     // Number and minimal timestamp for the first forced blueprint
-    let (base, minimal_timestamp) = match read_current_block_header(host) {
-        Result::Ok(BlockHeader {
-            blueprint_header, ..
-        }) => (blueprint_header.number + 1, blueprint_header.timestamp),
+    let (base, minimal_timestamp) = match read_current_blueprint_header(host) {
+        Result::Ok(blueprint_header) => {
+            (blueprint_header.number + 1, blueprint_header.timestamp)
+        }
         Err(_) => (0.into(), 0.into()),
     };
     // Accumulator of how many blueprints we fetched

@@ -15,6 +15,7 @@ use crate::{delayed_inbox, DelayedInbox};
 use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
+use std::fmt::Debug;
 use tezos_ethereum::block::L2Block;
 use tezos_ethereum::eth_gen::OwnedHash;
 use tezos_ethereum::rlp_helpers::{
@@ -110,12 +111,12 @@ pub struct EVMBlockHeader {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub struct BlockHeader {
+pub struct BlockHeader<H> {
     pub blueprint_header: BlueprintHeader,
-    pub evm_block_header: EVMBlockHeader,
+    pub evm_block_header: H,
 }
 
-impl From<L2Block> for BlockHeader {
+impl From<L2Block> for BlockHeader<EVMBlockHeader> {
     fn from(block: L2Block) -> Self {
         Self {
             blueprint_header: BlueprintHeader {
@@ -208,8 +209,8 @@ pub fn store_inbox_blueprint<Host: Runtime>(
 
 #[inline(always)]
 pub fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Error> {
-    match read_current_block_header(host) {
-        Ok(block_header) => Ok(block_header.blueprint_header.number + 1),
+    match read_current_blueprint_header(host) {
+        Ok(blueprint_header) => Ok(blueprint_header.number + 1),
         Err(Error::Storage(StorageError::Runtime(RuntimeError::PathNotFound))) => {
             Ok(U256::zero())
         }
@@ -261,7 +262,7 @@ impl Decodable for EVMBlockHeader {
     }
 }
 
-impl Encodable for BlockHeader {
+impl Encodable for BlockHeader<EVMBlockHeader> {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         let Self {
             blueprint_header: BlueprintHeader { number, timestamp },
@@ -275,7 +276,7 @@ impl Encodable for BlockHeader {
     }
 }
 
-impl Decodable for BlockHeader {
+impl<H: Decodable> Decodable for BlockHeader<H> {
     fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
         rlp_helpers::check_list(decoder, 3)?;
 
@@ -296,15 +297,22 @@ impl Decodable for BlockHeader {
 
 pub fn store_current_block_header<Host: Runtime>(
     host: &mut Host,
-    current_block_header: &BlockHeader,
+    current_block_header: &BlockHeader<EVMBlockHeader>,
 ) -> Result<(), Error> {
     store_rlp(current_block_header, host, &EVM_CURRENT_BLOCK_HEADER).map_err(Error::from)
 }
 
-pub fn read_current_block_header<Host: Runtime>(
+pub fn read_current_block_header<Host: Runtime, H: Decodable>(
     host: &Host,
-) -> Result<BlockHeader, Error> {
+) -> Result<BlockHeader<H>, Error> {
     Ok(read_rlp(host, &EVM_CURRENT_BLOCK_HEADER)?)
+}
+
+pub fn read_current_blueprint_header<Host: Runtime>(
+    host: &Host,
+) -> Result<BlueprintHeader, Error> {
+    let block_header = read_current_block_header::<_, rlp_helpers::IgnoredField>(host)?;
+    Ok(block_header.blueprint_header)
 }
 
 /// For the tick model we only accept blueprints where cumulative size of chunks
