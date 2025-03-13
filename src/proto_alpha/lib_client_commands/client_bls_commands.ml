@@ -29,6 +29,16 @@ let public_key_parameter ~name ~desc =
          | Some pk -> return pk
          | None -> cctxt#error "Failed to read a BLS public key"))
 
+let secret_key_parameter ~name ~desc =
+  param
+    ~name
+    ~desc
+    (parameter (fun (cctxt : #Protocol_client_context.full) s ->
+         let open Lwt_result_syntax in
+         match Signature.Bls.Secret_key.of_b58check_opt s with
+         | Some sk -> return sk
+         | None -> cctxt#error "Failed to read a BLS secret key"))
+
 type public_key_with_proof = {
   pk : Signature.Bls.Public_key.t;
   proof : Signature.Bls.t;
@@ -56,6 +66,31 @@ let public_key_and_public_key_hash_encoding =
     (obj2
        (req "public_key" Signature.Bls.Public_key.encoding)
        (req "public_key_hash" Signature.Bls.Public_key_hash.encoding))
+
+type threshold_secret_key = {id : int; sk : Signature.Bls.Secret_key.t}
+
+let threshold_secret_key_encoding =
+  let open Data_encoding in
+  conv
+    (fun {id; sk} -> (id, sk))
+    (fun (id, sk) -> {id; sk})
+    (obj2 (req "id" int8) (req "secret_key" Signature.Bls.Secret_key.encoding))
+
+type threshold_keys = {
+  pk : Signature.Bls.Public_key.t;
+  pkh : Signature.Bls.Public_key_hash.t;
+  secret_shares : threshold_secret_key list;
+}
+
+let threshold_keys_encoding =
+  let open Data_encoding in
+  conv
+    (fun {pk; pkh; secret_shares} -> (pk, pkh, secret_shares))
+    (fun (pk, pkh, secret_shares) -> {pk; pkh; secret_shares})
+    (obj3
+       (req "public_key" Signature.Bls.Public_key.encoding)
+       (req "public_key_hash" Signature.Bls.Public_key_hash.encoding)
+       (req "secret_shares" (list threshold_secret_key_encoding)))
 
 let check_public_key_with_proof pk proof =
   let msg =
@@ -162,4 +197,39 @@ let commands () =
               return_unit
           | None -> cctxt#error "Failed to aggregate the public keys"
         else cctxt#error "Failed to check proofs");
+    command
+      ~group
+      ~desc:
+        "Shamir's Secret Sharing: share a secret key between N participants so \
+         that any M participants can collaboratively sign messages, while \
+         fewer than M participants cannot produce a valid signature"
+      no_options
+      (prefixes ["share"; "bls"; "secret"; "key"]
+      @@ secret_key_parameter
+           ~name:"BLS secret key"
+           ~desc:"B58 encoded BLS secret key"
+      @@ prefixes ["between"]
+      @@ Tezos_clic.param
+           ~name:"shares"
+           ~desc:"Number of shares (N)"
+           Client_proto_args.int_parameter
+      @@ prefixes ["shares"; "with"; "threshold"]
+      @@ Tezos_clic.param
+           ~name:"threshold"
+           ~desc:"Number of required signatures (M)"
+           Client_proto_args.int_parameter
+      @@ stop)
+      (fun () sk n m (cctxt : #Protocol_client_context.full) ->
+        let open Lwt_result_syntax in
+        let pk, pkh, secret_shares =
+          Signature.Bls.generate_threshold_key sk ~n ~m
+        in
+        let secret_shares = List.map (fun (id, sk) -> {id; sk}) secret_shares in
+        let json =
+          Data_encoding.Json.construct
+            threshold_keys_encoding
+            {pk; pkh; secret_shares}
+        in
+        let*! () = cctxt#message "%a@." Data_encoding.Json.pp json in
+        return_unit);
   ]
