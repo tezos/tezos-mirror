@@ -29,6 +29,16 @@
 (** EVM node server state. *)
 type t
 
+type l2_setup = {
+  l2_chain_id : int;
+  world_state_path : string option;
+  bootstrap_accounts : string list option;
+  sequencer_pool_address : string option;
+  minimum_base_fee_per_gas : Wei.t option;
+  da_fee_per_byte : Wei.t option;
+  maximum_gas_per_transaction : int64 option;
+}
+
 type time_between_blocks =
   | Nothing  (** Does not produce any block if not forced by the private RPC *)
   | Time_between_blocks of float
@@ -335,6 +345,7 @@ val patch_config_with_experimental_feature :
   ?tx_queue_config:tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
+  ?l2_chains:l2_setup list ->
   unit ->
   JSON.t ->
   JSON.t

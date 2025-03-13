@@ -49,26 +49,17 @@ type sequencer_setup = {
   enable_multichain : bool;
 }
 
-type l2_setup = {
-  l2_chain_id : int;
-  world_state_path : string option;
-  bootstrap_accounts : string list option;
-  sequencer_pool_address : string option;
-  minimum_base_fee_per_gas : Wei.t option;
-  da_fee_per_byte : Wei.t option;
-  maximum_gas_per_transaction : int64 option;
-}
-
 let default_l2_setup ~l2_chain_id =
-  {
-    l2_chain_id;
-    world_state_path = None;
-    bootstrap_accounts = None;
-    sequencer_pool_address = None;
-    minimum_base_fee_per_gas = None;
-    da_fee_per_byte = None;
-    maximum_gas_per_transaction = None;
-  }
+  Evm_node.
+    {
+      l2_chain_id;
+      world_state_path = None;
+      bootstrap_accounts = None;
+      sequencer_pool_address = None;
+      minimum_base_fee_per_gas = None;
+      da_fee_per_byte = None;
+      maximum_gas_per_transaction = None;
+    }
 
 let multichain_setup_to_single ~(setup : multichain_sequencer_setup) =
   let observer =
@@ -191,7 +182,7 @@ let observer_counter =
   ref 0
 
 let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
-    ~sc_rollup_node ?rpc_server ?websockets ?history_mode evm_node =
+    ~sc_rollup_node ?rpc_server ?websockets ?history_mode ?l2_chain evm_node =
   let preimages_dir = Evm_node.preimages_dir evm_node in
   let initial_kernel = Evm_node.initial_kernel evm_node in
   let config_file = Temp.file (sf "config-%d.json" !observer_counter) in
@@ -211,6 +202,10 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
     | _, _ ->
         fun c ->
           Evm_node.patch_config_with_experimental_feature
+            ?l2_chains:
+              (match l2_chain with
+              | None -> None
+              | Some l2_chain -> Some [l2_chain])
             ?rpc_server
             ?enable_websocket:websockets
             ()
@@ -292,7 +287,7 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
   in
   return output
 
-let generate_l2_kernel_config l2_setup =
+let generate_l2_kernel_config (l2_setup : Evm_node.l2_setup) =
   let l2_config =
     Temp.file (Format.sprintf "l2-%d-config.yaml" l2_setup.l2_chain_id)
   in
@@ -310,13 +305,13 @@ let generate_l2_kernel_config l2_setup =
   in
   return l2_config
 
-let setup_kernel_multichain ~l2_setups ~l1_contracts
+let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
     ?max_delayed_inbox_blueprint_length ~mainnet_compat ?delayed_inbox_timeout
     ?delayed_inbox_min_levels ?maximum_allowed_ticks
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?enable_fast_withdrawal ~enable_dal ?dal_slots ~sequencer ~preimages_dir
     ~kernel () =
-  let l2_chain_ids = List.map (fun l2 -> l2.l2_chain_id) l2_setups in
+  let l2_chain_ids = List.map (fun l2 -> l2.Evm_node.l2_chain_id) l2_setups in
   let* l2_configs = Lwt_list.map_s generate_l2_kernel_config l2_setups in
   let rollup_config = Temp.file "rollup-config.yaml" in
   let*! () =
@@ -374,7 +369,7 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
       ?enable_fast_withdrawal
       ?dal_slots
       ?max_blueprint_lookahead_in_seconds
-      ?bootstrap_accounts:chain_config.bootstrap_accounts
+      ?bootstrap_accounts:chain_config.Evm_node.bootstrap_accounts
       ?enable_fa_bridge
       ~preimages_dir
       ~kernel
@@ -481,6 +476,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
   in
   let seq_patch_config =
     Evm_node.patch_config_with_experimental_feature
+      ?l2_chains:(if enable_multichain then Some l2_chains else None)
       ~drop_duplicate_when_injection
       ~blueprints_publisher_order_enabled
       ?next_wasm_runtime
@@ -494,6 +490,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
   in
   let obs_patch_config =
     Evm_node.patch_config_with_experimental_feature
+      ?l2_chains:(if enable_multichain then Some l2_chains else None)
       ~drop_duplicate_when_injection
       ~blueprints_publisher_order_enabled
       ?next_wasm_runtime
