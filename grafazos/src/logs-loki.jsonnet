@@ -23,15 +23,13 @@
 local grafonnet = import 'github.com/grafana/grafonnet/gen/grafonnet-latest/main.libsonnet';
 local query = grafonnet.query;
 
-// Base
+// Grafazos Base
 local base = import './base.jsonnet';
 local logs = base.logs;
-
 
 //##
 // Logs
 //##
-
 {
 
   // Query helper
@@ -41,19 +39,19 @@ local logs = base.logs;
 
   nodelogs(h, w, x, y):
     local q = self.query('node', 'Node logs');
-    logs.new('Node logs', [q], h, w, x, y),
+    logs.new('Node logs', [q], h, w, x, y, 'loki', 'Loki'),
 
   bakerlogs(h, w, x, y):
     local q = self.query('baker', 'Baker logs');
-    logs.new('Baker logs', [q], h, w, x, y),
+    logs.new('Baker logs', [q], h, w, x, y, 'loki', 'Loki'),
 
   accuserlogs(h, w, x, y):
     local q = self.query('accuser', 'Accuser logs');
-    logs.new('Accuser logs', [q], h, w, x, y),
+    logs.new('Accuser logs', [q], h, w, x, y, 'loki', 'Loki'),
 
   systemlogs(h, w, x, y):
     local q = query.prometheus.new('Loki', '{job="varlogs"}')
               + query.prometheus.withLegendFormat('System logs');
-    logs.new('System logs', [q], h, w, x, y),
+    logs.new('System logs', [q], h, w, x, y, 'loki', 'Loki'),
 
 }
