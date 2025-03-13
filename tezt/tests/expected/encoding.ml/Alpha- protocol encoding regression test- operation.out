@@ -75,6 +75,40 @@
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents": [
     {
+      "kind": "attestations_aggregate",
+      "consensus_content": {
+        "level": 1331,
+        "round": 0,
+        "block_payload_hash": "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG"
+      },
+      "committee": [
+        0,
+        23,
+        51,
+        893
+      ]
+    }
+  ],
+  "signature": "BLsigBANTUiNcB2UB7VMj1yTn4SgX9NZabdSY3cHBZgDvFoDcJWrtYZZZshA8LEjY46wqxoWM7PvDTatLiDoiCTmc4p2LVdsXLC9CPtDmZYe7mr33uPgLyVutVSqMmrxRF1ej9Ce7p7nRH"
+}'
+0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81f0000053300000000000000000000000000000000000000000000000000000000000000000000000000000008000000170033037dff03aa9d7b7d96832a1d687a1be9a330ed89ba3fcb293de1dbbede4d9f69a22555f2e2c661f68ed427c4cafc7568554207ce0e2d6daa5abb0a07031ed7e5ee3d5c9c17cf827b1824a4b03afd7f13cdde07e37d8c38b053fd928815e462bdf9eb062d
+
+./octez-codec decode alpha.operation from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81f0000053300000000000000000000000000000000000000000000000000000000000000000000000000000008000000170033037dff03aa9d7b7d96832a1d687a1be9a330ed89ba3fcb293de1dbbede4d9f69a22555f2e2c661f68ed427c4cafc7568554207ce0e2d6daa5abb0a07031ed7e5ee3d5c9c17cf827b1824a4b03afd7f13cdde07e37d8c38b053fd928815e462bdf9eb062d
+{ "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+  "contents":
+    [ { "kind": "attestations_aggregate",
+        "consensus_content":
+          { "level": 1331, "round": 0,
+            "block_payload_hash":
+              "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG" },
+        "committee": [ 0, 23, 51, 893 ] } ],
+  "signature":
+    "BLsigBANTUiNcB2UB7VMj1yTn4SgX9NZabdSY3cHBZgDvFoDcJWrtYZZZshA8LEjY46wqxoWM7PvDTatLiDoiCTmc4p2LVdsXLC9CPtDmZYe7mr33uPgLyVutVSqMmrxRF1ej9Ce7p7nRH" }
+
+./octez-codec encode alpha.operation from '{
+  "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+  "contents": [
+    {
       "kind": "ballot",
       "source": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
       "period": 719,

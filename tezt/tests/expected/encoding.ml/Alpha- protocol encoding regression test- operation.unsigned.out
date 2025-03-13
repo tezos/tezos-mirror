@@ -66,6 +66,37 @@
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents": [
     {
+      "kind": "attestations_aggregate",
+      "consensus_content": {
+        "level": 1331,
+        "round": 0,
+        "block_payload_hash": "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG"
+      },
+      "committee": [
+        0,
+        23,
+        51,
+        893
+      ]
+    }
+  ]
+}'
+0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81f0000053300000000000000000000000000000000000000000000000000000000000000000000000000000008000000170033037d
+
+./octez-codec decode alpha.operation.unsigned from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81f0000053300000000000000000000000000000000000000000000000000000000000000000000000000000008000000170033037d
+{ "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+  "contents":
+    [ { "kind": "attestations_aggregate",
+        "consensus_content":
+          { "level": 1331, "round": 0,
+            "block_payload_hash":
+              "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG" },
+        "committee": [ 0, 23, 51, 893 ] } ] }
+
+./octez-codec encode alpha.operation.unsigned from '{
+  "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+  "contents": [
+    {
       "kind": "ballot",
       "source": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
       "period": 719,
