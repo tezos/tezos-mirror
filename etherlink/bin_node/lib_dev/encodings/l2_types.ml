@@ -47,11 +47,13 @@ module Chain_family = struct
   let pp fmt cf = Format.fprintf fmt "%s" (to_string cf)
 end
 
-type 'a block = Eth of 'a Ethereum_types.block
+type 'a block = Eth of 'a Ethereum_types.block | Tez of Tezos_types.block
 
-let block_hash block = match block with Eth block -> block.hash
+let block_hash block =
+  match block with Eth block -> block.hash | Tez block -> block.hash
 
-let block_number block = match block with Eth block -> block.number
+let block_number block =
+  match block with Eth block -> block.number | Tez block -> block.number
 
 let block_number_of_transactions block =
   match block with
@@ -62,20 +64,26 @@ let block_number_of_transactions block =
         | TxFull l -> List.length l
       in
       number_of_transactions
+  | Tez _ -> 0
+
+let block_parent block =
+  match block with Eth block -> block.parent | Tez block -> block.parent_hash
 
 let decode_block_hash ~chain_family bytes =
   match chain_family with
   | EVM -> Ethereum_types.decode_block_hash bytes
-  | Michelson -> raise (Invalid_argument "TODO tezos")
+  | Michelson -> Tezos_types.decode_block_hash bytes
 
 let genesis_parent_hash ~chain_family =
   match chain_family with
   | EVM -> Ethereum_types.genesis_parent_hash
-  | Michelson -> raise (Invalid_argument "TODO tezos")
+  | Michelson -> Tezos_types.genesis_parent_hash
 
 let block_from_bytes ~chain_family bytes =
   match chain_family with
   | EVM ->
       let eth_block = Ethereum_types.block_from_rlp bytes in
       Eth eth_block
-  | Michelson -> raise (Invalid_argument "TODO tezos")
+  | Michelson ->
+      let tez_block = Tezos_types.block_from_binary bytes in
+      Tez tez_block

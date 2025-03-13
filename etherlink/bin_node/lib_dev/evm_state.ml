@@ -390,7 +390,7 @@ let get_delayed_inbox_item evm_state hash =
       return res
   | _ -> failwith "invalid delayed inbox item"
 
-let clear_block_storage (L2_types.Eth block) evm_state =
+let clear_block_storage block evm_state =
   let open Lwt_syntax in
   (* We have 2 path to clear related to block storage:
      1. The predecessor block.
@@ -400,11 +400,13 @@ let clear_block_storage (L2_types.Eth block) evm_state =
      necessary to produce the next block. Block production starts by reading
      the head to retrieve information such as parent block hash.
   *)
-  let (Qty number) = block.number in
+  let block_parent = L2_types.block_parent block in
+  let block_number = L2_types.block_number block in
+  let (Qty number) = block_number in
   (* Handles case (1.). *)
   let* evm_state =
     if number > Z.zero then
-      let pred_block_path = Durable_storage_path.Block.by_hash block.parent in
+      let pred_block_path = Durable_storage_path.Block.by_hash block_parent in
       delete ~kind:Value evm_state pred_block_path
     else return evm_state
   in

@@ -605,7 +605,7 @@ module State = struct
         return_true
     | None -> return_false
 
-  let store_block_unsafe conn evm_state (L2_types.Eth block) =
+  let store_block_unsafe conn evm_state block =
     let open Lwt_result_syntax in
     (* Store the block itself. *)
     let* () = Evm_store.Blocks.store conn block in
@@ -753,6 +753,9 @@ module State = struct
                   baseFeePerGas |> Ethereum_types.Qty.to_z
                   |> Metrics.set_gas_price)
                 block.baseFeePerGas
+          | Tez _ ->
+              (* TODO: https://gitlab.com/tezos/tezos/-/issues/7866 *)
+              ()
         in
         let* () =
           Evm_store.Blueprints.store
@@ -762,7 +765,13 @@ module State = struct
 
         let* evm_state, receipts =
           if not ctxt.legacy_block_storage then
-            let* receipts = store_block_unsafe conn evm_state block in
+            let* receipts =
+              match block with
+              | Eth block -> store_block_unsafe conn evm_state block
+              | Tez _ ->
+                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7866 *)
+                  Lwt_result.return []
+            in
             let*! evm_state = Evm_state.clear_block_storage block evm_state in
             return (evm_state, receipts)
           else
@@ -772,6 +781,9 @@ module State = struct
                   Durable_storage.block_receipts_of_block
                     (read_from_state evm_state)
                     block
+              | Tez _ ->
+                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7866 *)
+                  Lwt.return []
             in
             return (evm_state, receipts)
         in
@@ -809,11 +821,15 @@ module State = struct
     ctxt.session.context <- context ;
     ctxt.session.next_blueprint_number <- Qty (Z.succ level) ;
     ctxt.session.current_block_hash <- block_hash ;
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7865 *)
     (match block with
     | Eth block ->
         Lwt_watcher.notify
           head_watcher
-          (Ethereum_types.Subscription.NewHeads block)) ;
+          (Ethereum_types.Subscription.NewHeads block)
+    | Tez _ ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7866 *)
+        ()) ;
     Option.iter
       (fun (split_level, split_timestamp) ->
         ctxt.session.last_split_block <- Some (split_level, split_timestamp))
@@ -897,6 +913,7 @@ module State = struct
             Transaction_object.reconstruct_block payload block
           in
           return (L2_types.Eth current_block)
+      | Tez block -> return (L2_types.Tez block)
     in
 
     let*! () =
@@ -1763,6 +1780,7 @@ module Handlers = struct
               | TxHash tx_hashes -> List.to_seq tx_hashes
               | TxFull tx_objects ->
                   List.to_seq tx_objects |> Seq.map Transaction_object.hash)
+          | Tez _ -> Seq.empty
         in
         return tx_hashes
     | Last_known_L1_level -> (

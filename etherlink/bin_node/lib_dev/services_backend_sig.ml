@@ -188,6 +188,8 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
     in
     match result with
     | Apply_success {block = Eth block; _} -> return block
+    | Apply_success {block = Tez _; _} ->
+        failwith "Could not replay a tezlink block"
     | Apply_failure -> failwith "Could not replay the block"
 
   let smart_rollup_address = Backend.smart_rollup_address
