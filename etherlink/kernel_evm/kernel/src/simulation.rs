@@ -657,6 +657,7 @@ pub fn start_simulation_mode<Host: Runtime>(
 #[cfg(test)]
 mod tests {
 
+    use evm_execution::configuration::EVMVersion;
     use primitive_types::H256;
     use tezos_ethereum::{block::BlockConstants, tx_signature::TxSignature};
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -772,7 +773,7 @@ mod tests {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             callee,
             caller,
             call_data,
@@ -811,7 +812,8 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome = evaluation.run(&mut host, None, false);
+        let outcome =
+            evaluation.run(&mut host, None, false, &EVMVersion::current_test_config());
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
@@ -837,7 +839,8 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome = evaluation.run(&mut host, None, false);
+        let outcome =
+            evaluation.run(&mut host, None, false, &EVMVersion::current_test_config());
 
         assert!(outcome.is_ok(), "simulation should have succeeded");
         let outcome = outcome.unwrap();
@@ -869,7 +872,8 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome = evaluation.run(&mut host, None, false);
+        let outcome =
+            evaluation.run(&mut host, None, false, &EVMVersion::current_test_config());
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();

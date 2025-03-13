@@ -204,6 +204,7 @@ mod tests {
         },
         parsing::DAL_SLOT_IMPORT_SIGNAL_TAG,
     };
+    use evm_execution::configuration::EVMVersion;
     use primitive_types::U256;
     use rlp::Encodable;
     use tezos_crypto_rs::hash::{HashTrait, SecretKeyEd25519, UnknownSignature};
@@ -563,6 +564,7 @@ mod tests {
             &conf.tezos_contracts,
             false,
             false,
+            &EVMVersion::current_test_config(),
         )
         .unwrap()
         {

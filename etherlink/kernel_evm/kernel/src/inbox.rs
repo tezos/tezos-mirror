@@ -778,6 +778,7 @@ mod tests {
     use crate::inbox::TransactionContent::Ethereum;
     use crate::parsing::RollupType;
     use crate::storage::*;
+    use evm_execution::configuration::EVMVersion;
     use primitive_types::U256;
     use std::fmt::Write;
     use tezos_crypto_rs::hash::SmartRollupHash;
@@ -924,6 +925,7 @@ mod tests {
             &TezosContracts::default(),
             false,
             false,
+            &EVMVersion::current_test_config(),
         )
         .unwrap()
         .unwrap();
@@ -955,6 +957,7 @@ mod tests {
             &TezosContracts::default(),
             false,
             false,
+            &EVMVersion::current_test_config(),
         )
         .unwrap()
         .unwrap();
@@ -1011,6 +1014,7 @@ mod tests {
             },
             false,
             false,
+            &EVMVersion::current_test_config(),
         )
         .unwrap()
         .unwrap();
@@ -1057,6 +1061,7 @@ mod tests {
             &TezosContracts::default(),
             false,
             false,
+            &EVMVersion::current_test_config(),
         )
         .unwrap();
 
@@ -1108,6 +1113,7 @@ mod tests {
             &TezosContracts::default(),
             false,
             false,
+            &EVMVersion::current_test_config(),
         )
         .unwrap();
 
@@ -1147,6 +1153,7 @@ mod tests {
             &TezosContracts::default(),
             false,
             false,
+            &EVMVersion::current_test_config(),
         )
         .unwrap();
 
@@ -1203,6 +1210,7 @@ mod tests {
             &TezosContracts::default(),
             false,
             false,
+            &EVMVersion::current_test_config(),
         )
         .unwrap()
         .unwrap();
@@ -1224,6 +1232,7 @@ mod tests {
             &TezosContracts::default(),
             false,
             false,
+            &EVMVersion::current_test_config(),
         )
         .unwrap()
         .unwrap();
@@ -1286,6 +1295,7 @@ mod tests {
             &TezosContracts::default(),
             false,
             false,
+            &EVMVersion::current_test_config(),
         )
         .unwrap()
         .unwrap();
@@ -1310,6 +1320,7 @@ mod tests {
             &TezosContracts::default(),
             false,
             false,
+            &EVMVersion::current_test_config(),
         )
         .unwrap();
         assert!(inbox_content.is_some());
@@ -1321,6 +1332,7 @@ mod tests {
             &TezosContracts::default(),
             false,
             false,
+            &EVMVersion::current_test_config(),
         )
         .unwrap();
         assert!(inbox_content.is_none());
@@ -1425,6 +1437,7 @@ mod tests {
             false,
             None,
             false,
+            &EVMVersion::current_test_config(),
         )
         .unwrap();
 

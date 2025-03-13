@@ -626,6 +626,7 @@ mod tests {
     use evm_execution::account_storage::{
         account_path, init_account_storage, EthereumAccountStorage,
     };
+    use evm_execution::configuration::EVMVersion;
     use primitive_types::{H160, U256};
     use std::str::FromStr;
     use tezos_ethereum::block::BlockFees;
@@ -686,9 +687,9 @@ mod tests {
     const DUMMY_BASE_FEE_PER_GAS: u64 = MINIMUM_BASE_FEE_PER_GAS;
     const DUMMY_DA_FEE: u64 = DA_FEE_PER_BYTE;
 
-    fn dummy_configuration() -> Configuration {
+    fn dummy_configuration(evm_configuration: Config) -> Configuration {
         Configuration {
-            chain_config: ChainConfig::new_evm_config(DUMMY_CHAIN_ID),
+            chain_config: ChainConfig::new_evm_config(DUMMY_CHAIN_ID, evm_configuration),
             ..Configuration::default()
         }
     }
@@ -861,8 +862,13 @@ mod tests {
         );
         store_block_fees(host, &dummy_block_fees()).unwrap();
 
-        produce(host, &mut dummy_configuration(), None, None)
-            .expect("The block production failed.");
+        produce(
+            host,
+            &mut dummy_configuration(EVMVersion::current_test_config()),
+            None,
+            None,
+        )
+        .expect("The block production failed.");
     }
 
     fn assert_current_block_reading_validity<Host: Runtime>(host: &mut Host) {
@@ -903,8 +909,13 @@ mod tests {
             U256::from(30000u64),
         );
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
-        produce(&mut host, &mut dummy_configuration(), None, None)
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            &mut dummy_configuration(EVMVersion::current_test_config()),
+            None,
+            None,
+        )
+        .expect("The block production failed.");
 
         assert!(
             read_transaction_receipt_status(&mut host, &tx_hash).is_err(),
@@ -942,8 +953,13 @@ mod tests {
         );
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
-        produce(&mut host, &mut dummy_configuration(), None, None)
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            &mut dummy_configuration(EVMVersion::current_test_config()),
+            None,
+            None,
+        )
+        .expect("The block production failed.");
 
         let status = read_transaction_receipt_status(&mut host, &tx_hash)
             .expect("Should have found receipt");
@@ -979,8 +995,13 @@ mod tests {
         );
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
-        produce(&mut host, &mut dummy_configuration(), None, None)
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            &mut dummy_configuration(EVMVersion::current_test_config()),
+            None,
+            None,
+        )
+        .expect("The block production failed.");
         let receipt = read_transaction_receipt(&mut host, &tx_hash)
             .expect("should have found receipt");
         assert_eq!(TransactionStatus::Success, receipt.status);
@@ -1055,11 +1076,21 @@ mod tests {
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         // Produce block for blueprint containing transaction_0
-        produce(&mut host, &mut dummy_configuration(), None, None)
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            &mut dummy_configuration(EVMVersion::current_test_config()),
+            None,
+            None,
+        )
+        .expect("The block production failed.");
         // Produce block for blueprint containing transaction_1
-        produce(&mut host, &mut dummy_configuration(), None, None)
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            &mut dummy_configuration(EVMVersion::current_test_config()),
+            None,
+            None,
+        )
+        .expect("The block production failed.");
 
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
@@ -1110,8 +1141,13 @@ mod tests {
         );
         store_block_fees(&mut host, &dummy_block_fees).unwrap();
 
-        produce(&mut host, &mut dummy_configuration(), None, None)
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            &mut dummy_configuration(EVMVersion::current_test_config()),
+            None,
+            None,
+        )
+        .expect("The block production failed.");
         let receipt0 = read_transaction_receipt(&mut host, &tx_hash_0)
             .expect("should have found receipt");
         let receipt1 = read_transaction_receipt(&mut host, &tx_hash_1)
@@ -1164,8 +1200,13 @@ mod tests {
         );
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
-        produce(&mut host, &mut dummy_configuration(), None, None)
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            &mut dummy_configuration(EVMVersion::current_test_config()),
+            None,
+            None,
+        )
+        .expect("The block production failed.");
 
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
@@ -1208,8 +1249,13 @@ mod tests {
             U256::from(10000000000000000000u64),
         );
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
-        produce(&mut host, &mut dummy_configuration(), None, None)
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            &mut dummy_configuration(EVMVersion::current_test_config()),
+            None,
+            None,
+        )
+        .expect("The block production failed.");
 
         let new_number_of_blocks_indexed = blocks_index.length(&host).unwrap();
 
@@ -1292,6 +1338,7 @@ mod tests {
             None,
             &limits,
             None,
+            &EVMVersion::current_test_config(),
         )
         .expect("Should safely ask for a reboot");
 
@@ -1361,8 +1408,13 @@ mod tests {
 
         // Apply the transaction
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
-        produce(&mut host, &mut dummy_configuration(), None, None)
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            &mut dummy_configuration(EVMVersion::current_test_config()),
+            None,
+            None,
+        )
+        .expect("The block production failed.");
         assert!(
             read_transaction_receipt(&mut host, &tx_hash).is_err(),
             "Transaction is invalid, so should not have a receipt"
@@ -1402,22 +1454,37 @@ mod tests {
         let blueprint = almost_empty_blueprint();
         store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
-        produce(&mut host, &mut dummy_configuration(), None, None)
-            .expect("Empty block should have been produced");
+        produce(
+            &mut host,
+            &mut dummy_configuration(EVMVersion::current_test_config()),
+            None,
+            None,
+        )
+        .expect("Empty block should have been produced");
         check_current_block_number(&mut host, 0);
 
         // second block
         let blueprint = almost_empty_blueprint();
         store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
-        produce(&mut host, &mut dummy_configuration(), None, None)
-            .expect("Empty block should have been produced");
+        produce(
+            &mut host,
+            &mut dummy_configuration(EVMVersion::current_test_config()),
+            None,
+            None,
+        )
+        .expect("Empty block should have been produced");
         check_current_block_number(&mut host, 1);
 
         // third block
         let blueprint = almost_empty_blueprint();
         store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
-        produce(&mut host, &mut dummy_configuration(), None, None)
-            .expect("Empty block should have been produced");
+        produce(
+            &mut host,
+            &mut dummy_configuration(EVMVersion::current_test_config()),
+            None,
+            None,
+        )
+        .expect("Empty block should have been produced");
         check_current_block_number(&mut host, 2);
     }
 
@@ -1549,7 +1616,7 @@ mod tests {
 
         let mut configuration = Configuration {
             limits,
-            ..dummy_configuration()
+            ..dummy_configuration(EVMVersion::current_test_config())
         };
 
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
@@ -1629,7 +1696,7 @@ mod tests {
 
         let mut configuration = Configuration {
             limits,
-            ..dummy_configuration()
+            ..dummy_configuration(EVMVersion::current_test_config())
         };
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         let computation_result = produce(&mut host, &mut configuration, None, None)
@@ -1719,8 +1786,13 @@ mod tests {
             U256::from(1_000_000_000_000_000_000u64),
         );
 
-        produce(&mut host, &mut dummy_configuration(), None, None)
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            &mut dummy_configuration(EVMVersion::current_test_config()),
+            None,
+            None,
+        )
+        .expect("The block production failed.");
 
         // See address at https://www.multicall3.com/ on in the github repository linked above
         let expected_created_contract =
@@ -1781,7 +1853,7 @@ mod tests {
 
         let mut configuration = Configuration {
             limits,
-            ..dummy_configuration()
+            ..dummy_configuration(EVMVersion::current_test_config())
         };
         // sanity check: no current block
         assert!(
@@ -1884,8 +1956,13 @@ mod tests {
         );
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
-        produce(&mut host, &mut dummy_configuration(), None, None)
-            .expect("The block production failed.");
+        produce(
+            &mut host,
+            &mut dummy_configuration(EVMVersion::current_test_config()),
+            None,
+            None,
+        )
+        .expect("The block production failed.");
 
         let receipt = read_transaction_receipt(&mut host, &tx_hash)
             .expect("Should have found receipt");

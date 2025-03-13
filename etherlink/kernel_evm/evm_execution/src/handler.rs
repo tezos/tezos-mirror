@@ -3093,6 +3093,7 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
 mod test {
     use super::*;
     use crate::account_storage::init_account_storage;
+    use crate::configuration::EVMVersion;
     use crate::precompiles;
     use evm::Config;
     use pretty_assertions::assert_eq;
@@ -3177,21 +3178,13 @@ mod test {
         )
     }
 
-    const CONFIG: Config = Config {
-        // The current implementation doesn't support Cancun call
-        // stack limit of 256.  We need to set a lower limit until we
-        // have switched to a head-based recursive calls.
-        call_stack_limit: 256,
-        ..Config::cancun()
-    };
-
     #[test]
     fn legacy_create_to_correct_address() {
         let mut mock_runtime = MockKernelHost::default();
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
 
         let gas_price = U256::from(21000);
 
@@ -3234,7 +3227,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller: H160 =
             H160::from_str("9bbfed6889322e016e0a02ee459d306fc19545d8").unwrap();
 
@@ -3276,7 +3270,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
 
         let gas_price = U256::from(21000);
 
@@ -3322,7 +3316,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(28349_u64);
 
         // We use an origin distinct from caller for testing purposes
@@ -3395,7 +3390,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(28349_u64);
 
         let gas_price = U256::from(21000);
@@ -3497,7 +3493,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(2340);
 
         let gas_price = U256::from(21000);
@@ -3600,7 +3597,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(8213);
 
         let gas_price = U256::from(21000);
@@ -3701,7 +3699,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(444);
 
         let gas_price = U256::from(21000);
@@ -3781,7 +3780,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(117);
 
         let gas_price = U256::from(21000);
@@ -3846,7 +3846,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(117);
 
         let gas_price = U256::from(21000);
@@ -3920,7 +3921,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(118);
 
         let gas_price = U256::from(21000);
@@ -3991,7 +3993,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -4061,7 +4064,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -4140,7 +4144,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -4235,7 +4240,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -4295,7 +4301,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -4372,7 +4379,7 @@ mod test {
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
 
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
 
         let caller_address: [u8; 20] =
             hex::decode("a94f5374fce5edbc8e2a8697c15331677e6ebf0b")
@@ -4448,7 +4455,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
 
         let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
 
@@ -4497,7 +4504,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -4581,7 +4589,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -4610,7 +4619,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
 
         let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
         let withdrawal_contract =
@@ -4654,7 +4663,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -4743,7 +4753,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -4916,7 +4927,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
 
         let gas_price = U256::from(21000);
 
@@ -4996,7 +5007,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(523_u64);
 
         let mut handler = EvmHandler::new(
@@ -5067,7 +5079,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -5149,7 +5162,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(523_u64);
 
         let gas_price = U256::from(21000);
@@ -5207,7 +5221,7 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
 
         let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
 
@@ -5257,7 +5271,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(523_u64);
 
         let mut handler = EvmHandler::new(
@@ -5337,6 +5352,7 @@ mod test {
         let mut evm_account_storage = init_account_storage().unwrap();
         // This test is specifically testing a Shanghai behaviour:
         let config = Config::shanghai();
+
         let caller = H160::from_low_u64_be(111_u64);
 
         let gas_price = U256::from(21000);
@@ -5408,7 +5424,8 @@ mod test {
         let block = dummy_first_block();
         let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
         let mut evm_account_storage = init_account_storage().unwrap();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
+
         let caller = H160::from_low_u64_be(111_u64);
 
         let gas_price = U256::from(21000);

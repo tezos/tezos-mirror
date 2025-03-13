@@ -6,7 +6,6 @@
 pub use alloy_sol_types::SolCall;
 use alloy_sol_types::{sol, SolConstructor};
 use crypto::hash::ContractKt1Hash;
-use evm::Config;
 use num_bigint::BigInt;
 use primitive_types::{H160, H256, U256};
 use tezos_data_encoding::enc::BinWriter;
@@ -26,6 +25,7 @@ use tezos_storage::read_u256_le_default;
 
 use crate::{
     account_storage::{account_path, EthereumAccountStorage},
+    configuration::EVMVersion,
     handler::{EvmHandler, ExecutionOutcome},
     precompiles::{
         self, precompile_set, FA_BRIDGE_PRECOMPILE_ADDRESS, SYSTEM_ACCOUNT_ADDRESS,
@@ -62,14 +62,6 @@ const MOCK_WRAPPER_BYTECODE: &[u8] =
 const REENTRANCY_TESTER_BYTECODE: &[u8] =
     include_bytes!("../../tests/contracts/artifacts/ReentrancyTester.bytecode");
 
-pub const CONFIG: Config = Config {
-    // The current implementation doesn't support Cancun call
-    // stack limit of 256.  We need to set a lower limit until we
-    // have switched to a head-based recursive calls.
-    call_stack_limit: 256,
-    ..Config::cancun()
-};
-
 /// Create a smart contract in the storage with the mocked token code
 pub fn deploy_mock_wrapper(
     host: &mut MockKernelHost,
@@ -96,7 +88,7 @@ pub fn deploy_mock_wrapper(
         &block,
         evm_account_storage,
         &precompiles,
-        CONFIG,
+        &EVMVersion::current_test_config(),
         None,
         *caller,
         [code, calldata.abi_encode()].concat(),
@@ -143,7 +135,7 @@ pub fn deploy_reentrancy_tester(
         &block,
         evm_account_storage,
         &precompiles,
-        CONFIG,
+        &EVMVersion::current_test_config(),
         None,
         *caller,
         [code, calldata.abi_encode()].concat(),
@@ -177,7 +169,7 @@ pub fn run_fa_deposit(
         &block,
         evm_account_storage,
         &precompiles,
-        CONFIG,
+        &EVMVersion::current_test_config(),
         *caller,
         deposit,
         100_000_000_000,
@@ -401,7 +393,7 @@ pub fn fa_bridge_precompile_call_withdraw(
 ) -> ExecutionOutcome {
     let block = dummy_first_block();
     let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
-    let config = CONFIG;
+    let config = EVMVersion::current_test_config();
 
     let mut handler = EvmHandler::new(
         host,

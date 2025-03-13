@@ -245,14 +245,16 @@ pub fn execute_deposit<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use alloy_sol_types::SolEvent;
-    use evm_execution::account_storage::init_account_storage;
     use evm_execution::fa_bridge::test_utils::create_fa_ticket;
+    use evm_execution::{
+        account_storage::init_account_storage, configuration::EVMVersion,
+    };
     use primitive_types::{H160, U256};
     use rlp::Decodable;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::michelson::MichelsonBytes;
 
-    use crate::{bridge::DEPOSIT_EVENT_TOPIC, CONFIG};
+    use crate::bridge::DEPOSIT_EVENT_TOPIC;
 
     use super::{execute_deposit, Deposit};
 
@@ -348,9 +350,13 @@ mod tests {
 
         let deposit = dummy_deposit();
 
-        let outcome =
-            execute_deposit(&mut host, &mut evm_account_storage, &deposit, CONFIG)
-                .unwrap();
+        let outcome = execute_deposit(
+            &mut host,
+            &mut evm_account_storage,
+            &deposit,
+            &EVMVersion::current_test_config(),
+        )
+        .unwrap();
         assert!(outcome.is_success());
         assert_eq!(outcome.logs.len(), 1);
 
@@ -376,14 +382,22 @@ mod tests {
         let mut deposit = dummy_deposit();
         deposit.amount = U256::MAX;
 
-        let outcome =
-            execute_deposit(&mut host, &mut evm_account_storage, &deposit, CONFIG)
-                .unwrap();
+        let outcome = execute_deposit(
+            &mut host,
+            &mut evm_account_storage,
+            &deposit,
+            &EVMVersion::current_test_config(),
+        )
+        .unwrap();
         assert!(outcome.is_success());
 
-        let outcome =
-            execute_deposit(&mut host, &mut evm_account_storage, &deposit, CONFIG)
-                .unwrap();
+        let outcome = execute_deposit(
+            &mut host,
+            &mut evm_account_storage,
+            &deposit,
+            &EVMVersion::current_test_config(),
+        )
+        .unwrap();
         assert!(!outcome.is_success());
         assert!(outcome.logs.is_empty());
     }

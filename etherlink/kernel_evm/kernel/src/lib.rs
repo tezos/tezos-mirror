@@ -374,7 +374,9 @@ mod tests {
         inbox::{Transaction, TransactionContent},
         upgrade::KernelUpgrade,
     };
+    use evm::Config;
     use evm_execution::account_storage::{self, EthereumAccountStorage};
+    use evm_execution::configuration::EVMVersion;
     use evm_execution::fa_bridge::deposit::{ticket_hash, FaDeposit};
     use evm_execution::fa_bridge::test_utils::{
         convert_h160, convert_u256, dummy_ticket, kernel_wrapper, ticket_balance_add,
@@ -416,9 +418,9 @@ mod tests {
     const DUMMY_BASE_FEE_PER_GAS: u64 = 12345u64;
     const DUMMY_DA_FEE: u64 = 2_000_000_000_000u64;
 
-    fn dummy_configuration() -> Configuration {
+    fn dummy_configuration(evm_configuration: Config) -> Configuration {
         Configuration {
-            chain_config: ChainConfig::new_evm_config(DUMMY_CHAIN_ID),
+            chain_config: ChainConfig::new_evm_config(DUMMY_CHAIN_ID, evm_configuration),
             ..Configuration::default()
         }
     }
@@ -594,7 +596,7 @@ mod tests {
 
         let mut configuration = Configuration {
             limits,
-            ..dummy_configuration()
+            ..dummy_configuration(EVMVersion::current_test_config())
         };
 
         crate::storage::store_minimum_base_fee_per_gas(
