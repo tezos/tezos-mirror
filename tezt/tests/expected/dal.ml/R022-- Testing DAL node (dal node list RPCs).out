@@ -109,6 +109,10 @@ Available services:
   - GET /protocol_parameters
       Returns the protocol parameters as known by the DAL node. An optional
       'level' argument can specify for which level to retrieve them. 
+  - GET /published_levels/<int32>/known_traps
+      For a given published level, return all the traps known by the node.
+      Optional arguments allow to restrict the output to a given delegate or
+      slot index. 
   - POST /slots
       Post a slot to the DAL node, computes its commitment and commitment
       proof, then computes the correspoding shards with their proof. The
@@ -123,6 +127,7 @@ Available services:
 
 Dynamic parameter description:
   
+  int32
   int32
   <pkh>
       A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded) 

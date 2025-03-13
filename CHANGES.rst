@@ -276,6 +276,7 @@ DAL node
 - **Feature** A new RPC ``/p2p/gossipsub/reconnection_delays`` which
   provides for each unreachable point, the time remaining until the
   next reconnection attempt. (MR :gl:`!16767`)
+
 - **Bugfix** From v21.2, the ``SO_KEEP_ALIVE`` socket option was used
   for incoming connections only. It is not used with both incoming
   connections and outgoing connections.
@@ -344,6 +345,8 @@ DAL node
 
 - Increased the retention period of shards for bakers from 16 levels to 150 levels. (MR
   :gl:`!16869`)
+- Added a new RPC ``GET /published_levels/<level>/known_traps`` that returns the
+  trap shards that the DAL node knows. (MR :gl:`!16870`)
 
 Protocol
 ~~~~~~~~

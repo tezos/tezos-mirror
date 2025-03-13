@@ -32,7 +32,7 @@ let get_attestation_map (type block_info attestation_operation dal_attestation)
 let filter_injectable_traps attestation_map traps =
   List.filter_map
     (fun trap ->
-      let Store.Traps.{delegate; slot_index; shard; shard_proof} = trap in
+      let Types.{delegate; slot_index; shard; shard_proof} = trap in
       let attestation_opt =
         Signature.Public_key_hash.Map.find delegate attestation_map
       in
