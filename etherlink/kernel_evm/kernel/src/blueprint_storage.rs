@@ -3,7 +3,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::block_storage;
 use crate::blueprint::Blueprint;
 use crate::configuration::{Configuration, ConfigurationMode};
 use crate::error::{Error, StorageError};
@@ -28,9 +27,7 @@ use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::RuntimeError;
-use tezos_storage::{
-    error::Error as GenStorageError, read_rlp, store_read_slice, store_rlp,
-};
+use tezos_storage::{read_rlp, store_read_slice, store_rlp};
 
 pub const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/evm/blueprints");
 
@@ -210,15 +207,13 @@ pub fn store_inbox_blueprint<Host: Runtime>(
 }
 
 #[inline(always)]
-pub fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> anyhow::Result<U256> {
-    match block_storage::read_current_number(host) {
-        Err(err) => match err.downcast_ref() {
-            Some(GenStorageError::Runtime(RuntimeError::PathNotFound)) => {
-                Ok(U256::zero())
-            }
-            _ => Err(err),
-        },
-        Ok(block_number) => Ok(block_number.saturating_add(U256::one())),
+pub fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Error> {
+    match read_current_block_header(host) {
+        Ok(block_header) => Ok(block_header.blueprint_header.number + 1),
+        Err(Error::Storage(StorageError::Runtime(RuntimeError::PathNotFound))) => {
+            Ok(U256::zero())
+        }
+        Err(err) => Err(err),
     }
 }
 
@@ -304,6 +299,12 @@ pub fn store_current_block_header<Host: Runtime>(
     current_block_header: &BlockHeader,
 ) -> Result<(), Error> {
     store_rlp(current_block_header, host, &EVM_CURRENT_BLOCK_HEADER).map_err(Error::from)
+}
+
+pub fn read_current_block_header<Host: Runtime>(
+    host: &Host,
+) -> Result<BlockHeader, Error> {
+    Ok(read_rlp(host, &EVM_CURRENT_BLOCK_HEADER)?)
 }
 
 /// For the tick model we only accept blueprints where cumulative size of chunks
@@ -600,6 +601,7 @@ pub fn read_next_blueprint<Host: Runtime>(
     host: &mut Host,
     config: &mut Configuration,
 ) -> anyhow::Result<(Option<Blueprint>, usize)> {
+    use crate::block_storage;
     let (number, parent_hash, previous_timestamp) =
         match block_storage::read_current(host) {
             Ok(block) => (block.number + 1, block.hash, block.timestamp),
