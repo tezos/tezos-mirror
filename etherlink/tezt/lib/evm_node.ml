@@ -111,6 +111,7 @@ module Parameters = struct
     mode : mode;
     mutable history : history_mode option;
     data_dir : string;
+    config_file : string option;
     rpc_addr : string;
     rpc_port : int;
     endpoint : string;
@@ -782,8 +783,8 @@ let mode_with_new_private_rpc (mode : mode) =
   | _ -> mode
 
 let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
-    ?(mode = Proxy) ?history ?data_dir ?rpc_addr ?rpc_port ?restricted_rpcs
-    ?spawn_rpc endpoint =
+    ?(mode = Proxy) ?history ?data_dir ?config_file ?rpc_addr ?rpc_port
+    ?restricted_rpcs ?spawn_rpc endpoint =
   let arguments, rpc_addr, rpc_port =
     connection_arguments ?rpc_addr ?rpc_port ?runner ()
   in
@@ -818,6 +819,7 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
         mode;
         history;
         data_dir;
+        config_file;
         rpc_addr;
         rpc_port;
         endpoint;
@@ -840,13 +842,22 @@ let spawn_rpc evm_node = evm_node.persistent_state.spawn_rpc
 
 let data_dir evm_node = evm_node.persistent_state.data_dir
 
+let config_file evm_node = evm_node.persistent_state.config_file
+
 let data_dir_arg evm_node = ["--data-dir"; evm_node.persistent_state.data_dir]
+
+let config_file_arg evm_node =
+  Cli_arg.optional_arg
+    "config-file"
+    Fun.id
+    evm_node.persistent_state.config_file
 
 (* assume a valid config for the given command and uses new latest run
    command format. *)
 let run_args evm_node =
   let shared_args =
-    data_dir_arg evm_node @ evm_node.persistent_state.arguments
+    config_file_arg evm_node @ data_dir_arg evm_node
+    @ evm_node.persistent_state.arguments
   in
   let mode_args =
     match evm_node.persistent_state.mode with
@@ -967,7 +978,9 @@ let spawn_run ?(extra_arguments = []) evm_node =
 
 module Config_file = struct
   let filename evm_node =
-    Filename.concat evm_node.persistent_state.data_dir "config.json"
+    match evm_node.persistent_state.config_file with
+    | Some config_file -> config_file
+    | None -> Filename.concat evm_node.persistent_state.data_dir "config.json"
 
   let read evm_node =
     match evm_node.persistent_state.runner with
@@ -997,15 +1010,17 @@ module Config_file = struct
     write node config
 end
 
-let spawn_init_config_minimal ~data_dir
+let spawn_init_config_minimal ~data_dir ?config_file
     ?(path = Uses.(path Constant.octez_evm_node)) ?(extra_arguments = []) () =
   Process.spawn ~name:"evm_node_init_config" path
   @@ ["init"; "config"; "--data-dir"; data_dir]
+  @ Cli_arg.optional_arg "config-file" Fun.id config_file
   @ extra_arguments
 
 let spawn_init_config ?(extra_arguments = []) evm_node =
   let shared_args =
-    data_dir_arg evm_node @ evm_node.persistent_state.arguments
+    data_dir_arg evm_node @ config_file_arg evm_node
+    @ evm_node.persistent_state.arguments
     @ Cli_arg.optional_arg
         "restricted-rpcs"
         Fun.id
@@ -1363,8 +1378,8 @@ let patch_config_gc ?history_mode json =
          | Rolling retention -> `String (Format.sprintf "rolling:%d" retention)
          | Full retention -> `String (Format.sprintf "full:%d" retention))
 
-let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
-    ?restricted_rpcs ?history_mode ?spawn_rpc rollup_node =
+let init ?patch_config ?name ?runner ?mode ?data_dir ?config_file ?rpc_addr
+    ?rpc_port ?restricted_rpcs ?history_mode ?spawn_rpc rollup_node =
   let evm_node =
     create
       ?name
@@ -1372,6 +1387,7 @@ let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
       ?mode
       ?history:history_mode
       ?data_dir
+      ?config_file
       ?rpc_addr
       ?rpc_port
       ?restricted_rpcs
@@ -1394,7 +1410,7 @@ let init_from_rollup_node_data_dir ?(omit_delayed_tx_events = false) evm_node
     spawn_command
       evm_node
       (["init"; "from"; "rollup"; "node"; rollup_node_data_dir]
-      @ data_dir_arg evm_node
+      @ data_dir_arg evm_node @ config_file_arg evm_node
       @ Cli_arg.optional_switch "omit-delayed-tx-events" omit_delayed_tx_events
       )
   in

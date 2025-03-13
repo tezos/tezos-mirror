@@ -186,10 +186,16 @@ let run_new_rpc_endpoint evm_node =
   let* () = Evm_node.run rpc_node in
   return rpc_node
 
+let observer_counter =
+  (* Counter used to give unique names to config files used by observers *)
+  ref 0
+
 let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
     ~sc_rollup_node ?rpc_server ?websockets ?history_mode evm_node =
   let preimages_dir = Evm_node.preimages_dir evm_node in
   let initial_kernel = Evm_node.initial_kernel evm_node in
+  let config_file = Temp.file (sf "config-%d.json" !observer_counter) in
+  incr observer_counter ;
   let patch_config =
     if finalized_view then
       JSON.(
@@ -238,6 +244,7 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
     Evm_node.init
       ~patch_config
       ~mode:observer_mode
+      ~config_file
       ?history_mode
       (Evm_node.endpoint evm_node)
   in

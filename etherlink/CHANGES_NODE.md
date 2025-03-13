@@ -8,6 +8,8 @@
 
 - Fixes `check config` ignoring `--data-dir` when passed `--config-file`.
   (!17214)
+- It is now possible to pass `--config-file` to the commands of the EVM node,
+  to locate the configuration file outside of the data directory. (!17216)
 
 ### RPCs changes
 

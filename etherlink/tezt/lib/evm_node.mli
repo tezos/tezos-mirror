@@ -135,6 +135,10 @@ val name : t -> string
 (** Returns the data_dir of the EVM node. *)
 val data_dir : t -> string
 
+(** Optionally returns the config file used by the EVM node, if not the one by
+    default inside the data directory. *)
+val config_file : t -> string option
+
 (** Returns the path to the directory storing the preimages used by the
     kernel runned by the node. *)
 val preimages_dir : t -> string
@@ -160,6 +164,7 @@ val create :
   ?mode:mode ->
   ?history:history_mode ->
   ?data_dir:string ->
+  ?config_file:string ->
   ?rpc_addr:string ->
   ?rpc_port:int ->
   ?restricted_rpcs:string ->
@@ -297,6 +302,7 @@ val spawn_init_config : ?extra_arguments:string list -> t -> Process.t
     Unlike [spawn_init_config], does not require a [Evm_node.t] instance. *)
 val spawn_init_config_minimal :
   data_dir:string ->
+  ?config_file:string ->
   ?path:string ->
   ?extra_arguments:string list ->
   unit ->
@@ -346,6 +352,7 @@ val init :
   ?runner:Runner.t ->
   ?mode:mode ->
   ?data_dir:string ->
+  ?config_file:string ->
   ?rpc_addr:string ->
   ?rpc_port:int ->
   ?restricted_rpcs:string ->
