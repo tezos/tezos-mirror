@@ -68,6 +68,8 @@ val update_amplification_start_reconstruction_duration : float -> unit
 (** Add a the DAL metrics timing value when a reconstruction is aborted. *)
 val update_amplification_abort_reconstruction_duration : float -> unit
 
+val per_level_processing_time : float -> unit
+
 (** [sample_time ~sampling_frequency ~to_sample ~metric_updater] samples
     execution time of function [to_sample] at frequency
     [sampling_frequency]. Execution time if any is then provided to

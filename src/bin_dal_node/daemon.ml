@@ -764,6 +764,7 @@ module Handler = struct
     let rec loop () =
       let cryptobox = Node_context.get_cryptobox ctxt in
       let*! next_final_head = Lwt_stream.get stream in
+      let launch_time = Unix.gettimeofday () in
       match next_final_head with
       | None -> Lwt.fail_with "L1 crawler lib shut down"
       | Some (finalized_block_hash, finalized_shell_header) ->
@@ -819,6 +820,8 @@ module Handler = struct
                 finalized_shell_header
                 finalized_block_hash
           in
+          let end_time = Unix.gettimeofday () in
+          Dal_metrics.per_level_processing_time (end_time -. launch_time) ;
           loop ()
     in
     let*! () = Event.emit_layer1_node_tracking_started () in
