@@ -57,6 +57,10 @@ if [ "$(ps --no-headers -o comm 1)" = "systemd" ]; then
   systemctl enable octez-node
   systemctl start octez-node
 
+  # give some time to the node to create the identity
+  # otherwise the octez-client call below will give an error
+  /usr/share/octez-baker/wait-for-node-up.sh
+
   systemctl enable octez-baker
   systemctl start octez-baker.service
 
