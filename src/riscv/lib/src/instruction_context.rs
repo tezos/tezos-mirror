@@ -270,8 +270,14 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
 
 /// Operators for producing a boolean from two values.
 pub enum Predicate {
+    Equal,
+    NotEqual,
     LessThanSigned,
     LessThanUnsigned,
+    LessThanOrEqualSigned,
+    GreaterThanSigned,
+    GreaterThanOrEqualSigned,
+    GreaterThanOrEqualUnsigned,
 }
 
 impl Predicate {
@@ -279,8 +285,14 @@ impl Predicate {
     #[inline(always)]
     fn eval(self, lhs: XValue, rhs: XValue) -> bool {
         match self {
+            Self::Equal => lhs == rhs,
+            Self::NotEqual => lhs != rhs,
             Self::LessThanSigned => (lhs as i64) < (rhs as i64),
             Self::LessThanUnsigned => lhs < rhs,
+            Self::LessThanOrEqualSigned => (lhs as i64) <= (rhs as i64),
+            Self::GreaterThanSigned => (lhs as i64) > (rhs as i64),
+            Self::GreaterThanOrEqualSigned => (lhs as i64) >= (rhs as i64),
+            Self::GreaterThanOrEqualUnsigned => lhs >= rhs,
         }
     }
 }

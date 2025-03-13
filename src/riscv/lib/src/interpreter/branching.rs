@@ -125,6 +125,17 @@ pub fn run_add_immediate_to_pc(icb: &mut impl ICB, imm: i64, rd: NonZeroXRegiste
     icb.xregister_write_nz(rd, result);
 }
 
+/// Performs a conditional ( `predicate(val(rs1), val(rs2))` ) control transfer.
+/// If condition met, the offset is sign-extended and added to the pc to form the branch
+/// target address that is then set, otherwise indicates to proceed to the next instruction.
+///
+/// Relevant RISC-V opcodes:
+/// - `BEQ`
+/// - `BNE`
+/// - `BLT`
+/// - `BLTU`
+/// - `BGE`
+/// - `BGEU`
 #[inline(always)]
 pub fn run_branch<I: ICB>(
     icb: &mut I,
@@ -142,6 +153,19 @@ pub fn run_branch<I: ICB>(
     icb.branch(cond, imm, width)
 }
 
+/// Performs a conditional ( `predicate(val(rs1), 0)` ) control transfer.
+/// If condition met, the offset is sign-extended and added to the pc to form the branch
+/// target address that is then set, otherwise indicates to proceed to the next instruction.
+///
+/// Relevant RISC-V opcodes:
+/// - `BEQ`
+/// - `BNE`
+/// - `BLT`
+/// - `BLTU`
+/// - `BGE`
+/// - `BGEU`
+/// - `C.BEQZ`
+/// - `C.BNEZ`
 #[inline(always)]
 pub fn run_branch_compare_zero<I: ICB>(
     icb: &mut I,
@@ -160,11 +184,15 @@ pub fn run_branch_compare_zero<I: ICB>(
 
 #[cfg(test)]
 mod tests {
+    use proptest::prelude::*;
+
     use crate::backend_test;
     use crate::create_state;
+    use crate::instruction_context::Predicate;
     use crate::interpreter::branching::run_jr_imm;
     use crate::machine_state::MachineCoreState;
     use crate::machine_state::MachineCoreStateLayout;
+    use crate::machine_state::ProgramCounterUpdate;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::registers::nz;
     use crate::parser::instruction::InstrWidth;
@@ -252,5 +280,246 @@ mod tests {
 
             assert_eq!(read_pc, res);
         }
+    });
+
+    macro_rules! test_branch_compare_zero {
+        ($state:ident, $predicate:expr, $imm:expr,
+         $rs1:path, $r1_val:expr, $width:expr,
+         $init_pc:ident, $expected_pc:expr
+        ) => {
+            $state.hart.pc.write($init_pc);
+            $state.hart.xregisters.write_nz($rs1, $r1_val);
+
+            let new_pc =
+                super::run_branch_compare_zero(&mut $state, $predicate, $imm, $rs1, $width);
+            prop_assert_eq!(&new_pc, $expected_pc);
+        };
+    }
+
+    macro_rules! test_branch {
+        ($state:ident, $predicate:expr, $imm:expr,
+            $rs1:path, $r1_val:expr,
+            $rs2:path, $r2_val:expr, $width:expr,
+            $init_pc:ident, $expected_pc:expr
+           ) => {
+            $state.hart.pc.write($init_pc);
+            $state.hart.xregisters.write_nz($rs1, $r1_val);
+            $state.hart.xregisters.write_nz($rs2, $r2_val);
+
+            let new_pc = super::run_branch(&mut $state, $predicate, $imm, $rs1, $rs2, $width);
+            prop_assert_eq!(&new_pc, $expected_pc);
+        };
+    }
+
+    backend_test!(test_beq_bne, F, {
+        proptest!(|(
+            init_pc in any::<u64>(),
+            imm in any::<i64>(),
+            r1_val in any::<u64>(),
+            r2_val in any::<u64>(),
+        )| {
+            // to ensure different behaviour for tests
+            prop_assume!(r1_val != r2_val);
+            // to ensure branch_pc, init_pc, next_pc are different
+            prop_assume!(imm > 10);
+            let branch_pcu = ProgramCounterUpdate::Set(init_pc.wrapping_add(imm as u64));
+            let width = InstrWidth::Uncompressed;
+            let next_pcu = ProgramCounterUpdate::Next(InstrWidth::Uncompressed);
+            let init_pcu = ProgramCounterUpdate::Set(init_pc);
+
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+
+            // BEQ: different
+            test_branch!(state, Predicate::Equal, imm, nz::t1, r1_val, nz::t2, r2_val, width, init_pc, &next_pcu);
+            // BEQ: equal
+            test_branch!(state, Predicate::Equal, imm, nz::t1, r1_val, nz::t2, r1_val, width, init_pc, &branch_pcu);
+
+            // BNE: different
+            test_branch!(state, Predicate::NotEqual, imm, nz::t1, r1_val, nz::t2, r2_val, width, init_pc, &branch_pcu);
+            // BNE: equal
+            test_branch!(state, Predicate::NotEqual, imm, nz::t1, r1_val, nz::t2, r1_val, width, init_pc, &next_pcu);
+
+            // BEQ: different - imm = 0
+            test_branch!(state, Predicate::Equal, 0, nz::t1, r1_val, nz::t2, r2_val, width, init_pc, &next_pcu);
+            // BEQ: equal - imm = 0
+            test_branch!(state, Predicate::Equal, 0, nz::t1, r1_val, nz::t2, r1_val, width, init_pc, &init_pcu);
+
+            // BNE: different - imm = 0
+            test_branch!(state, Predicate::NotEqual, 0, nz::t1, r1_val, nz::t2, r2_val, width, init_pc, &init_pcu);
+            // BNE: equal - imm = 0
+            test_branch!(state, Predicate::NotEqual, 0, nz::t1, r1_val, nz::t2, r1_val, width, init_pc, &next_pcu);
+
+            // BEQ: same register - imm = 0
+            test_branch!(state, Predicate::Equal, 0, nz::t1, r1_val, nz::t1, r2_val, width, init_pc, &init_pcu);
+            // BEQ: same register
+            test_branch!(state, Predicate::Equal, imm, nz::t1, r1_val, nz::t1, r2_val, width, init_pc, &branch_pcu);
+
+            // BNE: same register - imm = 0
+            test_branch!(state, Predicate::NotEqual, 0, nz::t1, r1_val, nz::t1, r2_val, width, init_pc, &next_pcu);
+            // BNE: same register
+            test_branch!(state, Predicate::NotEqual, imm, nz::t1, r1_val, nz::t1, r2_val, width, init_pc, &next_pcu);
+        });
+    });
+
+    backend_test!(test_bge_blt, F, {
+        proptest!(|(
+            init_pc in any::<u64>(),
+            imm in any::<i64>(),
+        )| {
+            // to ensure branch_pc and init_pc are different
+            prop_assume!(imm > 10);
+            let branch_pcu = ProgramCounterUpdate::Set(init_pc.wrapping_add(imm as u64));
+            let width = InstrWidth::Uncompressed;
+            let next_pcu = ProgramCounterUpdate::Next(InstrWidth::Uncompressed);
+            let init_pcu = ProgramCounterUpdate::Set(init_pc);
+
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+
+            // lhs < rhs
+            test_branch!(state, Predicate::LessThanSigned, imm, nz::t1, 0, nz::t2, 1, width, init_pc, &branch_pcu);
+            test_branch!(state, Predicate::GreaterThanOrEqualSigned, imm, nz::t1, i64::MIN as u64, nz::t2, i64::MAX as u64, width, init_pc, &next_pcu);
+
+            // lhs > rhs
+            test_branch!(state, Predicate::LessThanSigned, imm, nz::t1, -1_i64 as u64, nz::t2, i64::MAX as u64, width, init_pc, &branch_pcu);
+            test_branch!(state, Predicate::GreaterThanOrEqualSigned, imm, nz::t1, 0, nz::t2, -123_123i64 as u64, width, init_pc, &branch_pcu);
+
+            // lhs = rhs
+            test_branch!(state, Predicate::LessThanSigned, imm, nz::t1, 0, nz::t2, 0, width, init_pc, &next_pcu);
+            test_branch!(state, Predicate::GreaterThanOrEqualSigned, imm, nz::t1, i64::MAX as u64, nz::t2, i64::MAX as u64, width, init_pc, &branch_pcu);
+
+            // same register
+            test_branch!(state, Predicate::LessThanSigned, imm, nz::t1, -1_i64 as u64, nz::t1, -1_i64 as u64, width, init_pc, &next_pcu);
+            test_branch!(state, Predicate::GreaterThanOrEqualSigned, imm, nz::t2, 0, nz::t2, 0, width, init_pc, &branch_pcu);
+
+            // imm 0
+            // lhs < rhs
+            test_branch!(state, Predicate::LessThanSigned, 0, nz::t1, 100, nz::t2, i64::MAX as u64, width, init_pc, &init_pcu);
+            test_branch!(state, Predicate::GreaterThanOrEqualSigned, 0, nz::t1, -1_i64 as u64, nz::t2, i64::MIN as u64, width, init_pc, &init_pcu);
+
+            // same register
+            test_branch!(state, Predicate::LessThanSigned, 0, nz::t1, 123_123_123, nz::t1, 123_123_123, width, init_pc, &next_pcu);
+            test_branch!(state, Predicate::GreaterThanOrEqualSigned, 0, nz::t2, -1_i64 as u64, nz::t2, -1_i64 as u64, width, init_pc, &init_pcu);
+        });
+    });
+
+    backend_test!(test_b, F, {
+        proptest!(|(
+            init_pc in any::<u64>(),
+            imm in any::<i64>(),
+        )| {
+            // to ensure branch_pc and init_pc are different
+            prop_assume!(imm > 10);
+            let branch_pcu = ProgramCounterUpdate::Set(init_pc.wrapping_add(imm as u64));
+            let width = InstrWidth::Uncompressed;
+            let next_pcu = ProgramCounterUpdate::Next(InstrWidth::Uncompressed);
+
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+
+            // lhs < 0
+            test_branch_compare_zero!(state, Predicate::LessThanSigned, imm, nz::t1, -1_i64 as u64, width, init_pc, &branch_pcu);
+            test_branch_compare_zero!(state, Predicate::GreaterThanOrEqualSigned, imm, nz::t1, -1_i64 as u64, width, init_pc, &next_pcu);
+            test_branch_compare_zero!(state, Predicate::LessThanOrEqualSigned, imm, nz::t1, -1_i64 as u64, width, init_pc, &branch_pcu);
+            test_branch_compare_zero!(state, Predicate::GreaterThanSigned, imm, nz::t1, -1_i64 as u64, width, init_pc, &next_pcu);
+
+            // lhs > 0
+            test_branch_compare_zero!(state, Predicate::LessThanSigned, imm, nz::t1, 1, width, init_pc, &next_pcu);
+            test_branch_compare_zero!(state, Predicate::GreaterThanOrEqualSigned, imm, nz::t1, 1, width, init_pc, &branch_pcu);
+            test_branch_compare_zero!(state, Predicate::LessThanOrEqualSigned, imm, nz::t1, 1, width, init_pc, &next_pcu);
+            test_branch_compare_zero!(state, Predicate::GreaterThanSigned, imm, nz::t1, 1, width, init_pc, &branch_pcu);
+
+            // lhs = 0
+            test_branch_compare_zero!(state, Predicate::LessThanSigned, imm, nz::t1, 0, width, init_pc, &next_pcu);
+            test_branch_compare_zero!(state, Predicate::GreaterThanOrEqualSigned, imm, nz::t1, 0, width, init_pc, &branch_pcu);
+            test_branch_compare_zero!(state, Predicate::LessThanOrEqualSigned, imm, nz::t1, 0, width, init_pc, &branch_pcu);
+            test_branch_compare_zero!(state, Predicate::GreaterThanSigned, imm, nz::t1, 0, width, init_pc, &next_pcu);
+        })
+    });
+
+    backend_test!(test_bge_ble_u, F, {
+        proptest!(|(
+            init_pc in any::<u64>(),
+            imm in any::<i64>(),
+            r1_val in any::<u64>(),
+            r2_val in any::<u64>(),
+        )| {
+            prop_assume!(r1_val < r2_val);
+            // to ensure branch_pc and init_pc are different
+            prop_assume!(imm > 10);
+            let branch_pcu = ProgramCounterUpdate::Set(init_pc.wrapping_add(imm as u64));
+            let width = InstrWidth::Uncompressed;
+            let next_pcu = ProgramCounterUpdate::Next(InstrWidth::Uncompressed);
+            let pc_update_init_pcu = ProgramCounterUpdate::Set(init_pc);
+
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+
+            // lhs < rhs
+            test_branch!(state, Predicate::LessThanUnsigned, imm, nz::t1, r1_val, nz::t2, r2_val, width, init_pc, &branch_pcu);
+            test_branch!(state, Predicate::GreaterThanOrEqualUnsigned, imm, nz::t1, r1_val, nz::t2, r2_val, width, init_pc, &next_pcu);
+
+            // lhs > rhs
+            test_branch!(state, Predicate::LessThanUnsigned, imm, nz::t1, r2_val, nz::t2, r1_val, width, init_pc, &next_pcu);
+            test_branch!(state, Predicate::GreaterThanOrEqualUnsigned, imm, nz::t1, r2_val, nz::t2, r1_val, width, init_pc, &branch_pcu);
+
+            // lhs = rhs
+            test_branch!(state, Predicate::LessThanUnsigned, imm, nz::t1, r1_val, nz::t2, r1_val, width, init_pc, &next_pcu);
+            test_branch!(state, Predicate::GreaterThanOrEqualUnsigned, imm, nz::t1, r2_val, nz::t2, r2_val, width, init_pc, &branch_pcu);
+
+            // same register
+            test_branch!(state, Predicate::LessThanUnsigned, imm, nz::t1, r1_val, nz::t1, r1_val, width, init_pc, &next_pcu);
+            test_branch!(state, Predicate::GreaterThanOrEqualUnsigned, imm, nz::t2, r1_val, nz::t2, r1_val, width, init_pc, &branch_pcu);
+
+            // imm 0
+            // lhs < rhs
+            test_branch!(state, Predicate::LessThanUnsigned, 0, nz::t1, r1_val, nz::t2, r2_val, width, init_pc, &pc_update_init_pcu);
+            test_branch!(state, Predicate::GreaterThanOrEqualUnsigned, 0, nz::t1, r1_val, nz::t2, r2_val, width, init_pc, &next_pcu);
+
+            // lhs > rhs
+            test_branch!(state, Predicate::LessThanUnsigned, 0, nz::t1, r2_val, nz::t2, r1_val, width, init_pc, &next_pcu);
+            test_branch!(state, Predicate::GreaterThanOrEqualUnsigned, 0, nz::t1, r2_val, nz::t2, r1_val, width, init_pc, &pc_update_init_pcu);
+
+            // lhs = rhs
+            test_branch!(state, Predicate::LessThanUnsigned, 0, nz::t1, r1_val, nz::t2, r1_val, width, init_pc, &next_pcu);
+            test_branch!(state, Predicate::GreaterThanOrEqualUnsigned, 0, nz::t2, r2_val, nz::t1, r2_val, width, init_pc, &pc_update_init_pcu);
+
+            // same register
+            test_branch!(state, Predicate::LessThanUnsigned, 0, nz::t1, r1_val, nz::t1, r1_val, width, init_pc, &next_pcu);
+            test_branch!(state, Predicate::GreaterThanOrEqualUnsigned, 0, nz::t2, r1_val, nz::t2, r1_val, width, init_pc, &pc_update_init_pcu);
+
+        });
+    });
+
+    backend_test!(test_beqz_bnez, F, {
+        proptest!(|(
+            init_pc in any::<u64>(),
+            imm in any::<i64>(),
+            r1_val in any::<u64>(),
+        )| {
+            // to ensure branch_pc, init_pc, next_pc are different
+            prop_assume!(imm > 10);
+            let branch_pcu = ProgramCounterUpdate::Set(init_pc.wrapping_add(imm as u64));
+            let width = InstrWidth::Uncompressed;
+            let next_pcu = ProgramCounterUpdate::Next(InstrWidth::Uncompressed);
+            let init_pcu = ProgramCounterUpdate::Set(init_pc);
+
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+
+            // BEQZ
+            if r1_val == 0 {
+                test_branch_compare_zero!(state, Predicate::Equal, imm, nz::t1, r1_val, width, init_pc, &branch_pcu);
+                test_branch_compare_zero!(state, Predicate::NotEqual, imm, nz::t1, r1_val, width, init_pc, &next_pcu);
+            } else {
+                test_branch_compare_zero!(state, Predicate::Equal, imm, nz::t1, r1_val, width, init_pc, &next_pcu);
+                test_branch_compare_zero!(state, Predicate::NotEqual, imm, nz::t1, r1_val, width, init_pc, &branch_pcu);
+            }
+
+            // BEQZ when imm = 0
+            if r1_val == 0 {
+                test_branch_compare_zero!(state, Predicate::Equal, 0, nz::t1, r1_val, width, init_pc, &init_pcu);
+                test_branch_compare_zero!(state, Predicate::NotEqual, 0, nz::t1, r1_val, width, init_pc, &next_pcu);
+            } else {
+                test_branch_compare_zero!(state, Predicate::Equal, 0, nz::t1, r1_val, width, init_pc, &next_pcu);
+                test_branch_compare_zero!(state, Predicate::NotEqual, 0, nz::t1, r1_val, width, init_pc, &init_pcu);
+            }
+        });
     });
 }

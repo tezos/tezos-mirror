@@ -38,6 +38,7 @@ use crate::default::ConstDefault;
 use crate::instruction_context::ICB;
 use crate::instruction_context::IcbFnResult;
 use crate::instruction_context::IcbLoweringFn;
+use crate::instruction_context::Predicate;
 use crate::interpreter::branching;
 use crate::interpreter::integer;
 use crate::interpreter::load_store;
@@ -662,6 +663,19 @@ impl OpCode {
             Self::SetLessThanUnsigned => Some(Args::run_set_less_than_unsigned),
             Self::SetLessThanImmediateSigned => Some(Args::run_set_less_than_immediate_signed),
             Self::SetLessThanImmediateUnsigned => Some(Args::run_set_less_than_immediate_unsigned),
+            // Branching instructions
+            Self::Beq => Some(Args::run_beq),
+            Self::Beqz => Some(Args::run_beqz),
+            Self::Bne => Some(Args::run_bne),
+            Self::Bnez => Some(Args::run_bnez),
+            Self::Blt => Some(Args::run_blt),
+            Self::Bltu => Some(Args::run_bltu),
+            Self::Bltz => Some(Args::run_bltz),
+            Self::Bltez => Some(Args::run_bltez),
+            Self::Bge => Some(Args::run_bge),
+            Self::Bgeu => Some(Args::run_bgeu),
+            Self::Bgez => Some(Args::run_bgez),
+            Self::Bgz => Some(Args::run_bgz),
             _ => None,
         }
     }
@@ -950,17 +964,37 @@ macro_rules! impl_fstore_type {
     };
 }
 
-macro_rules! impl_b_type {
-    ($fn: ident) => {
+macro_rules! impl_branch {
+    ($fn: ident, $predicate: expr) => {
         /// SAFETY: This function must only be called on an `Args` belonging
         /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
-            &self,
-            core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-            Ok(core
-                .hart
-                .$fn(self.imm, self.rs1.nzx, self.rs2.nzx, self.width))
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+            let pcu = branching::run_branch(
+                icb,
+                $predicate,
+                self.imm,
+                self.rs1.nzx,
+                self.rs2.nzx,
+                self.width,
+            );
+            icb.ok(pcu)
+        }
+    };
+}
+
+macro_rules! impl_branch_compare_zero {
+    ($fn: ident, $predicate: expr) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+            let pcu = branching::run_branch_compare_zero(
+                icb,
+                $predicate,
+                self.imm,
+                self.rs1.nzx,
+                self.width,
+            );
+            icb.ok(pcu)
         }
     };
 }
@@ -1049,19 +1083,6 @@ macro_rules! impl_cr_nz_type {
             $impl(icb, self.rd.nzx, self.rs2.nzx);
             let pcu = ProgramCounterUpdate::Next(self.width);
             icb.ok(pcu)
-        }
-    };
-}
-
-macro_rules! impl_cb_type {
-    ($fn: ident) => {
-        /// SAFETY: This function must only be called on an `Args` belonging
-        /// to the same OpCode as the OpCode used to derive this function.
-        unsafe fn $fn<MC: MemoryConfig, M: ManagerReadWrite>(
-            &self,
-            core: &mut MachineCoreState<MC, M>,
-        ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-            Ok(core.hart.$fn(self.imm, self.rs1.nzx, self.width))
         }
     };
 }
@@ -1289,13 +1310,19 @@ impl Args {
     impl_store_type!(run_shnz, non_zero);
     impl_store_type!(run_sbnz, non_zero);
 
-    // RV64I B-type instructions
-    impl_b_type!(run_beq);
-    impl_b_type!(run_bne);
-    impl_b_type!(run_blt);
-    impl_b_type!(run_bge);
-    impl_b_type!(run_bltu);
-    impl_b_type!(run_bgeu);
+    // Branching instructions
+    impl_branch!(run_beq, Predicate::Equal);
+    impl_branch!(run_bne, Predicate::NotEqual);
+    impl_branch!(run_blt, Predicate::LessThanSigned);
+    impl_branch!(run_bltu, Predicate::LessThanUnsigned);
+    impl_branch!(run_bge, Predicate::GreaterThanOrEqualSigned);
+    impl_branch!(run_bgeu, Predicate::GreaterThanOrEqualUnsigned);
+    impl_branch_compare_zero!(run_beqz, Predicate::Equal);
+    impl_branch_compare_zero!(run_bnez, Predicate::NotEqual);
+    impl_branch_compare_zero!(run_bltz, Predicate::LessThanSigned);
+    impl_branch_compare_zero!(run_bgez, Predicate::GreaterThanOrEqualSigned);
+    impl_branch_compare_zero!(run_bltez, Predicate::LessThanOrEqualSigned);
+    impl_branch_compare_zero!(run_bgz, Predicate::GreaterThanSigned);
 
     // RV64I U-type instructions
     /// SAFETY: This function must only be called on an `Args` belonging
@@ -1446,12 +1473,6 @@ impl Args {
     // RV32C compressed instructions
     impl_cr_nz_type!(integer::run_mv, run_mv);
     impl_cr_nz_type!(integer::run_neg, run_neg);
-    impl_cb_type!(run_beqz);
-    impl_cb_type!(run_bnez);
-    impl_cb_type!(run_bltz);
-    impl_cb_type!(run_bgez);
-    impl_cb_type!(run_bltez);
-    impl_cb_type!(run_bgz);
     impl_ci_type!(load_store::run_li, run_li, non_zero);
 
     fn run_j<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {

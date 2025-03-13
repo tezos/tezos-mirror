@@ -139,6 +139,7 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
 
         // Clearing the context is done via `finalize`, which internally clears the
         // buffers to allow re-use.
+        self.builder.seal_all_blocks();
         self.builder.finalize();
     }
 
@@ -269,9 +270,9 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
         // Handle branching block
         self.builder.switch_to_block(branch_block);
 
-        let snapshot = self.dynamic;
         self.complete_step(block_state::PCUpdate::Offset(offset));
         self.jump_to_end();
+
         self.builder.seal_block(branch_block);
 
         // Continue on the fallthrough block
@@ -303,8 +304,14 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
 impl From<Predicate> for IntCC {
     fn from(value: Predicate) -> Self {
         match value {
+            Predicate::Equal => IntCC::Equal,
+            Predicate::NotEqual => IntCC::NotEqual,
             Predicate::LessThanSigned => IntCC::SignedLessThan,
             Predicate::LessThanUnsigned => IntCC::UnsignedLessThan,
+            Predicate::LessThanOrEqualSigned => IntCC::SignedLessThanOrEqual,
+            Predicate::GreaterThanSigned => IntCC::SignedGreaterThan,
+            Predicate::GreaterThanOrEqualSigned => IntCC::SignedGreaterThanOrEqual,
+            Predicate::GreaterThanOrEqualUnsigned => IntCC::UnsignedGreaterThanOrEqual,
         }
     }
 }

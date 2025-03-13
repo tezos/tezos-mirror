@@ -8,7 +8,6 @@
 //! U:C-16
 
 use crate::machine_state::MachineCoreState;
-use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::hart_state::HartState;
 use crate::machine_state::memory;
 use crate::machine_state::memory::Address;
@@ -46,54 +45,6 @@ where
         target_address
     }
 
-    /// Performs a conditional ( val(`rs1`) == 0 ) control transfer.
-    /// If condition met, the offset is sign-extended and added to the pc to form the branch
-    /// target address that is then set, otherwise indicates to proceed to the next instruction.
-    ///
-    /// Relevant RISC-V opcodes:
-    /// - C.BEQZ
-    /// - BEQ
-    /// - BGEU
-    pub fn run_beqz(
-        &mut self,
-        imm: i64,
-        rs1: NonZeroXRegister,
-        width: InstrWidth,
-    ) -> ProgramCounterUpdate<Address> {
-        let current_pc = self.pc.read();
-
-        if self.xregisters.read_nz(rs1) == 0 {
-            ProgramCounterUpdate::Set(current_pc.wrapping_add(imm as u64))
-        } else {
-            ProgramCounterUpdate::Next(width)
-        }
-    }
-
-    /// Performs a conditional ( val(`rs1`) != 0 ) control transfer.
-    /// If condition met, the offset is sign-extended and added to the pc to form the branch
-    /// target address that is then set, otherwise indicates to proceed to the next instruction.
-    ///
-    /// Relevant RISC-V opcodes:
-    /// - C.BNEZ
-    /// - BNE
-    /// - BLTU
-    pub fn run_bnez(
-        &mut self,
-        imm: i64,
-        rs1: NonZeroXRegister,
-        width: InstrWidth,
-    ) -> ProgramCounterUpdate<Address> {
-        let current_pc = self.pc.read();
-
-        // Branch if `val(rs1) != val(rs2)`, jumping `imm` bytes ahead.
-        // Otherwise, jump the width of current instruction
-        if self.xregisters.read_nz(rs1) != 0 {
-            ProgramCounterUpdate::Set(current_pc.wrapping_add(imm as u64))
-        } else {
-            ProgramCounterUpdate::Next(width)
-        }
-    }
-
     /// `C.EBREAK` compressed instruction
     ///
     /// Equivalent to `EBREAK`.
@@ -122,23 +73,17 @@ where
 
 #[cfg(test)]
 mod tests {
-    use proptest::prelude::*;
-    use proptest::prop_assert_eq;
-    use proptest::proptest;
-
     use crate::backend_test;
     use crate::create_state;
     use crate::interpreter::branching::run_j;
     use crate::interpreter::branching::run_jr;
     use crate::machine_state::MachineCoreState;
     use crate::machine_state::MachineCoreStateLayout;
-    use crate::machine_state::ProgramCounterUpdate;
     use crate::machine_state::hart_state::HartState;
     use crate::machine_state::hart_state::HartStateLayout;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::registers::nz;
     use crate::machine_state::registers::nz::a0;
-    use crate::machine_state::registers::t1;
     use crate::parser::instruction::InstrWidth;
 
     backend_test!(test_run_j, F, {
@@ -222,53 +167,5 @@ mod tests {
         test_shift_instr!(state, run_slli, 20, a0, 0x1234_ABEF, 0x1_234A_BEF0_0000);
         // big imm (>= 32))
         test_shift_instr!(state, run_slli, 40, a0, 0x1234_ABEF, 0x34AB_EF00_0000_0000);
-    });
-
-    macro_rules! test_branch_instr {
-        ($state:ident, $branch_fn:tt, $imm:expr,
-         $rs1:ident, $r1_val:expr, $width:expr,
-         $init_pc:ident, $expected_pc:expr
-        ) => {
-            $state.pc.write($init_pc);
-            $state.xregisters.write($rs1, $r1_val);
-
-            let new_pc = $state.$branch_fn($imm, nz::$rs1, $width);
-            prop_assert_eq!(&new_pc, $expected_pc);
-        };
-    }
-
-    backend_test!(test_beqz_bnez, F, {
-        proptest!(|(
-            init_pc in any::<u64>(),
-            imm in any::<i64>(),
-            r1_val in any::<u64>(),
-        )| {
-            // to ensure branch_pc, init_pc, next_pc are different
-            prop_assume!(imm > 10);
-            let branch_pcu = ProgramCounterUpdate::Set(init_pc.wrapping_add(imm as u64));
-            let width = InstrWidth::Uncompressed;
-            let next_pcu = ProgramCounterUpdate::Next(InstrWidth::Uncompressed);
-            let init_pcu = ProgramCounterUpdate::Set(init_pc);
-
-            let mut state = create_state!(HartState, F);
-
-            // BEQZ
-            if r1_val == 0 {
-                test_branch_instr!(state, run_beqz, imm, t1, r1_val, width, init_pc, &branch_pcu);
-                test_branch_instr!(state, run_bnez, imm, t1, r1_val, width, init_pc, &next_pcu);
-            } else {
-                test_branch_instr!(state, run_beqz, imm, t1, r1_val, width, init_pc, &next_pcu);
-                test_branch_instr!(state, run_bnez, imm, t1, r1_val, width, init_pc, &branch_pcu);
-            }
-
-            // BEQZ when imm = 0
-            if r1_val == 0 {
-                test_branch_instr!(state, run_beqz, 0, t1, r1_val, width, init_pc, &init_pcu);
-                test_branch_instr!(state, run_bnez, 0, t1, r1_val, width, init_pc, &next_pcu);
-            } else {
-                test_branch_instr!(state, run_beqz, 0, t1, r1_val, width, init_pc, &next_pcu);
-                test_branch_instr!(state, run_bnez, 0, t1, r1_val, width, init_pc, &init_pcu);
-            }
-        });
     });
 }
