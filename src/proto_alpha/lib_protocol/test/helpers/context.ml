@@ -544,6 +544,8 @@ module Delegate = struct
     voting_info : Alpha_context.Vote.delegate_info;
     active_consensus_key : Signature.Public_key_hash.t;
     pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
+    active_companion_key : Signature.Bls.Public_key_hash.t option;
+    pending_companion_keys : (Cycle.t * Signature.Bls.Public_key_hash.t) list;
   }
 
   type stake = {frozen : Tez.t; weighted_delegated : Tez.t}

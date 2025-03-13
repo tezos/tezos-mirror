@@ -269,6 +269,8 @@ type info = {
   voting_info : Vote.delegate_info;
   active_consensus_key : Signature.Public_key_hash.t;
   pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
+  active_companion_key : Bls.Public_key_hash.t option;
+  pending_companion_keys : (Cycle.t * Bls.Public_key_hash.t) list;
 }
 
 type new_info = {
@@ -311,6 +313,11 @@ type new_info = {
     (* corresponds to old active_consensus_key and pending_consensus_keys *) :
     consensus_keys_info;
   (*
+    Companion key *)
+  companion_key
+    (* corresponds to active_companion_key and pending_companion_keys *) :
+    companion_keys_info;
+  (*
     Chunked RPCs at the end, because they might be arbitrarily large *)
   stakers : (public_key_hash * Tez.t) list;
   delegators (* old name: delegated_contracts *) : Contract.t list;
@@ -321,7 +328,7 @@ type new_info = {
    - staking_balance (equals total_staked + total_delegated
    - delegated_balance (equals external_staked + external_delegated) *)
 
-let conv26 ty =
+let conv27 ty =
   Data_encoding.conv
     (fun ( x0,
            x1,
@@ -348,13 +355,14 @@ let conv26 ty =
            x22,
            x23,
            x24,
-           x25 ) ->
+           x25,
+           x26 ) ->
       ( (x0, x1, x2, x3, x4, x5, x6, x7, x8, x9),
         ( (x10, x11, x12, x13, x14, x15, x16, x17, x18, x19),
-          (x20, x21, x22, x23, x24, x25) ) ))
+          (x20, x21, x22, x23, x24, x25, x26) ) ))
     (fun ( (x0, x1, x2, x3, x4, x5, x6, x7, x8, x9),
            ( (x10, x11, x12, x13, x14, x15, x16, x17, x18, x19),
-             (x20, x21, x22, x23, x24, x25) ) ) ->
+             (x20, x21, x22, x23, x24, x25, x26) ) ) ->
       ( x0,
         x1,
         x2,
@@ -380,18 +388,19 @@ let conv26 ty =
         x22,
         x23,
         x24,
-        x25 ))
+        x25,
+        x26 ))
     ty
 
-let obj26 f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19
-    f20 f21 f22 f23 f24 f25 =
-  conv26
+let obj27 f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19
+    f20 f21 f22 f23 f24 f25 f26 =
+  conv27
     Data_encoding.(
       merge_objs
         (obj10 f0 f1 f2 f3 f4 f5 f6 f7 f8 f9)
         (merge_objs
            (obj10 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19)
-           (obj6 f20 f21 f22 f23 f24 f25)))
+           (obj7 f20 f21 f22 f23 f24 f25 f26)))
 
 let info_encoding =
   let open Data_encoding in
@@ -425,6 +434,7 @@ let info_encoding =
            voting_info;
            (* Consensus key *)
            consensus_key;
+           companion_key;
            (* Chunked RPCs *)
            stakers;
            delegators;
@@ -457,6 +467,7 @@ let info_encoding =
         voting_info,
         (* Consensus key *)
         consensus_key,
+        companion_key,
         (* Chunked RPCs *)
         stakers,
         delegators ))
@@ -488,6 +499,7 @@ let info_encoding =
            voting_info,
            (* Consensus key *)
            consensus_key,
+           companion_key,
            (* Chunked RPCs *)
            stakers,
            delegators ) ->
@@ -520,11 +532,12 @@ let info_encoding =
         voting_info;
         (* Consensus key *)
         consensus_key;
+        companion_key;
         (* Chunked RPCs *)
         stakers;
         delegators;
       })
-    (obj26
+    (obj27
        (* General baking information *)
        (req "deactivated" bool)
        (req "is_forbidden" bool)
@@ -557,6 +570,7 @@ let info_encoding =
        (req "voting_info" Vote.delegate_info_encoding)
        (* Consensus key *)
        (req "consensus_key" consensus_key_info_encoding)
+       (req "companion_key" companion_key_info_encoding)
        (* Chunked RPCs *)
        (req "stakers" stakers_encoding)
        (req "delegators" (list Contract.encoding)))
@@ -1339,6 +1353,7 @@ let info ctxt pkh =
   let* voting_info = Vote.get_delegate_info ctxt pkh in
   (* Consensus key *)
   let* consensus_key = consensus_key ctxt pkh in
+  let* companion_key = companion_key ctxt pkh in
   (* Chunked RPCs *)
   let* stakers = stakers ctxt pkh in
   let*! delegators = Delegate.delegated_contracts ctxt pkh in
@@ -1372,6 +1387,7 @@ let info ctxt pkh =
       voting_info;
       (* Consensus key *)
       consensus_key;
+      companion_key;
       (* Chunked RPCs *)
       stakers;
       delegators;
@@ -1639,6 +1655,7 @@ let info ctxt block pkh =
          voting_info;
          (* Consensus key *)
          consensus_key;
+         companion_key;
          (* Chunked RPCs *)
          stakers = _;
          delegators;
@@ -1674,4 +1691,12 @@ let info ctxt block pkh =
         List.map
           (fun (cyc, ck) -> (cyc, ck.consensus_key_pkh))
           consensus_key.pendings;
+      active_companion_key =
+        Option.map
+          (fun x -> x.companion_key_pkh)
+          companion_key.active_companion_key;
+      pending_companion_keys =
+        List.map
+          (fun (cyc, ck) -> (cyc, ck.companion_key_pkh))
+          companion_key.pending_companion_keys;
     }
