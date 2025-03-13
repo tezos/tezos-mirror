@@ -101,6 +101,9 @@ Smart Rollup node
 - Add a new RPC ``/local/outbox/pending`` to fetch all known outbox messages
   with their status. (MR :gl:`!16831`)
 
+- Add a CLI argument ``--config-file`` to allow specifying a configuration file
+  outside the data directory. (MR :gl:`!17225`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
