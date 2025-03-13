@@ -8,6 +8,9 @@ DISTRO=$1
 RELEASE=$2
 DATADIR=${3:-}
 
+# include apt-get function with retry
+. scripts/packaging/tests/tests-common.inc.sh
+
 # For the upgrade script in the CI, we do not want debconf to ask questions
 export DEBIAN_FRONTEND=noninteractive
 
@@ -19,7 +22,7 @@ sudo curl "$REPO/$DISTRO/octez.asc" | sudo gpg --dearmor -o /etc/apt/trusted.gpg
 # [add next repository]
 repository="deb $REPO/$DISTRO $RELEASE main"
 echo "$repository" | sudo tee /etc/apt/sources.list.d/octez-next.list
-sudo apt-get update
+apt-get update
 
 # [ preeseed octez ]
 if [ -z "$PREFIX" ]; then
@@ -43,7 +46,7 @@ EOF
   sudo debconf-get-selections | grep octez
 fi
 
-sudo apt-get install -y octez-baker
+apt-get install -y octez-baker
 
 if [ -n "$DATADIR" ]; then
   echo "Setup Custom data dir"
