@@ -1422,11 +1422,12 @@ module Monitoring_app = struct
       let* _response = RPC_core.call_raw endpoint rpc in
       Lwt.return_unit
 
-    (* Relies on GMT for time.
-
-       /!\ Remember Paris is (UTC+1).
+    (* Relies on UTC (Universal Time Coordinated).
+       Paris operates on Central European Time (CET), which is UTC+1
+       during standard time (winter months). During daylight saving
+       time (summer months), Paris switches to Central European Summer
+       Time (CEST), which is UTC+2.
     *)
-
     let tasks ~dal_slack_webhook ~configuration =
       match dal_slack_webhook with
       | None -> []
