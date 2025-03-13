@@ -22,6 +22,7 @@ Staked and delegated funds **have different weights** in the computation
 of delegates’ baking and voting powers: staked funds (both external
 stakes by stakers and the delegate’s own) count **three times** as much as
 delegated funds.
+This ratio is defined by the protocol constant ``EDGE_OF_STAKING_OVER_DELEGATION``.
 
 Unlike delegated funds, staked funds are considered to contribute to the
 security deposit associated with their chosen delegate. Thus, they are

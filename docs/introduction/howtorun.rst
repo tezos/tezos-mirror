@@ -166,15 +166,15 @@ your user account::
 
    octez-client register key bob as delegate
    
-You also need to stake some tez, as explained above, so as to have at least ``minimal_stake = 6000`` :ref:`baking power <minimal_baking_power>`, taking into account your own and all your delegators' staked balances, as well as their delegated balances with a lesser weight.
+You also need to stake some tez, as explained above, so as to have at least ``MINIMAL_STAKE = 6000`` :ref:`baking power <minimal_baking_power>`, taking into account your own and all your delegators' staked balances, as well as their delegated balances with a lesser weight.
 Most commonly, you would stake (at least) the needed amount from your own tez, without waiting for delegators::
 
    octez-client stake 6000 for bob
 
-Once you registered and staked tez, you need to wait the end of the current cycle plus ``consensus_rights_delay = 2`` cycles,
+Once you registered and staked tez, you need to wait the end of the current cycle plus ``CONSENSUS_RIGHTS_DELAY = 2`` cycles,
 for your rights to be considered.
 
-There is a simple RPC that can be used to check your rights for every
+There is an RPC that can be used to check your rights for every
 cycle, up to 2 cycles in the future.
 
 ::
