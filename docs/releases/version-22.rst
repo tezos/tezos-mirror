@@ -1,4 +1,4 @@
-Version 22.0~rc1
+Version 22.0~rc2
 ================
 
 Changes
@@ -79,14 +79,14 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout octez-v22.0-rc1
+  git checkout octez-v22.0-rc2
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v22.0-rc1`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v22.0-rc2`` Docker images of Octez.
 
 
 .. _packages_v22:
@@ -104,13 +104,13 @@ Note however that the Zcash parameters are in a different package now, which nee
 
 Furthermore, RPM packages are now available in a **dnf repository**. Installation instructions are detailed in :ref:`the documentation <installing_packages>`.
 
-When upgrading to v22, also note that the name of the baker service has changed.
-To restart the baker manually, do::
+When upgrading to v22, you can start or restart the ``octez-baker.service`` that runs all bakers for supported protocols.
+Alternatively, you can run them individually. For instance, to start a baker for the Quebec protocol, you can use the command::
 
-    $ sudo systemctl stop octez-baker
-    $ sudo systemctl start octez-baker-active
+  $ sudo systemctl start octez-baker@PsQuebec
 
 Changelog
 ---------
 
+- `Version 22.0~rc2 <../CHANGES.html#version-22-0-rc2>`_
 - `Version 22.0~rc1 <../CHANGES.html#version-22-0-rc1>`_
