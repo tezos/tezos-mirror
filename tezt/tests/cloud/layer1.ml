@@ -15,6 +15,34 @@ type baker_account = {pk : string; pkh : string}
 let add_prometheus_source node cloud agent =
   Scenarios_helpers.add_prometheus_source ~node cloud agent (Agent.name agent)
 
+type snapshot_info = {chain_name : string; level : int}
+
+let get_snapshot_info snapshot_path =
+  let cmd =
+    Printf.sprintf
+      "./octez-node snapshot info --json %s 2>/dev/null"
+      snapshot_path
+  in
+  let ic = Unix.open_process_in cmd in
+  let json = Ezjsonm.from_channel ic in
+  let json =
+    match Unix.close_process_in ic with
+    | Unix.WEXITED 0 -> json
+    | _ -> failwith "Snapshot info command failed"
+  in
+  let chain_name =
+    try
+      Ezjsonm.find json ["snapshot_header"; "chain_name"] |> Ezjsonm.get_string
+    with Not_found ->
+      failwith "Could not find the snapshot chain_name in the JSON output"
+  in
+  let level =
+    try Ezjsonm.find json ["snapshot_header"; "level"] |> Ezjsonm.get_int
+    with Not_found ->
+      failwith "Could not find the snapshot level in the JSON output"
+  in
+  {chain_name; level}
+
 module Network = struct
   include Network
 
@@ -28,6 +56,9 @@ module Network = struct
   let default_protocol (t : t) = Network.default_protocol (t :> Network.t)
 
   let block_time = function `Ghostnet -> 5 | `Mainnet -> 8
+
+  (** Next protocol for both Mainnet and Ghostnet - needs to be updated manually. *)
+  let migrate_to _network = Protocol.R022
 end
 
 let yes_crypto_env =
@@ -102,6 +133,29 @@ module Node = struct
          [Allow_yes_crypto; Force_history_mode_switch]
          peers
 
+  (** [add_migration_offset_to_config node snapshot ~migration_offset ~network] adds an
+      entry in the configuration file of [node] to trigger a UAU at level [~migration_offset]
+      to upgrade to the next protocol of [~network]. This entry is is parametrised by the
+      information obtained from [snapshot]. *)
+  let add_migration_offset_to_config node snapshot ~migration_offset ~network =
+    let {chain_name; level} = get_snapshot_info snapshot in
+    match migration_offset with
+    | None -> Lwt.return_unit
+    | Some migration_offset ->
+        let migration_level = level + migration_offset in
+        toplog "Add UAU entry for level : %d" migration_level ;
+        Node.Config_file.update node (fun json ->
+            Node.Config_file.set_ghostnet_sandbox_network
+              ~user_activated_upgrades:
+                [(migration_level, Network.migrate_to network)]
+              ()
+              json
+            |> JSON.update
+                 "network"
+                 (JSON.put
+                    ( "chain_name",
+                      JSON.annotate ~origin:__LOC__ (`String chain_name) )))
+
   (* If trying to only bootstrap the network from a snapshot, you will have
      errors about missing block metadata, which is likely (I guess?) to be
      because of data not included in the snapshot.
@@ -119,7 +173,8 @@ module Node = struct
      That's why the bootstrap node first syncs for few levels before being
      disconnected from the real network.
   *)
-  let init_bootstrap_node_from_snapshot ~peers (agent, node) snapshot network =
+  let init_bootstrap_node_from_snapshot ~peers (agent, node) snapshot network
+      migration_offset =
     let* snapshot = ensure_snapshot agent snapshot in
     let* () =
       let toplog s = toplog "/!\\ %s /!\\" s in
@@ -147,6 +202,9 @@ module Node = struct
     toplog "Reset node config for private a yes-crypto network" ;
     let config = isolated_config ~peers ~network ~delay:0 in
     let* () = Node.config_reset node config in
+    let* () =
+      add_migration_offset_to_config node snapshot ~migration_offset ~network
+    in
     let arguments = isolated_args peers in
     let* () = run ~env:yes_crypto_env node arguments in
     wait_for_ready node
@@ -156,10 +214,14 @@ module Node = struct
       - import the relevant snapshot
       - run it with yes-crypto enabled and allowed peer lists
   *)
-  let init_node_from_snapshot ~delay ~peers ~snapshot ~network (agent, node) =
+  let init_node_from_snapshot ~delay ~peers ~snapshot ~network ~migration_offset
+      (agent, node) =
     let* snapshot = ensure_snapshot agent snapshot in
     let config = isolated_config ~peers ~network ~delay in
     let* () = Node.config_init node config in
+    let* () =
+      add_migration_offset_to_config node snapshot ~migration_offset ~network
+    in
     let* () = Node.snapshot_import ~no_check:true node snapshot in
     let arguments = isolated_args peers in
     let* () = run ~env:yes_crypto_env node arguments in
@@ -182,10 +244,16 @@ module Node = struct
       create the associated client,
       create the yes-wallet.
   *)
-  let init_bootstrap_node ~peers ~snapshot ~network (agent, node, name) =
+  let init_bootstrap_node ~peers ~snapshot ~network ~migration_offset
+      (agent, node, name) =
     toplog "Initializing an L1 node (public network): %s" name ;
     let* () =
-      init_bootstrap_node_from_snapshot ~peers (agent, node) snapshot network
+      init_bootstrap_node_from_snapshot
+        ~peers
+        (agent, node)
+        snapshot
+        network
+        migration_offset
     in
     let* client = client ~node agent in
     let* yes_wallet = yes_wallet agent in
@@ -207,10 +275,16 @@ module Node = struct
       create the yes-wallet.
     *)
   let init_baker_node ?(delay = 0) ~accounts ~peers ~snapshot ~network
-      (agent, node, name) =
+      ~migration_offset (agent, node, name) =
     toplog "Initializing an L1 node (public network): %s" name ;
     let* () =
-      init_node_from_snapshot ~delay ~peers ~snapshot ~network (agent, node)
+      init_node_from_snapshot
+        ~delay
+        ~peers
+        ~snapshot
+        ~network
+        ~migration_offset
+        (agent, node)
     in
     let* client = client ~node agent in
     let* yes_wallet = yes_wallet agent in
@@ -225,10 +299,16 @@ module Node = struct
     Lwt.return client
 
   (** Prerequisite: the chain is running (i.e. bakers are baking blocks) *)
-  let init_stresstest_node ?(delay = 0) ~pkh ~pk ~peers ~snapshot ~network ~tps
-      (agent, node, name) =
+  let init_stresstest_node ?(delay = 0) ~pkh ~pk ~peers ~snapshot ~network
+      ~migration_offset ~tps (agent, node, name) =
     let* () =
-      init_node_from_snapshot ~delay ~peers ~snapshot ~network (agent, node)
+      init_node_from_snapshot
+        ~delay
+        ~peers
+        ~snapshot
+        ~network
+        ~migration_offset
+        (agent, node)
     in
     let* client = client ~node agent in
     let* yes_wallet = yes_wallet agent in
@@ -277,6 +357,9 @@ type stresstest_conf = {pkh : string; pk : string; tps : int; seed : int}
       Default value is 1.
       Use 0 for disabling delay and have all the bakers to merge their
       store at the beginning of cycles.
+
+    - [migration_offset]: offset that dictates after how many levels a protocol
+      upgrade will be performed via a UAU.
   *)
 type 'network configuration0 = {
   stake : int list;
@@ -285,6 +368,7 @@ type 'network configuration0 = {
   snapshot : string;
   stresstest : stresstest_conf option;
   maintenance_delay : int;
+  migration_offset : int option;
 }
 
 type configuration = Network.t configuration0
@@ -332,6 +416,7 @@ let init_baker_i i (configuration : configuration) cloud ~peers ~use_agnostic
       ~peers
       ~snapshot:configuration.snapshot
       ~network:configuration.network
+      ~migration_offset:configuration.migration_offset
       (agent, node, name)
   in
   let* baker_kind =
@@ -368,6 +453,29 @@ let init_baker_i i (configuration : configuration) cloud ~peers ~use_agnostic
       in
       let* () = Baker.wait_for_ready baker in
       toplog "init_baker: %s is ready!" name ;
+      (* If case of a migration scenario, we also need to start the next protocol baker binary. *)
+      let* () =
+        if configuration.migration_offset == None then Lwt.return_unit
+        else (
+          toplog "init_baker_next: Initialize next baker" ;
+          let name = name ^ "-next" in
+          let* next_baker =
+            let protocol = Network.migrate_to configuration.network in
+            Baker.Agent.init
+              ~env:yes_crypto_env
+              ~name
+              ~delegates:
+                (List.map (fun ({pkh; _} : baker_account) -> pkh) accounts)
+              ~protocol
+              ~client
+              node
+              cloud
+              agent
+          in
+          let* () = Baker.wait_for_ready next_baker in
+          toplog "init_baker_next: %s is ready!" name ;
+          Lwt.return_unit)
+      in
       Lwt.return @@ Classic baker)
   in
   Lwt.return
@@ -399,6 +507,7 @@ let init_stresstest_i i configuration ~pkh ~pk ~peers (agent, node, name) tps :
       ~peers
       ~snapshot:configuration.snapshot
       ~network:configuration.network
+      ~migration_offset:configuration.migration_offset
       (agent, node, name)
       ~tps
   in
@@ -413,6 +522,7 @@ let init_network ~peers (configuration : configuration) cloud teztale
       ~peers
       ~snapshot:configuration.snapshot
       ~network:configuration.network
+      ~migration_offset:configuration.migration_offset
       resources
   in
   toplog "init_network: Add a Teztale archiver" ;
@@ -897,7 +1007,16 @@ let register (module Cli : Scenarios_cli.Layer1) =
     in
     let maintenance_delay = Option.value ~default:0 Cli.maintenance_delay in
     let snapshot = Option.value ~default:"" Cli.snapshot in
-    {stake; agnostic_bakers; network; stresstest; maintenance_delay; snapshot}
+    let migration_offset = Cli.migration_offset in
+    {
+      stake;
+      agnostic_bakers;
+      network;
+      stresstest;
+      maintenance_delay;
+      snapshot;
+      migration_offset;
+    }
   in
   let vms_conf = Option.map (parse_conf vms_conf_encoding) Cli.vms_config in
   toplog "Parsing CLI done" ;
