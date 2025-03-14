@@ -41,6 +41,16 @@ Breaking Changes
 RPC Changes
 -----------
 
+- Added ``GET
+  /chains/<chain_id>/blocks/<block_id>/delegate/<delegate_pkh>/companion_key``,
+  which returns the active companion key of the given delegate. Returns ``none``
+  if key is not yet set. (MR :gl:`!17236`)
+
+- Updated ``GET /chains/<chain_id>/blocks/<block_id>/delegate/<delegate_pkh>/``
+  with the new field ``companion_key`` which returns the active companion key of
+  a given delegate (``none`` if not yet set), and the list of pending updates to
+  that key in the following cycles. (MR :gl:`!17236`)
+
 Operation receipts
 ------------------
 
