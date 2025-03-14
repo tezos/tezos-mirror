@@ -6,8 +6,9 @@
 //! chain into a new deployment. It is not tick-safe, and should obviously not be used in a
 //! production setup.
 
-use crate::configuration::fetch_configuration;
-use crate::storage::{ADMIN, SEQUENCER};
+use crate::configuration::{fetch_configuration, CHAIN_ID};
+use crate::storage::{read_chain_id, ADMIN, SEQUENCER};
+use primitive_types::U256;
 use rlp::{Decodable, DecoderError, Rlp};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::rlp_helpers::{decode_field, next, FromRlpBytes};
@@ -105,6 +106,7 @@ pub fn reveal_storage(
 
     log!(host, Info, "Done revealing");
 
-    let configuration = fetch_configuration(host);
+    let chain_id = read_chain_id(host).unwrap_or(U256::from(CHAIN_ID));
+    let configuration = fetch_configuration(host, chain_id);
     log!(host, Info, "Configuration {}", configuration);
 }

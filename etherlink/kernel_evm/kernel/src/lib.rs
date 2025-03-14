@@ -5,7 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::configuration::{fetch_configuration, Configuration};
+use crate::configuration::{fetch_configuration, Configuration, CHAIN_ID};
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::migration::storage_migration;
@@ -44,6 +44,7 @@ mod block_storage;
 mod blueprint;
 mod blueprint_storage;
 mod bridge;
+mod chains;
 mod configuration;
 mod dal;
 mod dal_slot_import_signal;
@@ -67,10 +68,6 @@ mod tick_model;
 mod upgrade;
 
 extern crate alloc;
-
-/// The chain id will need to be unique when the EVM rollup is deployed in
-/// production.
-pub const CHAIN_ID: u32 = 1337;
 
 /// The configuration for the EVM execution.
 const CONFIG: Config = Config {
@@ -241,7 +238,7 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
             // in the storage.
             set_kernel_version(host)?;
             host.mark_for_reboot()?;
-            let configuration = fetch_configuration(host);
+            let configuration = fetch_configuration(host, chain_id);
             log!(
                 host,
                 Info,
@@ -275,7 +272,7 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     let smart_rollup_address = host.reveal_metadata().raw_rollup_address;
     // 2. Fetch the per mode configuration of the kernel. Returns the default
     //    configuration if it fails.
-    let mut configuration = fetch_configuration(host);
+    let mut configuration = fetch_configuration(host, chain_id);
     let sequencer_pool_address = read_sequencer_pool_address(host);
 
     // Run the stage one, this is a no-op if the inbox was already consumed
@@ -298,7 +295,6 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
         log!(host, Debug, "Entering stage two.");
         if let block::ComputationResult::RebootNeeded = block::produce(
             host,
-            chain_id,
             &mut configuration,
             sequencer_pool_address,
             trace_input,
@@ -380,7 +376,7 @@ mod tests {
 
     use crate::block_storage;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
-    use crate::configuration::{Configuration, Limits};
+    use crate::configuration::{ChainConfig, Configuration, Limits};
     use crate::fees;
     use crate::main;
     use crate::parsing::RollupType;
@@ -433,6 +429,13 @@ mod tests {
     const DUMMY_CHAIN_ID: U256 = U256::one();
     const DUMMY_BASE_FEE_PER_GAS: u64 = 12345u64;
     const DUMMY_DA_FEE: u64 = 2_000_000_000_000u64;
+
+    fn dummy_configuration() -> Configuration {
+        Configuration {
+            chain_config: ChainConfig::new_evm_config(DUMMY_CHAIN_ID),
+            ..Configuration::default()
+        }
+    }
 
     fn dummy_block_fees() -> BlockFees {
         BlockFees::new(
@@ -605,7 +608,7 @@ mod tests {
 
         let mut configuration = Configuration {
             limits,
-            ..Configuration::default()
+            ..dummy_configuration()
         };
 
         crate::storage::store_minimum_base_fee_per_gas(
@@ -616,14 +619,9 @@ mod tests {
         crate::storage::store_da_fee(&mut host, block_fees.da_fee_per_byte()).unwrap();
 
         // If the upgrade is started, it should raise an error
-        let computation_result = crate::block::produce(
-            &mut host,
-            DUMMY_CHAIN_ID,
-            &mut configuration,
-            None,
-            None,
-        )
-        .expect("Should have produced");
+        let computation_result =
+            crate::block::produce(&mut host, &mut configuration, None, None)
+                .expect("Should have produced");
 
         // test there is a new block
         assert_eq!(

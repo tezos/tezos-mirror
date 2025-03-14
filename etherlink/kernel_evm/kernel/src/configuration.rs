@@ -1,5 +1,6 @@
 use crate::{
     blueprint_storage::DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS,
+    chains::ChainFamily,
     delayed_inbox::DelayedInbox,
     storage::{
         dal_slots, enable_dal, evm_node_flag, is_enable_fa_bridge,
@@ -11,10 +12,15 @@ use crate::{
     tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS},
 };
 use evm_execution::read_ticketer;
+use primitive_types::U256;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
+
+/// The chain id will need to be unique when the EVM rollup is deployed in
+/// production.
+pub const CHAIN_ID: u32 = 1337;
 
 #[derive(Debug, Clone, Default)]
 pub struct DalConfiguration {
@@ -53,6 +59,39 @@ impl std::fmt::Display for ConfigurationMode {
     }
 }
 
+pub struct ChainConfig {
+    pub chain_id: U256,
+    pub chain_family: ChainFamily,
+}
+
+impl Default for ChainConfig {
+    fn default() -> Self {
+        Self {
+            chain_id: U256::from(CHAIN_ID),
+            chain_family: ChainFamily::Evm,
+        }
+    }
+}
+
+impl std::fmt::Display for ChainConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{{Chain id: {}, Chain informations: {}}}",
+            self.chain_id, self.chain_family
+        )
+    }
+}
+
+impl ChainConfig {
+    pub fn new_evm_config(chain_id: U256) -> Self {
+        ChainConfig {
+            chain_id,
+            chain_family: ChainFamily::Evm,
+        }
+    }
+}
+
 pub struct Limits {
     pub maximum_allowed_ticks: u64,
     pub maximum_gas_limit: u64,
@@ -72,6 +111,7 @@ pub struct Configuration {
     pub mode: ConfigurationMode,
     pub limits: Limits,
     pub enable_fa_bridge: bool,
+    pub chain_config: ChainConfig,
     pub garbage_collect_blocks: bool,
 }
 
@@ -82,6 +122,7 @@ impl Default for Configuration {
             mode: ConfigurationMode::Proxy,
             limits: Limits::default(),
             enable_fa_bridge: false,
+            chain_config: ChainConfig::default(),
             garbage_collect_blocks: false,
         }
     }
@@ -91,8 +132,8 @@ impl std::fmt::Display for Configuration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Tezos Contracts: {}, Mode: {}, Enable FA Bridge: {}, Garbage collect blocks: {}",
-            &self.tezos_contracts, &self.mode, &self.enable_fa_bridge, &self.garbage_collect_blocks
+            "Tezos Contracts: {}, Mode: {}, Enable FA Bridge: {}, Chain Config: {}, Garbage collect blocks: {}",
+            &self.tezos_contracts, &self.mode, &self.enable_fa_bridge, &self.chain_config, &self.garbage_collect_blocks
         )
     }
 }
@@ -194,13 +235,17 @@ fn fetch_dal_configuration<Host: Runtime>(host: &mut Host) -> Option<DalConfigur
     }
 }
 
-pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
+pub fn fetch_configuration<Host: Runtime>(
+    host: &mut Host,
+    chain_id: U256,
+) -> Configuration {
     let tezos_contracts = fetch_tezos_contracts(host);
     let limits = fetch_limits(host);
     let sequencer = sequencer(host).unwrap_or_default();
     let enable_fa_bridge = is_enable_fa_bridge(host).unwrap_or_default();
     let dal: Option<DalConfiguration> = fetch_dal_configuration(host);
     let evm_node_flag = evm_node_flag(host).unwrap_or(false);
+    let chain_config = ChainConfig::new_evm_config(chain_id);
     match sequencer {
         Some(sequencer) => {
             let delayed_bridge = read_delayed_transaction_bridge(host)
@@ -229,6 +274,7 @@ pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
                     },
                     limits,
                     enable_fa_bridge,
+                    chain_config,
                     garbage_collect_blocks: !evm_node_flag,
                 },
                 Err(err) => {
@@ -245,6 +291,7 @@ pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
             mode: ConfigurationMode::Proxy,
             limits,
             enable_fa_bridge,
+            chain_config,
             garbage_collect_blocks: false,
         },
     }
