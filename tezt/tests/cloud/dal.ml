@@ -465,7 +465,6 @@ type configuration = {
   data_dir : string option;
   fundraiser : string option;
   blocks_history : int;
-  metrics_retention : int;
   bootstrap_node_identity_file : string option;
   bootstrap_dal_node_identity_file : string option;
   external_rpc : bool;
@@ -3307,7 +3306,6 @@ let register (module Cli : Scenarios_cli.Dal) =
       else None
     in
     let blocks_history = Cli.blocks_history in
-    let metrics_retention = Cli.metrics_retention in
     let bootstrap_node_identity_file = Cli.bootstrap_node_identity_file in
     let bootstrap_dal_node_identity_file =
       Cli.bootstrap_dal_node_identity_file
@@ -3341,7 +3339,6 @@ let register (module Cli : Scenarios_cli.Dal) =
         data_dir;
         fundraiser;
         blocks_history;
-        metrics_retention;
         bootstrap_node_identity_file;
         bootstrap_dal_node_identity_file;
         external_rpc;
