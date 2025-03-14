@@ -2171,7 +2171,7 @@ let call_fa_withdraw ?timestamp ?expect_failure ~sender ~endpoint ~evm_node
        ~source_private_key:sender.Eth_account.private_key
        ~endpoint
        ~abi_label:"fa_withdrawal"
-       ~address:"0xff00000000000000000000000000000000000002"
+       ~address:Solidity_contracts.Precompile.fa_withdrawal
        ~method_call:
          (sf
             {|withdraw("%s", "0x%s", %d, "0x%s", "0x%s")|}
@@ -2370,7 +2370,8 @@ let test_fa_reentrant_deposit_reverts =
       (Eth_cli.deploy
          ~args:
            (sf
-              {|["0xff00000000000000000000000000000000000001", "0x", 0, "0x00000000000000000000000000000000000000000000", "0x", 5]|})
+              {|["%s", "0x", 0, "0x00000000000000000000000000000000000000000000", "0x", 5]|}
+              Solidity_contracts.Precompile.withdrawal)
          ~source_private_key:sender.private_key
          ~endpoint:(Evm_node.endpoint sequencer)
          ~abi:reentrancy.label
@@ -8429,7 +8430,7 @@ let fast_withdrawal ?(expect_failure = false) ~sender ~endpoint ~amount_wei
       ~source_private_key:sender.Eth_account.private_key
       ~endpoint
       ~abi_label:"fast_withdraw_base58"
-      ~address:"0xff00000000000000000000000000000000000001"
+      ~address:Solidity_contracts.Precompile.withdrawal
         (* NB: the third parameter is unused for now, could be used later for
            maximum fees to pay, whitelist of service providers etc. *)
       ~method_call:
@@ -11766,7 +11767,7 @@ let test_withdrawal_events =
          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
          ~endpoint:(Evm_node.endpoint sequencer)
          ~abi_label:"withdraw"
-         ~address:"0xff00000000000000000000000000000000000001"
+         ~address:Solidity_contracts.Precompile.withdrawal
          ~method_call:
            (sf {|withdraw_base58("%s")|} Constant.bootstrap5.public_key_hash)
          ~value:Wei.one_eth
@@ -11794,7 +11795,7 @@ let test_withdrawal_events =
          ~source_private_key:Eth_account.bootstrap_accounts.(1).private_key
          ~endpoint:(Evm_node.endpoint sequencer)
          ~abi_label:"fast_withdraw_base58"
-         ~address:"0xff00000000000000000000000000000000000001"
+         ~address:Solidity_contracts.Precompile.withdrawal
          ~method_call:
            (sf
               {|fast_withdraw_base58("%s","%s","%s")|}

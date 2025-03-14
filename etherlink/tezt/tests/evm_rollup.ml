@@ -2510,7 +2510,7 @@ let call_withdraw ?expect_failure ~sender ~endpoint ~value ~produce_block
       ~source_private_key:sender.Eth_account.private_key
       ~endpoint
       ~abi_label:"withdraw"
-      ~address:"0xff00000000000000000000000000000000000001"
+      ~address:Solidity_contracts.Precompile.withdrawal
       ~method_call:(sf {|withdraw_base58("%s")|} receiver)
       ~value
       ~gas:16_000_000

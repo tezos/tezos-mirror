@@ -441,3 +441,9 @@ let delegatecall_delegated () =
     ~label:"delegatecall_delegated"
     ~contract:"Delegated"
     ~evm_version:"shanghai"
+
+module Precompile = struct
+  let withdrawal = "0xff00000000000000000000000000000000000001"
+
+  let fa_withdrawal = "0xff00000000000000000000000000000000000002"
+end
