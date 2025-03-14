@@ -28,7 +28,7 @@
   -open Tezos_test_helpers
   -open Tezos_base_test_helpers
   -open Octez_alcotezt)
- (modules mocked_worker test_bees_unit))
+ (modules mocked_worker test_bees_unit test_bees_unit_eio))
 
 (executable
  (name main)
