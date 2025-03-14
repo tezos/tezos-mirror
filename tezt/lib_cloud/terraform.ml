@@ -239,8 +239,11 @@ module VM = struct
         (chdir Path.terraform_vm @ ["output"; "-json"])
     in
     let json = JSON.parse ~origin:"VM.machine_type" output in
+    (* TODO: find a better fix *)
     let machine_type =
-      JSON.(json |-> "machine_type" |-> "value" |> as_string)
+      match JSON.(json |-> "machine_type" |-> "value" |> as_string_opt) with
+      | Some machine_type -> machine_type
+      | None -> "n1-standard-2"
     in
     Lwt.return machine_type
 
