@@ -177,16 +177,21 @@ module VM = struct
     let destroy ~tezt_cloud =
       let () = Log.report "Terraform.VM.Workspace.destroy" in
       (* We ensure we are not using a workspace we want to delete. *)
-      let* () = select "default" in
-      let* workspaces = list ~tezt_cloud in
-      workspaces
-      |> List.map (fun workspace ->
-             Process.run
-               ~name
-               ~color
-               "terraform"
-               (chdir Path.terraform_vm @ ["workspace"; "delete"; workspace]))
-      |> Lwt.join
+      Lwt.catch
+        (fun () ->
+          let* () = select "default" in
+          let* workspaces = list ~tezt_cloud in
+          workspaces
+          |> List.map (fun workspace ->
+                 Process.run
+                   ~name
+                   ~color
+                   "terraform"
+                   (chdir Path.terraform_vm @ ["workspace"; "delete"; workspace]))
+          |> Lwt.join)
+        (fun exn ->
+          let* () = show_existing_resources ~tezt_cloud in
+          raise exn)
   end
 
   let init () =
@@ -288,29 +293,36 @@ module VM = struct
   let destroy workspaces ~project_id =
     workspaces
     |> Lwt_list.iter_s (fun workspace ->
-           let* () = Workspace.select workspace in
-           let* machine_type = machine_type () in
-           let vars =
-             [
-               "--var";
-               Format.asprintf "project_id=%s" project_id;
-               "--var";
-               Format.asprintf "machine_type=%s" machine_type;
-             ]
-           in
-           let* () =
-             (* Remote machines could have been destroyed
-                automatically. We synchronize the state to see whether
-                they still exist or not. *)
-             Process.run
-               ~name
-               ~color
-               "terraform"
-               (chdir Path.terraform_vm @ ["refresh"] @ vars)
-           in
-           Process.run
-             ~name
-             ~color
-             "terraform"
-             (chdir Path.terraform_vm @ ["destroy"; "--auto-approve"] @ vars))
+           Lwt.catch
+             (fun () ->
+               let* () = Workspace.select workspace in
+               let* machine_type = machine_type () in
+               let vars =
+                 [
+                   "--var";
+                   Format.asprintf "project_id=%s" project_id;
+                   "--var";
+                   Format.asprintf "machine_type=%s" machine_type;
+                 ]
+               in
+               let* () =
+                 (* Remote machines could have been destroyed
+                             automatically. We synchronize the state to see whether
+                             they still exist or not. *)
+                 Process.run
+                   ~name
+                   ~color
+                   "terraform"
+                   (chdir Path.terraform_vm @ ["refresh"] @ vars)
+               in
+               Process.run
+                 ~name
+                 ~color
+                 "terraform"
+                 (chdir Path.terraform_vm @ ["destroy"; "--auto-approve"] @ vars))
+             (fun exn ->
+               let* () =
+                 Workspace.show_existing_resources ~tezt_cloud:workspace
+               in
+               raise exn))
 end
