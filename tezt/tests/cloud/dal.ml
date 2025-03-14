@@ -549,7 +549,8 @@ type metrics = {
   ratio_published_commitments : float;
   ratio_attested_commitments : float;
   ratio_published_commitments_last_level : float;
-  ratio_attested_commitments_per_baker : (public_key_hash, float) Hashtbl.t;
+  ratio_attested_commitments_per_baker :
+    (public_key_hash, float option) Hashtbl.t;
   etherlink_operator_balance_sum : Tez.t;
 }
 
@@ -657,7 +658,11 @@ let pp_metrics t
                Hashtbl.find_opt t.aliases account.Account.public_key_hash
                |> Option.value ~default:account.Account.public_key_hash
              in
-             Log.info "Ratio for %s (with stake %d): %f" alias stake ratio) ;
+             Log.info
+               "Ratio for %s (with stake %d): %s"
+               alias
+               stake
+               (Option.fold ~none:"none" ~some:string_of_float ratio)) ;
   Log.info
     "Sum of balances of the Etherlink operator: %s tez"
     (Tez.to_string etherlink_operator_balance_sum) ;
@@ -688,28 +693,31 @@ let push_metrics t
       etherlink_operator_balance_sum;
     } =
   Hashtbl.to_seq ratio_attested_commitments_per_baker
-  |> Seq.iter (fun (public_key_hash, value) ->
-         (* Highly unoptimised since this is done everytime the metric is updated. *)
-         let alias =
-           Hashtbl.find_opt t.aliases public_key_hash
-           |> Option.map (fun alias -> [("alias", alias)])
-           |> Option.value ~default:[]
-         in
-         let version =
-           Hashtbl.find_opt t.versions public_key_hash
-           |> Option.map (fun version -> [("version", version)])
-           |> Option.value ~default:[]
-         in
-         let labels = [("attester", public_key_hash)] @ alias @ version in
-         Cloud.push_metric
-           t.cloud
-           ~help:
-             "Ratio between the number of attested and expected commitments \
-              per baker"
-           ~typ:`Gauge
-           ~labels
-           ~name:"tezt_dal_commitments_attested_ratio"
-           value) ;
+  |> Seq.iter (fun (public_key_hash, ratio_opt) ->
+         match ratio_opt with
+         | None -> ()
+         | Some value ->
+             (* Highly unoptimised since this is done everytime the metric is updated. *)
+             let alias =
+               Hashtbl.find_opt t.aliases public_key_hash
+               |> Option.map (fun alias -> [("alias", alias)])
+               |> Option.value ~default:[]
+             in
+             let version =
+               Hashtbl.find_opt t.versions public_key_hash
+               |> Option.map (fun version -> [("version", version)])
+               |> Option.value ~default:[]
+             in
+             let labels = [("attester", public_key_hash)] @ alias @ version in
+             Cloud.push_metric
+               t.cloud
+               ~help:
+                 "Ratio between the number of attested and expected \
+                  commitments per baker"
+               ~typ:`Gauge
+               ~labels
+               ~name:"tezt_dal_commitments_attested_ratio"
+               value) ;
   Hashtbl.iter
     (fun slot_index value ->
       let labels = [("slot_index", string_of_int slot_index)] in
@@ -936,7 +944,7 @@ let update_published_and_attested_commitments_per_slot t per_level_info
 let update_ratio_attested_commitments_per_baker t per_level_info metrics =
   let default () =
     Hashtbl.to_seq_keys per_level_info.attestations
-    |> Seq.map (fun key -> (key, 0.))
+    |> Seq.map (fun key -> (key, None))
     |> Hashtbl.of_seq
   in
   match metrics.level_first_commitment_attested with
@@ -976,27 +984,28 @@ let update_ratio_attested_commitments_per_baker t per_level_info metrics =
             Hashtbl.to_seq_keys per_level_info.attestations
             |> Seq.filter_map (fun public_key_hash ->
                    let bitset =
-                     float_of_int
-                     @@
                      match
                        Hashtbl.find_opt
                          per_level_info.attestations
                          public_key_hash
                      with
-                     | None -> (* No attestation in block *) 0
+                     | None -> (* No attestation in block *) Some 0.
                      | Some (Some z) when n = 0 ->
-                         if z = Z.zero then (* No slot were published. *) 100
+                         if z = Z.zero then
+                           (* No slot were published. *)
+                           Some 100.
                          else (
                            Log.error
                              "Wow wow wait! It seems an invariant is broken. \
                               Either on the test side, or on the DAL node side" ;
-                           100)
+                           Some 100.)
                      | Some (Some z) ->
                          (* Attestation with DAL payload *)
-                         if n = 0 then 100 else Z.popcount z * 100 / n
+                         if n = 0 then Some 100.
+                         else Some (float @@ (Z.popcount z * 100 / n))
                      | Some None ->
                          (* Attestation without DAL payload: no DAL rights. *)
-                         100
+                         Some 100.
                    in
                    match
                      Hashtbl.find_opt
@@ -1004,12 +1013,17 @@ let update_ratio_attested_commitments_per_baker t per_level_info metrics =
                        public_key_hash
                    with
                    | None -> None
+                   | Some None -> None
                    | Some _old_ratio when n = 0 -> None
-                   | Some old_ratio ->
-                       Some
-                         ( public_key_hash,
-                           ((old_ratio *. weight) +. bitset) /. (weight +. 1.)
-                         ))
+                   | Some (Some old_ratio) ->
+                       (* this will be removed in the next commit *)
+                       Option.map
+                         (fun bitset ->
+                           ( public_key_hash,
+                             Some
+                               (((old_ratio *. weight) +. bitset)
+                               /. (weight +. 1.)) ))
+                         bitset)
             |> Hashtbl.replace_seq table ;
             table)
 
