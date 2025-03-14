@@ -14,7 +14,7 @@ pub enum FaBridgeError {
     #[error("Primitive type error: {0:?}")]
     PrimitiveType(primitive_types::Error),
 
-    #[error("Invalid routing info")]
+    #[error("Invalid routing info: {0}")]
     InvalidRoutingInfo(&'static str),
 
     #[error("Ticket parsing error: {0}")]

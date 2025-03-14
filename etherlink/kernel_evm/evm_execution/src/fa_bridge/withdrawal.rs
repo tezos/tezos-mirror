@@ -29,16 +29,17 @@
 
 use alloy_primitives::FixedBytes;
 use alloy_sol_types::SolEvent;
+use enum_dispatch::enum_dispatch;
 use num_bigint::BigInt;
 use primitive_types::{H160, H256, U256};
-use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
+use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Zarith};
 use tezos_ethereum::Log;
 use tezos_smart_rollup_encoding::{
     contract::Contract,
     entrypoint::Entrypoint,
     michelson::{
         ticket::FA2_1Ticket, MichelsonBytes, MichelsonContract, MichelsonNat,
-        MichelsonOption, MichelsonPair,
+        MichelsonOption, MichelsonPair, MichelsonTimestamp,
     },
     outbox::{OutboxMessage, OutboxMessageTransaction},
 };
@@ -47,7 +48,7 @@ use crate::{
     handler::Withdrawal,
     precompiles::FA_BRIDGE_PRECOMPILE_ADDRESS,
     utilities::alloy::{alloy_to_h160, alloy_to_u256, h160_to_alloy, u256_to_alloy},
-    utilities::keccak256_hash,
+    utilities::{keccak256_hash, u256_to_bigint},
 };
 
 use super::error::FaBridgeError;
@@ -60,6 +61,13 @@ pub const WITHDRAW_EVENT_TOPIC: &[u8; 32] = b"\
     \xab\x68\x45\x0c\x9e\x54\x6f\x60\x62\xa8\x61\xee\xbf\x8e\xc5\xbb\
     \xd4\x1b\x44\x25\xe2\x6b\x20\x19\x9c\x91\x22\x7c\x7f\x90\x38\xca";
 
+/// Keccak256 of FastFaWithdrawal(address,address,bytes22,bytes22,uint256,uint256,uint256,bytes)
+pub const FAST_FA_WITHDRAWAL_EVENT_TOPIC: [u8; 32] = [
+    0x47, 0x7f, 0x54, 0x5a, 0x1f, 0x30, 0xcd, 0x1f, 0xb8, 0x9c, 0x51, 0xee, 0x4f, 0xa6,
+    0x7e, 0x3a, 0x56, 0xa1, 0xe3, 0x7e, 0x3d, 0x74, 0x2b, 0x84, 0xf6, 0xce, 0x73, 0xad,
+    0x6e, 0x33, 0x45, 0x1f,
+];
+
 /// L1 proxy contract entrypoint that will be invoked by the outbox message
 /// execution.
 pub const WITHDRAW_ENTRYPOINT: &str = "withdraw";
@@ -71,6 +79,18 @@ alloy_sol_types::sol! {
         uint256 amount,
         bytes22 ticketer,
         bytes   content,
+    );
+}
+
+alloy_sol_types::sol! {
+    event SolFastWithdrawalInput (
+        address ticket_owner,
+        bytes   routing_info,
+        uint256 amount,
+        bytes22 ticketer,
+        bytes   content,
+        string  fast_withdrawal_contract_address,
+        bytes   payload,
     );
 }
 
@@ -93,6 +113,19 @@ alloy_sol_types::sol! {
     );
 }
 
+alloy_sol_types::sol! {
+    event SolFastFAWithdrawalEvent (
+        address sender,
+        address ticket_owner,
+        bytes22 receiver,
+        bytes22 proxy,
+        uint256 amount,
+        uint256 withdrawal_id,
+        uint256 timestamp,
+        bytes   payload,
+    );
+}
+
 /// Withdrawal structure parsed from the precompile calldata
 #[derive(Debug, PartialEq)]
 pub struct FaWithdrawal {
@@ -110,6 +143,22 @@ pub struct FaWithdrawal {
     pub ticket_hash: H256,
     /// Actual ticket owner in global table (can be either sender or an ERC wrapper)
     pub ticket_owner: H160,
+}
+
+#[enum_dispatch]
+pub trait FaWithdrawalMethods {
+    fn calldata(&self) -> Vec<u8>;
+
+    fn event_log(&self, withdrawal_id: U256) -> Log;
+
+    fn into_outbox_message(self, withdrawal_id: U256) -> Withdrawal;
+
+    fn display(&self) -> String;
+
+    fn amount(&self) -> U256;
+    fn ticket_owner(&self) -> H160;
+    fn ticket_hash(&self) -> H256;
+    fn sender(&self) -> H160;
 }
 
 impl FaWithdrawal {
@@ -146,11 +195,15 @@ impl FaWithdrawal {
             ticket_owner,
         })
     }
+}
 
+impl FaWithdrawalMethods for FaWithdrawal {
     /// Returns calldata for the proxy (ERC wrapper) contract.
     ///
     /// Signature: withdraw(address,uint256,uint256)
-    pub fn calldata(&self) -> Vec<u8> {
+    /// TODO: https://gitlab.com/tezos/tezos/-/issues/7844
+    /// Find a way to share the implementation of `calldata` with `FaFastWithdrawal`
+    fn calldata(&self) -> Vec<u8> {
         let mut call_data = Vec::with_capacity(100);
         call_data.extend_from_slice(WITHDRAW_METHOD_ID);
 
@@ -176,7 +229,7 @@ impl FaWithdrawal {
     /// It also contains unique withdrawal identifier.
     ///
     /// Signature: Withdrawal(uint256,address,address,bytes22,bytes22,uint256,uint256)
-    pub fn event_log(&self, withdrawal_id: U256) -> Log {
+    fn event_log(&self, withdrawal_id: U256) -> Log {
         let mut receiver_bytes = vec![];
         let mut proxy_bytes = vec![];
 
@@ -207,7 +260,7 @@ impl FaWithdrawal {
     }
 
     // Converts FA withdrawal to an outbox message with a predefined Michelson type
-    pub fn into_outbox_message(self) -> Withdrawal {
+    fn into_outbox_message(self, _withdrawal_id: U256) -> Withdrawal {
         let message = OutboxMessageTransaction {
             // Destination is always proxy contract (until sr -> tz ticket transfers are enabled)
             destination: self.proxy,
@@ -222,11 +275,237 @@ impl FaWithdrawal {
     }
 
     /// Formats FA withdrawal structure for logging purposes.
-    pub fn display(&self) -> String {
+    fn display(&self) -> String {
         format!(
             "FA withdrawal {} of {} from {} via {:?}",
             self.amount, self.ticket_hash, self.sender, self.ticket_owner
         )
+    }
+
+    fn amount(&self) -> U256 {
+        self.amount
+    }
+    fn ticket_owner(&self) -> H160 {
+        self.ticket_owner
+    }
+    fn ticket_hash(&self) -> H256 {
+        self.ticket_hash
+    }
+    fn sender(&self) -> H160 {
+        self.sender
+    }
+}
+
+/// Withdrawal structure parsed from the precompile calldata
+#[derive(Debug, PartialEq)]
+pub struct FaFastWithdrawal {
+    /// Account that invoked the precompile (`l2_caller` or `caller` would be more
+    /// accurate but keeping `sender` to remain consistent with the FaWithdrawal struct)
+    pub sender: H160,
+    /// Contract (either implicit or originated) that will receive tokens or tickets
+    pub receiver: Contract,
+    /// Proxy contract on L1 that can handle ticket + receiver address (mandatory for now)
+    pub proxy: Contract,
+    /// Ticket transfer amount
+    pub amount: U256,
+    /// FA2.1 compatible ticket, constructed from the input
+    pub ticket: FA2_1Ticket,
+    /// Etherlink compatible ticket digest
+    pub ticket_hash: H256,
+    /// Actual ticket owner in global table (can be either sender or an ERC wrapper)
+    pub ticket_owner: H160,
+    // Creation date of the withdrawal
+    pub timestamp: U256,
+    // Address of the contract on L1 receiving the withdrawal
+    pub fast_withdrawal_contract_address: Contract,
+    // Additional metadata
+    pub payload: Vec<u8>,
+}
+
+impl FaFastWithdrawal {
+    /// Tries to parse withdrawal structure from the precompile call data.
+    ///
+    /// fa_fast_withdraw(
+    ///     address ticketOwner,
+    ///     bytes memory routingInfo,
+    ///     uint256 amount,
+    ///     bytes22 ticketer,
+    ///     bytes memory content,
+    ///     string memory fast_withdrawal_contract,
+    ///     bytes memory payload
+    /// )
+    pub fn try_parse(
+        input_data: &[u8],
+        timestamp: U256,
+        sender: H160,
+    ) -> Result<Self, FaBridgeError> {
+        let (
+            ticket_owner,
+            routing_info,
+            amount,
+            ticketer,
+            content,
+            fast_withdrawal_contract_address,
+            payload,
+        ) = SolFastWithdrawalInput::abi_decode_data(input_data, true).map_err(|_| {
+            FaBridgeError::AbiDecodeError("Failed to parse precompile call data")
+        })?;
+
+        let ticket_owner = alloy_to_h160(&ticket_owner).unwrap_or_default();
+        let amount = alloy_to_u256(&amount);
+        let ticket_hash = ticket_hash_from_raw_parts(ticketer.as_slice(), &content);
+        let (receiver, proxy) = parse_l1_routing_info(&routing_info)?;
+        let ticketer: [u8; 22] = ticketer.as_slice().try_into().unwrap_or_default();
+        let ticket = construct_ticket(ticketer, &content, amount)?;
+
+        let fast_withdrawal_contract_address =
+            Contract::from_b58check(&fast_withdrawal_contract_address)
+                .ok()
+                .ok_or(FaBridgeError::AbiDecodeError(
+                    "Failed to parse fast withdrawal contract address",
+                ))?;
+
+        Ok(Self {
+            sender,
+            receiver,
+            proxy,
+            amount,
+            ticket,
+            ticket_hash,
+            ticket_owner,
+            fast_withdrawal_contract_address,
+            timestamp,
+            payload: payload.to_vec(),
+        })
+    }
+}
+
+impl FaWithdrawalMethods for FaFastWithdrawal {
+    /// Returns calldata for the proxy (ERC wrapper) contract.
+    ///
+    /// Signature: withdraw(address,uint256,uint256)
+    fn calldata(&self) -> Vec<u8> {
+        let mut call_data = Vec::with_capacity(100);
+        call_data.extend_from_slice(WITHDRAW_METHOD_ID);
+
+        let calldata_ = SolStandardWithdrawalProxyCallData {
+            sender: h160_to_alloy(&self.sender),
+            amount: u256_to_alloy(&self.amount).unwrap_or_default(),
+            ticket_hash: u256_to_alloy(&U256::from_big_endian(
+                self.ticket_hash.as_bytes(),
+            ))
+            .unwrap_or_default(),
+        };
+
+        let data = SolStandardWithdrawalProxyCallData::encode_data(&calldata_);
+        call_data.extend_from_slice(&data);
+
+        call_data
+    }
+
+    /// Returns log structure for an implicit withdrawal event.
+    /// This event is added to the outer transaction receipt,
+    /// so that we can index successful withdrawal requests.
+    ///
+    /// It also contains unique withdrawal identifier.
+    ///
+    /// Signature:  FastFaWithdrawal(address,bytes22,bytes22,uint256,uint256,uint256,bytes,address)
+    fn event_log(&self, withdrawal_id: U256) -> Log {
+        let mut receiver_bytes = vec![];
+        let mut proxy_bytes = vec![];
+
+        // It is safe to unwrap, underlying implementation never fails (always returns Ok(()))
+        self.receiver.bin_write(&mut receiver_bytes).unwrap();
+        let receiver_bytes: [u8; 22] = receiver_bytes.try_into().unwrap();
+
+        // It is safe to unwrap, underlying implementation never fails (always returns Ok(()))
+        self.proxy.bin_write(&mut proxy_bytes).unwrap();
+        let proxy_bytes: [u8; 22] = proxy_bytes.try_into().unwrap();
+
+        let event_data = SolFastFAWithdrawalEvent {
+            // The sender is set to context.caller in the precompile
+            sender: h160_to_alloy(&self.sender),
+            ticket_owner: h160_to_alloy(&self.ticket_owner),
+            receiver: FixedBytes::<22>::from(&receiver_bytes),
+            proxy: FixedBytes::<22>::from(&proxy_bytes),
+            amount: u256_to_alloy(&self.amount).unwrap_or_default(),
+            withdrawal_id: u256_to_alloy(&withdrawal_id).unwrap_or_default(),
+            timestamp: u256_to_alloy(&self.timestamp).unwrap_or_default(),
+            payload: self.payload.to_vec().into(),
+        };
+
+        let data = SolFastFAWithdrawalEvent::encode_data(&event_data);
+
+        Log {
+            address: FA_BRIDGE_PRECOMPILE_ADDRESS,
+            topics: vec![H256(FAST_FA_WITHDRAWAL_EVENT_TOPIC), self.ticket_hash],
+            data,
+        }
+    }
+
+    // Converts FA withdrawal to an outbox message with a predefined Michelson type
+    fn into_outbox_message(self, withdrawal_id: U256) -> Withdrawal {
+        // Constant entrypoint name parsing won't fail
+        let entrypoint = Entrypoint::try_from(String::from("default")).unwrap();
+
+        let payload = MichelsonBytes(self.payload.to_vec());
+
+        let withdrawal_id =
+            MichelsonNat::new(Zarith(u256_to_bigint(withdrawal_id))).unwrap();
+
+        let timestamp = Zarith(u256_to_bigint(self.timestamp));
+        let timestamp: MichelsonTimestamp = MichelsonTimestamp(timestamp);
+
+        let caller = MichelsonBytes(self.sender.to_fixed_bytes().to_vec());
+
+        // L1 proxy accepts ticket and the final receiver address
+        let parameters = MichelsonPair(
+            withdrawal_id,
+            MichelsonPair(
+                self.ticket,
+                MichelsonPair(
+                    timestamp,
+                    MichelsonPair(
+                        MichelsonContract(self.receiver),
+                        MichelsonPair(payload, caller),
+                    ),
+                ),
+            ),
+        );
+
+        // Destination is always the fast withdrawal manager proxy contract
+        let destination = self.fast_withdrawal_contract_address;
+
+        let message = OutboxMessageTransaction {
+            destination,
+            entrypoint,
+            parameters,
+        };
+
+        crate::handler::Withdrawal::Fast(OutboxMessage::AtomicTransactionBatch(
+            vec![message].into(),
+        ))
+    }
+
+    /// Formats FA withdrawal structure for logging purposes.
+    fn display(&self) -> String {
+        format!(
+            "FA fast withdrawal {} of {} from {} via {:?}",
+            self.amount, self.ticket_hash, self.sender, self.ticket_owner
+        )
+    }
+
+    fn amount(&self) -> U256 {
+        self.amount
+    }
+    fn ticket_owner(&self) -> H160 {
+        self.ticket_owner
+    }
+    fn ticket_hash(&self) -> H256 {
+        self.ticket_hash
+    }
+    fn sender(&self) -> H160 {
+        self.sender
     }
 }
 
@@ -298,7 +577,8 @@ mod tests {
                 convert_h160, convert_log, convert_u256, dummy_ticket, kernel_wrapper,
                 ticket_id, token_wrapper,
             },
-            withdrawal::WITHDRAW_EVENT_TOPIC,
+            withdrawal::{FAST_FA_WITHDRAWAL_EVENT_TOPIC, WITHDRAW_EVENT_TOPIC},
+            FaWithdrawalMethods,
         },
         utilities::bigint_to_u256,
     };
@@ -375,7 +655,7 @@ mod tests {
                     .unwrap(),
                 ticket,
                 ticket_hash,
-                ticket_owner
+                ticket_owner,
             }
         );
     }
@@ -439,7 +719,7 @@ mod tests {
     fn fa_withdrawal_verify_message_to_originated_contract_encoding() {
         let withdrawal = dummy_fa_withdrawal();
 
-        let outbox_message = withdrawal.into_outbox_message();
+        let outbox_message = withdrawal.into_outbox_message(U256::default());
 
         let mut encoded_message = Vec::new();
         outbox_message.bin_write(&mut encoded_message).unwrap();
@@ -479,5 +759,16 @@ mod tests {
         let actual = ticket_hash_from_raw_parts(&ticketer, &content);
         let expected = ticket_hash(&ticket).unwrap();
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn fast_fa_withdrawal_event_signature() {
+        assert_eq!(
+            FAST_FA_WITHDRAWAL_EVENT_TOPIC.to_vec(),
+            Keccak256::digest(
+                b"FastFaWithdrawal(address,address,bytes22,bytes22,uint256,uint256,uint256,bytes)"
+            )
+            .to_vec()
+        );
     }
 }
