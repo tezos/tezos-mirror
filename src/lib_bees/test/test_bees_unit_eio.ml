@@ -309,47 +309,49 @@ let wrap_qcheck test () =
   let _ = QCheck_alcotest.to_alcotest test in
   Result_syntax.return_unit
 
-(* FIXME: do we want to use [Tezos_base_unix.Event_loop.main_run]?
-   If so, the test blocks at some point. *)
-let wrap_event_loop fn () =
-  Lwt.return
-  @@ Tezos_base_unix.Event_loop.main_run ~eio:true
-  @@ fun () -> Lwt_eio.run_eio fn
+(** Because our tests might be ran in the same process as other tests,
+    we need to run our tests in a child process or next tests ran
+    will fail if using [Unix.fork].
+*)
+let tztest label fn =
+  Tztest.tztest label `Quick @@ fun () ->
+  match Lwt_unix.fork () with
+  | 0 -> (
+      (* FIXME: do we want to use [Tezos_base_unix.Event_loop.main_run_eio]?
+         If so, the tests block at some point. *)
+      match
+        Tezos_base_unix.Event_loop.main_run ~eio:true @@ fun () ->
+        Lwt_eio.run_eio fn
+      with
+      | Ok () -> exit 0
+      | Error _ -> exit 1)
+  | pid -> (
+      let open Lwt_result_syntax in
+      let*! _, status = Lwt_unix.waitpid [] pid in
+      match status with
+      | Unix.WEXITED 0 -> return_unit
+      | _ -> Lwt.return_error [])
 
 let tests_history =
   ( "Queue history",
     [
-      Tztest.tztest
+      tztest
         "Random normal requests (eio handlers)"
-        `Quick
-        (wrap_event_loop @@ wrap_qcheck (test_random_requests create_queue));
-      Tztest.tztest
+        (wrap_qcheck (test_random_requests create_queue));
+      tztest
         "Random normal requests on Bounded (eio handlers)"
-        `Quick
-        (wrap_event_loop @@ wrap_qcheck (test_random_requests create_bounded));
+        (wrap_qcheck (test_random_requests create_bounded));
     ] )
 
 let tests_status =
   ( "Status",
     [
-      Tztest.tztest
-        "Canceled worker (eio handlers)"
-        `Quick
-        (wrap_event_loop @@ test_cancel_worker);
-      Tztest.tztest
-        "Crashing requests (eio handlers)"
-        `Quick
-        (wrap_event_loop @@ test_push_crashing_request);
+      tztest "Canceled worker (eio handlers)" test_cancel_worker;
+      tztest "Crashing requests (eio handlers)" test_push_crashing_request;
     ] )
 
 let tests_buffer =
-  ( "Buffer handling",
-    [
-      Tztest.tztest
-        "Dropbox/Async (eio handlers)"
-        `Quick
-        (wrap_event_loop @@ test_async_dropbox);
-    ] )
+  ("Buffer handling", [tztest "Dropbox/Async (eio handlers)" test_async_dropbox])
 
 let () =
   Alcotest_lwt.run

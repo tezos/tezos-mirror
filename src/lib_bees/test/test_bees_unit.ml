@@ -334,43 +334,40 @@ let wrap_qcheck test () =
   let _ = QCheck_alcotest.to_alcotest test in
   Lwt_result_syntax.return_unit
 
-let wrap_event_loop fn () =
-  Lwt.return @@ Tezos_base_unix.Event_loop.main_run ~eio:true fn
+let tztest label fn =
+  Tztest.tztest label `Quick @@ fun () ->
+  match Lwt_unix.fork () with
+  | 0 -> (
+      match Tezos_base_unix.Event_loop.main_run ~eio:true fn with
+      | Ok () -> exit 0
+      | Error _ -> exit 1)
+  | pid -> (
+      let open Lwt_result_syntax in
+      let*! _, status = Lwt_unix.waitpid [] pid in
+      match status with
+      | Unix.WEXITED 0 -> return_unit
+      | _ -> Lwt.return_error [])
 
 let tests_history =
   ( "Queue history",
     [
-      Tztest.tztest
+      tztest
         "Random normal requests"
-        `Quick
-        (wrap_event_loop @@ wrap_qcheck (test_random_requests create_queue));
-      Tztest.tztest
+        (wrap_qcheck (test_random_requests create_queue));
+      tztest
         "Random normal requests on Bounded"
-        `Quick
-        (wrap_event_loop @@ wrap_qcheck (test_random_requests create_bounded));
+        (wrap_qcheck (test_random_requests create_bounded));
     ] )
 
 let tests_status =
   ( "Status",
     [
-      Tztest.tztest
-        "Canceled worker"
-        `Quick
-        (wrap_event_loop @@ test_cancel_worker);
-      Tztest.tztest
-        "Crashing requests"
-        `Quick
-        (wrap_event_loop @@ test_push_crashing_request);
+      tztest "Canceled worker" test_cancel_worker;
+      tztest "Crashing requests" test_push_crashing_request;
     ] )
 
 let tests_buffer =
-  ( "Buffer handling",
-    [
-      Tztest.tztest
-        "Dropbox/Async"
-        `Quick
-        (wrap_event_loop @@ test_async_dropbox);
-    ] )
+  ("Buffer handling", [tztest "Dropbox/Async" test_async_dropbox])
 
 let () =
   Alcotest_lwt.run
