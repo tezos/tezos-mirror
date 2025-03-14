@@ -68,8 +68,8 @@ let () =
     ~pp:(fun ppf (snap_level, exp_level) ->
       Format.fprintf
         ppf
-        "The snapshot is outdated (for level %a) while the \n\
-        \ existing EVM node is already at %a@."
+        "The snapshot is outdated (for level %a) while the existing EVM node \
+         is already at %a"
         Z.pp_print
         snap_level
         Z.pp_print
@@ -81,14 +81,9 @@ let () =
     `Permanent
     ~id:"evm_invalid_snapshot_file"
     ~title:"Invalid snapshot file path"
-    ~description:"The snapshot file path is invalid."
+    ~description:"The snapshot file path is invalid"
     ~pp:(fun ppf name ->
-      Format.fprintf
-        ppf
-        "%s is not a valid snapshot file name. It is likely because you are \
-         using an invalid string interpolation variable or have a trailing \
-         percent"
-        name)
+      Format.fprintf ppf "%s is not a valid snapshot file name." name)
     Data_encoding.(obj1 (req "snapshot_file" string))
     (function Invalid_snapshot_file name -> Some name | _ -> None)
     (fun name -> Invalid_snapshot_file name) ;
@@ -116,12 +111,7 @@ let () =
     ~title:"Invalid snapshot provider"
     ~description:"The snapshot provider is invalid."
     ~pp:(fun ppf name ->
-      Format.fprintf
-        ppf
-        "%s is not a valid snapshot provider name. It is likely because you \
-         are using an invalid string interpolation variable or have a trailing \
-         percent"
-        name)
+      Format.fprintf ppf "%s is not a valid snapshot provider name" name)
     Data_encoding.(obj1 (req "snapshot_provider" string))
     (function Invalid_snapshot_provider name -> Some name | _ -> None)
     (fun name -> Invalid_snapshot_provider name)
@@ -217,14 +207,10 @@ let interpolate_snapshot_file current_level rollup_address history_mode filename
         (Configuration.string_of_history_mode_info history_mode
         |> String.lowercase_ascii) )
   in
-  try
-    Ok
-      (Misc.interpolate
-         filename
-         [
-           rollup_address_short; rollup_address_long; current_level; history_mode;
-         ])
-  with _ -> Result_syntax.tzfail (Invalid_snapshot_file filename)
+  record_trace (Invalid_snapshot_file filename)
+  @@ Misc.interpolate
+       filename
+       [rollup_address_short; rollup_address_long; current_level; history_mode]
 
 let default_snapshot_file = "evm-%h-snapshot-%r-%l"
 
@@ -480,8 +466,8 @@ let import_from ~force ~keep_alive ?history_mode ~data_dir ~download_path
 
 let interpolate_snapshot_provider ?rollup_address ?network history_mode provider
     =
-  let open Result_syntax in
   let inferred_rollup_address = Option.map Constants.rollup_address network in
+  let reason = "try specifying the network with --network" in
   let rollup_address_short, rollup_address_long =
     match (rollup_address, inferred_rollup_address) with
     | Some rollup_address, _ | None, Some rollup_address ->
@@ -493,7 +479,7 @@ let interpolate_snapshot_provider ?rollup_address ?network history_mode provider
             `Available
               (Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
                  rollup_address) ) )
-    | None, None -> (('r', `Disabled), ('R', `Disabled))
+    | None, None -> (('r', `Disabled reason), ('R', `Disabled reason))
   in
   let history_mode =
     ( 'h',
@@ -509,12 +495,10 @@ let interpolate_snapshot_provider ?rollup_address ?network history_mode provider
         ( 'n',
           `Available (Format.asprintf "%a" Configuration.pp_supported_network n)
         )
-    | None, None -> ('n', `Disabled)
+    | None, None -> ('n', `Disabled reason)
   in
 
-  try
-    return
-      (Misc.interpolate
-         provider
-         [rollup_address_short; rollup_address_long; history_mode; network])
-  with _ -> tzfail (Invalid_snapshot_provider provider)
+  record_trace (Invalid_snapshot_provider provider)
+  @@ Misc.interpolate
+       provider
+       [rollup_address_short; rollup_address_long; history_mode; network]
