@@ -1446,6 +1446,14 @@ counter_inc_assertion_warning:
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
 
+multichain_node_singlechain_kernel:
+  description: the configuration for the `l2_chains` experimental feature was ignored because the multichain feature is not yet enabled in the rollup
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* multichain_node_singlechain_kernel version 0 */
+      "multichain_node_singlechain_kernel.v0": any }
+
 wasm_pvm_fallback:
   description: the node needs to fallback to the WASM PVM to execute a block
   level: warning
