@@ -30,7 +30,10 @@ type ('msg, 'conn) inner_state = {
   canceler : Lwt_canceler.t;
   greylister : motive:string -> unit Lwt.t;
   conn : ('msg P2p_message.t, 'conn) P2p_socket.t;
-  mutable last_sent_swap_request : (Time.System.t * P2p_peer.Id.t) option;
+  last_sent_swap_request : (Time.System.t * P2p_peer.Id.t) option ref;
+      (* [last_sent_swap_request] is a reference and not a mutable field: it
+         must be shared with the "outer" state of the worker to be accessible if
+         the worker has been shutdown. *)
   peer_id : P2p_peer.Id.t;
   disable_peer_discovery : bool;
   callback : 'msg P2p_answerer.callback;
@@ -56,7 +59,7 @@ let loop (t : ('msg, 'conn) inner_state) =
            affectation and the invocation of the callback.
            The same statement is also true in the next cases. *)
         let request_info =
-          P2p_answerer.{last_sent_swap_request = t.last_sent_swap_request}
+          P2p_answerer.{last_sent_swap_request = !(t.last_sent_swap_request)}
         in
         let*! r = t.callback.bootstrap request_info in
         match r with
@@ -69,7 +72,7 @@ let loop (t : ('msg, 'conn) inner_state) =
         if t.disable_peer_discovery then Lwt.return_unit
         else
           let request_info =
-            P2p_answerer.{last_sent_swap_request = t.last_sent_swap_request}
+            P2p_answerer.{last_sent_swap_request = !(t.last_sent_swap_request)}
           in
           t.callback.advertise request_info points
       in
@@ -78,7 +81,7 @@ let loop (t : ('msg, 'conn) inner_state) =
       Prometheus.Counter.inc_one P2p_metrics.Messages.swap_request_received ;
       let*! () = Events.(emit swap_request_received) (t.peer_id, point, peer) in
       let request_info =
-        P2p_answerer.{last_sent_swap_request = t.last_sent_swap_request}
+        P2p_answerer.{last_sent_swap_request = !(t.last_sent_swap_request)}
       in
       let*! () = t.callback.swap_request request_info point peer in
       return_unit
@@ -86,14 +89,14 @@ let loop (t : ('msg, 'conn) inner_state) =
       Prometheus.Counter.inc_one P2p_metrics.Messages.swap_ack_received ;
       let*! () = Events.(emit swap_ack_received) (t.peer_id, point, peer) in
       let request_info =
-        P2p_answerer.{last_sent_swap_request = t.last_sent_swap_request}
+        P2p_answerer.{last_sent_swap_request = !(t.last_sent_swap_request)}
       in
       let*! () = t.callback.swap_ack request_info point peer in
       return_unit
   | Ok (size, Message msg) ->
       Prometheus.Counter.inc_one P2p_metrics.Messages.user_message_received ;
       let request_info =
-        P2p_answerer.{last_sent_swap_request = t.last_sent_swap_request}
+        P2p_answerer.{last_sent_swap_request = !(t.last_sent_swap_request)}
       in
       let*! () = t.callback.message request_info size msg in
       return_unit
@@ -125,6 +128,7 @@ module Types = struct
         disable_peer_discovery : bool;
         callback : 'msg P2p_answerer.t;
         peer_id : P2p_peer.Error_table.key;
+        last_sent_swap_request : (Time.System.t * P2p_peer.Id.t) option ref;
       }
         -> parameters
 end
@@ -141,6 +145,7 @@ type ('msg, 'peer, 'conn) t = {
   trusted_node : bool;
   private_node : bool;
   negotiated_version : Network_version.t;
+  last_sent_swap_request : (Time.System.t * P2p_peer.Id.t) option ref;
   disable_peer_discovery : bool;
 }
 
@@ -180,6 +185,7 @@ module Handlers = struct
            disable_peer_discovery;
            callback;
            peer_id;
+           last_sent_swap_request;
          }) ->
     let conn_info =
       P2p_answerer.
@@ -196,7 +202,7 @@ module Handlers = struct
         conn;
         canceler;
         greylister;
-        last_sent_swap_request = None;
+        last_sent_swap_request;
         peer_id;
         disable_peer_discovery;
         callback = callback conn_info;
@@ -253,6 +259,7 @@ let create (type msg peer conn) ~(conn : (msg P2p_message.t, conn) P2p_socket.t)
     || Option.fold ~none:false ~some:P2p_point_state.Info.trusted point_info
   in
   let peer_id = peer_info |> P2p_peer_state.Info.peer_id in
+  let last_sent_swap_request = ref None in
   let* worker =
     Worker.launch
       (Worker.create_table (Worker.Callback callback_buffer))
@@ -266,6 +273,7 @@ let create (type msg peer conn) ~(conn : (msg P2p_message.t, conn) P2p_socket.t)
            disable_peer_discovery;
            callback;
            peer_id;
+           last_sent_swap_request;
          })
       (module Handlers)
   in
@@ -280,6 +288,7 @@ let create (type msg peer conn) ~(conn : (msg P2p_message.t, conn) P2p_socket.t)
       trusted_node;
       peer_id;
       negotiated_version;
+      last_sent_swap_request;
       disable_peer_discovery : bool;
     }
 
@@ -346,8 +355,7 @@ let write_now t msg =
   result
 
 let write_swap_request (t : (_, _, _) t) point peer_id =
-  let (S wst) = Worker.state t.worker in
-  wst.last_sent_swap_request <- Some (Time.System.now (), peer_id) ;
+  t.last_sent_swap_request := Some (Time.System.now (), peer_id) ;
   let result = P2p_socket.write_now t.conn (Swap_request (point, peer_id)) in
   Prometheus.Counter.inc_one P2p_metrics.Messages.swap_request_sent ;
   result
