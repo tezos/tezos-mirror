@@ -6,8 +6,6 @@
 
 use std::borrow::Cow;
 
-use crate::abi::ABI_B22_RIGHT_PADDING;
-use crate::abi::ABI_H160_LEFT_PADDING;
 use crate::fast_withdrawals_enabled;
 use crate::handler::EvmHandler;
 use crate::handler::FastWithdrawalInterface;
@@ -21,7 +19,7 @@ use crate::utilities::alloy::h160_to_alloy;
 use crate::utilities::alloy::u256_to_alloy;
 use crate::utilities::u256_to_bigint;
 use crate::withdrawal_counter::WithdrawalCounter;
-use crate::{abi, fail_if_too_much, EthereumError};
+use crate::{fail_if_too_much, EthereumError};
 use alloy_primitives::FixedBytes;
 use alloy_sol_types::SolEvent;
 use crypto::hash::ContractKt1Hash;
@@ -86,9 +84,24 @@ pub const FAST_WITHDRAWAL_EVENT_TOPIC: [u8; 32] = [
 ];
 
 alloy_sol_types::sol! {
+    event SolStandardWithdrawalEvent (
+        uint256 amount,
+        address sender,
+        bytes22 receiver,
+        uint256 withdrawal_id,
+    );
+}
+
+alloy_sol_types::sol! {
+    event SolStandardWithdrawalInput (
+        string target,
+    );
+}
+
+alloy_sol_types::sol! {
     event SolFastWithdrawalEvent (
         bytes22 receiver,
-        uint256 withdrawalId,
+        uint256 withdrawal_id,
         uint256 amount,
         uint256 timestamp,
         bytes   payload,
@@ -326,7 +339,9 @@ pub fn withdrawal_precompile<Host: Runtime>(
         // "cda4fee2" is the function selector for `withdraw_base58(string)`
         [0xcd, 0xa4, 0xfe, 0xe2, input_data @ ..] => {
             // Execute base withdrawal preliminary
-            let Some(address_str) = abi::string_parameter(input_data, 0) else {
+            let Ok((address_str,)) =
+                SolStandardWithdrawalInput::abi_decode_data(input_data, true)
+            else {
                 log!(
                     handler.borrow_host(),
                     Info,
@@ -336,7 +351,7 @@ pub fn withdrawal_precompile<Host: Runtime>(
             };
 
             let (base_withdraw, precompile_outcome) =
-                base_withdrawal_preliminary(handler, address_str.to_string(), transfer)?;
+                base_withdrawal_preliminary(handler, address_str, transfer)?;
 
             if let Some(precompile_outcome) = precompile_outcome {
                 return Ok(precompile_outcome);
@@ -380,7 +395,7 @@ pub fn withdrawal_precompile<Host: Runtime>(
                 &base_transfer_value,
                 &context.caller,
                 &target,
-                withdrawal_id,
+                &withdrawal_id,
             );
 
             emit_log_and_return(handler, message, estimated_ticks, withdrawal_event)
@@ -527,24 +542,21 @@ fn event_log(
     amount: &U256,
     sender: &H160,
     receiver: &Contract,
-    withdrawal_id: U256,
+    withdrawal_id: &U256,
 ) -> Log {
-    let mut data = Vec::with_capacity(3 * 32);
-
-    data.extend_from_slice(&Into::<[u8; 32]>::into(*amount));
-    debug_assert!(data.len() % 32 == 0);
-
-    data.extend_from_slice(&ABI_H160_LEFT_PADDING);
-    data.extend_from_slice(&sender.0);
-    debug_assert!(data.len() % 32 == 0);
-
+    let mut receiver_bytes = vec![];
     // It is safe to unwrap, underlying implementation never fails (always returns Ok(()))
-    receiver.bin_write(&mut data).unwrap();
-    data.extend_from_slice(&ABI_B22_RIGHT_PADDING);
-    debug_assert!(data.len() % 32 == 0);
+    receiver.bin_write(&mut receiver_bytes).unwrap();
+    let receiver_bytes: [u8; 22] = receiver_bytes.try_into().unwrap();
 
-    data.extend_from_slice(&Into::<[u8; 32]>::into(withdrawal_id));
-    debug_assert!(data.len() % 32 == 0);
+    let event_data = SolStandardWithdrawalEvent {
+        sender: h160_to_alloy(sender),
+        amount: u256_to_alloy(amount).unwrap_or_default(),
+        receiver: FixedBytes::<22>::from(&receiver_bytes),
+        withdrawal_id: u256_to_alloy(withdrawal_id).unwrap_or_default(),
+    };
+
+    let data = SolStandardWithdrawalEvent::encode_data(&event_data);
 
     Log {
         address: WITHDRAWAL_ADDRESS,
@@ -575,7 +587,7 @@ fn event_log_fast_withdrawal(
 
     let event_data = SolFastWithdrawalEvent {
         receiver: FixedBytes::<22>::from(&receiver_bytes),
-        withdrawalId: u256_to_alloy(withdrawal_id).unwrap_or_default(),
+        withdrawal_id: u256_to_alloy(withdrawal_id).unwrap_or_default(),
         amount: u256_to_alloy(amount).unwrap_or_default(),
         timestamp: u256_to_alloy(timestamp).unwrap_or_default(),
         payload: payload.into(),
