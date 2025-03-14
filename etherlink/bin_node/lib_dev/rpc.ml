@@ -125,12 +125,15 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ctxt in
 
   let* chain_family =
+    let open Ethereum_types in
     match (config.experimental_features.l2_chains, enable_multichain) with
-    | None, false -> return Ethereum_types.EVM
-    | None, true -> tzfail (Node_error.Mismatched_multichain `Kernel)
+    | None, false -> return EVM
+    | None, true -> tzfail Node_error.Singlechain_node_multichain_kernel
+    | Some [_], false ->
+        let*! () = Events.multichain_node_singlechain_kernel () in
+        return EVM
     | Some [l2_chain], true ->
         Evm_ro_context.read_chain_family ctxt l2_chain.chain_id
-    | Some [_], false -> tzfail (Node_error.Mismatched_multichain `Node)
     | _ -> tzfail Node_error.Unexpected_multichain
   in
 

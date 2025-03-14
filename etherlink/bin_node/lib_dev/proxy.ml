@@ -97,6 +97,7 @@ let main
       ()
   in
   let* chain_family =
+    let open Ethereum_types in
     if finalized_view then
       if
         (* When finalized_view is set, it's too early to request the
@@ -105,13 +106,15 @@ let main
       then
         (* The finalized view of the proxy mode and the multichain feature are not compatible. *)
         tzfail (Node_error.Proxy_finalize_with_multichain `Node)
-      else return Ethereum_types.EVM
+      else return EVM
     else
       let* enable_multichain = Rollup_node_rpc.is_multichain_enabled () in
       match (config.experimental_features.l2_chains, enable_multichain) with
-      | None, false -> return Ethereum_types.EVM
-      | None, true -> tzfail (Node_error.Mismatched_multichain `Kernel)
-      | Some [_], false -> tzfail (Node_error.Mismatched_multichain `Node)
+      | None, false -> return EVM
+      | None, true -> tzfail Node_error.Singlechain_node_multichain_kernel
+      | Some [_], false ->
+          let*! () = Events.multichain_node_singlechain_kernel () in
+          return EVM
       | Some [l2_chain], true -> Rollup_node_rpc.chain_family l2_chain.chain_id
       | _ -> tzfail Node_error.Unexpected_multichain
   in

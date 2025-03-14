@@ -247,10 +247,11 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     match
       (configuration.experimental_features.l2_chains, enable_multichain)
     with
-    | None, false -> return_unit
-    | None, true -> tzfail (Node_error.Mismatched_multichain `Kernel)
-    | Some _, true -> return_unit
-    | Some _, false -> tzfail (Node_error.Mismatched_multichain `Node)
+    | None, true -> tzfail Node_error.Singlechain_node_multichain_kernel
+    | Some _, false ->
+        let*! () = Events.multichain_node_singlechain_kernel () in
+        return_unit
+    | _ -> return_unit
   in
   let* finalizer_public_server =
     Rpc_server.start_public_server

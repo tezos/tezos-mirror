@@ -32,7 +32,7 @@ type error +=
   | Cannot_handle_flushed_blueprint of Ethereum_types.quantity
   | Unexpected_multichain
   | Proxy_finalize_with_multichain of error_source
-  | Mismatched_multichain of error_source
+  | Singlechain_node_multichain_kernel
   | Dream_rpc_tezlink
 
 let () =
@@ -114,8 +114,8 @@ let () =
     ~id:"proxy_finalize_with_multichain"
     ~title:"Proxy node finalized_view with multichain"
     ~description:
-      "The proxy node with the finalized_view option is incompatible with the \
-       multichain features (originating from either the Node or the Kernel)."
+      "The `finalized_view` and `l2_chains` features of the proxy node are not \
+       compatible, please configure at most one of them."
     ~pp:(fun ppf source ->
       Format.fprintf
         ppf
@@ -128,28 +128,15 @@ let () =
     (fun src -> Proxy_finalize_with_multichain src) ;
   register_error_kind
     `Permanent
-    ~id:"mismatched_multichain"
-    ~title:"Node and Kernel multichain configuration mismatch"
+    ~id:"singlechain_node_multichain_kernel"
+    ~title:"Node is single chain while the Kernel is multichain"
     ~description:
-      "Node and Kernel configurations are mismatched in their multichain \
-       settings."
-    ~pp:(fun ppf source ->
-      match source with
-      | `Node ->
-          Format.fprintf
-            ppf
-            "The node is configured to work in a multichain environment, while \
-             the kernel is configured as to work in the single chain \
-             environment."
-      | `Kernel ->
-          Format.fprintf
-            ppf
-            "The kernel is configured to work in a multichain environment, \
-             while the node is configured as to work in the single chain \
-             environment.")
-    Data_encoding.(obj1 (req "source" error_source_encoding))
-    (function Mismatched_multichain source -> Some source | _ -> None)
-    (fun source -> Mismatched_multichain source) ;
+      "The rollup has the mulichain feature enabled, please configure the \
+       l2_chains experimental feature to specify which layer-2 chain this node \
+       should follow."
+    Data_encoding.empty
+    (function Singlechain_node_multichain_kernel -> Some () | _ -> None)
+    (fun () -> Singlechain_node_multichain_kernel) ;
   register_error_kind
     `Permanent
     ~id:"dream_rpc_tezlink"

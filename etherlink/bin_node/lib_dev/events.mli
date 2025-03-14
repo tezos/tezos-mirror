@@ -138,6 +138,11 @@ val wasm_pvm_fallback : unit -> unit Lwt.t
     consistency of the stored chain id with the selected network. *)
 val missing_chain_id : unit -> unit Lwt.t
 
+(** [multichain_node_singlechain_kernel ()] warns that the node
+    was configured to be executed in a multichain environment, but was given
+    a kernel for a single chain environment. *)
+val multichain_node_singlechain_kernel : unit -> unit Lwt.t
+
 (** [downloading_file ?size url] advertises that the node is downloading
     the file at [url], and explicitly mentions its [size] if provided. *)
 val downloading_file : ?size:int -> string -> unit Lwt.t
