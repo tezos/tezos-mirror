@@ -130,6 +130,60 @@ let check_adaptive_issuance_launch_cycle ~loc ~migrate_from client =
       ~error_msg:"Expected adaptive_issuance_launch_cycle = %R but got %L") ;
   unit
 
+(* Check for R to S migration. Remove after S. *)
+let check_delegate_sampler_state client =
+  let check_failure rpc =
+    let*? process = Client.RPC.spawn client @@ rpc in
+    Process.check ~expect_failure:true process
+  in
+  let check_success rpc =
+    let*? process = Client.RPC.spawn client @@ rpc in
+    Process.check ~expect_failure:false process
+  in
+  let* constants =
+    Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
+  in
+  let blocks_per_cycle = JSON.(constants |-> "blocks_per_cycle" |> as_int) in
+  let consensus_rights_delay =
+    JSON.(constants |-> "consensus_rights_delay" |> as_int)
+  in
+  let* level = Client.level client in
+  let current_cycle = level / blocks_per_cycle in
+  let* () =
+    Tezos_base.TzPervasives.List.iter_s
+      (fun cycle ->
+        let* () =
+          check_success
+          @@ RPC.get_chain_block_context_raw_json
+               ~path:["cycle"; string_of_int cycle; "delegate_sampler_state"]
+               ()
+        in
+        unit)
+      (List.init (consensus_rights_delay + 2) (fun x ->
+           max 0 (current_cycle - 1 + x)))
+  in
+  let* () =
+    check_failure
+    @@ RPC.get_chain_block_context_raw_json
+         ~path:
+           [
+             "cycle";
+             string_of_int (current_cycle + consensus_rights_delay + 1);
+             "delegate_sampler_state";
+           ]
+         ()
+  in
+  let* () =
+    check_failure
+    @@ RPC.get_chain_block_context_raw_json
+         ~path:
+           [
+             "cycle"; string_of_int (current_cycle - 2); "delegate_sampler_state";
+           ]
+         ()
+  in
+  unit
+
 (* Migration to Tenderbake is only supported after the first cycle,
    therefore at [migration_level >= blocks_per_cycle]. *)
 let perform_protocol_migration ?node_name ?client_name ?parameter_file
@@ -171,6 +225,8 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
   let* () =
     check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client
   in
+  (* Remove check_delegate_sampler_state after S. *)
+  let* () = check_delegate_sampler_state client in
   let* () = Client.bake_for_and_wait client in
   (* Ensure that we migrated *)
   Log.info "Checking migration block consistency" ;
@@ -182,6 +238,9 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
       ~migrate_to
       ~level:(migration_level + 1)
   in
+  (* Test that R to S stitching for Delegate_sampler worked correctly.
+     Remove after S. *)
+  let* () = check_delegate_sampler_state client in
   (* Test that we can still bake after migration *)
   let* () =
     repeat baked_blocks_after_migration (fun () ->
@@ -190,6 +249,8 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
   let* () =
     check_adaptive_issuance_launch_cycle ~loc:__LOC__ ~migrate_from client
   in
+  (* Remove check_delegate_sampler_state after S. *)
+  let* () = check_delegate_sampler_state client in
   return (client, node)
 
 (** Test all levels for one cycle, after the first cycle. *)
