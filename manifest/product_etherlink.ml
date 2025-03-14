@@ -249,6 +249,11 @@ let evm_node_lib_dev =
     | Some target -> target
     | None -> (* unreachable *) assert false
   in
+  let parameters =
+    match Protocol.parameters quebec with
+    | Some target -> target
+    | None -> (* unreachable *) assert false
+  in
   octez_evm_node_lib
     "evm_node_lib_dev"
     ~path:"etherlink/bin_node/lib_dev"
@@ -289,6 +294,7 @@ let evm_node_lib_dev =
         wasm_runtime;
         performance_metrics;
         plugin;
+        parameters;
       ]
 
 let evm_node_lib_dev_client =

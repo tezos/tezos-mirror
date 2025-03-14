@@ -5408,6 +5408,8 @@ module Protocol : sig
 
   val agnostic_baker : t -> target option
 
+  val parameters : t -> target option
+
   val parameters_exn : t -> target
 
   val benchmarks_proto_exn : t -> target
@@ -5608,6 +5610,8 @@ end = struct
   let dal p = p.dal
 
   let agnostic_baker p = p.agnostic_baker
+
+  let parameters p = p.parameters
 
   let parameters_exn p = mandatory "parameters" p p.parameters
 

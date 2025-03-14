@@ -33,6 +33,7 @@ type error +=
   | Unexpected_multichain
   | Proxy_finalize_with_multichain of error_source
   | Mismatched_multichain of error_source
+  | Dream_rpc_tezlink
 
 let () =
   register_error_kind
@@ -148,4 +149,12 @@ let () =
              environment.")
     Data_encoding.(obj1 (req "source" error_source_encoding))
     (function Mismatched_multichain source -> Some source | _ -> None)
-    (fun source -> Mismatched_multichain source)
+    (fun source -> Mismatched_multichain source) ;
+  register_error_kind
+    `Permanent
+    ~id:"dream_rpc_tezlink"
+    ~title:"Dream RPC node with Tezlink"
+    ~description:"Tezlink is only compatible with Resto RPC nodes."
+    Data_encoding.empty
+    (function Dream_rpc_tezlink -> Some () | _ -> None)
+    (fun () -> Dream_rpc_tezlink)

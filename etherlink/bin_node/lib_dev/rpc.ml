@@ -141,6 +141,12 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
         Evm_ro_context.(evm_services_methods ctxt time_between_blocks)
       ~data_dir
       ~rpc_server_family:(Rpc_types.Single_chain_node_rpc_server chain_family)
+      ?tezlink_services:
+        (if chain_family = Michelson then
+           Some
+             Tezlink_services_impl.(
+               michelson_services_methods rpc_backend Tezlink_constants.mainnet)
+         else None)
       Stateless
       rpc_config
       (rpc_backend, ctxt.smart_rollup_address)

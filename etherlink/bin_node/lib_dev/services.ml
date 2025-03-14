@@ -1154,9 +1154,9 @@ let dispatch_websocket_private (rpc_server_family : Rpc_types.rpc_server_family)
     (dispatch_private_websocket rpc_server_family ~block_production rpc)
 
 let directory ~rpc_server_family ?delegate_health_check_to rpc validation config
-    ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
-  Evm_directory.empty config.experimental_features.rpc_server
-  |> version |> configuration config
+    ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
+    dir =
+  dir |> version |> configuration config
   |> health_check ?delegate_to:delegate_health_check_to
   |> dispatch_public
        rpc_server_family
