@@ -397,7 +397,6 @@ mod tests {
         tx_common::EthereumTransactionCommon,
     };
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_evm_runtime::safe_storage::SafeStorage;
 
     use tezos_evm_runtime::runtime::Runtime;
     use tezos_smart_rollup::michelson::ticket::FA2_1Ticket;
@@ -671,24 +670,22 @@ mod tests {
     fn test_xtz_withdrawal_applied() {
         // init host
         let mut host = MockKernelHost::default();
-        let mut safe_storage = SafeStorage { host: &mut host };
-        safe_storage
-            .store_write_all(
-                &NATIVE_TOKEN_TICKETER_PATH,
-                b"KT1DWVsu4Jtu2ficZ1qtNheGPunm5YVniegT",
-            )
-            .unwrap();
-        store_chain_id(&mut safe_storage, DUMMY_CHAIN_ID).unwrap();
+        host.store_write_all(
+            &NATIVE_TOKEN_TICKETER_PATH,
+            b"KT1DWVsu4Jtu2ficZ1qtNheGPunm5YVniegT",
+        )
+        .unwrap();
+        store_chain_id(&mut host, DUMMY_CHAIN_ID).unwrap();
 
         // run level in order to initialize outbox counter (by SOL message)
-        let level = safe_storage.host.host.run_level(|_| ());
+        let level = host.host.run_level(|_| ());
 
         // provision sender account
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
         let mut evm_account_storage = account_storage::init_account_storage().unwrap();
         set_balance(
-            &mut safe_storage,
+            &mut host,
             &mut evm_account_storage,
             &sender,
             sender_initial_balance,
@@ -746,14 +743,14 @@ mod tests {
             contents,
         };
 
-        safe_storage.host.host.add_external(message);
+        host.host.add_external(message);
 
         // run kernel twice to get to the stage with block creation:
-        main(&mut safe_storage).expect("Kernel error");
-        main(&mut safe_storage).expect("Kernel error");
+        main(&mut host).expect("Kernel error");
+        main(&mut host).expect("Kernel error");
 
         // verify outbox is not empty
-        let outbox = safe_storage.host.host.outbox_at(level + 1);
+        let outbox = host.host.outbox_at(level + 1);
         assert!(!outbox.is_empty());
 
         // check message contents:
@@ -791,13 +788,10 @@ mod tests {
     fn send_fa_deposit(enable_fa_bridge: bool) -> Option<TransactionStatus> {
         // init host
         let mut mock_host = MockKernelHost::default();
-        let mut safe_storage = SafeStorage {
-            host: &mut mock_host,
-        };
 
         // enable FA bridge feature
         if enable_fa_bridge {
-            safe_storage
+            mock_host
                 .store_write_all(&ENABLE_FA_BRIDGE, &[1u8])
                 .unwrap();
         }
@@ -835,12 +829,12 @@ mod tests {
             "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5",
             "tz1P2Po7YM526ughEsRbY4oR9zaUPDZjxFrb",
         );
-        safe_storage.host.host.add_transfer(payload, &metadata);
+        mock_host.host.add_transfer(payload, &metadata);
 
         // run kernel
-        main(&mut safe_storage).expect("Kernel error");
+        main(&mut mock_host).expect("Kernel error");
         // QUESTION: looks like to get to the stage with block creation we need to call main twice (maybe check blueprint instead?) [1]
-        main(&mut safe_storage).expect("Kernel error");
+        main(&mut mock_host).expect("Kernel error");
 
         // reconstruct ticket
         let ticket = FA2_1Ticket::new(
@@ -862,7 +856,7 @@ mod tests {
         let deposit = FaDeposit {
             amount: 42.into(),
             proxy: Some(H160([2u8; 20])),
-            inbox_level: safe_storage.host.host.level(), // level not yet advanced
+            inbox_level: mock_host.host.level(), // level not yet advanced
             inbox_msg_id: 2,
             receiver: H160([1u8; 20]),
             ticket_hash: ticket_hash(&ticket).unwrap(),
@@ -871,7 +865,7 @@ mod tests {
         let tx_hash = deposit.hash(&[0u8; 20]);
 
         // read transaction receipt
-        read_transaction_receipt_status(&mut safe_storage, &tx_hash.0).ok()
+        read_transaction_receipt_status(&mut mock_host, &tx_hash.0).ok()
     }
 
     #[test]
@@ -887,26 +881,23 @@ mod tests {
     fn send_fa_withdrawal(enable_fa_bridge: bool) -> Vec<Vec<u8>> {
         // init host
         let mut mock_host = MockKernelHost::default();
-        let mut safe_storage = SafeStorage {
-            host: &mut mock_host,
-        };
 
         // enable FA bridge feature
         if enable_fa_bridge {
-            safe_storage
+            mock_host
                 .store_write_all(&ENABLE_FA_BRIDGE, &[1u8])
                 .unwrap();
         }
 
         // run level in order to initialize outbox counter (by SOL message)
-        let level = safe_storage.host.host.run_level(|_| ());
+        let level = mock_host.host.run_level(|_| ());
 
         // provision sender account
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
         let mut evm_account_storage = account_storage::init_account_storage().unwrap();
         set_balance(
-            &mut safe_storage,
+            &mut mock_host,
             &mut evm_account_storage,
             &sender,
             sender_initial_balance,
@@ -919,7 +910,7 @@ mod tests {
 
         // patch ticket table
         ticket_balance_add(
-            &mut safe_storage,
+            &mut mock_host,
             &mut evm_account_storage,
             &ticket_hash,
             &sender,
@@ -981,14 +972,14 @@ mod tests {
             contents,
         };
 
-        safe_storage.host.host.add_external(message);
+        mock_host.host.add_external(message);
 
         // run kernel
-        main(&mut safe_storage).expect("Kernel error");
+        main(&mut mock_host).expect("Kernel error");
         // QUESTION: looks like to get to the stage with block creation we need to call main twice (maybe check blueprint instead?) [2]
-        main(&mut safe_storage).expect("Kernel error");
+        main(&mut mock_host).expect("Kernel error");
 
-        safe_storage.host.host.outbox_at(level + 1)
+        mock_host.host.outbox_at(level + 1)
     }
 
     #[test]
