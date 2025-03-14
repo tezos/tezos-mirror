@@ -5,7 +5,7 @@
 use crate::Error;
 use tezos_crypto_rs::{
     hash::{self, HashTrait},
-    public_key, public_key_hash, PublicKeyWithHash,
+    public_key, public_key_hash, signature, PublicKeyWithHash,
 };
 
 macro_rules! bind_hash {
@@ -40,6 +40,34 @@ bind_hash!(PublicKeySecp256k1, hash::PublicKeySecp256k1);
 bind_hash!(PublicKeyP256, hash::PublicKeyP256);
 bind_hash!(PublicKeyBls, hash::PublicKeyBls);
 bind_hash!(PublicKey, public_key::PublicKey);
+
+bind_hash!(UnknownSignature, hash::UnknownSignature);
+bind_hash!(Ed25519Signature, hash::Ed25519Signature);
+bind_hash!(Secp256k1Signature, hash::Secp256k1Signature);
+bind_hash!(P256Signature, hash::P256Signature);
+bind_hash!(BlsSignature, hash::BlsSignature);
+
+// TODO: https://linear.app/tezos/issue/SDK-73.
+// Unable use the `bind_hash!` macro because the `signature::Signature` struct does not implement `from_b58check` and `to_b58check` but `from_base58_check` and `to_base58_check`
+/// Generic signature structure gathering the four types of signature hash and the unknown signature hash.
+#[derive(uniffi::Object)]
+pub struct Signature(pub(crate) signature::Signature);
+
+#[uniffi::export]
+impl Signature {
+    /// Decodes any Base58Check-encoded signature string into a `Signature`.
+    #[uniffi::constructor]
+    pub fn from_b58check(data: &str) -> Result<Self, Error> {
+        signature::Signature::from_base58_check(data)
+            .map(Self)
+            .map_err(Error::Base58)
+    }
+
+    /// Encodes the `Signature` into a Base58Check-encoded string.
+    pub fn to_b58check(&self) -> String {
+        signature::Signature::to_base58_check(&self.0)
+    }
+}
 
 macro_rules! bind_pk_to_pkh {
     ($pk:ident, $pkh:ident) => {
