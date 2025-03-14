@@ -64,3 +64,8 @@ Internal
 --------
 
 - Added ``octez_riscv_pvm`` as a dependency for the protocol environment (:gl:`!15918`)
+
+- Added ``companion_key`` for delegates. These keys are used to build attestations for tz4
+  addresses, and are registered the same way as consensus keys. They are used at validation
+  time for the consensus, so the type of the storage ``delegate_sampler_state`` had to be
+  updated. (MR :gl:`!17213`)
