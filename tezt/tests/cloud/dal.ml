@@ -1293,7 +1293,10 @@ module Monitoring_app = struct
         (fun (`address address, `alias alias, v) ->
           Format.sprintf
             "▪ `%s` - `%s` : `%s`"
-            (Option.fold ~none:"unk" ~some:(Format.sprintf "%.2f%%") v)
+            (Option.fold
+               ~none:"unk"
+               ~some:(fun v -> Format.sprintf "%.2f%%" (v *. 100.))
+               v)
             (String.sub address 0 7)
             (Option.value ~default:"no alias" alias))
         bakers
