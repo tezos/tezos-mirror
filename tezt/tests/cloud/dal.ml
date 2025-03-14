@@ -941,91 +941,62 @@ let update_published_and_attested_commitments_per_slot t per_level_info
         ( total_published_commitments_per_slot,
           total_attested_commitments_per_slot )
 
-let update_ratio_attested_commitments_per_baker t per_level_info metrics =
+let update_ratio_attested_commitments_per_baker t per_level_info =
   let default () =
     Hashtbl.to_seq_keys per_level_info.attestations
     |> Seq.map (fun key -> (key, None))
     |> Hashtbl.of_seq
   in
-  match metrics.level_first_commitment_attested with
-  | None -> default ()
-  | Some level_first_commitment_attested -> (
-      let published_level =
-        published_level_of_attested_level t per_level_info.level
-      in
-      if published_level <= t.first_level then (
+  let published_level =
+    published_level_of_attested_level t per_level_info.level
+  in
+  if published_level <= t.first_level then (
+    Log.warn
+      "Unable to retrieve information for published level %d because it \
+       precedes the earliest available level (%d)."
+      published_level
+      t.first_level ;
+    default ())
+  else
+    match Hashtbl.find_opt t.infos published_level with
+    | None ->
         Log.warn
-          "Unable to retrieve information for published level %d because it \
-           precedes the earliest available level (%d)."
-          published_level
-          t.first_level ;
-        default ())
-      else
-        match Hashtbl.find_opt t.infos published_level with
-        | None ->
-            Log.warn
-              "Unexpected error: The level %d is missing in the infos table"
-              published_level ;
-            default ()
-        | Some old_per_level_info ->
-            let n = Hashtbl.length old_per_level_info.published_commitments in
-            let maximum_number_of_blocks =
-              t.configuration.metrics_retention / t.time_between_blocks
-            in
-            let weight =
-              min
-                maximum_number_of_blocks
-                (per_level_info.level - level_first_commitment_attested)
-              |> float_of_int
-            in
-            let table =
-              Hashtbl.copy metrics.ratio_attested_commitments_per_baker
-            in
-            Hashtbl.to_seq_keys per_level_info.attestations
-            |> Seq.filter_map (fun public_key_hash ->
-                   let bitset =
-                     match
-                       Hashtbl.find_opt
-                         per_level_info.attestations
-                         public_key_hash
-                     with
-                     | None -> (* No attestation in block *) Some 0.
-                     | Some (Some z) when n = 0 ->
-                         if z = Z.zero then
-                           (* No slot were published. *)
-                           Some 100.
-                         else (
-                           Log.error
-                             "Wow wow wait! It seems an invariant is broken. \
-                              Either on the test side, or on the DAL node side" ;
-                           Some 100.)
-                     | Some (Some z) ->
-                         (* Attestation with DAL payload *)
-                         if n = 0 then Some 100.
-                         else Some (float @@ (Z.popcount z * 100 / n))
-                     | Some None ->
-                         (* Attestation without DAL payload: no DAL rights. *)
-                         Some 100.
-                   in
-                   match
-                     Hashtbl.find_opt
-                       metrics.ratio_attested_commitments_per_baker
-                       public_key_hash
-                   with
-                   | None -> None
-                   | Some None -> None
-                   | Some _old_ratio when n = 0 -> None
-                   | Some (Some old_ratio) ->
-                       (* this will be removed in the next commit *)
-                       Option.map
-                         (fun bitset ->
-                           ( public_key_hash,
-                             Some
-                               (((old_ratio *. weight) +. bitset)
-                               /. (weight +. 1.)) ))
-                         bitset)
-            |> Hashtbl.replace_seq table ;
-            table)
+          "Unexpected error: The level %d is missing in the infos table"
+          published_level ;
+        default ()
+    | Some published_level_info ->
+        (* Retrieves the number of published commitments *)
+        let number_of_published_commitments =
+          float (Hashtbl.length published_level_info.published_commitments)
+        in
+        let table = Hashtbl.(create (length per_level_info.attestations)) in
+        Hashtbl.to_seq_keys per_level_info.attestations
+        |> Seq.filter_map (fun public_key_hash ->
+               let bitset =
+                 match
+                   Hashtbl.find_opt per_level_info.attestations public_key_hash
+                 with
+                 | None -> (* No attestation in block *) None
+                 | Some (Some z) when number_of_published_commitments = 0. ->
+                     (* Attestation with DAL payload but no slot were published. *)
+                     if z = Z.zero then Some 1.
+                     else (
+                       Log.error
+                         "Wow wow wait! It seems an invariant is broken. \
+                          Either on the test side, or on the DAL node side" ;
+                       None)
+                 | Some (Some z) ->
+                     (* Attestation with DAL payload *)
+                     Some
+                       (float (Z.popcount z) /. number_of_published_commitments)
+                 | Some None ->
+                     (* Attestation without DAL payload: may be due to no
+                        DAL rights. *)
+                     None
+               in
+               Some (public_key_hash, bitset))
+        |> Hashtbl.add_seq table ;
+        table
 
 let get_metrics t infos_per_level metrics =
   let level_first_commitment_published =
@@ -1073,7 +1044,7 @@ let get_metrics t infos_per_level metrics =
     update_ratio_attested_commitments t infos_per_level metrics
   in
   let ratio_attested_commitments_per_baker =
-    update_ratio_attested_commitments_per_baker t infos_per_level metrics
+    update_ratio_attested_commitments_per_baker t infos_per_level
   in
   let total_published_commitments_per_slot, total_attested_commitments_per_slot
       =
