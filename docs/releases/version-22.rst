@@ -71,7 +71,7 @@ Other more specific uses may need adequate configurations.
 For instance:
 
 - running a node in full or archive mode requires extra storage space;
-- bakers participating to the DAL should consult `this article <https://forum.tezosagora.org/t/hardware-and-bandwidth-requirements-for-the-tezos-dal/6230>`__.
+- bakers participating to the DAL should consult :ref:`The DAL node requirements <dal_node_specs>`.
 
 Update Instructions
 -------------------
