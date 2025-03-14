@@ -16,6 +16,22 @@ pub enum ChainFamily {
     Michelson,
 }
 
+impl Default for ChainFamily {
+    fn default() -> Self {
+        Self::Evm
+    }
+}
+
+impl From<String> for ChainFamily {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            "Michelson" => Self::Michelson,
+            "Evm" => Self::Evm,
+            _ => Self::default(),
+        }
+    }
+}
+
 pub struct EvmChainConfig {
     pub chain_id: U256,
     pub limits: EvmLimits,

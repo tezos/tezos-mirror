@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::block_in_progress::EthBlockInProgress;
+use crate::chains::ChainFamily;
 use crate::event::Event;
 use crate::simulation::SimulationResult;
 use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
@@ -118,6 +119,10 @@ const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/evm/chain_id");
 pub const ENABLE_MULTICHAIN: RefPath =
     RefPath::assert_from(b"/evm/feature_flags/enable_multichain");
 
+// Root for chain configurations. Informations about a chain are available by appending its chain ID.
+pub const CHAIN_CONFIGURATIONS: RefPath =
+    RefPath::assert_from(b"/evm/chain_configurations");
+
 const EVM_MINIMUM_BASE_FEE_PER_GAS: RefPath =
     RefPath::assert_from(b"/evm/world_state/fees/minimum_base_fee_per_gas");
 const EVM_DA_FEE: RefPath =
@@ -189,6 +194,12 @@ pub fn object_path(object_hash: &TransactionHash) -> Result<OwnedPath, Error> {
     let raw_object_path: Vec<u8> = format!("/{}", &hash).into();
     let object_path = OwnedPath::try_from(raw_object_path)?;
     concat(&EVM_TRANSACTIONS_OBJECTS, &object_path).map_err(Error::from)
+}
+
+pub fn chain_config_path(chain_id: &U256) -> Result<OwnedPath, Error> {
+    let raw_chain_id_path: Vec<u8> = format!("/{}", chain_id).into();
+    let chain_id_path = OwnedPath::try_from(raw_chain_id_path)?;
+    concat(&CHAIN_CONFIGURATIONS, &chain_id_path).map_err(Error::from)
 }
 
 pub fn store_simulation_result<Host: Runtime, T: Decodable + Encodable>(
@@ -869,6 +880,23 @@ pub fn max_blueprint_lookahead_in_seconds(host: &impl Runtime) -> anyhow::Result
     let bytes = host.store_read_all(&MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS)?;
     let bytes: [u8; 8] = bytes.as_slice().try_into()?;
     Ok(i64::from_le_bytes(bytes))
+}
+
+// Storage functions related to a chain configuration
+
+#[allow(dead_code)]
+pub fn read_chain_family(
+    host: &impl Runtime,
+    chain_id: U256,
+) -> anyhow::Result<ChainFamily> {
+    let chain_configurations_path = chain_config_path(&chain_id)?;
+    let chain_family_path = RefPath::assert_from(b"/chain_family");
+    let path = concat(&chain_configurations_path, &chain_family_path)?;
+    let bytes = host
+        .store_read_all(&path)
+        .context(format!("Cannot read chain family for chain {}", chain_id))?;
+    let chain_family = String::from_utf8(bytes)?;
+    Ok(chain_family.into())
 }
 
 #[cfg(test)]
