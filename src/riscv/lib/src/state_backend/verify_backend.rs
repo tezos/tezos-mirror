@@ -235,7 +235,7 @@ impl ManagerReadWrite for Verifier {
 }
 
 impl ManagerClone for Verifier {
-    fn clone_region<E: Copy, const LEN: usize>(
+    fn clone_region<E: Clone + 'static, const LEN: usize>(
         region: &Self::Region<E, LEN>,
     ) -> Self::Region<E, LEN> {
         region.clone()
@@ -248,8 +248,8 @@ impl ManagerClone for Verifier {
     fn clone_enriched_cell<V>(cell: &Self::EnrichedCell<V>) -> Self::EnrichedCell<V>
     where
         V: EnrichedValue,
-        V::E: Copy,
-        V::D: Copy,
+        V::E: Clone,
+        V::D: Clone,
     {
         cell.clone()
     }

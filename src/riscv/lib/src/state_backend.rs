@@ -285,7 +285,7 @@ pub trait ManagerDeserialise: ManagerBase {
 /// Manager with the ability to clone regions
 pub trait ManagerClone: ManagerBase {
     /// Clone the region.
-    fn clone_region<E: Copy, const LEN: usize>(
+    fn clone_region<E: Clone, const LEN: usize>(
         region: &Self::Region<E, LEN>,
     ) -> Self::Region<E, LEN>;
 
@@ -296,8 +296,8 @@ pub trait ManagerClone: ManagerBase {
     fn clone_enriched_cell<V>(cell: &Self::EnrichedCell<V>) -> Self::EnrichedCell<V>
     where
         V: EnrichedValue,
-        V::E: Copy,
-        V::D: Copy;
+        V::E: Clone,
+        V::D: Clone;
 }
 
 /// Manager wrapper around `M` whose regions are immutable references to regions of `M`

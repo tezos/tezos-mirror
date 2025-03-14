@@ -3,6 +3,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::ops::Deref;
+
 use super::Elem;
 use super::EnrichedValue;
 use super::EnrichedValueLinked;
@@ -93,8 +95,8 @@ impl<V: EnrichedValue, M: ManagerBase> EnrichedCell<V, M> {
 
 impl<V: EnrichedValue, M: ManagerClone> Clone for EnrichedCell<V, M>
 where
-    V::E: Copy,
-    V::D: Copy,
+    V::E: Clone,
+    V::D: Clone,
 {
     fn clone(&self) -> Self {
         Self {
@@ -141,11 +143,12 @@ impl<E: 'static, M: ManagerBase> Cell<E, M> {
     }
 }
 
-impl<E: Copy, M: ManagerBase> Cell<E, M> {
+impl<E: 'static, M: ManagerBase> Cell<E, M> {
     /// Read the value managed by the cell.
     #[inline(always)]
     pub fn read(&self) -> E
     where
+        E: Copy,
         M: ManagerRead,
     {
         self.region.read(0)
@@ -164,6 +167,7 @@ impl<E: Copy, M: ManagerBase> Cell<E, M> {
     #[inline(always)]
     pub fn replace(&mut self, value: E) -> E
     where
+        E: Copy,
         M: ManagerReadWrite,
     {
         self.region.replace(0, value)
@@ -197,11 +201,9 @@ impl<'de, E: serde::Deserialize<'de>, M: ManagerDeserialise> serde::Deserialize<
     }
 }
 
-impl<A: PartialEq<B> + Copy, B: Copy, M: ManagerRead, N: ManagerRead> PartialEq<Cell<B, N>>
-    for Cell<A, M>
-{
+impl<A: PartialEq<B>, B, M: ManagerRead, N: ManagerRead> PartialEq<Cell<B, N>> for Cell<A, M> {
     fn eq(&self, other: &Cell<B, N>) -> bool {
-        self.read() == other.read()
+        self.as_ref() == other.as_ref()
     }
 }
 
@@ -213,9 +215,9 @@ impl<E: serde::Serialize, M: ManagerSerialise> AccessInfoAggregatable
     }
 }
 
-impl<E: Eq + Copy, M: ManagerRead> Eq for Cell<E, M> {}
+impl<E: Eq, M: ManagerRead> Eq for Cell<E, M> {}
 
-impl<E: Copy, M: ManagerClone> Clone for Cell<E, M> {
+impl<E: Clone, M: ManagerClone> Clone for Cell<E, M> {
     fn clone(&self) -> Self {
         Self {
             region: self.region.clone(),
@@ -224,8 +226,18 @@ impl<E: Copy, M: ManagerClone> Clone for Cell<E, M> {
 }
 
 impl<E, M: ManagerRead> AsRef<E> for Cell<E, M> {
+    #[inline]
     fn as_ref(&self) -> &E {
         M::region_ref(&self.region.region, 0)
+    }
+}
+
+impl<E, M: ManagerRead> Deref for Cell<E, M> {
+    type Target = E;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.as_ref()
     }
 }
 
@@ -345,11 +357,12 @@ impl<E: 'static, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
     }
 }
 
-impl<E: Copy, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
+impl<E: 'static, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
     /// Read an element in the region.
     #[inline]
     pub fn read(&self, index: usize) -> E
     where
+        E: Copy,
         M: ManagerRead,
     {
         M::region_read(&self.region, index)
@@ -359,6 +372,7 @@ impl<E: Copy, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
     #[inline]
     pub fn read_all(&self) -> Vec<E>
     where
+        E: Copy,
         M: ManagerRead,
     {
         M::region_read_all(&self.region)
@@ -377,6 +391,7 @@ impl<E: Copy, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
     #[inline]
     pub fn write_all(&mut self, value: &[E])
     where
+        E: Copy,
         M: ManagerWrite,
     {
         M::region_write_all(&mut self.region, value)
@@ -386,6 +401,7 @@ impl<E: Copy, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
     #[inline]
     pub fn replace(&mut self, index: usize, value: E) -> E
     where
+        E: Copy,
         M: ManagerReadWrite,
     {
         M::region_replace(&mut self.region, index, value)
@@ -470,7 +486,7 @@ impl<E: serde::Serialize, const LEN: usize, M: ManagerSerialise> AccessInfoAggre
     }
 }
 
-impl<E: Copy, const LEN: usize, M: ManagerClone> Clone for Cells<E, LEN, M> {
+impl<E: Clone, const LEN: usize, M: ManagerClone> Clone for Cells<E, LEN, M> {
     fn clone(&self) -> Self {
         Self {
             region: M::clone_region(&self.region),
