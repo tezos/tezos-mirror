@@ -16,7 +16,8 @@ gitlab_release_no_v=
 
 case "$RELEASETYPE" in
 ReleaseCandidate | TestReleaseCandidate | Release | TestRelease)
-  _VERSION=$VERSION
+  # rpm versions are more strict than debian versions
+  _VERSION=$(echo "${VERSION}" | tr -d '~' | tr '-' '_')
   _EPOCH="%{nil}"
   _CHANGELOG="New Release $VERSION / $CI_COMMIT_SHORT_SHA"
   ;;
