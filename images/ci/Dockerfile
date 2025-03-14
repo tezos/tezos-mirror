@@ -59,21 +59,12 @@ RUN apk update \
     libc-dev \
     libev \
     libffi \
-    # Used by 'scripts/install_dal_trusted_setup.sh' below
-    curl \
     sudo \
     sqlite-libs \
     # Used by teztale
     openssl-libs-static \
     sqlite-dev \
     postgresql-dev
-
-# Install dal SRS setup (need curl)
-COPY scripts/install_dal_trusted_setup.sh scripts/version.sh /tmp/
-RUN mkdir -p /usr/share/dal-trusted-setup && \
-    DAL_TRUSTED_SETUP=/usr/share/dal-trusted-setup \
-    sh /tmp/install_dal_trusted_setup.sh && \
-    rm /tmp/install_dal_trusted_setup.sh /tmp/version.sh
 
 USER tezos
 ENV USER=tezos
@@ -375,6 +366,13 @@ RUN apk update \
  && cp /root/.cargo/bin/cast /bin \
  # Clean up
  && rm -rf /tmp/* && rm -rf /root/.cargo
+
+# Install dal SRS setup (need curl)
+COPY scripts/install_dal_trusted_setup.sh scripts/version.sh /tmp/
+RUN mkdir -p /usr/share/dal-trusted-setup && \
+    DAL_TRUSTED_SETUP=/usr/share/dal-trusted-setup \
+    sh /tmp/install_dal_trusted_setup.sh && \
+    rm /tmp/install_dal_trusted_setup.sh /tmp/version.sh
 
 USER tezos
 WORKDIR /home/tezos
