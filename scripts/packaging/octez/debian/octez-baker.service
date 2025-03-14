@@ -4,7 +4,6 @@ After=network.target
 
 [Service]
 Type=oneshot
-ExecStart=/bin/true
 RemainAfterExit=yes
 Restart=on-failure
 TimeoutStartSec=300
@@ -16,8 +15,8 @@ EnvironmentFile=-/etc/default/octez-baker
 # The baker is started only if the node is up and running
 ExecStartPre=/usr/share/octez-baker/wait-for-node-up.sh
 
-ExecStartPre=/usr/share/octez-baker/systemd-octez-bakers.sh start
-ExecStopPost=/usr/share/octez-baker/systemd-octez-bakers.sh stop
+ExecStart=/usr/share/octez-baker/systemd-octez-bakers.sh start
+ExecStop=/usr/share/octez-baker/systemd-octez-bakers.sh stop
 
 [Install]
 WantedBy=multi-user.target
