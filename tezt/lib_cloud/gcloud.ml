@@ -81,6 +81,50 @@ let list_vms ~prefix =
   in
   Lwt.return (String.trim output)
 
+let gcloud_run_stdout args =
+  let* output =
+    Process.run_and_read_stdout "gcloud" (["--format"; "json"] @ args)
+  in
+  let origin = "gcloud " ^ String.concat " " args in
+  let json = JSON.parse ~origin output in
+  Lwt.return json
+
+let gcloud_run_stdout_filter ~filter args =
+  let filter =
+    match filter with
+    | None -> []
+    | Some filter -> [Format.asprintf "--filter=%s" filter]
+  in
+  let* json = gcloud_run_stdout (args @ filter) in
+  Lwt.return json
+
+let list_firewalls ?filter () =
+  gcloud_run_stdout_filter ~filter ["compute"; "firewall-rules"; "list"]
+
+let list_networks ?filter () =
+  gcloud_run_stdout_filter ~filter ["compute"; "networks"; "list"]
+
+let list_subnets ?filter () =
+  gcloud_run_stdout_filter ~filter ["compute"; "networks"; "subnets"; "list"]
+
+let list_addresses ?filter () =
+  gcloud_run_stdout_filter ~filter ["compute"; "addresses"; "list"]
+
+let list_instances ?filter () =
+  gcloud_run_stdout_filter ~filter ["compute"; "instances"; "list"]
+
+let list_instance_templates ?filter () =
+  gcloud_run_stdout_filter ~filter ["compute"; "instance-templates"; "list"]
+
+let list_instance_groups ?filter () =
+  gcloud_run_stdout_filter ~filter ["compute"; "instance-groups"; "list"]
+
+let list_iam_service_accounts ?filter () =
+  gcloud_run_stdout_filter ~filter ["iam"; "service-accounts"; "list"]
+
+let list_disks ?filter () =
+  gcloud_run_stdout_filter ~filter ["compute"; "disks"; "list"]
+
 module DNS = struct
   let create_zone ~domain ~zone () =
     let dns_name = Format.asprintf "%s.%s" zone domain in
