@@ -19,6 +19,16 @@ let signature_parameter ~name ~desc =
          | Some s -> return s
          | None -> cctxt#error "Failed to read a BLS signature"))
 
+let public_key_parameter ~name ~desc =
+  param
+    ~name
+    ~desc
+    (parameter (fun (cctxt : #Protocol_client_context.full) s ->
+         let open Lwt_result_syntax in
+         match Signature.Bls.Public_key.of_b58check_opt s with
+         | Some pk -> return pk
+         | None -> cctxt#error "Failed to read a BLS public key"))
+
 let commands () =
   let open Lwt_result_syntax in
   [
@@ -62,4 +72,29 @@ let commands () =
             let*! () = cctxt#message "%a" Signature.pp proof in
             return_unit
         | _ -> cctxt#error "Failed to produce a proof: input is not a BLS key");
+    command
+      ~group
+      ~desc:"Check a BLS proof"
+      no_options
+      (prefixes ["check"; "bls"; "proof"]
+      @@ signature_parameter
+           ~name:"BLS proof"
+           ~desc:"BLS proof is B58 encoded BLS signature"
+      @@ prefixes ["for"]
+      @@ public_key_parameter
+           ~name:"BLS public key"
+           ~desc:"B58 encoded BLS public key"
+      @@ stop)
+      (fun () proof pk (cctxt : #Protocol_client_context.full) ->
+        let open Lwt_result_syntax in
+        let msg =
+          Data_encoding.Binary.to_bytes_exn
+            Signature.Public_key.encoding
+            (Signature.Bls pk)
+        in
+        let is_valid = Signature.Bls.check pk proof msg in
+        if is_valid then
+          let*! () = cctxt#message "Proof check is successful." in
+          return_unit
+        else cctxt#error "Invalid proof");
   ]
