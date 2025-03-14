@@ -7,7 +7,6 @@ use std::collections::VecDeque;
 
 use super::Array;
 use super::Atom;
-use super::Cells;
 use super::DynArray;
 use super::Layout;
 use super::Many;
@@ -254,10 +253,7 @@ where
     ) -> Result<Hash, PartialHashError> {
         let region = state.into_region();
         match region.get_partial_region() {
-            PartialState::Complete(region) => {
-                let cells: Cells<T, 1, Ref<'_, Owned>> = Cells::bind(region.as_ref());
-                Ok(Hash::blake2b_hash(cells)?)
-            }
+            PartialState::Complete(region) => Ok(Hash::blake2b_hash(region)?),
             PartialState::Absent => proof.partial_hash_leaf(),
             PartialState::Incomplete => Err(PartialHashError::Fatal),
         }
@@ -310,10 +306,7 @@ where
     ) -> Result<Hash, PartialHashError> {
         let region = state.into_region();
         match region.get_partial_region() {
-            PartialState::Complete(region) => {
-                let cells: Cells<T, LEN, Ref<'_, Owned>> = Cells::bind(region.as_ref());
-                Ok(Hash::blake2b_hash(cells)?)
-            }
+            PartialState::Complete(region) => Ok(Hash::blake2b_hash(region)?),
             PartialState::Absent => proof.partial_hash_leaf(),
             PartialState::Incomplete => Err(PartialHashError::Fatal),
         }

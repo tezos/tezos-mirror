@@ -12,6 +12,7 @@ use std::panic::resume_unwind;
 use std::slice;
 
 use range_collections::RangeSet2;
+use serde::ser::SerializeTuple;
 
 use super::Cell;
 use super::EnrichedValue;
@@ -310,7 +311,9 @@ impl<E: serde::Serialize, const LEN: usize> serde::Serialize for CompleteRegionR
         let mut serializer = serializer.serialize_tuple(LEN)?;
 
         for item in self.region.iter() {
-            serializer.serialize_element(item)?;
+            serializer.serialize_element(item.as_ref().ok_or_else(|| {
+                <S::Error as serde::ser::Error>::custom("Region is not complete")
+            })?)?;
         }
 
         serializer.end()
@@ -319,24 +322,21 @@ impl<E: serde::Serialize, const LEN: usize> serde::Serialize for CompleteRegionR
 
 impl<E, const LEN: usize> Region<E, LEN> {
     /// Get the contents of the region if it is fully present or its status otherwise.
-    pub fn get_partial_region(&self) -> PartialState<Box<[E; LEN]>> {
-        match self {
-            Region::Absent => PartialState::Absent,
-            Region::Partial(region) => {
-                let values: Option<Vec<E>> = region.iter().copied().collect();
-                match values {
-                    Some(v) => {
-                        let region = Box::try_from(v)
-                            .map_err(|_| {
-                                unreachable!("Converting a vector to an array of the same size always succeeds")
-                            })
-                            .unwrap();
-                        PartialState::Complete(region)
-                    }
-                    None => PartialState::Incomplete,
-                }
+    pub fn get_partial_region(&self) -> PartialState<CompleteRegionRef<'_, E, LEN>> {
+        let region = match self {
+            Region::Absent => return PartialState::Absent,
+            Region::Partial(region) => region,
+        };
+
+        for value in region.iter() {
+            if value.is_none() {
+                return PartialState::Incomplete;
             }
         }
+
+        PartialState::Complete(CompleteRegionRef {
+            region: region.as_ref(),
+        })
     }
 }
 
