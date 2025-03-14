@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2024 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2024-2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -17,8 +17,9 @@ use crate::storage::{
 use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
 use crate::{error::Error, error::StorageError, storage};
 
-use crate::{parsable, parsing, retrieve_chain_id, tick_model, CONFIG};
+use crate::{parsable, parsing, retrieve_chain_id, tick_model};
 
+use evm::Config;
 use evm_execution::account_storage::account_path;
 use evm_execution::trace::TracerInput;
 use evm_execution::{
@@ -369,6 +370,7 @@ impl Evaluation {
         host: &mut Host,
         tracer_input: Option<TracerInput>,
         enable_fa_withdrawals: bool,
+        evm_configuration: &Config,
     ) -> Result<SimulationResult<CallResult, String>, Error> {
         let chain_id = retrieve_chain_id(host)?;
         let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host)?;
@@ -467,7 +469,7 @@ impl Evaluation {
             &constants,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            evm_configuration,
             self.to,
             from,
             self.data.clone(),
@@ -634,13 +636,19 @@ impl<T: Encodable + Decodable> VersionedEncoding for SimulationResult<T, String>
 pub fn start_simulation_mode<Host: Runtime>(
     host: &mut Host,
     enable_fa_withdrawals: bool,
+    evm_configuration: &Config,
 ) -> Result<(), anyhow::Error> {
     log!(host, Debug, "Starting simulation mode ");
     let simulation = parse_inbox(host)?;
     match simulation {
         Message::Evaluation(simulation) => {
             let tracer_input = read_tracer_input(host)?;
-            let outcome = simulation.run(host, tracer_input, enable_fa_withdrawals)?;
+            let outcome = simulation.run(
+                host,
+                tracer_input,
+                enable_fa_withdrawals,
+                evm_configuration,
+            )?;
             storage::store_simulation_result(host, outcome)
         }
     }
@@ -649,6 +657,7 @@ pub fn start_simulation_mode<Host: Runtime>(
 #[cfg(test)]
 mod tests {
 
+    use evm_execution::configuration::EVMVersion;
     use primitive_types::H256;
     use tezos_ethereum::{block::BlockConstants, tx_signature::TxSignature};
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -764,7 +773,7 @@ mod tests {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             callee,
             caller,
             call_data,
@@ -803,7 +812,8 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome = evaluation.run(&mut host, None, false);
+        let outcome =
+            evaluation.run(&mut host, None, false, &EVMVersion::current_test_config());
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
@@ -829,7 +839,8 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome = evaluation.run(&mut host, None, false);
+        let outcome =
+            evaluation.run(&mut host, None, false, &EVMVersion::current_test_config());
 
         assert!(outcome.is_ok(), "simulation should have succeeded");
         let outcome = outcome.unwrap();
@@ -861,7 +872,8 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome = evaluation.run(&mut host, None, false);
+        let outcome =
+            evaluation.run(&mut host, None, false, &EVMVersion::current_test_config());
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();

@@ -11,10 +11,11 @@ use crate::trace::TracerInput::{CallTracer, StructLogger};
 use account_storage::{AccountStorageError, EthereumAccountStorage};
 use alloc::borrow::Cow;
 use alloc::collections::TryReserveError;
+use configuration::EVMVersion;
 use crypto::hash::{ContractKt1Hash, HashTrait};
 use evm::executor::stack::PrecompileFailure;
 use handler::{EvmHandler, ExecutionOutcome, ExecutionResult};
-use host::path::RefPath;
+use host::{path::RefPath, runtime::RuntimeError};
 use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, Level::*};
@@ -27,6 +28,7 @@ mod access_record;
 pub mod abi;
 pub mod account_storage;
 pub mod code_storage;
+pub mod configuration;
 pub mod fa_bridge;
 pub mod handler;
 pub mod precompiles;
@@ -252,7 +254,7 @@ pub fn run_transaction<'a, Host>(
     block: &'a BlockConstants,
     evm_account_storage: &'a mut EthereumAccountStorage,
     precompiles: &'a precompiles::PrecompileBTreeMap<Host>,
-    config: Config,
+    config: &Config,
     address: Option<H160>,
     caller: H160,
     call_data: Vec<u8>,
@@ -282,7 +284,7 @@ where
         evm_account_storage,
         caller,
         block,
-        &config,
+        config,
         precompiles,
         allocated_ticks,
         effective_gas_price,
@@ -439,6 +441,30 @@ pub fn fast_withdrawals_enabled<Host: Runtime>(host: &Host) -> bool {
     host.store_read_all(&ENABLE_FAST_WITHDRAWAL).is_ok()
 }
 
+// Path to the EVM version.
+const EVM_VERSION: RefPath = RefPath::assert_from(b"/evm/evm_version");
+
+pub fn store_evm_version(
+    host: &mut impl Runtime,
+    evm_version: &EVMVersion,
+) -> Result<(), RuntimeError> {
+    host.store_write_all(&EVM_VERSION, &evm_version.to_le_bytes())
+}
+
+pub fn read_evm_version(host: &mut impl Runtime) -> EVMVersion {
+    let evm_version = host.store_read_all(&EVM_VERSION);
+    match evm_version {
+        Ok(evm_version) => match evm_version.as_slice().try_into().ok() {
+            Some(evm_version) => EVMVersion::from_le_bytes(evm_version),
+            None => EVMVersion::default(),
+        },
+        Err(_) => {
+            let _ = store_evm_version(host, &EVMVersion::default());
+            EVMVersion::default()
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::account_storage::EthereumAccount;
@@ -467,14 +493,6 @@ mod test {
     // call: set(42)
     const STORAGE_CONTRACT_CALL_SET42: &str =
         "60fe47b1000000000000000000000000000000000000000000000000000000000000002a";
-
-    const CONFIG: Config = Config {
-        // The current implementation doesn't support Cancun call
-        // stack limit of 256.  We need to set a lower limit until we
-        // have switched to a head-based recursive calls.
-        call_stack_limit: 256,
-        ..Config::cancun()
-    };
 
     // The compiled initialization code for the Ethereum demo contract given
     // as an example in kernel_evm/solidity_examples/erc20tok.sol
@@ -609,7 +627,7 @@ mod test {
         let caller = H160::from_low_u64_be(985493);
         let call_data: Vec<u8> = vec![];
         let transaction_value = U256::from(100_u32);
-        let config = CONFIG;
+        let config = &EVMVersion::current_test_config();
         let gas_price = U256::from(1);
 
         set_balance(
@@ -630,7 +648,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            config,
             Some(callee),
             caller,
             call_data,
@@ -674,7 +692,7 @@ mod test {
         let caller = H160::from_low_u64_be(1234);
         let call_data: Vec<u8> = vec![];
         let transaction_value = U256::from(100_u32);
-        let config = CONFIG;
+        let config = &EVMVersion::current_test_config();
         let gas_price = U256::from(1);
 
         set_balance(
@@ -695,7 +713,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            config,
             Some(callee),
             caller,
             call_data,
@@ -754,7 +772,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             callee,
             caller,
             call_data,
@@ -810,7 +828,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             callee,
             caller,
             call_data,
@@ -848,7 +866,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             new_address,
             caller,
             call_data2,
@@ -882,7 +900,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             new_address,
             caller,
             call_data_set,
@@ -915,7 +933,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             new_address,
             caller,
             hex::decode(STORAGE_CONTRACT_CALL_NUM).unwrap(),
@@ -975,7 +993,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             callee,
             caller,
             call_data,
@@ -1028,7 +1046,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             callee,
             caller,
             call_data,
@@ -1081,7 +1099,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             Some(target),
             caller,
             vec![],
@@ -1227,7 +1245,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             Some(target),
             caller,
             vec![],
@@ -1290,7 +1308,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             Some(target),
             caller,
             vec![],
@@ -1352,7 +1370,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             Some(target),
             caller,
             vec![],
@@ -1409,7 +1427,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             Some(address),
             caller,
             vec![],
@@ -1461,13 +1479,15 @@ mod test {
             22006.into(),
         );
 
+        let config = EVMVersion::current_test_config();
+
         // Act
         let result = run_transaction(
             &mut mock_runtime,
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &config,
             Some(target),
             caller,
             data.to_vec(),
@@ -1483,7 +1503,7 @@ mod test {
 
         let expected_gas = 21000 // base cost
             + 18 // execution cost
-            + 32 * CONFIG.gas_transaction_non_zero_data; // transaction data cost
+            + 32 * config.gas_transaction_non_zero_data; // transaction data cost
 
         // Assert
         let expected_result = Ok(Some(ExecutionOutcome {
@@ -1527,7 +1547,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             Some(target),
             caller,
             data.to_vec(),
@@ -1642,7 +1662,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             Some(target),
             caller,
             vec![],
@@ -1723,7 +1743,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             Some(target),
             caller,
             vec![],
@@ -1816,7 +1836,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             Some(target),
             caller,
             vec![],
@@ -1931,7 +1951,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             Some(target),
             caller,
             vec![],
@@ -2043,7 +2063,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             Some(target),
             caller,
             vec![],
@@ -2145,7 +2165,7 @@ mod test {
             &mut evm_account_storage,
             &precompiles,
             // This test is specifically testing a Shanghai behaviour:
-            Config::shanghai(),
+            &Config::shanghai(),
             Some(target),
             caller,
             vec![],
@@ -2262,7 +2282,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             Some(target),
             caller,
             vec![],
@@ -2360,7 +2380,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             Some(target),
             caller,
             vec![],
@@ -2445,7 +2465,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             Some(target),
             caller,
             vec![],
@@ -2526,7 +2546,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             Some(target),
             caller,
             vec![],
@@ -2578,7 +2598,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             callee,
             caller,
             call_data,
@@ -2631,12 +2651,15 @@ mod test {
             &caller,
             balance,
         );
+
+        let config = &EVMVersion::current_test_config();
+
         let result = run_transaction(
             &mut mock_runtime,
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            config,
             callee,
             caller,
             create_data,
@@ -2655,7 +2678,7 @@ mod test {
         // gas calculation
         let expected_gas = 21000 // base cost
         + 32000 // create cost
-        + 32 * CONFIG.gas_transaction_non_zero_data // transaction data cost
+        + 32 * config.gas_transaction_non_zero_data // transaction data cost
         + 3 // init cost
         + 2; // extra cost (EIP-3860)
 
@@ -2703,13 +2726,15 @@ mod test {
 
         set_account_code(&mut mock_runtime, &mut evm_account_storage, &target, &code);
 
+        let config = &EVMVersion::current_test_config();
+
         // Act
         let result = run_transaction(
             &mut mock_runtime,
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            config,
             Some(target),
             caller,
             data.to_vec(),
@@ -2727,7 +2752,7 @@ mod test {
         let result = unwrap_outcome!(&result);
 
         let expected_gas = 21000 // base cost
-        + 32 * CONFIG.gas_transaction_zero_data; // transaction data cost
+        + 32 * config.gas_transaction_zero_data; // transaction data cost
 
         assert_eq!(expected_gas, result.gas_used);
     }
@@ -2773,13 +2798,15 @@ mod test {
 
         set_account_code(&mut mock_runtime, &mut evm_account_storage, &target, &code);
 
+        let config = &EVMVersion::current_test_config();
+
         // Act
         let result = run_transaction(
             &mut mock_runtime,
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            config,
             Some(target),
             caller,
             data.to_vec(),
@@ -2797,7 +2824,7 @@ mod test {
         let result = unwrap_outcome!(&result);
 
         let expected_gas = 21000 // base cost
-        + 32 * CONFIG.gas_transaction_non_zero_data; // transaction data cost: should be zero_byte cost * size
+        + 32 * config.gas_transaction_non_zero_data; // transaction data cost: should be zero_byte cost * size
 
         assert_eq!(expected_gas, result.gas_used);
     }
@@ -2844,7 +2871,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             None,
             caller,
             data.to_vec(),
@@ -2949,7 +2976,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             None,
             caller,
             call_data,
@@ -3032,7 +3059,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             None,
             caller,
             init_code,
@@ -3142,7 +3169,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             None,
             caller,
             init_code,
@@ -3223,7 +3250,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             None,
             caller,
             call_data,
@@ -3271,7 +3298,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             callee,
             caller,
             call_data,
@@ -3327,7 +3354,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             Some(callee),
             caller,
             vec![],
@@ -3417,7 +3444,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             None,
             caller,
             code,
@@ -3516,7 +3543,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             callee,
             caller,
             call_data,
@@ -3647,7 +3674,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             Some(contract_address),
             caller,
             vec![],
@@ -3734,7 +3761,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             Some(contract_address),
             caller,
             vec![],
@@ -3774,7 +3801,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             None,
             caller,
             code,
@@ -3855,7 +3882,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             Some(address_3),
             address_2,
             call_data,
@@ -3946,7 +3973,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             None,
             caller,
             call_data,
@@ -4007,7 +4034,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
-            CONFIG,
+            &EVMVersion::current_test_config(),
             Some(callee),
             caller,
             vec![],

@@ -302,7 +302,7 @@ mod test_helpers {
     use crate::account_storage::account_path;
     use crate::account_storage::init_account_storage as init_evm_account_storage;
     use crate::account_storage::EthereumAccountStorage;
-    use crate::fa_bridge::test_utils::CONFIG;
+    use crate::configuration::EVMVersion;
     use crate::handler::EvmHandler;
     use crate::handler::ExecutionOutcome;
     use crate::EthereumError;
@@ -362,7 +362,7 @@ mod test_helpers {
         );
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let precompiles = precompile_set::<MockKernelHost>(false);
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
         let gas_price = U256::from(21000);
 
         set_ticketer(&mut mock_runtime, DUMMY_TICKETER);

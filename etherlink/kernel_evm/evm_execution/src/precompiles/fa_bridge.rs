@@ -165,12 +165,13 @@ mod tests {
 
     use crate::{
         account_storage::{init_account_storage, EthereumAccountStorage},
+        configuration::EVMVersion,
         fa_bridge::{
             deposit::ticket_hash,
             test_utils::{
                 convert_h160, convert_u256, deploy_reentrancy_tester,
                 dummy_fa_withdrawal, dummy_first_block, dummy_ticket, kernel_wrapper,
-                set_balance, ticket_balance_add, ticket_id, CONFIG,
+                set_balance, ticket_balance_add, ticket_id,
             },
         },
         handler::{EvmHandler, ExecutionOutcome, ExecutionResult},
@@ -192,7 +193,7 @@ mod tests {
         disable_reentrancy_guard: bool,
     ) -> ExecutionOutcome {
         let block = dummy_first_block();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
         let callee = FA_BRIDGE_PRECOMPILE_ADDRESS;
 
         let precompiles = precompiles::precompile_set::<MockKernelHost>(true);
@@ -321,7 +322,7 @@ mod tests {
         let caller = H160::from_low_u64_be(1);
         let callee = H160::from_low_u64_be(2);
         let block = dummy_first_block();
-        let config = CONFIG;
+        let config = EVMVersion::current_test_config();
 
         let precompiles = precompiles::precompile_set::<MockKernelHost>(true);
 

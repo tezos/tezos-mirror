@@ -13,7 +13,6 @@ use crate::stage_one::fetch_blueprints;
 use crate::storage::{read_sequencer_pool_address, PRIVATE_FLAG_PATH};
 use anyhow::Context;
 use delayed_inbox::DelayedInbox;
-use evm_execution::Config;
 use fallback_upgrade::fallback_backup_kernel;
 use inbox::StageOneStatus;
 use migration::MigrationStatus;
@@ -68,19 +67,6 @@ mod tick_model;
 mod upgrade;
 
 extern crate alloc;
-
-/// The configuration for the EVM execution.
-const CONFIG: Config = Config {
-    // The current implementation doesn't support Cancun call stack limit of 256.
-    // We need to set a lower limit until we have switched to a head-based
-    // recursive calls.
-    //
-    // TODO: When this limitation is removed, some evm evaluation tests needs
-    // to be reactivated. As well as tests `call_too_deep_not_revert` and
-    // `multiple_call_all_the_way_to_1024` in the evm execution crate.
-    call_stack_limit: 256,
-    ..Config::cancun()
-};
 
 const KERNEL_VERSION: &str = env!("GIT_HASH");
 
@@ -388,7 +374,9 @@ mod tests {
         inbox::{Transaction, TransactionContent},
         upgrade::KernelUpgrade,
     };
+    use evm::Config;
     use evm_execution::account_storage::{self, EthereumAccountStorage};
+    use evm_execution::configuration::EVMVersion;
     use evm_execution::fa_bridge::deposit::{ticket_hash, FaDeposit};
     use evm_execution::fa_bridge::test_utils::{
         convert_h160, convert_u256, dummy_ticket, kernel_wrapper, ticket_balance_add,
@@ -430,9 +418,9 @@ mod tests {
     const DUMMY_BASE_FEE_PER_GAS: u64 = 12345u64;
     const DUMMY_DA_FEE: u64 = 2_000_000_000_000u64;
 
-    fn dummy_configuration() -> Configuration {
+    fn dummy_configuration(evm_configuration: Config) -> Configuration {
         Configuration {
-            chain_config: ChainConfig::new_evm_config(DUMMY_CHAIN_ID),
+            chain_config: ChainConfig::new_evm_config(DUMMY_CHAIN_ID, evm_configuration),
             ..Configuration::default()
         }
     }
@@ -608,7 +596,7 @@ mod tests {
 
         let mut configuration = Configuration {
             limits,
-            ..dummy_configuration()
+            ..dummy_configuration(EVMVersion::current_test_config())
         };
 
         crate::storage::store_minimum_base_fee_per_gas(

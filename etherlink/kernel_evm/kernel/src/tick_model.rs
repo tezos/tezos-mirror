@@ -43,7 +43,7 @@ pub mod constants {
     pub const TICKS_FOR_CRYPTO: u64 = 25_000_000;
 
     /// The minimum amount of gas for an ethereum transaction.
-    pub const BASE_GAS: u64 = crate::CONFIG.gas_transaction_call;
+    pub const BASE_GAS: u64 = 21_000;
 
     /// Overapproximation of the upper bound of the number of ticks used to
     /// finalize a block. Considers a block corresponding to an inbox full of

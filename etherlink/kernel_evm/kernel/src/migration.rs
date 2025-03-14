@@ -18,9 +18,12 @@ use crate::storage::{
 };
 use evm_execution::account_storage::account_path;
 use evm_execution::account_storage::init_account_storage;
+use evm_execution::configuration::EVMVersion;
 use evm_execution::precompiles::SYSTEM_ACCOUNT_ADDRESS;
 use evm_execution::precompiles::WITHDRAWAL_ADDRESS;
-use evm_execution::{ENABLE_FAST_WITHDRAWAL, NATIVE_TOKEN_TICKETER_PATH};
+use evm_execution::{
+    store_evm_version, ENABLE_FAST_WITHDRAWAL, NATIVE_TOKEN_TICKETER_PATH,
+};
 use primitive_types::U256;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
@@ -280,6 +283,14 @@ fn migrate_to<Host: Runtime>(
                     _ => Err(err),
                 },
             }
+        }
+        StorageVersion::V28 => {
+            if is_etherlink_network(host, MAINNET_CHAIN_ID)?
+                || is_etherlink_network(host, TESTNET_CHAIN_ID)?
+            {
+                store_evm_version(host, &EVMVersion::Cancun)?;
+            }
+            Ok(MigrationStatus::Done)
         }
     }
 }

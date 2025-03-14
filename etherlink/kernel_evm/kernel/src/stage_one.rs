@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2024 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2024-2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -17,6 +17,7 @@ use crate::inbox::{read_proxy_inbox, read_sequencer_inbox};
 use crate::inbox::{ProxyInboxContent, StageOneStatus};
 use crate::storage::read_last_info_per_level_timestamp;
 use anyhow::Ok;
+use evm::Config;
 use std::ops::Add;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
@@ -31,6 +32,7 @@ pub fn fetch_proxy_blueprints<Host: Runtime>(
     tezos_contracts: &TezosContracts,
     enable_fa_bridge: bool,
     garbage_collect_blocks: bool,
+    evm_configuration: &Config,
 ) -> Result<StageOneStatus, anyhow::Error> {
     if let Some(ProxyInboxContent { transactions }) = read_proxy_inbox(
         host,
@@ -38,6 +40,7 @@ pub fn fetch_proxy_blueprints<Host: Runtime>(
         tezos_contracts,
         enable_fa_bridge,
         garbage_collect_blocks,
+        evm_configuration,
     )? {
         let timestamp =
             read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));
@@ -123,6 +126,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     dal: Option<DalConfiguration>,
     enable_fa_bridge: bool,
     garbage_collect_blocks: bool,
+    evm_configuration: &Config,
 ) -> Result<StageOneStatus, anyhow::Error> {
     match read_sequencer_inbox(
         host,
@@ -134,6 +138,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
         enable_fa_bridge,
         dal,
         garbage_collect_blocks,
+        evm_configuration,
     )? {
         StageOneStatus::Done => {
             // Check if there are timed-out transactions in the delayed inbox
@@ -176,6 +181,7 @@ pub fn fetch_blueprints<Host: Runtime>(
             dal.clone(),
             config.enable_fa_bridge,
             config.garbage_collect_blocks,
+            &config.chain_config.evm_configuration,
         ),
         ConfigurationMode::Proxy => fetch_proxy_blueprints(
             host,
@@ -183,6 +189,7 @@ pub fn fetch_blueprints<Host: Runtime>(
             &config.tezos_contracts,
             config.enable_fa_bridge,
             config.garbage_collect_blocks,
+            &config.chain_config.evm_configuration,
         ),
     }
 }
@@ -197,6 +204,7 @@ mod tests {
         },
         parsing::DAL_SLOT_IMPORT_SIGNAL_TAG,
     };
+    use evm_execution::configuration::EVMVersion;
     use primitive_types::U256;
     use rlp::Encodable;
     use tezos_crypto_rs::hash::{HashTrait, SecretKeyEd25519, UnknownSignature};
@@ -556,6 +564,7 @@ mod tests {
             &conf.tezos_contracts,
             false,
             false,
+            &EVMVersion::current_test_config(),
         )
         .unwrap()
         {

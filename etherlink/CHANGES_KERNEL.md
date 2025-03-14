@@ -26,6 +26,7 @@
 
 - Rework block production to simplify data flow and remove unnecessary
   IO. (!16661 !16684 !16685 !16618)
+- The EVM version is now written in the durable storage at `/evm/evm_version`. (!17202)
 
 ## Next proposal
 

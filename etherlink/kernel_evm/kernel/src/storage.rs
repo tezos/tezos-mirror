@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 // SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 //
@@ -60,6 +60,7 @@ pub enum StorageVersion {
     V25,
     V26,
     V27,
+    V28,
 }
 
 impl From<StorageVersion> for u64 {
@@ -74,7 +75,7 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V27;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V28;
 
 pub const PRIVATE_FLAG_PATH: RefPath = RefPath::assert_from(b"/evm/remove_whitelist");
 

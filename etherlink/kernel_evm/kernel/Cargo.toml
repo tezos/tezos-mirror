@@ -68,7 +68,10 @@ proptest.workspace = true
 getrandom = { version = "=0.2.15", features = ["custom"] }
 
 pretty_assertions.workspace = true
-evm-execution = { workspace = true, features = ["fa_bridge_testing"] }
+evm-execution = { workspace = true, features = [
+    "fa_bridge_testing",
+    "execution-test-utils",
+] }
 alloy-sol-types.workspace = true
 alloy-primitives.workspace = true
 
