@@ -495,14 +495,15 @@ let send_transactions_to_sequencer ~(sends : (unit -> 'a Lwt.t) list) sequencer
   let* transactions = Lwt.all res in
   Lwt.return (n, transactions)
 
-let send_transaction_to_sequencer (transaction : unit -> 'a Lwt.t) sequencer =
+let send_transaction_to_sequencer ?timestamp (transaction : unit -> 'a Lwt.t)
+    sequencer =
   let open Rpc.Syntax in
   let* transaction =
     send_transaction_to_sequencer_dont_produce_block transaction sequencer
   in
   (* Once the transaction us in the transaction pool the next block
      will include it. *)
-  let*@ _ = produce_block sequencer in
+  let*@ _ = produce_block ?timestamp sequencer in
   (* Resolve the transaction sends to make sure they were included. *)
   transaction
 

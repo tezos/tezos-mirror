@@ -2159,12 +2159,13 @@ let test_invalid_delayed_transaction =
   (* The transaction has been cleared from the delayed inbox. *)
   Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node)
 
-let call_fa_withdraw ?expect_failure ~sender ~endpoint ~evm_node ~ticket_owner
-    ~routing_info ~amount ~ticketer ~content () =
+let call_fa_withdraw ?timestamp ?expect_failure ~sender ~endpoint ~evm_node
+    ~ticket_owner ~routing_info ~amount ~ticketer ~content () =
   let* () =
     Eth_cli.add_abi ~label:"fa_withdrawal" ~abi:(fa_withdrawal_abi_path ()) ()
   in
   send_transaction_to_sequencer
+    ?timestamp
     (Eth_cli.contract_send
        ?expect_failure
        ~source_private_key:sender.Eth_account.private_key
@@ -11619,6 +11620,297 @@ let test_observer_periodic_snapshot =
   let*@ _ = produce_block new_sequencer in
   unit
 
+let get_one_receipt_from_latest_or_fail evm_node =
+  let*@ block =
+    Rpc.get_block_by_number ~full_tx_objects:false ~block:"latest" evm_node
+  in
+  match block.transactions with
+  | Hash [tx_hash] -> (
+      let*@ rpc_res = Rpc.get_transaction_receipt ~tx_hash evm_node in
+      match rpc_res with
+      | Some receipt -> return receipt
+      | None -> Test.fail "Could not fetch the transaction receipt")
+  | Hash _ | Empty ->
+      Test.fail
+        "Received a block with a transaction count different than the one \
+         expected"
+  | Full _ ->
+      Test.fail
+        "The EVM node returned the full transaction objects while it was \
+         expected to return only the hashes"
+
+let capture_logs ~header logs =
+  Regression.capture (sf "# %s" header) ;
+  List.iteri
+    (fun i tx_log ->
+      Regression.capture (sf "## Log %d" i) ;
+      Regression.capture (sf "Address: %s" tx_log.Transaction.address) ;
+      Regression.capture (sf "Topics:") ;
+      List.iter (fun t -> Regression.capture (sf "- %s" t)) tx_log.topics ;
+      Regression.capture (sf "Data: %s" tx_log.data))
+    logs
+
+(* {Note timestamp}
+
+   Some events emitted by Etherlink contains timestamp. In order for the
+   regression test to always generate the same trace, we control the timestamp
+   of each L2 blocks using the {!timestamp_generator} helper. *)
+
+let timestamp_generator () =
+  let block_count = ref 0 in
+  fun () ->
+    let res =
+      sf "2020-01-01T00:%02d:%02dZ" (!block_count / 60) (!block_count mod 60)
+    in
+    incr block_count ;
+    res
+
+let test_deposit_event =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~tags:["evm"; "deposit"; "event"]
+    ~title:"Regression test for the deposit event"
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+      ])
+  @@ fun protocol ->
+  (* See {Note timestamp} *)
+  let next_timestamp = timestamp_generator () in
+  let genesis_timestamp = next_timestamp () in
+  let* {sequencer; l1_contracts; sc_rollup_node; sc_rollup_address; client; _} =
+    Setup.setup_sequencer
+      ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
+      ~time_between_blocks:Nothing
+      ~mainnet_compat:false
+      ~enable_dal:false
+      ~enable_multichain:false
+      protocol
+  in
+  (* Send a deposit to the delayed inbox *)
+  let* () =
+    send_deposit_to_delayed_inbox
+      ~amount:Tez.one
+      ~l1_contracts
+      ~depositor:Constant.bootstrap5
+      ~receiver:Eth_account.bootstrap_accounts.(0).address
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  (* Bake two blocks to let the sequencer see the deposit *)
+  let* () =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  (* Produce an Etherlink block *)
+  let*@ nb_txns =
+    produce_block
+      ~timestamp:(next_timestamp ())
+      ~wait_on_blueprint_applied:true
+      sequencer
+  in
+  Check.(
+    (nb_txns = 1)
+      int
+      ~error_msg:
+        "Expecting the block to contain %R transaction (the deposit), got %L") ;
+
+  (* Fetch the deposit events *)
+  let* receipt = get_one_receipt_from_latest_or_fail sequencer in
+
+  (* Capture the log *)
+  capture_logs ~header:"XTZ Deposit" receipt.logs ;
+
+  unit
+
+let test_withdrawal_events =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~tags:["evm"; "withdrawal"; "event"]
+    ~title:"Regression test for the withdrawal events"
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+      ])
+  @@ fun protocol ->
+  (* See {Note timestamp} *)
+  let next_timestamp = timestamp_generator () in
+  let genesis_timestamp = next_timestamp () in
+  let* {sequencer; _} =
+    Setup.setup_sequencer
+      ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
+      ~time_between_blocks:Nothing
+      ~mainnet_compat:false
+      ~enable_dal:false
+      ~enable_multichain:false
+      ~enable_fast_withdrawal:true
+      protocol
+  in
+
+  (* Make a regular withdrawal *)
+  let* () =
+    Eth_cli.add_abi ~label:"withdraw" ~abi:(withdrawal_abi_path ()) ()
+  in
+  let* _ =
+    send_transaction_to_sequencer
+      ~timestamp:(next_timestamp ())
+      (Eth_cli.contract_send
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi_label:"withdraw"
+         ~address:"0xff00000000000000000000000000000000000001"
+         ~method_call:
+           (sf {|withdraw_base58("%s")|} Constant.bootstrap5.public_key_hash)
+         ~value:Wei.one_eth
+         ~gas:16_000_000)
+      sequencer
+  in
+
+  (* Fetch the withdrawal event *)
+  let* receipt = get_one_receipt_from_latest_or_fail sequencer in
+
+  (* Capture the log *)
+  capture_logs ~header:"XTZ Withdrawal" receipt.logs ;
+
+  (* Do the same thing for fast withdrawal *)
+  let* () =
+    Eth_cli.add_abi
+      ~label:"fast_withdraw_base58"
+      ~abi:(fast_withdrawal_abi_path ())
+      ()
+  in
+  let* _ =
+    send_transaction_to_sequencer
+      ~timestamp:(next_timestamp ())
+      (Eth_cli.contract_send
+         ~source_private_key:Eth_account.bootstrap_accounts.(1).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi_label:"fast_withdraw_base58"
+         ~address:"0xff00000000000000000000000000000000000001"
+         ~method_call:
+           (sf
+              {|fast_withdraw_base58("%s","%s","%s")|}
+              Constant.bootstrap5.public_key_hash
+              "KT1TczPwz5KjAuuJKvkTmttS7bBioT5gjQ4Y"
+              "0x0000000000000000000000000000000000000000000000000000000000000001")
+         ~value:Wei.one_eth
+         ~gas:16_000_000)
+      sequencer
+  in
+
+  (* Fetch the fast withdrawal event *)
+  let* receipt = get_one_receipt_from_latest_or_fail sequencer in
+
+  (* Capture the log *)
+  capture_logs ~header:"XTZ Fast Withdrawal" receipt.logs ;
+
+  unit
+
+let test_fa_deposit_and_withdrawals_events =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~tags:["evm"; "fa_bridge"; "event"]
+    ~title:"Regression test for the FA deposit and withdrawal events"
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+        Constant.octez_codec;
+      ])
+  @@ fun protocol ->
+  (* See {Note timestamp} *)
+  let next_timestamp = timestamp_generator () in
+  let* {sequencer; l1_contracts; sc_rollup_node; sc_rollup_address; client; _} =
+    let genesis_timestamp = next_timestamp () in
+    Setup.setup_sequencer
+      ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
+      ~time_between_blocks:Nothing
+      ~mainnet_compat:false
+      ~enable_dal:false
+      ~enable_multichain:false
+      ~enable_fa_bridge:true
+      protocol
+  in
+  (* Send a FA deposit to the delayed inbox *)
+  let* () =
+    send_fa_deposit_to_delayed_inbox
+      ~amount:42
+      ~l1_contracts
+      ~depositor:Constant.bootstrap5
+      ~receiver:Eth_account.bootstrap_accounts.(0).address
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  (* Bake two blocks to let the sequencer see the FA deposit *)
+  let* () =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  (* Produce an Etherlink block *)
+  let*@ nb_txns =
+    produce_block
+      ~timestamp:(next_timestamp ())
+      ~wait_on_blueprint_applied:true
+      sequencer
+  in
+  Check.(
+    (nb_txns = 1)
+      int
+      ~error_msg:
+        "Expecting the block to contain %R transaction (the deposit), got %L") ;
+
+  (* Fetch the deposit events *)
+  let* receipt = get_one_receipt_from_latest_or_fail sequencer in
+
+  (* Capture the log *)
+  capture_logs ~header:"FA Deposit" receipt.logs ;
+
+  (* Now, we can do a withdrawal *)
+  let* ticketer = ticket_creator l1_contracts.ticket_router_tester in
+  let* content = ticket_content 0 in
+  (* Withdrawing to the zero implicit account *)
+  let routing_info =
+    String.concat
+      ""
+      [
+        "00000000000000000000000000000000000000000000";
+        ticketer |> Hex.of_bytes |> Hex.show;
+      ]
+  in
+  let* _ =
+    call_fa_withdraw
+      ~timestamp:(next_timestamp ())
+      ~sender:Eth_account.bootstrap_accounts.(0)
+      ~ticket_owner:Eth_account.bootstrap_accounts.(0).address
+      ~endpoint:(Evm_node.endpoint sequencer)
+      ~evm_node:sequencer
+      ~routing_info
+      ~amount:40
+      ~ticketer:(ticketer |> Hex.of_bytes |> Hex.show)
+      ~content:(content |> Hex.of_bytes |> Hex.show)
+      ()
+  in
+
+  (* Fetch the deposit events *)
+  let* receipt = get_one_receipt_from_latest_or_fail sequencer in
+
+  (* Capture the log *)
+  capture_logs ~header:"FA Withdrawal" receipt.logs ;
+
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -11773,4 +12065,7 @@ let () =
   test_observer_init_from_snapshot protocols ;
   test_tx_queue_nonce [Alpha] ;
   test_tx_queue_limit [Alpha] ;
-  test_observer_periodic_snapshot [Alpha]
+  test_observer_periodic_snapshot [Alpha] ;
+  test_deposit_event [Alpha] ;
+  test_withdrawal_events [Alpha] ;
+  test_fa_deposit_and_withdrawals_events [Alpha]
