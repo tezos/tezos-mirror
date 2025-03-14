@@ -493,6 +493,16 @@ let wasm_pvm_fallback =
     ~msg:"the node needs to fallback to the WASM PVM to execute a block"
     ()
 
+let multichain_node_singlechain_kernel =
+  Internal_event.Simple.declare_0
+    ~level:Warning
+    ~section
+    ~name:"multichain_node_singlechain_kernel"
+    ~msg:
+      "the configuration for the `l2_chains` experimental feature was ignored \
+       because the multichain feature is not yet enabled in the rollup"
+    ()
+
 let received_upgrade payload = emit received_upgrade payload
 
 let pending_upgrade (upgrade : Evm_events.Upgrade.t) =
@@ -566,6 +576,9 @@ let deprecation_note msg = emit event_deprecation_note msg
 let wasm_pvm_fallback () = emit wasm_pvm_fallback ()
 
 let missing_chain_id () = emit missing_chain_id ()
+
+let multichain_node_singlechain_kernel () =
+  emit multichain_node_singlechain_kernel ()
 
 let downloading_file ?size url = emit downloading_file (url, size)
 

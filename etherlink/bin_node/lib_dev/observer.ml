@@ -193,8 +193,10 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
   let* chain_family =
     match (config.experimental_features.l2_chains, enable_multichain) with
     | None, false -> return EVM
-    | None, true -> tzfail (Node_error.Mismatched_multichain `Kernel)
-    | Some [_], false -> tzfail (Node_error.Mismatched_multichain `Node)
+    | None, true -> tzfail Node_error.Singlechain_node_multichain_kernel
+    | Some [_], false ->
+        let*! () = Events.multichain_node_singlechain_kernel () in
+        return EVM
     | Some [l2_chain], true ->
         Evm_ro_context.read_chain_family ro_ctxt l2_chain.chain_id
     | _ -> tzfail Node_error.Unexpected_multichain
