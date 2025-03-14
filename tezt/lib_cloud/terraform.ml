@@ -92,6 +92,7 @@ module VM = struct
     (* Return all the workspaces associated with the current tezt cloud
        environment. *)
     let list ~tezt_cloud =
+      let () = Log.report "Terraform.VM.Workspace.list" in
       (* We select the default workspace to be sure we can parse correctly the
          output. *)
       let* () = select "default" in
@@ -114,6 +115,7 @@ module VM = struct
 
     (* Create workspaces that will be used for the experiment. *)
     let init ~tezt_cloud workspaces =
+      let () = Log.report "Terraform.VM.Workspace.init" in
       let* existing_workspaces = list ~tezt_cloud in
       let to_create =
         (* Create only new workspaces. *)
@@ -137,18 +139,59 @@ module VM = struct
       let* () = select "default" in
       unit
 
+    let show_existing_resources ~tezt_cloud =
+      let filter = Format.asprintf "name=%s" tezt_cloud in
+      let* instances_groups = Gcloud.list_instance_groups ~filter () in
+      let* services_accounts = Gcloud.list_iam_service_accounts ~filter () in
+      let* addresses = Gcloud.list_addresses ~filter () in
+      let* firewalls = Gcloud.list_firewalls ~filter () in
+      let* subnets = Gcloud.list_subnets ~filter () in
+      let* networks = Gcloud.list_networks ~filter () in
+      let* disks = Gcloud.list_disks ~filter () in
+
+      let show title resources =
+        let names =
+          JSON.(
+            resources |> as_list
+            |> List.map (fun v -> v |-> "name" |> as_string))
+        in
+        if names = [] then ()
+        else
+          Log.warn
+            "%s: @[<hv 3>%a@;@]"
+            title
+            (Format.pp_print_list
+               ~pp_sep:(fun fmt () -> Format.fprintf fmt "@;")
+               Format.pp_print_string)
+            names
+      in
+      let () = show "instances groups" instances_groups in
+      let () = show "service_accounts" services_accounts in
+      let () = show "addresses" addresses in
+      let () = show "firewalls" firewalls in
+      let () = show "subnets" subnets in
+      let () = show "networks" networks in
+      let () = show "disks" disks in
+      Lwt.return_unit
+
     let destroy ~tezt_cloud =
+      let () = Log.report "Terraform.VM.Workspace.destroy" in
       (* We ensure we are not using a workspace we want to delete. *)
-      let* () = select "default" in
-      let* workspaces = list ~tezt_cloud in
-      workspaces
-      |> List.map (fun workspace ->
-             Process.run
-               ~name
-               ~color
-               "terraform"
-               (chdir Path.terraform_vm @ ["workspace"; "delete"; workspace]))
-      |> Lwt.join
+      Lwt.catch
+        (fun () ->
+          let* () = select "default" in
+          let* workspaces = list ~tezt_cloud in
+          workspaces
+          |> List.map (fun workspace ->
+                 Process.run
+                   ~name
+                   ~color
+                   "terraform"
+                   (chdir Path.terraform_vm @ ["workspace"; "delete"; workspace]))
+          |> Lwt.join)
+        (fun exn ->
+          let* () = show_existing_resources ~tezt_cloud in
+          raise exn)
   end
 
   let init () =
@@ -239,37 +282,47 @@ module VM = struct
         (chdir Path.terraform_vm @ ["output"; "-json"])
     in
     let json = JSON.parse ~origin:"VM.machine_type" output in
+    (* TODO: find a better fix *)
     let machine_type =
-      JSON.(json |-> "machine_type" |-> "value" |> as_string)
+      match JSON.(json |-> "machine_type" |-> "value" |> as_string_opt) with
+      | Some machine_type -> machine_type
+      | None -> "n1-standard-2"
     in
     Lwt.return machine_type
 
   let destroy workspaces ~project_id =
     workspaces
     |> Lwt_list.iter_s (fun workspace ->
-           let* () = Workspace.select workspace in
-           let* machine_type = machine_type () in
-           let vars =
-             [
-               "--var";
-               Format.asprintf "project_id=%s" project_id;
-               "--var";
-               Format.asprintf "machine_type=%s" machine_type;
-             ]
-           in
-           let* () =
-             (* Remote machines could have been destroyed
-                automatically. We synchronize the state to see whether
-                they still exist or not. *)
-             Process.run
-               ~name
-               ~color
-               "terraform"
-               (chdir Path.terraform_vm @ ["refresh"] @ vars)
-           in
-           Process.run
-             ~name
-             ~color
-             "terraform"
-             (chdir Path.terraform_vm @ ["destroy"; "--auto-approve"] @ vars))
+           Lwt.catch
+             (fun () ->
+               let* () = Workspace.select workspace in
+               let* machine_type = machine_type () in
+               let vars =
+                 [
+                   "--var";
+                   Format.asprintf "project_id=%s" project_id;
+                   "--var";
+                   Format.asprintf "machine_type=%s" machine_type;
+                 ]
+               in
+               let* () =
+                 (* Remote machines could have been destroyed
+                             automatically. We synchronize the state to see whether
+                             they still exist or not. *)
+                 Process.run
+                   ~name
+                   ~color
+                   "terraform"
+                   (chdir Path.terraform_vm @ ["refresh"] @ vars)
+               in
+               Process.run
+                 ~name
+                 ~color
+                 "terraform"
+                 (chdir Path.terraform_vm @ ["destroy"; "--auto-approve"] @ vars))
+             (fun exn ->
+               let* () =
+                 Workspace.show_existing_resources ~tezt_cloud:workspace
+               in
+               raise exn))
 end
