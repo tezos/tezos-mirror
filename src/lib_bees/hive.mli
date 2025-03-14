@@ -11,8 +11,11 @@
 
 (** [launch_worker worker bee_name domains worker_loop] starts [domains] domains
     running the worker_loop to handle worker requests. [worker_loop] takes the
-    domain number. *)
+    domain number.
+    If no [switch] is provided, the Event_loop's main switch will be used.
+    *)
 val launch_worker :
+  ?switch:Eio.Switch.t ->
   'worker ->
   bee_name:string ->
   domains:int ->
