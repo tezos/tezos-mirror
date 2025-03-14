@@ -17,7 +17,7 @@ let simple () =
   let agent1 = List.nth agents (1 mod List.length agents) in
   let* output =
     Process.spawn
-      ~name:"agent0"
+      ~name:(Agent.name agent0)
       ?runner:(Agent.runner agent0)
       "echo"
       ["Hello world"]
@@ -26,7 +26,7 @@ let simple () =
   Log.info "%s from agent 0" (String.trim output) ;
   let* output =
     Process.spawn
-      ~name:"agent1"
+      ~name:(Agent.name agent1)
       ?runner:(Agent.runner agent1)
       "echo"
       ["Hello world"]
