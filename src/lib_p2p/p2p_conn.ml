@@ -219,7 +219,9 @@ module Handlers = struct
 
   let on_no_request _self = Lwt.return_unit
 
-  let on_close _self = Lwt.return_unit
+  let on_close self =
+    let (Types.S state) = Worker.state self in
+    Error_monad.cancel_with_exceptions state.canceler
 
   let on_error :
       type response error.
