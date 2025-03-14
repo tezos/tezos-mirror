@@ -139,6 +139,41 @@ module VM = struct
       let* () = select "default" in
       unit
 
+    let show_existing_resources ~tezt_cloud =
+      let filter = Format.asprintf "name=%s" tezt_cloud in
+      let* instances_groups = Gcloud.list_instance_groups ~filter () in
+      let* services_accounts = Gcloud.list_iam_service_accounts ~filter () in
+      let* addresses = Gcloud.list_addresses ~filter () in
+      let* firewalls = Gcloud.list_firewalls ~filter () in
+      let* subnets = Gcloud.list_subnets ~filter () in
+      let* networks = Gcloud.list_networks ~filter () in
+      let* disks = Gcloud.list_disks ~filter () in
+
+      let show title resources =
+        let names =
+          JSON.(
+            resources |> as_list
+            |> List.map (fun v -> v |-> "name" |> as_string))
+        in
+        if names = [] then ()
+        else
+          Log.warn
+            "%s: @[<hv 3>%a@;@]"
+            title
+            (Format.pp_print_list
+               ~pp_sep:(fun fmt () -> Format.fprintf fmt "@;")
+               Format.pp_print_string)
+            names
+      in
+      let () = show "instances groups" instances_groups in
+      let () = show "service_accounts" services_accounts in
+      let () = show "addresses" addresses in
+      let () = show "firewalls" firewalls in
+      let () = show "subnets" subnets in
+      let () = show "networks" networks in
+      let () = show "disks" disks in
+      Lwt.return_unit
+
     let destroy ~tezt_cloud =
       let () = Log.report "Terraform.VM.Workspace.destroy" in
       (* We ensure we are not using a workspace we want to delete. *)
