@@ -8,13 +8,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Helpers
-
 type contract = {
   label : string;
   abi : string;
   bin : string;
-  deployed_bin : string option;
+  deployed_bin : string;
 }
 
 let solidity_contracts_path = "etherlink/kernel_evm/solidity_examples"
@@ -108,8 +106,7 @@ let compile_contract ~source ~label ~contract ~evm_version =
   JSON.encode_to_file abi_file abi ;
   Tezt.Base.write_file bin_file ~contents:bin ;
   Tezt.Base.write_file deployed_file ~contents:deployed_bin ;
-  return
-    {label; abi = abi_file; bin = bin_file; deployed_bin = Some deployed_file}
+  return {label; abi = abi_file; bin = bin_file; deployed_bin = deployed_file}
 
 (** The info for the "storage.sol" contract. *)
 let simple_storage () =
@@ -118,9 +115,6 @@ let simple_storage () =
     ~label:"simpleStorage"
     ~contract:"SimpleStorage"
     ~evm_version:"london"
-
-let simple_storage_code =
-  "0x6080604052348015600f57600080fd5b5060043610603c5760003560e01c80634e70b1dc14604157806360fe47b114605b5780636d4ce63c14606d575b600080fd5b604960005481565b60405190815260200160405180910390f35b606b60663660046074565b600055565b005b6000546049565b600060208284031215608557600080fd5b503591905056fea2646970667358221220c8bccd31314e5f73f97adfeb24c3a1836e3b134cdee11da72c6b9608ee0bad5464736f6c634300081a0033"
 
 (* The info for the "even_block_gas_consumer.sol" contract. *)
 let even_block_gas_consumer () =
@@ -308,32 +302,33 @@ let coinbase () =
 
 (** The info for the "block_constants.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/block_constants.sol] *)
-let block_constants =
-  {
-    label = "blocks_constants";
-    abi = kernel_inputs_path ^ "/block_constants.abi";
-    bin = kernel_inputs_path ^ "/block_constants.bin";
-    deployed_bin = None;
-  }
+let block_constants () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/block_constants.sol")
+    ~label:"block_constants"
+    ~contract:"BlockConstants"
+    ~evm_version:"cancun"
 
 (** The info for the "call_withdrawal.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/call_withdrawal.sol] *)
-let call_withdrawal =
-  {
-    label = "call_withdrawal";
-    abi = kernel_inputs_path ^ "/call_withdrawal.abi";
-    bin = kernel_inputs_path ^ "/call_withdrawal.bin";
-    deployed_bin = None;
-  }
+let call_withdrawal () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/call_withdrawal.sol")
+    ~label:"call_withdrawal"
+    ~contract:"CallPrecompile"
+    ~evm_version:"cancun"
 
 (** The info for the "callcode_withdrawal.sol" contract.
-    See [etherlink/kernel_evm/solidity_examples/callcode_withdrawal.sol] *)
+    See [etherlink/kernel_evm/solidity_examples/callcode_withdrawal.sol]
+    Deprecated Callcode withdrawal contract can't be compiled with the current solc version *)
 let callcode_withdrawal =
   {
     label = "callcode_withdrawal";
-    abi = kernel_inputs_path ^ "/callcode_withdrawal.abi";
-    bin = kernel_inputs_path ^ "/callcode_withdrawal.bin";
-    deployed_bin = None;
+    abi = Helpers.kernel_inputs_path ^ "/callcode_withdrawal.abi";
+    bin = Helpers.kernel_inputs_path ^ "/callcode_withdrawal.bin";
+    (* This field is unused as the deployment check is done directly within the called
+       contract. *)
+    deployed_bin = "";
   }
 
 let gas_left () =

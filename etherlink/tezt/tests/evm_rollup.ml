@@ -740,14 +740,9 @@ let deploy ~contract ~sender full_evm_setup =
   in
   Helpers.wait_for_application ~produce_block send_deploy
 
-type deploy_checks = {
-  contract : contract;
-  expected_address : string;
-  expected_code : string;
-}
+type deploy_checks = {contract : contract; expected_address : string}
 
-let deploy_with_base_checks {contract; expected_address; expected_code}
-    full_evm_setup =
+let deploy_with_base_checks {contract; expected_address} full_evm_setup =
   let {sc_rollup_node; evm_node; _} = full_evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -760,6 +755,7 @@ let deploy_with_base_checks {contract; expected_address; expected_code}
   let* code_in_kernel =
     Evm_node.fetch_contract_code evm_node contract_address
   in
+  let expected_code = "0x" ^ read_file contract.deployed_bin in
   Check.((code_in_kernel = expected_code) string)
     ~error_msg:"Unexpected code %L, it should be %R" ;
   (* The transaction was a contract creation, the transaction object
@@ -1215,15 +1211,11 @@ let test_l2_deploy_simple_storage =
     {
       contract = simple_storage_resolved;
       expected_address = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344";
-      (* The same deployment has been reproduced on the Sepolia testnet, resulting
-         on this specific code. *)
-      expected_code = simple_storage_code;
     }
     evm_setup
 
-let send_call_set_storage_simple contract_address sender n
-    {produce_block; endpoint; _} =
-  let* simple_storage_resolved = simple_storage () in
+let send_call_set_storage_simple simple_storage_resolved contract_address sender
+    n {produce_block; endpoint; _} =
   let call_set (sender : Eth_account.t) n =
     Eth_cli.contract_send
       ~source_private_key:sender.private_key
@@ -1246,12 +1238,15 @@ let send_call_get_storage_simple contract_address {endpoint; _} =
   in
   return @@ int_of_string (String.trim nb)
 
-let set_and_get_simple_storage_check ~sender ~number ~address ~error_prefix
-    evm_setup =
+let set_and_get_simple_storage_check simple_storage ~sender ~number ~address
+    ~error_prefix evm_setup =
   let*@ code = Rpc.get_code ~address evm_setup.evm_node in
-  Check.((code = simple_storage_code) string)
+  let expected_code = "0x" ^ read_file simple_storage.deployed_bin in
+  Check.((code = expected_code) string)
     ~error_msg:(sf "%s, expected code is %%R, but got %%L" error_prefix) ;
-  let* tx = send_call_set_storage_simple address sender number evm_setup in
+  let* tx =
+    send_call_set_storage_simple simple_storage address sender number evm_setup
+  in
   let* () = check_tx_succeeded ~endpoint:evm_setup.endpoint ~tx in
   let* found_nb = send_call_get_storage_simple address evm_setup in
   Check.((number = found_nb) int)
@@ -1279,7 +1274,14 @@ let test_l2_call_simple_storage =
   in
 
   (* set 42 *)
-  let* tx = send_call_set_storage_simple address sender 42 evm_setup in
+  let* tx =
+    send_call_set_storage_simple
+      simple_storage_resolved
+      address
+      sender
+      42
+      evm_setup
+  in
 
   let* () = check_tx_succeeded ~endpoint ~tx in
   let* () = check_storage_size sc_rollup_node ~address 1 in
@@ -1288,6 +1290,7 @@ let test_l2_call_simple_storage =
   (* set 24 by another user *)
   let* tx =
     send_call_set_storage_simple
+      simple_storage_resolved
       address
       Eth_account.bootstrap_accounts.(1)
       24
@@ -1302,7 +1305,14 @@ let test_l2_call_simple_storage =
   (* set -1 *)
   (* some environments prevent sending a negative value, as the value is
      unsigned (eg remix) but it is actually the expected result *)
-  let* tx = send_call_set_storage_simple address sender (-1) evm_setup in
+  let* tx =
+    send_call_set_storage_simple
+      simple_storage_resolved
+      address
+      sender
+      (-1)
+      evm_setup
+  in
 
   let* () = check_tx_succeeded ~endpoint ~tx in
   let* () = check_storage_size sc_rollup_node ~address 1 in
@@ -1452,8 +1462,6 @@ let test_deploy_contract_for_shanghai =
     {
       contract = shanghai_storage_resolved;
       expected_address = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344";
-      expected_code =
-        "0x6080604052348015600e575f80fd5b5060043610603a575f3560e01c80634e70b1dc14603e57806360fe47b11460575780636d4ce63c146068575b5f80fd5b60455f5481565b60405190815260200160405180910390f35b60666062366004606e565b5f55565b005b5f546045565b5f60208284031215607d575f80fd5b503591905056fea26469706673582212205ac3c8853fa911acef1949bb82ac7e4c424679606388e035123d9a6f1120b37a64736f6c634300081a0033";
     }
     evm_setup
 
@@ -2384,7 +2392,14 @@ let test_eth_call_storage_contract =
         string)
       ~error_msg:"Expected result %R, but got %L" ;
 
-    let* tx = send_call_set_storage_simple address sender 42 evm_setup in
+    let* tx =
+      send_call_set_storage_simple
+        simple_storage_resolved
+        address
+        sender
+        42
+        evm_setup
+    in
     let* () = check_tx_succeeded ~endpoint ~tx in
 
     (* make call to proxy *)
@@ -2433,7 +2448,14 @@ let test_eth_call_storage_contract_eth_cli =
     let* address, _tx =
       deploy ~contract:simple_storage_resolved ~sender evm_setup
     in
-    let* tx = send_call_set_storage_simple address sender 42 evm_setup in
+    let* tx =
+      send_call_set_storage_simple
+        simple_storage_resolved
+        address
+        sender
+        42
+        evm_setup
+    in
     let* () = check_tx_succeeded ~endpoint ~tx in
 
     (* make a call to proxy through eth-cli *)
@@ -2699,7 +2721,7 @@ let test_withdraw_via_calls =
     ~admin
   @@ fun ~protocol:_ ~evm_setup:({endpoint; produce_block; _} as evm_setup) ->
   let sender = Eth_account.bootstrap_accounts.(0) in
-
+  let* call_withdrawal = call_withdrawal () in
   let* contract, _tx = deploy ~contract:call_withdrawal ~sender evm_setup in
 
   (* Call works, it transfers funds to the precompiled contract and produce
@@ -2753,7 +2775,7 @@ let test_withdraw_via_calls =
      because solidity deprecation blablabla. *)
   let* contract, _tx = deploy ~contract:callcode_withdrawal ~sender evm_setup in
 
-  (* Static call does not produce a transfer, the precompiled contract
+  (* Callcode does not produce a transfer, the precompiled contract
      reverts. *)
   let callcode =
     Eth_cli.contract_send
@@ -3173,7 +3195,7 @@ let test_rpc_getCode =
     deploy ~contract:simple_storage_resolved ~sender evm_setup
   in
   let*@ code = Rpc.get_code ~address evm_setup.evm_node in
-  let expected_code = simple_storage_code in
+  let expected_code = "0x" ^ read_file simple_storage_resolved.deployed_bin in
   Check.((code = expected_code) string)
     ~error_msg:"Expected code is %R, but got %L" ;
   unit
@@ -3333,6 +3355,7 @@ let test_mainnet_ghostnet_kernel_migration =
     in
     let* () =
       set_and_get_simple_storage_check
+        simple_storage
         ~sender:deployer
         ~number:42
         ~address:simple_storage_address
@@ -3355,6 +3378,7 @@ let test_mainnet_ghostnet_kernel_migration =
     in
     let* () =
       set_and_get_simple_storage_check
+        simple_storage
         ~sender:deployer
         ~number:24
         ~address:sanity_check.simple_storage_address
@@ -3366,6 +3390,7 @@ let test_mainnet_ghostnet_kernel_migration =
     in
     let* () =
       set_and_get_simple_storage_check
+        simple_storage
         ~sender:deployer
         ~number:42
         ~address:seconde_simple_storage_address
@@ -3425,6 +3450,7 @@ let test_latest_kernel_migration protocols =
       in
       let* () =
         set_and_get_simple_storage_check
+          simple_storage
           ~sender:deployer
           ~number:42
           ~address:simple_storage_address
@@ -3448,6 +3474,7 @@ let test_latest_kernel_migration protocols =
       let* () = ensure_current_block_header_integrity evm_setup in
       let* () =
         set_and_get_simple_storage_check
+          simple_storage
           ~sender:deployer
           ~number:24
           ~address:sanity_check.simple_storage_address
@@ -3459,6 +3486,7 @@ let test_latest_kernel_migration protocols =
       in
       let* () =
         set_and_get_simple_storage_check
+          simple_storage
           ~sender:deployer
           ~number:42
           ~address:seconde_simple_storage_address
@@ -5525,7 +5553,7 @@ let test_block_constants_opcode =
              ~evm_setup:({evm_node; produce_block; endpoint; _} as evm_setup) ->
   let sender = Eth_account.bootstrap_accounts.(0) in
   (* Deploy the contracts with the block constants. *)
-  let contract = block_constants in
+  let* contract = block_constants () in
   let* address, tx = deploy ~contract ~sender evm_setup in
   let* () = check_tx_succeeded ~endpoint ~tx in
   (* Set the block number in the contract's storage. *)
@@ -5568,7 +5596,7 @@ let test_block_constants_opcode =
       ~endpoint
       ~abi_label:contract.label
       ~address
-      ~method_call:"set_block_timestamp()"
+      ~method_call:"set_timestamp()"
   in
   let* set_block_timestamp_tx =
     wait_for_application ~produce_block set_block_timestamp

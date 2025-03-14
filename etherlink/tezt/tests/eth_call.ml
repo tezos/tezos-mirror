@@ -130,9 +130,7 @@ let test_call_state_override_code =
          ~bin:constant.bin)
       sequencer
   in
-  let bytecode_accessor =
-    read_file (Option.value ~default:"" constant_readable.deployed_bin)
-  in
+  let bytecode_accessor = read_file constant_readable.deployed_bin in
   let* calldata = Cast.calldata "getCount()" in
   let call = `O [("to", `String contract); ("data", `String calldata)] in
 

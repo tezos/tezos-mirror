@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
+//
+// SPDX-License-Identifier: MIT
 pragma solidity <=0.4.26;
 
 contract CallPrecompile {
