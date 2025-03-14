@@ -465,7 +465,6 @@ type configuration = {
   data_dir : string option;
   fundraiser : string option;
   blocks_history : int;
-  metrics_retention : int;
   bootstrap_node_identity_file : string option;
   bootstrap_dal_node_identity_file : string option;
   external_rpc : bool;
@@ -549,7 +548,8 @@ type metrics = {
   ratio_published_commitments : float;
   ratio_attested_commitments : float;
   ratio_published_commitments_last_level : float;
-  ratio_attested_commitments_per_baker : (public_key_hash, float) Hashtbl.t;
+  ratio_attested_commitments_per_baker :
+    (public_key_hash, float option) Hashtbl.t;
   etherlink_operator_balance_sum : Tez.t;
 }
 
@@ -657,7 +657,11 @@ let pp_metrics t
                Hashtbl.find_opt t.aliases account.Account.public_key_hash
                |> Option.value ~default:account.Account.public_key_hash
              in
-             Log.info "Ratio for %s (with stake %d): %f" alias stake ratio) ;
+             Log.info
+               "Ratio for %s (with stake %d): %s"
+               alias
+               stake
+               (Option.fold ~none:"none" ~some:string_of_float ratio)) ;
   Log.info
     "Sum of balances of the Etherlink operator: %s tez"
     (Tez.to_string etherlink_operator_balance_sum) ;
@@ -688,28 +692,31 @@ let push_metrics t
       etherlink_operator_balance_sum;
     } =
   Hashtbl.to_seq ratio_attested_commitments_per_baker
-  |> Seq.iter (fun (public_key_hash, value) ->
-         (* Highly unoptimised since this is done everytime the metric is updated. *)
-         let alias =
-           Hashtbl.find_opt t.aliases public_key_hash
-           |> Option.map (fun alias -> [("alias", alias)])
-           |> Option.value ~default:[]
-         in
-         let version =
-           Hashtbl.find_opt t.versions public_key_hash
-           |> Option.map (fun version -> [("version", version)])
-           |> Option.value ~default:[]
-         in
-         let labels = [("attester", public_key_hash)] @ alias @ version in
-         Cloud.push_metric
-           t.cloud
-           ~help:
-             "Ratio between the number of attested and expected commitments \
-              per baker"
-           ~typ:`Gauge
-           ~labels
-           ~name:"tezt_dal_commitments_attested_ratio"
-           value) ;
+  |> Seq.iter (fun (public_key_hash, ratio_opt) ->
+         match ratio_opt with
+         | None -> ()
+         | Some value ->
+             (* Highly unoptimised since this is done everytime the metric is updated. *)
+             let alias =
+               Hashtbl.find_opt t.aliases public_key_hash
+               |> Option.map (fun alias -> [("alias", alias)])
+               |> Option.value ~default:[]
+             in
+             let version =
+               Hashtbl.find_opt t.versions public_key_hash
+               |> Option.map (fun version -> [("version", version)])
+               |> Option.value ~default:[]
+             in
+             let labels = [("attester", public_key_hash)] @ alias @ version in
+             Cloud.push_metric
+               t.cloud
+               ~help:
+                 "Ratio between the number of attested and expected \
+                  commitments per baker"
+               ~typ:`Gauge
+               ~labels
+               ~name:"tezt_dal_commitments_attested_ratio"
+               value) ;
   Hashtbl.iter
     (fun slot_index value ->
       let labels = [("slot_index", string_of_int slot_index)] in
@@ -933,85 +940,62 @@ let update_published_and_attested_commitments_per_slot t per_level_info
         ( total_published_commitments_per_slot,
           total_attested_commitments_per_slot )
 
-let update_ratio_attested_commitments_per_baker t per_level_info metrics =
+let update_ratio_attested_commitments_per_baker t per_level_info =
   let default () =
     Hashtbl.to_seq_keys per_level_info.attestations
-    |> Seq.map (fun key -> (key, 0.))
+    |> Seq.map (fun key -> (key, None))
     |> Hashtbl.of_seq
   in
-  match metrics.level_first_commitment_attested with
-  | None -> default ()
-  | Some level_first_commitment_attested -> (
-      let published_level =
-        published_level_of_attested_level t per_level_info.level
-      in
-      if published_level <= t.first_level then (
+  let published_level =
+    published_level_of_attested_level t per_level_info.level
+  in
+  if published_level <= t.first_level then (
+    Log.warn
+      "Unable to retrieve information for published level %d because it \
+       precedes the earliest available level (%d)."
+      published_level
+      t.first_level ;
+    default ())
+  else
+    match Hashtbl.find_opt t.infos published_level with
+    | None ->
         Log.warn
-          "Unable to retrieve information for published level %d because it \
-           precedes the earliest available level (%d)."
-          published_level
-          t.first_level ;
-        default ())
-      else
-        match Hashtbl.find_opt t.infos published_level with
-        | None ->
-            Log.warn
-              "Unexpected error: The level %d is missing in the infos table"
-              published_level ;
-            default ()
-        | Some old_per_level_info ->
-            let n = Hashtbl.length old_per_level_info.published_commitments in
-            let maximum_number_of_blocks =
-              t.configuration.metrics_retention / t.time_between_blocks
-            in
-            let weight =
-              min
-                maximum_number_of_blocks
-                (per_level_info.level - level_first_commitment_attested)
-              |> float_of_int
-            in
-            let table =
-              Hashtbl.copy metrics.ratio_attested_commitments_per_baker
-            in
-            Hashtbl.to_seq_keys per_level_info.attestations
-            |> Seq.filter_map (fun public_key_hash ->
-                   let bitset =
-                     float_of_int
-                     @@
-                     match
-                       Hashtbl.find_opt
-                         per_level_info.attestations
-                         public_key_hash
-                     with
-                     | None -> (* No attestation in block *) 0
-                     | Some (Some z) when n = 0 ->
-                         if z = Z.zero then (* No slot were published. *) 100
-                         else (
-                           Log.error
-                             "Wow wow wait! It seems an invariant is broken. \
-                              Either on the test side, or on the DAL node side" ;
-                           100)
-                     | Some (Some z) ->
-                         (* Attestation with DAL payload *)
-                         if n = 0 then 100 else Z.popcount z * 100 / n
-                     | Some None ->
-                         (* Attestation without DAL payload: no DAL rights. *)
-                         100
-                   in
-                   match
-                     Hashtbl.find_opt
-                       metrics.ratio_attested_commitments_per_baker
-                       public_key_hash
-                   with
-                   | None -> None
-                   | Some _old_ratio when n = 0 -> None
-                   | Some old_ratio ->
-                       Some
-                         ( public_key_hash,
-                           ((old_ratio *. weight) +. bitset) /. (weight +. 1.)
-                         ))
-            |> Hashtbl.replace_seq table ;
-            table)
+          "Unexpected error: The level %d is missing in the infos table"
+          published_level ;
+        default ()
+    | Some published_level_info ->
+        (* Retrieves the number of published commitments *)
+        let number_of_published_commitments =
+          float (Hashtbl.length published_level_info.published_commitments)
+        in
+        let table = Hashtbl.(create (length per_level_info.attestations)) in
+        Hashtbl.to_seq_keys per_level_info.attestations
+        |> Seq.filter_map (fun public_key_hash ->
+               let bitset =
+                 match
+                   Hashtbl.find_opt per_level_info.attestations public_key_hash
+                 with
+                 | None -> (* No attestation in block *) None
+                 | Some (Some z) when number_of_published_commitments = 0. ->
+                     (* Attestation with DAL payload but no slot were published. *)
+                     if z = Z.zero then Some 1.
+                     else (
+                       Log.error
+                         "Wow wow wait! It seems an invariant is broken. \
+                          Either on the test side, or on the DAL node side" ;
+                       None)
+                 | Some (Some z) ->
+                     (* Attestation with DAL payload *)
+                     Some
+                       (float (Z.popcount z) /. number_of_published_commitments)
+                 | Some None ->
+                     (* Attestation without DAL payload: may be due to no
+                        DAL rights. *)
+                     None
+               in
+               Some (public_key_hash, bitset))
+        |> Hashtbl.add_seq table ;
+        table
 
 let get_metrics t infos_per_level metrics =
   let level_first_commitment_published =
@@ -1059,7 +1043,7 @@ let get_metrics t infos_per_level metrics =
     update_ratio_attested_commitments t infos_per_level metrics
   in
   let ratio_attested_commitments_per_baker =
-    update_ratio_attested_commitments_per_baker t infos_per_level metrics
+    update_ratio_attested_commitments_per_baker t infos_per_level
   in
   let total_published_commitments_per_slot, total_attested_commitments_per_slot
       =
@@ -1309,7 +1293,10 @@ module Monitoring_app = struct
         (fun (`address address, `alias alias, v) ->
           Format.sprintf
             "▪ `%s` - `%s` : `%s`"
-            (Option.fold ~none:"unk" ~some:(Format.sprintf "%.2f%%") v)
+            (Option.fold
+               ~none:"unk"
+               ~some:(fun v -> Format.sprintf "%.2f%%" (v *. 100.))
+               v)
             (String.sub address 0 7)
             (Option.value ~default:"no alias" alias))
         bakers
@@ -3322,7 +3309,6 @@ let register (module Cli : Scenarios_cli.Dal) =
       else None
     in
     let blocks_history = Cli.blocks_history in
-    let metrics_retention = Cli.metrics_retention in
     let bootstrap_node_identity_file = Cli.bootstrap_node_identity_file in
     let bootstrap_dal_node_identity_file =
       Cli.bootstrap_dal_node_identity_file
@@ -3356,7 +3342,6 @@ let register (module Cli : Scenarios_cli.Dal) =
         data_dir;
         fundraiser;
         blocks_history;
-        metrics_retention;
         bootstrap_node_identity_file;
         bootstrap_dal_node_identity_file;
         external_rpc;

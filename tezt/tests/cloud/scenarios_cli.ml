@@ -22,8 +22,6 @@ end
 module type Dal = sig
   val blocks_history : int
 
-  val metrics_retention : int
-
   val fundraiser : string option
 
   val network_typ : Network.t Clap.typ
@@ -104,35 +102,6 @@ module Dal () : Dal = struct
       ~long:"blocks-history"
       ~description:"Number of blocks history kept in memory. Default value: 100"
       100
-
-  let metrics_retention =
-    let parse str =
-      try
-        let suffix = String.get str (String.length str - 1) in
-        let factor =
-          match suffix with
-          | 's' -> 1
-          | 'm' -> 60
-          | 'h' -> 60 * 60
-          | 'd' -> 24 * 60 * 60
-          | _ -> raise Not_found
-        in
-        String.sub str 0 (String.length str - 1)
-        |> int_of_string |> ( * ) factor |> Option.some
-      with _ -> None
-    in
-    let show d = string_of_int d in
-    let typ = Clap.typ ~name:"time" ~dummy:0 ~parse ~show in
-    Clap.default
-      typ
-      ~section
-      ~long:"metrics-retention"
-      ~placeholder:"<integer>s OR <integer>m OR <integer>h OR <integer>d ..."
-      ~description:
-        "Define the characteristic time of the exponential moving average. \
-         Default value: 12h."
-      (* retention is half of a day. *)
-      (12 * 60 * 60)
 
   let fundraiser =
     Clap.optional_string
