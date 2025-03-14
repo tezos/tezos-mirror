@@ -89,7 +89,7 @@ struct
 end
 
 module Small_conf = struct
-  let entries = 2
+  let nb_entries = 2
 
   let stable_hash = 3
 

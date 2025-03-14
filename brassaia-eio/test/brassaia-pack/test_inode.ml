@@ -163,7 +163,7 @@ struct
 end
 
 module Conf = struct
-  let entries = 2
+  let nb_entries = 2
 
   let stable_hash = 3
 
@@ -483,7 +483,7 @@ let test_remove_inodes () =
     lazily loads subtrees, this won't be caught here. *)
 let test_representation_uniqueness_maxdepth_3 () =
   let module P = Inode_permutations_generator in
-  let p = P.v ~entries:Conf.entries ~maxdepth_of_test:3 in
+  let p = P.v ~entries:Conf.nb_entries ~maxdepth_of_test:3 in
   let f steps tree s =
     (* [steps, tree] is one of the known pair built using [Val.v]. Let's try to
        add or remove [s] from it and see if something breaks. *)
@@ -877,12 +877,12 @@ module Child_ordering = struct
 
   module type S = Brassaia_pack.Inode.Child_ordering with type step := Step.t
 
-  let make ?entries:(entries' = Brassaia_tezos.Conf.entries)
+  let make ?entries:(entries' = Brassaia_tezos.Conf.nb_entries)
       (t : Brassaia_pack.Conf.inode_child_order) : (module S) =
     let module Conf = struct
       include Brassaia_tezos.Conf
 
-      let entries = entries'
+      let nb_entries = entries'
 
       let inode_child_order = t
     end in
@@ -918,7 +918,7 @@ module Child_ordering = struct
     chosen_bit
 
   let test_seeded_hash () =
-    let entries = Brassaia_tezos.Conf.entries in
+    let entries = Brassaia_tezos.Conf.nb_entries in
     let reference ~depth step =
       abs (Step.short_hash ~seed:depth step) mod entries
     in

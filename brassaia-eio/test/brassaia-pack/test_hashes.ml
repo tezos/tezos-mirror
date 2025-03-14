@@ -230,7 +230,7 @@ end
 
 module Test_small_conf = struct
   module Conf = struct
-    let entries = 2
+    let nb_entries = 2
 
     let stable_hash = 3
 

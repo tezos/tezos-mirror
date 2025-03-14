@@ -431,7 +431,7 @@ let test_deeper_proof () =
   test_proofs ctxt ops
 
 module Binary = Make (struct
-  let entries = 2
+  let nb_entries = 2
 
   let stable_hash = 2
 
@@ -487,7 +487,7 @@ let test_large_proofs () =
     [a; b; c; d]
 
 module Custom = Make (struct
-  let entries = 2
+  let nb_entries = 2
 
   let stable_hash = 2
 

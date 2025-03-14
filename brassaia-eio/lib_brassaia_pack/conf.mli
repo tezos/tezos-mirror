@@ -26,7 +26,7 @@ type inode_child_order =
 module type S = sig
   (** The branching factor of the inode tree. 32 is a good choice for general
       applications. *)
-  val entries : int
+  val nb_entries : int
 
   (** This offers a way to conditional base hashing on node entries instead of
       inodes. It is available for some backwards compatibility applications, but

@@ -89,7 +89,7 @@ let suite =
   let module Index = Brassaia_pack.Indexing_strategy in
   let module Conf_small_nodes = struct
     (* Parameters chosen to be different from those in [Brassaia_tezos.Conf]: *)
-    let entries = 2
+    let nb_entries = 2
 
     let stable_hash = 3
 

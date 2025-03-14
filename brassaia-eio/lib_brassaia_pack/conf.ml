@@ -22,7 +22,7 @@ type inode_child_order =
   [`Seeded_hash | `Hash_bits | `Custom of depth:int -> bytes -> int]
 
 module type S = sig
-  val entries : int
+  val nb_entries : int
 
   val stable_hash : int
 
