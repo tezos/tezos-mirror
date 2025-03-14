@@ -5,15 +5,15 @@
 
 use crate::{
     blueprint_storage::DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS,
-    chains::{ChainConfig, EvmLimits},
+    chains::{ChainConfig, ChainFamily, EvmLimits},
     delayed_inbox::DelayedInbox,
     retrieve_minimum_base_fee_per_gas,
     storage::{
         dal_slots, enable_dal, evm_node_flag, is_enable_fa_bridge,
-        max_blueprint_lookahead_in_seconds, read_admin, read_delayed_transaction_bridge,
-        read_kernel_governance, read_kernel_security_governance,
-        read_maximum_allowed_ticks, read_or_set_maximum_gas_per_transaction,
-        read_sequencer_governance, sequencer,
+        max_blueprint_lookahead_in_seconds, read_admin, read_chain_family,
+        read_delayed_transaction_bridge, read_kernel_governance,
+        read_kernel_security_governance, read_maximum_allowed_ticks,
+        read_or_set_maximum_gas_per_transaction, read_sequencer_governance, sequencer,
     },
     tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS},
 };
@@ -193,6 +193,22 @@ fn fetch_dal_configuration<Host: Runtime>(host: &mut Host) -> Option<DalConfigur
     }
 }
 
+pub fn fetch_chain_configuration<Host: Runtime>(
+    host: &mut Host,
+    chain_id: U256,
+) -> ChainConfig {
+    // if the info is not in durable storage, we must not fail, but treat it as EVM
+    let chain_family = read_chain_family(host, chain_id).unwrap_or_default();
+    match chain_family {
+        ChainFamily::Michelson => ChainConfig::new_michelson_config(chain_id),
+        ChainFamily::Evm => {
+            let evm_limits = fetch_evm_limits(host);
+            let evm_configuration = fetch_evm_configuration(host);
+            ChainConfig::new_evm_config(chain_id, evm_limits, evm_configuration)
+        }
+    }
+}
+
 pub fn fetch_configuration<Host: Runtime>(
     host: &mut Host,
     chain_id: U256,
@@ -200,14 +216,11 @@ pub fn fetch_configuration<Host: Runtime>(
     let tezos_contracts = fetch_tezos_contracts(host);
     let maximum_allowed_ticks =
         read_maximum_allowed_ticks(host).unwrap_or(MAX_ALLOWED_TICKS);
-    let evm_limits = fetch_evm_limits(host);
     let sequencer = sequencer(host).unwrap_or_default();
     let enable_fa_bridge = is_enable_fa_bridge(host).unwrap_or_default();
-    let evm_configuration = fetch_evm_configuration(host);
     let dal: Option<DalConfiguration> = fetch_dal_configuration(host);
     let evm_node_flag = evm_node_flag(host).unwrap_or(false);
-    let chain_config =
-        ChainConfig::new_evm_config(chain_id, evm_limits, evm_configuration);
+    let chain_config = fetch_chain_configuration(host, chain_id);
     match sequencer {
         Some(sequencer) => {
             let delayed_bridge = read_delayed_transaction_bridge(host)

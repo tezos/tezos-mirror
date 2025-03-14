@@ -884,7 +884,6 @@ pub fn max_blueprint_lookahead_in_seconds(host: &impl Runtime) -> anyhow::Result
 
 // Storage functions related to a chain configuration
 
-#[allow(dead_code)]
 pub fn read_chain_family(
     host: &impl Runtime,
     chain_id: U256,
