@@ -92,6 +92,7 @@ module VM = struct
     (* Return all the workspaces associated with the current tezt cloud
        environment. *)
     let list ~tezt_cloud =
+      let () = Log.report "Terraform.VM.Workspace.list" in
       (* We select the default workspace to be sure we can parse correctly the
          output. *)
       let* () = select "default" in
@@ -114,6 +115,7 @@ module VM = struct
 
     (* Create workspaces that will be used for the experiment. *)
     let init ~tezt_cloud workspaces =
+      let () = Log.report "Terraform.VM.Workspace.init" in
       let* existing_workspaces = list ~tezt_cloud in
       let to_create =
         (* Create only new workspaces. *)
@@ -138,6 +140,7 @@ module VM = struct
       unit
 
     let destroy ~tezt_cloud =
+      let () = Log.report "Terraform.VM.Workspace.destroy" in
       (* We ensure we are not using a workspace we want to delete. *)
       let* () = select "default" in
       let* workspaces = list ~tezt_cloud in
