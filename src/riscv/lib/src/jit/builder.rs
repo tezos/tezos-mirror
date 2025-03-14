@@ -26,19 +26,19 @@ use crate::machine_state::registers::NonZeroXRegister;
 /// Builder context used when lowering individual instructions within a block.
 pub(super) struct Builder<'a, MC: MemoryConfig, JSA: JitStateAccess> {
     /// Cranelift function builder
-    pub builder: FunctionBuilder<'a>,
+    builder: FunctionBuilder<'a>,
 
     /// Helpers for calling locally imported [JitStateAccess] methods.
-    pub jsa_call: JsaCalls<'a, MC, JSA>,
+    jsa_call: JsaCalls<'a, MC, JSA>,
 
     /// The IR-type of pointers on the current native platform
-    pub ptr: Type,
+    ptr: Type,
 
     /// Value representing a pointer to `MachineCoreState<MC, JSA>`
-    pub core_ptr_val: Value,
+    core_ptr_val: Value,
 
     /// Value representing a pointer to `steps: usize`
-    pub steps_ptr_val: Value,
+    steps_ptr_val: Value,
 
     /// The number of steps taken within the function
     pub steps: usize,
@@ -51,10 +51,42 @@ pub(super) struct Builder<'a, MC: MemoryConfig, JSA: JitStateAccess> {
 
     /// The final block that is last executed within a block - it is responsible for
     /// flushing `steps` and the `instr_pc` back to the state.
-    pub end_block: Option<ir::Block>,
+    end_block: Option<ir::Block>,
 }
 
 impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
+    /// Create a new block builder.
+    ///
+    /// The function constructed after compilation takes
+    /// `core_ptr`, `instr_pc` & `steps_ptr` as arguments.
+    pub fn new(
+        ptr: ir::Type,
+        mut builder: FunctionBuilder<'a>,
+        jsa_call: JsaCalls<'a, MC, JSA>,
+    ) -> Self {
+        // Create the entry block, to start emitting code in.
+        let entry_block = builder.create_block();
+        builder.append_block_params_for_function_params(entry_block);
+        builder.switch_to_block(entry_block);
+        builder.seal_block(entry_block);
+
+        let core_ptr_val = builder.block_params(entry_block)[0];
+        let pc_val = builder.block_params(entry_block)[1];
+        let steps_ptr_val = builder.block_params(entry_block)[2];
+
+        Self {
+            ptr,
+            builder,
+            jsa_call,
+            core_ptr_val,
+            steps_ptr_val,
+            pc_val,
+            steps: 0,
+            pc_offset: 0,
+            end_block: None,
+        }
+    }
+
     /// Finalise the end block - by flushing PC & Steps.
     ///
     /// The end block takes two dynamic-parameters: `(instr_pc, steps)`.

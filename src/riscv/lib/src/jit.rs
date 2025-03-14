@@ -115,7 +115,7 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
     pub fn new() -> Result<Self, JitError> {
         if std::mem::size_of::<usize>() != std::mem::size_of::<u64>() {
             return Err(JitError::UnsupportedPlatform(
-                "octez-riscv only support 64-bit architectures",
+                "octez-riscv JIT only supports 64-bit architectures",
             ));
         }
 
@@ -212,31 +212,10 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
         self.ctx.func.signature.params.push(AbiParam::new(I64));
         self.ctx.func.signature.params.push(AbiParam::new(ptr));
 
-        let mut builder = FunctionBuilder::new(&mut self.ctx.func, &mut self.builder_context);
-
-        // Create the entry block, to start emitting code in.
-        let entry_block = builder.create_block();
-        builder.append_block_params_for_function_params(entry_block);
-        builder.switch_to_block(entry_block);
-        builder.seal_block(entry_block);
-
-        let core_ptr_val = builder.block_params(entry_block)[0];
-        let pc_val = builder.block_params(entry_block)[1];
-        let steps_ptr_val = builder.block_params(entry_block)[2];
-
+        let builder = FunctionBuilder::new(&mut self.ctx.func, &mut self.builder_context);
         let jsa_call = JsaCalls::func_calls(&mut self.module, &self.jsa_imports);
 
-        Builder::<'_, MC, JSA> {
-            builder,
-            ptr,
-            core_ptr_val,
-            steps_ptr_val,
-            steps: 0,
-            pc_val,
-            pc_offset: 0,
-            jsa_call,
-            end_block: None,
-        }
+        Builder::<'_, MC, JSA>::new(ptr, builder, jsa_call)
     }
 
     /// Finalise the function currently under construction.
