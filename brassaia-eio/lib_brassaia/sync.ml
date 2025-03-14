@@ -129,7 +129,7 @@ module Make (S : Store.Generic_key.S) = struct
         | `Empty | `Commit _ -> Ok `Empty
         | `Branch br -> (
             [%log.debug "Fetching branch %a" pp_branch br] ;
-            let g = B.v (S.repo t) in
+            let g = B.init (S.repo t) in
             match B.fetch g ?depth e br with
             | Error _ as e -> e
             | Ok (Some key) -> (
@@ -213,7 +213,7 @@ module Make (S : Store.Generic_key.S) = struct
         | `Commit _ -> Error `Detached_head
         | `Branch br -> (
             let head = S.of_branch (S.repo t) br |> S.Head.get in
-            let g = B.v (S.repo t) in
+            let g = B.init (S.repo t) in
             match B.push g ?depth e br with
             | Ok () -> Ok (`Head head)
             | Error err -> Error (err :> push_error)))

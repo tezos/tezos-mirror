@@ -79,7 +79,7 @@ module Make (S : Generic_key) = struct
     in
     may repo heads hook
 
-  let contents c = S.Tree.v (`Contents (c, S.Metadata.default))
+  let contents c = S.Tree.init (`Contents (c, S.Metadata.default))
 
   let test_contents x () =
     let test repo =
@@ -173,8 +173,8 @@ module Make (S : Generic_key) = struct
       let w = B.Node.find n k in
       check_values (get w) ;
       let kv1 = kv1 ~repo in
-      let k1 = with_node repo (fun g -> Graph.v g [("x", normal kv1)]) in
-      let k1' = with_node repo (fun g -> Graph.v g [("x", normal kv1)]) in
+      let k1 = with_node repo (fun g -> Graph.init g [("x", normal kv1)]) in
+      let k1' = with_node repo (fun g -> Graph.init g [("x", normal kv1)]) in
       check_key "k1.1" k1 k1' ;
       let t1 = B.Node.find n k1 in
       let k' = B.Node.Val.find (get t1) "x" in
@@ -185,16 +185,16 @@ module Make (S : Generic_key) = struct
         k' ;
       let k1'' = with_node repo (fun n -> B.Node.add n (get t1)) in
       check_key "k1.2" k1 k1'' ;
-      let k2 = with_node repo (fun g -> Graph.v g [("b", `Node k1)]) in
-      let k2' = with_node repo (fun g -> Graph.v g [("b", `Node k1)]) in
+      let k2 = with_node repo (fun g -> Graph.init g [("b", `Node k1)]) in
+      let k2' = with_node repo (fun g -> Graph.init g [("b", `Node k1)]) in
       check_key "k2.1" k2 k2' ;
       let t2 = B.Node.find n k2 in
       let k2'' = with_node repo (fun n -> B.Node.add n (get t2)) in
       check_key "k2.2" k2 k2'' ;
       let k1''' = Graph.find g k2 ["b"] in
       check_val "k1.3" (Some (`Node k1)) k1''' ;
-      let k3 = with_node repo (fun g -> Graph.v g [("a", `Node k2)]) in
-      let k3' = with_node repo (fun g -> Graph.v g [("a", `Node k2)]) in
+      let k3 = with_node repo (fun g -> Graph.init g [("a", `Node k2)]) in
+      let k3' = with_node repo (fun g -> Graph.init g [("a", `Node k2)]) in
       check_key "k3.1" k3 k3' ;
       let t3 = B.Node.find n k3 in
       let k3'' = with_node repo (fun n -> B.Node.add n (get t3)) in
@@ -212,11 +212,12 @@ module Make (S : Generic_key) = struct
       let kv13 = Graph.find g k3 ["a"; "b"; "x"] in
       check_val "v1" (Some (normal kv1)) kv13 ;
       let kv2 = kv2 ~repo in
-      let k4 = with_node repo (fun g -> Graph.v g [("x", normal kv2)]) in
+      let k4 = with_node repo (fun g -> Graph.init g [("x", normal kv2)]) in
       let k5 =
-        with_node repo (fun g -> Graph.v g [("b", `Node k1); ("c", `Node k4)])
+        with_node repo (fun g ->
+            Graph.init g [("b", `Node k1); ("c", `Node k4)])
       in
-      let k6 = with_node repo (fun g -> Graph.v g [("a", `Node k5)]) in
+      let k6 = with_node repo (fun g -> Graph.init g [("a", `Node k5)]) in
       let k6' =
         with_node repo (fun g -> Graph.add g k3 ["a"; "c"; "x"] (normal kv2))
       in
@@ -234,7 +235,7 @@ module Make (S : Generic_key) = struct
             else names := s :: !names)
           all
       in
-      let n0 = with_node repo (fun g -> Graph.v g []) in
+      let n0 = with_node repo (fun g -> Graph.init g []) in
       let n1 = with_node repo (fun g -> Graph.add g n0 ["b"] (`Node n0)) in
       let n2 = with_node repo (fun g -> Graph.add g n1 ["a"] (`Node n0)) in
       let n3 = with_node repo (fun g -> Graph.add g n2 ["a"] (`Node n0)) in
@@ -253,7 +254,7 @@ module Make (S : Generic_key) = struct
       assert_no_duplicates "4" n3 ;
       S.Repo.close repo ;
       try
-        let n0 = with_node repo (fun g -> Graph.v g []) in
+        let n0 = with_node repo (fun g -> Graph.init g []) in
         let _ = with_node repo (fun g -> Graph.add g n0 ["b"] (`Node n0)) in
         Alcotest.fail "Add after close should not be allowed"
       with
@@ -266,7 +267,7 @@ module Make (S : Generic_key) = struct
     let test repo =
       let info date =
         let message = Fmt.str "Test commit: %d" date in
-        S.Info.v ~author:"test" ~message (Int64.of_int date)
+        S.Info.init ~author:"test" ~message (Int64.of_int date)
       in
       let kv1 = kv1 ~repo in
       let h = h repo and c = B.Repo.commit_t repo in
@@ -274,21 +275,27 @@ module Make (S : Generic_key) = struct
       let check_key = check B.Commit.Key.t in
       let check_keys = checks B.Commit.Key.t in
       (* t3 -a-> t2 -b-> t1 -x-> (v1) *)
-      let kt1 = with_node repo (fun g -> Graph.v g [("x", normal kv1)]) in
-      let kt2 = with_node repo (fun g -> Graph.v g [("a", `Node kt1)]) in
-      let kt3 = with_node repo (fun g -> Graph.v g [("b", `Node kt2)]) in
+      let kt1 = with_node repo (fun g -> Graph.init g [("x", normal kv1)]) in
+      let kt2 = with_node repo (fun g -> Graph.init g [("a", `Node kt1)]) in
+      let kt3 = with_node repo (fun g -> Graph.init g [("b", `Node kt2)]) in
       (* r1 : t2 *)
       let with_info n fn = with_commit repo (fun h -> fn h ~info:(info n)) in
-      let kr1, _ = with_info 3 (History.v ~node:kt2 ~parents:[]) in
-      let kr1', _ = with_info 3 (History.v ~node:kt2 ~parents:[]) in
+      let kr1, _ = with_info 3 (History.init_and_store ~node:kt2 ~parents:[]) in
+      let kr1', _ =
+        with_info 3 (History.init_and_store ~node:kt2 ~parents:[])
+      in
       let t1 = B.Commit.find c kr1 in
       let t1' = B.Commit.find c kr1' in
       check_val "t1" t1 t1' ;
       check_key "kr1" kr1 kr1' ;
 
       (* r1 -> r2 : t3 *)
-      let kr2, _ = with_info 4 (History.v ~node:kt3 ~parents:[kr1]) in
-      let kr2', _ = with_info 4 (History.v ~node:kt3 ~parents:[kr1]) in
+      let kr2, _ =
+        with_info 4 (History.init_and_store ~node:kt3 ~parents:[kr1])
+      in
+      let kr2', _ =
+        with_info 4 (History.init_and_store ~node:kt3 ~parents:[kr1])
+      in
       check_key "kr2" kr2 kr2' ;
       let kr1s = History.closure h ~min:[] ~max:[kr1] in
       check_keys "g1" [kr1] kr1s ;
@@ -305,7 +312,7 @@ module Make (S : Generic_key) = struct
       in
       S.Repo.close repo ;
       try
-        let _ = with_info 3 (History.v ~node:kt1 ~parents:[]) in
+        let _ = with_info 3 (History.init_and_store ~node:kt1 ~parents:[]) in
         Alcotest.fail "Add after close should not be allowed"
       with
       | Brassaia.Closed -> ()
@@ -317,7 +324,7 @@ module Make (S : Generic_key) = struct
     let test repo =
       let info date =
         let message = Fmt.str "Test commit: %d" date in
-        S.Info.v ~author:"test" ~message (Int64.of_int date)
+        S.Info.init ~author:"test" ~message (Int64.of_int date)
       in
       let check_keys = checks B.Commit.Key.t in
       let equal_key = Brassaia.Type.(unstage (equal B.Commit.Key.t)) in
@@ -328,7 +335,8 @@ module Make (S : Generic_key) = struct
             let kv =
               with_contents repo (fun t -> B.Contents.add t (string_of_int i))
             in
-            with_node repo (fun g -> Graph.v g [(string_of_int i, normal kv)]))
+            with_node repo (fun g ->
+                Graph.init g [(string_of_int i, normal kv)]))
           [0; 1; 2; 3; 4; 5; 6; 7; 8]
       in
       let with_info n fn = with_commit repo (fun h -> fn h ~info:(info n)) in
@@ -336,10 +344,14 @@ module Make (S : Generic_key) = struct
         match nodes with
         | [] -> assert false
         | node :: rest ->
-            let kr0, _ = with_info 0 (History.v ~node ~parents:[]) in
+            let kr0, _ =
+              with_info 0 (History.init_and_store ~node ~parents:[])
+            in
             let commits = Array.make 9 kr0 in
             let commit ~node ~parents i =
-              let kr1, _ = with_info i (History.v ~node ~parents) in
+              let kr1, _ =
+                with_info i (History.init_and_store ~node ~parents)
+              in
               commits.(i) <- kr1 ;
               i + 1
             in
@@ -519,9 +531,9 @@ module Make (S : Generic_key) = struct
       let merge_right ~old:_ _ y = ok y in
       let merge_default = Brassaia.Merge.default dt in
       let merge = function
-        | "left" -> Brassaia.Merge.v dt merge_left
-        | "right" -> Brassaia.Merge.v dt merge_right
-        | "skip" -> Brassaia.Merge.v dt merge_skip
+        | "left" -> Brassaia.Merge.init dt merge_left
+        | "right" -> Brassaia.Merge.init dt merge_right
+        | "skip" -> Brassaia.Merge.init dt merge_skip
         | _ -> merge_default
       in
       let merge_x = Brassaia.Merge.alist T.string T.int64 merge in
@@ -565,13 +577,13 @@ module Make (S : Generic_key) = struct
       (* merge nodes *)
       let g = g repo in
       (* The empty node *)
-      let k0 = with_node repo (fun g -> Graph.v g []) in
+      let k0 = with_node repo (fun g -> Graph.init g []) in
       (* Create the node t1 -x-> (v1) *)
-      let k1 = with_node repo (fun g -> Graph.v g [("x", normal kv1)]) in
+      let k1 = with_node repo (fun g -> Graph.init g [("x", normal kv1)]) in
       (* Create the node t2 -b-> t1 -x-> (v1) *)
-      let k2 = with_node repo (fun g -> Graph.v g [("b", `Node k1)]) in
+      let k2 = with_node repo (fun g -> Graph.init g [("b", `Node k1)]) in
       (* Create the node t3 -c-> t1 -x-> (v1) *)
-      let k3 = with_node repo (fun g -> Graph.v g [("c", `Node k1)]) in
+      let k3 = with_node repo (fun g -> Graph.init g [("c", `Node k1)]) in
       (* Should create the node:
                           t4 -b-> t1 -x-> (v1)
                              \c/ *)
@@ -590,13 +602,17 @@ module Make (S : Generic_key) = struct
       checks succ_t "k4" [("b", `Node k1); ("c", `Node k1)] succ ;
       let info date =
         let i = Int64.of_int date in
-        S.Info.v ~author:"test" ~message:"Test commit" i
+        S.Info.init ~author:"test" ~message:"Test commit" i
       in
       let c = B.Repo.commit_t repo in
       let with_info n fn = with_commit repo (fun h -> fn h ~info:(info n)) in
-      let kr0, _ = with_info 0 (History.v ~node:k0 ~parents:[]) in
-      let kr1, _ = with_info 1 (History.v ~node:k2 ~parents:[kr0]) in
-      let kr2, _ = with_info 2 (History.v ~node:k3 ~parents:[kr0]) in
+      let kr0, _ = with_info 0 (History.init_and_store ~node:k0 ~parents:[]) in
+      let kr1, _ =
+        with_info 1 (History.init_and_store ~node:k2 ~parents:[kr0])
+      in
+      let kr2, _ =
+        with_info 2 (History.init_and_store ~node:k3 ~parents:[kr0])
+      in
       may_get_keys repo [kr1; kr2] hook ;
       let kr3 =
         with_info 3 (fun h ~info ->
@@ -629,7 +645,9 @@ module Make (S : Generic_key) = struct
       in
       let kr3_key = merge_exn "kr3_key" kr3_key in
       check_key "kr3 key with old parent" kr3 kr3_key ;
-      let kr3', _ = with_info 3 @@ History.v ~node:k4 ~parents:[kr1; kr2] in
+      let kr3', _ =
+        with_info 3 @@ History.init_and_store ~node:k4 ~parents:[kr1; kr2]
+      in
       let r3 = B.Commit.find c kr3 in
       let r3' = B.Commit.find c kr3' in
       check T.(option B.Commit.Val.t) "r3" r3 r3' ;
@@ -642,7 +660,7 @@ module Make (S : Generic_key) = struct
     let test repo =
       let info date =
         let i = Int64.of_int date in
-        S.Info.v ~author:"test" ~message:"Test commit" i
+        S.Info.init ~author:"test" ~message:"Test commit" i
       in
       let assert_lcas_err msg err l2 =
         let err_str = function
@@ -697,20 +715,28 @@ module Make (S : Generic_key) = struct
       *)
       let tree = S.Tree.add tree k0 (random_value 1024) in
       let tree = S.Tree.add tree k1 (random_value 1024) in
-      let c0 = S.Commit.v repo ~info:(info 0) ~parents:[] tree in
+      let c0 = S.Commit.init repo ~info:(info 0) ~parents:[] tree in
       may repo [c0] hook ;
       assert_history_empty "nonempty 1 commit" c0 false ;
       let tree = S.Tree.add tree k1 (random_value 1024) in
-      let c1 = S.Commit.v repo ~info:(info 1) ~parents:[S.Commit.key c0] tree in
+      let c1 =
+        S.Commit.init repo ~info:(info 1) ~parents:[S.Commit.key c0] tree
+      in
       assert_history_empty "nonempty 2 commits" c0 false ;
       let tree = S.Tree.add tree k0 (random_value 1024) in
-      let c2 = S.Commit.v repo ~info:(info 2) ~parents:[S.Commit.key c1] tree in
+      let c2 =
+        S.Commit.init repo ~info:(info 2) ~parents:[S.Commit.key c1] tree
+      in
       let tree = S.Tree.add tree k0 (random_value 1024) in
       let tree = S.Tree.add tree k1 (random_value 1024) in
-      let c3 = S.Commit.v repo ~info:(info 3) ~parents:[S.Commit.key c2] tree in
+      let c3 =
+        S.Commit.init repo ~info:(info 3) ~parents:[S.Commit.key c2] tree
+      in
       may repo [c3] hook ;
       let tree = S.Tree.add tree k1 (random_value 1024) in
-      let c4 = S.Commit.v repo ~info:(info 4) ~parents:[S.Commit.key c3] tree in
+      let c4 =
+        S.Commit.init repo ~info:(info 4) ~parents:[S.Commit.key c3] tree
+      in
       assert_lcas "line lcas 1" ~max_depth:0 3 c3 c4 [c3] ;
       assert_lcas "line lcas 2" ~max_depth:1 3 c2 c4 [c2] ;
       assert_lcas "line lcas 3" ~max_depth:2 3 c1 c4 [c1] ;
@@ -731,30 +757,30 @@ module Make (S : Generic_key) = struct
       *)
       let tree = S.Tree.add tree k2 (random_value 1024) in
       let c10 =
-        S.Commit.v repo ~info:(info 10) ~parents:[S.Commit.key c4] tree
+        S.Commit.init repo ~info:(info 10) ~parents:[S.Commit.key c4] tree
       in
       let tree_up = S.Tree.add tree k0 (random_value 1024) in
       let tree_up = S.Tree.add tree_up k2 (random_value 1024) in
       let c11 =
-        S.Commit.v repo ~info:(info 11) ~parents:[S.Commit.key c10] tree_up
+        S.Commit.init repo ~info:(info 11) ~parents:[S.Commit.key c10] tree_up
       in
       let tree_down = S.Tree.add tree k0 (random_value 1024) in
       let tree_12 = S.Tree.add tree_down k1 (random_value 1024) in
       let c12 =
-        S.Commit.v repo ~info:(info 12) ~parents:[S.Commit.key c10] tree_12
+        S.Commit.init repo ~info:(info 12) ~parents:[S.Commit.key c10] tree_12
       in
       let tree_up = S.Tree.add tree_up k1 (random_value 1024) in
       let c13 =
-        S.Commit.v repo ~info:(info 13) ~parents:[S.Commit.key c11] tree_up
+        S.Commit.init repo ~info:(info 13) ~parents:[S.Commit.key c11] tree_up
       in
       let tree_down = S.Tree.add tree_12 k2 (random_value 1024) in
       let c14 =
-        S.Commit.v repo ~info:(info 14) ~parents:[S.Commit.key c12] tree_down
+        S.Commit.init repo ~info:(info 14) ~parents:[S.Commit.key c12] tree_down
       in
       let tree_up = S.Tree.add tree_12 k1 (random_value 1024) in
       let tree_up = S.Tree.add tree_up k2 (random_value 1024) in
       let c15 =
-        S.Commit.v
+        S.Commit.init
           repo
           ~info:(info 15)
           ~parents:[S.Commit.key c12; S.Commit.key c13]
@@ -762,11 +788,11 @@ module Make (S : Generic_key) = struct
       in
       let tree_down = S.Tree.add tree_down k2 (random_value 1024) in
       let c16 =
-        S.Commit.v repo ~info:(info 16) ~parents:[S.Commit.key c14] tree_down
+        S.Commit.init repo ~info:(info 16) ~parents:[S.Commit.key c14] tree_down
       in
       let tree_down = S.Tree.add tree_down k0 (random_value 1024) in
       let c17 =
-        S.Commit.v
+        S.Commit.init
           repo
           ~info:(info 17)
           ~parents:[S.Commit.key c11; S.Commit.key c16]
@@ -815,33 +841,33 @@ module Make (S : Generic_key) = struct
                  \-----------/
       *)
       let c10 =
-        S.Commit.v repo ~info:(info 10) ~parents:[S.Commit.key c4] tree
+        S.Commit.init repo ~info:(info 10) ~parents:[S.Commit.key c4] tree
       in
       let c11 =
-        S.Commit.v repo ~info:(info 11) ~parents:[S.Commit.key c10] tree
+        S.Commit.init repo ~info:(info 11) ~parents:[S.Commit.key c10] tree
       in
       let c12 =
-        S.Commit.v repo ~info:(info 12) ~parents:[S.Commit.key c11] tree
+        S.Commit.init repo ~info:(info 12) ~parents:[S.Commit.key c11] tree
       in
       let c13 =
-        S.Commit.v repo ~info:(info 13) ~parents:[S.Commit.key c12] tree
+        S.Commit.init repo ~info:(info 13) ~parents:[S.Commit.key c12] tree
       in
       let c14 =
-        S.Commit.v
+        S.Commit.init
           repo
           ~info:(info 14)
           ~parents:[S.Commit.key c11; S.Commit.key c13]
           tree
       in
       let c15 =
-        S.Commit.v
+        S.Commit.init
           repo
           ~info:(info 15)
           ~parents:[S.Commit.key c13; S.Commit.key c14]
           tree
       in
       let c16 =
-        S.Commit.v repo ~info:(info 16) ~parents:[S.Commit.key c11] tree
+        S.Commit.init repo ~info:(info 16) ~parents:[S.Commit.key c11] tree
       in
       assert_lcas "weird lcas 1" ~max_depth:0 3 c14 c15 [c14] ;
       assert_lcas "weird lcas 2" ~max_depth:0 3 c13 c15 [c13] ;
@@ -1466,7 +1492,7 @@ module Make (S : Generic_key) = struct
       let r2 = r2 ~repo in
       let i0 = S.Info.empty in
       let c =
-        S.Commit.v
+        S.Commit.init
           repo
           ~info:S.Info.empty
           ~parents:[S.Commit.key r1; S.Commit.key r2]
@@ -1784,7 +1810,7 @@ module Make (S : Generic_key) = struct
       let p0, () = S.Tree.produce_proof repo key f0 in
       let proof ?(before = S.Tree.Proof.before p0)
           ?(after = S.Tree.Proof.after p0) ?(state = S.Tree.Proof.state p0) () =
-        S.Tree.Proof.v ~before ~after state
+        S.Tree.Proof.init ~before ~after state
       in
       let wrong_hash = B.Contents.Hash.hash "not the right hash!" in
       let wrong_kinded_hash = `Node wrong_hash in
@@ -2361,7 +2387,7 @@ module Make (S : Generic_key) = struct
       let commit (s : string) : S.commit_key =
         with_commit repo (fun c ->
             let node = node s in
-            let commit = B.Commit.Val.v ~info:(info "") ~node ~parents:[] in
+            let commit = B.Commit.Val.init ~info:(info "") ~node ~parents:[] in
             B.Commit.add c commit)
       in
       let foo_k = node "foo" in
@@ -2388,7 +2414,7 @@ module Make (S : Generic_key) = struct
       let h = S.Head.get t in
       let commit_v =
         let commit_foo = commit "foo" in
-        S.Backend.Commit.Val.v
+        S.Backend.Commit.Val.init
           ~info:(info ())
           ~node:key_3
           ~parents:[S.Commit.key h; commit_foo]
@@ -2420,7 +2446,7 @@ module Make (S : Generic_key) = struct
     let equal_hash = Brassaia.Type.(equal S.Hash.t |> unstage) in
     let test create_tree repo =
       let tree = create_tree () in
-      let c = S.Commit.v repo ~info:S.Info.empty ~parents:[] tree in
+      let c = S.Commit.init repo ~info:S.Info.empty ~parents:[] tree in
 
       let node_b =
         S.Tree.destruct tree

@@ -103,7 +103,7 @@ module Store = struct
 
   let commit ?(info = info) t =
     let parents = List.map S.Commit.key t.parents in
-    let h = S.Commit.v t.repo ~info ~parents t.tree in
+    let h = S.Commit.init t.repo ~info ~parents t.tree in
     S.Tree.clear t.tree ;
     h
 
@@ -134,7 +134,9 @@ module Store = struct
     if fresh then (
       rm_dir root ;
       Option.iter rm_dir lower_root) ;
-    let repo = S.Repo.v (config ~readonly ~fresh ~lru_size ~lower_root root) in
+    let repo =
+      S.Repo.init (config ~readonly ~fresh ~lru_size ~lower_root root)
+    in
     let tree = S.Tree.empty () in
     {root; repo; tree; parents = []}
 
@@ -142,7 +144,7 @@ module Store = struct
     config ~lru_size:0 ~readonly:false ~fresh:true ~lower_root:None root
 
   let init_with_config config =
-    let repo = S.Repo.v config in
+    let repo = S.Repo.init config in
     let root = Brassaia_pack.Conf.root config in
     let tree = S.Tree.empty () in
     {root; repo; tree; parents = []}
@@ -182,7 +184,7 @@ module Store = struct
     (t, h)
 
   let commit_1_different_author t =
-    let info = S.Info.v ~author:"someone" Int64.zero in
+    let info = S.Info.init ~author:"someone" Int64.zero in
     let t = set t ["a"; "b"] "Novembre" in
     let t = set t ["a"; "c"] "Juin" in
     let h = commit ~info t in

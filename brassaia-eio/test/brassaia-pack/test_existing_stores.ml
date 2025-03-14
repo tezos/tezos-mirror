@@ -136,15 +136,15 @@ module Test_reconstruct = struct
     setup_test_env () ;
     let conf = config ~readonly:false ~fresh:false root_v1 in
     (* Open store in RW to migrate it to V3. *)
-    let repo = S.Repo.v conf in
+    let repo = S.Repo.init conf in
     let () = S.Repo.close repo in
     (* Test on a V3 store. *)
     S.test_traverse_pack_file (`Reconstruct_index `In_place) conf ;
     let index_old =
-      Index.v_exn ~fresh:false ~readonly:false ~log_size:500_000 tmp
+      Index.init_exn ~fresh:false ~readonly:false ~log_size:500_000 tmp
     in
     let index_new =
-      Index.v_exn ~fresh:false ~readonly:false ~log_size:500_000 root_v1
+      Index.init_exn ~fresh:false ~readonly:false ~log_size:500_000 root_v1
     in
     Index.iter
       (fun k (offset, length, kind) ->
@@ -172,14 +172,14 @@ module Test_reconstruct = struct
     Index.close_exn index_new ;
     [%log.app
       "Checking old bindings are still reachable post index reconstruction)"] ;
-    let r = S.Repo.v conf in
+    let r = S.Repo.init conf in
     check_repo r archive ;
     S.Repo.close r
 
   let test_gc_allowed () =
     setup_test_env () ;
     let conf = config ~readonly:false ~fresh:false root_v1 in
-    let repo = S.Repo.v conf in
+    let repo = S.Repo.init conf in
     let allowed = S.Gc.is_allowed repo in
     Alcotest.(check bool)
       "deleting gc not allowed on stores with V1 objects"
@@ -202,7 +202,7 @@ module Test_corrupted_stores = struct
 
   let test () =
     setup_env () ;
-    let rw = S.Repo.v (config ~fresh:false root) in
+    let rw = S.Repo.init (config ~fresh:false root) in
     [%log.app
       "integrity check on a store where 3 entries are missing from pack"] ;
     let result = S.integrity_check ~auto_repair:false rw in
@@ -253,7 +253,7 @@ module Test_corrupted_stores = struct
         ~indexing_strategy:Brassaia_pack.Indexing_strategy.minimal
         root_local_build
     in
-    let rw = S.Repo.v config in
+    let rw = S.Repo.init config in
 
     let commit =
       commit_of_string rw "22e159de13b427226e5901defd17f0c14e744205"
@@ -268,7 +268,7 @@ module Test_corrupted_stores = struct
     let () = S.Repo.close rw in
     [%log.app "integrity check on a corrupted minimal store"] ;
     write_corrupted_data_to_suffix () ;
-    let rw = S.Repo.v config in
+    let rw = S.Repo.init config in
     let result = S.integrity_check ~heads:[commit] ~auto_repair:false rw in
     let () =
       match result with
@@ -299,7 +299,7 @@ module Test_corrupted_inode = struct
 
   let test () =
     setup_test_env () ;
-    let rw = S.Repo.v (config ~fresh:false root) in
+    let rw = S.Repo.init (config ~fresh:false root) in
     [%log.app "integrity check of inodes on a store with one corrupted inode"] ;
     let c2 = "8d89b97726d9fb650d088cb7e21b78d84d132c6e" in
     let c2 = commit_of_string rw c2 in
@@ -333,13 +333,13 @@ module Test_traverse_gced = struct
   include Test (S)
 
   let commit_and_gc conf =
-    let repo = S.Repo.v conf in
+    let repo = S.Repo.init conf in
     let commit =
       commit_of_string repo "22e159de13b427226e5901defd17f0c14e744205"
     in
     let tree = S.Commit.tree commit in
     let tree = S.Tree.add tree ["abba"; "baba"] "x" in
-    let commit = S.Commit.v repo ~info:S.Info.empty ~parents:[] tree in
+    let commit = S.Commit.init repo ~info:S.Info.empty ~parents:[] tree in
     let commit_key = S.Commit.key commit in
     let _launched = S.Gc.start_exn ~unlink:false repo commit_key in
     let result = S.Gc.finalise_exn ~wait:true repo in

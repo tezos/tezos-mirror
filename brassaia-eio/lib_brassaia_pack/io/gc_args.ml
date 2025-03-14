@@ -52,7 +52,7 @@ module type S = sig
   module Node_store : sig
     type 'a t
 
-    val v :
+    val init :
       config:Brassaia.Backend.Conf.t ->
       fm:Fm.t ->
       dict:Fm.Dict.t ->

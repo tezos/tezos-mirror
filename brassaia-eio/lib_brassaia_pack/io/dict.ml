@@ -84,7 +84,7 @@ module Make (Io : Io_intf.S) = struct
 
   let default_capacity = 100_000
 
-  let v_empty ao =
+  let init_empty ao =
     let cache = Hashtbl.create 997 in
     let index = Hashtbl.create 997 in
     let last_refill_offset = Int63.zero in
@@ -93,23 +93,23 @@ module Make (Io : Io_intf.S) = struct
   let create_rw ~overwrite ~path:filename =
     let open Result_syntax in
     let* ao = Ao.create_rw ~overwrite ~path:filename in
-    Ok (v_empty ao)
+    Ok (init_empty ao)
 
-  let v_filled ao =
+  let init_filled ao =
     let open Result_syntax in
-    let t = v_empty ao in
+    let t = init_empty ao in
     let* () = refill t in
     Ok t
 
   let open_rw ~size ~dead_header_size filename =
     let open Result_syntax in
     let* ao = Ao.open_rw ~path:filename ~end_poff:size ~dead_header_size in
-    v_filled ao
+    init_filled ao
 
   let open_ro ~size ~dead_header_size filename =
     let open Result_syntax in
     let* ao = Ao.open_ro ~path:filename ~end_poff:size ~dead_header_size in
-    v_filled ao
+    init_filled ao
 
   let end_poff t = Ao.end_poff t.ao
 

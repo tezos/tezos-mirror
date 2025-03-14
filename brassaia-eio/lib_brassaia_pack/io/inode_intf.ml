@@ -26,7 +26,7 @@ module type Persistent = sig
 
   type dispatcher
 
-  val v :
+  val init :
     config:Brassaia.Backend.Conf.t ->
     fm:file_manager ->
     dict:dict ->

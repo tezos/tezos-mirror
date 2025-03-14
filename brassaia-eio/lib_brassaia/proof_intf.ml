@@ -130,10 +130,10 @@ module type S = sig
       information for the computation to reach [after p]. *)
   type t [@@deriving brassaia]
 
-  (** [v ~before ~after p] proves that the state advanced from [before] to
+  (** [init ~before ~after p] proves that the state advanced from [before] to
       [after]. [p]'s hash is [before], and [p] contains the minimal information
       for the computation to reach [after]. *)
-  val v : before:kinded_hash -> after:kinded_hash -> tree -> t
+  val init : before:kinded_hash -> after:kinded_hash -> tree -> t
 
   (** [before t] it the state's hash at the beginning of the computation. *)
   val before : t -> kinded_hash

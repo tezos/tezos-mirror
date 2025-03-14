@@ -109,8 +109,8 @@ module type S_generic_key = sig
     (** The type of repository handles. *)
     type t = repo
 
-    (** [v config] connects to a repository in a backend-specific manner. *)
-    val v : Conf.t -> t
+    (** [init config] connects to a repository in a backend-specific manner. *)
+    val init : Conf.t -> t
 
     (** [config repo] is the configuration used to create [repo] *)
     val config : t -> Conf.t
@@ -354,7 +354,7 @@ module type S_generic_key = sig
     val pp : t Fmt.t
     [@@ocaml.toplevel_printer]
 
-    (** [v r i ~parents:p t] is the commit [c] such that:
+    (** [init r i ~parents:p t] is the commit [c] such that:
 
         - [info c = i]
         - [parents c = p]
@@ -362,7 +362,7 @@ module type S_generic_key = sig
 
         When [clear] is set (the default), the tree cache is emptied upon the
         function's completion, mirroring the effect of invoking {!Tree.clear}. *)
-    val v :
+    val init :
       ?clear:bool ->
       repo ->
       info:info ->

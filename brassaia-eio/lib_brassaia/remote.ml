@@ -19,7 +19,7 @@ include Remote_intf
 module None (H : Type.S) (R : Type.S) = struct
   type t = unit
 
-  let v _ = ()
+  let init _ = ()
 
   type endpoint = unit
 

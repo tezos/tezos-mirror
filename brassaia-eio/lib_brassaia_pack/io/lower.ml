@@ -41,7 +41,7 @@ struct
     | `Corrupted_control_file of string
     | `Unknown_major_pack_version of string ]
 
-  let v volume_path =
+  let open_volume volume_path =
     let open Result_syntax in
     let* control =
       let path = Layout.control ~root:volume_path in
@@ -57,7 +57,7 @@ struct
        | None -> Empty {path}
        | Some control -> Nonempty {path; control; sparse = None})
 
-  let create_empty volume_path =
+  let create volume_path =
     let open Result_syntax in
     (* 0. Validate volume directory does not already exist *)
     let* () =
@@ -79,7 +79,7 @@ struct
     in
     (* TODO: handle failure to create all artifacts, either here or in a cleanup
        when the store starts. *)
-    v volume_path
+    open_volume volume_path
 
   let create_from ~src ~dead_header_size ~size lower_root =
     let open Result_syntax in
@@ -251,7 +251,7 @@ struct
 
   let cleanup ~generation t =
     let clean filename =
-      match Brassaia_pack.Layout.Classification.Volume.v filename with
+      match Brassaia_pack.Layout.Classification.Volume.open_volume filename with
       | `Control_tmp g when g = generation -> swap ~generation t
       | `Control_tmp g when g <> generation ->
           Io.unlink filename
@@ -308,7 +308,7 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
         | `File | `Other | `No_such_file_or_directory ->
             raise (LoadVolumeError (`Volume_missing path))
         | `Directory -> (
-            match Volume.v path with
+            match Volume.open_volume path with
             | Error e -> raise (LoadVolumeError e)
             | Ok v -> v)
       in
@@ -318,7 +318,7 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
     t.volumes <- volumes ;
     Ok t
 
-  let v ~readonly ~volume_num root =
+  let open_volumes ~readonly ~volume_num root =
     load_volumes
       ~volume_num
       {root; readonly; volumes = [||]; open_volume = None}
@@ -350,7 +350,7 @@ module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) = struct
       let next_idx = volume_num t in
       Layout.directory ~root:t.root ~idx:next_idx
     in
-    let* vol = Volume.create_empty volume_path in
+    let* vol = Volume.create volume_path in
     t.volumes <- Array.append t.volumes [|vol|] ;
     Ok vol
 

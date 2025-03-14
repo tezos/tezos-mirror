@@ -316,7 +316,7 @@ struct
       |+ field "v" v_t (fun t -> t.v)
       |> sealr |> like ~pre_hash
 
-    let v ~hash ~root v = {hash; root; v}
+    let init ~hash ~root v = {hash; root; v}
 
     let hash t = Lazy.force t.hash
 
@@ -520,7 +520,7 @@ struct
 
     type t = {hash : H.t; tv : tagged_v} [@@deriving brassaia]
 
-    let v ~root ~hash v =
+    let init ~root ~hash v =
       let length = no_length in
       let tv = if root then V2_root {v; length} else V2_nonroot {v; length} in
       {hash; tv}
@@ -576,7 +576,7 @@ struct
       The layout of an inode is determined from the module [Val], it depends on
       the way the inode was constructed:
 
-      - When [Total], it originates from [Val.v] or [Val.empty].
+      - When [Total], it originates from [Val.init] or [Val.empty].
       - When [Partial], it originates from [Val.of_bin], which is only used by
         [Inode.find].
       - When [Truncated], it either originates from an [Brassaia.Type]
@@ -993,7 +993,7 @@ struct
 
     let to_bin layout mode t =
       let v = to_bin_v layout mode t.v in
-      Bin.v ~root:(is_root t) ~hash:(Val_ref.to_lazy_hash t.v_ref) v
+      Bin.init ~root:(is_root t) ~hash:(Val_ref.to_lazy_hash t.v_ref) v
 
     type len = [`Eq of int | `Ge of int] [@@deriving brassaia]
 
@@ -2000,7 +2000,7 @@ struct
             let entries = List.map ptr entries in
             Tree {Compress.depth; length; entries}
       in
-      let t = Compress.v ~root:t.root ~hash (v t.v) in
+      let t = Compress.init ~root:t.root ~hash (v t.v) in
       encode_compress t
 
     exception Exit of [`Msg of string]
@@ -2059,7 +2059,7 @@ struct
       in
       let root = Compress.is_root i in
       let v = t i.tv in
-      Bin.v ~root ~hash:(Lazy.from_val i.hash) v
+      Bin.init ~root ~hash:(Lazy.from_val i.hash) v
 
     let decode_bin_length = decode_compress_length
 

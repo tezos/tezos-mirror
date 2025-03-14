@@ -21,7 +21,7 @@ module type S = sig
 
   type t
 
-  val v : unit -> t
+  val create : unit -> t
 
   val with_lock : t -> key -> (unit -> 'a) -> 'a
 
@@ -43,7 +43,7 @@ module Make (K : Type.S) = struct
 
   type t = {global : Eio.Mutex.t; locks : Eio.Mutex.t KHashtbl.t}
 
-  let v () = {global = Eio.Mutex.create (); locks = KHashtbl.create 1024}
+  let create () = {global = Eio.Mutex.create (); locks = KHashtbl.create 1024}
 
   let stats t = KHashtbl.length t.locks
 

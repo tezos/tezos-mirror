@@ -74,14 +74,14 @@ struct
   include Index_raw
   module Io = Io
 
-  let v_exn =
+  let init_exn =
     let cache = None in
     Index_raw.v ?cache
 
-  let v ?flush_callback ?fresh ?readonly ?throttle ?lru_size ~log_size root =
+  let init ?flush_callback ?fresh ?readonly ?throttle ?lru_size ~log_size root =
     try
       Ok
-        (v_exn
+        (init_exn
            ?flush_callback
            ?fresh
            ?readonly

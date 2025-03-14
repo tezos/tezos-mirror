@@ -178,12 +178,12 @@ struct
     let f = ref (fun () -> ()) in
     let config = config ~readonly ~fresh name in
     let fm = get_fm config in
-    let dispatcher = Dispatcher.v fm |> Errs.raise_if_error in
+    let dispatcher = Dispatcher.init fm |> Errs.raise_if_error in
     (* open the index created by the fm. *)
     let index = File_manager.index fm in
     let dict = File_manager.dict fm in
     let lru = Brassaia_pack_unix.Lru.create config in
-    let pack = Pack.v ~config ~fm ~dict ~dispatcher ~lru in
+    let pack = Pack.init ~config ~fm ~dict ~dispatcher ~lru in
     (f := fun () -> File_manager.flush fm |> Errs.raise_if_error) ;
     {name; index; pack; dict; fm}
 

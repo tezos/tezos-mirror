@@ -139,11 +139,11 @@ struct
       let config = config ~indexing_strategy ~readonly:false ~fresh:true root in
       let fm = get_fm config in
       let dict = File_manager.dict fm in
-      let dispatcher = Dispatcher.v fm |> Errs.raise_if_error in
+      let dispatcher = Dispatcher.init fm |> Errs.raise_if_error in
       let lru = Brassaia_pack_unix.Lru.create config in
-      let store = Inode.v ~config ~fm ~dict ~dispatcher ~lru in
+      let store = Inode.init ~config ~fm ~dict ~dispatcher ~lru in
       let store_contents =
-        Contents_store.v ~config ~fm ~dict ~dispatcher ~lru
+        Contents_store.init ~config ~fm ~dict ~dispatcher ~lru
       in
       let foo, bar =
         Contents_store.batch store_contents (fun writer ->
@@ -283,7 +283,7 @@ module Inode_permutations_generator = struct
   let powerset xs =
     List.fold_left (fun acc x -> acc @ List.map (fun ys -> x :: ys) acc) [[]] xs
 
-  let v ~entries ~maxdepth_of_test =
+  let init ~entries ~maxdepth_of_test =
     let ( ** ) a b = float_of_int a ** float_of_int b |> int_of_float in
     let steps = gen_steps entries maxdepth_of_test in
     let content_per_step =
@@ -462,9 +462,9 @@ let test_remove_inodes () =
   test_remove_inodes ~indexing_strategy:`minimal
 
 (** For each of the 256 possible inode trees with [depth <= 3] and
-    [width = Conf.entries = 2] built by [Inode.Val.v], assert that
+    [width = Conf.entries = 2] built by [Inode.Contents_store.init], assert that
     independently, all the possible [Inode.Val.add]/[Inode.Val.remove]
-    operations yield a tree computable by [Inode.Val.v].
+    operations yield a tree computable by [Inode.Contents_store.init].
 
     In other words. Let [T] be the set of all possible trees (256). Let [O] be
     the set of unitary [tree -> tree] operations (8). If all the combinations of
@@ -483,9 +483,9 @@ let test_remove_inodes () =
     lazily loads subtrees, this won't be caught here. *)
 let test_representation_uniqueness_maxdepth_3 () =
   let module P = Inode_permutations_generator in
-  let p = P.v ~entries:Conf.nb_entries ~maxdepth_of_test:3 in
+  let p = P.init ~entries:Conf.nb_entries ~maxdepth_of_test:3 in
   let f steps tree s =
-    (* [steps, tree] is one of the known pair built using [Val.v]. Let's try to
+    (* [steps, tree] is one of the known pair built using [Contents_store.init]. Let's try to
        add or remove [s] from it and see if something breaks. *)
     if P.StepSet.mem s steps then
       let steps' = P.StepSet.remove s steps in

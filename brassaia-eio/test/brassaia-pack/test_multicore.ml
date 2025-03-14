@@ -111,7 +111,7 @@ let rec list_shape acc path : shape -> _ = function
 let list_shape shape = list_shape [] [] shape
 
 let make_store shape =
-  let repo = Store.Repo.v (Store.config ~fresh:true root) in
+  let repo = Store.Repo.init (Store.config ~fresh:true root) in
   let main = Store.main repo in
   let tree = make_tree shape in
   let () = Store.set_tree_exn ~info main [] tree in
@@ -146,7 +146,7 @@ let find_all tree paths =
 let test_find d_mgr =
   Logs.set_level None ;
   make_store shape0 ;
-  let repo = Store.Repo.v (Store.config ~readonly:true ~fresh:false root) in
+  let repo = Store.Repo.init (Store.config ~readonly:true ~fresh:false root) in
   let tree = Store.main repo |> Store.Head.get |> Store.Commit.tree in
   let paths = flatten_shape shape0 in
   domains_spawn d_mgr (fun () -> find_all tree paths) ;
@@ -166,7 +166,7 @@ let expected_lengths shape = expected_lengths [] [] shape
 let test_length d_mgr =
   Logs.set_level None ;
   make_store shape0 ;
-  let repo = Store.Repo.v (Store.config ~readonly:true ~fresh:false root) in
+  let repo = Store.Repo.init (Store.config ~readonly:true ~fresh:false root) in
   let tree = Store.main repo |> Store.Head.get |> Store.Commit.tree in
   let lengths = expected_lengths shape0 in
   let all_length () =
@@ -221,7 +221,7 @@ let diff_shape old_shape new_shape =
 let test_add_remove d_mgr =
   Logs.set_level None ;
   make_store shape0 ;
-  let repo = Store.Repo.v (Store.config ~readonly:true ~fresh:false root) in
+  let repo = Store.Repo.init (Store.config ~readonly:true ~fresh:false root) in
   let tree = Store.main repo |> Store.Head.get |> Store.Commit.tree in
   let patch = diff_shape shape0 shape1 in
   let after_paths = flatten_shape shape1 in
@@ -268,7 +268,7 @@ let check_patch_was_applied patch tree =
 let test_commit d_mgr =
   Logs.set_level None ;
   make_store shape0 ;
-  let repo = Store.Repo.v (Store.config ~readonly:false ~fresh:false root) in
+  let repo = Store.Repo.init (Store.config ~readonly:false ~fresh:false root) in
   let store = Store.main repo in
   let patch01 = diff_shape shape0 shape1 in
   let patch02 = diff_shape shape0 shape2 in
@@ -288,7 +288,7 @@ let test_commit d_mgr =
 let test_merkle d_mgr =
   Logs.set_level None ;
   make_store shape0 ;
-  let repo = Store.Repo.v (Store.config ~readonly:false ~fresh:false root) in
+  let repo = Store.Repo.init (Store.config ~readonly:false ~fresh:false root) in
   let tree = Store.main repo |> Store.Head.get |> Store.Commit.tree in
   let hash = Store.Tree.key tree |> Option.get in
   let patch01 = diff_shape shape0 shape1 in
@@ -309,7 +309,7 @@ let test_merkle d_mgr =
 let test_hash d_mgr =
   Logs.set_level None ;
   make_store shape0 ;
-  let repo = Store.Repo.v (Store.config ~readonly:false ~fresh:false root) in
+  let repo = Store.Repo.init (Store.config ~readonly:false ~fresh:false root) in
   let tree = Store.main repo |> Store.Head.get |> Store.Commit.tree in
   let patch01 = diff_shape shape0 shape1 in
   let patch12 = diff_shape shape1 shape2 in
@@ -351,7 +351,7 @@ let list_all cache tree paths =
 let test_list_disk ~cache d_mgr =
   Logs.set_level None ;
   make_store shape0 ;
-  let repo = Store.Repo.v (Store.config ~readonly:true ~fresh:false root) in
+  let repo = Store.Repo.init (Store.config ~readonly:true ~fresh:false root) in
   let tree = Store.main repo |> Store.Head.get |> Store.Commit.tree in
   let paths = list_shape shape0 in
   domains_spawn d_mgr (fun () -> list_all cache tree paths) ;
@@ -360,7 +360,7 @@ let test_list_disk ~cache d_mgr =
 let test_list_mem ~cache d_mgr =
   Logs.set_level None ;
   make_store shape0 ;
-  let repo = Store.Repo.v (Store.config ~readonly:true ~fresh:false root) in
+  let repo = Store.Repo.init (Store.config ~readonly:true ~fresh:false root) in
   let tree = Store.main repo |> Store.Head.get |> Store.Commit.tree in
   let patch = diff_shape shape0 shape1 in
   let paths = list_shape shape1 in
@@ -371,7 +371,7 @@ let test_list_mem ~cache d_mgr =
 let test_commit_of_hash d_mgr =
   Logs.set_level None ;
   make_store shape0 ;
-  let repo = Store.Repo.v (Store.config ~readonly:false ~fresh:false root) in
+  let repo = Store.Repo.init (Store.config ~readonly:false ~fresh:false root) in
   let store = Store.main repo in
   let patch01 = diff_shape shape0 shape1 in
   let patch02 = diff_shape shape0 shape2 in
@@ -419,7 +419,7 @@ let test_commit_of_hash d_mgr =
 let test_commit_parents d_mgr =
   Logs.set_level None ;
   make_store shape0 ;
-  let repo = Store.Repo.v (Store.config ~readonly:false ~fresh:false root) in
+  let repo = Store.Repo.init (Store.config ~readonly:false ~fresh:false root) in
   let store = Store.main repo in
   let patch01 = diff_shape shape0 shape1 in
   let commit = Store.Head.get store in
@@ -450,14 +450,14 @@ let test_commit_parents d_mgr =
 let test_commit_v d_mgr =
   Logs.set_level None ;
   make_store shape0 ;
-  let repo = Store.Repo.v (Store.config ~readonly:false ~fresh:false root) in
+  let repo = Store.Repo.init (Store.config ~readonly:false ~fresh:false root) in
   let store = Store.main repo in
   let patch01 = diff_shape shape0 shape1 in
   let commit = Store.Head.get store in
   let tree = List.fold_left apply_op (Store.Commit.tree commit) patch01 in
   let do_commit_v () =
     let _ =
-      Store.Commit.v
+      Store.Commit.init
         repo
         ~info:(info ())
         ~parents:[Store.Commit.key commit]

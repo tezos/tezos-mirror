@@ -31,8 +31,8 @@ module type S_generic_key = sig
   (** The type for commit info. *)
   module Info : Info.S
 
-  (** Create a commit. *)
-  val v : info:Info.t -> node:node_key -> parents:commit_key list -> t
+  (** [init ~info ~node ~parents] returns a new a commit. *)
+  val init : info:Info.t -> node:node_key -> parents:commit_key list -> t
 
   (** The underlying node key. *)
   val node : t -> node_key
@@ -143,8 +143,9 @@ module type History = sig
   (** The type for commit info. *)
   type info [@@deriving brassaia]
 
-  (** Create a new commit. *)
-  val v :
+  (** [init_and_store t ~node ~parents ~info] creates a new commit and stores it in [t].
+      It returns the hash obtained by adding the commit to [t] *)
+  val init_and_store :
     [> write] t ->
     node:node_key ->
     parents:commit_key list ->

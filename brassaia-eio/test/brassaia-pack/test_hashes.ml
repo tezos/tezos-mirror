@@ -71,19 +71,19 @@ struct
     tree
 
   let persist_tree tree =
-    let repo = Repo.v conf in
+    let repo = Repo.init conf in
     let init_commit =
-      Commit.v
+      Commit.init
         ~parents:[]
         ~info:Info.empty
         repo
         (Tree.singleton ["singleton-step"] (Bytes.of_string "singleton-val"))
     in
     let h = Commit.hash init_commit in
-    let info = Info.v ~author:"Tezos" 0L in
+    let info = Info.init ~author:"Tezos" 0L in
     let commit =
-      Commit.v
-        ~parents:[Brassaia_pack_unix.Pack_key.v_indexed h]
+      Commit.init
+        ~parents:[Brassaia_pack_unix.Pack_key.init_indexed h]
         ~info
         repo
         tree

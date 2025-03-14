@@ -29,7 +29,7 @@ module Make (Fm : File_manager.S) : S with module Fm = Fm = struct
 
   type t = {fm : Fm.t}
 
-  let v fm =
+  let init fm =
     let t = {fm} in
     Ok t
 

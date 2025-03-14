@@ -26,23 +26,23 @@ module type S = sig
   (** The empty path. *)
   val empty : t
 
-  (** Create a path from a list of steps. *)
-  val v : step list -> t
+  (** Creates a path from a list of steps. *)
+  val init : step list -> t
 
   (** Check if the path is empty. *)
   val is_empty : t -> bool
 
-  (** Prepend a step to the path. *)
+  (** Prepends a step to the path. *)
   val cons : step -> t -> t
 
   (** Append a step to the path. *)
   val rcons : t -> step -> t
 
-  (** Deconstruct the first element of the path. Return [None] if the path is
+  (** Deconstructs the first element of the path. Return [None] if the path is
       empty. *)
   val decons : t -> (step * t) option
 
-  (** Deconstruct the last element of the path. Return [None] if the path is
+  (** Deconstructs the last element of the path. Return [None] if the path is
       empty. *)
   val rdecons : t -> (t * step) option
 

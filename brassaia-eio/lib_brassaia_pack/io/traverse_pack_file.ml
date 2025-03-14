@@ -154,7 +154,7 @@ end = struct
       [%log.app
         "Beginning index reconstruction with parameters: { log_size = %d }"
           log_size] ;
-      let index = Index.v_exn ~fresh:true ~readonly:false ~log_size dest in
+      let index = Index.init_exn ~fresh:true ~readonly:false ~log_size dest in
       index
 
     let iter_pack_entry ~always index key data =
@@ -176,7 +176,7 @@ end = struct
       [%log.app
         "Beginning index checking with parameters: { log_size = %d }" log_size] ;
       let index =
-        Index.v_exn ~fresh:false ~readonly:true ~log_size (Conf.root config)
+        Index.init_exn ~fresh:false ~readonly:true ~log_size (Conf.root config)
       in
       (index, ref 0)
 
@@ -202,7 +202,7 @@ end = struct
       [%log.app
         "Beginning index checking with parameters: { log_size = %d }" log_size] ;
       let root = Conf.root config in
-      let index = Index.v_exn ~fresh:false ~readonly:false ~log_size root in
+      let index = Index.init_exn ~fresh:false ~readonly:false ~log_size root in
       (index, ref 0)
 
     let iter_pack_entry ~always (index, idx_ref) key data =
@@ -415,7 +415,7 @@ end = struct
     in
     let run_duration = Io.Clock.counter () in
     let fm = File_manager.open_ro config |> Errs.raise_if_error in
-    let dispatcher = Dispatcher.v fm |> Errs.raise_if_error in
+    let dispatcher = Dispatcher.init fm |> Errs.raise_if_error in
     let total = Dispatcher.end_offset dispatcher in
     let ingest_data progress =
       if File_manager.gc_allowed fm then

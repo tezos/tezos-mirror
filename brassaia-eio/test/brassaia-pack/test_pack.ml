@@ -454,14 +454,14 @@ module Branch = struct
       List.map check branches |> Eio.Fiber.all
     in
     let name = Context.fresh_name "branch" in
-    Branch.v ~fresh:true name |> test ;
-    Branch.v ~fresh:true name |> test ;
-    Branch.v ~fresh:true name |> test ;
-    let t = Branch.v ~fresh:false name in
+    Branch.create ~fresh:true name |> test ;
+    Branch.create ~fresh:true name |> test ;
+    Branch.create ~fresh:true name |> test ;
+    let t = Branch.create ~fresh:false name in
     test t ;
     let x = sha1 "XXX" in
     Branch.set t "foo" x ;
-    let t = Branch.v ~fresh:false name in
+    let t = Branch.create ~fresh:false name in
     let v = Branch.find t "foo" in
     Alcotest.(check (option hash)) "foo" (Some x) v ;
     let br = Branch.list t in
@@ -470,7 +470,7 @@ module Branch = struct
       branches
       br ;
     Branch.remove t "foo" ;
-    let t = Branch.v ~fresh:false name in
+    let t = Branch.create ~fresh:false name in
     let v = Branch.find t "foo" in
     Alcotest.(check (option hash)) "foo none" None v ;
     let br = Branch.list t in
@@ -496,16 +496,16 @@ module Branch = struct
       List.map check branches |> Eio.Fiber.all
     in
     let name = Context.fresh_name "branch" in
-    let t = Branch.v ~fresh:true name in
+    let t = Branch.create ~fresh:true name in
     add t ;
     test t ;
     Branch.close t ;
-    let t = Branch.v ~fresh:false ~readonly:true name in
+    let t = Branch.create ~fresh:false ~readonly:true name in
     test t ;
     Branch.close t ;
     let name = Context.fresh_name "branch" in
-    let t1 = Branch.v ~fresh:true ~readonly:false name in
-    let t2 = Branch.v ~fresh:false ~readonly:true name in
+    let t1 = Branch.create ~fresh:true ~readonly:false name in
+    let t2 = Branch.create ~fresh:false ~readonly:true name in
     add t1 ;
     Branch.close t1 ;
     test t2
@@ -523,7 +523,7 @@ module Layout = struct
     let module V4 = Brassaia_pack.Layout.V4 in
     let module Classification = Brassaia_pack.Layout.Classification.Upper in
     let c = Alcotest.(check (testable_repr Classification.t)) "" in
-    let classif = Classification.v in
+    let classif = Classification.init in
     c `V1_or_v2_pack (V1_and_v2.pack ~root:"" |> classif) ;
     c `Branch (V4.branch ~root:"" |> classif) ;
     c `Control (V4.control ~root:"" |> classif) ;
@@ -549,7 +549,7 @@ module Layout = struct
     let module V5 = Brassaia_pack.Layout.V5.Volume in
     let module Classification = Brassaia_pack.Layout.Classification.Volume in
     let c = Alcotest.(check (testable_repr Classification.t)) "" in
-    let classif = Classification.v in
+    let classif = Classification.open_volume in
     c `Control (V5.control ~root:"" |> classif) ;
     c `Mapping (V5.mapping ~root:"" |> classif) ;
     c `Data (V5.data ~root:"" |> classif) ;

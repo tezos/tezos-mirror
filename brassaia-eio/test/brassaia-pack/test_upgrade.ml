@@ -96,7 +96,7 @@ let index_entries =
   List.map (fun e -> (e.h, e.o)) pack_entries |> List.to_seq |> Hashtbl.of_seq
 
 let key_of_entry x =
-  Brassaia_pack_unix.Pack_key.v_direct ~offset:x.o ~length:x.l x.h
+  Brassaia_pack_unix.Pack_key.init_direct ~offset:x.o ~length:x.l x.h
 
 type start_mode = From_v2 | From_v3 | From_scratch | From_v3_c0_gced
 [@@deriving brassaia]
@@ -126,7 +126,7 @@ module Model = struct
     index : (Schema.Hash.t, unit) Hashtbl.t;
   }
 
-  let v setup =
+  let create setup =
     let dict = Hashtbl.create 5 in
     let suffix = Hashtbl.create 5 in
     let index = Hashtbl.create 5 in
@@ -202,28 +202,28 @@ module Model = struct
 
   (** The 5 different states in which a model may be *)
   include struct
-    let create_empty setup = v setup
+    let create_empty setup = create setup
 
     let create_after_preload setup =
-      let m = v setup in
+      let m = create setup in
       preload m ;
       m
 
     let create_after_write1 setup =
-      let m = v setup in
+      let m = create setup in
       preload m ;
       write1 m ;
       m
 
     let create_after_gc setup =
-      let m = v setup in
+      let m = create setup in
       preload m ;
       write1 m ;
       gc m ;
       m
 
     let create_after_write2 setup =
-      let m = v setup in
+      let m = create setup in
       preload m ;
       write1 m ;
       gc m ;
@@ -250,8 +250,8 @@ module Store = struct
     let lru_size = setup.lru_size in
     Brassaia_pack.config ~readonly ~indexing_strategy ~lru_size ~fresh root
 
-  let v setup ~readonly ~fresh root =
-    S.Repo.v (config setup ~readonly ~fresh root)
+  let init setup ~readonly ~fresh root =
+    S.Repo.init (config setup ~readonly ~fresh root)
 
   let close = S.Repo.close
 
@@ -314,7 +314,9 @@ module Store = struct
 
   let put_c0 bstore nstore cstore =
     let k_n0 = put_n0 bstore nstore in
-    let c = S.Backend.Commit.Val.v ~info:S.Info.empty ~node:k_n0 ~parents:[] in
+    let c =
+      S.Backend.Commit.Val.init ~info:S.Info.empty ~node:k_n0 ~parents:[]
+    in
     let k = S.Backend.Commit.add cstore c in
     assert (k = key_of_entry c0) ;
     k
@@ -338,7 +340,7 @@ module Store = struct
     let k_n1 = put_n1 bstore nstore in
     let k_c0 = key_of_entry c0 in
     let c =
-      S.Backend.Commit.Val.v ~info:S.Info.empty ~node:k_n1 ~parents:[k_c0]
+      S.Backend.Commit.Val.init ~info:S.Info.empty ~node:k_n1 ~parents:[k_c0]
     in
     let k = S.Backend.Commit.add cstore c in
     assert (k = key_of_entry c1) ;
@@ -367,7 +369,7 @@ module Store = struct
     let k_n2 = put_n2 bstore nstore in
     let k_c1 = key_of_entry c1 in
     let c =
-      S.Backend.Commit.Val.v ~info:S.Info.empty ~node:k_n2 ~parents:[k_c1]
+      S.Backend.Commit.Val.init ~info:S.Info.empty ~node:k_n2 ~parents:[k_c1]
     in
     let k = S.Backend.Commit.add cstore c in
     assert (k = key_of_entry c2) ;
@@ -516,13 +518,13 @@ let start_rw t =
           match t.setup.start_mode with
           | From_v2 | From_v3 | From_v3_c0_gced ->
               (* Model with pre-loaded data. *)
-              let m = Model.v t.setup in
+              let m = Model.create t.setup in
               Model.preload m ;
               m
-          | From_scratch -> Model.v t.setup
+          | From_scratch -> Model.create t.setup
         in
         let repo =
-          Store.v t.setup ~readonly:false ~fresh:false root_local_build
+          Store.init t.setup ~readonly:false ~fresh:false root_local_build
         in
         (model, repo)
   in
@@ -610,7 +612,11 @@ let open_ro t current_phase =
               (Brassaia_pack_unix.Errors.Pack_error error)
               (fun () ->
                 let repo =
-                  Store.v t.setup ~readonly:true ~fresh:false root_local_build
+                  Store.init
+                    t.setup
+                    ~readonly:true
+                    ~fresh:false
+                    root_local_build
                 in
                 Store.close repo)
           in
@@ -625,7 +631,7 @@ let open_ro t current_phase =
               fail_and_skip (`No_such_file_or_directory missing_path)
           | From_v2, S1_before_start -> fail_and_skip `Migration_needed
           | (From_v2 | From_v3 | From_v3_c0_gced | From_scratch), _ ->
-              Store.v t.setup ~readonly:true ~fresh:false root_local_build
+              Store.init t.setup ~readonly:true ~fresh:false root_local_build
         in
         (model, repo)
   in

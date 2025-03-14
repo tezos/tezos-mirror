@@ -30,8 +30,8 @@ module Spec : sig
   (** A configuration spec is used to group keys by backend *)
   type t
 
-  (** [v name] is a new configuration specification named [name] *)
-  val v : string -> t
+  (** [init name] is a new configuration specification named [name] *)
+  val init : string -> t
 
   (** [name spec] is the name associated with a config spec *)
   val name : t -> string

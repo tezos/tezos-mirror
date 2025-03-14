@@ -44,7 +44,7 @@ module Keyed_by_value = struct
     let check_not_closed t =
       match !(t.instance) with None -> raise Closed | Some t -> t
 
-    let v _ = {instance = ref (Some ())}
+    let init _ = {instance = ref (Some ())}
 
     let mem t _ =
       let _ = check_not_closed t in
@@ -79,7 +79,7 @@ module Plain = struct
         (V)
     include Indexable.Of_content_addressable (H) (CA)
 
-    let v = CA.v
+    let init = CA.init
   end
 end
 

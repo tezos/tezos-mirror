@@ -18,8 +18,8 @@ module Brassaia = Brassaia_eio.Brassaia
 open Brassaia.Backend.Conf
 
 let test_conf () =
-  let spec_a = Spec.v "a" in
-  let spec_b = Spec.v "b" in
+  let spec_a = Spec.init "a" in
+  let spec_b = Spec.init "b" in
   let x = key ~spec:spec_a "x" Brassaia.Type.int 0 in
   let _y = key ~spec:spec_a "y" Brassaia.Type.int 1 in
   let conf_a = add (empty spec_a) x 1 in
@@ -45,7 +45,7 @@ let test_conf () =
   ()
 
 let test_duplicate_key_names () =
-  let spec = Spec.v "test" in
+  let spec = Spec.init "test" in
   let name = "name" in
   let _ = key ~spec name Brassaia.Type.char 'Z' in
   Alcotest.check_raises

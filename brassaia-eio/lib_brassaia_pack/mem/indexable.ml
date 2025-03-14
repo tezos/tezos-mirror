@@ -87,7 +87,7 @@ module Maker (K : Brassaia.Hash.S) = struct
 
     let instances = Pool.create ~alloc:(fun name -> {name; t = KMap.empty})
 
-    let v name = Pool.take instances name
+    let init name = Pool.take instances name
 
     let equal_key = Brassaia.Type.(unstage (equal K.t))
 
