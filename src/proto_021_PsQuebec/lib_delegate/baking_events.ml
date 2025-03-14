@@ -605,7 +605,7 @@ module Delegates = struct
       ~alternative_color:Internal_event.Cyan
       ~name:"delegates_used"
       ~level:Notice
-      ~msg:"Baker will run with the following delegates:@[<v 2>@,{delegates}@]"
+      ~msg:"Baker will run with the following delegates:{delegates}"
       ~pp1:(fun ppf delegates ->
         Format.fprintf
           ppf
