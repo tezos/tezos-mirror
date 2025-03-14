@@ -28,7 +28,6 @@ use self::state_access::JsaCalls;
 use self::state_access::JsaImports;
 use self::state_access::register_jsa_symbols;
 use crate::machine_state::MachineCoreState;
-use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::instruction::Instruction;
 use crate::machine_state::memory::MemoryConfig;
 use crate::state_backend::hash::Hash;
@@ -169,16 +168,9 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
                 (lower)(i.args(), &mut builder)
             };
 
-            builder.steps += 1;
-            match pc_update {
-                ProgramCounterUpdate::Next(width) => {
-                    builder.pc_offset += width as u64;
-                }
-                ProgramCounterUpdate::Set(pc_val) => {
-                    builder.pc_offset = 0;
-                    builder.pc_val = pc_val;
-                    break;
-                }
+            if !builder.complete_step(pc_update) {
+                // We have encountered an unconditional jump, exit the block.
+                break;
             }
         }
 

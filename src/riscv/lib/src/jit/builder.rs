@@ -15,13 +15,15 @@ use cranelift::codegen::ir::condcodes::IntCC;
 use cranelift::codegen::ir::types::I64;
 use cranelift::frontend::FunctionBuilder;
 
+use self::block_state::DynamicValues;
 use super::state_access::JitStateAccess;
 use super::state_access::JsaCalls;
 use crate::instruction_context::ICB;
 use crate::instruction_context::Predicate;
-use crate::machine_state::memory::Address;
 use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::registers::NonZeroXRegister;
+
+pub(super) mod block_state;
 
 /// Builder context used when lowering individual instructions within a block.
 pub(super) struct Builder<'a, MC: MemoryConfig, JSA: JitStateAccess> {
@@ -40,17 +42,15 @@ pub(super) struct Builder<'a, MC: MemoryConfig, JSA: JitStateAccess> {
     /// Value representing a pointer to `steps: usize`
     steps_ptr_val: Value,
 
-    /// The number of steps taken within the function
-    pub steps: usize,
+    /// Values that are dynamically updated throughout lowering.
+    dynamic: DynamicValues,
 
-    /// Value representing the initial value of `instr_pc`
-    pub pc_val: Value,
-
-    /// The static offset so far of the `instr_pc`
-    pub pc_offset: Address,
-
-    /// The final block that is last executed within a block - it is responsible for
-    /// flushing `steps` and the `instr_pc` back to the state.
+    /// The final Cranelift-IR block that is last executed on exit from a JIT-compiled
+    /// block cache block.
+    ///
+    /// It is responsible for writing the final values of `steps` and the `instr_pc` back to the state.
+    /// *N.B.* the end block can be jumped-to from multiple places, for example by every branching
+    /// point, and also once all instructions have been executed--if no branching took place.
     end_block: Option<ir::Block>,
 }
 
@@ -59,7 +59,7 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
     ///
     /// The function constructed after compilation takes
     /// `core_ptr`, `instr_pc` & `steps_ptr` as arguments.
-    pub fn new(
+    pub(super) fn new(
         ptr: ir::Type,
         mut builder: FunctionBuilder<'a>,
         jsa_call: JsaCalls<'a, MC, JSA>,
@@ -80,17 +80,16 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
             jsa_call,
             core_ptr_val,
             steps_ptr_val,
-            pc_val,
-            steps: 0,
-            pc_offset: 0,
+            dynamic: DynamicValues::new(pc_val),
             end_block: None,
         }
     }
 
-    /// Finalise the end block - by flushing PC & Steps.
+    /// Construct the end block - which writes the updated `pc` and `steps`
+    /// back to the state.
     ///
-    /// The end block takes two dynamic-parameters: `(instr_pc, steps)`.
-    /// If an end block has already been created, we re-use it.
+    /// Since the end block can be jumped to from multiple places, it takes
+    /// `pc` and `steps` as dynamic-parameters. These are provided by the caller.
     fn finalise_end_block(&mut self, end_block: ir::Block) {
         if self.end_block.is_some() {
             return;
@@ -101,42 +100,18 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
         let pc_val = self.builder.append_block_param(end_block, I64);
         let steps_val = self.builder.append_block_param(end_block, I64);
 
-        // flush steps
+        // write steps back to the `steps: &mut usize` reference.
         self.builder
             .ins()
             .store(MemFlags::trusted(), steps_val, self.steps_ptr_val, 0);
 
-        // flush pc
+        // write the final pc to the state.
         self.jsa_call
             .pc_write(&mut self.builder, self.core_ptr_val, pc_val);
 
         self.builder.ins().return_(&[]);
 
         self.end_block = Some(end_block);
-    }
-
-    /// Jump from the current block to the end block.
-    pub fn jump_to_end(&mut self) {
-        // flush steps
-        let steps_val =
-            self.builder
-                .ins()
-                .load(self.ptr, MemFlags::trusted(), self.steps_ptr_val, 0);
-        let steps_val = self.builder.ins().iadd_imm(steps_val, self.steps as i64);
-
-        // flush pc
-        let pc_val = self
-            .builder
-            .ins()
-            .iadd_imm(self.pc_val, self.pc_offset as i64);
-
-        let end_block = self
-            .end_block
-            .unwrap_or_else(|| self.builder.create_block());
-
-        self.builder.ins().jump(end_block, &[pc_val, steps_val]);
-
-        self.finalise_end_block(end_block)
     }
 
     /// Consume the builder, allowing for the function under construction to be [`finalised`].
@@ -163,6 +138,37 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
         // Clearing the context is done via `finalize`, which internally clears the
         // buffers to allow re-use.
         self.builder.finalize();
+    }
+
+    /// Complete a step, updating the program counter in the process.
+    ///
+    /// Returns `false` if an unconditional exit from the block occurs, in which case compilation
+    /// should be finalised without proceeding to the following instruction.
+    pub(super) fn complete_step<U: Into<block_state::PCUpdate>>(&mut self, pc_update: U) -> bool {
+        self.dynamic.complete_step(pc_update)
+    }
+
+    /// Jump from the current block to the end block, exiting the function.
+    fn jump_to_end(&mut self) {
+        // update steps taken so far
+        let steps_val =
+            self.builder
+                .ins()
+                .load(self.ptr, ir::MemFlags::trusted(), self.steps_ptr_val, 0);
+        let steps_val = self
+            .builder
+            .ins()
+            .iadd_imm(steps_val, self.dynamic.steps() as i64);
+
+        // get the new value of the pc to write back to the state
+        let pc_val = self.dynamic.read_pc(&mut self.builder);
+
+        let end_block = self
+            .end_block
+            .unwrap_or_else(|| self.builder.create_block());
+
+        self.builder.ins().jump(end_block, &[pc_val, steps_val]);
+        self.finalise_end_block(end_block)
     }
 }
 
@@ -218,9 +224,7 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
     /// already lowered into this block) to `self.pc_val` (the initial value of the program counter
     /// for the block).
     fn pc_read(&mut self) -> Self::XValue {
-        self.builder
-            .ins()
-            .iadd_imm(self.pc_val, self.pc_offset as i64)
+        self.dynamic.read_pc(&mut self.builder)
     }
 
     fn xvalue_compare(
