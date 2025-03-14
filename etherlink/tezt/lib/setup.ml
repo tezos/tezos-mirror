@@ -537,6 +537,23 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ?periodic_snapshot_path
       ()
   in
+  let proxy_patch_config =
+    (* by default activate the tx_queue for the proxy *)
+    let enable_tx_queue =
+      match enable_tx_queue with
+      | Some enable_tx_queue -> enable_tx_queue
+      | None -> Enable true
+    in
+    Evm_node.patch_config_with_experimental_feature
+      ~drop_duplicate_when_injection
+      ~blueprints_publisher_order_enabled
+      ?next_wasm_runtime
+      ?rpc_server
+      ?enable_websocket:websockets
+      ~enable_tx_queue
+      ?periodic_snapshot_path
+      ()
+  in
   let* sequencer_mode =
     if threshold_encryption then
       let sequencer_sidecar = Dsn_node.sequencer () in
@@ -609,7 +626,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
     Lwt_list.map_s
       (fun _l2 ->
         Evm_node.init
-          ~patch_config:obs_patch_config
+          ~patch_config:proxy_patch_config
           ~mode:Proxy
           (Sc_rollup_node.endpoint sc_rollup_node))
       l2_chains

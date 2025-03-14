@@ -325,20 +325,15 @@ val spawn_init_config_minimal :
 
 type rpc_server = Resto | Dream
 
-type tx_queue_config = {
-  max_size : int;
-  max_lifespan : int;
-  tx_per_addr_limit : int;
-}
+type tx_queue_config =
+  | Config of {max_size : int; max_lifespan : int; tx_per_addr_limit : int}
+  | Enable of bool
 
 (** [patch_config_with_experimental_feature
     ?drop_duplicate_when_injection ?next_wasm_runtime ?rpc_server
     ?enable_websocket ?max_websocket_message_length json_config]
     patches a config to add experimental feature. Each optional
-    argument add the correspondent experimental feature.
-
-    if [enable_tx_queue] is true then set the config to [true] or to
-    [tx_queue_config] if it's defined. *)
+    argument adds the corresponding experimental feature. *)
 val patch_config_with_experimental_feature :
   ?drop_duplicate_when_injection:bool ->
   ?blueprints_publisher_order_enabled:bool ->
@@ -346,8 +341,7 @@ val patch_config_with_experimental_feature :
   ?rpc_server:rpc_server ->
   ?enable_websocket:bool ->
   ?max_websocket_message_length:int ->
-  ?enable_tx_queue:bool ->
-  ?tx_queue_config:tx_queue_config ->
+  ?enable_tx_queue:tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
   ?l2_chains:l2_setup list ->

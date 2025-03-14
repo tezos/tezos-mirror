@@ -1364,18 +1364,15 @@ let optional_json_put ~name v f json =
         (name, JSON.annotate ~origin:"evm_node.config_patch" @@ value_json)
         json
 
-type tx_queue_config = {
-  max_size : int;
-  max_lifespan : int;
-  tx_per_addr_limit : int;
-}
+type tx_queue_config =
+  | Config of {max_size : int; max_lifespan : int; tx_per_addr_limit : int}
+  | Enable of bool
 
 let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false)
     ?(blueprints_publisher_order_enabled = false) ?(next_wasm_runtime = true)
     ?rpc_server ?(enable_websocket = false) ?max_websocket_message_length
-    ?(enable_tx_queue = false) ?tx_queue_config ?spawn_rpc
-    ?periodic_snapshot_path ?l2_chains () =
+    ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?l2_chains () =
   JSON.update "experimental_features" @@ fun json ->
   conditional_json_put
     drop_duplicate_when_injection
@@ -1394,18 +1391,15 @@ let patch_config_with_experimental_feature
          | Resto -> `String "resto"
          | Dream -> `String "dream")
   |> conditional_json_put enable_websocket ~name:"enable_websocket" (`Bool true)
-  |> conditional_json_put
-       enable_tx_queue
-       ~name:"enable_tx_queue"
-       (match tx_queue_config with
-       | Some {max_size; max_lifespan; tx_per_addr_limit} ->
-           `O
-             [
-               ("max_size", `Float (Float.of_int max_size));
-               ("max_lifespan", `Float (Float.of_int max_lifespan));
-               ("tx_per_addr_limit", `String (string_of_int tx_per_addr_limit));
-             ]
-       | None -> `Bool true)
+  |> optional_json_put enable_tx_queue ~name:"enable_tx_queue" (function
+         | Config {max_size; max_lifespan; tx_per_addr_limit} ->
+             `O
+               [
+                 ("max_size", `Float (Float.of_int max_size));
+                 ("max_lifespan", `Float (Float.of_int max_lifespan));
+                 ("tx_per_addr_limit", `String (string_of_int tx_per_addr_limit));
+               ]
+         | Enable b -> `Bool b)
   |> optional_json_put
        max_websocket_message_length
        ~name:"max_websocket_message_length"

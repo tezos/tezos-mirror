@@ -433,6 +433,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
   let patch_config =
     Evm_node.patch_config_with_experimental_feature
       ?enable_websocket:websockets
+      ~enable_tx_queue:(Enable true)
       ()
   in
   let* produce_block, evm_node =
