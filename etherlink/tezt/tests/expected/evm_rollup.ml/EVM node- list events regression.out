@@ -181,7 +181,7 @@ evm_events_request_failed:
           "errors": any } }
 
 evm_events_follower_out_of_sync:
-  description: rollup node confimed block {expected}, but we have applied block {received}
+  description: rollup node confimed block {received}, but we have applied block {expected}
   level: error
   section: evm_node.dev
   json format:
@@ -2082,7 +2082,7 @@ rollup_node_follower_connection_lost:
       "rollup_node_follower_connection_lost.v0": any }
 
 evm_events_follower_out_of_sync:
-  description: rollup node confimed block {expected}, but we have applied block {received}
+  description: rollup node confimed block {received}, but we have applied block {expected}
   level: error
   section: evm_node.dev
   json format:
