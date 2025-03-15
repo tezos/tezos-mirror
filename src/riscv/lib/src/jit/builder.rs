@@ -8,6 +8,7 @@
 
 pub(super) mod arithmetic;
 pub(super) mod block_state;
+pub(super) mod stack_slots;
 
 use cranelift::codegen::ir;
 use cranelift::codegen::ir::InstBuilder;
@@ -19,14 +20,17 @@ use cranelift::codegen::ir::types::I64;
 use cranelift::frontend::FunctionBuilder;
 
 use self::block_state::DynamicValues;
+use self::stack_slots::StackSlots;
 use super::state_access::JitStateAccess;
 use super::state_access::JsaCalls;
 use crate::instruction_context::ICB;
 use crate::instruction_context::Predicate;
+use crate::jit::builder::block_state::PCUpdate;
 use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::parser::instruction::InstrWidth;
+use crate::traps::Exception;
 
 #[derive(Copy, Clone, Debug)]
 pub struct X64(pub Value);
@@ -48,6 +52,9 @@ pub(super) struct Builder<'a, MC: MemoryConfig, JSA: JitStateAccess> {
     /// Value representing a pointer to `steps: usize`
     steps_ptr_val: Value,
 
+    /// Value representing a pointer to `Option<Exception>`
+    exception_ptr_val: Value,
+
     /// Values that are dynamically updated throughout lowering.
     dynamic: DynamicValues,
 
@@ -58,6 +65,12 @@ pub(super) struct Builder<'a, MC: MemoryConfig, JSA: JitStateAccess> {
     /// *N.B.* the end block can be jumped-to from multiple places, for example by every branching
     /// point, and also once all instructions have been executed--if no branching took place.
     end_block: Option<ir::Block>,
+
+    /// Value representing a pointer to `result: Result<(), EnvironException>`
+    result_ptr_val: Value,
+
+    /// Stack Slots for storing temporary values on the stack during execution.
+    stack_slots: StackSlots,
 }
 
 impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
@@ -79,6 +92,10 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
         let core_ptr_val = builder.block_params(entry_block)[0];
         let pc_val = X64(builder.block_params(entry_block)[1]);
         let steps_ptr_val = builder.block_params(entry_block)[2];
+        let exception_ptr_val = builder.block_params(entry_block)[3];
+        let result_ptr_val = builder.block_params(entry_block)[4];
+
+        let stack_slots = StackSlots::new(ptr, &mut builder);
 
         Self {
             ptr,
@@ -86,7 +103,10 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
             jsa_call,
             core_ptr_val,
             steps_ptr_val,
+            exception_ptr_val,
+            result_ptr_val,
             dynamic: DynamicValues::new(pc_val),
+            stack_slots,
             end_block: None,
         }
     }
@@ -125,6 +145,11 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
     /// [`finalised`]: super::JIT::finalise
     pub(super) fn end(mut self) {
         self.jump_to_end();
+        self.builder.seal_all_blocks();
+        self.builder.finalize();
+    }
+
+    pub(super) fn end_unconditional_exception(mut self) {
         self.builder.seal_all_blocks();
         self.builder.finalize();
     }
@@ -181,7 +206,7 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
 
 impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
     type XValue = X64;
-    type IResult<Value> = Value;
+    type IResult<Value> = Option<Value>;
 
     /// An `I8` width value.
     type Bool = Value;
@@ -260,21 +285,26 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
     }
 
     fn ok<Value>(&mut self, val: Value) -> Self::IResult<Value> {
-        val
+        Some(val)
     }
 
-    fn map<Value, Next, F>(_res: Self::IResult<Value>, _f: F) -> Self::IResult<Next>
+    #[allow(unused)]
+    fn map<Value, Next, F>(res: Self::IResult<Value>, f: F) -> Self::IResult<Next>
     where
         F: FnOnce(Value) -> Next,
     {
-        todo!("RV-415: support fallible pathways in JIT")
+        res.map(f)
     }
 
-    fn and_then<Value, Next, F>(_res: Self::IResult<Value>, _f: F) -> Self::IResult<Next>
+    #[allow(unused)]
+    fn and_then<Value, Next, F>(res: Self::IResult<Value>, f: F) -> Self::IResult<Next>
     where
         F: FnOnce(Value) -> Self::IResult<Next>,
     {
-        todo!("RV-415: support fallible pathways in JIT")
+        match res {
+            Some(value) => f(value),
+            None => None,
+        }
     }
 }
 
