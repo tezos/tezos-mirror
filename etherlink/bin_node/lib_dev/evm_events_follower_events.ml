@@ -89,8 +89,8 @@ module Event = struct
       ~section
       ~name:"evm_events_follower_out_of_sync"
       ~msg:
-        "rollup node confimed block {expected}, but we have applied block \
-         {received}"
+        "rollup node confimed block {received}, but we have applied block \
+         {expected}"
       ~level:Error
       ("received", Data_encoding.int32)
       ("expected", Data_encoding.int32)

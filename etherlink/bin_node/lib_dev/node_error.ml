@@ -76,8 +76,8 @@ let () =
       Format.fprintf
         ppf
         "Evm node received finalized level %ld but was expected %ld."
-        expected
-        received)
+        received
+        expected)
     Data_encoding.(obj2 (req "expected" int32) (req "received" int32))
     (function
       | Out_of_sync {level_expected; level_received} ->
