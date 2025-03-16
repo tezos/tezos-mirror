@@ -15,6 +15,7 @@ path = "src/uniffi-bindgen.rs"
 tezos_crypto_rs = { path = "../../../sdk/rust/crypto", default-features = false, features = [
   "bls",
 ] }
+tezos_data_encoding = { path = "../../../sdk/rust/encoding" }
 uniffi = { version = "0.29", features = [ "cli" ] }
 thiserror = "1.0"
 

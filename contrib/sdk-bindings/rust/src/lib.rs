@@ -6,6 +6,7 @@ use tezos_crypto_rs::base58;
 
 uniffi::setup_scaffolding!();
 
+pub mod forge;
 pub mod keys;
 
 #[derive(Debug, uniffi::Error, thiserror::Error)]
@@ -13,4 +14,6 @@ pub mod keys;
 pub enum Error {
     #[error("Base58check conversion failure: {0:?}")]
     Base58(#[from] base58::FromBase58CheckError),
+    #[error("Forging failure: {0:?}")]
+    Forge(#[from] forge::ForgingError),
 }
