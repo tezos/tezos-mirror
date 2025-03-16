@@ -2,18 +2,11 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::Error;
 use tezos_crypto_rs::{
-    base58,
     hash::{self, HashTrait},
     public_key, public_key_hash, PublicKeyWithHash,
 };
-
-#[derive(Debug, uniffi::Error, thiserror::Error)]
-#[uniffi(flat_error)]
-pub enum Error {
-    #[error("Base58check conversion failure: {0:?}")]
-    Base58(#[from] base58::FromBase58CheckError),
-}
 
 macro_rules! bind_hash {
     ($bind_name:ident, $name:ty) => {
