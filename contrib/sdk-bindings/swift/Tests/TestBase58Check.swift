@@ -11,6 +11,8 @@ class TestBase58Check: XCTestCase {
       ("tz1DecodeEncode", tz1DecodeEncode),
       ("blpkDecodeEncode", blpkDecodeEncode),
       ("pkDecodeEncode", pkDecodeEncode),
+      ("p2SigDecodeEncode", p2SigDecodeEncode),
+      ("sigDecodeEncode", sigDecodeEncode),
       ("decodeInvalidChecksum", decodeInvalidChecksum),
     ]
 
@@ -36,6 +38,24 @@ class TestBase58Check: XCTestCase {
         let pk = try! PublicKey.fromB58check(data: baseB58Pk)
         let b58Pk = pk.toB58check()
         XCTAssertEqual(baseB58Pk, b58Pk)
+    }
+
+    func p2SigDecodeEncode() {
+        // sk: p2sk432A1xe56akKM7n8vk4g7tSyTTWodJgcwwH9mSmA6jjrApUB3F
+        // msg: "a"
+        let baseB58Sig = "p2sigqUk7jhcXFUQqLkRhb7o3oTyp7hbttCenbcrsg4qmmh4HjM4fHfXExj7raBTFoaJJKt3oR3sUjy4V163rkQLx9pAYERW7r"
+        let sig = try! P256Signature.fromB58check(data: baseB58Sig)
+        let b58Sig = sig.toB58check()
+        XCTAssertEqual(baseB58Sig, b58Sig)
+    }
+
+    func sigDecodeEncode() {
+        // sk: edsk4BYt5bFFa7rHeoZSxgbTUJFYJjSynS9tFgFBzjQpRTL4Gku2x2
+        // msg: "a"
+        let baseB58Sig = "edsigtgNwQE9rwEWL8Jr7AL414yUN1ZvVK6dZrCf5fuXUxn9q8Te2SVbzFcw5VdgKipscVoYAcvFyAnJDB7MRQRswPGKY4DY73h"
+        let sig = try! Signature.fromB58check(data: baseB58Sig)
+        let b58Sig = sig.toB58check()
+        XCTAssertEqual(baseB58Sig, b58Sig)
     }
 
     func decodeInvalidChecksum() {

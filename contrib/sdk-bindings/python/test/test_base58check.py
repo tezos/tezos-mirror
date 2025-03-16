@@ -7,6 +7,8 @@ from tezos import (
     ContractTz1Hash,
     PublicKeyBls,
     PublicKey,
+    Ed25519Signature,
+    UnknownSignature,
 )
 
 
@@ -32,6 +34,24 @@ def test_pk_decode_encode():
     pk = PublicKey.from_b58check(base_b58_pk)
     b58_pk = pk.to_b58check()
     assert b58_pk == base_b58_pk
+
+
+def test_edsig_decode_encode():
+    # sk: edsk3x51ok91omWQd5ZBzBuMV3pjCyFCjxh4fyoTRJ4QYuk59sjZch
+    # msg: "a"
+    base_b58_sig = "edsigtditBCndqgbQf4qrDzUoLjhq79VfxfRzsBp7EctpgPP1Qn3EPuTVjxSt1qyxvyEW9S3HCd4XyehT2tAcG2ATPDaYyjZaLJ"
+    sig = Ed25519Signature.from_b58check(base_b58_sig)
+    b58_sig = sig.to_b58check()
+    assert b58_sig == base_b58_sig
+
+
+def test_unknown_sig_decode_encode():
+    # sk: p2sk3EC67qL8iPQv6o2j14bgqKR6JaPBahXHpZFypVCGkbeMvv5H5G
+    # msg: "a"
+    base_b58_sig = "sigTCLMigPjVA1ogWQP16sp6DpcAb3Wf4wkxUWDBHUa8wuixro5AVQLkWCGtBH91iYdcDLwPqW2yFs2XppXfBdbCSdbD3v9f"
+    sig = UnknownSignature.from_b58check(base_b58_sig)
+    b58_sig = sig.to_b58check()
+    assert b58_sig == base_b58_sig
 
 
 def test_decode_invalid_checksum():
