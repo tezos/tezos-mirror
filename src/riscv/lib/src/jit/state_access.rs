@@ -57,6 +57,8 @@ const XREG_WRITE_SYMBOL: &str = "JSA::xreg_write";
 
 const HANDLE_EXCEPTION: &str = "JSA::handle_exception";
 
+const RAISE_ILLEGAL_INSTRUCTION_EXCEPTION: &str = "JSA::raise_illegal_instruction_exception";
+
 /// State Access that a JIT-compiled block may use.
 ///
 /// In future, this will come in two parts:
@@ -99,6 +101,14 @@ pub trait JitStateAccess: ManagerReadWrite {
         exception: &Option<Exception>,
         result: &mut Result<(), EnvironException>,
     ) -> bool;
+
+    /// Raise an [`Exception::IllegalInstruction`].
+    ///
+    /// Writes the instruction to the given exception memory, after which it would be safe to
+    /// assume it is initialised.
+    extern "C" fn raise_illegal_instruction_exception(exception_out: &mut Option<Exception>) {
+        *exception_out = Some(Exception::IllegalInstruction);
+    }
 }
 
 impl JitStateAccess for Owned {
@@ -166,6 +176,11 @@ pub(super) fn register_jsa_symbols<MC: MemoryConfig, JSA: JitStateAccess>(
         HANDLE_EXCEPTION,
         <JSA as JitStateAccess>::handle_exception::<MC> as *const u8,
     );
+
+    builder.symbol(
+        RAISE_ILLEGAL_INSTRUCTION_EXCEPTION,
+        <JSA as JitStateAccess>::raise_illegal_instruction_exception as *const u8,
+    );
 }
 
 /// Identifications of globally imported [`JitStateAccess`] methods.
@@ -174,6 +189,7 @@ pub(super) struct JsaImports<MC: MemoryConfig, JSA: JitStateAccess> {
     xreg_read: FuncId,
     xreg_write: FuncId,
     handle_exception: FuncId,
+    raise_illegal_instruction_exception: FuncId,
     _pd: PhantomData<(MC, JSA)>,
 }
 
@@ -224,11 +240,23 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JsaImports<MC, JSA> {
         let handle_exception =
             module.declare_function(HANDLE_EXCEPTION, Linkage::Import, &handle_exception_sig)?;
 
+        let raise_illegal_exception_sig = Signature {
+            params: vec![ptr],
+            returns: vec![],
+            call_conv,
+        };
+        let raise_illegal_instruction_exception = module.declare_function(
+            RAISE_ILLEGAL_INSTRUCTION_EXCEPTION,
+            Linkage::Import,
+            &raise_illegal_exception_sig,
+        )?;
+
         Ok(Self {
             pc_write,
             xreg_read,
             xreg_write,
             handle_exception,
+            raise_illegal_instruction_exception,
             _pd: PhantomData,
         })
     }
@@ -243,6 +271,7 @@ pub(super) struct JsaCalls<'a, MC: MemoryConfig, JSA: JitStateAccess> {
     xreg_read: Option<FuncRef>,
     xreg_write: Option<FuncRef>,
     handle_exception: Option<FuncRef>,
+    raise_illegal_instruction_exception: Option<FuncRef>,
     _pd: PhantomData<(MC, JSA)>,
 }
 
@@ -256,6 +285,7 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
             xreg_read: None,
             xreg_write: None,
             handle_exception: None,
+            raise_illegal_instruction_exception: None,
             _pd: PhantomData,
         }
     }
@@ -342,6 +372,26 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
         let new_pc = stack_slots.instr_pc_load(builder);
 
         ExceptionHandledOutcome { handled, new_pc }
+    }
+
+    /// Emit the required IR to call `raise_illegal_exception`.
+    ///
+    /// This sets the exception to `Some(_)` with the illegal instruction exception.
+    pub(super) fn raise_illegal_instruction_exception(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        exception_ptr: Value,
+    ) {
+        let raise_illegal = self
+            .raise_illegal_instruction_exception
+            .get_or_insert_with(|| {
+                self.module.declare_func_in_func(
+                    self.imports.raise_illegal_instruction_exception,
+                    builder.func,
+                )
+            });
+
+        builder.ins().call(*raise_illegal, &[exception_ptr]);
     }
 }
 

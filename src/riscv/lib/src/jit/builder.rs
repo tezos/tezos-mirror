@@ -30,7 +30,6 @@ use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::parser::instruction::InstrWidth;
-use crate::traps::Exception;
 
 #[derive(Copy, Clone, Debug)]
 pub struct X64(pub Value);
@@ -202,6 +201,46 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
         self.builder.ins().jump(end_block, &[pc_val.0, steps_val]);
         self.finalise_end_block(end_block)
     }
+
+    /// Handle an exception that has occurred.
+    fn handle_exception(&mut self) {
+        let current_pc = self.pc_read();
+
+        let outcome = self.jsa_call.handle_exception(
+            &mut self.builder,
+            self.core_ptr_val,
+            self.exception_ptr_val,
+            self.result_ptr_val,
+            current_pc,
+            &mut self.stack_slots,
+        );
+
+        // if handled -> jump to end with updated pc_ptr. Add steps += 1
+        // if !handled -> exit directly; environ needs to be consulted.
+        //                pc has been committed
+        let handled_block = self.builder.create_block();
+        let environ_block = self.builder.create_block();
+
+        self.builder
+            .ins()
+            .brif(outcome.handled, handled_block, &[], environ_block, &[]);
+
+        let snapshot = self.dynamic;
+
+        // Exception succesfully handled, we have a new PC and need to complete
+        // the current step.
+        self.builder.switch_to_block(handled_block);
+        self.complete_step(PCUpdate::Absolute(outcome.new_pc));
+        self.jump_to_end();
+
+        self.builder.seal_block(handled_block);
+
+        // The exception has to be handled by the environment. Do not complete
+        // the current step; this will be done by the ECall handling mechanism
+        self.builder.switch_to_block(environ_block);
+        self.dynamic = snapshot;
+        self.jump_to_end();
+    }
 }
 
 impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
@@ -286,6 +325,15 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
 
     fn ok<Value>(&mut self, val: Value) -> Self::IResult<Value> {
         Some(val)
+    }
+
+    fn err_illegal_instruction<In>(&mut self) -> Self::IResult<In> {
+        self.jsa_call
+            .raise_illegal_instruction_exception(&mut self.builder, self.exception_ptr_val);
+
+        self.handle_exception();
+
+        None
     }
 
     #[allow(unused)]

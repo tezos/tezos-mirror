@@ -77,7 +77,6 @@ use crate::parser::instruction::RTypeArgs;
 use crate::parser::instruction::UJTypeArgs;
 use crate::parser::instruction::XRegToFRegArgs;
 use crate::parser::instruction::XRegToFRegArgsWithRounding;
-use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerReadWrite;
 use crate::traps::Exception;
 
@@ -697,6 +696,9 @@ impl OpCode {
             Self::ShiftLeftImmediate => Some(Args::run_shift_left_immediate),
             Self::ShiftRightImmediateUnsigned => Some(Args::run_shift_right_immediate_unsigned),
             Self::ShiftRightImmediateSigned => Some(Args::run_shift_right_immediate_signed),
+
+            // Errors
+            Self::Unknown => Some(Args::run_illegal),
             _ => None,
         }
     }
@@ -1604,11 +1606,8 @@ impl Args {
     impl_fcss_type!(run_cfsdsp);
 
     // Unknown
-    fn run_illegal<MC: MemoryConfig, M: ManagerBase>(
-        &self,
-        _core: &mut MachineCoreState<MC, M>,
-    ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-        Err(Exception::IllegalInstruction)
+    fn run_illegal<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+        icb.err_illegal_instruction()
     }
 }
 
@@ -2245,17 +2244,12 @@ impl From<&InstrCacheable> for Instruction {
                 args: args.into(),
             },
 
-            InstrCacheable::Unknown { instr: _ } => Instruction {
-                opcode: OpCode::Unknown,
-                args: Args::DEFAULT,
-            },
-            InstrCacheable::UnknownCompressed { instr: _ } => Instruction {
-                opcode: OpCode::Unknown,
-                args: Args {
-                    width: InstrWidth::Compressed,
-                    ..Args::DEFAULT
-                },
-            },
+            InstrCacheable::Unknown { instr: _ } => {
+                Instruction::new_unknown(InstrWidth::Uncompressed)
+            }
+            InstrCacheable::UnknownCompressed { instr: _ } => {
+                Instruction::new_unknown(InstrWidth::Compressed)
+            }
 
             InstrCacheable::Hint { instr: _ } => Instruction::new_nop(InstrWidth::Uncompressed),
             InstrCacheable::HintCompressed { instr: _ } => {

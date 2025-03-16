@@ -292,7 +292,6 @@ mod tests {
     use crate::machine_state::block_cache::bcall::InterpretedBlockBuilder;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::memory::MemoryConfig;
-    use crate::machine_state::mode::Mode;
     use crate::machine_state::registers::NonZeroXRegister;
     use crate::machine_state::registers::XRegister;
     use crate::machine_state::registers::nz;
@@ -1299,6 +1298,24 @@ mod tests {
                 -12,
             ),
         ];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
+
+    backend_test!(test_unknown, F, {
+        let scenarios: &[Scenario<F>] = &[ScenarioBuilder::default()
+            .set_expected_steps(2)
+            .set_instructions(&[
+                I::new_nop(Uncompressed),
+                I::new_unknown(Compressed),
+                I::new_nop(Uncompressed),
+            ])
+            .build()];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
         let mut interpreted_bb = InterpretedBlockBuilder;

@@ -93,6 +93,9 @@ pub trait ICB {
     /// Wrap a value as a fallible value.
     fn ok<Value>(&mut self, val: Value) -> Self::IResult<Value>;
 
+    /// Raise an [`Exception::IllegalInstruction`] error.
+    fn err_illegal_instruction<In>(&mut self) -> Self::IResult<In>;
+
     /// Map the fallible-value into a fallible-value of a different type.
     fn map<Value, Next, F>(res: Self::IResult<Value>, f: F) -> Self::IResult<Next>
     where
@@ -198,6 +201,11 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
     #[inline(always)]
     fn ok<In>(&mut self, val: In) -> Self::IResult<In> {
         Ok(val)
+    }
+
+    #[inline(always)]
+    fn err_illegal_instruction<In>(&mut self) -> Self::IResult<In> {
+        Err(Exception::IllegalInstruction)
     }
 
     #[inline(always)]

@@ -114,6 +114,18 @@ impl Instruction {
         }
     }
 
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for
+    /// [`OpCode::Unknown`].
+    pub(crate) fn new_unknown(width: InstrWidth) -> Self {
+        Self {
+            opcode: OpCode::Unknown,
+            args: Args {
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
     /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Addi`].
     pub(crate) fn new_addi(
         rd: NonZeroXRegister,
