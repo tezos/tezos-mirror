@@ -720,4 +720,18 @@ mod tests {
             prop_assert!(proof_cell.get_access_info());
         });
     }
+
+    #[test]
+    fn test_proof_gen_region_replace() {
+        let region: ProofRegion<u64, 1, Owned> = ProofRegion::bind([0u64; 1]);
+        let mut cells: Cells<u64, 1, ProofGen<Owned>> = Cells::bind(region);
+
+        cells.write(0, 13);
+
+        let old = cells.replace(0, 37);
+        assert_eq!(old, 13);
+
+        let value = cells.read(0);
+        assert_eq!(value, 37);
+    }
 }
