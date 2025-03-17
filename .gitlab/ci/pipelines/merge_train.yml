@@ -2460,6 +2460,7 @@ test_sdk_bindings:
     - .gitlab/**/*
     - contrib/sdk-bindings
     - images/**/*
+    - sdk/rust/**/*
     when: on_success
   needs:
   - job: oc.docker:rust-sdk-bindings:amd64
