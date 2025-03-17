@@ -22,6 +22,14 @@ impl Layout for () {
     fn allocate<M: super::ManagerAlloc>(_backend: &mut M) -> Self::Allocated<M> {}
 }
 
+impl<T: Layout> Layout for Box<T> {
+    type Allocated<M: super::ManagerBase> = Box<T::Allocated<M>>;
+
+    fn allocate<M: super::ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
+        Box::new(T::allocate(backend))
+    }
+}
+
 /// `L::Allocated`
 pub type AllocatedOf<L, M> = <L as Layout>::Allocated<M>;
 
