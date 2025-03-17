@@ -5,7 +5,6 @@ exclude = [
   "jstz",
   "dummy_kernel",
   "supervised_dummy_kernel",
-  "dummy_sdk_kernel",
   "tests",
 ]
 

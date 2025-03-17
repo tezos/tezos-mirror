@@ -23,3 +23,6 @@ features = [
 
 [dependencies.tezos-smart-rollup-constants]
 path = "../../kernel_sdk/constants"
+
+[dependencies]
+hex = "0.4.3"

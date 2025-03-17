@@ -58,16 +58,6 @@ fn regression_dummy_kernel() {
     )
 }
 
-#[test]
-fn regression_dummy_sdk_kernel() {
-    test_regression(
-        "tests/expected/dummy_sdk_volatile",
-        "../riscv-dummy-sdk.elf",
-        "../assets/dummy-kernel-inbox.json",
-        false,
-    )
-}
-
 fn test_regression(
     golden_dir: impl AsRef<Path>,
     kernel_path: impl AsRef<Path>,
