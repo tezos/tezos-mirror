@@ -58,6 +58,23 @@ let fetch_dal_config cctxt =
     ~rpc:Config_services.dal_config
     ~requested_info:"DAL config"
 
+let fetch_l1_version_info cctxt =
+  fetch_info_from_l1
+    cctxt
+    ~rpc:Version_services.version
+    ~requested_info:"version info"
+
+(* Infers the DAL network name based on the L1 chain name.
+
+   This function queries the L1 node to retrieve its chain name, then constructs
+   the corresponding DAL network name by prefixing it with "DAL_". The resulting
+   name is returned as a [Distributed_db_version.Name.t]. *)
+let _infer_dal_network_name cctxt =
+  let open Lwt_result_syntax in
+  let+ l1_version = fetch_l1_version_info cctxt in
+  Format.sprintf "DAL_%s" (l1_version.network_version.chain_name :> string)
+  |> Distributed_db_version.Name.of_string
+
 let init_cryptobox config proto_parameters =
   let open Lwt_result_syntax in
   let prover_srs =
