@@ -70,6 +70,8 @@ module Chain_id : sig
   val decode_be : bytes -> chain_id
 
   val compare : chain_id -> chain_id -> int
+
+  val pp : Format.formatter -> chain_id -> unit
 end
 
 type chain_family = EVM | Michelson
@@ -84,6 +86,8 @@ module Chain_family : sig
   val of_string_exn : string -> chain_family
 
   val to_string : chain_family -> string
+
+  val pp : Format.formatter -> chain_family -> unit
 end
 
 (** Ethereum block hash (32 bytes) *)

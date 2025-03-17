@@ -143,6 +143,9 @@ module Chain_id = struct
   let decode_be bytes = Chain_id (decode_z_be bytes)
 
   let compare (Chain_id c1) (Chain_id c2) = Z.compare c1 c2
+
+  let pp fmt (Chain_id cid) =
+    Format.fprintf fmt "Chain_id (%s)" (Z.to_string cid)
 end
 
 type chain_family = EVM | Michelson
@@ -158,6 +161,8 @@ module Chain_family = struct
 
   let encoding =
     Data_encoding.string_enum [("EVM", EVM); ("Michelson", Michelson)]
+
+  let pp fmt cf = Format.fprintf fmt "%s" (to_string cf)
 end
 
 type block_hash = Block_hash of hex [@@ocaml.unboxed]
