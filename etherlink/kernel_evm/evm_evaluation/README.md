@@ -2,7 +2,7 @@
 
 ## Preliminary step
 
-Clone [ethereum/tests](https://github.com/ethereum/tests).
+Clone [ethereum/tests](https://github.com/functori/tests).
 
 Since Rust has a small minimum stack size, some tests will fail.
 To prevent that run the following command:
@@ -11,7 +11,7 @@ To prevent that run the following command:
 $ ulimit -s 20000
 ```
 
-**NB:** The suite must be run on **[tag: v13]** `428f218d7d6f4a52544e12684afbfe6e2882ffbf` as we only support tests up to **Shanghai**.
+**NB:** The suite must be run on **[branch: v14.1@etherlink]** `d144093d375a75102180f3688ee6fedfb441e768` as we only support tests up to **Cancun**.
 
 ## Execute the assessor
 
