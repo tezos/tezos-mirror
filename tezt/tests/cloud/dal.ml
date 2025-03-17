@@ -1471,57 +1471,48 @@ module Monitoring_app = struct
       let* _response = RPC_core.call_raw endpoint rpc in
       Lwt.return_unit
 
-    let check_for_lost_dal_rewards t ~metadata ~blocks_per_cycle =
+    let check_for_lost_dal_rewards t ~metadata =
       match t.configuration.monitor_app_configuration with
       | None -> unit
       | Some {dal_slack_webhook = webhook} ->
-          let cycle, cycle_position =
-            let open JSON in
-            let level_info = metadata |-> "level_info" in
-            ( level_info |-> "cycle" |> as_int,
-              level_info |-> "cycle_position" |> as_int )
+          let cycle = JSON.(metadata |-> "level_info" |-> "cycle" |> as_int) in
+          let level = JSON.(metadata |-> "level_info" |-> "level" |> as_int) in
+          let balance_updates =
+            JSON.(metadata |-> "balance_updates" |> as_list)
           in
-          if cycle_position + 1 <> blocks_per_cycle then unit
+          let lost_dal_rewards =
+            List.filter_map
+              (fun balance_update ->
+                let category =
+                  JSON.(balance_update |-> "category" |> as_string_opt)
+                in
+                match category with
+                | None -> None
+                | Some category ->
+                    if String.equal category "lost DAL attesting rewards" then
+                      let delegate =
+                        JSON.(balance_update |-> "delegate" |> as_string)
+                      in
+                      let change =
+                        JSON.(balance_update |-> "change" |> as_int)
+                      in
+                      Some (`delegate delegate, `change change)
+                    else None)
+              balance_updates
+          in
+          if List.is_empty lost_dal_rewards then unit
           else
-            let level =
-              JSON.(metadata |-> "level_info" |-> "level" |> as_int)
-            in
-            let balance_updates =
-              JSON.(metadata |-> "balance_updates" |> as_list)
-            in
-            let lost_dal_rewards =
-              List.filter_map
-                (fun balance_update ->
-                  let category =
-                    JSON.(balance_update |-> "category" |> as_string_opt)
-                  in
-                  match category with
-                  | None -> None
-                  | Some category ->
-                      if String.equal category "lost DAL attesting rewards" then
-                        let delegate =
-                          JSON.(balance_update |-> "delegate" |> as_string)
-                        in
-                        let change =
-                          JSON.(balance_update |-> "change" |> as_int)
-                        in
-                        Some (`delegate delegate, `change change)
-                      else None)
-                balance_updates
-            in
-            if List.is_empty lost_dal_rewards then unit
-            else
-              let network = t.configuration.network in
-              report_lost_dal_rewards
-                ~webhook
-                ~network
-                ~level
-                ~cycle
-                ~lost_dal_rewards
+            let network = t.configuration.network in
+            report_lost_dal_rewards
+              ~webhook
+              ~network
+              ~level
+              ~cycle
+              ~lost_dal_rewards
 
-    let check_for_lost_dal_rewards t ~metadata ~blocks_per_cycle =
+    let check_for_lost_dal_rewards t ~metadata =
       Lwt.catch
-        (fun () -> check_for_lost_dal_rewards t ~metadata ~blocks_per_cycle)
+        (fun () -> check_for_lost_dal_rewards t ~metadata)
         (fun exn ->
           Log.warn
             "Monitor_app.Alert.check_for_lost_dal_rewards: unexpected error: \
@@ -1662,7 +1653,7 @@ module Monitoring_app = struct
   end
 end
 
-let get_infos_per_level t ~level =
+let get_infos_per_level t ~level ~metadata =
   let client = t.bootstrap.client in
   let endpoint = t.bootstrap.node_rpc_endpoint in
   let etherlink_operators =
@@ -1673,12 +1664,8 @@ let get_infos_per_level t ~level =
   let block = string_of_int level in
   let* header =
     RPC_core.call endpoint @@ RPC.get_chain_block_header_shell ~block ()
-  and* metadata =
-    RPC_core.call endpoint @@ RPC.get_chain_block_metadata_raw ~block ()
   and* operations =
     RPC_core.call endpoint @@ RPC.get_chain_block_operations ~block ()
-  and* constants =
-    RPC_core.call endpoint @@ RPC.get_chain_block_context_constants ~block ()
   in
   let level = JSON.(header |-> "level" |> as_int) in
   let attested_commitments =
@@ -1724,7 +1711,6 @@ let get_infos_per_level t ~level =
       operation |-> "contents" |=> 0 |-> "dal_attestation" |> as_string
       |> Z.of_string |> Option.some)
   in
-  let blocks_per_cycle = JSON.(constants |-> "blocks_per_cycle" |> as_int) in
   let attestations =
     consensus_operations |> List.to_seq
     |> Seq.map (fun operation ->
@@ -1747,25 +1733,15 @@ let get_infos_per_level t ~level =
       (return Tez.zero)
       etherlink_operators
   in
+  (* This action is performed only if `--dal-slack-webhook` is provided. *)
   let* () =
-    (* None of these actions are performed if `--dal-slack-webhook` is
-       not provided. *)
-    let* () =
-      Monitoring_app.Alert.check_for_lost_dal_rewards
-        t
-        ~metadata
-        ~blocks_per_cycle
-    in
-    let* () =
-      let cycle = JSON.(metadata |-> "level_info" |-> "cycle" |> as_int) in
-      Monitoring_app.Alert.check_for_dal_accusations
-        t
-        ~cycle
-        ~level
-        ~operations
-        ~endpoint:t.bootstrap.node_rpc_endpoint
-    in
-    unit
+    let cycle = JSON.(metadata |-> "level_info" |-> "cycle" |> as_int) in
+    Monitoring_app.Alert.check_for_dal_accusations
+      t
+      ~cycle
+      ~level
+      ~operations
+      ~endpoint:t.bootstrap.node_rpc_endpoint
   in
   Lwt.return
     {
@@ -3136,14 +3112,14 @@ let update_bakers_infos t =
   t.versions <- versions ;
   Lwt.return_unit
 
-let on_new_level t level =
+let on_new_level t level ~metadata =
   let* () = wait_for_level t level in
   toplog "Start process level %d" level ;
   clean_up t (level - t.configuration.blocks_history) ;
   let* () =
     if level mod 1_000 = 0 then update_bakers_infos t else Lwt.return_unit
   in
-  let* infos_per_level = get_infos_per_level t ~level in
+  let* infos_per_level = get_infos_per_level t ~level ~metadata in
   toplog "Level info processed" ;
   Hashtbl.replace t.infos level infos_per_level ;
   let metrics =
@@ -3178,6 +3154,29 @@ let on_new_level t level =
   in
   toplog "Level processed" ;
   Lwt.return t
+
+let on_new_cycle t ~level =
+  let endpoint = t.bootstrap.node_rpc_endpoint in
+  let last_block_of_prev_cycle = string_of_int (level - 1) in
+  let* metadata =
+    RPC_core.call endpoint
+    @@ RPC.get_chain_block_metadata_raw ~block:last_block_of_prev_cycle ()
+  in
+  (* This action is performed only if `--dal-slack-webhook` is provided. *)
+  Monitoring_app.Alert.check_for_lost_dal_rewards t ~metadata
+
+let on_new_block t ~level =
+  let endpoint = t.bootstrap.node_rpc_endpoint in
+  let block = string_of_int level in
+  let* metadata =
+    RPC_core.call endpoint @@ RPC.get_chain_block_metadata_raw ~block ()
+  in
+  let cycle_position =
+    JSON.(metadata |-> "level_info" |-> "cycle_position" |> as_int)
+  in
+  let is_new_cycle = cycle_position = 0 in
+  let* () = if is_new_cycle then on_new_cycle t ~level else unit in
+  on_new_level t level ~metadata
 
 let ensure_enough_funds t i =
   let producer = List.nth t.producers i in
@@ -3249,7 +3248,7 @@ let producers_not_ready t =
   List.for_all producer_ready t.producers
 
 let rec loop t level =
-  let p = on_new_level t level in
+  let p = on_new_block t ~level in
   let _p2 =
     if producers_not_ready t then (
       toplog "producers not ready for level %d" level ;
