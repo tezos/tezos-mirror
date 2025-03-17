@@ -239,6 +239,12 @@ type t = {
 let is_tx_queue_enabled {experimental_features = {enable_tx_queue; _}; _} =
   Option.is_some enable_tx_queue
 
+let retrieve_chain_family ~l2_chains =
+  match l2_chains with
+  | Some [l2_chain] -> l2_chain.chain_family
+  | None -> L2_types.EVM
+  | _ -> assert false
+
 let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
   {
     max_nb_blocks = Option.value ~default:100 max_nb_blocks;

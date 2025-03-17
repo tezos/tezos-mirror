@@ -99,6 +99,7 @@ val apply_blueprint :
   ?log_file:string ->
   ?profile:bool ->
   data_dir:string ->
+  chain_family:L2_types.chain_family ->
   config:Wasm_debugger.config ->
   native_execution_policy:Configuration.native_execution_policy ->
   t ->

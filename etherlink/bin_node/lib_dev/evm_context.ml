@@ -673,6 +673,11 @@ module State = struct
 
     let time_processed = ref Ptime.Span.zero in
 
+    (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
+    let chain_family =
+      Configuration.retrieve_chain_family
+        ~l2_chains:ctxt.configuration.experimental_features.l2_chains
+    in
     let* try_apply =
       Misc.with_timing
         (fun time -> Lwt.return (time_processed := time))
@@ -682,6 +687,7 @@ module State = struct
               ctxt.configuration.kernel_execution.native_execution_policy
             ~wasm_pvm_fallback:(not @@ List.is_empty delayed_transactions)
             ~data_dir
+            ~chain_family
             ~config
             ctxt.session.evm_state
             payload)

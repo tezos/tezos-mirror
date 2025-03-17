@@ -305,8 +305,9 @@ type apply_result =
     }
   | Apply_failure
 
-let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir ~config
-    ~native_execution_policy evm_state (blueprint : Blueprint_types.payload) =
+let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir
+    ~chain_family ~config ~native_execution_policy evm_state
+    (blueprint : Blueprint_types.payload) =
   let open Lwt_result_syntax in
   let exec_inputs =
     List.map
@@ -331,7 +332,7 @@ let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir ~config
     let*! bytes =
       inspect evm_state (Durable_storage_path.Block.by_hash block_hash)
     in
-    return (Option.map (L2_types.block_from_bytes ~chain_family:EVM) bytes)
+    return (Option.map (L2_types.block_from_bytes ~chain_family) bytes)
   in
   let export_gas_used (Qty gas) =
     match (profile, log_file) with

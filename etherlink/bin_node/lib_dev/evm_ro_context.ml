@@ -435,6 +435,7 @@ let replay ctxt ?(log_file = "replay") ?profile
     ~log_file
     ?profile
     ~data_dir:ctxt.data_dir
+    ~chain_family:EVM
     ~config:(pvm_config ctxt)
     ~native_execution_policy:ctxt.native_execution_policy
     evm_state
