@@ -46,7 +46,9 @@ let fetch_dal_config cctxt =
     | Error err -> return_error err
     | Ok dal_config ->
         let* () =
-          Event.emit_fetched_config_success ~endpoint:(Uri.to_string cctxt#base)
+          Event.emit_fetched_l1_info_success
+            ~endpoint:(Uri.to_string cctxt#base)
+            ~what:"DAL config"
         in
         return_ok dal_config
   in

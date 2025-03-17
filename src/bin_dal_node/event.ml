@@ -177,13 +177,14 @@ open struct
       ~level:Notice
       ("number", Data_encoding.int31)
 
-  let fetched_config_success =
-    declare_1
+  let fetched_l1_info_success =
+    declare_2
       ~section
       ~prefix_name_with_section:true
-      ~name:"fetched_config_success"
-      ~msg:"success fetching config from l1 node at {endpoint}"
+      ~name:"fetched_l1_info_success"
+      ~msg:"successfully fetched {info} from L1 node at {endpoint}"
       ~level:Notice
+      ("info", Data_encoding.string)
       ("endpoint", Data_encoding.string)
 
   let failed_to_persist_profiles =
@@ -1051,7 +1052,8 @@ let emit_resolved_bootstrap_no_points () = emit resolved_bootstrap_no_points ()
 let emit_resolved_bootstrap_points_total ~number =
   emit resolved_bootstrap_points_total number
 
-let emit_fetched_config_success ~endpoint = emit fetched_config_success endpoint
+let emit_fetched_l1_info_success ~what ~endpoint =
+  emit fetched_l1_info_success (what, endpoint)
 
 let emit_failed_to_persist_profiles ~profiles ~error =
   emit failed_to_persist_profiles (profiles, error)
