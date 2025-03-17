@@ -18,6 +18,7 @@ val start :
   keep_alive:bool ->
   drop_duplicate:bool ->
   order_enabled:bool ->
+  tx_queue_enabled:bool ->
   unit ->
   unit tzresult Lwt.t
 

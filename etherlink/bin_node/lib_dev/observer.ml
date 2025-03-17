@@ -8,10 +8,12 @@
 
 open Ethereum_types
 
-let confirm_txs config tx_hashes =
+let confirm_txs config confirmed_txs =
   let open Lwt_result_syntax in
   if Configuration.is_tx_queue_enabled config then
-    Seq.iter_ep (fun hash -> Tx_queue.confirm hash) tx_hashes
+    Tx_queue.confirm_transactions
+      ~clear_pending_queue_after:false
+      ~confirmed_txs
   else return_unit
 
 (** [on_new_blueprint evm_node_endpoint next_blueprint_number

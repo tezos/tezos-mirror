@@ -82,6 +82,14 @@ let transaction_confirmed =
     ~pp1:(fun fmt Ethereum_types.(Hash (Hex h)) -> Format.fprintf fmt "%10s" h)
     ("tx_hash", Ethereum_types.hash_encoding)
 
+let missing_tx_object =
+  declare_1
+    ~name:"tx_queue_missing_tx_object"
+    ~msg:"transaction {tx_hash} has no associated object"
+    ~level:Error
+    ~pp1:(fun fmt Ethereum_types.(Hash (Hex h)) -> Format.fprintf fmt "%10s" h)
+    ("tx_hash", Ethereum_types.hash_encoding)
+
 let is_ready () = emit is_ready ()
 
 let shutdown () = emit shutdown ()
@@ -100,3 +108,5 @@ let rpc_error (error : Rpc_encodings.JSONRPC.error) =
   emit rpc_error (Int32.of_int error.code, error.message)
 
 let callback_error (error : tztrace) = emit callback_error error
+
+let missing_tx_object tx = emit missing_tx_object tx

@@ -10882,6 +10882,7 @@ let test_tx_queue =
     ~use_threshold_encryption:Register_without_feature
     ~use_dal:Register_without_feature
     ~websockets:false
+    ~enable_tx_queue:true
     ~title:"Submits a transaction to an observer with a tx queue."
   @@ fun {sequencer; observer; _} _protocol ->
   let* () = Evm_node.terminate observer in
@@ -10930,51 +10931,14 @@ let test_tx_queue =
       inject, ...) *)
   let nb_txs = 10 in
 
-  let wait_for_all_tx_process ~name ~waiter =
-    let rec aux total =
-      if total = nb_txs then (
-        Log.info "All (%d) txs processed: \"%s\"." total name ;
-        unit)
-      else if total > nb_txs then
-        Test.fail
-          "more transaction where processed (%s) than expected, impossible"
-          name
-      else
-        let* nb = waiter () in
-        let total = total + nb in
-        Log.debug "Processed %d of txs. (%s)" total name ;
-        aux total
-    in
-    aux 0
+  let wait_for_all_tx_process_p ~hashes ~name ~waiter =
+    let* () = Lwt_list.iter_p (fun hash -> waiter ~hash) hashes in
+    Log.info "All (%d) txs processed: \"%s\"." (List.length hashes) name ;
+    unit
   in
 
   (* Promises that checks that [nb_txs] txs have been seen with different
      events. *)
-
-  (* Checks that all txs were added to the observer tx_queue *)
-  let observer_wait_tx_added =
-    let waiter () =
-      let* _ = Evm_node.wait_for_tx_queue_add_transaction observer in
-      return 1
-    in
-    wait_for_all_tx_process ~name:"tx added in observer queue" ~waiter
-  in
-
-  (* Checks that all txs were added to the sequencer tx_pool *)
-  let sequencer_wait_tx_added =
-    let waiter () =
-      let* _ = Evm_node.wait_for_tx_pool_add_transaction sequencer in
-      return 1
-    in
-    wait_for_all_tx_process ~name:"tx added in sequencer tx pool" ~waiter
-  in
-
-  (* Checks that all txs were injected to the sequencer by the
-      observer *)
-  let observer_wait_tx_injected =
-    let waiter () = Evm_node.wait_for_tx_queue_injecting_transaction observer in
-    wait_for_all_tx_process ~name:"tx injected by observer queue" ~waiter
-  in
 
   (* Test start here *)
   Log.info
@@ -10984,46 +10948,40 @@ let test_tx_queue =
   let* hashes =
     fold nb_txs [] @@ fun i hashes ->
     let* raw_tx = raw_tx ~nonce:i in
-    let*@ hash = Rpc.send_raw_transaction ~raw_tx observer in
-    let* () = check_tx_is_found ~__LOC__ ~hash ~node:observer in
+    let* hash =
+      let*@ hash = Rpc.send_raw_transaction ~raw_tx observer in
+      return hash
+    and* _ = Evm_node.wait_for_tx_queue_add_transaction observer
+    and* _ = Evm_node.wait_for_tx_queue_add_transaction sequencer
+    and* _ = Evm_node.wait_for_tx_queue_injecting_transaction observer in
+    let* () = check_tx_is_found ~__LOC__ ~hash ~node:observer
+    and* () = check_tx_is_found ~__LOC__ ~hash ~node:sequencer in
     return (hash :: hashes)
-  and* _ = observer_wait_tx_added
-  and* _ = observer_wait_tx_injected
-  and* _ = sequencer_wait_tx_added in
+  in
 
   Log.info
     "Produce enough block to include all txs and make sure they are confirmed \
      by the observer" ;
   (* Checks that all txs were confirmed in the observer *)
   let observer_wait_tx_confirmed =
-    let waiter () =
-      let* _ = Evm_node.wait_for_tx_queue_transaction_confirmed observer in
-      return 1
-    in
-    wait_for_all_tx_process ~name:"tx confirmed in observer" ~waiter
-  in
-  (* Checks that all txs were included in a block by the sequencer *)
-  let* () =
-    let res = ref None in
-    let _p =
-      let* () =
-        let waiter () =
-          let* _hash = Evm_node.wait_for_block_producer_tx_injected sequencer in
-          return 1
-        in
-        wait_for_all_tx_process ~name:"tx included by sequencer" ~waiter
+    let waiter ~hash =
+      let* _ =
+        Evm_node.wait_for_tx_queue_transaction_confirmed observer ~hash
       in
-      res := Some () ;
       unit
     in
-    let result_f () = return !res in
-    bake_until
-      ~__LOC__
-      ~bake:(fun () ->
-        let*@ _ = produce_block sequencer in
-        unit)
-      ~result_f
-      ()
+    wait_for_all_tx_process_p ~hashes ~name:"tx confirmed in observer" ~waiter
+  in
+
+  (* Checks that all txs were included in a unique block by the sequencer *)
+  let* () =
+    let*@ included_nb_txs = produce_block sequencer in
+    Check.(
+      (included_nb_txs = nb_txs)
+        int
+        ~__LOC__
+        ~error_msg:"Produce block included %L transaction expected %R") ;
+    unit
   and* _ = observer_wait_tx_confirmed in
 
   Log.info
@@ -11050,6 +11008,7 @@ let test_tx_queue_clear =
     ~kernels:[Latest]
     ~use_dal:Register_without_feature
     ~use_threshold_encryption:Register_without_feature
+    ~websockets:false
   @@ fun {
            client;
            l1_contracts;
@@ -11148,6 +11107,7 @@ let test_tx_queue_nonce =
     ~use_threshold_encryption:Register_without_feature
     ~use_dal:Register_without_feature
     ~websockets:false
+    ~enable_tx_queue:true
     ~title:
       "Submits transactions to an observer with a tx queue and make sure it \
        can respond to getTransactionCount."
@@ -11172,6 +11132,7 @@ let test_tx_queue_nonce =
     let*@ _ = produce_block sequencer in
     unit
   and* () = Evm_node.wait_for_blueprint_applied observer 1 in
+
   let check_nonce ~__LOC__ ~evm_node ~block ~expected =
     let*@ nonce =
       Rpc.get_transaction_count
@@ -11217,31 +11178,19 @@ let test_tx_queue_nonce =
 
   let send_and_wait_sequencer_receive ~nonce =
     let wait_sequencer_see_tx =
-      Evm_node.wait_for_tx_pool_add_transaction sequencer
+      Evm_node.wait_for_tx_queue_add_transaction sequencer
     in
-    let* _ =
-      let*@ _hash = send_raw_tx ~nonce in
-      unit
+    let* hash =
+      let*@ hash = send_raw_tx ~nonce in
+      return hash
     and* _ = wait_sequencer_see_tx in
-    unit
+    return hash
   in
 
-  let wait_for_all_tx_process ~nb_txs ~name ~waiter =
-    let rec aux total =
-      if total = nb_txs then (
-        Log.info "All (%d) txs processed: \"%s\"." total name ;
-        unit)
-      else if total > nb_txs then
-        Test.fail
-          "more transaction where processed (%s) than expected, impossible"
-          name
-      else
-        let* nb = waiter () in
-        let total = total + nb in
-        Log.debug "Processed %d of txs. (%s)" total name ;
-        aux total
-    in
-    aux 0
+  let wait_for_all_tx_process_p ~hashes ~name ~waiter =
+    let* () = Lwt_list.iter_p (fun hash -> waiter ~hash) hashes in
+    Log.info "All (%d) txs processed: \"%s\"." (List.length hashes) name ;
+    unit
   in
 
   (* Test start here *)
@@ -11256,32 +11205,25 @@ let test_tx_queue_nonce =
     "Sending %d transactions to the observer and check after each that the \
      nonce in pending is correct"
     nb_txs ;
-  let* _hashes =
-    fold nb_txs () @@ fun i () ->
-    let* () = send_and_wait_sequencer_receive ~nonce:i in
-    check_nonce
-      ~__LOC__
-      ~check_observer:true
-      ~check_sequencer:true
-      ~block:"pending"
-      ~expected:(i + 1)
-      ()
-  in
-
-  let* () =
-    check_nonce
-      ~__LOC__
-      ~check_observer:true
-      ~check_sequencer:true
-      ~block:"pending"
-      ~expected:nb_txs
-      ()
+  let* hashes =
+    fold nb_txs [] @@ fun i hashes ->
+    let* hash = send_and_wait_sequencer_receive ~nonce:i in
+    let* () =
+      check_nonce
+        ~__LOC__
+        ~check_observer:true
+        ~check_sequencer:true
+        ~block:"pending"
+        ~expected:(i + 1)
+        ()
+    in
+    return (hash :: hashes)
   in
 
   Log.info
     "Send another txs to create a gap and check that the nonce in pending is \
      still the same" ;
-  let* () = send_and_wait_sequencer_receive ~nonce:(nb_txs + 1) in
+  let* _lost_hash = send_and_wait_sequencer_receive ~nonce:(nb_txs + 1) in
 
   let* () =
     check_nonce
@@ -11296,84 +11238,78 @@ let test_tx_queue_nonce =
   Log.info
     "Send missing nonce to fill the gap and check that the nonce in pending is \
      now correct" ;
-  let* () = send_and_wait_sequencer_receive ~nonce:nb_txs in
+  let* hash = send_and_wait_sequencer_receive ~nonce:nb_txs in
 
   Log.info
     "produce enough block to include all txs and make sure the nonce of latest \
      and pending is equal." ;
   (* Checks that all txs were confirmed in the observer *)
   let observer_wait_tx_confirmed () =
-    let waiter () =
-      let* _ = Evm_node.wait_for_tx_queue_transaction_confirmed observer in
-      return 1
-    in
-    wait_for_all_tx_process
-      ~nb_txs:(nb_txs + 2)
-      ~name:"tx confirmed in observer"
-      ~waiter
-  in
-
-  (* Checks that all txs were included in a block by the sequencer *)
-  let sequencer_wait_tx_included () =
-    let waiter () =
-      let* _hash = Evm_node.wait_for_block_producer_tx_injected sequencer in
-      return 1
-    in
-    wait_for_all_tx_process
-      ~nb_txs:(nb_txs + 2)
-      ~name:"tx included by sequencer"
-      ~waiter
-  in
-
-  (* produce enough blocks to include all txs submited *)
-  let produce_block_until_all_included () =
-    let res = ref None in
-    let _p =
-      let* () = sequencer_wait_tx_included () in
-      res := Some () ;
+    let waiter ~hash =
+      let* _ =
+        Evm_node.wait_for_tx_queue_transaction_confirmed ~hash observer
+      in
       unit
     in
-    let result_f () = return !res in
-    bake_until
-      ~__LOC__
-      ~bake:(fun () ->
-        let*@ _ = produce_block sequencer in
-        unit)
-      ~result_f
-      ()
+    let hashes = hash :: hashes in
+    wait_for_all_tx_process_p ~hashes ~name:"tx confirmed in observer" ~waiter
   in
 
-  let* () = produce_block_until_all_included ()
-  and* () = observer_wait_tx_confirmed () in
-
+  (* Checks that all txs were included in a unique block by the sequencer *)
   let* () =
-    check_nonce
-      ~__LOC__
-      ~check_observer:true
-      ~check_sequencer:true
-      ~block:"pending"
-      ~expected:(nb_txs + 2)
-      ()
-  in
+    let*@ included_nb_txs = produce_block sequencer in
+    Check.(
+      (included_nb_txs = nb_txs + 2)
+        int
+        ~__LOC__
+        ~error_msg:"Produce block included %L transaction expected %R") ;
+    unit
+  and* _ = observer_wait_tx_confirmed () in
+
   let* () =
     check_nonce
       ~__LOC__
       ~check_observer:true
       ~check_sequencer:true
       ~block:"latest"
+      ~expected:(nb_txs + 1)
+        (* latest two transaction were submitted in the wrong order,
+           only the second one is correctly applied. The other still
+           lives in the pending state of the observer tx_queue for
+           now, it's reason for "pending" still it. *)
+      ()
+  in
+  let* () =
+    (* In the observer the wrong ordered tx is still in pending *)
+    check_nonce
+      ~__LOC__
+      ~check_observer:true
+      ~check_sequencer:false
+      ~block:"pending"
       ~expected:(nb_txs + 2)
+      ()
+  in
+  let* () =
+    (* In the sequencer the wrong ordered tx is dropped when creating
+       the block *)
+    check_nonce
+      ~__LOC__
+      ~check_observer:false
+      ~check_sequencer:true
+      ~block:"pending"
+      ~expected:(nb_txs + 1)
       ()
   in
 
   Log.info "Try to send a transaction with a nonce in the past." ;
-  let*@? _hash = send_raw_tx ~nonce:(nb_txs + 1) in
+  let*@? _hash = send_raw_tx ~nonce:nb_txs in
 
   (* still true with a valid tx in pending. *)
-  let* () = send_and_wait_sequencer_receive ~nonce:(nb_txs + 3) in
-  let*@? _hash = send_raw_tx ~nonce:(nb_txs + 1) in
+  let* _hash = send_and_wait_sequencer_receive ~nonce:(nb_txs + 1) in
+  let*@? _hash = send_raw_tx ~nonce:nb_txs in
 
-  Log.info "Try to send a transaction with an nonce already pending." ;
-  let* () = send_and_wait_sequencer_receive ~nonce:(nb_txs + 3) in
+  Log.info "Try to send a transaction with an nonce already pending, is valid." ;
+  let* _hash = send_and_wait_sequencer_receive ~nonce:(nb_txs + 1) in
   unit
 
 let test_spawn_rpc =
@@ -11465,6 +11401,7 @@ let test_tx_queue_limit =
     ~use_threshold_encryption:Register_without_feature
     ~use_dal:Register_without_feature
     ~websockets:false
+    ~enable_tx_queue:true (* enables it in the sequencer *)
     ~title:
       "Submits transactions to an observer with a tx queue and make sure its \
        limit are respected."
@@ -11477,6 +11414,7 @@ let test_tx_queue_limit =
 
   let max_number_of_txs = 10 in
   let* () =
+    (* modify the config of the observer. *)
     Evm_node.Config_file.update observer
     @@ Evm_node.patch_config_with_experimental_feature
          ~enable_tx_queue:true
@@ -11491,106 +11429,78 @@ let test_tx_queue_limit =
   let* () = Evm_node.run observer in
 
   (* helper to craft a tx with given nonce. *)
-  let raw_tx ~nonce =
-    Cast.craft_tx
-      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-      ~chain_id:1337
-      ~nonce
-      ~gas_price:1_000_000_000
-      ~gas:23_300
-      ~value:Wei.one
-      ~address:Eth_account.bootstrap_accounts.(1).address
-      ()
+  let send_raw_tx ~nonce =
+    let* raw_tx =
+      Cast.craft_tx
+        ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+        ~chain_id:1337
+        ~nonce
+        ~gas_price:1_000_000_000
+        ~gas:23_300
+        ~value:Wei.one
+        ~address:Eth_account.bootstrap_accounts.(1).address
+        ()
+    in
+    Rpc.send_raw_transaction ~raw_tx observer
+  in
+
+  let send_and_wait_sequencer_receive ~nonce =
+    let wait_sequencer_see_tx =
+      Evm_node.wait_for_tx_queue_add_transaction sequencer
+    in
+    let* hash =
+      let*@ hash = send_raw_tx ~nonce in
+      return hash
+    and* _ = wait_sequencer_see_tx in
+    return hash
   in
 
   Log.info
     "send %d txs, all are successfully added to the queue"
     max_number_of_txs ;
-  let* () =
-    Lwt_list.iter_p
-      (fun i ->
-        let* raw_tx = raw_tx ~nonce:i in
-        let*@ _hash = Rpc.send_raw_transaction ~raw_tx observer in
-        unit)
-      (range 0 (max_number_of_txs - 1))
+  let* hashes =
+    fold max_number_of_txs [] (fun i hashes ->
+        let* hash = send_and_wait_sequencer_receive ~nonce:i in
+        return (hash :: hashes))
   in
 
   Log.info "Then send an additional txs, that fails" ;
-  let*@? _error =
-    let* raw_tx = raw_tx ~nonce:max_number_of_txs in
-    Rpc.send_raw_transaction ~raw_tx observer
-  in
+  let*@? _error = send_raw_tx ~nonce:max_number_of_txs in
 
-  Log.info "Wait for all txs to be included by the sequencer" ;
-  let wait_for_all_tx_process ~nb_txs ~name ~waiter =
-    let rec aux total =
-      if total = nb_txs then (
-        Log.info "All (%d) txs processed: \"%s\"." total name ;
-        unit)
-      else if total > nb_txs then
-        Test.fail
-          "more transaction where processed (%s) than expected, impossible"
-          name
-      else
-        let* nb = waiter () in
-        let total = total + nb in
-        Log.debug "Processed %d of txs. (%s)" total name ;
-        aux total
-    in
-    aux 0
-  in
-
-  (* Checks that all txs were included in a block by the sequencer *)
-  let sequencer_wait_tx_included () =
-    let waiter () =
-      let* _hash = Evm_node.wait_for_block_producer_tx_injected sequencer in
-      return 1
-    in
-    wait_for_all_tx_process
-      ~nb_txs:max_number_of_txs
-      ~name:"tx included by sequencer"
-      ~waiter
-  in
-
-  (* produce enough blocks to include all txs submited *)
-  let produce_block_until_all_included () =
-    let res = ref None in
-    let _p =
-      let* () = sequencer_wait_tx_included () in
-      res := Some () ;
-      unit
-    in
-    let result_f () = return !res in
-    bake_until
-      ~__LOC__
-      ~bake:(fun () ->
-        let*@ _ = produce_block sequencer in
-        unit)
-      ~result_f
-      ()
-  in
+  Log.info "Produce a block, all transaction are confirmed" ;
   let observer_wait_tx_confirmed () =
-    let waiter () =
-      let* _ = Evm_node.wait_for_tx_queue_transaction_confirmed observer in
-      return 1
+    let* () =
+      Lwt_list.iter_p
+        (fun hash ->
+          let* _ =
+            Evm_node.wait_for_tx_queue_transaction_confirmed ~hash observer
+          in
+          Log.debug "tx %s confirmed" hash ;
+          unit)
+        hashes
     in
-    wait_for_all_tx_process
-      ~nb_txs:max_number_of_txs
-      ~name:"tx confirmed in observer"
-      ~waiter
+    Log.info "All (%d) txs confirmed in observer" max_number_of_txs ;
+    unit
   in
 
-  let* () = produce_block_until_all_included ()
-  and* () = observer_wait_tx_confirmed () in
+  (* Checks that all txs were included in a unique block by the sequencer *)
+  let* () =
+    let*@ included_nb_txs = produce_block sequencer in
+    Check.(
+      (included_nb_txs = max_number_of_txs)
+        int
+        ~__LOC__
+        ~error_msg:"Produce block included %L transaction expected %R") ;
+    unit
+  and* _ = observer_wait_tx_confirmed () in
 
   Log.info
     "Resend %d txs, all are successfully added to the queue"
     max_number_of_txs ;
   let* () =
-    Lwt_list.iter_p
+    Lwt_list.iter_s
       (fun i ->
-        let* raw_tx = raw_tx ~nonce:i in
-        let*@ _hash = Rpc.send_raw_transaction ~raw_tx observer in
+        let* _ = send_and_wait_sequencer_receive ~nonce:i in
         unit)
       (range max_number_of_txs ((2 * max_number_of_txs) - 1))
   in

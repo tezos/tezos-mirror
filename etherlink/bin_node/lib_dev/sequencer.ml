@@ -164,6 +164,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
         configuration.experimental_features.drop_duplicate_on_injection
       ~order_enabled:
         configuration.experimental_features.blueprints_publisher_order_enabled
+      ~tx_queue_enabled:(Configuration.is_tx_queue_enabled configuration)
       ()
   in
   let* () =
@@ -196,20 +197,27 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
 
   let backend = Evm_ro_context.ro_backend ro_ctxt configuration in
   let* () =
-    Tx_pool.start
-      {
-        backend;
-        smart_rollup_address = smart_rollup_address_b58;
-        mode = Sequencer;
-        tx_timeout_limit = configuration.tx_pool_timeout_limit;
-        tx_pool_addr_limit = Int64.to_int configuration.tx_pool_addr_limit;
-        tx_pool_tx_per_addr_limit =
-          Int64.to_int configuration.tx_pool_tx_per_addr_limit;
-        max_number_of_chunks =
-          (match configuration.sequencer with
-          | Some {max_number_of_chunks; _} -> Some max_number_of_chunks
-          | None -> None);
-      }
+    match configuration.experimental_features.enable_tx_queue with
+    | Some tx_queue_config ->
+        Tx_queue.start
+          ~config:tx_queue_config
+          ~keep_alive:configuration.keep_alive
+          ()
+    | None ->
+        Tx_pool.start
+          {
+            backend;
+            smart_rollup_address = smart_rollup_address_b58;
+            mode = Sequencer;
+            tx_timeout_limit = configuration.tx_pool_timeout_limit;
+            tx_pool_addr_limit = Int64.to_int configuration.tx_pool_addr_limit;
+            tx_pool_tx_per_addr_limit =
+              Int64.to_int configuration.tx_pool_tx_per_addr_limit;
+            max_number_of_chunks =
+              (match configuration.sequencer with
+              | Some {max_number_of_chunks; _} -> Some max_number_of_chunks
+              | None -> None);
+          }
   in
   Metrics.init
     ~mode:"sequencer"
@@ -222,6 +230,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
         smart_rollup_address = smart_rollup_address_b58;
         sequencer_key = sequencer_config.sequencer;
         maximum_number_of_chunks = sequencer_config.max_number_of_chunks;
+        uses_tx_queue = Configuration.is_tx_queue_enabled configuration;
       }
   in
   let* () =

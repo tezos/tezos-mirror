@@ -582,9 +582,13 @@ let wait_for_tx_queue_add_transaction ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"tx_queue_add_transaction.v0"
   @@ fun json -> JSON.(json |> as_string |> Option.some)
 
-let wait_for_tx_queue_transaction_confirmed ?timeout evm_node =
+let wait_for_tx_queue_transaction_confirmed ?timeout ?hash evm_node =
   wait_for_event ?timeout evm_node ~event:"tx_queue_transaction_confirmed.v0"
-  @@ fun json -> JSON.(json |> as_string |> Option.some)
+  @@ fun json ->
+  let found_hash = JSON.(json |> as_string) in
+  match hash with
+  | Some hash -> if found_hash = hash then Some found_hash else None
+  | None -> Some found_hash
 
 let wait_for_tx_queue_injecting_transaction ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"tx_queue_injecting_transaction.v0"

@@ -10,6 +10,7 @@ type parameters = {
   smart_rollup_address : string;
   sequencer_key : Client_keys.sk_uri;
   maximum_number_of_chunks : int;
+  uses_tx_queue : bool;
 }
 
 (* The size of a delayed transaction is overapproximated to the maximum size
@@ -168,7 +169,7 @@ let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
         Evm_state.get_delayed_inbox_item head_info.evm_state delayed_hash)
       delayed_hashes
   in
-  let* _hashes =
+  let* confirmed_txs =
     Evm_context.apply_blueprint timestamp blueprint_payload delayed_transactions
   in
   let (Qty number) = head_info.next_blueprint_number in
@@ -183,25 +184,34 @@ let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
       (fun hash -> Block_producer_events.transaction_selected ~hash)
       (tx_hashes @ delayed_hashes)
   in
-  return_unit
+  return confirmed_txs
 
 (** Produces a block if we find at least one valid transaction in the transaction
     pool or if [force] is true. *)
 let produce_block_if_needed ~cctxt ~smart_rollup_address ~sequencer_key ~force
-    ~timestamp ~delayed_hashes ~remaining_cumulative_size head_info =
+    ~timestamp ~delayed_hashes ~remaining_cumulative_size ~uses_tx_queue
+    head_info =
   let open Lwt_result_syntax in
   let* transactions_and_objects =
     (* Low key optimization to avoid even checking the txpool if there is not
        enough space for the smallest transaction. *)
     if remaining_cumulative_size <= minimum_ethereum_transaction_size then
       return []
+    else if uses_tx_queue then
+      (* TODO: https://gitlab.com/tezos/tezos/-/merge_requests/17211
+         Validates transactions with regards to balance for
+         example (with_state validation) *)
+      Tx_queue.pop_transactions
+        ~maximum_cumulative_size:remaining_cumulative_size
     else
+      (* When the tx_pool is removed, we could keep the sequence instead
+         of creating a list in the popped transaction of the tx_queue. *)
       Tx_pool.pop_transactions
         ~maximum_cumulative_size:remaining_cumulative_size
   in
   let n = List.length transactions_and_objects + List.length delayed_hashes in
   if force || n > 0 then
-    let* () =
+    let* confirmed_txs =
       produce_block_with_transactions
         ~sequencer_key
         ~cctxt
@@ -211,7 +221,13 @@ let produce_block_if_needed ~cctxt ~smart_rollup_address ~sequencer_key ~force
         ~delayed_hashes
         head_info
     in
-    let* () = Tx_pool.clear_popped_transactions () in
+    let* () =
+      if uses_tx_queue then
+        Tx_queue.confirm_transactions
+          ~clear_pending_queue_after:true
+          ~confirmed_txs
+      else Tx_pool.clear_popped_transactions ()
+    in
     return n
   else return 0
 
@@ -233,10 +249,12 @@ let head_info_and_delayed_transactions ~with_delayed_transactions
   let*! head_info = Evm_context.head_info () in
   return (head_info, delayed_hashes, remaining_cumulative_size)
 
-let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
-    ~maximum_number_of_chunks ~with_delayed_transactions =
+let produce_block ~uses_tx_queue ~cctxt ~smart_rollup_address ~sequencer_key
+    ~force ~timestamp ~maximum_number_of_chunks ~with_delayed_transactions =
   let open Lwt_result_syntax in
-  let* is_locked = Tx_pool.is_locked () in
+  let* is_locked =
+    if uses_tx_queue then Tx_queue.is_locked () else Tx_pool.is_locked ()
+  in
   if is_locked then
     let*! () = Block_producer_events.production_locked () in
     return 0
@@ -253,7 +271,7 @@ let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
       | None -> false
     in
     if is_going_to_upgrade then
-      let* () =
+      let* _hashes (* empty because no txs given *) =
         produce_block_with_transactions
           ~sequencer_key
           ~cctxt
@@ -273,6 +291,7 @@ let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
         ~force
         ~delayed_hashes
         ~remaining_cumulative_size
+        ~uses_tx_queue
         head_info
 
 module Handlers = struct
@@ -292,10 +311,12 @@ module Handlers = struct
           smart_rollup_address;
           sequencer_key;
           maximum_number_of_chunks;
+          uses_tx_queue;
         } =
           state
         in
         produce_block
+          ~uses_tx_queue
           ~cctxt
           ~smart_rollup_address
           ~sequencer_key
