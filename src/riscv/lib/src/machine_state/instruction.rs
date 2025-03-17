@@ -254,7 +254,7 @@ pub enum OpCode {
     Bgeu,
 
     // RV64I U-type instructions
-    Auipc,
+    AddImmediateToPC,
 
     // RV64I jump instructions
     Jal,
@@ -500,7 +500,7 @@ impl OpCode {
             Self::Bgz => Args::run_bgz,
             Self::Bltu => Args::run_bltu,
             Self::Bgeu => Args::run_bgeu,
-            Self::Auipc => Args::run_auipc,
+            Self::AddImmediateToPC => Args::run_add_immediate_to_pc,
             Self::Jal => Args::run_jal,
             Self::JalrImm => Args::run_jalr_imm,
             Self::JrImm => Args::run_jr_imm,
@@ -651,6 +651,7 @@ impl OpCode {
             Self::And => Some(Args::run_and),
             Self::Or => Some(Args::run_or),
             Self::Li => Some(Args::run_li),
+            Self::AddImmediateToPC => Some(Args::run_add_immediate_to_pc),
             Self::J => Some(Args::run_j),
             Self::Jr => Some(Args::run_jr),
             Self::JrImm => Some(Args::run_jr_imm),
@@ -1298,12 +1299,9 @@ impl Args {
     // RV64I U-type instructions
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
-    unsafe fn run_auipc<MC: MemoryConfig, M: ManagerReadWrite>(
-        &self,
-        core: &mut MachineCoreState<MC, M>,
-    ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-        core.hart.run_auipc(self.imm, self.rd.nzx);
-        Ok(Next(self.width))
+    unsafe fn run_add_immediate_to_pc<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+        branching::run_add_immediate_to_pc(icb, self.imm, self.rd.nzx);
+        icb.ok(Next(self.width))
     }
 
     // RV64I jump instructions
@@ -1637,10 +1635,9 @@ impl From<&InstrCacheable> for Instruction {
             InstrCacheable::Lui(args) => {
                 Instruction::new_li(args.rd, args.imm, InstrWidth::Uncompressed)
             }
-            InstrCacheable::Auipc(args) => Instruction {
-                opcode: OpCode::Auipc,
-                args: args.into(),
-            },
+            InstrCacheable::Auipc(args) => {
+                Instruction::new_add_immediate_to_pc(args.rd, args.imm, InstrWidth::Uncompressed)
+            }
 
             // RV64I jump instructions
             InstrCacheable::Jal(args) => Instruction::from_ic_jal(args),

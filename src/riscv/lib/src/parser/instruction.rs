@@ -405,6 +405,11 @@ pub enum InstrCacheable {
     /// Being a `U-type` operation, the immediate is correctly formatted
     /// (lower 12 bits cleared and the value is sign-extended).
     Lui(NonZeroRdUJTypeArgs),
+    /// `AUIPC` - Add the `U-type` formatted immediate `imm` to the current program counter
+    /// and store the result in `rd`.
+    ///
+    /// Being a `U-type` operation, the immediate is correctly formatted
+    /// (lower 12 bits cleared and the value is sign-extended).
     Auipc(NonZeroRdUJTypeArgs),
 
     // RV64I jump instructions
