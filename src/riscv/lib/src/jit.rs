@@ -292,6 +292,7 @@ mod tests {
     use crate::machine_state::block_cache::bcall::InterpretedBlockBuilder;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::memory::MemoryConfig;
+    use crate::machine_state::mode::Mode;
     use crate::machine_state::registers::NonZeroXRegister;
     use crate::machine_state::registers::XRegister;
     use crate::machine_state::registers::nz;
@@ -1316,6 +1317,31 @@ mod tests {
                 I::new_nop(Uncompressed),
             ])
             .build()];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
+
+    backend_test!(test_ecall, F, {
+        use strum::IntoEnumIterator;
+
+        let scenarios: Vec<Scenario<F>> = Mode::iter()
+            .map(|mode| {
+                ScenarioBuilder::default()
+                    .set_expected_steps(1)
+                    .set_setup_hook(setup_hook!(core, F, { core.hart.mode.write(mode) }))
+                    .set_instructions(&[
+                        I::new_nop(Uncompressed),
+                        I::new_ecall(),
+                        I::new_nop(Uncompressed),
+                    ])
+                    .build()
+            })
+            .collect();
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
         let mut interpreted_bb = InterpretedBlockBuilder;

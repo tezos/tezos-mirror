@@ -354,6 +354,15 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
             None => None,
         }
     }
+
+    fn ecall(&mut self) -> Self::IResult<ProgramCounterUpdate<Self::XValue>> {
+        self.jsa_call
+            .ecall(&mut self.builder, self.core_ptr_val, self.exception_ptr_val);
+
+        self.handle_exception();
+
+        None
+    }
 }
 
 impl From<Predicate> for IntCC {

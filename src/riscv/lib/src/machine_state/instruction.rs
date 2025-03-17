@@ -699,6 +699,7 @@ impl OpCode {
 
             // Errors
             Self::Unknown => Some(Args::run_illegal),
+            Self::ECall => Some(Args::run_ecall),
             _ => None,
         }
     }
@@ -1587,11 +1588,8 @@ impl Args {
         icb.ok(pcu)
     }
 
-    fn run_ecall<MC: MemoryConfig, M: ManagerReadWrite>(
-        &self,
-        core: &mut MachineCoreState<MC, M>,
-    ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-        Err(core.hart.run_ecall())
+    fn run_ecall<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+        icb.ecall()
     }
 
     // RV64C compressed instructions

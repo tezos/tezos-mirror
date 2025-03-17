@@ -42,6 +42,7 @@ use super::builder::stack_slots::StackSlots;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::memory::Address;
 use crate::machine_state::memory::MemoryConfig;
+use crate::machine_state::mode::Mode;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::registers::XValue;
 use crate::state_backend::ManagerReadWrite;
@@ -58,6 +59,8 @@ const XREG_WRITE_SYMBOL: &str = "JSA::xreg_write";
 const HANDLE_EXCEPTION: &str = "JSA::handle_exception";
 
 const RAISE_ILLEGAL_INSTRUCTION_EXCEPTION: &str = "JSA::raise_illegal_instruction_exception";
+
+const ECALL_FROM_MODE: &str = "JSA::ecall_from_mode";
 
 /// State Access that a JIT-compiled block may use.
 ///
@@ -109,6 +112,15 @@ pub trait JitStateAccess: ManagerReadWrite {
     extern "C" fn raise_illegal_instruction_exception(exception_out: &mut Option<Exception>) {
         *exception_out = Some(Exception::IllegalInstruction);
     }
+
+    /// Raise the appropriate environment-call exception given the current machine mode.
+    ///
+    /// Writes the exception to the given exception memory, after which it would be safe to
+    /// assume it is initialised.
+    extern "C" fn ecall<MC: MemoryConfig>(
+        core: &mut MachineCoreState<MC, Self>,
+        exception_out: &mut Option<Exception>,
+    );
 }
 
 impl JitStateAccess for Owned {
@@ -151,6 +163,19 @@ impl JitStateAccess for Owned {
             }
         }
     }
+
+    extern "C" fn ecall<MC: MemoryConfig>(
+        core: &mut MachineCoreState<MC, Self>,
+        exception_out: &mut Option<Exception>,
+    ) {
+        let exception = match core.hart.mode.read() {
+            Mode::User => Exception::EnvCallFromUMode,
+            Mode::Supervisor => Exception::EnvCallFromSMode,
+            Mode::Machine => Exception::EnvCallFromMMode,
+        };
+
+        *exception_out = Some(exception);
+    }
 }
 
 /// Register state access symbols in the builder.
@@ -181,6 +206,11 @@ pub(super) fn register_jsa_symbols<MC: MemoryConfig, JSA: JitStateAccess>(
         RAISE_ILLEGAL_INSTRUCTION_EXCEPTION,
         <JSA as JitStateAccess>::raise_illegal_instruction_exception as *const u8,
     );
+
+    builder.symbol(
+        ECALL_FROM_MODE,
+        <JSA as JitStateAccess>::ecall::<MC> as *const u8,
+    );
 }
 
 /// Identifications of globally imported [`JitStateAccess`] methods.
@@ -190,6 +220,7 @@ pub(super) struct JsaImports<MC: MemoryConfig, JSA: JitStateAccess> {
     xreg_write: FuncId,
     handle_exception: FuncId,
     raise_illegal_instruction_exception: FuncId,
+    ecall_from_mode: FuncId,
     _pd: PhantomData<(MC, JSA)>,
 }
 
@@ -251,12 +282,21 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JsaImports<MC, JSA> {
             &raise_illegal_exception_sig,
         )?;
 
+        let ecall_from_mode_sig = Signature {
+            params: vec![ptr, ptr],
+            returns: vec![],
+            call_conv,
+        };
+        let ecall_from_mode =
+            module.declare_function(ECALL_FROM_MODE, Linkage::Import, &ecall_from_mode_sig)?;
+
         Ok(Self {
             pc_write,
             xreg_read,
             xreg_write,
             handle_exception,
             raise_illegal_instruction_exception,
+            ecall_from_mode,
             _pd: PhantomData,
         })
     }
@@ -272,6 +312,7 @@ pub(super) struct JsaCalls<'a, MC: MemoryConfig, JSA: JitStateAccess> {
     xreg_write: Option<FuncRef>,
     handle_exception: Option<FuncRef>,
     raise_illegal_instruction_exception: Option<FuncRef>,
+    ecall_from_mode: Option<FuncRef>,
     _pd: PhantomData<(MC, JSA)>,
 }
 
@@ -286,6 +327,7 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
             xreg_write: None,
             handle_exception: None,
             raise_illegal_instruction_exception: None,
+            ecall_from_mode: None,
             _pd: PhantomData,
         }
     }
@@ -392,6 +434,26 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
             });
 
         builder.ins().call(*raise_illegal, &[exception_ptr]);
+    }
+
+    /// Emit the required IR to call `ecall`.
+    ///
+    /// This sets the exception to `Some(_)` with the appropriate environment call exception for
+    /// the current machine mode.
+    pub(super) fn ecall(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        core_ptr: Value,
+        exception_ptr: Value,
+    ) {
+        let ecall_from_mode = self.ecall_from_mode.get_or_insert_with(|| {
+            self.module
+                .declare_func_in_func(self.imports.ecall_from_mode, builder.func)
+        });
+
+        builder
+            .ins()
+            .call(*ecall_from_mode, &[core_ptr, exception_ptr]);
     }
 }
 
