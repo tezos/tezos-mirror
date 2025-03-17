@@ -42,10 +42,10 @@ configure)
     true)
       db_get octez-baker/dal-node-url
       DALURL=${RET}
-      echo "RUNTIME_OPTS=\"--dal-node $DALURL\"" >> /etc/default/octez-baker
+      echo "RUNTIME_OPTS=\"--keep-alive --dal-node $DALURL\"" >> /etc/default/octez-baker
       ;;
     false)
-      echo "RUNTIME_OPTS=--without-dal" >> /etc/default/octez-baker
+      echo "RUNTIME_OPTS=--keep-alive --without-dal" >> /etc/default/octez-baker
       ;;
     esac
 
@@ -78,12 +78,12 @@ configure)
       true)
         db_get octez-baker/dal-node-url
         DALURL=${RET}
-        echo "RUNTIME_OPTS=\"--dal-node $DALURL\"" >> /etc/default/octez-baker
-        echoerr "RUNTIME_OPTS=--dal-node $DALURL"
+        echo "RUNTIME_OPTS=\" --keep-alive --dal-node $DALURL\"" >> /etc/default/octez-baker
+        echoerr "RUNTIME_OPTS=--keep-alive --dal-node $DALURL"
         ;;
       false)
-        echo "RUNTIME_OPTS=--without-dal" >> /etc/default/octez-baker
-        echoerr "RUNTIME_OPTS=--without-dal"
+        echo "RUNTIME_OPTS=--keep-alive --without-dal" >> /etc/default/octez-baker
+        echoerr "RUNTIME_OPTS=--keep-alive --without-dal"
         ;;
       esac
 
