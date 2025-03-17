@@ -39,6 +39,7 @@ use crate::instruction_context::ICB;
 use crate::instruction_context::IcbFnResult;
 use crate::instruction_context::IcbLoweringFn;
 use crate::instruction_context::Predicate;
+use crate::instruction_context::Shift;
 use crate::interpreter::branching;
 use crate::interpreter::integer;
 use crate::interpreter::load_store;
@@ -207,9 +208,9 @@ pub enum OpCode {
     Xor,
     Or,
     And,
-    Sll,
-    Srl,
-    Sra,
+    ShiftLeft,
+    ShiftRightUnsigned,
+    ShiftRightSigned,
     SetLessThanSigned,
     SetLessThanUnsigned,
     Addw,
@@ -453,9 +454,9 @@ impl OpCode {
             Self::Xor => Args::run_xor,
             Self::Or => Args::run_or,
             Self::And => Args::run_and,
-            Self::Sll => Args::run_sll,
-            Self::Srl => Args::run_srl,
-            Self::Sra => Args::run_sra,
+            Self::ShiftLeft => Args::run_shift_left,
+            Self::ShiftRightUnsigned => Args::run_shift_right_unsigned,
+            Self::ShiftRightSigned => Args::run_shift_right_signed,
             Self::SetLessThanSigned => Args::run_set_less_than_signed,
             Self::SetLessThanUnsigned => Args::run_set_less_than_unsigned,
             Self::Addw => Args::run_addw,
@@ -690,6 +691,9 @@ impl OpCode {
             Self::BranchGreaterThanOrEqualZero => Some(Args::run_branch_greater_than_or_equal_zero),
             Self::BranchGreaterThanZero => Some(Args::run_branch_greater_than_zero),
 
+            Self::ShiftLeft => Some(Args::run_shift_left),
+            Self::ShiftRightUnsigned => Some(Args::run_shift_right_unsigned),
+            Self::ShiftRightSigned => Some(Args::run_shift_right_signed),
             _ => None,
         }
     }
@@ -836,6 +840,15 @@ macro_rules! impl_r_type {
         /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
             $impl(icb, self.rs1.x, self.rs2.x, self.rd.nzx);
+            icb.ok(Next(self.width))
+        }
+    };
+
+    ($fn: ident, $shift: ident) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+            integer::run_shift(icb, Shift::$shift, self.rs1.nzx, self.rs2.nzx, self.rd.nzx);
             icb.ok(Next(self.width))
         }
     };
@@ -1261,9 +1274,9 @@ impl Args {
     impl_r_type!(run_xor, non_zero);
     impl_r_type!(integer::run_and, run_and, non_zero);
     impl_r_type!(integer::run_or, run_or, non_zero);
-    impl_r_type!(run_sll, non_zero);
-    impl_r_type!(run_srl, non_zero);
-    impl_r_type!(run_sra, non_zero);
+    impl_r_type!(run_shift_left, Left);
+    impl_r_type!(run_shift_right_unsigned, RightUnsigned);
+    impl_r_type!(run_shift_right_signed, RightSigned);
     impl_r_type!(
         integer::run_set_less_than_signed,
         run_set_less_than_signed,

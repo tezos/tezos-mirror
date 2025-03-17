@@ -507,6 +507,8 @@ const RS2_3_U5: u5 = u5::new(0b11);
 const FM_0: u32 = 0b0;
 const FM_8: u32 = 0b1000;
 
+pub(crate) const SHIFT_BITMASK: i64 = 0b11_1111;
+
 /// Parse an uncompressed instruction from a u32.
 #[inline]
 pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {

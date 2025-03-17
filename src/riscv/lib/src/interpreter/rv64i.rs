@@ -144,50 +144,6 @@ where
         self.write_nz(rd, result as u64)
     }
 
-    /// Shift left logically bits in rs1 by shift_amount = val(rs2)\[5:0\]
-    /// saving the result in rd.
-    /// (zeros are shifted in the lower bits)
-    ///
-    /// Relevant opcodes:
-    /// - `SLL`
-    pub fn run_sll(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
-        // Get last 6 bits of rs2
-        // TODO: RV-459: Move bit-masking of shamt to the parser
-        let sh_amt = self.read_nz(rs2) & 0b11_1111;
-        let result = self.read_nz(rs1) << sh_amt;
-        self.write_nz(rd, result)
-    }
-
-    /// Shift right logically bits in rs1 by shift_amount = val(rs2)\[5:0\]
-    /// saving the result in rd
-    /// (zeros are shifted in the upper bits)
-    ///
-    /// Relevant opcodes:
-    /// - `SRL`
-    pub fn run_srl(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
-        // Get last 6 bits of rs2
-        // TODO: RV-459: Move bit-masking of shamt to the parser
-        let sh_amt = self.read_nz(rs2) & 0b11_1111;
-        let result = self.read_nz(rs1) >> sh_amt;
-        self.write_nz(rd, result)
-    }
-
-    /// Shift right arithmeticallly bits in rs1 by shift_amount = val(rs2)\[5:0\]
-    /// saving the result in rd
-    /// (sign-bits are shifted in the upper bits)
-    ///
-    /// Relevant opcodes:
-    /// - `SRA`
-    pub fn run_sra(&mut self, rs1: NonZeroXRegister, rs2: NonZeroXRegister, rd: NonZeroXRegister) {
-        // Get last 6 bits of rs2
-        // TODO: RV-459: Move bit-masking of shamt to the parser
-        let sh_amt = self.read_nz(rs2) & 0b11_1111;
-        // Right shift on i64 is an arithmetic shift
-        let result = (self.read_nz(rs1) as i64) >> sh_amt;
-        // i64 as u64 is a no-op
-        self.write_nz(rd, result as u64)
-    }
-
     /// `SLLW` R-type instruction
     ///
     /// Shift left logically only lowest 32 bits in rs1
@@ -510,6 +466,8 @@ mod tests {
 
     use crate::backend_test;
     use crate::create_state;
+    use crate::instruction_context::Shift;
+    use crate::interpreter::integer::run_shift;
     use crate::machine_state::MachineCoreState;
     use crate::machine_state::MachineCoreStateLayout;
     use crate::machine_state::hart_state::HartState;
@@ -578,9 +536,9 @@ mod tests {
             $rs1:ident, $r1_val:expr,
             $rd:ident, $expected_val:expr
         ) => {
-            $state.xregisters.write($rs1, $r1_val);
-            $state.xregisters.$shift_fn($imm, $rs1, nz::$rd);
-            let new_val = $state.xregisters.read($rd);
+            $state.hart.xregisters.write($rs1, $r1_val);
+            $state.hart.xregisters.$shift_fn($imm, $rs1, nz::$rd);
+            let new_val = $state.hart.xregisters.read($rd);
             assert_eq!(new_val, $expected_val);
         };
 
@@ -588,9 +546,9 @@ mod tests {
             $rs1:ident, $r1_val:expr,
             $rd:ident, $expected_val:expr, non_zero
         ) => {
-            $state.xregisters.write_nz(nz::$rs1, $r1_val);
-            $state.xregisters.$shift_fn($imm, nz::$rs1, nz::$rd);
-            let new_val = $state.xregisters.read($rd);
+            $state.hart.xregisters.write_nz(nz::$rs1, $r1_val);
+            $state.hart.xregisters.$shift_fn($imm, nz::$rs1, nz::$rd);
+            let new_val = $state.hart.xregisters.read($rd);
             assert_eq!(new_val, $expected_val);
         };
     }
@@ -601,23 +559,23 @@ mod tests {
             $rs1:ident, $r1_val:expr,
             $rd:ident, $expected_val:expr
         ) => {
-            $state.xregisters.write($rs2, $r2_val);
-            $state.xregisters.write($rs1, $r1_val);
-            $state.xregisters.$shift_fn($rs1, $rs2, nz::$rd);
-            let new_val = $state.xregisters.read($rd);
+            $state.hart.xregisters.write($rs2, $r2_val);
+            $state.hart.xregisters.write($rs1, $r1_val);
+            $state.hart.xregisters.$shift_fn($rs1, $rs2, nz::$rd);
+            let new_val = $state.hart.xregisters.read($rd);
             assert_eq!(new_val, $expected_val);
         };
 
-        ($state:ident, $shift_fn:tt,
+        ($state:ident, $shift:expr,
             $rs2:ident, $r2_val:expr,
             $rs1:ident, $r1_val:expr,
             $rd:ident, $expected_val:expr,
             non_zero
         ) => {
-            $state.xregisters.write($rs2, $r2_val);
-            $state.xregisters.write($rs1, $r1_val);
-            $state.xregisters.$shift_fn(nz::$rs1, nz::$rs2, nz::$rd);
-            let new_val = $state.xregisters.read($rd);
+            $state.hart.xregisters.write($rs2, $r2_val);
+            $state.hart.xregisters.write($rs1, $r1_val);
+            run_shift(&mut $state, $shift, nz::$rs1, nz::$rs2, nz::$rd);
+            let new_val = $state.hart.xregisters.read($rd);
             assert_eq!(new_val, $expected_val);
         };
     }
@@ -677,16 +635,45 @@ mod tests {
                 non_zero
             );
         };
+
+        ($state:ident, $shift_fn_imm:tt, $shift_reg:expr,
+            $rs2:ident, $r2_val:expr,
+            $rs1:ident, $r1_val:expr,
+            $rd:ident, $expected_val:expr,
+            non_zero
+        ) => {
+            test_shift_instr!(
+                $state,
+                $shift_fn_imm,
+                $r2_val,
+                $rs1,
+                $r1_val,
+                $rd,
+                $expected_val,
+                non_zero
+            );
+            test_shift_reg_instr!(
+                $state,
+                $shift_reg,
+                $rs2,
+                $r2_val,
+                $rs1,
+                $r1_val,
+                $rd,
+                $expected_val,
+                non_zero
+            );
+        };
     }
 
     backend_test!(test_shift, F, {
-        let mut state = create_state!(HartState, F);
+        let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
 
         // imm = 0
         test_both_shift_instr!(
             state,
             run_slli,
-            run_sll,
+            Shift::Left,
             t0,
             0,
             a0,
@@ -698,7 +685,7 @@ mod tests {
         test_both_shift_instr!(
             state,
             run_srli,
-            run_srl,
+            Shift::RightUnsigned,
             t1,
             0,
             a0,
@@ -710,7 +697,7 @@ mod tests {
         test_both_shift_instr!(
             state,
             run_srai,
-            run_sra,
+            Shift::RightSigned,
             t3,
             0,
             a0,
@@ -724,7 +711,7 @@ mod tests {
         test_both_shift_instr!(
             state,
             run_slli,
-            run_sll,
+            Shift::Left,
             a2,
             20,
             a0,
@@ -736,7 +723,7 @@ mod tests {
         test_both_shift_instr!(
             state,
             run_srli,
-            run_srl,
+            Shift::RightUnsigned,
             a2,
             10,
             a0,
@@ -748,7 +735,7 @@ mod tests {
         test_both_shift_instr!(
             state,
             run_srli,
-            run_srl,
+            Shift::RightUnsigned,
             a2,
             14,
             t0,
@@ -760,7 +747,7 @@ mod tests {
         test_both_shift_instr!(
             state,
             run_srai,
-            run_sra,
+            Shift::RightSigned,
             t0,
             10,
             a0,
@@ -774,7 +761,7 @@ mod tests {
         test_both_shift_instr!(
             state,
             run_slli,
-            run_sll,
+            Shift::Left,
             t0,
             40,
             a0,
@@ -786,7 +773,7 @@ mod tests {
         test_both_shift_instr!(
             state,
             run_srli,
-            run_srl,
+            Shift::RightUnsigned,
             a1,
             40,
             a0,
@@ -798,7 +785,7 @@ mod tests {
         test_both_shift_instr!(
             state,
             run_srai,
-            run_sra,
+            Shift::RightSigned,
             a2,
             40,
             a0,
@@ -811,7 +798,7 @@ mod tests {
         // Use same register for shift and source
         test_shift_reg_instr!(
             state,
-            run_sll,
+            Shift::Left,
             a1,
             0b1001_0101,
             a1,
@@ -823,7 +810,7 @@ mod tests {
         // Use same register for shift and destination
         test_shift_reg_instr!(
             state,
-            run_sll,
+            Shift::Left,
             a1,
             0b1001_0101,
             a2,
@@ -835,7 +822,7 @@ mod tests {
         // Use same register for shift, source and destination
         test_shift_reg_instr!(
             state,
-            run_sll,
+            Shift::Left,
             a1,
             0b1101_0101,
             a1,
@@ -847,7 +834,7 @@ mod tests {
     });
 
     backend_test!(test_shift_w, F, {
-        let mut state = create_state!(HartState, F);
+        let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
 
         // imm = 0
         test_both_shift_instr!(

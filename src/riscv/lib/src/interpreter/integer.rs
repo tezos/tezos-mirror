@@ -6,8 +6,10 @@
 
 use crate::instruction_context::ICB;
 use crate::instruction_context::Predicate;
+use crate::instruction_context::Shift;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::registers::XRegister;
+use crate::parser::SHIFT_BITMASK;
 
 /// Moves the two's complement representation of `rs1` into `rd`.
 ///
@@ -249,6 +251,31 @@ pub fn run_mul(
     let rhs = icb.xregister_read_nz(rs2);
     let result = icb.xvalue_wrapping_mul(lhs, rhs);
     icb.xregister_write_nz(rd, result)
+}
+
+/// Shift bits in `rs1` by `shift_amount = val(rs2)\[5:0\]` in the method specified by `shift`
+/// saving the result in `rd`.
+///
+/// Relevant opcodes:
+/// - `SLL`
+/// - `SRL`
+/// - `SRA`
+#[inline]
+pub fn run_shift(
+    icb: &mut impl ICB,
+    shift: Shift,
+    rs1: NonZeroXRegister,
+    rs2: NonZeroXRegister,
+    rd: NonZeroXRegister,
+) {
+    let bitmask = icb.xvalue_of_imm(SHIFT_BITMASK);
+    let rs2val = icb.xregister_read_nz(rs2);
+    let shift_amount = icb.xvalue_bitwise_and(rs2val, bitmask);
+
+    let rs1val = icb.xregister_read_nz(rs1);
+    let result = icb.xvalue_shift(rs1val, shift_amount, shift);
+
+    icb.xregister_write_nz(rd, result);
 }
 
 #[cfg(test)]
