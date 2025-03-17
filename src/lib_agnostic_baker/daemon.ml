@@ -52,6 +52,8 @@ let run_thread ~protocol_hash ~baker_commands ~baker_args ~cancel_promise
         (module Config)
         ~select_commands
         ~cmd_args:baker_args
+          (* The underlying logging from the baker must not be initialised, otherwise we double log. *)
+        ~disable_logging:true
         ();
       cancel_promise;
     ]
@@ -77,9 +79,6 @@ let spawn_baker protocol_hash ~baker_args =
   let cancel_promise, canceller = Lwt.wait () in
   let* thread =
     let*? plugin = Protocol_plugins.proto_plugin_for_protocol protocol_hash in
-    (* The internal event logging needs to be closed, because another one will be
-       initialised in the [run_baker_binary]. *)
-    let*! () = Tezos_base_unix.Internal_event_unix.close () in
     let baker_commands = Commands.baker_commands plugin in
     return
     @@ run_thread

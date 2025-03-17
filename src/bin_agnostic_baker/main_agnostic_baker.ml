@@ -40,4 +40,5 @@ let () =
          in
          Format.pp_print_flush Format.err_formatter () ;
          Format.pp_print_flush Format.std_formatter () ;
+         let*! () = Tezos_base_unix.Internal_event_unix.close () in
          Lwt.return retcode))

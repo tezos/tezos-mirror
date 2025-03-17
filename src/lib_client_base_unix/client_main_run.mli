@@ -104,7 +104,9 @@ val run :
     application computation as an Lwt promise. Unlike [run], this function
     does not run the event loop, it merely returns the wrapped promise to be
     integrated into an existing Lwt-based application. It can optionally use
-    [?cmd_args] as already parsed arguments to the [main] function. *)
+    [?cmd_args] as already parsed arguments to the [main] function. It can
+    also optionally disable logging of the underlying process via
+    [?disable_logging]. *)
 val lwt_run :
   (module M) ->
   select_commands:
@@ -112,5 +114,6 @@ val lwt_run :
     Client_config.cli_args ->
     Client_context.full Tezos_clic.command list tzresult Lwt.t) ->
   ?cmd_args:string list ->
+  ?disable_logging:bool ->
   unit ->
   int Lwt.t
