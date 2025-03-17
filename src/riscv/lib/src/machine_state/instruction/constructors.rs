@@ -19,6 +19,7 @@ use crate::parser::instruction::ITypeArgs;
 use crate::parser::instruction::InstrWidth;
 use crate::parser::instruction::NonZeroRdITypeArgs;
 use crate::parser::instruction::NonZeroRdRTypeArgs;
+use crate::parser::instruction::RTypeArgs;
 use crate::parser::instruction::SBTypeArgs;
 use crate::parser::instruction::SplitITypeArgs;
 use crate::parser::instruction::UJTypeArgs;
@@ -1012,6 +1013,25 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Mul`].
+    pub(crate) fn new_mul(
+        rd: NonZeroXRegister,
+        rs1: NonZeroXRegister,
+        rs2: NonZeroXRegister,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::Mul,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {
@@ -1681,6 +1701,22 @@ impl Instruction {
             }
             (X::NonZero(rs1), X::NonZero(rs2)) => {
                 Instruction::new_bgeu(rs1, rs2, args.imm, InstrWidth::Uncompressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::Mul`] according to whether registers are non-zero.
+    ///
+    /// [`InstrCacheable::Mul`]: crate::parser::instruction::InstrCacheable::Mul
+    pub(super) fn from_ic_mul(args: &RTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match (split_x0(args.rd), split_x0(args.rs1), split_x0(args.rs2)) {
+            (X::X0, _, _) => Instruction::new_nop(InstrWidth::Uncompressed),
+            (X::NonZero(rd), X::X0, _) | (X::NonZero(rd), _, X::X0) => {
+                Instruction::new_li(rd, 0, InstrWidth::Uncompressed)
+            }
+            (X::NonZero(rd), X::NonZero(rs1), X::NonZero(rs2)) => {
+                Instruction::new_mul(rd, rs1, rs2, InstrWidth::Uncompressed)
             }
         }
     }

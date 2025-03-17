@@ -58,6 +58,11 @@ pub trait ICB {
     /// This behaves identically for both signed & unsigned values.
     fn xvalue_wrapping_sub(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue;
 
+    /// Perform a wrapping mul of two **XValues**, returning the new value.
+    ///
+    /// This behaves identically for both signed & unsigned values.
+    fn xvalue_wrapping_mul(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue;
+
     /// Perform a bitwise and of two **XValues**, returning the new value.
     fn xvalue_bitwise_and(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue;
 
@@ -169,6 +174,12 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
     fn xvalue_wrapping_sub(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
         // Wrapped subtraction in two's complement behaves the same for signed and unsigned
         lhs.wrapping_sub(rhs)
+    }
+
+    #[inline(always)]
+    fn xvalue_wrapping_mul(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
+        // Wrapped multiplication in two's complement behaves the same for signed and unsigned
+        lhs.wrapping_mul(rhs)
     }
 
     #[inline(always)]
