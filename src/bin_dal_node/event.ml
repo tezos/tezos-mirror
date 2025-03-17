@@ -119,22 +119,23 @@ open struct
       ~level:Warning
       ("path", Data_encoding.(string))
 
-  let retry_fetching_node_config level prefix =
-    declare_2
+  let retry_fetching_info_from_l1 level prefix =
+    declare_3
       ~section
       ~prefix_name_with_section:true
-      ~name:(prefix ^ "retry_fetching_config")
+      ~name:(prefix ^ "fetching_info_from_l1")
       ~msg:
-        "cannot fetch config from l1 node at {endpoint}, retrying in {delay}s"
+        "failed to fetch {info} from L1 node at {endpoint}, retry in {delay}s"
       ~level
+      ("info", Data_encoding.string)
       ("endpoint", Data_encoding.string)
       ("delay", Data_encoding.float)
 
-  let retry_fetching_node_config_notice =
-    retry_fetching_node_config Internal_event.Notice "notice"
+  let retry_fetching_info_from_l1_notice =
+    retry_fetching_info_from_l1 Internal_event.Notice "notice"
 
-  let retry_fetching_node_config_warning =
-    retry_fetching_node_config Internal_event.Warning "warning"
+  let retry_fetching_info_from_l1_warning =
+    retry_fetching_info_from_l1 Internal_event.Warning "warning"
 
   let config_error_no_bootstrap =
     declare_0
@@ -1035,11 +1036,10 @@ let emit_node_is_ready () = emit node_is_ready ()
 
 let emit_data_dir_not_found ~path = emit data_dir_not_found path
 
-let emit_retry_fetching_node_config_notice ~endpoint ~delay =
-  emit retry_fetching_node_config_notice (endpoint, delay)
-
-let emit_retry_fetching_node_config_warning ~endpoint ~delay =
-  emit retry_fetching_node_config_warning (endpoint, delay)
+let emit_retry_fetching_info_from_l1 ~endpoint ~delay ~what ~event_kind =
+  match event_kind with
+  | `Notice -> emit retry_fetching_info_from_l1_notice (what, endpoint, delay)
+  | `Warning -> emit retry_fetching_info_from_l1_warning (what, endpoint, delay)
 
 let emit_config_error_no_bootstrap () = emit config_error_no_bootstrap ()
 
