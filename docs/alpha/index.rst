@@ -5,13 +5,16 @@ The economic protocol provides the rules for checking the validity of the blocks
 Thus, the
 economic protocol represents the amendable part of Tezos.
 
+The following pages provide the full documentation for this protocol.
+The differences with respect to other protocols are summarized in the protocol release page
+:doc:`../protocols/alpha`.
 
 .. toctree::
    :maxdepth: 2
 
    protocol
 
-The following documentation pages have a specific version for this protocol:
+The following pages provide a reference for this protocol:
 
 .. toctree::
    :maxdepth: 2

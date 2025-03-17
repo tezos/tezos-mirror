@@ -1,13 +1,15 @@
 Protocol Quebec
 ===============
 
-This page documents the changes brought by protocol Quebec with respect
+This page lists the changes brought by protocol Quebec with respect
 to Paris (see :ref:`naming_convention`).
+For the list of changes brought by Paris with respect to Oxford, see :doc:`../protocols/020_paris`.
 
-For changes brought by Paris with respect to Oxford, see :doc:`../protocols/020_paris`.
+For a higher-level overview of the most salient new features see the 
+`Quebec announcement <https://research-development.nomadic-labs.com/quebec-announcement.html>`__.
 
 The code can be found in directory :src:`src/proto_021_PsQuebec` of the ``master``
-branch of Octez.
+branch of Octez and the full documentation in :doc:`this page <../active/index>`.
 
 Environment Version
 -------------------
