@@ -29,7 +29,7 @@ let suite =
   ]
 
 let () =
-  Logs.set_level (Some Debug) ;
+  Logs.set_level (Some Info) ;
   Logs.set_reporter (Brassaia_eio_test_helpers.Brassaia_test.reporter ()) ;
   Random.self_init () ;
   Alcotest.run ~__FILE__ ~tags:["ci_disabled"] "brassaia-eio" suite

@@ -33,6 +33,9 @@ module Spec : sig
   (** [init name] is a new configuration specification named [name] *)
   val init : string -> t
 
+  (** [clear_all t] clears the hash table containing the specs *)
+  val clear_all : unit -> unit
+
   (** [name spec] is the name associated with a config spec *)
   val name : t -> string
 

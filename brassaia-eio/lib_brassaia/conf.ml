@@ -52,6 +52,8 @@ module Spec = struct
 
   let all = Hashtbl.create 8
 
+  let clear_all () = Hashtbl.clear all
+
   let init name =
     let keys = M.empty in
     if Hashtbl.mem all name then

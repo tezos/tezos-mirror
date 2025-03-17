@@ -18,6 +18,7 @@ module Brassaia = Brassaia_eio.Brassaia
 open Brassaia.Backend.Conf
 
 let test_conf () =
+  Spec.clear_all () ;
   let spec_a = Spec.init "a" in
   let spec_b = Spec.init "b" in
   let x = key ~spec:spec_a "x" Brassaia.Type.int 0 in
@@ -33,9 +34,7 @@ let test_conf () =
   let specs =
     Spec.list () |> Seq.map Spec.name |> List.of_seq |> List.sort String.compare
   in
-  let () =
-    Alcotest.(check (list string)) "Spec list" ["a"; "b"; "mem"; "pack"] specs
-  in
+  let () = Alcotest.(check (list string)) "Spec list" ["a"; "b"] specs in
   let keys =
     Spec.keys spec_a
     |> Seq.map (fun (K k) -> name k)
