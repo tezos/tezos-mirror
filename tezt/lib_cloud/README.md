@@ -54,7 +54,9 @@ Run the following commands:
    artifact registries of Google (necessary for pushing docker images).
 
 5. `sudo usermod -aG docker $USER` where `$USER` is your user. This is to enable
-   `docker` commands to be run without being sudo.
+   `docker` commands to be run without being sudo. This is only required for `Linux`
+   distributions, as on `macOS` `docker` runs inside a virtualized environment and
+   the user automatically has the necessary privileges.
 
 6. `gcloud config set project [YOUR_PROJECT_ID]`: For configuring the default
     project.
@@ -91,7 +93,7 @@ provided in `tezt/lib_cloud/dockerfiles/debian.Dockerfile`.
 The library takes care for you to push this image on a dedicated GCP
 registry. A docker image such as the one generated from
 `debian.Dockerfile` may contain some binaries. Tezt cloud always
-try to rebuild the docker image to be sure it uses the last version,
+tries to rebuild the docker image to be sure it uses the last version,
 however be sure to compile the binaries beforehand.
 
 Finally, do note that with Tezt cloud you can specify for each VM

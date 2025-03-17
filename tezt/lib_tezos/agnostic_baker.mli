@@ -49,6 +49,7 @@ val on_event : t -> (event -> unit) -> unit
     The resulting promise is fulfilled as soon as the agnostic baker has been
     spawned. It continues running in the background. *)
 val run :
+  ?env:string String_map.t ->
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   t ->
@@ -134,6 +135,7 @@ val create :
   ?remote_mode:bool ->
   ?operations_pool:string ->
   ?dal_node:Dal_node.t ->
+  ?dal_node_timeout_percentage:int ->
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
   ?node_version_allowed:string ->
@@ -172,6 +174,7 @@ val create_from_uris :
   ?remote_mode:bool ->
   ?operations_pool:string ->
   ?dal_node_rpc_endpoint:Endpoint.t ->
+  ?dal_node_timeout_percentage:int ->
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
   ?node_version_allowed:string ->
@@ -218,6 +221,7 @@ val create_from_uris :
     If [remote_mode] is specified, the agnostic baker will run in
     RPC-only mode. *)
 val init :
+  ?env:string String_map.t ->
   ?runner:Runner.t ->
   ?path:string ->
   ?name:string ->
@@ -232,6 +236,7 @@ val init :
   ?remote_mode:bool ->
   ?operations_pool:string ->
   ?dal_node:Dal_node.t ->
+  ?dal_node_timeout_percentage:int ->
   ?state_recorder:bool ->
   ?node_version_check_bypass:bool ->
   ?node_version_allowed:string ->

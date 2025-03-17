@@ -30,6 +30,7 @@ module Parameters = struct
     node_data_dir : string;
     node_rpc_endpoint : Endpoint.t;
     dal_node_rpc_endpoint : Endpoint.t option;
+    dal_node_timeout_percentage : int option;
     mutable pending_ready : unit option Lwt.u list;
     votefile : string option;
     liquidity_baking_toggle_vote : liquidity_baking_vote option;
@@ -82,8 +83,9 @@ let create_from_uris ?runner
     ?event_pipe ?(delegates = []) ?votefile
     ?(liquidity_baking_toggle_vote = Some Pass) ?force_apply_from_round
     ?(remote_mode = false) ?operations_pool ?dal_node_rpc_endpoint
-    ?(state_recorder = false) ?(node_version_check_bypass = false)
-    ?node_version_allowed ~base_dir ~node_data_dir ~node_rpc_endpoint () =
+    ?dal_node_timeout_percentage ?(state_recorder = false)
+    ?(node_version_check_bypass = false) ?node_version_allowed ~base_dir
+    ~node_data_dir ~node_rpc_endpoint () =
   let agnostic_baker =
     create
       ~path
@@ -104,6 +106,7 @@ let create_from_uris ?runner
         remote_mode;
         operations_pool;
         dal_node_rpc_endpoint;
+        dal_node_timeout_percentage;
         state_recorder;
         node_version_check_bypass;
         node_version_allowed;
@@ -116,7 +119,8 @@ let handle_event node ({name; _} : event) =
 
 let create ?runner ?path ?name ?color ?event_pipe ?(delegates = []) ?votefile
     ?(liquidity_baking_toggle_vote = Some Pass) ?force_apply_from_round
-    ?(remote_mode = false) ?operations_pool ?dal_node ?(state_recorder = false)
+    ?(remote_mode = false) ?operations_pool ?dal_node
+    ?dal_node_timeout_percentage ?(state_recorder = false)
     ?(node_version_check_bypass = false) ?node_version_allowed node client =
   let dal_node_rpc_endpoint = Option.map Dal_node.as_rpc_endpoint dal_node in
   let agnostic_baker =
@@ -133,6 +137,7 @@ let create ?runner ?path ?name ?color ?event_pipe ?(delegates = []) ?votefile
       ~remote_mode
       ?operations_pool
       ?dal_node_rpc_endpoint
+      ?dal_node_timeout_percentage
       ~state_recorder
       ~node_version_check_bypass
       ?node_version_allowed
@@ -144,7 +149,7 @@ let create ?runner ?path ?name ?color ?event_pipe ?(delegates = []) ?votefile
   on_event agnostic_baker (handle_event agnostic_baker) ;
   agnostic_baker
 
-let run ?event_level ?event_sections_levels (agnostic_baker : t) =
+let run ?env ?event_level ?event_sections_levels (agnostic_baker : t) =
   (match agnostic_baker.status with
   | Not_running -> ()
   | Running _ ->
@@ -194,6 +199,12 @@ let run ?event_level ?event_sections_levels (agnostic_baker : t) =
       "without-dal"
       (Option.is_none agnostic_baker.persistent_state.dal_node_rpc_endpoint)
   in
+  let dal_node_timeout_percentage =
+    Cli_arg.optional_arg
+      "dal-node-timeout-percentage"
+      string_of_int
+      agnostic_baker.persistent_state.dal_node_timeout_percentage
+  in
   let state_recorder =
     Cli_arg.optional_switch
       "record-state"
@@ -218,7 +229,8 @@ let run ?event_level ?event_sections_levels (agnostic_baker : t) =
     ["--"; "--endpoint"; node_addr; "--base-dir"; base_dir; "run"]
     @ run_args @ delegates @ liquidity_baking_toggle_vote @ votefile
     @ force_apply_from_round @ operations_pool @ dal_node_endpoint @ without_dal
-    @ state_recorder @ node_version_check_bypass @ node_version_allowed
+    @ dal_node_timeout_percentage @ state_recorder @ node_version_check_bypass
+    @ node_version_allowed
   in
 
   let on_terminate _ =
@@ -227,6 +239,7 @@ let run ?event_level ?event_sections_levels (agnostic_baker : t) =
     unit
   in
   run
+    ?env
     ?event_level
     ?event_sections_levels
     agnostic_baker
@@ -253,12 +266,12 @@ let wait_for_ready agnostic_baker =
         resolver :: agnostic_baker.persistent_state.pending_ready ;
       check_event agnostic_baker "agnostic baker started" promise
 
-let init ?runner ?(path = Uses.path Constant.octez_experimental_agnostic_baker)
-    ?name ?color ?event_level ?event_pipe ?event_sections_levels
-    ?(delegates = []) ?votefile ?liquidity_baking_toggle_vote
-    ?force_apply_from_round ?remote_mode ?operations_pool ?dal_node
-    ?state_recorder ?node_version_check_bypass ?node_version_allowed node client
-    =
+let init ?env ?runner
+    ?(path = Uses.path Constant.octez_experimental_agnostic_baker) ?name ?color
+    ?event_level ?event_pipe ?event_sections_levels ?(delegates = []) ?votefile
+    ?liquidity_baking_toggle_vote ?force_apply_from_round ?remote_mode
+    ?operations_pool ?dal_node ?dal_node_timeout_percentage ?state_recorder
+    ?node_version_check_bypass ?node_version_allowed node client =
   let* () = Node.wait_for_ready node in
   let agnostic_baker =
     create
@@ -273,6 +286,7 @@ let init ?runner ?(path = Uses.path Constant.octez_experimental_agnostic_baker)
       ?remote_mode
       ?operations_pool
       ?dal_node
+      ?dal_node_timeout_percentage
       ?state_recorder
       ?node_version_check_bypass
       ?node_version_allowed
@@ -280,7 +294,7 @@ let init ?runner ?(path = Uses.path Constant.octez_experimental_agnostic_baker)
       node
       client
   in
-  let* () = run ?event_level ?event_sections_levels agnostic_baker in
+  let* () = run ?env ?event_level ?event_sections_levels agnostic_baker in
   let* () = wait_for_ready agnostic_baker in
   return agnostic_baker
 

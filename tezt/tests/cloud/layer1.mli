@@ -16,7 +16,7 @@
       with the latest block metadata
     - Disconnect the node from this network
     - From here, every node will be ran with --private-mode and a known list
-      of peer (i.e. the full set of nodes involved in the experiment)
+      of peers (i.e. the full set of nodes involved in the experiment)
     - Start bakers
     - Wait for the nodes to sync
     - Launch some nodes and clients and use them for stresstesting the network
@@ -50,16 +50,16 @@
     v}
 
     On ghostnet, the goto account to use is the faucet account (the one used above).
-    For mainnet, you can either ask a local node or try with and indexer and find a
+    For mainnet, you can either ask a local node or try with an indexer and find a
     big account.
 
-    Along these step, monitoring tools common to tezt cloud scenarios can be
+    Along these steps, monitoring tools common to tezt cloud scenarios can be
     started (prometheus, grafana). Teztale service is started automatically.
 
-    Every nodes (bootstrap one, bakers ones and stresstest ones) are
+    All nodes (bootstrap one, bakers ones and stresstest ones) are
     registered as a prometheus source.
 
-    If you use the --prometheus option, you should automatically obtain a
+    If you use the [--prometheus] option, you should automatically obtain a
     snapshot of data scraped during the experiment.
 
     For now, teztale database has to be dowloaded manually before the bootstrap

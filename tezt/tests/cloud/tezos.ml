@@ -409,6 +409,37 @@ module Baker = struct
   end
 end
 
+module Agnostic_baker = struct
+  include Agnostic_baker
+
+  module Agent = struct
+    let init ?(group = "L1") ?env ?name ~delegates
+        ?(path = Uses.path Constant.octez_experimental_agnostic_baker) ~client
+        ?dal_node ?dal_node_timeout_percentage node cloud agent =
+      let* path = Agent.copy agent ~source:path in
+      let* () =
+        Cloud.register_binary
+          cloud
+          ~agents:[agent]
+          ~group
+          ~name:(Filename.basename path)
+          ()
+      in
+      let runner = Agent.runner agent in
+      init
+        ?env
+        ?name
+        ~event_level:`Notice
+        ?runner
+        ~path
+        ~delegates
+        ?dal_node
+        ?dal_node_timeout_percentage
+        node
+        client
+  end
+end
+
 module Accuser = struct
   include Accuser
 

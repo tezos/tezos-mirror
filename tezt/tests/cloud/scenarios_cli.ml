@@ -415,6 +415,8 @@ module type Layer1 = sig
 
   val stake : int list option
 
+  val agnostic_bakers : int list option
+
   val stresstest : (string * string * int * int) option
 
   val maintenance_delay : int option
@@ -465,15 +467,28 @@ module Layer1 () = struct
       ~long:"stake"
       ~placeholder:"<integer>,<integer>,<integer>,..."
       ~description:
-        "By default, each delegate will run its own baker node. In that is \
-         what you want, --stake option only takes one integers that is the \
+        "By default, each delegate will run its own baker node. If that is \
+         what you want, --stake option only takes one integer that is the \
          number of active bakers on the network (you need to know that number \
          before starting the experiment). If you want to aggregate delegates \
-         into pools, use a comma-separated list of integers representating \
+         into pools, use a comma-separated list of integers representing \
          relative weights defining the expected stake repartition. Delegates \
-         will be distributed amongs pools in order to (approximately) respect \
+         will be distributed amongst pools in order to (approximately) respect \
          the given stake distribution."
       (Clap.list_of_int ~dummy:[] "stake")
+      ()
+
+  let agnostic_bakers =
+    Clap.optional
+      ~section
+      ~long:"agnostic-bakers"
+      ~placeholder:"<integer>,<integer>,<integer>,..."
+      ~description:
+        "By default all the bakers run in the experiment will use protocol \
+         specific octez binaries. This list contains the indices of the bakers \
+         that are going to be agnostic, meaning that they will use the \
+         agnostic-baker binary, instead of the protocol specific one."
+      (Clap.list_of_int ~dummy:[] "agnostic-bakers")
       ()
 
   let stresstest =
