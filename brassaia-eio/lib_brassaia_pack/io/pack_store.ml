@@ -62,19 +62,19 @@ module Table (K : Brassaia.Hash.S) = struct
 end
 
 module Make_without_close_checks
-    (Fm : File_manager.S)
-    (Dispatcher : Dispatcher.S with module Fm = Fm)
-    (Hash : Brassaia.Hash.S with type t = Fm.Index.key)
+    (File_Manager : File_manager.S)
+    (Dispatcher : Dispatcher.S with module File_Manager = File_Manager)
+    (Hash : Brassaia.Hash.S with type t = File_Manager.Index.key)
     (Val : Pack_value.Persistent
              with type hash := Hash.t
               and type key := Hash.t Pack_key.t)
-    (Errs : Io_errors.S with module Io = Fm.Io) =
+    (Errs : Io_errors.S with module Io = File_Manager.Io) =
 struct
   module Tbl = Table (Hash)
-  module Control = Fm.Control
-  module Dict = Fm.Dict
-  module Suffix = Fm.Suffix
-  module Index = Fm.Index
+  module Control = File_Manager.Control
+  module Dict = File_Manager.Dict
+  module Suffix = File_Manager.Suffix
+  module Index = File_Manager.Index
   module Key = Pack_key.Make (Hash)
 
   module Lru = struct
@@ -85,7 +85,7 @@ struct
     let find t k = find t k |> Val.of_kinded
   end
 
-  type file_manager = Fm.t
+  type file_manager = File_Manager.t
 
   type dict = Dict.t
 
@@ -95,7 +95,7 @@ struct
     lru : Lru.t;
     staging : Val.t Tbl.t;
     indexing_strategy : Brassaia_pack.Indexing_strategy.t;
-    fm : Fm.t;
+    file_manager : File_Manager.t;
     dict : Dict.t;
     dispatcher : Dispatcher.t;
   }
@@ -109,7 +109,7 @@ struct
   let get_location t k =
     match Pack_key.inspect k with
     | Indexed hash -> (
-        match Index.find (Fm.index t.fm) hash with
+        match Index.find (File_Manager.index t.file_manager) hash with
         | None -> raise Dangling_hash
         | Some (off, len, _kind) ->
             Pack_key.promote_exn k ~offset:off ~length:len ;
@@ -143,7 +143,7 @@ struct
 
   let index_direct_with_kind t hash =
     [%log.debug "index %a" pp_hash hash] ;
-    match Index.find (Fm.index t.fm) hash with
+    match Index.find (File_Manager.index t.file_manager) hash with
     | None -> None
     | Some (offset, length, kind) ->
         let key = Pack_key.init_direct ~offset ~length hash in
@@ -154,12 +154,14 @@ struct
 
   let index t hash = index_direct t hash
 
-  let init ~config ~fm ~dict ~dispatcher ~lru =
+  let init ~config ~file_manager ~dict ~dispatcher ~lru =
     let indexing_strategy = Conf.indexing_strategy config in
     let staging = Tbl.create 127 in
-    Fm.register_suffix_consumer fm ~after_flush:(fun () -> Tbl.clear staging) ;
-    Fm.register_prefix_consumer fm ~after_reload:(fun () -> Ok (Lru.clear lru)) ;
-    {lru; staging; indexing_strategy; fm; dict; dispatcher}
+    File_Manager.register_suffix_consumer file_manager ~after_flush:(fun () ->
+        Tbl.clear staging) ;
+    File_Manager.register_prefix_consumer file_manager ~after_reload:(fun () ->
+        Ok (Lru.clear lru)) ;
+    {lru; staging; indexing_strategy; file_manager; dict; dispatcher}
 
   module Entry_prefix = struct
     type t = {
@@ -239,7 +241,7 @@ struct
      object. *)
   let gced t buf =
     let kind = Pack_value.Kind.of_magic_exn (Bytes.get buf Hash.hash_size) in
-    match (kind, Fm.gc_behaviour t.fm) with
+    match (kind, File_Manager.gc_behaviour t.file_manager) with
     | kind, `Delete -> kind = Pack_value.Kind.Dangling_parent_commit
     | _, `Archive -> false
 
@@ -277,7 +279,7 @@ struct
            isn't (yet) valid. If we're a read-only instance, the key may
            become valid on [reload]; otherwise we know that this key wasn't
            constructed for this store. *)
-        (if not (Control.readonly (Fm.control t.fm)) then
+        (if not (Control.readonly (File_Manager.control t.file_manager)) then
            let io_offset = Dispatcher.end_offset t.dispatcher in
            invalid_read
              "invalid key %a checked for membership (IO offset = %a)"
@@ -386,7 +388,7 @@ struct
          * become valid on [reload]; otherwise we know that this key wasn't
          * constructed for this store. *)
         let io_offset = Dispatcher.end_offset t.dispatcher in
-        match Control.readonly (Fm.control t.fm) with
+        match Control.readonly (File_Manager.control t.file_manager) with
         | false ->
             invalid_read
               "attempt to dereference invalid key %a (IO offset = %a)"
@@ -488,14 +490,14 @@ struct
       "[pack] calling batch directory on a store is not recommended. Use \
        repo.batch instead."] ;
     let on_success res =
-      Fm.flush t.fm |> Errs.raise_if_error ;
+      File_Manager.flush t.file_manager |> Errs.raise_if_error ;
       res
     in
     let on_fail exn =
       [%log.info
         "[pack] batch failed. calling flush. (%s)" (Printexc.to_string exn)] ;
       let () =
-        match Fm.flush t.fm with
+        match File_Manager.flush t.file_manager with
         | Ok () -> ()
         | Error err ->
             [%log.err
@@ -523,7 +525,7 @@ struct
             Some offset
         | Indexed hash -> (
             (* TODO: Why don't we promote the key here? *)
-            match Index.find (Fm.index t.fm) hash with
+            match Index.find (File_Manager.index t.file_manager) hash with
             | None ->
                 Stats.incr_appended_hashes () ;
                 None
@@ -534,7 +536,7 @@ struct
       let dict = Dict.index t.dict in
       let off = Dispatcher.end_offset t.dispatcher in
 
-      let append = Suffix.append_exn (Fm.suffix t.fm) in
+      let append = Suffix.append_exn (File_Manager.suffix t.file_manager) in
       Val.encode_bin ~offset_of_key ~dict hash v append ;
 
       let open Int63.Syntax in
@@ -543,7 +545,11 @@ struct
       let () =
         let should_index = t.indexing_strategy ~value_length:len kind in
         if should_index then
-          Index.add ~overcommit (Fm.index t.fm) hash (off, len, kind)
+          Index.add
+            ~overcommit
+            (File_Manager.index t.file_manager)
+            hash
+            (off, len, kind)
       in
       Tbl.add t.staging hash v ;
       Lru.add t.lru off v ;
@@ -573,20 +579,21 @@ struct
 end
 
 module Make
-    (Fm : File_manager.S)
-    (Dispatcher : Dispatcher.S with module Fm = Fm)
-    (Hash : Brassaia.Hash.S with type t = Fm.Index.key)
+    (File_Manager : File_manager.S)
+    (Dispatcher : Dispatcher.S with module File_Manager = File_Manager)
+    (Hash : Brassaia.Hash.S with type t = File_Manager.Index.key)
     (Val : Pack_value.Persistent
              with type hash := Hash.t
               and type key := Hash.t Pack_key.t)
-    (Errs : Io_errors.S with module Io = Fm.Io) =
+    (Errs : Io_errors.S with module Io = File_Manager.Io) =
 struct
-  module Inner = Make_without_close_checks (Fm) (Dispatcher) (Hash) (Val) (Errs)
+  module Inner =
+    Make_without_close_checks (File_Manager) (Dispatcher) (Hash) (Val) (Errs)
   include Inner
   include Indexable.Closeable (Inner)
 
-  let init ~config ~fm ~dict ~dispatcher ~lru =
-    Inner.init ~config ~fm ~dict ~dispatcher ~lru |> make_closeable
+  let init ~config ~file_manager ~dict ~dispatcher ~lru =
+    Inner.init ~config ~file_manager ~dict ~dispatcher ~lru |> make_closeable
 
   let cast t = Inner.cast (get_if_open_exn t) |> make_closeable
 

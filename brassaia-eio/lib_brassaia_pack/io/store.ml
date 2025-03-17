@@ -126,7 +126,7 @@ struct
 
       module Gc = Gc.Make (struct
         module Async = Async
-        module Fm = File_manager
+        module File_Manager = File_manager
         module Errs = Errs
         module Dict = Dict
         module Dispatcher = Dispatcher
@@ -151,7 +151,7 @@ struct
           node : read Node.CA.t;
           commit : read Commit.CA.t;
           branch : Branch.t;
-          fm : File_manager.t;
+          file_manager : File_manager.t;
           dict : Dict.t;
           dispatcher : Dispatcher.t;
           during_batch : bool Atomic.t;
@@ -174,7 +174,7 @@ struct
         let init config =
           let root = Brassaia_pack.Conf.root config in
           let fresh = Brassaia_pack.Conf.fresh config in
-          let fm =
+          let file_manager =
             let readonly = Brassaia_pack.Conf.readonly config in
             if readonly then File_manager.open_ro config |> Errs.raise_if_error
             else
@@ -189,12 +189,20 @@ struct
                   File_manager.open_rw config |> Errs.raise_if_error
               | (`File | `Other), _ -> Errs.raise_error (`Not_a_directory root)
           in
-          let dict = File_manager.dict fm in
-          let dispatcher = Dispatcher.init fm |> Errs.raise_if_error in
+          let dict = File_manager.dict file_manager in
+          let dispatcher =
+            Dispatcher.init file_manager |> Errs.raise_if_error
+          in
           let lru = Lru.create config in
-          let contents = Contents.CA.init ~config ~fm ~dict ~dispatcher ~lru in
-          let node = Node.CA.init ~config ~fm ~dict ~dispatcher ~lru in
-          let commit = Commit.CA.init ~config ~fm ~dict ~dispatcher ~lru in
+          let contents =
+            Contents.CA.init ~config ~file_manager ~dict ~dispatcher ~lru
+          in
+          let node =
+            Node.CA.init ~config ~file_manager ~dict ~dispatcher ~lru
+          in
+          let commit =
+            Commit.CA.init ~config ~file_manager ~dict ~dispatcher ~lru
+          in
           let branch =
             let root = Conf.root config in
             let fresh = Conf.fresh config in
@@ -211,7 +219,7 @@ struct
             node;
             commit;
             branch;
-            fm;
+            file_manager;
             dict;
             during_batch;
             running_gc;
@@ -219,16 +227,19 @@ struct
             lock;
           }
 
-        let flush t = File_manager.flush ?hook:None t.fm |> Errs.raise_if_error
+        let flush t =
+          File_manager.flush ?hook:None t.file_manager |> Errs.raise_if_error
 
-        let fsync t = File_manager.fsync t.fm |> Errs.raise_if_error
+        let fsync t = File_manager.fsync t.file_manager |> Errs.raise_if_error
 
-        let reload t = File_manager.reload t.fm |> Errs.raise_if_error
+        let reload t = File_manager.reload t.file_manager |> Errs.raise_if_error
 
         module Gc = struct
-          let is_allowed {fm; _} = File_manager.gc_allowed fm
+          let is_allowed {file_manager; _} =
+            File_manager.gc_allowed file_manager
 
-          let behaviour {fm; _} = File_manager.gc_behaviour fm
+          let behaviour {file_manager; _} =
+            File_manager.gc_behaviour file_manager
 
           let unsafe_cancel t =
             match Atomic.get t.running_gc with
@@ -268,7 +279,7 @@ struct
               else Ok ()
             in
             Eio.Mutex.use_rw ~protect:false t.lock @@ fun () ->
-            let current_generation = File_manager.generation t.fm in
+            let current_generation = File_manager.generation t.file_manager in
             let next_generation = current_generation + 1 in
             let lower_root = Conf.lower_root t.config in
             let* gc =
@@ -278,7 +289,7 @@ struct
                 ~generation:next_generation
                 ~unlink
                 ~dispatcher:t.dispatcher
-                ~fm:t.fm
+                ~file_manager:t.file_manager
                 ~contents:t.contents
                 ~node:t.node
                 ~commit:t.commit
@@ -335,7 +346,7 @@ struct
                 ()
 
           let latest_gc_target t =
-            let pl = File_manager.(Control.payload (control t.fm)) in
+            let pl = File_manager.(Control.payload (control t.file_manager)) in
             match pl.status with
             | From_v1_v2_post_upgrade _ | Used_non_minimal_indexing_strategy
             | No_gc_yet ->
@@ -395,7 +406,11 @@ struct
               Brassaia.Backend.Conf.add t.config Conf.Key.root path
             in
             let () =
-              File_manager.create_one_commit_store t.fm config gced commit_key
+              File_manager.create_one_commit_store
+                t.file_manager
+                config
+                gced
+                commit_key
               |> Errs.raise_if_error
             in
             let branch_path = Brassaia_pack.Layout.V4.branch ~root:path in
@@ -420,7 +435,7 @@ struct
             else Ok ()
           in
           Eio.Mutex.use_rw ~protect:true t.lock @@ fun () ->
-          File_manager.split t.fm
+          File_manager.split t.file_manager
 
         let split_exn repo = split repo |> Errs.raise_if_error
 
@@ -431,7 +446,7 @@ struct
             if Gc.is_finished t = false then
               Errs.raise_error `Add_volume_forbidden_during_gc
           in
-          File_manager.add_volume t.fm |> Errs.raise_if_error
+          File_manager.add_volume t.file_manager |> Errs.raise_if_error
 
         let unsafe_batch t f =
           [%log.debug "[pack] batch start"] ;
@@ -452,7 +467,7 @@ struct
               let s = Io.Clock.count c0 |> Mtime.span_to_s in
               [%log.info "[pack] batch completed in %.6fs" s] ;
               Atomic.set t.during_batch false ;
-              File_manager.flush t.fm |> Errs.raise_if_error ;
+              File_manager.flush t.file_manager |> Errs.raise_if_error ;
               let _ = try_finalise () in
               res
             in
@@ -462,7 +477,7 @@ struct
                 "[pack] batch failed. calling flush. (%s)"
                   (Printexc.to_string exn)] ;
               let () =
-                match File_manager.flush t.fm with
+                match File_manager.flush t.file_manager with
                 | Ok () -> ()
                 | Error err ->
                     [%log.err
@@ -487,7 +502,7 @@ struct
           (* Step 1 - Kill the gc process if it is running *)
           let _ = Gc.unsafe_cancel t in
           (* Step 2 - Close the files *)
-          let () = File_manager.close t.fm |> Errs.raise_if_error in
+          let () = File_manager.close t.file_manager |> Errs.raise_if_error in
           Branch.close t.branch ;
           (* Step 3 - Close the in-memory abstractions *)
           (* Dict.close t.dict; *)
@@ -528,7 +543,7 @@ struct
         | `Node -> X.Node.CA.integrity_check ~offset ~length k nodes
         | `Commit -> X.Commit.CA.integrity_check ~offset ~length k commits
       in
-      let index = File_manager.index t.fm in
+      let index = File_manager.index t.file_manager in
       Integrity_checks.check_always ?ppf ~auto_repair ~check index
 
     let integrity_check_minimal ?ppf ?heads t =
@@ -753,7 +768,7 @@ struct
         module Hash = H
         module Inode = X.Node.CA
         module Contents_pack = X.Contents.CA
-        module Fm = File_manager
+        module File_Manager = File_manager
         module Dispatcher = Dispatcher
         module Io_index = Io_index
       end)
@@ -812,7 +827,7 @@ struct
       module Index = Index
       module File_manager = File_manager
 
-      let file_manager (repo : X.Repo.t) = repo.fm
+      let file_manager (repo : X.Repo.t) = repo.file_manager
 
       module Dict = Dict
 

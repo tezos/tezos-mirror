@@ -17,11 +17,11 @@
 open Import
 
 module type S = sig
-  module Fm : File_manager.S
+  module File_Manager : File_manager.S
 
   type t
 
-  val init : Fm.t -> (t, [> Fm.Errs.t]) result
+  val init : File_Manager.t -> (t, [> File_Manager.Errs.t]) result
 
   (** [read_exn t ~off ~len buffer] writes into [buffer] the bytes from [off] to
       [off+len]. If the read occurred, in a lower volume, its identifier is
@@ -100,5 +100,6 @@ end
 module type Sigs = sig
   module type S = S
 
-  module Make (Fm : File_manager.S) : S with module Fm = Fm
+  module Make (File_Manager : File_manager.S) :
+    S with module File_Manager = File_Manager
 end

@@ -21,8 +21,8 @@ module Make (Args : Args) = struct
   module Hashes = Brassaia.Hash.Set.Make (Args.Hash)
   open Args
   module Inode_pack = Inode.Pack
-  module Pack_index = Fm.Index
-  module Io = Fm.Io
+  module Pack_index = File_Manager.Index
+  module Io = File_Manager.Io
 
   let rm_index path =
     let path_index = Filename.concat path "index" in
@@ -58,7 +58,7 @@ module Make (Args : Args) = struct
         (Brassaia_index.Index.Cache.Unbounded)
 
     type t = {
-      fm : Fm.t;
+      file_manager : File_Manager.t;
       dispatcher : Dispatcher.t;
       log_size : int;
       inode_pack : read Inode_pack.t;
@@ -69,12 +69,16 @@ module Make (Args : Args) = struct
       (* In order to read from the pack files, we need to open at least two
          files: suffix and control. We just open the file manager for
          simplicity. *)
-      let fm = Fm.open_ro config |> Fm.Errs.raise_if_error in
-      let dispatcher = Dispatcher.init fm |> Fm.Errs.raise_if_error in
+      let file_manager =
+        File_Manager.open_ro config |> File_Manager.Errs.raise_if_error
+      in
+      let dispatcher =
+        Dispatcher.init file_manager |> File_Manager.Errs.raise_if_error
+      in
       let log_size = Conf.index_log_size config in
-      {fm; dispatcher; log_size; inode_pack; contents_pack}
+      {file_manager; dispatcher; log_size; inode_pack; contents_pack}
 
-    let close t = Fm.close t.fm
+    let close t = File_Manager.close t.file_manager
 
     let key_of_hash hash t =
       Inode_pack.index_direct_with_kind t hash |> Option.get

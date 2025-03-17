@@ -91,7 +91,7 @@ struct
   struct
     type t = {
       store : read Inode.t;
-      fm : File_manager.t;
+      file_manager : File_manager.t;
       (* Two contents values that are guaranteed to be read by {!store}: *)
       foo : Key.t;
       bar : Key.t;
@@ -110,7 +110,7 @@ struct
         name
 
     (* TODO : remove duplication with brassaia_pack/ext.ml *)
-    let get_fm config =
+    let get_file_manager config =
       let readonly = Brassaia_pack.Conf.readonly config in
 
       if readonly then File_manager.open_ro config |> Errs.raise_if_error
@@ -137,13 +137,13 @@ struct
       [%log.app "Constructing a fresh context for use by the test"] ;
       rm_dir root ;
       let config = config ~indexing_strategy ~readonly:false ~fresh:true root in
-      let fm = get_fm config in
-      let dict = File_manager.dict fm in
-      let dispatcher = Dispatcher.init fm |> Errs.raise_if_error in
+      let file_manager = get_file_manager config in
+      let dict = File_manager.dict file_manager in
+      let dispatcher = Dispatcher.init file_manager |> Errs.raise_if_error in
       let lru = Brassaia_pack_unix.Lru.create config in
-      let store = Inode.init ~config ~fm ~dict ~dispatcher ~lru in
+      let store = Inode.init ~config ~file_manager ~dict ~dispatcher ~lru in
       let store_contents =
-        Contents_store.init ~config ~fm ~dict ~dispatcher ~lru
+        Contents_store.init ~config ~file_manager ~dict ~dispatcher ~lru
       in
       let foo, bar =
         Contents_store.batch store_contents (fun writer ->
@@ -152,9 +152,9 @@ struct
             (foo, bar))
       in
       [%log.app "Test context constructed"] ;
-      {store; fm; foo; bar}
+      {store; file_manager; foo; bar}
 
-    let close t = File_manager.close t.fm |> Errs.raise_if_error
+    let close t = File_manager.close t.file_manager |> Errs.raise_if_error
     (* closes dict, inodes and contents store. *)
   end
 

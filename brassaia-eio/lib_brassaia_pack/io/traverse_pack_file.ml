@@ -68,7 +68,7 @@ end
 module type Args = sig
   module File_manager : File_manager.S
 
-  module Dispatcher : Dispatcher.S with module Fm = File_manager
+  module Dispatcher : Dispatcher.S with module File_Manager = File_manager
 
   module Hash : Brassaia.Hash.S
 
@@ -414,11 +414,11 @@ end = struct
           (iter_pack_entry ~always v, finalise v, "Checking and fixing index")
     in
     let run_duration = Io.Clock.counter () in
-    let fm = File_manager.open_ro config |> Errs.raise_if_error in
-    let dispatcher = Dispatcher.init fm |> Errs.raise_if_error in
+    let file_manager = File_manager.open_ro config |> Errs.raise_if_error in
+    let dispatcher = Dispatcher.init file_manager |> Errs.raise_if_error in
     let total = Dispatcher.end_offset dispatcher in
     let ingest_data progress =
-      if File_manager.gc_allowed fm then
+      if File_manager.gc_allowed file_manager then
         ingest_data_file_after_v3
           ~initial_buffer_size
           dispatcher
@@ -440,7 +440,7 @@ end = struct
       Progress.(with_reporter bar) ingest_data
     in
     finalise () ;
-    File_manager.close fm |> Errs.raise_if_error ;
+    File_manager.close file_manager |> Errs.raise_if_error ;
     let run_duration = Io.Clock.count run_duration in
     let store_stats fmt =
       Fmt.pf fmt "Store statistics:@,  @[<v 0>%a@]" Stats.pp stats
