@@ -140,8 +140,10 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
   let rpc_backend = Evm_ro_context.ro_backend ctxt config ~evm_node_endpoint in
 
   let* ping_tx_pool, tx_container =
-    match evm_node_private_endpoint with
-    | Some private_endpoint ->
+    match
+      (evm_node_private_endpoint, config.experimental_features.enable_tx_queue)
+    with
+    | Some private_endpoint, _ ->
         let forward_request =
           container_forward_request
             ~keep_alive:config.keep_alive
@@ -150,7 +152,18 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
         in
 
         return (false, forward_request)
-    | None ->
+    | None, Some tx_queue_config ->
+        let* () =
+          Tx_queue.start
+            ~config:tx_queue_config
+            ~keep_alive:config.keep_alive
+            ()
+        in
+        return
+          ( false,
+            (module Tx_queue.Tx_container : Services_backend_sig.Tx_container)
+          )
+    | None, None ->
         let* () =
           Tx_pool.start
             {
@@ -241,18 +254,27 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
   in
 
   let* next_blueprint_number = Evm_ro_context.next_blueprint_number ctxt in
-
-  Blueprints_follower.start
-    ~time_between_blocks
-    ~evm_node_endpoint
-    ~next_blueprint_number
-    ~ping_tx_pool
-  @@ fun (Qty number) blueprint ->
   let* () =
-    when_ (Option.is_some blueprint.kernel_upgrade) @@ fun () ->
-    Evm_ro_context.preload_kernel_from_level ctxt (Qty number)
+    if
+      Configuration.is_tx_queue_enabled config
+      && Option.is_none evm_node_private_endpoint
+      (* Only start the beacon when the tx_queue is started. *)
+    then Tx_queue.beacon ~evm_node_endpoint ~tick_interval:0.05
+    else return_unit
+  and* () =
+    Blueprints_follower.start
+      ~ping_tx_pool
+      ~time_between_blocks
+      ~evm_node_endpoint
+      ~next_blueprint_number
+    @@ fun (Qty number) blueprint ->
+    let* () =
+      when_ (Option.is_some blueprint.kernel_upgrade) @@ fun () ->
+      Evm_ro_context.preload_kernel_from_level ctxt (Qty number)
+    in
+    Broadcast.notify @@ Broadcast.Blueprint blueprint ;
+    Metrics.set_level ~level:number ;
+    let* () = set_metrics_confirmed_levels ctxt in
+    return `Continue
   in
-  Broadcast.notify @@ Broadcast.Blueprint blueprint ;
-  Metrics.set_level ~level:number ;
-  let* () = set_metrics_confirmed_levels ctxt in
-  return `Continue
+  return_unit
