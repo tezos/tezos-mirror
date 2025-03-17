@@ -474,6 +474,15 @@ val wait_for_start_history_mode : ?history_mode:string -> t -> string Lwt.t
 *)
 val rpc_endpoint : ?local:bool -> ?private_:bool -> t -> string
 
+(** [rpc_endpoint ?local ?private_ evm_node] returns the endpoint to communicate with the
+    [evm_node] in the {!Endpoint.t} format.
+
+    If [local] is given ([false] by default),
+    then [Constant.default_host] is used (it overrides [rpc-addr] or
+    the [runner] argument).
+*)
+val rpc_endpoint_record : ?local:bool -> t -> Endpoint.t
+
 (** A deprecated alias for [rpc_endpoint] where [local] optional parameter is not given. *)
 val endpoint : ?private_:bool -> t -> string
 

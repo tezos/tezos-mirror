@@ -1292,6 +1292,14 @@ let rpc_endpoint ?(local = false) ?(private_ = false) (evm_node : t) =
   in
   Format.sprintf "http://%s:%d%s" addr port path
 
+let rpc_endpoint_record ?(local = false) (evm_node : t) =
+  let host =
+    if local then Constant.default_host
+    else Runner.address evm_node.persistent_state.runner
+  in
+  let port = evm_node.persistent_state.rpc_port in
+  Endpoint.{host; scheme = "http"; port}
+
 let endpoint = rpc_endpoint ?local:None
 
 type rpc_server = Resto | Dream

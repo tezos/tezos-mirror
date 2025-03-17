@@ -171,6 +171,7 @@ let start_public_server ~(rpc_server_family : Rpc_types.rpc_server_family)
          ctxt
     |> register_evm_services
     |> Evm_directory.register_metrics "/metrics"
+    |> Evm_directory.register_describe
   in
   let* finalizer = start_server rpc directory in
   let*! () =
@@ -195,6 +196,7 @@ let start_private_server ~(rpc_server_family : Rpc_types.rpc_server_family)
           config
           ctxt
         |> Evm_directory.register_metrics "/metrics"
+        |> Evm_directory.register_describe
       in
       let* finalizer = start_server private_rpc directory in
       let*! () =

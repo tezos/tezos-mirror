@@ -1,0 +1,34 @@
+
+./octez-client rpc list
+
+Available services:
+  
+  - POST /
+      JSONRPC endpoint 
+  - GET /configuration
+      configuration 
+  + evm/
+    - GET /evm/blueprint/<uint63>
+        Fetch the contents of a blueprint 
+    - GET /evm/blueprints
+        Watch for new blueprints 
+    - GET /evm/messages
+        Watch for new messages 
+    - GET /evm/smart_rollup_address
+        Get the address of the smart rollup hosting the chain 
+    - GET /evm/time_between_blocks
+        Get the maximum time between two blocks 
+  - GET /health_check
+      Assess the health of the RPC server 
+  - GET /version
+      version 
+
+
+Dynamic parameter description:
+  
+  uint63
+
+Warning:
+  Failed to acquire the protocol version from the node
+  Did not find service: GET http://[HOST]:[PORT]/chains/main/blocks/head/protocols
+

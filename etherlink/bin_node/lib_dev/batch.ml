@@ -39,6 +39,7 @@ let dispatch_service ~path =
 
 let dispatch_batch_service ~path =
   Service.post_service
+    ~description:"JSONRPC endpoint"
     ~query:Query.empty
     ~input:(batch_encoding JSONRPC.request_encoding)
     ~output:(batch_encoding JSONRPC.response_encoding)

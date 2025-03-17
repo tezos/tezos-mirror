@@ -9516,6 +9516,34 @@ let test_describe_config () =
   let hooks = Tezos_regression.hooks in
   Evm_node.describe_config ~hooks ()
 
+let test_describe_endpoint =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~tags:["evm"; "rpc"; "describe"]
+    ~title:"Test the /describe endpoint"
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_evm_node;
+        Constant.octez_client;
+        Constant.WASM.evm_kernel;
+        Constant.octez_smart_rollup_node;
+        Constant.smart_rollup_installer;
+      ])
+  @@ fun protocol ->
+  let* {sequencer; client; _} =
+    Setup.setup_sequencer
+      ~mainnet_compat:false
+      ~enable_dal:false
+      ~enable_multichain:false
+      protocol
+  in
+  let hooks = Tezos_regression.hooks in
+  let endpoint =
+    Client.(Foreign_endpoint (Evm_node.rpc_endpoint_record sequencer))
+  in
+  let* (_ : string) = Client.rpc_list ~hooks ~endpoint client in
+  unit
+
 let test_relay_restricted_rpcs =
   register_all
     ~bootstrap_accounts:Eth_account.lots_of_address
@@ -12051,6 +12079,7 @@ let () =
   test_websocket_heartbeat_monitoring () ;
   test_websocket_newPendingTransactions_event [Protocol.Alpha] ;
   test_websocket_logs_event [Protocol.Alpha] ;
+  test_describe_endpoint protocols ;
   test_node_correctly_uses_batcher_heap [Protocol.Alpha] ;
   test_init_config_mainnet "mainnet" ;
   test_init_config_mainnet "testnet" ;
