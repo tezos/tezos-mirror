@@ -107,14 +107,6 @@ Data Availability Layer (DAL)
 DAL node
 ~~~~~~~~
 
-- **Feature** The node will detect stalled connections more quickly (on
-  Linux-based distributions). This behavior can be controlled via the
-  environment variable ``OCTEZ_P2P_TCP_USER_TIMEOUT``. Its default
-  value is ``15000``, meaning that it will now take ``15s`` to detect
-  a stalled connection (compared to up to ``15`` minutes by default on
-  Linux). Users can opt out by setting the value to ``0``. (MR
-  :gl:`!16907`)
-
 - **Feature** The DAL node stores now a peers.json file in its
   directory when it is shutdown with SIGINT. This file is read if it
   exists when starting the DAL node to restore previous known
@@ -166,9 +158,6 @@ DAL node
 - Added a new RPC ``GET /protocol_parameters/`` that retrieve the protocol
   parameters that the DAL node uses for a given level, which by default is the
   last finalized level the node is aware of. (MR :gl:`!16704`)
-
-- Added a new RPC ``GET /published_levels/<level>/known_traps`` that returns the
-  trap shards that the DAL node knows. (MR :gl:`!16870`)
 
 Protocol
 ~~~~~~~~
