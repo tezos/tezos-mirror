@@ -432,6 +432,10 @@ pub enum OpCode {
     BranchLessThanOrEqualZero,
     /// Jump to `pc + imm` if `val(rs2) > 0`.
     BranchGreaterThanZero,
+
+    /// Performs an environment call, from the current
+    /// machine mode.
+    ECall,
 }
 
 impl OpCode {
@@ -628,6 +632,7 @@ impl OpCode {
             Self::CFsd => Args::run_cfsd,
             Self::CFsdsp => Args::run_cfsdsp,
             Self::Unknown => Args::run_illegal,
+            Self::ECall => Args::run_ecall,
         }
     }
 
@@ -1555,6 +1560,13 @@ impl Args {
         icb.ok(pcu)
     }
 
+    fn run_ecall<MC: MemoryConfig, M: ManagerReadWrite>(
+        &self,
+        core: &mut MachineCoreState<MC, M>,
+    ) -> Result<ProgramCounterUpdate<Address>, Exception> {
+        Err(core.hart.run_ecall())
+    }
+
     // RV64C compressed instructions
     impl_ci_type!(run_caddiw, non_zero);
     impl_cr_type!(run_caddw);
@@ -2221,6 +2233,8 @@ impl From<&InstrCacheable> for Instruction {
             InstrCacheable::HintCompressed { instr: _ } => {
                 Instruction::new_nop(InstrWidth::Compressed)
             }
+
+            InstrCacheable::Ecall => Instruction::new_ecall(),
         }
     }
 }

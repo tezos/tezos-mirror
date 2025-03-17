@@ -696,7 +696,7 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
         OP_SYS => match funct3(instr) {
             F3_0 => match funct7(instr) {
                 F7_0 => match (rs1_bits(instr), rs2_bits(instr)) {
-                    (RS1_0, RS2_0) => return Instr::Uncacheable(Ecall),
+                    (RS1_0, RS2_0) => Ecall,
                     (RS1_0, RS2_1) => return Instr::Uncacheable(Ebreak),
                     _ => Unknown { instr },
                 },
