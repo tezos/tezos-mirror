@@ -65,11 +65,7 @@ impl<M: ManagerBase> ManagerBase for ProofGen<M> {
 /// additionally records read locations.
 impl<M: ManagerRead> ManagerRead for ProofGen<M> {
     fn region_read<E: Copy, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> E {
-        region.set_access_info();
-        match region.writes.get(&index) {
-            Some(elem) => *elem,
-            None => M::region_read(&region.source, index),
-        }
+        *Self::region_ref(region, index)
     }
 
     fn region_ref<E: 'static, const LEN: usize>(region: &Self::Region<E, LEN>, index: usize) -> &E {
@@ -78,12 +74,7 @@ impl<M: ManagerRead> ManagerRead for ProofGen<M> {
     }
 
     fn region_read_all<E: Copy, const LEN: usize>(region: &Self::Region<E, LEN>) -> Vec<E> {
-        region.set_access_info();
-        let mut elems = M::region_read_all(&region.source);
-        for (index, elem) in region.writes.iter() {
-            elems[*index] = *elem;
-        }
-        elems
+        (0..LEN).map(|i| Self::region_read(region, i)).collect()
     }
 
     fn dyn_region_read<E: super::Elem, const LEN: usize>(
@@ -142,10 +133,12 @@ impl<M: ManagerBase> ManagerWrite for ProofGen<M> {
         region.writes.insert(index, value);
     }
 
-    fn region_write_all<E: Copy, const LEN: usize>(region: &mut Self::Region<E, LEN>, value: &[E]) {
-        region.set_access_info();
-        for (index, elem) in value.iter().enumerate() {
-            region.writes.insert(index, *elem);
+    fn region_write_all<E: Copy, const LEN: usize>(
+        region: &mut Self::Region<E, LEN>,
+        values: &[E],
+    ) {
+        for (i, value) in values.iter().enumerate() {
+            Self::region_write(region, i, *value);
         }
     }
 
@@ -200,10 +193,9 @@ impl<M: ManagerRead> ManagerReadWrite for ProofGen<M> {
         index: usize,
         value: E,
     ) -> E {
-        region.set_access_info();
-        let elem = M::region_read(&region.source, index);
-        region.writes.insert(index, value);
-        elem
+        let old = Self::region_read(region, index);
+        Self::region_write(region, index, value);
+        old
     }
 }
 
@@ -719,5 +711,19 @@ mod tests {
             prop_assert_eq!(derived, T::from(&value_after));
             prop_assert!(proof_cell.get_access_info());
         });
+    }
+
+    #[test]
+    fn test_proof_gen_region_replace() {
+        let region: ProofRegion<u64, 1, Owned> = ProofRegion::bind([0u64; 1]);
+        let mut cells: Cells<u64, 1, ProofGen<Owned>> = Cells::bind(region);
+
+        cells.write(0, 13);
+
+        let old = cells.replace(0, 37);
+        assert_eq!(old, 13);
+
+        let value = cells.read(0);
+        assert_eq!(value, 37);
     }
 }
