@@ -1471,23 +1471,17 @@ module Monitoring_app = struct
       let* _response = RPC_core.call_raw endpoint rpc in
       Lwt.return_unit
 
-    let check_for_lost_dal_rewards t ~metadata =
+    let check_for_lost_dal_rewards t ~metadata ~blocks_per_cycle =
       match t.configuration.monitor_app_configuration with
       | None -> unit
       | Some {dal_slack_webhook = webhook} ->
-          (* We don't have access to the `blocks_per_cycle` proto
-             constant here. To check whether we are at the end of the
-             cycle, we use the following condition:
-             (cycle + 1) * (cycle_position + 1) = level_position + 1.
-          *)
-          let cycle, cycle_position, level_position =
+          let cycle, cycle_position =
             let open JSON in
             let level_info = metadata |-> "level_info" in
             ( level_info |-> "cycle" |> as_int,
-              level_info |-> "cycle_position" |> as_int,
-              level_info |-> "level_position" |> as_int )
+              level_info |-> "cycle_position" |> as_int )
           in
-          if (cycle + 1) * (cycle_position + 1) <> level_position + 1 then unit
+          if cycle_position + 1 <> blocks_per_cycle then unit
           else
             let level =
               JSON.(metadata |-> "level_info" |-> "level" |> as_int)
@@ -1525,9 +1519,9 @@ module Monitoring_app = struct
                 ~cycle
                 ~lost_dal_rewards
 
-    let check_for_lost_dal_rewards t ~metadata =
+    let check_for_lost_dal_rewards t ~metadata ~blocks_per_cycle =
       Lwt.catch
-        (fun () -> check_for_lost_dal_rewards t ~metadata)
+        (fun () -> check_for_lost_dal_rewards t ~metadata ~blocks_per_cycle)
         (fun exn ->
           Log.warn
             "Monitor_app.Alert.check_for_lost_dal_rewards: unexpected error: \
@@ -1683,6 +1677,8 @@ let get_infos_per_level t ~level =
     RPC_core.call endpoint @@ RPC.get_chain_block_metadata_raw ~block ()
   and* operations =
     RPC_core.call endpoint @@ RPC.get_chain_block_operations ~block ()
+  and* constants =
+    RPC_core.call endpoint @@ RPC.get_chain_block_context_constants ~block ()
   in
   let level = JSON.(header |-> "level" |> as_int) in
   let attested_commitments =
@@ -1728,6 +1724,7 @@ let get_infos_per_level t ~level =
       operation |-> "contents" |=> 0 |-> "dal_attestation" |> as_string
       |> Z.of_string |> Option.some)
   in
+  let blocks_per_cycle = JSON.(constants |-> "blocks_per_cycle" |> as_int) in
   let attestations =
     consensus_operations |> List.to_seq
     |> Seq.map (fun operation ->
@@ -1753,7 +1750,12 @@ let get_infos_per_level t ~level =
   let* () =
     (* None of these actions are performed if `--dal-slack-webhook` is
        not provided. *)
-    let* () = Monitoring_app.Alert.check_for_lost_dal_rewards t ~metadata in
+    let* () =
+      Monitoring_app.Alert.check_for_lost_dal_rewards
+        t
+        ~metadata
+        ~blocks_per_cycle
+    in
     let* () =
       let cycle = JSON.(metadata |-> "level_info" |-> "cycle" |> as_int) in
       Monitoring_app.Alert.check_for_dal_accusations
