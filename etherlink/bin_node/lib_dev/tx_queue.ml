@@ -463,6 +463,12 @@ module Request = struct
           (obj1 (req "request" (constant "is_locked")))
           (function View Is_locked -> Some () | _ -> None)
           (fun _ -> assert false);
+        case
+          Json_only
+          ~title:"Content"
+          (obj1 (req "request" (constant "content")))
+          (function View Content -> Some () | _ -> None)
+          (fun _ -> assert false);
       ]
 
   let pp fmt (View r) =
