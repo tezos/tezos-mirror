@@ -1,5 +1,5 @@
 
-./octez-client --wait none originate smart rollup rollup from bootstrap1 of kind riscv of type bytes with kernel kernel:src/riscv/assets/riscv-dummy.elf:a595cd3eecf02648fde06c7b18912c037e54e35ca382619c80db96db7bbad38d --burn-cap 9999999
+./octez-client --wait none originate smart rollup rollup from bootstrap1 of kind riscv of type bytes with kernel kernel:src/riscv/assets/riscv-dummy.elf:71f45fec5446163519a2e7712e202b8251946b6e488a3d28e698e4546f9513db --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 1933.839 units (will add 100 for safety)
 Estimated storage: 6552 bytes added (will add 20 for safety)
@@ -22,7 +22,7 @@ This sequence of operations was run:
     Smart rollup origination:
       Kind: riscv
       Parameter type: bytes
-      Kernel Blake2B hash: '25620e264beefd1be8d7cd987bbd3bb7b035811009ee5d194f14cf3bc11af3ba'
+      Kernel Blake2B hash: '9ab3832948915992ea8d64c3890562ff2482c1bd35596a365bde320f2afd6d9c'
       This smart rollup origination was successfully applied
       Consumed gas: 1933.806
       Storage size: 6552 bytes
@@ -73,36 +73,45 @@ Hello World
 I am [SMART_ROLLUP_HASH]
 RollupMetadata {
     raw_rollup_address: [
-        96,
-        199,
-        233,
-        218,
-        59,
-        68,
-        150,
-        221,
-        26,
-        173,
-        62,
-        210,
-        48,
-        77,
-        239,
-        43,
-        32,
-        59,
-        90,
-        108,
+        174,
+        213,
+        131,
+        158,
+        41,
+        83,
+        44,
+        214,
+        58,
+        156,
+        183,
+        243,
+        176,
+        183,
+        9,
+        72,
+        129,
+        10,
+        98,
+        139,
     ],
     origination_level: 2,
 }
 [09, 90, A8, 2F, DD, B2, 8D, E6, 07, 33, 28, 86, 5C, EF, 23, A4, D5, 2A, CC, 6C, D4, 17, D8, AB, 39, 66, 69, D6, 3C, 3B, A8, BD]
+Signature is [133, 153, 89, 165, 225, 52, 223, 180, 255, 131, 0, 136, 151, 153, 173, 101, 89, 156, 116, 182, 204, 196, 243, 216, 218, 77, 17, 96, 8, 132, 254, 190, 220, 2, 63, 202, 122, 112, 169, 61, 119, 166, 30, 78, 142, 64, 30, 40, 210, 60, 25, 219, 193, 87, 197, 19, 194, 101, 0, 232, 241, 244, 56, 2]
+Reveal metadata...
+
+Reveal metadata succeeded, result: 
+Rollup address: RollupMetadata { raw_rollup_address: [174, 213, 131, 158, 41, 83, 44, 214, 58, 156, 183, 243, 176, 183, 9, 72, 129, 10, 98, 139], origination_level: 2 }
+Reveal preimage...
+
+Preimage: "cafebabe"
+Reveals Done
 
 Internal(
     StartOfLevel,
 )
 
-Internal(InforPerLevel)
+Internal(InfoPerLevel)
 
 External(
     [
@@ -130,7 +139,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"980583"
+"1041064"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -138,7 +147,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"980583"
+"1041064"
 
 
 ./octez-client --wait none send smart rollup message '["2 8 + value"]' from bootstrap2
@@ -169,7 +178,7 @@ Internal(
     StartOfLevel,
 )
 
-Internal(InforPerLevel)
+Internal(InfoPerLevel)
 
 External(
     [
@@ -197,7 +206,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1011740"
+"1071131"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -205,7 +214,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1011740"
+"1071131"
 
 
 ./octez-client --wait none send smart rollup message '["3 10 + value"]' from bootstrap2
@@ -236,7 +245,7 @@ Internal(
     StartOfLevel,
 )
 
-Internal(InforPerLevel)
+Internal(InfoPerLevel)
 
 External(
     [
@@ -265,7 +274,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1043991"
+"1102292"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -273,7 +282,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1043991"
+"1102292"
 
 
 ./octez-client --wait none send smart rollup message '["4 12 + value"]' from bootstrap2
@@ -304,7 +313,7 @@ Internal(
     StartOfLevel,
 )
 
-Internal(InforPerLevel)
+Internal(InfoPerLevel)
 
 External(
     [
@@ -333,7 +342,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1076242"
+"1133453"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -341,7 +350,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1076242"
+"1133453"
 
 
 ./octez-client --wait none send smart rollup message '["5 14 + value"]' from bootstrap2
@@ -372,7 +381,7 @@ Internal(
     StartOfLevel,
 )
 
-Internal(InforPerLevel)
+Internal(InfoPerLevel)
 
 External(
     [
@@ -401,7 +410,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1108493"
+"1164614"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -409,7 +418,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1108493"
+"1164614"
 
 
 ./octez-client --wait none send smart rollup message '["6 16 + value"]' from bootstrap2
@@ -440,7 +449,7 @@ Internal(
     StartOfLevel,
 )
 
-Internal(InforPerLevel)
+Internal(InfoPerLevel)
 
 External(
     [
@@ -469,7 +478,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1140744"
+"1195775"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -477,7 +486,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1140744"
+"1195775"
 
 
 ./octez-client --wait none send smart rollup message '["7 18 + value"]' from bootstrap2
@@ -508,7 +517,7 @@ Internal(
     StartOfLevel,
 )
 
-Internal(InforPerLevel)
+Internal(InfoPerLevel)
 
 External(
     [
@@ -537,7 +546,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1172995"
+"1226936"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -545,7 +554,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1172995"
+"1226936"
 
 
 ./octez-client --wait none send smart rollup message '["8 20 + value"]' from bootstrap2
@@ -576,7 +585,7 @@ Internal(
     StartOfLevel,
 )
 
-Internal(InforPerLevel)
+Internal(InfoPerLevel)
 
 External(
     [
@@ -605,7 +614,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1205246"
+"1258097"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -613,7 +622,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1205246"
+"1258097"
 
 
 ./octez-client --wait none send smart rollup message '["9 22 + value"]' from bootstrap2
@@ -644,7 +653,7 @@ Internal(
     StartOfLevel,
 )
 
-Internal(InforPerLevel)
+Internal(InfoPerLevel)
 
 External(
     [
@@ -673,7 +682,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1237497"
+"1289258"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK
@@ -681,7 +690,7 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1237497"
+"1289258"
 
 
 ./octez-client --wait none send smart rollup message '["10 24 + value"]' from bootstrap2
@@ -712,7 +721,7 @@ Internal(
     StartOfLevel,
 )
 
-Internal(InforPerLevel)
+Internal(InfoPerLevel)
 
 External(
     [
@@ -742,5 +751,5 @@ GET http://[HOST]:[PORT]/global/block/head/state_hash
 
 GET http://[HOST]:[PORT]/global/block/head/total_ticks
 200 OK
-"1270842"
+"1321513"
 

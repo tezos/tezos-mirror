@@ -35,6 +35,7 @@ smart_rollup_installer: smart-rollup-installer
 echo: src/proto_alpha/lib_protocol/test/integration/wasm_kernel/echo.wasm
 riscv: src/riscv/assets/jstz
 riscv: src/riscv/assets/jstz.checksum
+riscv: src/riscv/assets/preimages
 riscv: src/riscv/assets/riscv-dummy.elf
 riscv: src/riscv/assets/riscv-dummy.elf.checksum
 riscv: tezt/tests/riscv-tests/jstz-inbox.json

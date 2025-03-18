@@ -182,14 +182,18 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?commitment_period ?(parameters_ty = "string") ?challenge_window ?timeout
     ?rollup_node_name ?whitelist_enable ?whitelist ?operator ?operators
     ?(uses = fun _protocol -> []) ?rpc_external ?allow_degraded
-    ?kernel_debug_log {variant; tags; description} scenario =
+    ?kernel_debug_log ?preimages_dir {variant; tags; description} scenario =
+  let uses protocol =
+    (Constant.octez_smart_rollup_node :: Option.to_list preimages_dir)
+    @ uses protocol
+  in
   register_test
     ~kind
     ?supports
     ?regression
     ~__FILE__
     ~tags
-    ~uses:(fun protocol -> Constant.octez_smart_rollup_node :: uses protocol)
+    ~uses
     ~title:(format_title_scenario kind {variant; tags; description})
   @@ fun protocol ->
   let riscv_pvm_enable = kind = "riscv" in
@@ -231,6 +235,16 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
         if name = "kernel_debug.v0" then
           Regression.capture
             (Tezos_regression.replace_variables (JSON.as_string value))) ;
+  let* () =
+    match preimages_dir with
+    | None -> Lwt.return_unit
+    | Some src_dir ->
+        let data_dir = Sc_rollup_node.data_dir rollup_node in
+        let dest_dir = Filename.concat data_dir kind in
+        (* Copying used here instead of softlink to avoid tampering of artefact
+           when debugging from the temp test directory *)
+        Process.run "cp" ["-r"; Uses.path src_dir; dest_dir]
+  in
   scenario protocol rollup_node sc_rollup tezos_node tezos_client
 
 (*
@@ -1543,7 +1557,7 @@ let test_advances_state_with_inbox ~title ~boot_sector ~kind ~inbox_file =
   test_advances_state_with_kernel ~title ~boot_sector ~kind ~messages
 
 let test_rollup_node_advances_pvm_state ?regression ?kernel_debug_log ~title
-    ?boot_sector ~internal ~kind =
+    ?boot_sector ~internal ~kind ?preimages_dir =
   test_full_scenario
     ?regression
     ?kernel_debug_log
@@ -1556,6 +1570,7 @@ let test_rollup_node_advances_pvm_state ?regression ?kernel_debug_log ~title
     ?boot_sector
     ~parameters_ty:"bytes"
     ~kind
+    ?preimages_dir
   @@ fun protocol sc_rollup_node sc_rollup _tezos_node client ->
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
   let* _ = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
@@ -1677,7 +1692,7 @@ let test_rollup_node_run_with_kernel ~kind ~kernel_name ~internal =
    After each a PVM kind-specific test is run, asserting the validity of the new state.
 *)
 let test_rollup_node_advances_pvm_state ~kind ?boot_sector ?kernel_debug_log
-    ~internal =
+    ~internal ?preimages_dir =
   test_rollup_node_advances_pvm_state
     ~regression:true
     ?kernel_debug_log
@@ -1685,7 +1700,7 @@ let test_rollup_node_advances_pvm_state ~kind ?boot_sector ?kernel_debug_log
     ?boot_sector
     ~internal
     ~kind
-
+    ?preimages_dir
 (* Ensure that commitments are stored and published properly.
    ----------------------------------------------------------
 
@@ -4799,7 +4814,7 @@ let test_outbox_message protocols ~kind =
 
 let test_rpcs ~kind
     ?(boot_sector = Sc_rollup_helpers.default_boot_sector_of ~kind)
-    ?kernel_debug_log =
+    ?kernel_debug_log ?preimages_dir =
   test_full_scenario
     ~regression:true
     ?kernel_debug_log
@@ -4807,6 +4822,7 @@ let test_rpcs ~kind
     ~kind
     ~boot_sector
     ~whitelist_enable:true
+    ?preimages_dir
     {
       tags = ["rpc"; "api"];
       variant = None;
@@ -7023,8 +7039,11 @@ let register_riscv ~protocols =
          ~path:"src/riscv/assets/riscv-dummy.elf.checksum"
          ())
   in
+  let preimages_dir =
+    Uses.make ~tag:kind ~path:"src/riscv/assets/preimages" ()
+  in
   test_origination ~kind protocols ;
-  test_rpcs ~kind ~boot_sector protocols ~kernel_debug_log:true ;
+  test_rpcs ~kind ~boot_sector protocols ~kernel_debug_log:true ~preimages_dir ;
   test_rollup_node_boots_into_initial_state protocols ~kind ;
   test_rollup_node_advances_pvm_state
     protocols
@@ -7032,6 +7051,7 @@ let register_riscv ~protocols =
     ~boot_sector
     ~internal:false
     ~kernel_debug_log:true
+    ~preimages_dir
 
 let register_riscv_jstz ~protocols =
   let kind = "riscv" in
