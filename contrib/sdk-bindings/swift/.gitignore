@@ -11,4 +11,4 @@ tezos/Tezos.swiftsourceinfo
 resources/libtezosswift.so
 
 # Test bin
-test.exe
+.build/*

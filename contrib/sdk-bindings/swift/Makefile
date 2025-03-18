@@ -7,7 +7,12 @@ UNIFFI_BINDINGS_DIR = uniffi_bindings
 LIB_DIR = tezos
 RESOURCES_DIR = resources
 
-TEST_EXE = test.exe
+TEST_DIR = Tests
+BUILD_DIR = .build
+TEST_EXE = $(BUILD_DIR)/test.exe
+
+$(BUILD_DIR):
+	@mkdir -p $(BUILD_DIR)
 
 link-lib: $(UNIFFI_DIR)/tezos.swift \
 	$(UNIFFI_DIR)/tezosFFI.h \
@@ -34,7 +39,7 @@ build: link-lib \
 
 
 .PHONY: build-test
-build-test: build \
+build-test: build $(BUILD_DIR) \
 	$(UNIFFI_BINDINGS_DIR)/tezosFFI.h \
 	$(UNIFFI_BINDINGS_DIR)/tezosFFI.modulemap \
 	$(RESOURCES_DIR)/libtezos.so \
@@ -45,7 +50,8 @@ build-test: build \
 		-L $(RESOURCES_DIR) -ltezos -ltezosswift \
 		-Xcc -fmodule-map-file=$(UNIFFI_BINDINGS_DIR)/tezosFFI.modulemap \
 		-o $(TEST_EXE) \
-		test.swift
+		$(TEST_DIR)/*.swift
+
 
 .PHONY: test
 test: build-test \

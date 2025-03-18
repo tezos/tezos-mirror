@@ -16,6 +16,9 @@ class TezosTests: XCTestCase {
     }
 }
 
-XCTMain([
-    testCase(TezosTests.allTests)
-])
+XCTMain(
+  [
+    testCase(TezosTests.allTests),
+    testCase(TestBase58Check.allTests),
+  ]
+)
