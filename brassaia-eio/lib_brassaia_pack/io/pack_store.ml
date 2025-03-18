@@ -23,6 +23,28 @@ exception Corrupted_store of string
 
 exception Dangling_hash
 
+module Events = struct
+  include Internal_event.Simple
+
+  let section = ["brassaia-eio"; "brassaia_pack"; "io"; "pack_store"]
+
+  let index_direct_with_kind =
+    declare_1
+      ~section
+      ~level:Debug
+      ~name:"index_direct_with_kind"
+      ~msg:"Index direct with kind for hash {hash}"
+      ("hash", Data_encoding.(option string))
+
+  let unsafe_mem =
+    declare_1
+      ~section
+      ~level:Debug
+      ~name:"unsafe_mem"
+      ~msg:"unsafe_mem for key {key}"
+      ("key", Data_encoding.(option string))
+end
+
 let invalid_read fmt = Fmt.kstr (fun s -> raise (Invalid_read s)) fmt
 
 let corrupted_store fmt = Fmt.kstr (fun s -> raise (Corrupted_store s)) fmt
@@ -142,7 +164,8 @@ struct
     | Some offset -> offset
 
   let index_direct_with_kind t hash =
-    [%log.debug "index %a" pp_hash hash] ;
+    Events.(emit__dont_wait__use_with_care index_direct_with_kind)
+      (Data_encoding.Binary.to_string_opt Hash.encoding hash) ;
     match Index.find (File_Manager.index t.file_manager) hash with
     | None -> None
     | Some (offset, length, kind) ->
@@ -292,7 +315,8 @@ struct
     | Errors.Pack_error (`Invalid_prefix_read _) -> false
 
   let unsafe_mem t k =
-    [%log.debug "[pack] mem %a" pp_key k] ;
+    Events.(emit__dont_wait__use_with_care unsafe_mem)
+      (Data_encoding.Binary.to_string_opt Key.encoding k) ;
     match Pack_key.inspect k with
     | Indexed hash ->
         (* The key doesn't contain an offset, let's skip the lookup in [lru] and

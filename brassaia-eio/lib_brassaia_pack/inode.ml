@@ -19,6 +19,28 @@ include Inode_intf
 
 exception Max_depth of int
 
+module Events = struct
+  include Internal_event.Simple
+
+  let section = ["brassaia-eio"; "brassaia_pack"; "inode"]
+
+  let inode_save_values =
+    declare_1
+      ~section
+      ~level:Debug
+      ~name:"inode_save_values"
+      ~msg:"Inode.save values depth: {depth}"
+      ("depth", Data_encoding.int64)
+
+  let inode_save_tree =
+    declare_1
+      ~section
+      ~level:Debug
+      ~name:"inode_save_tree"
+      ~msg:"Inode.save tree depth: {depth}"
+      ("depth", Data_encoding.int64)
+end
+
 module Make_internal
     (Conf : Conf.S)
     (H : Brassaia.Hash.S)
@@ -53,18 +75,32 @@ struct
   module T = struct
     type hash = H.t [@@deriving brassaia ~pp ~to_bin_string ~equal]
 
+    let hash_encoding = H.encoding
+
     type key = Key.t [@@deriving brassaia ~pp ~equal]
+
+    let _key_encoding = Key.encoding
 
     type node_key = Node.node_key [@@deriving brassaia]
 
+    let node_key_encoding = Node.node_key_encoding
+
     type contents_key = Node.contents_key [@@deriving brassaia]
+
+    let contents_key_encoding = Node.contents_key_encoding
 
     type step = Node.step
     [@@deriving brassaia ~compare ~to_bin_string ~of_bin_string ~short_hash]
 
+    let step_encoding = Node.step_encoding
+
     type metadata = Node.metadata [@@deriving brassaia ~equal]
 
+    let metadata_encoding = Node.metadata_encoding
+
     type value = Node.value [@@deriving brassaia ~equal]
+
+    let value_encoding = Node.value_encoding
 
     module Metadata = Node.Metadata
 
@@ -90,6 +126,8 @@ struct
         type t = T.step
 
         let t = T.step_t
+
+        let encoding = T.step_encoding
       end)
 
   module Child_ordering : Child_ordering with type step := T.step = struct
@@ -184,6 +222,8 @@ struct
 
     type v = private Key of Key.t | Hash of hash Lazy.t
 
+    val encoding : t Data_encoding.t
+
     val inspect : t -> v
 
     val of_key : key -> t
@@ -215,6 +255,29 @@ struct
     type v = Key of Key.t | Hash of hash Lazy.t [@@deriving brassaia ~pp_dump]
 
     type t = v ref
+
+    let hash_lazy_encoding =
+      Data_encoding.(
+        conv (fun lazyv -> Lazy.force lazyv) (fun v -> lazy v) hash_encoding)
+
+    let encoding =
+      let open Data_encoding in
+      union
+        [
+          case
+            (Tag 1)
+            ~title:"Key"
+            Key.encoding
+            (function Key k -> Some k | _ -> None)
+            (fun k -> Key k);
+          case
+            (Tag 2)
+            ~title:"Hash"
+            hash_lazy_encoding
+            (function Hash h -> Some h | _ -> None)
+            (fun h -> Hash h);
+        ]
+      |> conv (fun vref -> !vref) (fun v -> ref v)
 
     let inspect t = !t
 
@@ -285,6 +348,13 @@ struct
 
     type 'vref with_index = {index : int; vref : 'vref} [@@deriving brassaia]
 
+    let with_index_encoding vref_encoding =
+      Data_encoding.(
+        conv
+          (fun {index; vref} -> (index, vref))
+          (fun (index, vref) -> {index; vref})
+          (obj2 (req "index" uint8) (req "vref" vref_encoding)))
+
     type 'vref tree = {
       depth : int;
       length : int;
@@ -292,14 +362,41 @@ struct
     }
     [@@deriving brassaia]
 
+    let tree_encoding vref_encoding =
+      Data_encoding.(
+        conv
+          (fun {depth; length; entries} -> (depth, length, entries))
+          (fun (depth, length, entries) -> {depth; length; entries})
+          (tup3 uint8 uint8 (list (with_index_encoding vref_encoding))))
+
     type 'vref v = Values of (step * value) list | Tree of 'vref tree
     [@@deriving brassaia ~pre_hash]
+
+    let v_encoding vref_encoding =
+      let open Data_encoding in
+      union
+        [
+          case
+            (Tag 1)
+            ~title:"Values"
+            (list (tup2 step_encoding value_encoding))
+            (function Values l -> Some l | _ -> None)
+            (fun l -> Values l);
+          case
+            (Tag 2)
+            ~title:"Tree"
+            (tree_encoding vref_encoding)
+            (function Tree t -> Some t | _ -> None)
+            (fun t -> Tree t);
+        ]
 
     module V =
       Brassaia.Hash.Typed
         (H)
         (struct
           type t = Val_ref.t v [@@deriving brassaia]
+
+          let encoding = v_encoding Val_ref.encoding
         end)
 
     type 'vref t = {hash : H.t Lazy.t; root : bool; v : 'vref v}
@@ -1582,7 +1679,8 @@ struct
       let rec aux ~depth t =
         match t.v with
         | Values _ -> (
-            [%log.debug "Inode.save values depth:%d" depth] ;
+            Events.(emit__dont_wait__use_with_care inode_save_values)
+              (Int64.of_int depth) ;
             let unguarded_add hash =
               let value =
                 (* NOTE: the choice of [Bin.mode] is irrelevant (and this
@@ -1599,7 +1697,8 @@ struct
                 if mem key then key else unguarded_add (Key.to_hash key)
             | Hash hash -> unguarded_add (Lazy.force hash))
         | Tree n ->
-            [%log.debug "Inode.save tree depth:%d" depth] ;
+            Events.(emit__dont_wait__use_with_care inode_save_tree)
+              (Int64.of_int depth) ;
             let save_dirty t k =
               let key =
                 match Val_ref.inspect t.v_ref with
@@ -2153,6 +2252,8 @@ struct
       | Partial of I.partial_ptr I.layout * I.partial_ptr I.t
       | Truncated of I.truncated_ptr I.t
 
+    let encoding = failwith "TODO"
+
     type 'b apply_fn = {f : 'a. 'a I.layout -> 'a I.t -> 'b} [@@unboxed]
 
     let apply : t -> 'b apply_fn -> 'b =
@@ -2374,10 +2475,32 @@ struct
 
       type node_key = hash [@@deriving brassaia]
 
+      let node_key_encoding = hash_encoding
+
       type contents_key = hash [@@deriving brassaia]
+
+      let contents_key_encoding = hash_encoding
 
       type value = [`Contents of hash * metadata | `Node of hash]
       [@@deriving brassaia]
+
+      let value_encoding =
+        let open Data_encoding in
+        union
+          [
+            case
+              (Tag 1)
+              ~title:"`Contents"
+              (tup2 hash_encoding metadata_encoding)
+              (function `Contents t -> Some t | _ -> None)
+              (fun t -> `Contents t);
+            case
+              (Tag 2)
+              ~title:"`Node"
+              hash_encoding
+              (function `Node h -> Some h | _ -> None)
+              (fun h -> `Node h);
+          ]
 
       let of_node t = t
 
