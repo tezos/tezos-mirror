@@ -91,12 +91,16 @@ val constant : 'a -> ('a, 'ctx) arg
 (** [arg ~doc ~long ?short converter] creates an argument to a command.
     The [~long] argument is the long format, without the double dashes.
     The [?short] argument is the optional one letter shortcut.
+    The [?env] argument is the optional environment variable name that can be
+    used to provide a default value. If the environment variable is set and
+    the CLI argument is passed, the CLI argument is used.
     If the argument is not provided, [None] is returned. *)
 val arg :
   doc:string ->
   ?short:char ->
   long:string ->
   placeholder:string ->
+  ?env:string ->
   ('a, 'ctx) parameter ->
   ('a option, 'ctx) arg
 
@@ -114,13 +118,16 @@ val multiple_arg :
   ('a, 'ctx) parameter ->
   ('a list option, 'ctx) arg
 
-(** Create an argument that will contain the [~default] value if it is not provided. *)
+(** Create an argument that will contain the [~default] value if it is not provided.
+    [?env] is the optional environment variable name that can be
+    used to override the default value. *)
 val default_arg :
   doc:string ->
   ?short:char ->
   long:string ->
   placeholder:string ->
   default:string ->
+  ?env:string ->
   ('a, 'ctx) parameter ->
   ('a, 'ctx) arg
 
