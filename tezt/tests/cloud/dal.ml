@@ -1660,6 +1660,127 @@ module Monitoring_app = struct
              '%s'"
             (Printexc.to_string exn) ;
           unit)
+
+    type attestation_transition = Stopped_attesting | Restarted_attesting
+
+    let report_attestation_transition ~monitor_app_configuration ~network ~level
+        ~pkh ~transition ~attestation_percentage =
+      let {slack_channel_id; slack_bot_token} = monitor_app_configuration in
+      let data =
+        let header =
+          Format.sprintf
+            (match transition with
+            | Restarted_attesting ->
+                "*[dal-attester-is-back]* On network `%s` at level `%d`, \
+                 delegate `%s` who was under the reward threshold is again \
+                 above threshold. New attestation rate is %.2f%%."
+            | Stopped_attesting ->
+                "*[dal-attester-dropped]* On network `%s` at level `%d`, \
+                 delegate `%s` DAL attestation rate dropped under the reward \
+                 threshold. New attestation rate is %.2f%%.")
+            (Network.to_string network)
+            level
+            (String.sub pkh 0 8)
+            attestation_percentage
+        in
+        Format_app.section [header] ()
+      in
+      let* _ts = post_message ~slack_channel_id ~slack_bot_token data in
+      Lwt.return_unit
+
+    let take_and_drop n l =
+      let rec bis acc n = function
+        | [] -> (List.rev acc, [])
+        | hd :: tl as l ->
+            if n = 0 then (List.rev acc, l) else bis (hd :: acc) (n - 1) tl
+      in
+      bis [] n l
+
+    let check_for_recently_missed_a_lot =
+      (* TODO: This correspond to the number of bakers which activated DAL on mainnet.
+         We expect more bakers to run the DAL, this initial size might be then increased
+         to avoid rescaling of the hash table.
+      *)
+      let prev_was_enough = Hashtbl.create 50 in
+      let to_treat_delegates = ref [] in
+      fun t ~level ~metadata ->
+        match t.configuration.monitor_app_configuration with
+        | None -> unit
+        | Some monitor_app_configuration -> (
+            let cycle_position =
+              JSON.(metadata |-> "level_info" |-> "cycle_position" |> as_int)
+            in
+            (* We do not run this function during the first 20 levels of a cycle,
+               since the attestation rate are not relevant when so few levels happened.
+               Especially since 0 attestation out of 0 attestable slots is considered
+               as 100% attestation rate. *)
+            if cycle_position < 20 then unit
+            else
+              let endpoint = t.bootstrap.node_rpc_endpoint in
+              let treat_delegate pkh =
+                let* infos =
+                  RPC_core.call endpoint
+                  @@ RPC.get_chain_block_context_delegate pkh
+                in
+                let dal_participation = JSON.(infos |-> "dal_participation") in
+                let attest_enough =
+                  JSON.(
+                    dal_participation |-> "sufficient_dal_participation"
+                    |> as_bool)
+                in
+                match Hashtbl.find_opt prev_was_enough pkh with
+                | None ->
+                    let () = Hashtbl.add prev_was_enough pkh attest_enough in
+                    unit
+                | Some prev_status ->
+                    if prev_status = attest_enough then unit
+                    else (
+                      Hashtbl.add prev_was_enough pkh attest_enough ;
+                      let network = t.configuration.network in
+                      let attested =
+                        JSON.(
+                          dal_participation |-> "delegate_attested_dal_slots"
+                          |> as_float)
+                      in
+                      let attestable =
+                        JSON.(
+                          dal_participation |-> "delegate_attestable_dal_slots"
+                          |> as_float)
+                      in
+                      let attestation_percentage =
+                        100. *. attested /. attestable
+                      in
+                      let transition =
+                        if attest_enough then Restarted_attesting
+                        else Stopped_attesting
+                      in
+                      report_attestation_transition
+                        ~monitor_app_configuration
+                        ~network
+                        ~level
+                        ~pkh
+                        ~transition
+                        ~attestation_percentage)
+              in
+              let refill_delegates_to_treat () =
+                let query_string = [("active", "true")] in
+                let* delegates =
+                  RPC_core.call endpoint
+                  @@ RPC.get_chain_block_context_delegates ~query_string ()
+                in
+                to_treat_delegates := delegates ;
+                unit
+              in
+              (* To avoid spawning a high number of RPCs simultaneously, we treat 2 delegates at each level. *)
+              let to_treat_now, treat_later =
+                take_and_drop 2 !to_treat_delegates
+              in
+              let* () = Lwt_list.iter_p treat_delegate to_treat_now in
+              match treat_later with
+              | [] -> refill_delegates_to_treat ()
+              | remaining_delegates ->
+                  to_treat_delegates := remaining_delegates ;
+                  unit)
   end
 end
 
@@ -1672,12 +1793,9 @@ let get_infos_per_level t ~level ~metadata =
     | Some setup -> setup.operator.account :: setup.operator.batching_operators
   in
   let block = string_of_int level in
-  let* header =
-    RPC_core.call endpoint @@ RPC.get_chain_block_header_shell ~block ()
-  and* operations =
+  let* operations =
     RPC_core.call endpoint @@ RPC.get_chain_block_operations ~block ()
   in
-  let level = JSON.(header |-> "level" |> as_int) in
   let attested_commitments =
     JSON.(metadata |-> "dal_attestation" |> as_string |> Z.of_string)
   in
@@ -1721,6 +1839,7 @@ let get_infos_per_level t ~level ~metadata =
       operation |-> "contents" |=> 0 |-> "dal_attestation" |> as_string
       |> Z.of_string |> Option.some)
   in
+  let cycle = JSON.(metadata |-> "level_info" |-> "cycle" |> as_int) in
   let attestations =
     consensus_operations |> List.to_seq
     |> Seq.map (fun operation ->
@@ -1743,15 +1862,20 @@ let get_infos_per_level t ~level ~metadata =
       (return Tez.zero)
       etherlink_operators
   in
-  (* This action is performed only if `--dal-slack-webhook` is provided. *)
+  (* None of these actions are performed if `--dal-slack-webhook` is
+     not provided. *)
   let* () =
-    let cycle = JSON.(metadata |-> "level_info" |-> "cycle" |> as_int) in
-    Monitoring_app.Alert.check_for_dal_accusations
-      t
-      ~cycle
-      ~level
-      ~operations
-      ~endpoint:t.bootstrap.node_rpc_endpoint
+    let open Monitoring_app.Alert in
+    let* () =
+      check_for_dal_accusations
+        t
+        ~cycle
+        ~level
+        ~operations
+        ~endpoint:t.bootstrap.node_rpc_endpoint
+    in
+    let* () = check_for_recently_missed_a_lot t ~level ~metadata in
+    unit
   in
   Lwt.return
     {

@@ -1029,7 +1029,11 @@ val get_chain_block_context_smart_rollups_smart_rollup_whitelist :
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_context_delegates :
-  ?chain:string -> ?block:string -> unit -> string list t
+  ?chain:string ->
+  ?block:string ->
+  ?query_string:(string * string) list ->
+  unit ->
+  string list t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>]
 
