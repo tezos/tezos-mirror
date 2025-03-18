@@ -672,11 +672,10 @@ let get_executable_pending_outbox_messages {store; lcc; current_protocol; _} =
   let max_level = (Reference.get lcc).level in
   let constants = (Reference.get current_protocol).constants.sc_rollup in
   let min_level =
-    Int32.sub
-      max_level
-      (Int32.of_int
-         (constants.max_number_of_stored_cemented_commitments
-        * constants.commitment_period_in_blocks))
+    Int32.sub max_level (Int32.of_int constants.max_active_outbox_levels)
+    |> Int32.succ
+    (* Protocol uses strict inequality, see function [validate_outbox_level] in
+       src/proto_alpha/lib_protocol/sc_rollup_operations.ml. *)
   in
   Store.Outbox_messages.pending store ~min_level ~max_level
 
