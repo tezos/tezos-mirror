@@ -517,6 +517,7 @@ let _outbox_monitor =
         octez_sqlite |> open_;
         evm_node_lib_dev_encoding |> open_;
         evm_node_lib_dev_client |> open_;
+        evm_node_lib_dev |> open_;
       ]
     ~dune:
       Dune.

@@ -12,6 +12,123 @@ open Caqti_type.Std
 (** Current version for migrations. *)
 let version = 0
 
+module Contract = Tezos_raw_protocol_alpha.Alpha_context.Contract
+
+let quantity_hum_encoding =
+  Data_encoding.conv
+    (fun (Ethereum_types.Qty z) -> z)
+    Ethereum_types.quantity_of_z
+    Data_encoding.z
+
+type withdrawal_kind = Xtz | FA of Ethereum_types.Address.t
+
+type withdrawal = {
+  kind : withdrawal_kind;
+  amount : Ethereum_types.quantity;
+  sender : Ethereum_types.Address.t;
+  receiver : Contract.t;
+  withdrawal_id : Ethereum_types.quantity;
+}
+
+type withdrawal_log = {
+  transactionHash : Ethereum_types.hash;
+  transactionIndex : Ethereum_types.quantity;
+  logIndex : Ethereum_types.quantity;
+  blockHash : Ethereum_types.block_hash;
+  blockNumber : Ethereum_types.quantity;
+  removed : bool;
+  withdrawal : withdrawal;
+}
+
+let withdrawal_kind_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"XTZ"
+        (Tag 0)
+        (obj1 (req "kind" (constant "XTZ")))
+        (function Xtz -> Some () | _ -> None)
+        (fun () -> Xtz);
+      case
+        ~title:"FA"
+        (Tag 1)
+        (obj2
+           (req "kind" (constant "FA"))
+           (req "ticket_owner" Ethereum_types.address_encoding))
+        (function FA tow -> Some ((), tow) | _ -> None)
+        (fun ((), tow) -> FA tow);
+    ]
+
+let pp_withdrawal_kind fmt k =
+  match k with
+  | Xtz -> Format.pp_print_string fmt "XTZ"
+  | FA ticket_owner ->
+      Format.fprintf
+        fmt
+        "FA(%s)"
+        (Ethereum_types.Address.to_string ticket_owner)
+
+let withdrawal_encoding =
+  let open Data_encoding in
+  conv
+    (fun {kind; amount; sender; receiver; withdrawal_id} ->
+      (kind, (amount, sender, receiver, withdrawal_id)))
+    (fun (kind, (amount, sender, receiver, withdrawal_id)) ->
+      {kind; amount; sender; receiver; withdrawal_id})
+  @@ merge_objs
+       withdrawal_kind_encoding
+       (obj4
+          (req "amount" quantity_hum_encoding)
+          (req "sender" Ethereum_types.address_encoding)
+          (req "receiver" Contract.encoding)
+          (req "withdrawal_id" quantity_hum_encoding))
+
+let withdrawal_log_encoding =
+  let open Data_encoding in
+  let open Ethereum_types in
+  conv
+    (fun {
+           transactionHash;
+           transactionIndex;
+           logIndex;
+           blockHash;
+           blockNumber;
+           removed;
+           withdrawal;
+         } ->
+      ( transactionHash,
+        transactionIndex,
+        logIndex,
+        blockHash,
+        blockNumber,
+        removed,
+        withdrawal ))
+    (fun ( transactionHash,
+           transactionIndex,
+           logIndex,
+           blockHash,
+           blockNumber,
+           removed,
+           withdrawal ) ->
+      {
+        transactionHash;
+        transactionIndex;
+        logIndex;
+        blockHash;
+        blockNumber;
+        removed;
+        withdrawal;
+      })
+  @@ obj7
+       (req "transactionHash" hash_encoding)
+       (req "transactionIndex" quantity_encoding)
+       (req "logIndex" quantity_encoding)
+       (req "blockHash" block_hash_encoding)
+       (req "blockNumber" quantity_encoding)
+       (req "removed" bool)
+       (req "withdrawal" withdrawal_encoding)
+
 module Events = struct
   include Internal_event.Simple
 
@@ -43,14 +160,112 @@ module Events = struct
       ("known", Data_encoding.int31)
 end
 
-let _with_connection store conn =
+let with_connection db conn =
   match conn with
   | Some conn -> Sqlite.with_connection conn
-  | None ->
-      fun k -> Sqlite.use store @@ fun conn -> Sqlite.with_connection conn k
+  | None -> fun k -> Sqlite.use db @@ fun conn -> Sqlite.with_connection conn k
 
-let _with_transaction store k =
-  Sqlite.use store @@ fun conn -> Sqlite.with_transaction conn k
+let _with_transaction db k =
+  Sqlite.use db @@ fun conn -> Sqlite.with_transaction conn k
+
+module Types = struct
+  let level =
+    custom
+      ~encode:(fun (Ethereum_types.Qty x) -> Ok Z.(to_int x))
+      ~decode:(fun x -> Ok (Qty Z.(of_int x)))
+      int
+
+  let amount =
+    custom
+      ~encode:(fun (Ethereum_types.Qty x) -> Ok Z.(to_string x))
+      ~decode:(fun x -> Ok (Qty Z.(of_string x)))
+      string
+
+  let address =
+    custom
+      ~encode:(fun (Ethereum_types.Address (Hex address)) ->
+        Result.of_option ~error:"not a valid address"
+        @@ Hex.to_string (`Hex address))
+      ~decode:(fun address ->
+        let (`Hex address) = Hex.of_string address in
+        Ok (Address (Hex address)))
+      octets
+
+  let hash =
+    custom
+      ~encode:(fun (Ethereum_types.Hash (Hex hash)) ->
+        Result.of_option ~error:"not a valid hash" @@ Hex.to_string (`Hex hash))
+      ~decode:(fun hash ->
+        let (`Hex hash) = Hex.of_string hash in
+        Ok (Hash (Hex hash)))
+      octets
+
+  let block_hash =
+    custom
+      ~encode:(fun (Ethereum_types.Block_hash (Hex hash)) ->
+        Result.of_option ~error:"not a valid hash" @@ Hex.to_string (`Hex hash))
+      ~decode:(fun hash ->
+        let (`Hex hash) = Hex.of_string hash in
+        Ok (Block_hash (Hex hash)))
+      octets
+
+  let withdrawal_kind =
+    custom
+      ~encode:(function
+        | Xtz -> Ok (0, None) | FA ticket_owner -> Ok (1, Some ticket_owner))
+      ~decode:(function
+        | 0, None -> Ok Xtz
+        | 1, Some ticket_owner -> Ok (FA ticket_owner)
+        | _ -> Error "not a valid withdrawal kind")
+      (t2 int (option address))
+
+  let contract =
+    custom
+      ~encode:(fun c -> Ok (Contract.to_b58check c))
+      ~decode:(fun s ->
+        Contract.of_b58check s
+        |> Result.map_error (fun _e -> "invalid contract in db"))
+      string
+
+  let withdrawal =
+    product (fun kind amount sender receiver withdrawal_id ->
+        {kind; amount; sender; receiver; withdrawal_id})
+    @@ proj withdrawal_kind (fun w -> w.kind)
+    @@ proj amount (fun w -> w.amount)
+    @@ proj address (fun w -> w.sender)
+    @@ proj contract (fun w -> w.receiver)
+    @@ proj level (fun w -> w.withdrawal_id)
+    @@ proj_end
+
+  let withdrawal_log =
+    product
+      (fun
+        transactionHash
+        transactionIndex
+        logIndex
+        blockHash
+        blockNumber
+        removed
+        withdrawal
+      ->
+        {
+          transactionHash;
+          transactionIndex;
+          logIndex;
+          blockHash;
+          blockNumber;
+          removed;
+          withdrawal;
+        })
+    @@ proj hash (fun l -> l.transactionHash)
+    @@ proj level (fun l -> l.transactionIndex)
+    @@ proj level (fun l -> l.logIndex)
+    @@ proj block_hash (fun l -> l.blockHash)
+    @@ proj level (fun l -> l.blockNumber)
+    @@ proj bool (fun l -> l.removed)
+    @@ proj withdrawal (fun l -> l.withdrawal)
+    @@ proj_end
+end
 
 module Migrations = struct
   module Q = struct
@@ -159,3 +374,22 @@ let init ~data_dir perm : t tzresult Lwt.t =
     return_unit
   in
   Sqlite.init ~path ~perm migration
+
+module Withdrawals = struct
+  module Q = struct
+    open Types
+
+    let insert =
+      (withdrawal_log ->. unit)
+      @@ {sql|
+      REPLACE INTO withdrawals
+      (transactionHash,
+       transactionIndex, logIndex, blockHash, blockNumber,
+       removed, kind, ticket_owner, amount, sender, receiver, withdrawal_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      |sql}
+  end
+
+  let store ?conn db log =
+    with_connection db conn @@ fun conn -> Sqlite.Db.exec conn Q.insert log
+end

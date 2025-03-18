@@ -102,20 +102,23 @@ let validate_range log_filter_config
       else
         tzfail (Block_range_too_large {limit = log_filter_config.max_nb_blocks})
 
-(* Constructs the bloom filter *)
-let make_bloom (filter : Filter.t) =
+let make_bloom_address_topics address topics =
   let bloom = Ethbloom.make () in
   Option.iter
     (function
       | Filter.Single (Address address) -> Ethbloom.accrue ~input:address bloom
       | _ -> ())
-    filter.address ;
+    address ;
   Option.iter
     (List.iter (function
         | Some Filter.(One (Hash topic)) -> Ethbloom.accrue ~input:topic bloom
         | _ -> ()))
-    filter.topics ;
+    topics ;
   bloom
+
+(* Constructs the bloom filter *)
+let make_bloom (filter : Filter.t) =
+  make_bloom_address_topics filter.address filter.topics
 
 let validate_topics (filter : Filter.t) =
   let open Lwt_result_syntax in
