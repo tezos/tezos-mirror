@@ -1133,7 +1133,41 @@ module Monitoring_app = struct
                  ~some:(fun data -> [("accessory", data)])
                  accessory);
         ]
+
+    let make_payload ~slack_channel_id ?ts content =
+      let open Ezjsonm in
+      `O
+        (("channel", string slack_channel_id)
+        :: ("blocks", `A content)
+        :: Option.fold ~none:[] ~some:(fun ts -> [("thread_ts", string ts)]) ts
+        )
   end
+
+  let post_message ?ts ~slack_channel_id ~slack_bot_token data =
+    let data = Format_app.make_payload ?ts ~slack_channel_id data in
+    let slack_endpoint =
+      {Endpoint.scheme = "https"; host = "slack.com"; port = 443}
+    in
+    let rpc =
+      RPC_core.make
+        ~data:(Data data)
+        POST
+        ["api"; "chat.postMessage"]
+        (fun _json -> ())
+    in
+    let* response =
+      RPC_core.call_raw
+        ~extra_headers:
+          [("Authorization", Format.sprintf "Bearer %s" slack_bot_token)]
+        slack_endpoint
+        rpc
+    in
+    let thread_id =
+      let open JSON in
+      parse ~origin:"DAL.Monitoring_app.chat_postMessage" response.body
+      |-> "ts" |> as_string
+    in
+    return thread_id
 
   module Tasks = struct
     let endpoint_from_prometheus_query ~query =
@@ -1370,7 +1404,7 @@ module Monitoring_app = struct
         in
         Lwt.return (view_slot_info data)
 
-    let action ~webhook ~configuration () =
+    let action ~slack_bot_token ~slack_channel_id ~configuration () =
       let network = configuration.network in
       let title_info =
         Format.sprintf
@@ -1391,35 +1425,20 @@ module Monitoring_app = struct
       in
       let* bakers_info = fetch_bakers_info network in
       let data =
-        let open Ezjsonm in
         let open Format_app in
-        `O
-          [
-            ("text", string "DAL reporting");
-            ( "blocks",
-              `A
-                (section [title_info] ()
-                @ section ["*Network overview*"] ()
-                @ section
-                    network_overview_info
-                    ~accessory:
-                      (Format_app.image
-                         ~url:(network_to_image_url network)
-                         ~alt:(Network.to_string network))
-                    ()
-                @ section ["*Baker performance overview*"] ()
-                @ section bakers_info ()) );
-          ]
+        section [title_info] ()
+        @ section ["*Network overview*"] ()
+        @ section
+            network_overview_info
+            ~accessory:
+              (Format_app.image
+                 ~url:(network_to_image_url network)
+                 ~alt:(Network.to_string network))
+            ()
+        @ section ["*Baker performance overview*"] ()
+        @ section bakers_info ()
       in
-      let rpc =
-        RPC_core.make
-          ~data:(Data data)
-          POST
-          (String.split_on_char '/' (Uri.path webhook))
-          (fun _json -> ())
-      in
-      let endpoint = endpoint_of_webhook webhook in
-      let* _response = RPC_core.call_raw endpoint rpc in
+      let* _ts = post_message ~slack_channel_id ~slack_bot_token data in
       Lwt.return_unit
 
     (* Relies on UTC (Universal Time Coordinated).
@@ -1428,12 +1447,13 @@ module Monitoring_app = struct
        time (summer months), Paris switches to Central European Summer
        Time (CEST), which is UTC+2.
     *)
-    let tasks ~dal_slack_webhook ~configuration =
-      match dal_slack_webhook with
+    let tasks ~configuration =
+      match configuration.monitor_app_configuration with
       | None -> []
-      | Some webhook ->
-          let webhook = Uri.of_string webhook in
-          let action () = action ~webhook ~configuration () in
+      | Some {slack_bot_token; slack_channel_id; _} ->
+          let action () =
+            action ~slack_bot_token ~slack_channel_id ~configuration ()
+          in
           [Chronos.task ~name:"network-overview" ~tm:"0 0-23/6 * * *" ~action]
   end
 
@@ -3466,10 +3486,7 @@ let register (module Cli : Scenarios_cli.Dal) =
       | Some fundraiser_key -> ["--fundraiser"; fundraiser_key])
     ~__FILE__
     ~title:"DAL node benchmark"
-    ~tasks:
-      (Monitoring_app.Tasks.tasks
-         ~dal_slack_webhook:Cli.Alerts.dal_slack_webhook
-         ~configuration)
+    ~tasks:(Monitoring_app.Tasks.tasks ~configuration)
     ~tags:[]
     (fun cloud ->
       toplog "Creating the agents" ;
