@@ -420,67 +420,19 @@ module V0 = struct
         })
       (merge_objs
          (obj10
-            (dft
-               "data-dir"
-               ~description:"Location of the data dir"
-               string
-               default_data_dir)
-            (dft
-               "rpc-addr"
-               ~description:"RPC address"
-               P2p_point.Id.encoding
-               default_rpc_addr)
-            (dft
-               "net-addr"
-               ~description:"P2P address of this node"
-               P2p_point.Id.encoding
-               default_listen_addr)
-            (dft
-               "public-addr"
-               ~description:"P2P address of this node"
-               P2p_point.Id.encoding
-               default_listen_addr)
-            (dft
-               "neighbors"
-               ~description:"DAL Neighbors"
-               (list neighbor_encoding)
-               default_neighbors)
-            (dft
-               "peers"
-               ~description:"P2P addresses of remote peers"
-               (list string)
-               default_peers)
-            (dft
-               "expected-pow"
-               ~description:"Expected P2P identity's PoW"
-               float
-               default_expected_pow)
-            (dft
-               "network-name"
-               ~description:"The name that identifies the network"
-               string
-               default_network_name)
-            (dft
-               "endpoint"
-               ~description:"The Tezos node endpoint"
-               endpoint_encoding
-               default_endpoint)
-            (dft
-               "metrics-addr"
-               ~description:"The point for the DAL node metrics server"
-               P2p_point.Id.encoding
-               default_metrics_addr))
+            (dft "data-dir" string default_data_dir)
+            (dft "rpc-addr" P2p_point.Id.encoding default_rpc_addr)
+            (dft "net-addr" P2p_point.Id.encoding default_listen_addr)
+            (dft "public-addr" P2p_point.Id.encoding default_listen_addr)
+            (dft "neighbors" (list neighbor_encoding) default_neighbors)
+            (dft "peers" (list string) default_peers)
+            (dft "expected-pow" float default_expected_pow)
+            (dft "network-name" string default_network_name)
+            (dft "endpoint" endpoint_encoding default_endpoint)
+            (dft "metrics-addr" P2p_point.Id.encoding default_metrics_addr))
          (obj2
-            (dft
-               "history_mode"
-               ~description:"The history mode for the DAL node"
-               history_mode_encoding
-               default_history_mode)
-            (dft
-               "profiles"
-               ~description:"The Octez DAL node profiles"
-               Profile_manager.encoding
-               Profile_manager.empty)))
+            (dft "history_mode" history_mode_encoding default_history_mode)
+            (dft "profiles" Profile_manager.encoding Profile_manager.empty)))
 end
 
 let from_v0 v0 =
