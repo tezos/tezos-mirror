@@ -180,7 +180,8 @@ end
 
 module Sandbox = struct
   type state = {
-    mutable daemons : (Node.t * Baker.t option * Client.t option) array;
+    mutable daemons :
+      (Node.t * Agnostic_baker.t option * Client.t option) array;
     mutable delegates : Account.key Inf.t;
   }
 
@@ -218,8 +219,10 @@ module Sandbox = struct
     | node, _, _ ->
         let* client = Client.init ~endpoint:(Client.Node node) () in
         let delegates = [get_delegate st] in
-        let baker = Baker.create ~protocol node client ~delegates in
-        let* () = if run_baker then Baker.run baker else Lwt.return_unit in
+        let baker = Agnostic_baker.create node client ~delegates in
+        let* () =
+          if run_baker then Agnostic_baker.run baker else Lwt.return_unit
+        in
         st.daemons.(h) <- (node, Some baker, Some client) ;
         return (client, baker)
 
@@ -233,7 +236,7 @@ module Sandbox = struct
           (Invalid_argument
              (sf "remove_baker_from_node: node %d has no baker" h))
     | node, Some baker, client_opt ->
-        let* () = Baker.terminate baker in
+        let* () = Agnostic_baker.terminate baker in
         st.daemons.(h) <- (node, None, client_opt) ;
         return baker
 
@@ -247,14 +250,16 @@ module Sandbox = struct
   let add_node_with_baker ?(run_baker = true) (st : state) =
     let* handle, node = add_node st in
     let* client, baker = add_baker_to_node ~run_baker st handle in
-    Log.info "Creating baker #%d (%s)" handle (Baker.name baker) ;
+    Log.info "Creating baker #%d (%s)" handle (Agnostic_baker.name baker) ;
     return (handle, node, client, baker)
 
   let terminate (st : state) =
     Lwt_list.iter_p
       (fun (node, baker_opt, _) ->
         let* () = Node.terminate node
-        and* () = Option.fold ~none:unit ~some:Baker.terminate baker_opt in
+        and* () =
+          Option.fold ~none:unit ~some:Agnostic_baker.terminate baker_opt
+        in
         unit)
       (Array.to_list st.daemons)
 end
@@ -321,7 +326,7 @@ module Rounds = struct
       ~title:test
       ~tags:["tenderbake"; "basic"]
       ~team
-      ~uses:[Protocol.baker protocol]
+      ~uses:[Constant.octez_experimental_agnostic_baker]
       ~executors
       ~timeout:(Long_test.Seconds (repeat * 8 * timeout))
     @@ fun () ->
@@ -355,7 +360,7 @@ module Rounds = struct
     Log.info "Setting up nodes in ring topology" ;
     Cluster.ring nodes ;
     let* () = Cluster.start ~wait_connections:true nodes in
-    let* () = Lwt_list.iter_p Baker.run bakers in
+    let* () = Lwt_list.iter_p Agnostic_baker.run bakers in
 
     let* parameter_file =
       write_parameter_file
@@ -478,7 +483,7 @@ module Long_dynamic_bake = struct
       ~title:(test topology)
       ~tags:["tenderbake"; "dynamic"; string_of_topology topology]
       ~team
-      ~uses:[Protocol.baker protocol]
+      ~uses:[Constant.octez_experimental_agnostic_baker]
       ~executors
       ~timeout:(Long_test.Seconds (repeat * 8 * timeout))
     @@ fun () ->
@@ -522,7 +527,7 @@ module Long_dynamic_bake = struct
     let* () = Cluster.start ~wait_connections:true nodes in
 
     Log.info "Starting bakers" ;
-    let* () = Lwt_list.iter_p Baker.run bakers in
+    let* () = Lwt_list.iter_p Agnostic_baker.run bakers in
 
     Log.info "Activating protocol" ;
     let* () =
@@ -548,7 +553,7 @@ module Long_dynamic_bake = struct
           "Cycle %d (head level %d): killed baker %s from handle #%d"
           cycle
           head_level
-          (Baker.name killed_baker)
+          (Agnostic_baker.name killed_baker)
           dead_baker_handle' ;
 
         let revive_delay = 1.0 in
@@ -563,7 +568,7 @@ module Long_dynamic_bake = struct
           "Cycle %d (head level %d): added baker %s to handle #%d"
           cycle
           head_level
-          (Baker.name new_baker)
+          (Agnostic_baker.name new_baker)
           dead_baker_handle ;
 
         (* set the next baker to die *)
