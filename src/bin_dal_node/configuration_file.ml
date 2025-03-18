@@ -25,8 +25,9 @@
 
 (* Version history:
    - 0: initial version, comes with octez v20 release
-   - 1: changed format of 'profile' field; added 'version' field *)
-let current_version = 1
+   - 1: changed format of 'profile' field; added 'version' field
+   - 2: removed fields network_name and neighbors. *)
+let current_version = 2
 
 type neighbor = {addr : string; port : int}
 
@@ -66,12 +67,10 @@ let history_mode_encoding =
 type t = {
   data_dir : string;
   rpc_addr : P2p_point.Id.t;
-  neighbors : neighbor list;
   listen_addr : P2p_point.Id.t;
   public_addr : P2p_point.Id.t;
   peers : string list;
   expected_pow : float;
-  network_name : string;
   endpoint : Uri.t;
   metrics_addr : P2p_point.Id.t option;
   profile : Profile_manager.t;
@@ -129,12 +128,10 @@ let default =
   {
     data_dir = default_data_dir;
     rpc_addr = default_rpc_addr;
-    neighbors = default_neighbors;
     listen_addr = default_listen_addr;
     public_addr = default_public_addr;
     peers = default_peers;
     expected_pow = default_expected_pow;
-    network_name = default_network_name;
     endpoint = default_endpoint;
     metrics_addr = None;
     history_mode = default_history_mode;
@@ -187,10 +184,8 @@ let encoding : t Data_encoding.t =
            rpc_addr;
            listen_addr;
            public_addr;
-           neighbors;
            peers;
            expected_pow;
-           network_name;
            endpoint;
            metrics_addr;
            history_mode;
@@ -206,10 +201,8 @@ let encoding : t Data_encoding.t =
           rpc_addr,
           listen_addr,
           public_addr,
-          neighbors,
           peers,
           expected_pow,
-          network_name,
           endpoint,
           metrics_addr ),
         ( history_mode,
@@ -224,10 +217,8 @@ let encoding : t Data_encoding.t =
              rpc_addr,
              listen_addr,
              public_addr,
-             neighbors,
              peers,
              expected_pow,
-             network_name,
              endpoint,
              metrics_addr ),
            ( history_mode,
@@ -243,10 +234,8 @@ let encoding : t Data_encoding.t =
         rpc_addr;
         listen_addr;
         public_addr;
-        neighbors;
         peers;
         expected_pow;
-        network_name;
         endpoint;
         metrics_addr;
         history_mode;
@@ -259,7 +248,7 @@ let encoding : t Data_encoding.t =
         verbose;
       })
     (merge_objs
-       (obj10
+       (obj8
           (dft
              "data-dir"
              ~description:"Location of the data dir"
@@ -281,11 +270,6 @@ let encoding : t Data_encoding.t =
              P2p_point.Id.encoding
              default_listen_addr)
           (dft
-             "neighbors"
-             ~description:"DAL Neighbors"
-             (list neighbor_encoding)
-             default_neighbors)
-          (dft
              "peers"
              ~description:"P2P addresses of remote peers"
              (list string)
@@ -295,11 +279,6 @@ let encoding : t Data_encoding.t =
              ~description:"Expected P2P identity's PoW"
              float
              default_expected_pow)
-          (dft
-             "network-name"
-             ~description:"The name that identifies the network"
-             string
-             default_network_name)
           (dft
              "endpoint"
              ~description:"The Tezos node endpoint"
@@ -405,10 +384,10 @@ module V0 = struct
           rpc_addr,
           listen_addr,
           public_addr,
-          neighbors,
+          _neighbors,
           peers,
           expected_pow,
-          network_name,
+          _network_name,
           endpoint,
           metrics_addr ),
         (history_mode, profile) ) =
@@ -417,10 +396,8 @@ module V0 = struct
       rpc_addr;
       listen_addr;
       public_addr;
-      neighbors;
       peers;
       expected_pow;
-      network_name;
       endpoint;
       metrics_addr = Some metrics_addr;
       history_mode;
@@ -451,9 +428,9 @@ module V1 = struct
 
      This design reflects the temporary, transitional nature of the V1
      configuration and isolates legacy logic from the active codebase. *)
-  type t = tup10 * tup8
+  type t = tup1 * tup2
 
-  and tup10 =
+  and tup1 =
     string (* data_dir *)
     * P2p_point.Id.t (* rpc_addr *)
     * P2p_point.Id.t (*listen_addr  *)
@@ -465,7 +442,7 @@ module V1 = struct
     * Uri.t (*endpoint  *)
     * P2p_point.Id.t option (*metrics_addr  *)
 
-  and tup8 =
+  and tup2 =
     history_mode (* history_mode *)
     * Profile_manager.t (* profile *)
     * int (*version  *)
@@ -510,10 +487,10 @@ module V1 = struct
           rpc_addr,
           listen_addr,
           public_addr,
-          neighbors,
+          _neighbors,
           peers,
           expected_pow,
-          network_name,
+          _network_name,
           endpoint,
           metrics_addr ),
         ( history_mode,
@@ -529,10 +506,8 @@ module V1 = struct
       rpc_addr;
       listen_addr;
       public_addr;
-      neighbors;
       peers;
       expected_pow;
-      network_name;
       endpoint;
       metrics_addr;
       history_mode;
