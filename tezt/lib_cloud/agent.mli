@@ -97,6 +97,9 @@ val host_run_command : t -> string -> string list -> Process.t
 (** Returns the process monitor if any *)
 val process_monitor : t -> Process_monitor.t option
 
+(** Returns the service manager if any *)
+val service_manager : t -> Service_manager.t option
+
 (** Run a command on the docker image run by the agent.
 
     This command should not be used outside of the [tezt-cloud]

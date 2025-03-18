@@ -64,6 +64,7 @@ type t = {
   next_available_port : unit -> int;
   configuration : Configuration.t;
   process_monitor : Process_monitor.t option;
+  service_manager : Service_manager.t option;
 }
 
 let ssh_id () = Env.ssh_private_key_filename ()
@@ -81,6 +82,7 @@ let encoding =
            next_available_port;
            configuration;
            process_monitor;
+           service_manager = _;
          } ->
       ( vm_name,
         zone,
@@ -116,6 +118,7 @@ let encoding =
         next_available_port;
         configuration;
         process_monitor;
+        service_manager = Service_manager.init () |> Option.some;
       })
     (obj6
        (req "vm_name" (option string))
@@ -158,6 +161,7 @@ let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~vm_name
     configuration;
     zone;
     process_monitor;
+    service_manager = Service_manager.init () |> Option.some;
   }
 
 let cmd_wrapper {zone; vm_name; _} =
@@ -178,6 +182,8 @@ let cmd_wrapper {zone; vm_name; _} =
 let path_of agent binary = agent.configuration.vm.binaries_path // binary
 
 let process_monitor agent = agent.process_monitor
+
+let service_manager t = t.service_manager
 
 let host_run_command agent cmd args =
   match cmd_wrapper agent with
