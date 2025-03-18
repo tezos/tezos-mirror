@@ -307,7 +307,7 @@ oc.docker-build-debian-dependencies:
       - unstable
       - bookworm
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
       - gcp_arm64
 
 oc.build-debian:
@@ -353,7 +353,7 @@ oc.build-debian:
       - unstable
       - bookworm
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
       - gcp_arm64
 
 oc.build-debian-old_a:
@@ -399,7 +399,7 @@ oc.build-debian-old_a:
       - unstable
       - bookworm
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
       - gcp_arm64
 
 oc.build-debian-old_b:
@@ -445,7 +445,7 @@ oc.build-debian-old_b:
       - unstable
       - bookworm
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
       - gcp_arm64
 
 oc.build-data_packages:
