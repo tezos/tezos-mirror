@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::convert::Infallible;
 use std::num::TryFromIntError;
 
 use arbitrary_int::TryNewError;
@@ -64,6 +65,12 @@ impl Error {
         // The discriminant matches the error code
         let error_code = -(self as i32);
         error_code as u64
+    }
+}
+
+impl From<Infallible> for Error {
+    fn from(infallible: Infallible) -> Self {
+        match infallible {}
     }
 }
 

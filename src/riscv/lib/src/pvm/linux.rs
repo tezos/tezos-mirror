@@ -465,6 +465,22 @@ impl<M: ManagerBase> SupervisorState<M> {
         MC: MemoryConfig,
         M: ManagerReadWrite,
     {
+        // `dispatch1!(system_call_no)`
+        // Converts the system call name to the handler
+        #[allow(unused_macros)]
+        macro_rules! dispatch1 {
+            ($system_call:ty) => {{
+                try_blocks::try_block! {
+                    paste::paste! {
+                        let arg1 = core.hart.xregisters.try_read(registers::a0)?;
+                        let result = self.[<handle_$system_call>](arg1)?;
+                        core.hart.xregisters.write(registers::a0, result.into());
+                        true
+                    }
+                }
+            }};
+        }
+
         // We need to jump to the next instruction. The ECall instruction which triggered this
         // function is 4 byte wide.
         let pc = core.hart.pc.read().saturating_add(4);
