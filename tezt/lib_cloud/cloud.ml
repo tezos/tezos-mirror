@@ -111,6 +111,13 @@ let shutdown ?exn t =
           (Printexc.to_string exn) ;
         Lwt.return_unit)
   in
+  (* Shutdown the service managers before alert_manager *)
+  let () =
+    List.iter
+      (fun agent ->
+        Option.iter Service_manager.shutdown (Agent.service_manager agent))
+      t.agents
+  in
   let* () =
     if Option.is_some t.alert_manager then Alert_manager.shutdown ()
     else Lwt.return_unit
@@ -772,3 +779,32 @@ let register_binary cloud ?agents ?(group = "tezt-cloud") ~name () =
             else Lwt.return_unit)
       agents
   else Lwt.return_unit
+
+(* FIXME: remove the need for this table by being able to properly associate
+   node to the corresponding agent *)
+let agents_by_service_name = Hashtbl.create 10
+
+let service_register ~name ~executable agent =
+  match Agent.service_manager agent with
+  | None -> ()
+  | Some service_manager ->
+      let () = Hashtbl.add agents_by_service_name name agent in
+      Service_manager.register_service ~name ~executable service_manager
+
+let notify_service_start ~name ~pid =
+  match Hashtbl.find_opt agents_by_service_name name with
+  | None -> ()
+  | Some agent -> (
+      match Agent.service_manager agent with
+      | None -> ()
+      | Some service_manager ->
+          Service_manager.notify_start_service ~name ~pid service_manager)
+
+let notify_service_stop ~name =
+  match Hashtbl.find_opt agents_by_service_name name with
+  | None -> ()
+  | Some agent -> (
+      match Agent.service_manager agent with
+      | None -> ()
+      | Some service_manager ->
+          Service_manager.notify_stop_service ~name service_manager)

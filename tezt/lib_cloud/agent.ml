@@ -118,7 +118,8 @@ let encoding =
         next_available_port;
         configuration;
         process_monitor;
-        service_manager = Service_manager.init () |> Option.some;
+        service_manager = None;
+        (* As of now, this encoding is only used when reattaching *)
       })
     (obj6
        (req "vm_name" (option string))
