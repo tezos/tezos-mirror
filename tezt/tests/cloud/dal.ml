@@ -446,7 +446,6 @@ type etherlink_configuration = {
 type monitor_app_configuration = {
   slack_bot_token : string;
   slack_channel_id : string;
-  dal_slack_webhook : Uri.t;
 }
 
 type configuration = {
@@ -3343,8 +3342,7 @@ let register (module Cli : Scenarios_cli.Dal) =
              reports or alerts will be sent." ;
           None
       | Some slack_bot_token, Some slack_channel_id ->
-          Some
-            {dal_slack_webhook = Uri.empty; slack_channel_id; slack_bot_token}
+          Some {slack_channel_id; slack_bot_token}
     in
     let t =
       {
