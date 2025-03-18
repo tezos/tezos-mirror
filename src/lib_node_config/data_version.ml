@@ -323,7 +323,7 @@ end
 
 let version_file data_dir = Filename.concat data_dir version_file_name
 
-let clean_directory files =
+let warning_clean_directory files =
   let to_delete =
     Format.asprintf
       "%a"
@@ -335,6 +335,17 @@ let clean_directory files =
   Format.sprintf
     "Please provide a clean directory by removing the following files: %s"
     to_delete
+
+let clean_directory ~data_dir =
+  let open Lwt_result_syntax in
+  List.iter_es (fun f ->
+      protect @@ fun () ->
+      let f = Filename.concat data_dir f in
+      let*! is_dir = Lwt_utils_unix.is_directory f in
+      let*! () =
+        if is_dir then Lwt_utils_unix.remove_dir f else Lwt_unix.unlink f
+      in
+      return_unit)
 
 let write_version_file data_dir =
   let version_file = version_file data_dir in
@@ -370,7 +381,10 @@ let check_data_dir_version data_dir =
       | Some f -> return_some f
       | None -> tzfail (Invalid_data_dir_version (current_version, version))
 
-type ensure_mode = Exists | Is_bare | Is_compatible
+type ensure_mode =
+  | Exists
+  | Is_bare of {clean_if_needed : bool}
+  | Is_compatible
 
 let ensure_data_dir ~mode data_dir =
   let open Lwt_result_syntax in
@@ -396,9 +410,13 @@ let ensure_data_dir ~mode data_dir =
         in
         match (files, mode) with
         | [], _ -> write_version ()
-        | files, Is_bare ->
-            let msg = Some (clean_directory files) in
-            tzfail (Invalid_data_dir {data_dir; msg})
+        | files, Is_bare {clean_if_needed} ->
+            if clean_if_needed then
+              let* () = clean_directory ~data_dir files in
+              return_none
+            else
+              let msg = Some (warning_clean_directory files) in
+              tzfail (Invalid_data_dir {data_dir; msg})
         | _, Is_compatible -> check_data_dir_version data_dir
         | _files, Exists -> return_none
       else

@@ -157,7 +157,7 @@ module Term = struct
     Shared_arg.process_command run
 
   let import data_dir config_file operation_metadata_size_limit snapshot_path
-      block disable_check reconstruct sandbox_file progress_display_mode =
+      block disable_check reconstruct sandbox_file progress_display_mode force =
     let run =
       let open Lwt_result_syntax in
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
@@ -186,7 +186,12 @@ module Term = struct
         let*! lock_file_exists = Lwt_unix.file_exists lock_file in
         if lock_file_exists then Lwt_unix.unlink lock_file else Lwt.return_unit
       in
-      let* () = Data_version.ensure_data_dir ~mode:Is_bare genesis data_dir in
+      let* () =
+        Data_version.ensure_data_dir
+          ~mode:(Is_bare {clean_if_needed = force})
+          genesis
+          data_dir
+      in
       (* Lock only on snapshot import *)
       Lwt_lock_file.with_lock
         ~when_locked:
@@ -394,6 +399,14 @@ module Term = struct
           ~docv:"<auto|always|never>"
           ["progress-display-mode"])
 
+  let force =
+    let open Cmdliner in
+    let doc =
+      "Cleans leftover files in the data-dir when importing a snapshot, such \
+       as context, store and daily_logs. Must use with care."
+    in
+    Arg.(value & flag & info ~doc ["force"])
+
   let format_json =
     let open Cmdliner in
     let doc = "Displays the snapshot's information in JSON format." in
@@ -419,7 +432,8 @@ module Term = struct
             (const import $ Shared_arg.Term.data_dir
            $ Shared_arg.Term.config_file
            $ Shared_arg.Term.operation_metadata_size_limit $ file_arg $ block
-           $ disable_check $ reconstruct $ sandbox $ progress_display_mode));
+           $ disable_check $ reconstruct $ sandbox $ progress_display_mode
+           $ force));
       Cmd.v
         (Cmd.info ~doc:"displays information about the snapshot file" "info")
         Term.(ret (const get_info $ file_arg $ format_json));
