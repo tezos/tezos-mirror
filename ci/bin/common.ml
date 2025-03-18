@@ -576,6 +576,7 @@ let changeset_test_sdk_bindings =
   Changeset.(
     changeset_base
     @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    @ make ["sdk/rust/**/*"]
     @ make ["contrib/sdk-bindings"])
 
 let changeset_test_kernels =

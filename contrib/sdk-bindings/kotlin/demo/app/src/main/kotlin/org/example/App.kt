@@ -3,8 +3,6 @@
  */
 package org.example
 
-import org.example.tezos.add
-
 class App {
     val greeting: String
         get() {
@@ -14,5 +12,4 @@ class App {
 
 fun main() {
     println(App().greeting)
-    println("1 + 2 = ${add(1u, 2u)}")
 }
