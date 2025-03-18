@@ -249,16 +249,20 @@ module State = struct
       Lwt.wakeup head_info_waker first_head
   end
 
-  let load ~data_dir ~store_perm:perm index =
+  let load ~l2_chains ~data_dir ~store_perm:perm index =
     let open Lwt_result_syntax in
     let* store = Evm_store.init ~data_dir ~perm () in
     Evm_store.use store @@ fun conn ->
     let* latest = Evm_store.Context_hashes.find_latest conn in
+    (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
+    let chain_family = Configuration.retrieve_chain_family ~l2_chains in
     match latest with
     | Some (Qty latest_blueprint_number, checkpoint) ->
         let*! context = Irmin_context.checkout_exn index checkpoint in
         let*! evm_state = Irmin_context.PVMState.get context in
-        let+ current_block_hash = Evm_state.current_block_hash evm_state in
+        let+ current_block_hash =
+          Evm_state.current_block_hash ~chain_family evm_state
+        in
         ( store,
           context,
           Ethereum_types.Qty Z.(succ latest_blueprint_number),
@@ -266,11 +270,12 @@ module State = struct
           Loaded )
     | None ->
         let context = Irmin_context.empty index in
+        let genesis_parent_hash = L2_types.genesis_parent_hash ~chain_family in
         return
           ( store,
             context,
             Ethereum_types.Qty Z.zero,
-            L2_types.genesis_parent_hash ~chain_family:EVM,
+            genesis_parent_hash,
             Created )
 
   let commit store (context : Irmin_context.rw) evm_state number =
@@ -475,7 +480,14 @@ module State = struct
     let* pending_upgrade = Evm_store.Kernel_upgrades.find_latest_pending conn in
     (* Update mutable session values. *)
     let next_blueprint_number = Ethereum_types.Qty.next l2_level in
-    let* current_block_hash = Evm_state.current_block_hash evm_state in
+    (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
+    let chain_family =
+      Configuration.retrieve_chain_family
+        ~l2_chains:ctxt.configuration.experimental_features.l2_chains
+    in
+    let* current_block_hash =
+      Evm_state.current_block_hash ~chain_family evm_state
+    in
     ctxt.session.next_blueprint_number <- next_blueprint_number ;
     ctxt.session.evm_state <- evm_state ;
     ctxt.session.current_block_hash <- current_block_hash ;
@@ -1135,8 +1147,15 @@ module State = struct
     let* () = clear_head_delayed_inbox ctxt in
     (* Prepare an event list to be reapplied on current head *)
     let events = Evm_events.of_parts delayed_transactions lost_upgrade in
+    (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
+    let chain_family =
+      Configuration.retrieve_chain_family
+        ~l2_chains:ctxt.configuration.experimental_features.l2_chains
+    in
     (* Prepare a blueprint payload signed by the sequencer to execute locally. *)
-    let* parent_hash = Evm_state.current_block_hash ctxt.session.evm_state in
+    let* parent_hash =
+      Evm_state.current_block_hash ~chain_family ctxt.session.evm_state
+    in
     let* payload =
       prepare_local_flushed_blueprint ctxt parent_hash flushed_blueprint
     in
@@ -1352,7 +1371,11 @@ module State = struct
     let* index = irmin_load ?snapshot_url ~data_dir configuration in
     let* store, context, next_blueprint_number, current_block_hash, init_status
         =
-      load ~data_dir ~store_perm index
+      load
+        ~l2_chains:configuration.experimental_features.l2_chains
+        ~data_dir
+        ~store_perm
+        index
     in
     Evm_store.use store @@ fun conn ->
     let* () =

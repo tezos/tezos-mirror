@@ -221,14 +221,14 @@ let current_block_height evm_state =
       let (Qty current_block_number) = decode_number_le current_block_number in
       return (Qty current_block_number)
 
-let current_block_hash evm_state =
+let current_block_hash ~chain_family evm_state =
   let open Lwt_result_syntax in
   let*! current_hash =
     inspect evm_state Durable_storage_path.Block.current_hash
   in
   match current_hash with
   | Some h -> return (decode_block_hash h)
-  | None -> return (L2_types.genesis_parent_hash ~chain_family:EVM)
+  | None -> return (L2_types.genesis_parent_hash ~chain_family)
 
 (* The Fast Execution engine relies on Lwt_preemptive to execute Wasmer in
    dedicated worker threads (`Lwt_preemptive.detach`), while pushing to lwt
@@ -327,7 +327,7 @@ let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir
       evm_state
       exec_inputs
   in
-  let* block_hash = current_block_hash evm_state in
+  let* block_hash = current_block_hash ~chain_family evm_state in
   let* block =
     let*! bytes =
       inspect evm_state (Durable_storage_path.Block.by_hash block_hash)
