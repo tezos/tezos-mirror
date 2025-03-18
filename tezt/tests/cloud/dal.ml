@@ -3323,14 +3323,21 @@ let register (module Cli : Scenarios_cli.Dal) =
     let external_rpc = Cli.node_external_rpc_server in
     let dal_incentives = Cli.dal_incentives in
     let monitor_app_configuration =
-      Option.map
-        (fun dal_slack_webhook ->
-          {
-            dal_slack_webhook = Uri.of_string dal_slack_webhook;
-            slack_bot_token = String.empty;
-            slack_channel_id = String.empty;
-          })
-        Cli.Alerts.dal_slack_webhook
+      match Cli.Monitoring_app.(slack_bot_token, slack_channel_id) with
+      | None, None -> None
+      | Some _, None ->
+          Log.warn
+            "A Slack bot token has been provided but no Slack channel id. No \
+             reports or alerts will be sent." ;
+          None
+      | None, Some _ ->
+          Log.warn
+            "A Slack channel ID has been provided but no Slack bot token. No \
+             reports or alerts will be sent." ;
+          None
+      | Some slack_bot_token, Some slack_channel_id ->
+          Some
+            {dal_slack_webhook = Uri.empty; slack_channel_id; slack_bot_token}
     in
     let t =
       {
