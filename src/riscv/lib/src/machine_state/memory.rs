@@ -19,10 +19,8 @@ use crate::state_backend::Elem;
 use crate::state_backend::FnManager;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerClone;
-use crate::state_backend::ManagerDeserialise;
 use crate::state_backend::ManagerRead;
 use crate::state_backend::ManagerReadWrite;
-use crate::state_backend::ManagerSerialise;
 use crate::state_backend::ManagerWrite;
 use crate::state_backend::ProofLayout;
 use crate::state_backend::Ref;
@@ -161,18 +159,6 @@ pub trait Memory<M: ManagerBase>: Sized {
     where
         E: Elem,
         M: ManagerReadWrite;
-
-    /// Serialise memory.
-    fn serialise<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        M: ManagerSerialise,
-        S: serde::Serializer;
-
-    /// Deserialise memory.
-    fn deserialise<'de, D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        M: ManagerDeserialise,
-        D: serde::Deserializer<'de>;
 
     /// Clone all memory.
     fn clone(&self) -> Self

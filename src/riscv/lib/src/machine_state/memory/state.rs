@@ -4,9 +4,6 @@
 
 use std::mem;
 
-use serde::Deserialize;
-use serde::Serialize;
-
 use super::Address;
 use super::Memory;
 use super::OutOfBounds;
@@ -18,10 +15,8 @@ use crate::state_backend::DynCells;
 use crate::state_backend::Elem;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerClone;
-use crate::state_backend::ManagerDeserialise;
 use crate::state_backend::ManagerRead;
 use crate::state_backend::ManagerReadWrite;
-use crate::state_backend::ManagerSerialise;
 use crate::state_backend::ManagerWrite;
 
 /// Machine's memory
@@ -165,37 +160,6 @@ where
 
         self.data.write_all(address as usize, values);
         Ok(())
-    }
-
-    fn serialise<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        M: ManagerSerialise,
-        S: serde::Serializer,
-    {
-        self.data.serialize(serializer)
-    }
-
-    fn deserialise<'de, D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        M: ManagerDeserialise,
-        D: serde::Deserializer<'de>,
-    {
-        #[cfg(not(feature = "supervisor"))]
-        let data = DynCells::deserialize(deserializer)?;
-
-        #[cfg(feature = "supervisor")]
-        let (data, readable_pages, writable_pages, executable_pages) =
-            Deserialize::deserialize(deserializer)?;
-
-        Ok(Self {
-            data,
-            #[cfg(feature = "supervisor")]
-            readable_pages,
-            #[cfg(feature = "supervisor")]
-            writable_pages,
-            #[cfg(feature = "supervisor")]
-            executable_pages,
-        })
     }
 
     fn clone(&self) -> Self
