@@ -227,4 +227,5 @@ let commands =
 
 let () =
   Random.self_init () ;
+  Memtrace.trace_if_requested () ;
   exit (Cmdliner.Cmd.eval commands)

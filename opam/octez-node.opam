@@ -22,6 +22,7 @@ depends: [
   "tls-lwt" { >= "1.0.4" }
   "lwt-exit"
   "uri" { >= "3.1.0" }
+  "memtrace"
   "tezos-protocol-000-Ps9mPmXa" { = version }
   "tezos-protocol-021-PsQuebec" { = version }
   "octez-protocol-021-PsQuebec-libs" { = version }
