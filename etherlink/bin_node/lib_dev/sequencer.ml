@@ -170,6 +170,11 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   in
   let* () =
     if status = Created then
+      (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
+      let chain_family =
+        Configuration.retrieve_chain_family
+          ~l2_chains:configuration.experimental_features.l2_chains
+      in
       (* Create the first empty block. *)
       let* genesis_chunks =
         Sequencer_blueprint.prepare
@@ -179,7 +184,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
           ~transactions:[]
           ~delayed_transactions:[]
           ~number:Ethereum_types.(Qty Z.zero)
-          ~parent_hash:(L2_types.genesis_parent_hash ~chain_family:EVM)
+          ~parent_hash:(L2_types.genesis_parent_hash ~chain_family)
       in
       let genesis_payload =
         Sequencer_blueprint.create_inbox_payload
