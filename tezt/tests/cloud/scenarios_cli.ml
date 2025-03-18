@@ -82,6 +82,10 @@ module type Dal = sig
 
   val proxy_localhost : bool
 
+  module Monitoring_app : sig
+    val slack_channel_id : string option
+  end
+
   module Alerts : sig
     val section : Clap.section
 
@@ -394,6 +398,20 @@ module Dal () : Dal = struct
          can be used to solve a bug with the Tezt Cloud library. This option \
          will be removed once the bug is fixed"
       false
+
+  module Monitoring_app = struct
+    let section =
+      Clap.section
+        ~description:"Define report and alert managing options"
+        "Cloud reporting and alerting options"
+
+    let slack_channel_id =
+      Clap.optional_string
+        ~section
+        ~long:"slack-channel-id"
+        ~description:"The Slack channel id to send reports and alerts on"
+        ()
+  end
 
   module Alerts = struct
     let section =
