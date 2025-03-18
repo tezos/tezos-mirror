@@ -265,7 +265,6 @@ let run state =
         Lwt.return_unit)
   in
   let* () = may_start_initial_baker state in
-  let* _protocol_proposal = Rpc_services.get_current_proposal ~node_addr in
   let* head_stream = monitor_heads ~node_addr in
   (* Monitoring voting periods through heads monitoring to avoid
      missing UAUs. *)

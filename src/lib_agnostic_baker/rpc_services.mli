@@ -18,11 +18,6 @@ val request_uri :
     block. *)
 val get_next_protocol_hash : node_addr:string -> Protocol_hash.t tzresult Lwt.t
 
-(** [get_current_proposal ~node_addr] returns the protocol hash of
-    the current voting period, if any. *)
-val get_current_proposal :
-  node_addr:string -> Protocol_hash.t option tzresult Lwt.t
-
 (** [get_current_period ~node_addr] returns the current voting
     period in addition to the number of remaining blocks until the end
     of the period. *)

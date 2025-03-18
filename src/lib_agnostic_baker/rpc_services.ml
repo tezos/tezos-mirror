@@ -62,19 +62,6 @@ let get_next_protocol_hash ~node_addr =
   let uri = Format.sprintf "%s/chains/main/blocks/head/metadata" node_addr in
   call_and_wrap_rpc ~node_addr ~uri ~f
 
-let get_current_proposal ~node_addr =
-  let open Lwt_result_syntax in
-  let f json =
-    match json with
-    | `Null -> return_none
-    | `String s -> return_some @@ Protocol_hash.of_b58check_exn s
-    | _ -> tzfail (Cannot_decode_node_data "not an object")
-  in
-  let uri =
-    Format.sprintf "%s/chains/main/blocks/head/votes/current_proposal" node_addr
-  in
-  call_and_wrap_rpc ~node_addr ~uri ~f
-
 let get_current_period ~node_addr =
   let open Lwt_result_syntax in
   let voting_period_field = "voting_period" in
