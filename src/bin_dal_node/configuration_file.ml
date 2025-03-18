@@ -350,105 +350,82 @@ let encoding : t Data_encoding.t =
              default.verbose)))
 
 module V0 = struct
-  type t = {
-    data_dir : string;
-    rpc_addr : P2p_point.Id.t;
-    neighbors : neighbor list;
-    listen_addr : P2p_point.Id.t;
-    public_addr : P2p_point.Id.t;
-    peers : string list;
-    expected_pow : float;
-    network_name : string;
-    endpoint : Uri.t;
-    metrics_addr : P2p_point.Id.t;
-    profile : Profile_manager.t;
-    history_mode : history_mode;
-  }
+  (* Legacy V0 configuration type used solely for migration purposes.
+
+     This type represents the legacy (V0) version of the configuration,
+     originally defined as a record. It is intentionally rewritten as a tuple
+     for the following reasons:
+
+     - Simplified Encoding/Decoding: Using a tuple allows removing
+     [Data_encoding.conv] and its field-by-field mapping, significantly reducing
+     boilerplate in the migration code.
+
+     - Read-Only & Migration-Only: The V0 type is no longer edited or used
+     beyond JSON decoding and transformation into the current configuration
+     version. Record semantics (field names, accessors) are unnecessary.
+
+     This design reflects the temporary, transitional nature of the V0
+     configuration and isolates legacy logic from the active codebase. *)
+  type t = tup1 * tup2
+
+  and tup1 =
+    string (* data_dir *)
+    * P2p_point.Id.t (* rpc_addr *)
+    * P2p_point.Id.t (* listen_addr *)
+    * P2p_point.Id.t (* public_addr *)
+    * neighbor list (* neighbors *)
+    * string list (* peers *)
+    * float (* expected_pow *)
+    * string (* network_name *)
+    * Uri.t (* endpoint *)
+    * P2p_point.Id.t (* metrics_addr *)
+
+  and tup2 = history_mode (* history_mode *) * Profile_manager.t (* profile *)
 
   let encoding : t Data_encoding.t =
     let open Data_encoding in
-    conv
-      (fun {
-             data_dir;
-             rpc_addr;
-             listen_addr;
-             public_addr;
-             neighbors;
-             peers;
-             expected_pow;
-             network_name;
-             endpoint;
-             metrics_addr;
-             history_mode;
-             profile;
-           } ->
-        ( ( data_dir,
-            rpc_addr,
-            listen_addr,
-            public_addr,
-            neighbors,
-            peers,
-            expected_pow,
-            network_name,
-            endpoint,
-            metrics_addr ),
-          (history_mode, profile) ))
-      (fun ( ( data_dir,
-               rpc_addr,
-               listen_addr,
-               public_addr,
-               neighbors,
-               peers,
-               expected_pow,
-               network_name,
-               endpoint,
-               metrics_addr ),
-             (history_mode, profile) ) ->
-        {
-          data_dir;
-          rpc_addr;
-          listen_addr;
-          public_addr;
-          neighbors;
-          peers;
-          expected_pow;
-          network_name;
-          endpoint;
-          metrics_addr;
-          history_mode;
-          profile;
-        })
-      (merge_objs
-         (obj10
-            (dft "data-dir" string default_data_dir)
-            (dft "rpc-addr" P2p_point.Id.encoding default_rpc_addr)
-            (dft "net-addr" P2p_point.Id.encoding default_listen_addr)
-            (dft "public-addr" P2p_point.Id.encoding default_listen_addr)
-            (dft "neighbors" (list neighbor_encoding) default_neighbors)
-            (dft "peers" (list string) default_peers)
-            (dft "expected-pow" float default_expected_pow)
-            (dft "network-name" string default_network_name)
-            (dft "endpoint" endpoint_encoding default_endpoint)
-            (dft "metrics-addr" P2p_point.Id.encoding default_metrics_addr))
-         (obj2
-            (dft "history_mode" history_mode_encoding default_history_mode)
-            (dft "profiles" Profile_manager.encoding Profile_manager.empty)))
+    merge_objs
+      (obj10
+         (dft "data-dir" string default_data_dir)
+         (dft "rpc-addr" P2p_point.Id.encoding default_rpc_addr)
+         (dft "net-addr" P2p_point.Id.encoding default_listen_addr)
+         (dft "public-addr" P2p_point.Id.encoding default_listen_addr)
+         (dft "neighbors" (list neighbor_encoding) default_neighbors)
+         (dft "peers" (list string) default_peers)
+         (dft "expected-pow" float default_expected_pow)
+         (dft "network-name" string default_network_name)
+         (dft "endpoint" endpoint_encoding default_endpoint)
+         (dft "metrics-addr" P2p_point.Id.encoding default_metrics_addr))
+      (obj2
+         (dft "history_mode" history_mode_encoding default_history_mode)
+         (dft "profiles" Profile_manager.encoding Profile_manager.empty))
 end
 
-let from_v0 v0 =
+let from_v0
+    ( ( data_dir,
+        rpc_addr,
+        listen_addr,
+        public_addr,
+        neighbors,
+        peers,
+        expected_pow,
+        network_name,
+        endpoint,
+        metrics_addr ),
+      (history_mode, profile) ) =
   {
-    data_dir = v0.V0.data_dir;
-    rpc_addr = v0.rpc_addr;
-    listen_addr = v0.listen_addr;
-    public_addr = v0.public_addr;
-    neighbors = v0.neighbors;
-    peers = v0.peers;
-    expected_pow = v0.expected_pow;
-    network_name = v0.network_name;
-    endpoint = v0.endpoint;
-    metrics_addr = Some v0.metrics_addr;
-    history_mode = v0.history_mode;
-    profile = v0.profile;
+    data_dir;
+    rpc_addr;
+    listen_addr;
+    public_addr;
+    neighbors;
+    peers;
+    expected_pow;
+    network_name;
+    endpoint;
+    metrics_addr = Some metrics_addr;
+    history_mode;
+    profile;
     version = current_version;
     service_name = None;
     service_namespace = None;
