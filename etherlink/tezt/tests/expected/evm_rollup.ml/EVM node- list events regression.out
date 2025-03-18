@@ -1060,12 +1060,17 @@ migrations_from_the_future:
           "known": integer ∈ [-2^30, 2^30] } }
 
 store_applied_migration:
-  description: applied migration {name} to the store
+  description: applied migration {name} to the store in {time}
   level: notice
   section: evm_node.dev
   json format:
     { /* store_applied_migration version 0 */
-      "store_applied_migration.v0": $unistring }
+      "store_applied_migration.v0":
+        { "name": $unistring,
+          "time": $timespan.system } }
+    $timespan.system:
+      /* A span of time, as seen by the local computer. */
+      number
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that
