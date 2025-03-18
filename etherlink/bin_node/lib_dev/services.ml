@@ -262,7 +262,8 @@ let filter_logs ~bloom_filter ~receipt =
 let produce_logs_stream ~bloom_filter stream =
   Lwt_stream.map_list (fun receipt -> filter_logs ~bloom_filter ~receipt) stream
 
-let eth_subscribe ~(kind : Ethereum_types.Subscription.kind) =
+let eth_subscribe ~(kind : Ethereum_types.Subscription.kind)
+    (module Backend_rpc : Services_backend_sig.S) =
   let open Lwt_result_syntax in
   let id = make_id ~id:(generate_id ()) in
   let* stream, stopper =
@@ -280,6 +281,40 @@ let eth_subscribe ~(kind : Ethereum_types.Subscription.kind) =
     | Syncing ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/7642 *)
         Stdlib.failwith "The websocket event [syncing] is not implemented yet."
+    | Etherlink (L1_L2_levels from_l1_level) ->
+        let* () =
+          unless (Evm_events_follower.available ()) @@ fun () ->
+          failwith "The EVM node does not follow a rollup node"
+        in
+        let* extra =
+          match from_l1_level with
+          | None -> return_nil
+          | Some from_l1_level ->
+              let+ l1_l2 = Backend_rpc.list_l1_l2_levels ~from_l1_level in
+              List.rev_map
+                (fun ( l1_level,
+                       {
+                         Evm_store.L1_l2_finalized_levels.start_l2_level;
+                         end_l2_level;
+                       } ) ->
+                  {
+                    Ethereum_types.Subscription.l1_level;
+                    start_l2_level;
+                    end_l2_level;
+                  })
+                l1_l2
+              |> List.rev
+        in
+        let stream, stopper =
+          Lwt_watcher.create_stream Evm_context.l1_l2_levels_watcher
+        in
+        let stream = Lwt_stream.append (Lwt_stream.of_list extra) stream in
+        let stream =
+          Lwt_stream.map
+            (fun l -> Ethereum_types.Subscription.Etherlink (L1_l2_levels l))
+            stream
+        in
+        return (stream, stopper)
   in
   let stopper () =
     Stdlib.Hashtbl.remove subscriptions id ;
@@ -851,6 +886,19 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
             in
 
             build_with_input ~f module_ parameters
+        | Get_finalized_blocks_of_l1_level.Method ->
+            let f l1_level =
+              let open Lwt_result_syntax in
+              let* l2_levels = Backend_rpc.l2_levels_of_l1_level l1_level in
+              match l2_levels with
+              | Some {start_l2_level; end_l2_level} ->
+                  rpc_ok Rpc_encodings.{start_l2_level; end_l2_level}
+              | None ->
+                  rpc_error
+                    (Rpc_errors.resource_not_found
+                       (Format.sprintf "Unknown L1 block %ld" l1_level))
+            in
+            build_with_input ~f module_ parameters
         | _ ->
             Stdlib.failwith "The pattern matching of methods is not exhaustive")
   in
@@ -1044,7 +1092,7 @@ let dispatch_websocket (rpc_server_family : Rpc_types.rpc_server_family)
       let sub_stream = ref empty_stream in
       let sid = ref empty_sid in
       let f (kind : Ethereum_types.Subscription.kind) =
-        let* id_stream = eth_subscribe ~kind in
+        let* id_stream = eth_subscribe ~kind (fst ctx) in
         let id, stream =
           match id_stream with
           | Ok id_stream -> id_stream

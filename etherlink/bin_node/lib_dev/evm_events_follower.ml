@@ -359,3 +359,13 @@ let worker_add_request ~request =
 
 let new_rollup_block rollup_level =
   worker_add_request ~request:(New_rollup_node_block rollup_level)
+
+let status () =
+  let open Result_syntax in
+  let+ worker = Lazy.force worker in
+  Worker.status worker
+
+let available () =
+  match status () with
+  | Error _ | Ok (Closed _ | Closing _) -> false
+  | Ok (Launching _) | Ok (Running _) -> true

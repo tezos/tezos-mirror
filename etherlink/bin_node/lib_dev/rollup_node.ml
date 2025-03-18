@@ -214,6 +214,12 @@ end) : Services_backend_sig.Backend = struct
   end
 
   let smart_rollup_address = Base.smart_rollup_address
+
+  let list_l1_l2_levels ~from_l1_level:_ =
+    failwith "L1/L2 levels relationship not available in proxy mode"
+
+  let l2_levels_of_l1_level _ =
+    failwith "L1/L2 levels relationship not available in proxy mode"
 end
 
 module Make (Base : sig

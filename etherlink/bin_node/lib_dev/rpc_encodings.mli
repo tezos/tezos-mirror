@@ -349,6 +349,14 @@ module Subscribe :
 module Unsubscribe :
   METHOD with type input = Ethereum_types.Subscription.id and type output = bool
 
+type l1_block_l2_levels = {
+  start_l2_level : Ethereum_types.quantity;
+  end_l2_level : Ethereum_types.quantity;
+}
+
+module Get_finalized_blocks_of_l1_level :
+  METHOD with type input = int32 and type output = l1_block_l2_levels
+
 type map_result =
   | Method :
       ('input, 'output) method_

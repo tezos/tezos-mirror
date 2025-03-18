@@ -14,6 +14,11 @@
 ### RPCs changes
 
 - Added a `/describe` endpoint compatible with `octez-client`. (!17190)
+- New Etherlink specific method for ``eth_subscribe``: ``tez_l1L2Levels``
+  to be notified of L2/L1 levels associations when an L2 block is
+  finalized. (!16923)
+- New Etherlink specific JSONRPC ``tez_getFinalizedBlocksOfL1Level``
+  to retrieve the finalized L2 levels for a given L1 level. (!16923)
 
 ### Metrics changes
 

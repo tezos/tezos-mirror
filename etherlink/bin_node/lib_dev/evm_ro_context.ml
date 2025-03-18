@@ -341,6 +341,22 @@ struct
     Tezos_crypto.Hashed.Smart_rollup_address.to_string
       Ctxt.ctxt.smart_rollup_address
 
+  let list_l1_l2_levels ~from_l1_level =
+    let open Lwt_result_syntax in
+    Evm_store.use Ctxt.ctxt.store @@ fun conn ->
+    let* last = Evm_store.L1_l2_finalized_levels.last conn in
+    match last with
+    | None -> return_nil
+    | Some (end_l1_level, _) ->
+        Evm_store.L1_l2_finalized_levels.list_by_l1_levels
+          conn
+          ~start_l1_level:from_l1_level
+          ~end_l1_level
+
+  let l2_levels_of_l1_level l1_level =
+    Evm_store.use Ctxt.ctxt.store @@ fun conn ->
+    Evm_store.L1_l2_finalized_levels.find conn ~l1_level
+
   let block_param_to_block_number
       (block_param : Ethereum_types.Block_parameter.extended) =
     let open Lwt_result_syntax in

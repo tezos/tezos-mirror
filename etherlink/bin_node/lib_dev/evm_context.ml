@@ -148,6 +148,10 @@ let head_watcher :
 let receipt_watcher : Transaction_receipt.t Lwt_watcher.input =
   Lwt_watcher.create_input ()
 
+let l1_l2_levels_watcher :
+    Ethereum_types.Subscription.l1_l2_levels_output Lwt_watcher.input =
+  Lwt_watcher.create_input ()
+
 module State = struct
   let current_blueprint_number ctxt =
     let (Qty next_blueprint_number) = ctxt.session.next_blueprint_number in
@@ -1037,6 +1041,13 @@ module State = struct
                   ~end_l2_level:(Qty latest_finalized_number)
               in
               Metrics.set_l1_level ~level:l1_level ;
+              Lwt_watcher.notify
+                l1_l2_levels_watcher
+                {
+                  l1_level;
+                  start_l2_level = start_finalized_number;
+                  end_l2_level = Qty latest_finalized_number;
+                } ;
               let*! () =
                 Evm_context_events.processed_l1_level
                   (l1_level, latest_finalized_number)

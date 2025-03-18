@@ -23,3 +23,10 @@ val shutdown : unit -> unit tzresult Lwt.t
     head has been published and that the rollup head is now
     [rollup_level]. *)
 val new_rollup_block : Int32.t -> unit tzresult Lwt.t
+
+(** Returns the status of the worker or an error if it was never started. *)
+val status : unit -> Tezos_base.Worker_types.worker_status tzresult
+
+(** Returns [true] is the rollup node EVM events follower is starting or
+    started. *)
+val available : unit -> bool
