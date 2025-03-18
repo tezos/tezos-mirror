@@ -373,7 +373,7 @@ impl Evaluation {
         evm_configuration: &Config,
     ) -> Result<SimulationResult<CallResult, String>, Error> {
         let chain_id = retrieve_chain_id(host)?;
-        let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host)?;
+        let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host);
         let da_fee = crate::retrieve_da_fee(host)?;
         let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
         let mut evm_account_storage = account_storage::init_account_storage()

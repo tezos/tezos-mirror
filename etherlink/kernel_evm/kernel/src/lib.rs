@@ -142,15 +142,22 @@ fn retrieve_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
     }
 }
 
-fn retrieve_minimum_base_fee_per_gas<Host: Runtime>(
-    host: &mut Host,
-) -> Result<U256, Error> {
+fn retrieve_minimum_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> U256 {
     match read_minimum_base_fee_per_gas(host) {
-        Ok(minimum_base_fee_per_gas) => Ok(minimum_base_fee_per_gas),
+        Ok(minimum_base_fee_per_gas) => minimum_base_fee_per_gas,
         Err(_) => {
             let minimum_base_fee_per_gas = crate::fees::MINIMUM_BASE_FEE_PER_GAS.into();
-            store_minimum_base_fee_per_gas(host, minimum_base_fee_per_gas)?;
-            Ok(minimum_base_fee_per_gas)
+            if let Err(err) =
+                store_minimum_base_fee_per_gas(host, minimum_base_fee_per_gas)
+            {
+                log!(
+                    host,
+                    Error,
+                    "Can't store the default minimum_base_fee: {:?}",
+                    err
+                );
+            }
+            minimum_base_fee_per_gas
         }
     }
 }
@@ -188,7 +195,7 @@ fn retrieve_da_fee<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
 fn retrieve_block_fees<Host: Runtime>(
     host: &mut Host,
 ) -> Result<tezos_ethereum::block::BlockFees, Error> {
-    let minimum_base_fee_per_gas = retrieve_minimum_base_fee_per_gas(host)?;
+    let minimum_base_fee_per_gas = retrieve_minimum_base_fee_per_gas(host);
     let base_fee_per_gas = retrieve_base_fee_per_gas(host, minimum_base_fee_per_gas);
     let da_fee = retrieve_da_fee(host)?;
     let block_fees = tezos_ethereum::block::BlockFees::new(

@@ -7,7 +7,6 @@ use crate::{
     blueprint_storage::DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS,
     chains::{ChainFamily, EvmLimits},
     delayed_inbox::DelayedInbox,
-    fees::MINIMUM_BASE_FEE_PER_GAS,
     retrieve_minimum_base_fee_per_gas,
     storage::{
         dal_slots, enable_dal, evm_node_flag, is_enable_fa_bridge,
@@ -218,8 +217,7 @@ pub fn fetch_limits(host: &mut impl Runtime) -> EvmLimits {
     let maximum_gas_limit =
         read_or_set_maximum_gas_per_transaction(host).unwrap_or(MAXIMUM_GAS_LIMIT);
 
-    let minimum_base_fee_per_gas = retrieve_minimum_base_fee_per_gas(host)
-        .unwrap_or(MINIMUM_BASE_FEE_PER_GAS.into());
+    let minimum_base_fee_per_gas = retrieve_minimum_base_fee_per_gas(host);
 
     EvmLimits {
         maximum_gas_limit,
