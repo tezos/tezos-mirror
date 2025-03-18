@@ -788,8 +788,8 @@ let restore_formatter ppf (out_functions, tag_functions, tags) =
   Format.pp_set_formatter_stag_functions ppf tag_functions ;
   Format.pp_set_print_tags ppf tags
 
-let usage_internal ppf ~executable_name ~global_options ?(highlights = [])
-    commands =
+let usage_internal ppf ~prefix_executable ~executable_name ~global_options
+    ?(highlights = []) commands =
   let by_group = group_commands commands in
   let print_groups =
     Format.pp_print_list
@@ -797,7 +797,9 @@ let usage_internal ppf ~executable_name ~global_options ?(highlights = [])
       (print_group (fun ppf (Ex command) ->
            print_command
              ?prefix:
-               (Some (fun ppf () -> Format.fprintf ppf "%s " executable_name))
+               (if prefix_executable then
+                  Some (fun ppf () -> Format.fprintf ppf "%s " executable_name)
+                else None)
              ~highlights
              ppf
              command))
@@ -1992,6 +1994,7 @@ let add_manual ~executable_name ~global_options format ppf commands =
                   let commands = List.map (fun c -> Ex c) commands in
                   usage_internal
                     ppf
+                    ~prefix_executable:(format = Html)
                     ~executable_name
                     ~global_options
                     ~highlights:keywords
@@ -2106,12 +2109,18 @@ let pp_cli_errors ppf ~executable_name ~global_options ~default errs =
         ppf
         "@]@\n@\n@[<v 0>%a@]"
         (fun ppf commands ->
-          usage_internal ppf ~executable_name ~global_options commands)
+          usage_internal
+            ppf
+            ~prefix_executable:false
+            ~executable_name
+            ~global_options
+            commands)
         commands
 
 let usage ppf ~executable_name ~global_options commands =
   usage_internal
     ppf
+    ~prefix_executable:false
     ~executable_name
     ~global_options
     (List.map (fun c -> Ex c) commands)
