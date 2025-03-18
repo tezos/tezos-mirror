@@ -210,14 +210,17 @@ module P2p_message_V1 = struct
   let distributed_db_versions = [distributed_db_version]
 
   let message_config ~network_name : p2p_message P2p_params.message_config =
-    let chain_name = Distributed_db_version.Name.of_string network_name in
-    {encoding = p2p_message_app_encoding; chain_name; distributed_db_versions}
+    {
+      encoding = p2p_message_app_encoding;
+      chain_name = network_name;
+      distributed_db_versions;
+    }
 end
 
 let version ~network_name =
   Network_version.
     {
-      chain_name = Distributed_db_version.Name.of_string network_name;
+      chain_name = network_name;
       distributed_db_version = P2p_message_V1.distributed_db_version;
       p2p_version = P2p_version.one;
     }

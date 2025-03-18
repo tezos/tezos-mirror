@@ -1544,7 +1544,10 @@ let run ~data_dir ~configuration_override =
   (* Create a transport (P2P) layer instance. *)
   let* transport_layer =
     (* WIP: will be fixed in the next MR. *)
-    let network_name = Configuration_file.default_network_name in
+    let network_name =
+      Distributed_db_version.Name.of_string
+        Configuration_file.default_network_name
+    in
     Gossipsub.Transport_layer.create
       ~public_addr
       ~is_bootstrap_peer:(profile = Profile_manager.bootstrap)

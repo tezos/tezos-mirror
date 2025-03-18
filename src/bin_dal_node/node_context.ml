@@ -214,7 +214,10 @@ let get_fetched_assigned_shard_indices ctxt ~level ~pkh =
 
 let version _t =
   (* WIP: will be fixed in the next MR. *)
-  let network_name = Configuration_file.default_network_name in
+  let network_name =
+    Distributed_db_version.Name.of_string
+      Configuration_file.default_network_name
+  in
   Types.Version.make ~network_version:(Gossipsub.version ~network_name)
 
 let warn_if_attesters_not_delegates ctxt operator_profiles =
