@@ -1041,50 +1041,6 @@ signal_publisher_is_ready:
     { /* signal_publisher_is_ready version 0 */
       "signal_publisher_is_ready.v0": any }
 
-no_l1_latest_level:
-  description: no l1 level processed, no EVM events catch up will occur
-  level: warning
-  section: evm_node.dev
-  json format:
-    { /* no_l1_latest_level version 0 */
-      "no_l1_latest_level.v0": any }
-
-migrations_from_the_future:
-  description: store has {applied} migrations applied but the EVM node is only aware of {known}
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* migrations_from_the_future version 0 */
-      "migrations_from_the_future.v0":
-        { "applied": integer ∈ [-2^30, 2^30],
-          "known": integer ∈ [-2^30, 2^30] } }
-
-store_applied_migration:
-  description: applied migration {name} to the store in {time}
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* store_applied_migration version 0 */
-      "store_applied_migration.v0":
-        { "name": $unistring,
-          "time": $timespan.system } }
-    $timespan.system:
-      /* A span of time, as seen by the local computer. */
-      number
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-store_init:
-  description: store is being initialized for the first time
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* store_init version 0 */
-      "store_init.v0": any }
-
 websocket_monitoring_exception:
   description: monitoring for websocket {conn} raised exception {exception}
   level: warning
@@ -1435,6 +1391,50 @@ tx_queue_is_ready:
   json format:
     { /* tx_queue_is_ready version 0 */
       "tx_queue_is_ready.v0": any }
+
+no_l1_latest_level:
+  description: no l1 level processed, no EVM events catch up will occur
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* no_l1_latest_level version 0 */
+      "no_l1_latest_level.v0": any }
+
+migrations_from_the_future:
+  description: store has {applied} migrations applied but the EVM node is only aware of {known}
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* migrations_from_the_future version 0 */
+      "migrations_from_the_future.v0":
+        { "applied": integer ∈ [-2^30, 2^30],
+          "known": integer ∈ [-2^30, 2^30] } }
+
+store_applied_migration:
+  description: applied migration {name} to the store in {time}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* store_applied_migration version 0 */
+      "store_applied_migration.v0":
+        { "name": $unistring,
+          "time": $timespan.system } }
+    $timespan.system:
+      /* A span of time, as seen by the local computer. */
+      number
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+
+store_init:
+  description: store is being initialized for the first time
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* store_init version 0 */
+      "store_init.v0": any }
 
 counter_inc_assertion_warning:
   description: assertion failed while updating a Counter metric: the increment ({increment} occuring at {label}) is negative; the value will not be updated
@@ -2379,16 +2379,6 @@ block_producer_locked:
     { /* block_producer_locked version 0 */
       "block_producer_locked.v0": any }
 
-migrations_from_the_future:
-  description: store has {applied} migrations applied but the EVM node is only aware of {known}
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* migrations_from_the_future version 0 */
-      "migrations_from_the_future.v0":
-        { "applied": integer ∈ [-2^30, 2^30],
-          "known": integer ∈ [-2^30, 2^30] } }
-
 websocket_missing_worker:
   description: no worker for websocket connection {conn}
   level: error
@@ -2442,6 +2432,16 @@ tx_queue_rpc_error:
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+
+migrations_from_the_future:
+  description: store has {applied} migrations applied but the EVM node is only aware of {known}
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* migrations_from_the_future version 0 */
+      "migrations_from_the_future.v0":
+        { "applied": integer ∈ [-2^30, 2^30],
+          "known": integer ∈ [-2^30, 2^30] } }
 
 node_da_fees:
   description: internal: node gives {node_da_fees} DA fees, whereas kernel gives {kernel_da_fees} on block {block_number} with {call}
