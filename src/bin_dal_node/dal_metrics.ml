@@ -195,6 +195,14 @@ module Node_metrics = struct
       ~namespace
       ~subsystem
       name
+
+  let per_level_processing_time =
+    let name = "per_level_processing_time" in
+    Prometheus.Gauge.v
+      ~help:"Time spent in the new_finalized_head function at each level"
+      ~namespace
+      ~subsystem
+      name
 end
 
 module GS = struct
@@ -578,6 +586,9 @@ let update_amplification_abort_reconstruction_duration duration =
   Prometheus.DefaultHistogram.observe
     Node_metrics.amplification_abort_reconstruction_duration
     duration
+
+let per_level_processing_time =
+  Prometheus.Gauge.set Node_metrics.per_level_processing_time
 
 let sample_time ~sampling_frequency ~to_sample ~metric_updater =
   if sampling_frequency > 0 && Random.int sampling_frequency <> 0 then

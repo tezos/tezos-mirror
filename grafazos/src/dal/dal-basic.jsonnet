@@ -46,7 +46,7 @@ dashboard.new('Octez DAL Node Dashboard')
 + dashboard.withPanels(
 
   //#######
-  grafonnet.util.grid.wrapPanels(panels=[panel.row.new("DAL node' core stats")], panelWidth=26, panelHeight=30, startY=1)
+  grafonnet.util.grid.wrapPanels(panels=[panel.row.new("DAL node' core stats")], panelWidth=26, panelHeight=30, startY=node_y)
   + [
     // ## First line of pannels
     dalNode.layer1MonitorLevels(h=8, w=8, x=0, y=node_y),
@@ -57,6 +57,9 @@ dashboard.new('Octez DAL Node Dashboard')
     dalNode.slotsAttesatationSummary(h=8, w=8, x=0, y=node_y + 8),
     dalNode.slotsWaitingAttestations(h=8, w=8, x=8, y=node_y + 8),
     dalNode.slotsAttested(h=8, w=8, x=16, y=node_y + 8),
+
+    // ## Third line of pannels
+    dalNode.L1BlockProcessingTime(h=8, w=8, x=0, y=node_y + 16),
   ]
 
   //#######
