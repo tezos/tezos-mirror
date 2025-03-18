@@ -989,6 +989,7 @@ module State = struct
     in
     if needs_process then (
       let* context, evm_state =
+        let start_finalized_number = ctxt.session.finalized_number in
         let* evm_state, context, Qty latest_finalized_number =
           match events with
           | [] ->
@@ -1027,7 +1028,13 @@ module State = struct
                   conn
                   ~l1_level
                   ~latest_l2_level:(current_blueprint_number ctxt)
-                  ~finalized_l2_level:(Qty latest_finalized_number)
+              in
+              let* () =
+                Evm_store.L1_l2_finalized_levels.store
+                  conn
+                  ~l1_level
+                  ~start_l2_level:start_finalized_number
+                  ~end_l2_level:(Qty latest_finalized_number)
               in
               Metrics.set_l1_level ~level:l1_level ;
               let*! () =
@@ -1303,11 +1310,11 @@ module State = struct
           failwith "Store has pending confirmation, state is not final")
     in
     let* pending_upgrade = Evm_store.Kernel_upgrades.find_latest_pending conn in
-    let* latest_relationship = Evm_store.L1_l2_levels_relationships.find conn in
+    let* latest = Evm_store.L1_l2_finalized_levels.last conn in
     let finalized_number, l1_level =
-      match latest_relationship with
+      match latest with
       | None -> (Ethereum_types.Qty Z.zero, None)
-      | Some {finalized; l1_level; _} -> (finalized, Some l1_level)
+      | Some (l1_level, {end_l2_level; _}) -> (end_l2_level, Some l1_level)
     in
     let* {smart_rollup_address; history_mode} =
       let smart_rollup_address =

@@ -50,9 +50,9 @@ let set_metrics_level (ctxt : Evm_ro_context.t) =
 
 let set_metrics_confirmed_levels (ctxt : Evm_ro_context.t) =
   let open Lwt_result_syntax in
-  let+ candidate = Evm_store.(use ctxt.store L1_l2_levels_relationships.find) in
+  let+ candidate = Evm_store.(use ctxt.store L1_l2_finalized_levels.last) in
   match candidate with
-  | Some {l1_level; finalized = Qty finalized; _} ->
+  | Some (l1_level, {end_l2_level = Qty finalized; _}) ->
       Metrics.set_confirmed_level ~level:finalized ;
       Metrics.set_l1_level ~level:l1_level
   | None -> ()
