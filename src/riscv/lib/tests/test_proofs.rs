@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024-2025 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
@@ -6,11 +6,13 @@
 mod common;
 
 use std::ops::Bound;
+use std::time::Instant;
 
 use common::*;
 use octez_riscv::machine_state::DefaultCacheLayouts;
 use octez_riscv::machine_state::memory::M64M;
 use octez_riscv::state_backend::hash;
+use octez_riscv::state_backend::proof_backend::proof::serialise_proof;
 use octez_riscv::stepper::Stepper;
 use octez_riscv::stepper::StepperStatus;
 use octez_riscv::stepper::pvm::PvmStepper;
@@ -70,7 +72,15 @@ where
             assert!(matches!(result, StepperStatus::Running { .. }));
 
             eprintln!("> Producing proof ...");
+            let start = Instant::now();
             let proof = stepper.produce_proof().unwrap();
+            let time = start.elapsed();
+            let serialisation: Vec<u8> = serialise_proof(&proof).collect();
+            eprintln!(
+                "> Proof of size {} KiB produced in {:?}",
+                serialisation.len() / 1024,
+                time
+            );
 
             eprintln!("> Checking initial proof hash ...");
             assert_eq!(proof.initial_state_hash(), stepper.hash());
