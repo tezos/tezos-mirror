@@ -2716,20 +2716,27 @@ let list_events_command =
     (prefixes ["list"; "events"] stop)
     (fun (level, show_json) () ->
       let open Lwt_result_syntax in
+      let prefix = Internal_event.Section.make_sanitized ["evm_node"] in
       let events =
         let filter Internal_event.Generic.(Definition (section, _, def)) =
           let module E = (val def) in
-          match Option.map Internal_event.Section.to_string_list section with
-          | Some section when List.hd section = Some "evm_node" ->
-              Option.fold ~none:true ~some:(( >= ) E.level) level
-          | _ -> false
+          match section with
+          | Some section ->
+              Internal_event.Section.is_prefix ~prefix section
+              && Some E.level >= level
+          | None -> false
         in
         Internal_event.All_definitions.get ~filter ()
+        |> List.sort
+             (fun
+               (Internal_event.Generic.Definition (_, name1, _))
+               (Internal_event.Generic.Definition (_, name2, _))
+             -> String.compare name1 name2)
       in
       Format.printf
-        "%a"
+        "@[<v>%a@]@."
         (Format.pp_print_list
-           ~pp_sep:(fun fmt () -> Format.fprintf fmt "@.")
+           ~pp_sep:(fun fmt () -> Format.fprintf fmt "@,")
            (fun fmt
                 Internal_event.Generic.(Definition (section, name, definition)) ->
              let module E = (val definition) in
@@ -2746,7 +2753,7 @@ let list_events_command =
                  if show_json then
                    Format.fprintf
                      fmt
-                     "@[<v 2>json format:@,@[<hov 2>%a@]@]@."
+                     "@[<v 2>json format:@,@[<hov 2>%a@]@]@,"
                      Json_schema.pp
                      (Data_encoding.Json.schema E.encoding))
                ()))
