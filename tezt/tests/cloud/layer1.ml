@@ -17,31 +17,14 @@ let add_prometheus_source node cloud agent =
 
 type snapshot_info = {chain_name : string; level : int}
 
-let get_snapshot_info snapshot_path =
-  let cmd =
-    Printf.sprintf
-      "./octez-node snapshot info --json %s 2>/dev/null"
-      snapshot_path
-  in
-  let ic = Unix.open_process_in cmd in
-  let json = Ezjsonm.from_channel ic in
-  let json =
-    match Unix.close_process_in ic with
-    | Unix.WEXITED 0 -> json
-    | _ -> failwith "Snapshot info command failed"
-  in
+let get_snapshot_info node snapshot_path =
+  let* info = Node.snapshot_info node ~json:true snapshot_path in
+  let json = JSON.parse ~origin:"snapshot_info" info in
   let chain_name =
-    try
-      Ezjsonm.find json ["snapshot_header"; "chain_name"] |> Ezjsonm.get_string
-    with Not_found ->
-      failwith "Could not find the snapshot chain_name in the JSON output"
+    JSON.(json |-> "snapshot_header" |-> "chain_name" |> as_string)
   in
-  let level =
-    try Ezjsonm.find json ["snapshot_header"; "level"] |> Ezjsonm.get_int
-    with Not_found ->
-      failwith "Could not find the snapshot level in the JSON output"
-  in
-  {chain_name; level}
+  let level = JSON.(json |-> "snapshot_header" |-> "level" |> as_int) in
+  Lwt.return {chain_name; level}
 
 module Network = struct
   include Network
@@ -138,7 +121,7 @@ module Node = struct
       to upgrade to the next protocol of [~network]. This entry is is parametrised by the
       information obtained from [snapshot]. *)
   let add_migration_offset_to_config node snapshot ~migration_offset ~network =
-    let {chain_name; level} = get_snapshot_info snapshot in
+    let* {chain_name; level} = get_snapshot_info node snapshot in
     match migration_offset with
     | None -> Lwt.return_unit
     | Some migration_offset ->
