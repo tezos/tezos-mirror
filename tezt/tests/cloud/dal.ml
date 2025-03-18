@@ -443,7 +443,11 @@ type etherlink_configuration = {
   chain_id : int option;
 }
 
-type monitor_app_configuration = {dal_slack_webhook : Uri.t}
+type monitor_app_configuration = {
+  slack_bot_token : string;
+  slack_channel_id : string;
+  dal_slack_webhook : Uri.t;
+}
 
 type configuration = {
   with_dal : bool;
@@ -1474,7 +1478,7 @@ module Monitoring_app = struct
     let check_for_lost_dal_rewards t ~metadata =
       match t.configuration.monitor_app_configuration with
       | None -> unit
-      | Some {dal_slack_webhook = webhook} ->
+      | Some {dal_slack_webhook = webhook; _} ->
           let cycle = JSON.(metadata |-> "level_info" |-> "cycle" |> as_int) in
           let level = JSON.(metadata |-> "level_info" |-> "level" |> as_int) in
           let balance_updates =
@@ -1562,7 +1566,7 @@ module Monitoring_app = struct
     let check_for_dal_accusations t ~cycle ~level ~operations ~endpoint =
       match t.configuration.monitor_app_configuration with
       | None -> unit
-      | Some {dal_slack_webhook = webhook} ->
+      | Some {dal_slack_webhook = webhook; _} ->
           let open JSON in
           let accusations =
             operations |> as_list |> Fun.flip List.nth 2 |> as_list
@@ -3321,7 +3325,11 @@ let register (module Cli : Scenarios_cli.Dal) =
     let monitor_app_configuration =
       Option.map
         (fun dal_slack_webhook ->
-          {dal_slack_webhook = Uri.of_string dal_slack_webhook})
+          {
+            dal_slack_webhook = Uri.of_string dal_slack_webhook;
+            slack_bot_token = String.empty;
+            slack_channel_id = String.empty;
+          })
         Cli.Alerts.dal_slack_webhook
     in
     let t =
