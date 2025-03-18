@@ -373,6 +373,14 @@ module Config_file : sig
   (** Write the configuration file of a node, replacing the existing one. *)
   val write : t -> JSON.t -> unit Lwt.t
 
+  (** Basic network configuration for ghostnet
+      (genesis, genesis_parameters, chain_name and sandboxed_chain_name *)
+  val ghostnet_network_config : JSON.u
+
+  (** Basic network configuration for mainnet
+      (genesis, chain_name and sandboxed_chain_name *)
+  val mainnet_network_config : JSON.u
+
   (** Update the configuration file of a node. If the node is already
      running, it needs to be restarted manually.
 

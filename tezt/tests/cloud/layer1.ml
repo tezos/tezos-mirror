@@ -15,16 +15,10 @@ type baker_account = {pk : string; pkh : string}
 let add_prometheus_source node cloud agent =
   Scenarios_helpers.add_prometheus_source ~node cloud agent (Agent.name agent)
 
-type snapshot_info = {chain_name : string; level : int}
-
-let get_snapshot_info node snapshot_path =
+let get_snapshot_info_level node snapshot_path =
   let* info = Node.snapshot_info node ~json:true snapshot_path in
   let json = JSON.parse ~origin:"snapshot_info" info in
-  let chain_name =
-    JSON.(json |-> "snapshot_header" |-> "chain_name" |> as_string)
-  in
-  let level = JSON.(json |-> "snapshot_header" |-> "level" |> as_int) in
-  Lwt.return {chain_name; level}
+  Lwt.return JSON.(json |-> "snapshot_header" |-> "level" |> as_int)
 
 module Network = struct
   include Network
@@ -121,23 +115,26 @@ module Node = struct
       to upgrade to the next protocol of [~network]. This entry is is parametrised by the
       information obtained from [snapshot]. *)
   let add_migration_offset_to_config node snapshot ~migration_offset ~network =
-    let* {chain_name; level} = get_snapshot_info node snapshot in
+    let* level = get_snapshot_info_level node snapshot in
     match migration_offset with
     | None -> Lwt.return_unit
     | Some migration_offset ->
+        let network_config =
+          match network with
+          | `Mainnet -> Node.Config_file.mainnet_network_config
+          | `Ghostnet -> Node.Config_file.ghostnet_network_config
+        in
         let migration_level = level + migration_offset in
         toplog "Add UAU entry for level : %d" migration_level ;
         Node.Config_file.update node (fun json ->
-            Node.Config_file.set_ghostnet_sandbox_network
-              ~user_activated_upgrades:
-                [(migration_level, Network.migrate_to network)]
-              ()
+            JSON.put
+              ( "network",
+                JSON.annotate
+                  ~origin:"add_migration_offset_to_config"
+                  network_config )
               json
-            |> JSON.update
-                 "network"
-                 (JSON.put
-                    ( "chain_name",
-                      JSON.annotate ~origin:__LOC__ (`String chain_name) )))
+            |> Node.Config_file.update_network_with_user_activated_upgrades
+                 [(migration_level, Network.migrate_to network)])
 
   (* If trying to only bootstrap the network from a snapshot, you will have
      errors about missing block metadata, which is likely (I guess?) to be
