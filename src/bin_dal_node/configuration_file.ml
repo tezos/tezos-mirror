@@ -435,218 +435,95 @@ module V0 = struct
 end
 
 module V1 = struct
-  type tmp = {
-    data_dir : string;
-    rpc_addr : P2p_point.Id.t;
-    listen_addr : P2p_point.Id.t;
-    public_addr : P2p_point.Id.t;
-    neighbors : neighbor list;
-    peers : string list;
-    expected_pow : float;
-    network_name : string;
-    endpoint : Uri.t;
-    metrics_addr : P2p_point.Id.t option;
-    history_mode : history_mode;
-    profile : Profile_manager.t;
-    version : int;
-    service_name : string option;
-    service_namespace : string option;
-    experimental_features : experimental_features;
-    fetch_trusted_setup : bool;
-    verbose : bool;
-  }
+  (* Legacy V1 configuration type used solely for migration purposes.
 
-  let encoding : tmp Data_encoding.t =
+     This type represents the legacy (V1) version of the configuration,
+     originally defined as a record. It is intentionally rewritten as a tuple
+     for the following reasons:
+
+     - Simplified Encoding/Decoding: Using a tuple allows removing
+     [Data_encoding.conv] and its field-by-field mapping, significantly reducing
+     boilerplate in the migration code.
+
+     - Read-Only & Migration-Only: The V1 type is no longer edited or used
+     beyond JSON decoding and transformation into the current configuration
+     version. Record semantics (field names, accessors) are unnecessary.
+
+     This design reflects the temporary, transitional nature of the V1
+     configuration and isolates legacy logic from the active codebase. *)
+  type t = tup10 * tup8
+
+  and tup10 =
+    string (* data_dir *)
+    * P2p_point.Id.t (* rpc_addr *)
+    * P2p_point.Id.t (*listen_addr  *)
+    * P2p_point.Id.t (* public_addr *)
+    * neighbor list (* neighbors *)
+    * string list (* peers *)
+    * float (* expected_pow *)
+    * string (*network_name  *)
+    * Uri.t (*endpoint  *)
+    * P2p_point.Id.t option (*metrics_addr  *)
+
+  and tup8 =
+    history_mode (* history_mode *)
+    * Profile_manager.t (* profile *)
+    * int (*version  *)
+    * string option (* service_name *)
+    * string option (*service_namespace  *)
+    * experimental_features (* experimental_features *)
+    * bool (* fetch_trusted_setup *)
+    * bool (* verbose *)
+
+  let encoding : t Data_encoding.t =
     let open Data_encoding in
-    conv
-      (fun {
-             data_dir;
-             rpc_addr;
-             listen_addr;
-             public_addr;
-             neighbors;
-             peers;
-             expected_pow;
-             network_name;
-             endpoint;
-             metrics_addr;
-             history_mode;
-             profile;
-             version;
-             service_name;
-             service_namespace;
-             experimental_features;
-             fetch_trusted_setup;
-             verbose;
-           } ->
-        ( ( data_dir,
-            rpc_addr,
-            listen_addr,
-            public_addr,
-            neighbors,
-            peers,
-            expected_pow,
-            network_name,
-            endpoint,
-            metrics_addr ),
-          ( history_mode,
-            profile,
-            version,
-            service_name,
-            service_namespace,
-            experimental_features,
-            fetch_trusted_setup,
-            verbose ) ))
-      (fun ( ( data_dir,
-               rpc_addr,
-               listen_addr,
-               public_addr,
-               neighbors,
-               peers,
-               expected_pow,
-               network_name,
-               endpoint,
-               metrics_addr ),
-             ( history_mode,
-               profile,
-               version,
-               service_name,
-               service_namespace,
-               experimental_features,
-               fetch_trusted_setup,
-               verbose ) ) ->
-        {
-          data_dir;
-          rpc_addr;
-          listen_addr;
-          public_addr;
-          neighbors;
-          peers;
-          expected_pow;
-          network_name;
-          endpoint;
-          metrics_addr;
-          history_mode;
-          profile;
-          version;
-          service_name;
-          service_namespace;
-          experimental_features;
-          fetch_trusted_setup;
-          verbose;
-        })
-      (merge_objs
-         (obj10
-            (dft
-               "data-dir"
-               ~description:"Location of the data dir"
-               string
-               default_data_dir)
-            (dft
-               "rpc-addr"
-               ~description:"RPC address"
-               P2p_point.Id.encoding
-               default_rpc_addr)
-            (dft
-               "net-addr"
-               ~description:"P2P address of this node"
-               P2p_point.Id.encoding
-               default_listen_addr)
-            (dft
-               "public-addr"
-               ~description:"P2P address of this node"
-               P2p_point.Id.encoding
-               default_listen_addr)
-            (dft
-               "neighbors"
-               ~description:"DAL Neighbors"
-               (list neighbor_encoding)
-               default_neighbors)
-            (dft
-               "peers"
-               ~description:"P2P addresses of remote peers"
-               (list string)
-               default_peers)
-            (dft
-               "expected-pow"
-               ~description:"Expected P2P identity's PoW"
-               float
-               default_expected_pow)
-            (dft
-               "network-name"
-               ~description:"The name that identifies the network"
-               string
-               default_network_name)
-            (dft
-               "endpoint"
-               ~description:"The Tezos node endpoint"
-               endpoint_encoding
-               default_endpoint)
-            (dft
-               "metrics-addr"
-               ~description:"The point for the DAL node metrics server"
-               (Encoding.option P2p_point.Id.encoding)
-               None))
-         (obj8
-            (dft
-               "history_mode"
-               ~description:"The history mode for the DAL node"
-               history_mode_encoding
-               default_history_mode)
-            (dft
-               "profiles"
-               ~description:"The Octez DAL node profiles"
-               Profile_manager.encoding
-               Profile_manager.empty)
-            (req "version" ~description:"The configuration file version" int31)
-            (dft
-               "service_name"
-               ~description:"Name of the service"
-               (Data_encoding.option Data_encoding.string)
-               None)
-            (dft
-               "service_namespace"
-               ~description:"Namespace for the service"
-               (Data_encoding.option Data_encoding.string)
-               None)
-            (dft
-               "experimental_features"
-               ~description:"Experimental features"
-               experimental_features_encoding
-               default_experimental_features)
-            (dft
-               "fetch_trusted_setup"
-               ~description:"Install trusted setup"
-               bool
-               true)
-            (dft
-               "verbose"
-               ~description:
-                 "Whether to emit details about frequent logging events"
-               bool
-               default.verbose)))
+    merge_objs
+      (obj10
+         (dft "data-dir" string default_data_dir)
+         (dft "rpc-addr" P2p_point.Id.encoding default_rpc_addr)
+         (dft "net-addr" P2p_point.Id.encoding default_listen_addr)
+         (dft "public-addr" P2p_point.Id.encoding default_listen_addr)
+         (dft "neighbors" (list neighbor_encoding) default_neighbors)
+         (dft "peers" (list string) default_peers)
+         (dft "expected-pow" float default_expected_pow)
+         (dft "network-name" string default_network_name)
+         (dft "endpoint" endpoint_encoding default_endpoint)
+         (dft "metrics-addr" (Encoding.option P2p_point.Id.encoding) None))
+      (obj8
+         (dft "history_mode" history_mode_encoding default_history_mode)
+         (dft "profiles" Profile_manager.encoding Profile_manager.empty)
+         (req "version" int31)
+         (dft "service_name" (Data_encoding.option Data_encoding.string) None)
+         (dft
+            "service_namespace"
+            (Data_encoding.option Data_encoding.string)
+            None)
+         (dft
+            "experimental_features"
+            experimental_features_encoding
+            default_experimental_features)
+         (dft "fetch_trusted_setup" bool true)
+         (dft "verbose" bool default.verbose))
 
   let to_latest_version
-      {
-        data_dir;
-        rpc_addr;
-        listen_addr;
-        public_addr;
-        neighbors;
-        peers;
-        expected_pow;
-        network_name;
-        endpoint;
-        metrics_addr;
-        history_mode;
-        profile;
-        version;
-        service_name;
-        service_namespace;
-        experimental_features;
-        fetch_trusted_setup;
-        verbose;
-      } : t =
+      ( ( data_dir,
+          rpc_addr,
+          listen_addr,
+          public_addr,
+          neighbors,
+          peers,
+          expected_pow,
+          network_name,
+          endpoint,
+          metrics_addr ),
+        ( history_mode,
+          profile,
+          version,
+          service_name,
+          service_namespace,
+          experimental_features,
+          fetch_trusted_setup,
+          verbose ) ) =
     {
       data_dir;
       rpc_addr;
