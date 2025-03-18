@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+mod buddy;
 mod config;
 #[cfg(feature = "supervisor")]
 mod protection;
