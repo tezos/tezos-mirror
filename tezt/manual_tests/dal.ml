@@ -401,8 +401,8 @@ let baker_scenario ?baker_sk ~airdropper_alias client dal_node l1_node =
   (* Manually stake a part of the baker's balance
      after it is declared as delegate. *)
   let* () = stake_or_unstake_half_balance client ~baker_alias in
-  let baker = Baker.create ~protocol:Protocol.Alpha ~dal_node l1_node client in
-  let* () = Baker.run baker in
+  let baker = Agnostic_baker.create ~dal_node l1_node client in
+  let* () = Agnostic_baker.run baker in
   Lwt_unix.sleep Float.max_float
 
 (** A slots injector test parameterized by a network. Typically, to run a slot
@@ -457,7 +457,7 @@ let baker_test ~network =
     ~__FILE__
     ~title:(sf "Join %s and bake" network)
     ~tags:[Tag.tezos2; "dal"; "baker"; network]
-    ~uses:[Protocol.baker Alpha]
+    ~uses:[Constant.octez_experimental_agnostic_baker]
   @@ fun () ->
   let baker_sk = Cli.get_string_opt "baker-sk" in
   let dal_bootstrap_peers =

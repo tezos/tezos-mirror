@@ -25,9 +25,9 @@
 
 (* Testing
    -------
-   Component:    Baker
+   Component:    Agnostic Baker
    Invocation:   dune exec tezt/manual_tests/main.exe -- --file baker_test.ml
-   Subject:      Ensure that the baker behave properly
+   Subject:      Ensure that the agnostic baker behaves properly
 *)
 
 let craft_heavy_operation source branch contract_hash client =
@@ -111,8 +111,8 @@ let baker_early_preattestation_test =
   Protocol.register_test
     ~__FILE__
     ~title:"Test baker early pre-attestation"
-    ~tags:["node"; "baker"; "early"; "preattestation"]
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~tags:["node"; "agnostic_baker"; "early"; "preattestation"]
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   Log.info
@@ -184,12 +184,11 @@ let baker_early_preattestation_test =
     pp_list
     baker1_delegates_alias ;
   let* baker1 =
-    Baker.init
+    Agnostic_baker.init
       ~delegates:
         (List.map
            (fun (bootstrap : Account.key) -> bootstrap.public_key_hash)
            baker1_delegates)
-      ~protocol
       node1
       client1
   in
@@ -200,7 +199,7 @@ let baker_early_preattestation_test =
     pp_list
     baker2_delegates_alias ;
   let* baker2 =
-    Baker.init
+    Agnostic_baker.init
       ~event_sections_levels:
         [
           ( String.concat
@@ -214,7 +213,6 @@ let baker_early_preattestation_test =
         (List.map
            (fun (bootstrap : Account.key) -> bootstrap.public_key_hash)
            baker2_delegates)
-      ~protocol
       node2
       client2
   in
@@ -250,10 +248,10 @@ let baker_early_preattestation_test =
   Log.info
     "Ensure that the test is in an state where %s propose at round 0 for level \
      %d and %d. And that %s propose at level %d round 1. "
-    (Baker.name baker1)
+    (Agnostic_baker.name baker1)
     prev_lvl
     test_lvl
-    (Baker.name baker2)
+    (Agnostic_baker.name baker2)
     test_lvl ;
   let* baking_rights_prev_lvl =
     recover_baking_rights ~max_round:1 client1 prev_lvl
@@ -281,10 +279,10 @@ let baker_early_preattestation_test =
   Log.info
     "Ensure that %s as reached the EQC at level %d round 0 and is locked on a \
      payload before starting to inject costly manager operations"
-    (Baker.name baker2)
+    (Agnostic_baker.name baker2)
     prev_lvl ;
   let is_proposed = ref false in
-  let baker_on_event resolver Baker.{name; value; timestamp = _} =
+  let baker_on_event resolver Agnostic_baker.{name; value; timestamp = _} =
     match name with
     | "new_valid_proposal.v0" ->
         let level = JSON.(value |-> "level" |> as_int) in
@@ -297,7 +295,7 @@ let baker_early_preattestation_test =
     | _ -> ()
   in
   let baker_t, baker_u = Lwt.task () in
-  Baker.on_event baker2 (baker_on_event baker_u) ;
+  Agnostic_baker.on_event baker2 (baker_on_event baker_u) ;
   let* () = baker_t in
 
   Log.info
@@ -327,16 +325,16 @@ let baker_early_preattestation_test =
 
   Log.info
     "Stop the %s once these operations are included in the %s mempool."
-    (Baker.name baker1)
+    (Agnostic_baker.name baker1)
     (Node.name node1) ;
-  let* () = Baker.stop baker1 in
+  let* () = Agnostic_baker.stop baker1 in
 
   Log.info
     "Wait for %s to propose a block at level:%d round 1."
-    (Baker.name baker2)
+    (Agnostic_baker.name baker2)
     prev_lvl ;
   let is_proposed = ref false in
-  let baker_on_event resolver Baker.{name; value; timestamp = _} =
+  let baker_on_event resolver Agnostic_baker.{name; value; timestamp = _} =
     match name with
     | "new_valid_proposal.v0" ->
         let level = JSON.(value |-> "level" |> as_int) in
@@ -349,12 +347,12 @@ let baker_early_preattestation_test =
     | _ -> ()
   in
   let baker_t, baker_u = Lwt.task () in
-  Baker.on_event baker2 (baker_on_event baker_u) ;
+  Agnostic_baker.on_event baker2 (baker_on_event baker_u) ;
   let* () = baker_t in
 
   let baker_on_event ?(log = false) (status : status ref)
       preattestations_resolver pqc_resolver attestations_resolver
-      Baker.{name; value; timestamp = _} =
+      Agnostic_baker.{name; value; timestamp = _} =
     match name with
     | "new_valid_proposal.v0" ->
         let block = JSON.(value |-> "block" |> as_string) in
@@ -442,7 +440,7 @@ let baker_early_preattestation_test =
   let preattestation_t1, preattestation_u1 = Lwt.task () in
   let pqc_t1, pqc_u1 = Lwt.task () in
   let attestations_t1, attestations_u1 = Lwt.task () in
-  Baker.on_event
+  Agnostic_baker.on_event
     baker1
     (baker_on_event ~log:true status1 preattestation_u1 pqc_u1 attestations_u1) ;
 
@@ -452,16 +450,16 @@ let baker_early_preattestation_test =
   let preattestation_t2, preattestation_u2 = Lwt.task () in
   let pqc_t2, pqc_u2 = Lwt.task () in
   let attestations_t2, attestations_u2 = Lwt.task () in
-  Baker.on_event
+  Agnostic_baker.on_event
     baker2
     (baker_on_event status2 preattestation_u2 pqc_u2 attestations_u2) ;
 
   Log.info
     "Continue %s and wait for it to propose a block at level:%d that contains \
      the gas consuming manager operations."
-    (Baker.name baker1)
+    (Agnostic_baker.name baker1)
     test_lvl ;
-  let* _baker = Baker.continue baker1 in
+  let* _baker = Agnostic_baker.continue baker1 in
 
   let preattestation_should_be_validated = Protocol.(number protocol > 16) in
 
@@ -481,7 +479,7 @@ let baker_early_preattestation_test =
   let* mempool2 = get_preattestation_mempool client2 in
   Log.info
     "%s have proposed, both baker have pre-attested for their delegates%s"
-    (Baker.name baker1)
+    (Agnostic_baker.name baker1)
     (if preattestation_should_be_validated then
        " and the pqc is reached. Ensure that the pre-attestations are injected \
         in the nodes as validated operation"
