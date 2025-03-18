@@ -59,6 +59,11 @@ module type S = sig
 
   (** [t] is the value type for {!type-t}. *)
   val t : t Type.t
+
+  val pp : Format.formatter -> t -> unit
+
+  (** [encoding] is the data_encoding for {!type-t}. *)
+  val encoding : t Data_encoding.t
 end
 
 module type Typed = sig
@@ -80,6 +85,11 @@ module type Typed = sig
 
   (** [t] is the value type for {!type-t}. *)
   val t : t Type.t
+
+  val pp : Format.formatter -> t -> unit
+
+  (** [encoding] is the data_encoding for {!type-t}. *)
+  val encoding : t Data_encoding.t
 end
 
 module type Set = sig

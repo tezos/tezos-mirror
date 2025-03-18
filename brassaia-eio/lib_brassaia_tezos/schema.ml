@@ -65,6 +65,9 @@ module Hash : Brassaia.Hash.S = struct
   let to_raw_string = H.to_raw_string
 
   let unsafe_of_raw_string = H.of_raw_string
+
+  let encoding =
+    Data_encoding.conv H.to_raw_string H.of_raw_string Data_encoding.string
 end
 
 module Info = Brassaia.Info.Default
