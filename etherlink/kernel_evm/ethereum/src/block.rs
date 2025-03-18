@@ -128,7 +128,7 @@ impl BlockConstants {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct L2Block {
+pub struct EthBlock {
     // This choice of a L2 block representation is totally
     // arbitrarily based on what is an Ethereum block and is
     // subject to change.
@@ -153,7 +153,7 @@ pub struct L2Block {
     pub mix_hash: H256,
 }
 
-impl L2Block {
+impl EthBlock {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         number: U256,
@@ -181,7 +181,7 @@ impl L2Block {
             timestamp,
             &None,
         );
-        L2Block {
+        EthBlock {
             number,
             hash,
             parent_hash,
@@ -231,7 +231,7 @@ impl L2Block {
         H256(Keccak256::digest(bytes).into())
     }
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<L2Block, DecoderError> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<EthBlock, DecoderError> {
         let first = *bytes.first().ok_or(DecoderError::Custom("Empty bytes"))?;
         if first == 0x01 {
             let decoder = Rlp::new(&bytes[1..]);
@@ -242,7 +242,7 @@ impl L2Block {
         }
     }
 
-    fn rlp_decode_v0(decoder: &Rlp) -> Result<L2Block, DecoderError> {
+    fn rlp_decode_v0(decoder: &Rlp) -> Result<EthBlock, DecoderError> {
         if decoder.is_list() {
             if Ok(13) == decoder.item_count() {
                 let mut it = decoder.iter();
@@ -264,7 +264,7 @@ impl L2Block {
                     decode_transaction_hash_list(&next(&mut it)?, "transactions")?;
                 let gas_used: U256 = decode_field_u256_le(&next(&mut it)?, "gas_used")?;
                 let timestamp = decode_timestamp(&next(&mut it)?)?;
-                Ok(L2Block {
+                Ok(EthBlock {
                     number,
                     hash,
                     parent_hash,
@@ -289,7 +289,7 @@ impl L2Block {
         }
     }
 
-    fn rlp_decode_v1(decoder: &Rlp) -> Result<L2Block, DecoderError> {
+    fn rlp_decode_v1(decoder: &Rlp) -> Result<EthBlock, DecoderError> {
         if decoder.is_list() {
             if Ok(15) == decoder.item_count() {
                 let mut it = decoder.iter();
@@ -314,7 +314,7 @@ impl L2Block {
                 let base_fee_per_gas: U256 =
                     decode_field_u256_le(&next(&mut it)?, "base_fee_per_gas")?;
                 let mix_hash: H256 = decode_field(&next(&mut it)?, "mix_hash")?;
-                Ok(L2Block {
+                Ok(EthBlock {
                     number,
                     hash,
                     parent_hash,
@@ -339,7 +339,7 @@ impl L2Block {
         }
     }
 
-    fn rlp_encode(self: &L2Block, s: &mut RlpStream) {
+    fn rlp_encode(self: &EthBlock, s: &mut RlpStream) {
         s.begin_list(15);
         append_u256_le(s, &self.number);
         s.append(&self.hash);
@@ -361,7 +361,7 @@ impl L2Block {
     }
 }
 
-impl VersionedEncoding for L2Block {
+impl VersionedEncoding for EthBlock {
     const VERSION: u8 = 1;
 
     fn unversionned_encode(&self) -> bytes::BytesMut {
@@ -378,7 +378,7 @@ impl VersionedEncoding for L2Block {
 #[cfg(test)]
 mod tests {
 
-    use super::L2Block;
+    use super::EthBlock;
     use crate::eth_gen::OwnedHash;
     use crate::rlp_helpers::VersionedEncoding;
     use crate::transaction::TRANSACTION_HASH_SIZE;
@@ -386,9 +386,9 @@ mod tests {
     use primitive_types::{H256, U256};
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
-    fn block_encoding_roundtrip(v: L2Block) {
+    fn block_encoding_roundtrip(v: EthBlock) {
         let bytes = v.to_bytes();
-        let v2 = L2Block::from_bytes(&bytes).expect("L2Block should be decodable");
+        let v2 = EthBlock::from_bytes(&bytes).expect("EthBlock should be decodable");
         assert_eq!(v, v2, "Roundtrip failed on {:?}", v)
     }
 
@@ -397,8 +397,8 @@ mod tests {
     pub fn dummy_hash() -> OwnedHash {
         DUMMY_HASH.into()
     }
-    fn dummy_block(tx_length: usize) -> L2Block {
-        L2Block {
+    fn dummy_block(tx_length: usize) -> EthBlock {
+        EthBlock {
             number: U256::from(42),
             hash: H256::from([3u8; 32]),
             parent_hash: H256::from([2u8; 32]),
@@ -420,7 +420,7 @@ mod tests {
     #[test]
     fn roundtrip_rlp() {
         for tx_length in 0..3 {
-            let v: L2Block = dummy_block(tx_length);
+            let v: EthBlock = dummy_block(tx_length);
             block_encoding_roundtrip(v);
         }
     }

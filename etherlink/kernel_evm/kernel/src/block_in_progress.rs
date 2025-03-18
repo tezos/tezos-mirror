@@ -18,7 +18,7 @@ use evm_execution::account_storage::EVM_ACCOUNTS_PATH;
 use primitive_types::{H160, H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
 use std::collections::VecDeque;
-use tezos_ethereum::block::{BlockConstants, BlockFees, L2Block};
+use tezos_ethereum::block::{BlockConstants, BlockFees, EthBlock};
 use tezos_ethereum::eth_gen::OwnedHash;
 use tezos_ethereum::rlp_helpers::*;
 use tezos_ethereum::transaction::{
@@ -442,7 +442,7 @@ impl BlockInProgress {
         self,
         host: &mut Host,
         block_constants: &BlockConstants,
-    ) -> Result<L2Block, anyhow::Error> {
+    ) -> Result<EthBlock, anyhow::Error> {
         let state_root = Self::safe_store_get_hash(host, &EVM_ACCOUNTS_PATH)?;
         let receipts_root = self.receipts_root(host, &self.previous_receipts_root)?;
         let transactions_root =
@@ -452,7 +452,7 @@ impl BlockInProgress {
             self.timestamp,
             block_constants.block_fees.minimum_base_fee_per_gas(),
         );
-        let new_block = L2Block::new(
+        let new_block = EthBlock::new(
             self.number,
             self.valid_txs,
             self.timestamp,

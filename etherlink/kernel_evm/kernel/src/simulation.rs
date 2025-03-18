@@ -9,12 +9,12 @@
 // when the proxy node simulates directly
 
 use crate::block_storage;
-use crate::configuration::fetch_limits;
 use crate::fees::simulation_add_gas_for_fees;
 use crate::storage::{
-    read_last_info_per_level_timestamp, read_sequencer_pool_address, read_tracer_input,
+    read_last_info_per_level_timestamp, read_maximum_allowed_ticks,
+    read_sequencer_pool_address, read_tracer_input,
 };
-use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
+use crate::tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS};
 use crate::{error::Error, error::StorageError, storage};
 
 use crate::{parsable, parsing, retrieve_chain_id, tick_model};
@@ -373,7 +373,7 @@ impl Evaluation {
         evm_configuration: &Config,
     ) -> Result<SimulationResult<CallResult, String>, Error> {
         let chain_id = retrieve_chain_id(host)?;
-        let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host)?;
+        let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host);
         let da_fee = crate::retrieve_da_fee(host)?;
         let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
         let mut evm_account_storage = account_storage::init_account_storage()
@@ -450,10 +450,11 @@ impl Evaluation {
 
         let precompiles = precompiles::precompile_set::<Host>(enable_fa_withdrawals);
         let tx_data_size = self.data.len() as u64;
-        let limits = fetch_limits(host);
+        let maximum_allowed_ticks =
+            read_maximum_allowed_ticks(host).unwrap_or(MAX_ALLOWED_TICKS);
         let allocated_ticks =
             tick_model::estimate_remaining_ticks_for_transaction_execution(
-                limits.maximum_allowed_ticks,
+                maximum_allowed_ticks,
                 0,
                 tx_data_size,
             );

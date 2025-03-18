@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use primitive_types::{H256, U256};
-use tezos_ethereum::block::L2Block;
+use tezos_ethereum::block::EthBlock;
 use tezos_ethereum::rlp_helpers::VersionedEncoding;
 use tezos_evm_logging::{
     log,
@@ -52,7 +52,7 @@ fn store_current_hash(host: &mut impl Runtime, hash: H256) -> anyhow::Result<()>
 
 fn store_block(
     host: &mut impl Runtime,
-    block: &L2Block,
+    block: &EthBlock,
     index_block: bool,
 ) -> anyhow::Result<()> {
     if index_block {
@@ -68,7 +68,7 @@ fn store_block(
 
 fn store_current_index_or_not(
     host: &mut impl Runtime,
-    block: &L2Block,
+    block: &EthBlock,
     index_block: bool,
 ) -> anyhow::Result<()> {
     store_current_number(host, block.number)?;
@@ -86,11 +86,11 @@ fn store_current_index_or_not(
     Ok(())
 }
 
-pub fn store_current(host: &mut impl Runtime, block: &L2Block) -> anyhow::Result<()> {
+pub fn store_current(host: &mut impl Runtime, block: &EthBlock) -> anyhow::Result<()> {
     store_current_index_or_not(host, block, true)
 }
 
-pub fn restore_current(host: &mut impl Runtime, block: &L2Block) -> anyhow::Result<()> {
+pub fn restore_current(host: &mut impl Runtime, block: &EthBlock) -> anyhow::Result<()> {
     store_current_index_or_not(host, block, false)
 }
 
@@ -102,11 +102,11 @@ pub fn read_current_hash(host: &impl Runtime) -> anyhow::Result<H256> {
     read_h256_be(host, &path::CURRENT_HASH)
 }
 
-pub fn read_current(host: &mut impl Runtime) -> anyhow::Result<L2Block> {
+pub fn read_current(host: &mut impl Runtime) -> anyhow::Result<EthBlock> {
     let hash = read_current_hash(host)?;
     let block_path = path::path(hash)?;
     let bytes = &host.store_read_all(&block_path)?;
-    let block_from_bytes = L2Block::from_bytes(bytes)?;
+    let block_from_bytes = EthBlock::from_bytes(bytes)?;
     Ok(block_from_bytes)
 }
 

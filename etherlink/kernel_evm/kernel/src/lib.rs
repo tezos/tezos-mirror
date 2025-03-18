@@ -142,15 +142,22 @@ fn retrieve_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
     }
 }
 
-fn retrieve_minimum_base_fee_per_gas<Host: Runtime>(
-    host: &mut Host,
-) -> Result<U256, Error> {
+fn retrieve_minimum_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> U256 {
     match read_minimum_base_fee_per_gas(host) {
-        Ok(minimum_base_fee_per_gas) => Ok(minimum_base_fee_per_gas),
+        Ok(minimum_base_fee_per_gas) => minimum_base_fee_per_gas,
         Err(_) => {
             let minimum_base_fee_per_gas = crate::fees::MINIMUM_BASE_FEE_PER_GAS.into();
-            store_minimum_base_fee_per_gas(host, minimum_base_fee_per_gas)?;
-            Ok(minimum_base_fee_per_gas)
+            if let Err(err) =
+                store_minimum_base_fee_per_gas(host, minimum_base_fee_per_gas)
+            {
+                log!(
+                    host,
+                    Error,
+                    "Can't store the default minimum_base_fee: {:?}",
+                    err
+                );
+            }
+            minimum_base_fee_per_gas
         }
     }
 }
@@ -188,7 +195,7 @@ fn retrieve_da_fee<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
 fn retrieve_block_fees<Host: Runtime>(
     host: &mut Host,
 ) -> Result<tezos_ethereum::block::BlockFees, Error> {
-    let minimum_base_fee_per_gas = retrieve_minimum_base_fee_per_gas(host)?;
+    let minimum_base_fee_per_gas = retrieve_minimum_base_fee_per_gas(host);
     let base_fee_per_gas = retrieve_base_fee_per_gas(host, minimum_base_fee_per_gas);
     let da_fee = retrieve_da_fee(host)?;
     let block_fees = tezos_ethereum::block::BlockFees::new(
@@ -362,7 +369,8 @@ mod tests {
 
     use crate::block_storage;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
-    use crate::configuration::{ChainConfig, Configuration, Limits};
+    use crate::chains::{ChainConfig, EvmLimits};
+    use crate::configuration::Configuration;
     use crate::fees;
     use crate::main;
     use crate::parsing::RollupType;
@@ -419,7 +427,11 @@ mod tests {
 
     fn dummy_configuration(evm_configuration: Config) -> Configuration {
         Configuration {
-            chain_config: ChainConfig::new_evm_config(DUMMY_CHAIN_ID, evm_configuration),
+            chain_config: ChainConfig::new_evm_config(
+                DUMMY_CHAIN_ID,
+                EvmLimits::default(),
+                evm_configuration,
+            ),
             ..Configuration::default()
         }
     }
@@ -588,13 +600,8 @@ mod tests {
         let block_fees = dummy_block_fees();
 
         // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
-        let limits = Limits {
-            maximum_allowed_ticks: 9_000_000_000,
-            ..Limits::default()
-        };
-
         let mut configuration = Configuration {
-            limits,
+            maximum_allowed_ticks: 9_000_000_000,
             ..dummy_configuration(EVMVersion::current_test_config())
         };
 

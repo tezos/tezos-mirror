@@ -16,7 +16,7 @@ use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use std::fmt::Debug;
-use tezos_ethereum::block::L2Block;
+use tezos_ethereum::block::EthBlock;
 use tezos_ethereum::eth_gen::OwnedHash;
 use tezos_ethereum::rlp_helpers::{
     self, append_timestamp, append_u256_le, decode_field_u256_le, decode_timestamp,
@@ -116,8 +116,8 @@ pub struct BlockHeader<H> {
     pub evm_block_header: H,
 }
 
-impl From<L2Block> for BlockHeader<EVMBlockHeader> {
-    fn from(block: L2Block) -> Self {
+impl From<EthBlock> for BlockHeader<EVMBlockHeader> {
+    fn from(block: EthBlock) -> Self {
         Self {
             blueprint_header: BlueprintHeader {
                 number: block.number,
@@ -640,10 +640,12 @@ mod tests {
 
     use super::*;
     use crate::block::GENESIS_PARENT_HASH;
-    use crate::configuration::{ChainConfig, DalConfiguration, Limits, TezosContracts};
+    use crate::chains::ChainConfig;
+    use crate::configuration::{DalConfiguration, TezosContracts};
     use crate::delayed_inbox::Hash;
     use crate::sequencer_blueprint::rlp_roundtrip;
     use crate::storage::store_last_info_per_level_timestamp;
+    use crate::tick_model::constants::MAX_ALLOWED_TICKS;
     use primitive_types::H256;
     use tezos_crypto_rs::hash::ContractKt1Hash;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
@@ -679,7 +681,7 @@ mod tests {
                 evm_node_flag: false,
                 max_blueprint_lookahead_in_seconds: 100_000i64,
             },
-            limits: Limits::default(),
+            maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
             chain_config: ChainConfig::default(),
             garbage_collect_blocks: false,

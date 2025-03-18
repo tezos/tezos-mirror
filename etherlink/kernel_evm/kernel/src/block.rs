@@ -12,8 +12,8 @@ use crate::blueprint_storage::{
     drop_blueprint, read_blueprint, read_current_block_header,
     store_current_block_header, BlockHeader, BlueprintHeader, EVMBlockHeader,
 };
+use crate::chains::{ChainConfig, EvmLimits};
 use crate::configuration::ConfigurationMode;
-use crate::configuration::Limits;
 use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
 use crate::event::Event;
@@ -32,7 +32,7 @@ use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::trace::TracerInput;
 use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockConstants;
-use tezos_ethereum::block::L2Block;
+use tezos_ethereum::block::EthBlock;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::runtime::Runtime;
@@ -76,7 +76,7 @@ pub enum BlockComputationResult {
     RebootNeeded,
     Finished {
         included_delayed_transactions: Vec<TransactionHash>,
-        block: Box<L2Block>,
+        block: Box<EthBlock>,
     },
 }
 
@@ -120,7 +120,8 @@ fn compute<Host: Runtime>(
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
     sequencer_pool_address: Option<H160>,
-    limits: &Limits,
+    maximum_allowed_ticks: u64,
+    limits: &EvmLimits,
     tracer_input: Option<TracerInput>,
     evm_configuration: &Config,
 ) -> Result<BlockInProgressComputationResult, anyhow::Error> {
@@ -139,7 +140,7 @@ fn compute<Host: Runtime>(
         log!(host, Benchmarking, "Transaction data size: {}", data_size);
         // The current number of ticks remaining for the current `kernel_run` is allocated for the transaction.
         let allocated_ticks = estimate_remaining_ticks_for_transaction_execution(
-            limits.maximum_allowed_ticks,
+            maximum_allowed_ticks,
             block_in_progress.estimated_ticks_in_run,
             data_size,
         );
@@ -255,7 +256,6 @@ fn next_bip_from_blueprints<Host: Runtime>(
     tick_counter: &TickCounter,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
-    minimum_base_fee_per_gas: U256,
 ) -> Result<BlueprintParsing, anyhow::Error> {
     let (
         current_block_number,
@@ -305,28 +305,33 @@ fn next_bip_from_blueprints<Host: Runtime>(
                     return Ok(BlueprintParsing::None);
                 }
             }
-            let gas_price = crate::gas_price::base_fee_per_gas(
-                host,
-                blueprint.timestamp,
-                minimum_base_fee_per_gas,
-            );
+            match &config.chain_config {
+                ChainConfig::Evm(chain_config) => {
+                    let gas_price = crate::gas_price::base_fee_per_gas(
+                        host,
+                        blueprint.timestamp,
+                        chain_config.limits.minimum_base_fee_per_gas,
+                    );
 
-            let bip = block_in_progress::BlockInProgress::from_blueprint(
-                blueprint,
-                current_block_number,
-                current_block_parent_hash,
-                tick_counter.c,
-                gas_price,
-                receipts_root,
-                transactions_root,
-            );
+                    let bip = block_in_progress::BlockInProgress::from_blueprint(
+                        blueprint,
+                        current_block_number,
+                        current_block_parent_hash,
+                        tick_counter.c,
+                        gas_price,
+                        receipts_root,
+                        transactions_root,
+                    );
 
-            tezos_evm_logging::log!(
-                host,
-                tezos_evm_logging::Level::Debug,
-                "bip: {bip:?}"
-            );
-            Ok(BlueprintParsing::Next(Box::new(bip)))
+                    tezos_evm_logging::log!(
+                        host,
+                        tezos_evm_logging::Level::Debug,
+                        "bip: {bip:?}"
+                    );
+                    Ok(BlueprintParsing::Next(Box::new(bip)))
+                }
+                ChainConfig::Michelson(_) => panic!("Implement Tezlink"),
+            }
         }
         None => Ok(BlueprintParsing::None),
     }
@@ -338,20 +343,21 @@ fn compute_bip<Host: Runtime>(
     outbox_queue: &OutboxQueue<'_, impl Path>,
     mut block_in_progress: BlockInProgress,
     precompiles: &PrecompileBTreeMap<Host>,
-    evm_account_storage: &mut EthereumAccountStorage,
     tick_counter: &mut TickCounter,
     sequencer_pool_address: Option<H160>,
-    limits: &Limits,
+    limits: &EvmLimits,
+    maximum_allowed_ticks: u64,
     tracer_input: Option<TracerInput>,
     chain_id: U256,
-    minimum_base_fee_per_gas: U256,
     da_fee_per_byte: U256,
     coinbase: H160,
     evm_configuration: &Config,
 ) -> anyhow::Result<BlockComputationResult> {
+    let mut evm_account_storage =
+        init_account_storage().context("Failed to initialize EVM account storage")?;
     let constants: BlockConstants = block_in_progress.constants(
         chain_id,
-        minimum_base_fee_per_gas,
+        limits.minimum_base_fee_per_gas,
         da_fee_per_byte,
         GAS_LIMIT,
         coinbase,
@@ -362,8 +368,9 @@ fn compute_bip<Host: Runtime>(
         &mut block_in_progress,
         &constants,
         precompiles,
-        evm_account_storage,
+        &mut evm_account_storage,
         sequencer_pool_address,
+        maximum_allowed_ticks,
         limits,
         tracer_input,
         evm_configuration,
@@ -438,7 +445,7 @@ fn promote_block<Host: Runtime>(
     safe_host: &mut SafeStorage<&mut Host>,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress_provenance: &BlockInProgressProvenance,
-    block: L2Block,
+    block: EthBlock,
     config: &mut Configuration,
     delayed_txs: Vec<TransactionHash>,
 ) -> anyhow::Result<()> {
@@ -480,8 +487,7 @@ pub fn produce<Host: Runtime>(
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
 ) -> Result<ComputationResult, anyhow::Error> {
-    let chain_id = config.chain_config.chain_id;
-    let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host)?;
+    let chain_id = config.chain_config.get_chain_id();
     let da_fee_per_byte = crate::retrieve_da_fee(host)?;
 
     let kernel_upgrade = upgrade::read_kernel_upgrade(host)?;
@@ -490,8 +496,6 @@ pub fn produce<Host: Runtime>(
     // in blocks is set to the pool address.
     let coinbase = sequencer_pool_address.unwrap_or_default();
 
-    let mut evm_account_storage =
-        init_account_storage().context("Failed to initialize EVM account storage")?;
     let mut tick_counter = TickCounter::new(0u64);
 
     let mut safe_host = SafeStorage { host };
@@ -516,7 +520,6 @@ pub fn produce<Host: Runtime>(
                     &tick_counter,
                     config,
                     &kernel_upgrade,
-                    minimum_base_fee_per_gas,
                 )? {
                     BlueprintParsing::Next(bip) => bip,
                     BlueprintParsing::None => {
@@ -537,22 +540,25 @@ pub fn produce<Host: Runtime>(
         };
 
     let processed_blueprint = block_in_progress.number;
-    match compute_bip(
-        &mut safe_host,
-        &outbox_queue,
-        block_in_progress,
-        &precompiles,
-        &mut evm_account_storage,
-        &mut tick_counter,
-        sequencer_pool_address,
-        &config.limits,
-        tracer_input,
-        chain_id,
-        minimum_base_fee_per_gas,
-        da_fee_per_byte,
-        coinbase,
-        &config.chain_config.evm_configuration,
-    ) {
+    let computation_result = match &config.chain_config {
+        ChainConfig::Evm(chain_config) => compute_bip(
+            &mut safe_host,
+            &outbox_queue,
+            block_in_progress,
+            &precompiles,
+            &mut tick_counter,
+            sequencer_pool_address,
+            &chain_config.limits,
+            config.maximum_allowed_ticks,
+            tracer_input,
+            chain_id,
+            da_fee_per_byte,
+            coinbase,
+            &chain_config.evm_config,
+        ),
+        ChainConfig::Michelson(_) => panic!("Implement Tezlink"),
+    };
+    match computation_result {
         Ok(BlockComputationResult::Finished {
             included_delayed_transactions,
             block,
@@ -612,7 +618,6 @@ mod tests {
     use crate::blueprint_storage::read_next_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
-    use crate::configuration::ChainConfig;
     use crate::fees::DA_FEE_PER_BYTE;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
     use crate::inbox::Transaction;
@@ -622,6 +627,7 @@ mod tests {
     use crate::storage::read_block_in_progress;
     use crate::storage::read_last_info_per_level_timestamp;
     use crate::storage::{read_transaction_receipt, read_transaction_receipt_status};
+    use crate::tick_model::constants::MAX_ALLOWED_TICKS;
     use crate::{retrieve_block_fees, retrieve_chain_id};
     use evm_execution::account_storage::{
         account_path, init_account_storage, EthereumAccountStorage,
@@ -689,7 +695,11 @@ mod tests {
 
     fn dummy_configuration(evm_configuration: Config) -> Configuration {
         Configuration {
-            chain_config: ChainConfig::new_evm_config(DUMMY_CHAIN_ID, evm_configuration),
+            chain_config: ChainConfig::new_evm_config(
+                DUMMY_CHAIN_ID,
+                EvmLimits::default(),
+                evm_configuration,
+            ),
             ..Configuration::default()
         }
     }
@@ -1324,8 +1334,7 @@ mod tests {
             vec![0; 32],
         );
         // run is almost full wrt ticks
-        let limits = Limits::default();
-        block_in_progress.estimated_ticks_in_run = limits.maximum_allowed_ticks - 1000;
+        block_in_progress.estimated_ticks_in_run = MAX_ALLOWED_TICKS - 1000;
 
         // act
         let result = compute(
@@ -1336,7 +1345,8 @@ mod tests {
             &precompiles,
             &mut evm_account_storage,
             None,
-            &limits,
+            MAX_ALLOWED_TICKS,
+            &EvmLimits::default(),
             None,
             &EVMVersion::current_test_config(),
         )
@@ -1609,13 +1619,8 @@ mod tests {
         host.reboot_left().expect("should be some reboot left");
 
         // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
-        let limits = Limits {
-            maximum_allowed_ticks: 9_000_000_000,
-            ..Limits::default()
-        };
-
         let mut configuration = Configuration {
-            limits,
+            maximum_allowed_ticks: 9_000_000_000,
             ..dummy_configuration(EVMVersion::current_test_config())
         };
 
@@ -1689,13 +1694,8 @@ mod tests {
         store_blueprints(&mut host, proposals);
 
         // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
-        let limits = Limits {
-            maximum_allowed_ticks: 9_000_000_000,
-            ..Limits::default()
-        };
-
         let mut configuration = Configuration {
-            limits,
+            maximum_allowed_ticks: 9_000_000_000,
             ..dummy_configuration(EVMVersion::current_test_config())
         };
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
@@ -1846,13 +1846,8 @@ mod tests {
         store_inbox_blueprint(&mut host, blueprint(proposals_first_reboot)).unwrap();
 
         // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
-        let limits = Limits {
-            maximum_allowed_ticks: 9_000_000_000,
-            ..Limits::default()
-        };
-
         let mut configuration = Configuration {
-            limits,
+            maximum_allowed_ticks: 9_000_000_000,
             ..dummy_configuration(EVMVersion::current_test_config())
         };
         // sanity check: no current block
