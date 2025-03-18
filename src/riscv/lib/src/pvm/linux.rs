@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 mod addr;
-mod error;
+pub mod error;
 mod fds;
 mod fs;
 mod memory;
@@ -16,6 +16,7 @@ use tezos_smart_rollup_constants::riscv::SBI_FIRMWARE_TEZOS;
 
 use self::addr::VirtAddr;
 use self::error::Error;
+use self::memory::BREAK_SIZE;
 use self::memory::STACK_SIZE;
 use super::Pvm;
 use super::PvmHooks;
@@ -42,6 +43,7 @@ use crate::state_backend::ManagerRead;
 use crate::state_backend::ManagerReadWrite;
 use crate::state_backend::ManagerWrite;
 use crate::state_backend::Ref;
+use crate::struct_layout;
 
 /// Thread identifier for the main thread
 const MAIN_THREAD_ID: u64 = 1;
@@ -84,6 +86,21 @@ const RT_SIGACTION: u64 = 134;
 
 /// System call number for `rt_sigprocmask` on RISC-V
 const RT_SIGPROCMASK: u64 = 135;
+
+/// System call number for `brk` on RISC-V
+const BRK: u64 = 214;
+
+/// System call number for `munmap` on RISC-V
+const MUNMAP: u64 = 215;
+
+/// System call number for `mmap` on RISC-V
+const MMAP: u64 = 222;
+
+/// System call number for `mprotect` on RISC-V
+const MPROTECT: u64 = 226;
+
+/// System call number for `madvise` on RISC-V
+const MADVISE: u64 = 233;
 
 /// System call number for `getrandom` on RISC-V
 const GETRANDOM: u64 = 278;
@@ -182,7 +199,13 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase>
     }
 }
 
-impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase> Pvm<MC, CL, B, M> {
+impl<MC, CL, B, M> Pvm<MC, CL, B, M>
+where
+    MC: MemoryConfig,
+    CL: CacheLayouts,
+    B: Block<MC, M>,
+    M: ManagerBase,
+{
     /// Load the program into memory and set the PC to its entrypoint.
     fn load_program(&mut self, program: &Program<MC>) -> Result<(), MachineError>
     where
@@ -293,6 +316,9 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase> Pvm<MC
             .xregisters
             .write(registers::sp, stack_top.to_machine_address());
 
+        // Remember the stack bottom for later use
+        self.system_state.stack_guard_start.write(stack_guard);
+
         Ok(())
     }
 
@@ -326,6 +352,14 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase> Pvm<MC
         // The user program may not access the M or S privilege level
         self.machine_state.core.hart.mode.write(Mode::User);
 
+        // Setup heap addresses
+        let program_end = self.system_state.program_end.read();
+        let heap_start = (program_end + BREAK_SIZE)
+            .align_up(PAGE_SIZE)
+            .ok_or(MachineError::MemoryTooSmall)?;
+        self.system_state.heap_start.write(heap_start);
+        self.system_state.heap_next_free.write(heap_start);
+
         Ok(())
     }
 
@@ -343,33 +377,64 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerBase> Pvm<MC
     }
 }
 
-/// Layout for the Linux supervisor state
-pub type SupervisorStateLayout = (
-    Atom<u64>,
-    Atom<bool>,
-    Atom<u64>,
-    Atom<VirtAddr>,
-    Atom<VirtAddr>,
-);
+struct_layout! {
+    pub struct SupervisorStateLayout {
+        tid_address: Atom<VirtAddr>,
+        exited: Atom<bool>,
+        exit_code: Atom<u64>,
+        program_start: Atom<VirtAddr>,
+        program_end: Atom<VirtAddr>,
+        program_break: Atom<VirtAddr>,
+        stack_guard_start: Atom<VirtAddr>,
+        heap_start: Atom<VirtAddr>,
+        heap_next_free: Atom<VirtAddr>,
+    }
+}
 
 /// Linux supervisor state
+// TODO: RV-533: Represent memory-related start and end combinations as `Range<VirtAddr>`
 pub struct SupervisorState<M: ManagerBase> {
-    tid_address: Cell<u64, M>,
+    /// Thread lock address
+    tid_address: Cell<VirtAddr, M>,
+
+    /// Has the process exited?
     exited: Cell<bool, M>,
+
+    /// Exit code for when the process exited
     exit_code: Cell<u64, M>,
+
+    /// First byte of the program in memory
     program_start: Cell<VirtAddr, M>,
+
+    /// First byte after the program in memory
     program_end: Cell<VirtAddr, M>,
+
+    /// Program break
+    program_break: Cell<VirtAddr, M>,
+
+    /// First byte of the heap
+    heap_start: Cell<VirtAddr, M>,
+
+    /// First free byte in the heap
+    heap_next_free: Cell<VirtAddr, M>,
+
+    /// First byte of the stack guard page
+    stack_guard_start: Cell<VirtAddr, M>,
 }
 
 impl<M: ManagerBase> SupervisorState<M> {
     /// Bind the given allocated regions to the supervisor state.
     pub fn bind(space: AllocatedOf<SupervisorStateLayout, M>) -> Self {
         SupervisorState {
-            tid_address: space.0,
-            exited: space.1,
-            exit_code: space.2,
-            program_start: space.3,
-            program_end: space.4,
+            tid_address: space.tid_address,
+            exited: space.exited,
+            exit_code: space.exit_code,
+            program_start: space.program_start,
+            program_end: space.program_end,
+            program_break: space.program_break,
+            stack_guard_start: space.stack_guard_start,
+            heap_start: space.heap_start,
+            heap_next_free: space.heap_next_free,
         }
     }
 
@@ -378,13 +443,17 @@ impl<M: ManagerBase> SupervisorState<M> {
     pub fn struct_ref<'a, F: FnManager<Ref<'a, M>>>(
         &'a self,
     ) -> AllocatedOf<SupervisorStateLayout, F::Output> {
-        (
-            self.tid_address.struct_ref::<F>(),
-            self.exited.struct_ref::<F>(),
-            self.exit_code.struct_ref::<F>(),
-            self.program_start.struct_ref::<F>(),
-            self.program_end.struct_ref::<F>(),
-        )
+        SupervisorStateLayoutF {
+            tid_address: self.tid_address.struct_ref::<F>(),
+            exited: self.exited.struct_ref::<F>(),
+            exit_code: self.exit_code.struct_ref::<F>(),
+            program_start: self.program_start.struct_ref::<F>(),
+            program_end: self.program_end.struct_ref::<F>(),
+            program_break: self.program_break.struct_ref::<F>(),
+            stack_guard_start: self.stack_guard_start.struct_ref::<F>(),
+            heap_start: self.heap_start.struct_ref::<F>(),
+            heap_next_free: self.heap_next_free.struct_ref::<F>(),
+        }
     }
 
     /// Handle a Linux system call.
@@ -419,6 +488,11 @@ impl<M: ManagerBase> SupervisorState<M> {
             SIGALTSTACK => self.handle_sigaltstack(core),
             RT_SIGACTION => self.handle_rt_sigaction(core),
             RT_SIGPROCMASK => self.handle_rt_sigprocmask(core),
+            BRK => self.handle_brk(core),
+            MMAP => self.handle_mmap(core),
+            MPROTECT => self.handle_mprotect(core),
+            MUNMAP => self.handle_munmap(core),
+            MADVISE => self.handle_madvise(core),
             GETRANDOM => self.handle_getrandom(core),
             SBI_FIRMWARE_TEZOS => return on_tezos(core),
             _ => Err(Error::NoSystemCall),
@@ -468,7 +542,7 @@ impl<M: ManagerBase> SupervisorState<M> {
         // support informing other (waiting) threads of termination.
 
         // The address is passed as the first and only parameter
-        let tid_address = core.hart.xregisters.read(registers::a0);
+        let tid_address = core.hart.xregisters.read(registers::a0).into();
         self.tid_address.write(tid_address);
 
         // The caller expects the Thread ID to be returned
@@ -618,6 +692,10 @@ impl<M: ManagerClone> Clone for SupervisorState<M> {
             exit_code: self.exit_code.clone(),
             program_start: self.program_start.clone(),
             program_end: self.program_end.clone(),
+            program_break: self.program_break.clone(),
+            stack_guard_start: self.stack_guard_start.clone(),
+            heap_start: self.heap_start.clone(),
+            heap_next_free: self.heap_next_free.clone(),
         }
     }
 }

@@ -5,13 +5,24 @@
 use std::fmt;
 use std::num::NonZeroU64;
 use std::ops::Add;
+use std::ops::Deref;
 use std::ops::Sub;
 
 use crate::default::ConstDefault;
 use crate::machine_state;
 
 /// Virtual address
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+    derive_more::From,
+)]
 #[repr(transparent)]
 pub struct VirtAddr(u64);
 
@@ -104,6 +115,32 @@ impl PartialEq<u64> for VirtAddr {
 impl PartialOrd<u64> for VirtAddr {
     fn partial_cmp(&self, other: &u64) -> Option<std::cmp::Ordering> {
         self.0.partial_cmp(other)
+    }
+}
+
+/// Page-aligned value
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct PageAligned<T>(T);
+
+impl<T> Deref for PageAligned<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl TryFrom<u64> for PageAligned<VirtAddr> {
+    type Error = super::Error;
+
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        let addr = VirtAddr::new(value);
+
+        if !addr.is_aligned(super::PAGE_SIZE) {
+            return Err(super::Error::InvalidArgument);
+        }
+
+        Ok(PageAligned(addr))
     }
 }
 

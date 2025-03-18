@@ -60,6 +60,14 @@ fn fit_ascii(c: u8) -> u8 {
     }
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Default)]
+struct Foo {
+    a: usize,
+    b: u64,
+    c: u8,
+}
+
 fn main() {
     unsafe {
         test_write(c"Hello World\n");
@@ -70,13 +78,10 @@ fn main() {
     random(&mut chars[..5]);
     let chars = chars.map(fit_ascii);
 
-    unsafe {
-        let cstr = CStr::from_bytes_with_nul_unchecked(&chars);
+    let letters = std::str::from_utf8(&chars).unwrap();
+    eprintln!("Random letters: {letters}");
 
-        test_write(c"Random letters: ");
-        test_write(cstr);
-        test_write(c"\n");
-    }
+    println!("Hello World");
 
     unsafe {
         let mut buffer = [0u8; 256];
@@ -88,4 +93,7 @@ fn main() {
         test_write(cstr);
         test_write(c"\n");
     }
+
+    let boxed = Box::new(Foo::default());
+    println!("Debug {boxed:#?}");
 }

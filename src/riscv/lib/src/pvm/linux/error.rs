@@ -32,6 +32,11 @@ pub enum Error {
     /// See [`EACCESS`](https://github.com/torvalds/linux/blob/0ad2507d5d93f39619fc42372c347d6006b64319/include/uapi/asm-generic/errno-base.h#L17)
     Access = 13,
 
+    /// Out of memory
+    ///
+    /// See [`ENOMEM`](https://github.com/torvalds/linux/blob/0ad2507d5d93f39619fc42372c347d6006b64319/include/uapi/asm-generic/errno-base.h#L16)
+    NoMemory = 12,
+
     /// Fault during memory access
     ///
     /// See [`EFAULT`](https://github.com/torvalds/linux/blob/0ad2507d5d93f39619fc42372c347d6006b64319/include/uapi/asm-generic/errno-base.h#L18)
@@ -64,7 +69,7 @@ impl Error {
 
 impl From<OutOfBounds> for Error {
     fn from(_: OutOfBounds) -> Self {
-        Error::InvalidArgument
+        Self::Fault
     }
 }
 
