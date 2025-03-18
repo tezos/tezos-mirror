@@ -119,23 +119,24 @@ open struct
       ~level:Warning
       ("path", Data_encoding.(string))
 
-  let retry_fetching_info_from_l1 level prefix =
+  let retry_fetching_info_from_l1 event_level =
     declare_3
       ~section
       ~prefix_name_with_section:true
-      ~name:(prefix ^ "fetching_info_from_l1")
+      ~name:
+        (Internal_event.Level.to_string event_level ^ "_fetching_info_from_l1")
       ~msg:
         "failed to fetch {info} from L1 node at {endpoint}, retry in {delay}s"
-      ~level
+      ~level:event_level
       ("info", Data_encoding.string)
       ("endpoint", Data_encoding.string)
       ("delay", Data_encoding.float)
 
   let retry_fetching_info_from_l1_notice =
-    retry_fetching_info_from_l1 Internal_event.Notice "notice"
+    retry_fetching_info_from_l1 Internal_event.Notice
 
   let retry_fetching_info_from_l1_warning =
-    retry_fetching_info_from_l1 Internal_event.Warning "warning"
+    retry_fetching_info_from_l1 Internal_event.Warning
 
   let config_error_no_bootstrap =
     declare_0
@@ -1037,10 +1038,13 @@ let emit_node_is_ready () = emit node_is_ready ()
 
 let emit_data_dir_not_found ~path = emit data_dir_not_found path
 
-let emit_retry_fetching_info_from_l1 ~endpoint ~delay ~what ~event_kind =
-  match event_kind with
-  | `Notice -> emit retry_fetching_info_from_l1_notice (what, endpoint, delay)
-  | `Warning -> emit retry_fetching_info_from_l1_warning (what, endpoint, delay)
+let emit_retry_fetching_info_from_l1 ~endpoint ~delay ~requested_info
+    ~event_level =
+  match event_level with
+  | `Notice ->
+      emit retry_fetching_info_from_l1_notice (requested_info, endpoint, delay)
+  | `Warning ->
+      emit retry_fetching_info_from_l1_warning (requested_info, endpoint, delay)
 
 let emit_config_error_no_bootstrap () = emit config_error_no_bootstrap ()
 
@@ -1052,8 +1056,8 @@ let emit_resolved_bootstrap_no_points () = emit resolved_bootstrap_no_points ()
 let emit_resolved_bootstrap_points_total ~number =
   emit resolved_bootstrap_points_total number
 
-let emit_fetched_l1_info_success ~what ~endpoint =
-  emit fetched_l1_info_success (what, endpoint)
+let emit_fetched_l1_info_success ~requested_info ~endpoint =
+  emit fetched_l1_info_success (requested_info, endpoint)
 
 let emit_failed_to_persist_profiles ~profiles ~error =
   emit failed_to_persist_profiles (profiles, error)

@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let fetch_info_from_l1 cctxt ~what ~rpc =
+let fetch_info_from_l1 cctxt ~requested_info ~rpc =
   let open Lwt_syntax in
   let delay = 0.1 in
   let delay_max = 20.0 in
@@ -38,20 +38,25 @@ let fetch_info_from_l1 cctxt ~what ~rpc =
           Event.emit_retry_fetching_info_from_l1
             ~endpoint
             ~delay
-            ~what
-            ~event_kind:(if delay < delay_max then `Notice else `Warning)
+            ~requested_info
+            ~event_level:(if delay < delay_max then `Notice else `Warning)
         in
         let* () = Lwt_unix.sleep delay in
         retry delay
     | Error err -> return_error err
     | Ok res ->
-        let* () = Event.emit_fetched_l1_info_success ~endpoint ~what in
+        let* () =
+          Event.emit_fetched_l1_info_success ~endpoint ~requested_info
+        in
         return_ok res
   in
   retry delay
 
 let fetch_dal_config cctxt =
-  fetch_info_from_l1 cctxt ~rpc:Config_services.dal_config ~what:"DAL config"
+  fetch_info_from_l1
+    cctxt
+    ~rpc:Config_services.dal_config
+    ~requested_info:"DAL config"
 
 let init_cryptobox config proto_parameters =
   let open Lwt_result_syntax in
