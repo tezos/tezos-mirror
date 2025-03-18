@@ -539,25 +539,34 @@ let save config =
        (fun _ -> [DAL_node_unable_to_write_configuration_file file])
        v)
 
-let load ~data_dir =
+let load =
   let open Lwt_result_syntax in
-  let* json =
-    let*! json = Lwt_utils_unix.Json.read_file (filename ~data_dir) in
-    match json with
-    | Ok json -> return json
-    | Error (Exn _ :: _ as e) -> fail e
-    | Error e -> fail e
+  let config_versions =
+    [
+      (1, Data_encoding.Json.destruct encoding);
+      (0, fun json -> Data_encoding.Json.destruct V0.encoding json |> from_v0);
+    ]
   in
-  let* config =
-    Lwt.catch
-      (fun () -> Data_encoding.Json.destruct encoding json |> return)
-      (fun _e ->
-        Data_encoding.Json.destruct V0.encoding json |> from_v0 |> return)
+  let rec try_decode json = function
+    | [] -> failwith "Unreachable. Expecting to have at least one version"
+    | (_version, version_decoder) :: older_versions -> (
+        try version_decoder json |> return
+        with e ->
+          if List.is_empty older_versions then tzfail (Exn e)
+          else try_decode json older_versions)
   in
-  let config = {config with data_dir} in
-  (* We save the config so that its format is that of the latest version. *)
-  let* () = save config in
-  return config
+  fun ~data_dir ->
+    let* json =
+      let*! json = Lwt_utils_unix.Json.read_file (filename ~data_dir) in
+      match json with
+      | Ok json -> return json
+      | Error (Exn _ :: _ as e) | Error e -> fail e
+    in
+    let* config = try_decode json config_versions in
+    let config = {config with data_dir} in
+    (* We save the config so that its format is that of the latest version. *)
+    let* () = save config in
+    return config
 
 let identity_file {data_dir; _} = Filename.concat data_dir "identity.json"
 
