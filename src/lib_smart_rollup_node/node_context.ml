@@ -674,11 +674,10 @@ let get_executable_pending_outbox_messages ?outbox_level
   let max_level = (Reference.get lcc).level in
   let constants = (Reference.get current_protocol).constants.sc_rollup in
   let min_level =
-    Int32.sub
-      max_level
-      (Int32.of_int
-         (constants.max_number_of_stored_cemented_commitments
-        * constants.commitment_period_in_blocks))
+    Int32.sub max_level (Int32.of_int constants.max_active_outbox_levels)
+    |> Int32.succ
+    (* Protocol uses strict inequality, see function [validate_outbox_level] in
+       src/proto_alpha/lib_protocol/sc_rollup_operations.ml. *)
   in
   match outbox_level with
   | None -> Store.Outbox_messages.pending store ~min_level ~max_level
@@ -723,13 +722,13 @@ let get_pending_outbox_messages ?outbox_level
   in
   let lcc = (Reference.get lcc).level in
   let constants = (Reference.get current_protocol).constants.sc_rollup in
+  (* Messages below, and including, this level are lost because protocol uses
+     strict inequality. See function [validate_outbox_level] in
+     src/proto_alpha/lib_protocol/sc_rollup_operations.ml. *)
   let lost_level =
-    Int32.sub
-      lcc
-      (Int32.of_int
-         (constants.max_number_of_stored_cemented_commitments
-        * constants.commitment_period_in_blocks))
+    Int32.sub lcc (Int32.of_int constants.max_active_outbox_levels)
   in
+
   let+ messages =
     match outbox_level with
     | None -> Store.Outbox_messages.pending store ~min_level:0l ~max_level
@@ -743,7 +742,7 @@ let get_pending_outbox_messages ?outbox_level
   List.rev_map
     (fun ((outbox_level, _) as msg) ->
       let status =
-        if outbox_level < lost_level then `Lost
+        if outbox_level <= lost_level then `Lost
         else if outbox_level <= lcc then `Executable
         else `Pending
       in
