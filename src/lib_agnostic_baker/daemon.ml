@@ -17,7 +17,7 @@ type process = {thread : int Lwt.t; canceller : int Lwt.u}
 
 type baker = {protocol_hash : Protocol_hash.t; process : process}
 
-let shutdown baker =
+let shutdown_baker baker =
   let open Lwt_syntax in
   let* () = Agnostic_baker_events.(emit stopping_baker) baker.protocol_hash in
   Lwt.wakeup baker.process.canceller 0 ;
@@ -63,8 +63,8 @@ let run_thread ~protocol_hash ~baker_commands ~baker_args ~cancel_promise
       cancel_promise;
     ]
 
-(** [spawn_baker protocol_hash ~baker_args] spawns a baker for the given [protocol_hash]
-    with [~baker_args] as command line arguments. *)
+(** [spawn_baker protocol_hash ~baker_args] spawns a new baker process for the
+    given [protocol_hash] with command-line arguments [~baker_args]. *)
 let spawn_baker protocol_hash ~baker_args =
   let open Lwt_result_syntax in
   let args_as_string =
@@ -78,8 +78,8 @@ let spawn_baker protocol_hash ~baker_args =
   let*! () =
     Agnostic_baker_events.(emit starting_baker) (protocol_hash, args_as_string)
   in
-  (* The mocked binary argument is necessary for command line parsing done in the running
-     baker function below. It will be discarded, so its value is not important. *)
+  (* Prepend a dummy binary argument required for command-line parsing. The argument
+     will be discarded, so its value is not important. *)
   let baker_args = "./mock-binary" :: baker_args in
   let cancel_promise, canceller = Lwt.wait () in
   let* thread =
@@ -133,12 +133,8 @@ let monitor_heads ~node_addr =
   return stream
 
 (** [hot_swap_baker ~state ~current_protocol_hash ~next_protocol_hash 
-    ~level_to_kill_old_baker] performs a swap in the current [~state] of the
-    agnostic baker, exchanging the current baker from [~current_protocol_hash]
-    with the one corresponding to [~next_protocol_hash]. The current baker is kept
-    running for a few more levels after the migration (as dictated by
-    [~level_to_kill_old_baker]), for safety purposes (such as reorganisations after
-    the migration, or high round blocks). *)
+    ~level_to_kill_old_baker] moves the current baker into the old baker slot
+    (to be killed later) and spawns a new baker for [~next_protocol_hash] *)
 let hot_swap_baker ~state ~current_protocol_hash ~next_protocol_hash
     ~level_to_kill_old_baker =
   let open Lwt_result_syntax in
@@ -152,8 +148,6 @@ let hot_swap_baker ~state ~current_protocol_hash ~next_protocol_hash
     Agnostic_baker_events.(emit protocol_encountered)
       (next_proto_status, next_protocol_hash)
   in
-  (* Current baker is moved to old baker, which will be killed after a safe
-     number of levels. *)
   let*! () =
     Agnostic_baker_events.(emit become_old_baker)
       (current_protocol_hash, level_to_kill_old_baker)
@@ -166,16 +160,17 @@ let hot_swap_baker ~state ~current_protocol_hash ~next_protocol_hash
   state.current_baker <- Some new_baker ;
   return_unit
 
-(** [monitor_voting_periods ~state head_stream] creates a process which listens
-    to the [head_stream] stream (which returns the data of the heads of the network
-    chain) in order to know when to "hot swap" (fork) the current protocol baking
-    binary with the one associated with the next protocol. *)
+(** [monitor_voting_periods ~state head_stream] continuously monitors [heads_stream]
+    to detect protocol changes. It will:
+    - Shut down an old baker it its time has come;
+    - Spawn and "hot-swap" to a new baker if the next protocol hash is different. *)
 let monitor_voting_periods ~state head_stream =
   let open Lwt_result_syntax in
   let node_addr = state.node_endpoint in
   let rec loop () =
     let*! v = Lwt_stream.get head_stream in
     match v with
+    | None -> tzfail Lost_node_connection
     | Some _tick ->
         let* period_kind, remaining =
           Rpc_services.get_current_period ~node_addr
@@ -183,15 +178,14 @@ let monitor_voting_periods ~state head_stream =
         let*! () =
           Agnostic_baker_events.(emit period_status) (period_kind, remaining)
         in
-        (* Check if old baker from previous protocol exists, and in that case, if
-           it must be killed. *)
+        (* Kill old baker if its safe period has elapsed. *)
         let* () =
           match state.old_baker with
           | None -> return_unit
-          | Some (old_baker, level_to_kill) ->
+          | Some (old_baker, kill_level) ->
               let* head_level = Rpc_services.get_level ~node_addr in
-              if level_to_kill <= head_level then (
-                let*! () = shutdown old_baker in
+              if head_level >= kill_level then (
+                let*! () = shutdown_baker old_baker in
                 state.old_baker <- None ;
                 return_unit)
               else return_unit
@@ -202,7 +196,7 @@ let monitor_voting_periods ~state head_stream =
         let* current_protocol_hash =
           match state.current_baker with
           | None -> tzfail Missing_current_baker
-          | Some v -> return v.protocol_hash
+          | Some baker -> return baker.protocol_hash
         in
         let* () =
           if not (Protocol_hash.equal current_protocol_hash next_protocol_hash)
@@ -216,10 +210,8 @@ let monitor_voting_periods ~state head_stream =
           else return_unit
         in
         loop ()
-    | None -> tzfail Lost_node_connection
   in
-  let* () = loop () in
-  return_unit
+  loop ()
 
 (** [baker_thread ~state] monitors the current baker thread for any potential error, and
     it propagates any error that can appear. *)
@@ -232,11 +224,9 @@ let baker_thread ~state =
   in
   if retcode = 0 then return_unit else tzfail Baker_process_error
 
-(** [may_start_initial_baker state] aims to start the baker associated
-    to the current protocol. If the protocol is considered as [frozen] (not
-    [active] anymore), and there is thus no actual baker binary anymore, the
-    initial phase consists in waiting until an [active] protocol is observed on
-    monitored heads function. *)
+(** [may_start_initial_baker state] recursively waits for an [active] protocol
+    and spawns a baker for it. If the protocol is [frozen] (not [active] anymore), it
+    waits for a head with an [active] protocol. *)
 let may_start_initial_baker state =
   let open Lwt_result_syntax in
   let*! () = Agnostic_baker_events.(emit experimental_binary) () in
@@ -302,7 +292,4 @@ let run state =
   let* head_stream = monitor_heads ~node_addr in
   (* Monitoring voting periods through heads monitoring to avoid
      missing UAUs. *)
-  let* () =
-    Lwt.pick [monitor_voting_periods ~state head_stream; baker_thread ~state]
-  in
-  return_unit
+  Lwt.pick [monitor_voting_periods ~state head_stream; baker_thread ~state]
