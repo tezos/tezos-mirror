@@ -20,5 +20,6 @@ XCTMain(
   [
     testCase(TezosTests.allTests),
     testCase(TestBase58Check.allTests),
+    testCase(TestKeys.allTests),
   ]
 )
