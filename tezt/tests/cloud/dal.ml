@@ -1458,8 +1458,8 @@ module Monitoring_app = struct
   end
 
   module Alert = struct
-    let report_lost_dal_rewards ~webhook ~network ~level ~cycle
-        ~lost_dal_rewards =
+    let report_lost_dal_rewards ~slack_channel_id ~slack_bot_token ~network
+        ~level ~cycle ~lost_dal_rewards =
       let data =
         let header =
           Format.sprintf
@@ -1482,23 +1482,15 @@ module Monitoring_app = struct
                 (change / 100_000))
             lost_dal_rewards
         in
-        `O [("blocks", `A (Format_app.section (header :: content) ()))]
+        Format_app.section (header :: content) ()
       in
-      let endpoint = endpoint_of_webhook webhook in
-      let rpc =
-        RPC_core.make
-          ~data:(Data data)
-          POST
-          (String.split_on_char '/' (Uri.path webhook))
-          (fun _json -> ())
-      in
-      let* _response = RPC_core.call_raw endpoint rpc in
+      let* _ts = post_message ~slack_channel_id ~slack_bot_token data in
       Lwt.return_unit
 
     let check_for_lost_dal_rewards t ~metadata =
       match t.configuration.monitor_app_configuration with
       | None -> unit
-      | Some {dal_slack_webhook = webhook; _} ->
+      | Some {slack_channel_id; slack_bot_token; _} ->
           let cycle = JSON.(metadata |-> "level_info" |-> "cycle" |> as_int) in
           let level = JSON.(metadata |-> "level_info" |-> "level" |> as_int) in
           let balance_updates =
@@ -1528,7 +1520,8 @@ module Monitoring_app = struct
           else
             let network = t.configuration.network in
             report_lost_dal_rewards
-              ~webhook
+              ~slack_channel_id
+              ~slack_bot_token
               ~network
               ~level
               ~cycle
@@ -1544,7 +1537,8 @@ module Monitoring_app = struct
             (Printexc.to_string exn) ;
           unit)
 
-    let report_dal_accusations ~webhook ~network ~level ~cycle dal_accusations =
+    let report_dal_accusations ~slack_channel_id ~slack_bot_token ~network
+        ~level ~cycle dal_accusations =
       let data =
         let header =
           Format.sprintf
@@ -1570,23 +1564,15 @@ module Monitoring_app = struct
                 hash)
             dal_accusations
         in
-        `O [("blocks", `A (Format_app.section (header :: content) ()))]
+        Format_app.section (header :: content) ()
       in
-      let endpoint = endpoint_of_webhook webhook in
-      let rpc =
-        RPC_core.make
-          ~data:(Data data)
-          POST
-          (String.split_on_char '/' (Uri.path webhook))
-          (fun _json -> ())
-      in
-      let* _response = RPC_core.call_raw endpoint rpc in
+      let* _ts = post_message ~slack_channel_id ~slack_bot_token data in
       Lwt.return_unit
 
     let check_for_dal_accusations t ~cycle ~level ~operations ~endpoint =
       match t.configuration.monitor_app_configuration with
       | None -> unit
-      | Some {dal_slack_webhook = webhook; _} ->
+      | Some {slack_channel_id; slack_bot_token; _} ->
           let open JSON in
           let accusations =
             operations |> as_list |> Fun.flip List.nth 2 |> as_list
@@ -1658,7 +1644,8 @@ module Monitoring_app = struct
           else
             let network = t.configuration.network in
             report_dal_accusations
-              ~webhook
+              ~slack_channel_id
+              ~slack_bot_token
               ~network
               ~cycle
               ~level
