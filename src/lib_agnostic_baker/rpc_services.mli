@@ -13,6 +13,9 @@ val request_uri :
   uri:string ->
   (Cohttp_lwt_unix.Response.t * Cohttp_lwt.Body.t) tzresult Lwt.t
 
+(** [get_level ~node_addr] returns the level of the block. *)
+val get_level : node_addr:string -> (int, error trace) result Lwt.t
+
 (** [get_next_protocol_hash ~node_addr] returns the protocol hash
     contained in the [next_protocol] field of the metadata of a
     block. *)

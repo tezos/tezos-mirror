@@ -70,6 +70,18 @@ let protocol_encountered =
     ("proto_hash", Protocol_hash.encoding)
     ~pp2:Protocol_hash.pp_short
 
+let become_old_baker =
+  declare_2
+    ~section
+    ~level:Notice
+    ~name:"become_old_baker"
+    ~msg:
+      "The old baker for protocol {proto_hash} will be shut down at level \
+       {level_to_kill}."
+    ("proto_hash", Protocol_hash.encoding)
+    ~pp1:Protocol_hash.pp_short
+    ("level_to_kill", int31)
+
 let waiting_for_active_protocol =
   declare_0
     ~section

@@ -8,6 +8,11 @@
 
 open Agnostic_baker_errors
 
+(* Number of extra levels to keep the old baker alive before shutting it down.
+   This extra time is used to avoid halting the chain in cases such as
+   reorganization or high round migration blocks. *)
+let extra_levels_for_old_baker = 3
+
 type process = {thread : int Lwt.t; canceller : int Lwt.u}
 
 type baker = {protocol_hash : Protocol_hash.t; process : process}
@@ -95,6 +100,7 @@ type 'a state = {
   node_endpoint : string;
   baker_args : string list;
   mutable current_baker : baker option;
+  mutable old_baker : (baker * int) option;
 }
 
 type 'a t = 'a state
@@ -126,11 +132,15 @@ let monitor_heads ~node_addr =
   ignore (loop () : unit Lwt.t) ;
   return stream
 
-(** [hot_swap_baker ~state ~next_protocol_hash] performs a swap in the current
-    [~state] of the agnostic baker, exchanging the current baker with the one
-    corresponding to [~next_protocol_hash]. This is done by stopping the
-    current baking process and spawning a new process instead. *)
-let hot_swap_baker ~state ~next_protocol_hash =
+(** [hot_swap_baker ~state ~current_protocol_hash ~next_protocol_hash 
+    ~level_to_kill_old_baker] performs a swap in the current [~state] of the
+    agnostic baker, exchanging the current baker from [~current_protocol_hash]
+    with the one corresponding to [~next_protocol_hash]. The current baker is kept
+    running for a few more levels after the migration (as dictated by
+    [~level_to_kill_old_baker]), for safety purposes (such as reorganisations after
+    the migration, or high round blocks). *)
+let hot_swap_baker ~state ~current_protocol_hash ~next_protocol_hash
+    ~level_to_kill_old_baker =
   let open Lwt_result_syntax in
   let* current_baker =
     match state.current_baker with
@@ -142,8 +152,13 @@ let hot_swap_baker ~state ~next_protocol_hash =
     Agnostic_baker_events.(emit protocol_encountered)
       (next_proto_status, next_protocol_hash)
   in
-  (* Shutdown previous baker *)
-  let*! () = shutdown current_baker in
+  (* Current baker is moved to old baker, which will be killed after a safe
+     number of levels. *)
+  let*! () =
+    Agnostic_baker_events.(emit become_old_baker)
+      (current_protocol_hash, level_to_kill_old_baker)
+  in
+  state.old_baker <- Some (current_baker, level_to_kill_old_baker) ;
   state.current_baker <- None ;
   let* new_baker =
     spawn_baker next_protocol_hash ~baker_args:state.baker_args
@@ -168,6 +183,19 @@ let monitor_voting_periods ~state head_stream =
         let*! () =
           Agnostic_baker_events.(emit period_status) (period_kind, remaining)
         in
+        (* Check if old baker from previous protocol exists, and in that case, if
+           it must be killed. *)
+        let* () =
+          match state.old_baker with
+          | None -> return_unit
+          | Some (old_baker, level_to_kill) ->
+              let* head_level = Rpc_services.get_level ~node_addr in
+              if level_to_kill <= head_level then (
+                let*! () = shutdown old_baker in
+                state.old_baker <- None ;
+                return_unit)
+              else return_unit
+        in
         let* next_protocol_hash =
           Rpc_services.get_next_protocol_hash ~node_addr
         in
@@ -178,7 +206,13 @@ let monitor_voting_periods ~state head_stream =
         in
         let* () =
           if not (Protocol_hash.equal current_protocol_hash next_protocol_hash)
-          then hot_swap_baker ~state ~next_protocol_hash
+          then
+            let* head_level = Rpc_services.get_level ~node_addr in
+            hot_swap_baker
+              ~state
+              ~current_protocol_hash
+              ~next_protocol_hash
+              ~level_to_kill_old_baker:(head_level + extra_levels_for_old_baker)
           else return_unit
         in
         loop ()
@@ -253,7 +287,7 @@ let may_start_initial_baker state =
   may_start ~head_stream:None ()
 
 let create ~node_endpoint ~baker_args =
-  {node_endpoint; baker_args; current_baker = None}
+  {node_endpoint; baker_args; current_baker = None; old_baker = None}
 
 let run state =
   let open Lwt_result_syntax in
