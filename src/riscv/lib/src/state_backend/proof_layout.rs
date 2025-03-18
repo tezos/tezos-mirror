@@ -3,6 +3,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::collections::VecDeque;
+
 use super::Array;
 use super::Atom;
 use super::DynArray;
@@ -10,6 +12,8 @@ use super::Layout;
 use super::Many;
 use super::Ref;
 use super::RefProofGenOwnedAlloc;
+use super::RefVerifierAlloc;
+use super::hash::Hash;
 use super::hash::HashError;
 use super::owned_backend::Owned;
 use super::proof_backend::merkle::MERKLE_ARITY;
@@ -20,9 +24,11 @@ use super::proof_backend::merkle::chunks_to_writer;
 use super::proof_backend::proof::MerkleProof;
 use super::proof_backend::proof::MerkleProofLeaf;
 use super::proof_backend::tree::Tree;
-use super::verify_backend;
+use super::verify_backend::PartialState;
+use super::verify_backend::{self};
 use crate::array_utils::boxed_array;
 use crate::default::ConstDefault;
+use crate::state_backend::verify_backend::PageId;
 use crate::storage::binary;
 
 /// Errors that may occur when parsing a Merkle proof
@@ -51,6 +57,28 @@ pub enum FromProofError {
 }
 
 type Result<T, E = FromProofError> = std::result::Result<T, E>;
+
+/// Errors that may occur when hashing a [`verify_backend::Verifier`] state
+#[derive(Debug, thiserror::Error)]
+pub enum PartialHashError {
+    #[error("Error during hashing: {0}")]
+    Hash(#[from] HashError),
+
+    #[error("Error from proof: {0}")]
+    FromProof(#[from] FromProofError),
+
+    /// Indicates that a hash could not be computed due to absent data,
+    /// but from which it is possible to recover if the level at which
+    /// it was raised is part of a blinded subtree and its hash is present
+    /// in the proof.
+    #[error("Potentially recoverable error")]
+    PotentiallyRecoverable,
+
+    /// Indicates that a hash could not be computed because the data being
+    /// hashed is only partially available.
+    #[error("Fatal error")]
+    Fatal,
+}
 
 /// Common result type for parsing a Merkle proof
 pub type FromProofResult<L> = Result<<L as Layout>::Allocated<verify_backend::Verifier>>;
@@ -127,6 +155,58 @@ impl<'a> ProofTree<'a> {
             Ok(ProofPart::Absent)
         }
     }
+
+    /// For the purpose of computing the final hash of a `Verifier` state,
+    /// interpret this part of a Merkle proof as a leaf and return its hash if
+    /// it is a blinded leaf or hash the data if it is present.
+    pub(crate) fn partial_hash_leaf(self) -> Result<Hash, PartialHashError> {
+        let ProofTree::Present(proof) = self else {
+            return Err(PartialHashError::PotentiallyRecoverable);
+        };
+
+        let Tree::Leaf(leaf) = proof else {
+            return Err(FromProofError::UnexpectedNode.into());
+        };
+
+        let hash = match leaf {
+            MerkleProofLeaf::Blind(hash) => *hash,
+            MerkleProofLeaf::Read(data) => Hash::blake2b_hash_bytes(data)?,
+        };
+
+        Ok(hash)
+    }
+
+    /// For the purpose of computing the final hash of a `Verifier` state,
+    /// if present, try to interpret this part of a Merkle proof as:
+    /// - a node with `LEN` branches, in which case return the proof branches
+    ///   and no proof hash
+    /// - a blinded leaf which corresponds to a node with `LEN` children,
+    ///   in which case return absent branches and the proof hash
+    /// If the proof tree is absent, return absent branches and no proof hash.
+    fn into_branches_with_hash<const LEN: usize>(
+        self,
+    ) -> Result<(Vec<ProofTree<'a>>, Option<Hash>), PartialHashError> {
+        let ProofTree::Present(proof) = self else {
+            return Ok((vec![ProofTree::Absent; LEN], None));
+        };
+
+        match proof {
+            Tree::Node(branches) if branches.len() != LEN => Err(PartialHashError::FromProof(
+                FromProofError::BadNumberOfBranches {
+                    got: branches.len(),
+                    expected: LEN,
+                },
+            )),
+            Tree::Node(branches) => Ok((
+                branches.iter().map(ProofTree::Present).collect::<Vec<_>>(),
+                None,
+            )),
+            Tree::Leaf(leaf) => match leaf {
+                MerkleProofLeaf::Blind(hash) => Ok((vec![ProofTree::Absent; LEN], Some(*hash))),
+                _ => Err(FromProofError::UnexpectedLeaf)?,
+            },
+        }
+    }
 }
 
 /// [`Layouts`] which may be used in a Merkle proof
@@ -139,6 +219,13 @@ pub trait ProofLayout: Layout {
 
     /// Parse a Merkle proof into the allocated form of this layout.
     fn from_proof(proof: ProofTree) -> FromProofResult<Self>;
+
+    /// Compute the state hash of a partial `Verifier` state using its
+    /// corresponding proof tree where data is missing.
+    fn partial_state_hash(
+        state: RefVerifierAlloc<Self>,
+        proof: ProofTree,
+    ) -> Result<Hash, PartialHashError>;
 }
 
 impl<T> ProofLayout for Atom<T>
@@ -158,6 +245,18 @@ where
 
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
         <Array<T, 1>>::from_proof(proof).map(super::Cell::from)
+    }
+
+    fn partial_state_hash(
+        state: RefVerifierAlloc<Self>,
+        proof: ProofTree,
+    ) -> Result<Hash, PartialHashError> {
+        let region = state.into_region();
+        match region.get_partial_region() {
+            PartialState::Complete(region) => Ok(Hash::blake2b_hash(region)?),
+            PartialState::Absent => proof.partial_hash_leaf(),
+            PartialState::Incomplete => Err(PartialHashError::Fatal),
+        }
     }
 }
 
@@ -199,6 +298,18 @@ where
         };
 
         Ok(super::Cells::bind(region))
+    }
+
+    fn partial_state_hash(
+        state: RefVerifierAlloc<Self>,
+        proof: ProofTree,
+    ) -> Result<Hash, PartialHashError> {
+        let region = state.into_region();
+        match region.get_partial_region() {
+            PartialState::Complete(region) => Ok(Hash::blake2b_hash(region)?),
+            PartialState::Absent => proof.partial_hash_leaf(),
+            PartialState::Incomplete => Err(PartialHashError::Fatal),
+        }
     }
 }
 
@@ -266,6 +377,95 @@ impl<const LEN: usize> ProofLayout for DynArray<LEN> {
         let data = super::DynCells::bind(region);
         Ok(data)
     }
+
+    fn partial_state_hash(
+        state: RefVerifierAlloc<Self>,
+        proof: ProofTree,
+    ) -> Result<Hash, PartialHashError> {
+        enum Event<'a> {
+            Span(usize, usize, ProofTree<'a>),
+            Node(Option<Hash>),
+        }
+
+        let mut queue = VecDeque::new();
+        queue.push_back(Event::Span(0usize, LEN, proof));
+
+        let mut hashes: Vec<Result<Hash, PartialHashError>> = Vec::new();
+
+        while let Some(event) = queue.pop_front() {
+            match event {
+                Event::Span(start, length, tree) => {
+                    if length <= MERKLE_LEAF_SIZE.get() {
+                        // TODO RV-463: Leaves smaller than `MERKLE_LEAF_SIZE` should also be accepted.
+                        // The span's size if that of a leaf, obtain its hash if possible and push
+                        // the result to the `hashes` stack.
+                        match state
+                            .region_ref()
+                            .get_partial_page(PageId::from_address(start))
+                        {
+                            PartialState::Absent => hashes.push(tree.partial_hash_leaf()),
+                            PartialState::Complete(data) => {
+                                hashes.push(Ok(Hash::blake2b_hash_bytes(data)?))
+                            }
+                            PartialState::Incomplete => {
+                                return Err(PartialHashError::Fatal);
+                            }
+                        };
+                    } else {
+                        // TODO RV-463: Nodes with fewer than `MERKLE_ARITY` children should also be accepted.
+                        // The span's size is that of a node, produce `Event::Span` work items for each of its
+                        // children and add them to the work queue, followed by an `Event::Node`.
+                        let (branches, proof_hash) =
+                            tree.into_branches_with_hash::<{ MERKLE_ARITY }>()?;
+
+                        let branch_max_length = length.div_ceil(MERKLE_ARITY);
+                        let mut branch_start = start;
+                        let mut length_left = length;
+
+                        for branch in branches.into_iter() {
+                            let this_branch_length = branch_max_length.min(length_left);
+
+                            if this_branch_length > 0 {
+                                queue.push_back(Event::Span(
+                                    branch_start,
+                                    this_branch_length,
+                                    branch,
+                                ));
+                            }
+
+                            branch_start = branch_start.saturating_add(this_branch_length);
+                            length_left = length_left.saturating_sub(this_branch_length);
+                        }
+
+                        queue.push_back(Event::Node(proof_hash));
+                    }
+                }
+                Event::Node(proof_hash) => {
+                    if hashes.is_empty() {
+                        // The hashes which need to be combined have not yet been computed because
+                        // their processing resulted in more `Event::Span` items. Push to the back
+                        // of the work queue.
+                        queue.push_back(Event::Node(proof_hash));
+                        continue;
+                    }
+                    if hashes.len() < MERKLE_ARITY {
+                        return Err(PartialHashError::Fatal);
+                    };
+
+                    // Take `MERKLE_ARITY` children hashes, compute their parent's hash, and
+                    // push it to the `hashes` stack.
+                    let node_hashes: Vec<_> = hashes.drain(hashes.len() - MERKLE_ARITY..).collect();
+                    hashes.push(combine_partial_hashes(node_hashes, proof_hash))
+                }
+            }
+        }
+
+        if hashes.len() == 1 {
+            hashes.pop().unwrap()
+        } else {
+            Err(PartialHashError::Fatal)
+        }
+    }
 }
 
 impl<A, B> ProofLayout for (A, B)
@@ -281,6 +481,20 @@ where
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
         let [left, right] = *proof.into_branches()?;
         Ok((A::from_proof(left)?, B::from_proof(right)?))
+    }
+
+    fn partial_state_hash(
+        state: RefVerifierAlloc<Self>,
+        proof: ProofTree,
+    ) -> Result<Hash, PartialHashError> {
+        let (branches, proof_hash) = proof.into_branches_with_hash::<2>()?;
+
+        let hashes = [
+            A::partial_state_hash(state.0, branches[0]),
+            B::partial_state_hash(state.1, branches[1]),
+        ];
+
+        combine_partial_hashes(hashes, proof_hash)
     }
 }
 
@@ -302,6 +516,21 @@ where
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
         let [a, b, c] = *proof.into_branches()?;
         Ok((A::from_proof(a)?, B::from_proof(b)?, C::from_proof(c)?))
+    }
+
+    fn partial_state_hash(
+        state: RefVerifierAlloc<Self>,
+        proof: ProofTree,
+    ) -> Result<Hash, PartialHashError> {
+        let (branches, proof_hash) = proof.into_branches_with_hash::<3>()?;
+
+        let hashes = [
+            A::partial_state_hash(state.0, branches[0]),
+            B::partial_state_hash(state.1, branches[1]),
+            C::partial_state_hash(state.2, branches[2]),
+        ];
+
+        combine_partial_hashes(hashes, proof_hash)
     }
 }
 
@@ -330,6 +559,22 @@ where
             C::from_proof(c)?,
             D::from_proof(d)?,
         ))
+    }
+
+    fn partial_state_hash(
+        state: RefVerifierAlloc<Self>,
+        proof: ProofTree,
+    ) -> Result<Hash, PartialHashError> {
+        let (branches, proof_hash) = proof.into_branches_with_hash::<4>()?;
+
+        let hashes = [
+            A::partial_state_hash(state.0, branches[0]),
+            B::partial_state_hash(state.1, branches[1]),
+            C::partial_state_hash(state.2, branches[2]),
+            D::partial_state_hash(state.3, branches[3]),
+        ];
+
+        combine_partial_hashes(hashes, proof_hash)
     }
 }
 
@@ -361,6 +606,23 @@ where
             D::from_proof(d)?,
             E::from_proof(e)?,
         ))
+    }
+
+    fn partial_state_hash(
+        state: RefVerifierAlloc<Self>,
+        proof: ProofTree,
+    ) -> Result<Hash, PartialHashError> {
+        let (branches, proof_hash) = proof.into_branches_with_hash::<5>()?;
+
+        let hashes = [
+            A::partial_state_hash(state.0, branches[0]),
+            B::partial_state_hash(state.1, branches[1]),
+            C::partial_state_hash(state.2, branches[2]),
+            D::partial_state_hash(state.3, branches[3]),
+            E::partial_state_hash(state.4, branches[4]),
+        ];
+
+        combine_partial_hashes(hashes, proof_hash)
     }
 }
 
@@ -396,6 +658,24 @@ where
             F::from_proof(f)?,
         ))
     }
+
+    fn partial_state_hash(
+        state: RefVerifierAlloc<Self>,
+        proof: ProofTree,
+    ) -> Result<Hash, PartialHashError> {
+        let (branches, proof_hash) = proof.into_branches_with_hash::<6>()?;
+
+        let hashes = [
+            A::partial_state_hash(state.0, branches[0]),
+            B::partial_state_hash(state.1, branches[1]),
+            C::partial_state_hash(state.2, branches[2]),
+            D::partial_state_hash(state.3, branches[3]),
+            E::partial_state_hash(state.4, branches[4]),
+            F::partial_state_hash(state.5, branches[5]),
+        ];
+
+        combine_partial_hashes(hashes, proof_hash)
+    }
 }
 
 impl<T, const LEN: usize> ProofLayout for [T; LEN]
@@ -418,6 +698,19 @@ where
                 unreachable!()
             })
     }
+
+    fn partial_state_hash(
+        state: RefVerifierAlloc<Self>,
+        proof: ProofTree,
+    ) -> Result<Hash, PartialHashError> {
+        let (branches, proof_hash) = proof.into_branches_with_hash::<LEN>()?;
+        let hashes = state
+            .into_iter()
+            .zip(branches.iter())
+            .map(|(state, proof)| T::partial_state_hash(state, *proof))
+            .collect::<Vec<Result<Hash, PartialHashError>>>();
+        combine_partial_hashes(hashes, proof_hash)
+    }
 }
 
 impl<T, const LEN: usize> ProofLayout for Many<T, LEN>
@@ -436,6 +729,56 @@ where
             .map(T::from_proof)
             .collect::<Result<Vec<_>, _>>()
     }
+
+    fn partial_state_hash(
+        state: RefVerifierAlloc<Self>,
+        proof: ProofTree,
+    ) -> Result<Hash, PartialHashError> {
+        let (branches, proof_hash) = proof.into_branches_with_hash::<LEN>()?;
+        let hashes = state
+            .into_iter()
+            .zip(branches.iter())
+            .map(|(state, proof)| T::partial_state_hash(state, *proof))
+            .collect::<Vec<Result<Hash, PartialHashError>>>();
+        combine_partial_hashes(hashes, proof_hash)
+    }
+}
+
+fn combine_partial_hashes(
+    hash_results: impl AsRef<[Result<Hash, PartialHashError>]>,
+    proof_hash: Option<Hash>,
+) -> Result<Hash, PartialHashError> {
+    let hash_results = hash_results.as_ref();
+    if hash_results.is_empty() {
+        return Ok(Hash::combine(&[])?);
+    }
+
+    // If the first result is a hash, all results need to be a hash in order to
+    // compute the combined hash. If the first result is a potentially
+    // recoverable error, all results need to to be potentially recoverable
+    // errors in order to fall back on the proof hash. Anything else is a fatal error.
+    let expect_ok = match hash_results[0] {
+        Ok(_) => true,
+        Err(PartialHashError::PotentiallyRecoverable) => false,
+        _ => return Err(PartialHashError::Fatal),
+    };
+
+    let mut hashes = Vec::with_capacity(hash_results.len());
+    let hash_results_len = hash_results.len();
+    for r in hash_results {
+        match r {
+            Ok(hash) if expect_ok => hashes.push(*hash),
+            Err(PartialHashError::PotentiallyRecoverable) if !expect_ok => (),
+            _ => return Err(PartialHashError::Fatal),
+        }
+    }
+
+    if expect_ok {
+        debug_assert_eq!(hashes.len(), hash_results_len);
+        return Ok(Hash::combine(hashes.as_slice())?);
+    };
+
+    proof_hash.ok_or(PartialHashError::PotentiallyRecoverable)
 }
 
 fn iter_to_proof<'a, 'b, I, T>(iter: I) -> Result<MerkleTree, HashError>
@@ -461,6 +804,7 @@ mod tests {
 
     use super::*;
     use crate::state_backend::Cells;
+    use crate::state_backend::FnManagerIdent;
     use crate::state_backend::ManagerWrite;
     use crate::state_backend::proof_backend::ProofGen;
     use crate::state_backend::proof_backend::ProofRegion;
@@ -469,7 +813,9 @@ mod tests {
 
     // When producing a proof from a `ProofGen` state, values written during
     // the execution of the tick being proven should not be blinded, whereas
-    // values which were not accessed should be blinded.
+    // values which were not accessed should be blinded. When a proof contains
+    // blinded values, it should be possible to compute the final hash of the
+    // `Verifier` state constructed from this proof.
     #[test]
     fn test_proof_blinding() {
         type TestLayout = (Array<u64, CELLS_SIZE>, Array<u64, CELLS_SIZE>);
@@ -508,7 +854,15 @@ mod tests {
             // be read from the array.
             for i in 0..CELLS_SIZE {
                 prop_assert!(handle_not_found(|| verifier_state.1.read(i)).is_err());
-            }
+            };
+
+            let ref_verifier_state = (
+                verifier_state.0.struct_ref::<FnManagerIdent>(),
+                verifier_state.1.struct_ref::<FnManagerIdent>(),
+            );
+            prop_assert!(
+                <TestLayout as ProofLayout>::partial_state_hash(ref_verifier_state, proof_tree).is_ok()
+            );
         })
     }
 }

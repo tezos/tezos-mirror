@@ -135,9 +135,7 @@ impl<'hooks, MC: MemoryConfig, CL: CacheLayouts> PvmStepper<'hooks, MC, CL, Owne
         let mut proof_stepper = self.start_proof_mode();
 
         proof_stepper.try_step().then(|| {
-            let refs = proof_stepper
-                .pvm
-                .struct_ref::<crate::state_backend::FnManagerIdent>();
+            let refs = proof_stepper.pvm.struct_ref::<FnManagerIdent>();
             let merkle_proof = PvmLayout::<MC, CL>::to_merkle_tree(refs)
                 .expect("Obtaining the Merkle tree of a proof-gen state should not fail")
                 .to_merkle_proof()
@@ -322,11 +320,15 @@ impl<'hooks, MC: MemoryConfig, CL: CacheLayouts, M: ManagerReadWrite>
             reveal_request_response_map: self.reveal_request_response_map.clone(),
         };
 
-        stepper.try_step()
-        // TODO: RV-362: Check the final state
-        // let _refs = stepper.pvm.struct_ref::<FnManagerIdent>();
-        // let hash: Hash = todo!("Can't obtain the hash of a verification state yet");
-        // &hash == proof.final_state_hash()
+        if !stepper.try_step() {
+            return false;
+        };
+
+        let refs = stepper.pvm.struct_ref::<FnManagerIdent>();
+        match PvmLayout::<MC, CL>::partial_state_hash(refs, proof_tree) {
+            Ok(final_hash) => final_hash == proof.final_state_hash(),
+            Err(_) => false,
+        }
     }
 }
 

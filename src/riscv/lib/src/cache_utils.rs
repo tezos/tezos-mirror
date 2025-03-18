@@ -117,4 +117,11 @@ impl<const BITS: usize, const SIZE: usize, CachedLayout: ProofLayout> ProofLayou
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
         Many::<CachedLayout, SIZE>::from_proof(proof)
     }
+
+    fn partial_state_hash(
+        state: crate::state_backend::RefVerifierAlloc<Self>,
+        proof: crate::state_backend::ProofTree,
+    ) -> Result<Hash, crate::state_backend::PartialHashError> {
+        Many::<CachedLayout, SIZE>::partial_state_hash(state, proof)
+    }
 }
