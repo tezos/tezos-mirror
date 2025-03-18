@@ -97,7 +97,7 @@ let sleep_before_reconnection ~factor =
    to reconnect.
 
     [count] is the number of time we tried to reconnect in a row. *)
-let[@tailrec] rec connect_to_stream ?(count = 0) ~rollup_node_endpoint () =
+let rec connect_to_stream ?(count = 0) ~rollup_node_endpoint () =
   let open Lwt_result_syntax in
   let*! () = sleep_before_reconnection ~factor:count in
   let*! res = Rollup_services.make_streamed_call ~rollup_node_endpoint in
@@ -121,7 +121,7 @@ let[@tailrec] rec connect_to_stream ?(count = 0) ~rollup_node_endpoint () =
     - If the connection timeout (takes more than [connection.timeout])
     or if the connection fails then reconnect with [connect_to_stream]
     and try to fetch [get_next_block] with that new stream.*)
-let[@tailrec] rec get_next_block ~proxy ~connection =
+let rec get_next_block ~proxy ~connection =
   let open Lwt_result_syntax in
   let get_promise () =
     let*! res = Lwt_stream.get connection.stream in
@@ -156,7 +156,7 @@ let[@tailrec] rec get_next_block ~proxy ~connection =
 
     get the current rollup node block with [get_next_block], process it
     with [process_finalized_level] then loop over. *)
-let[@tailrec] rec loop_on_rollup_node_stream ~keep_alive ~proxy
+let rec loop_on_rollup_node_stream ~keep_alive ~proxy
     ~oldest_rollup_node_known_l1_level ~connection () =
   let open Lwt_result_syntax in
   let start_time = Unix.gettimeofday () in

@@ -208,7 +208,7 @@ let new_rollup_block worker rollup_level =
   in
   (* add request for fetching evm events for rollup node block going
      from [from] to [to_] inclusive. *)
-  let[@tailrec] rec aux ~from ~to_ =
+  let rec aux ~from ~to_ =
     if from > to_ then
       failwith
         "Internal error: The catchup of evm_event went too far, it should be \
@@ -218,7 +218,7 @@ let new_rollup_block worker rollup_level =
     else
       let* () = add_request from in
       if from = to_ then (* we are catching up *) return_unit
-      else aux ~from:(Int32.succ from) ~to_
+      else (aux [@tailcall]) ~from:(Int32.succ from) ~to_
   in
   match state.last_l1_level with
   | Some last_l1_level
