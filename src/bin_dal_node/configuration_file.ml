@@ -399,40 +399,40 @@ module V0 = struct
       (obj2
          (dft "history_mode" history_mode_encoding default_history_mode)
          (dft "profiles" Profile_manager.encoding Profile_manager.empty))
-end
 
-let from_v0
-    ( ( data_dir,
-        rpc_addr,
-        listen_addr,
-        public_addr,
-        neighbors,
-        peers,
-        expected_pow,
-        network_name,
-        endpoint,
-        metrics_addr ),
-      (history_mode, profile) ) =
-  {
-    data_dir;
-    rpc_addr;
-    listen_addr;
-    public_addr;
-    neighbors;
-    peers;
-    expected_pow;
-    network_name;
-    endpoint;
-    metrics_addr = Some metrics_addr;
-    history_mode;
-    profile;
-    version = current_version;
-    service_name = None;
-    service_namespace = None;
-    experimental_features = default_experimental_features;
-    fetch_trusted_setup = true;
-    verbose = false;
-  }
+  let to_latest_version
+      ( ( data_dir,
+          rpc_addr,
+          listen_addr,
+          public_addr,
+          neighbors,
+          peers,
+          expected_pow,
+          network_name,
+          endpoint,
+          metrics_addr ),
+        (history_mode, profile) ) =
+    {
+      data_dir;
+      rpc_addr;
+      listen_addr;
+      public_addr;
+      neighbors;
+      peers;
+      expected_pow;
+      network_name;
+      endpoint;
+      metrics_addr = Some metrics_addr;
+      history_mode;
+      profile;
+      version = current_version;
+      service_name = None;
+      service_namespace = None;
+      experimental_features = default_experimental_features;
+      fetch_trusted_setup = true;
+      verbose = false;
+    }
+end
 
 type error += DAL_node_unable_to_write_configuration_file of string
 
@@ -471,9 +471,10 @@ let save config =
 let load =
   let open Lwt_result_syntax in
   let config_versions =
+    let open Data_encoding in
     [
-      (1, Data_encoding.Json.destruct encoding);
-      (0, fun json -> Data_encoding.Json.destruct V0.encoding json |> from_v0);
+      (1, Json.destruct encoding);
+      (0, fun json -> Json.destruct V0.encoding json |> V0.to_latest_version);
     ]
   in
   let rec try_decode json = function
