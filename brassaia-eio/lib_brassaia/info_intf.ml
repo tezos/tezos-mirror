@@ -24,6 +24,9 @@ module type S = sig
   (** The type for commit info. *)
   type t [@@deriving brassaia]
 
+  (** [encoding] is the data_encoding for {!type-t}. *)
+  val encoding : t Data_encoding.t
+
   (** Create a new commit info. *)
   val init : ?author:author -> ?message:message -> int64 -> t
 

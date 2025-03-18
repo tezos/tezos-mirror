@@ -16,6 +16,12 @@
 
 include Repr
 
+module type S = sig
+  include Repr.S
+
+  val encoding : t Data_encoding.t
+end
+
 module type Defaultable = sig
   include S
 

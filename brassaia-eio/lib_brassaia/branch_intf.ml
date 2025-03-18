@@ -23,6 +23,9 @@ module type S = sig
   (** The name of the main branch. *)
   val main : t
 
+  (** [encoding] is the data_encoding for {!type-t}. *)
+  val encoding : t Data_encoding.t
+
   (** Check if the branch is valid. *)
   val is_valid : t -> bool
 end

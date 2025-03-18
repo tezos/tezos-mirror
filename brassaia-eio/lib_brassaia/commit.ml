@@ -36,10 +36,24 @@ module Maker_generic_key (I : Info.S) = struct
 
     type node_key = N.t [@@deriving brassaia ~compare]
 
+    let node_key_encoding = N.encoding
+
     type commit_key = C.t [@@deriving brassaia]
+
+    let commit_key_encoding = C.encoding
 
     type t = {node : node_key; parents : commit_key list; info : Info.t}
     [@@deriving brassaia]
+
+    let encoding =
+      Data_encoding.(
+        conv
+          (fun {node; parents; info} -> (node, parents, info))
+          (fun (node, parents, info) -> {node; parents; info})
+          (obj3
+             (req "node" node_key_encoding)
+             (req "parents" (list commit_key_encoding))
+             (req "info" Info.encoding)))
 
     type t_not_prefixed = t [@@deriving brassaia]
 
@@ -90,9 +104,25 @@ module Maker_generic_key (I : Info.S) = struct
 
       type commit_key = H.t [@@deriving brassaia]
 
+      let commit_key_encoding = H.encoding
+
       type node_key = H.t [@@deriving brassaia]
 
+      let node_key_encoding = H.encoding
+
       type hash = H.t [@@deriving brassaia]
+
+      let hash_encoding = H.encoding
+
+      let encoding =
+        Data_encoding.(
+          conv
+            (fun {node; parents; info} -> (node, parents, info))
+            (fun (node, parents, info) -> {node; parents; info})
+            (obj3
+               (req "node" hash_encoding)
+               (req "parents" (list hash_encoding))
+               (req "info" Info.encoding)))
 
       let parents t = t.parents
 
@@ -306,6 +336,8 @@ module History (S : Store) = struct
 
   module U = struct
     type t = unit [@@deriving brassaia]
+
+    let encoding = Data_encoding.unit
   end
 
   module Graph = Object_graph.Make (U) (S.Node.Key) (S.Key) (U)
@@ -703,21 +735,40 @@ module V1 = struct
           pre_hash x f
 
       let t = Type.like K.t ~bin:(encode_bin, decode_bin, size_of) ~pre_hash
+
+      let encoding = K.encoding
     end
 
     module Node_key = K (struct
       type t = Commit.node_key [@@deriving brassaia]
+
+      let encoding = Commit.node_key_encoding
     end)
 
     module Commit_key = K (struct
       type t = Commit.commit_key [@@deriving brassaia]
+
+      let encoding = Commit.commit_key_encoding
     end)
 
     type node_key = Node_key.t [@@deriving brassaia]
 
+    let node_key_encoding = Node_key.encoding
+
     type commit_key = Commit_key.t [@@deriving brassaia]
 
+    let commit_key_encoding = Commit_key.encoding
+
     type t = {parents : commit_key list; commit : Commit.t}
+
+    let encoding =
+      Data_encoding.(
+        conv
+          (fun {parents; commit} -> (parents, commit))
+          (fun (parents, commit) -> {parents; commit})
+          (obj2
+             (req "parents" (list commit_key_encoding))
+             (req "c" Commit.encoding)))
 
     module Info = Info
 

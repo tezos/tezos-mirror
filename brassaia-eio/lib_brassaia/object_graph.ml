@@ -45,6 +45,36 @@ struct
       | `Branch of Branch.t ]
     [@@deriving brassaia]
 
+    let encoding =
+      let open Data_encoding in
+      union
+        [
+          case
+            (Tag 1)
+            ~title:"`Contents"
+            Contents_key.encoding
+            (function `Contents k -> Some k | _ -> None)
+            (fun k -> `Contents k);
+          case
+            (Tag 2)
+            ~title:"`Node"
+            Node_key.encoding
+            (function `Node k -> Some k | _ -> None)
+            (fun k -> `Node k);
+          case
+            (Tag 3)
+            ~title:"`Commit"
+            Commit_key.encoding
+            (function `Commit c -> Some c | _ -> None)
+            (fun c -> `Commit c);
+          case
+            (Tag 4)
+            ~title:"`Branch "
+            Branch.encoding
+            (function `Branch b -> Some b | _ -> None)
+            (fun b -> `Branch b);
+        ]
+
     let equal = Type.(unstage (equal t))
 
     let compare = Type.(unstage (compare t))
@@ -104,6 +134,9 @@ struct
      to save space. *)
   module Dump = struct
     type t = X.t list * (X.t * X.t) list [@@deriving brassaia]
+
+    let encoding =
+      Data_encoding.(tup2 (list X.encoding) (list (tup2 X.encoding X.encoding)))
   end
 
   let vertex g = G.fold_vertex (fun k set -> k :: set) g []
