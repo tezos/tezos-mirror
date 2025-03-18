@@ -242,6 +242,13 @@ let identity_file node = Filename.concat (data_dir node) "identity.json"
 
 let runner node = node.persistent_state.runner
 
+let pid node =
+  match node.status with
+  | Running status -> Process.pid status.process |> Option.some
+  | Not_running -> None
+
+let path node = node.path
+
 let spawn_command node =
   Process.spawn
     ?runner:node.persistent_state.runner
