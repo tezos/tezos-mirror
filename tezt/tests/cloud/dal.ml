@@ -1349,7 +1349,7 @@ module Monitoring_app = struct
         Lwt.return
           ("• Baker performance ranked from worst to best (truncated to 10 \
             bakers):" :: view_bakers worst_bakers
-          @ ("..." :: view_bakers best_bakers))
+          @ ("▪ ..." :: view_bakers best_bakers))
 
     let fetch_slots_info network =
       if network = `Mainnet then
