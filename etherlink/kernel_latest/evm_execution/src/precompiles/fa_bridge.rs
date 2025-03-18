@@ -234,7 +234,6 @@ mod tests {
             &precompiles,
             100_000_000_000,
             U256::from(21000),
-            false,
             None,
         );
 
@@ -362,7 +361,6 @@ mod tests {
             &precompiles,
             1_000_000_000,
             U256::from(21000),
-            false,
             None,
         );
 

@@ -664,7 +664,6 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
 
@@ -729,7 +728,6 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
 
@@ -788,7 +786,6 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
 
@@ -844,7 +841,6 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
 
@@ -882,7 +878,6 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
         assert!(result2.is_ok(), "execution should have succeeded");
@@ -916,7 +911,6 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
         assert!(result3.is_ok(), "execution should have succeeded");
@@ -948,7 +942,6 @@ mod test {
             U256::zero(),
             true,
             DUMMY_ALLOCATED_TICKS,
-            false,
             false,
             None,
         );
@@ -1009,7 +1002,6 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
 
@@ -1062,7 +1054,6 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
 
@@ -1114,7 +1105,6 @@ mod test {
             U256::zero(),
             true,
             DUMMY_ALLOCATED_TICKS,
-            false,
             false,
             None,
         );
@@ -1261,7 +1251,6 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
 
@@ -1324,7 +1313,6 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
 
@@ -1386,7 +1374,6 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
 
@@ -1442,7 +1429,6 @@ mod test {
             U256::from(100),
             true,
             DUMMY_ALLOCATED_TICKS,
-            false,
             false,
             None,
         );
@@ -1503,7 +1489,6 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
 
@@ -1562,7 +1547,6 @@ mod test {
             U256::zero(),
             true,
             DUMMY_ALLOCATED_TICKS,
-            false,
             false,
             None,
         );
@@ -1678,7 +1662,6 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
 
@@ -1759,23 +1742,22 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
 
         let expected_gas = 21000 // base cost
-        + 65535 // staticcall allocated gas
+        + 68035 // staticcall allocated gas
         + 6 * 3 // cost for push
         + 100; // cost for staticcall
 
         // Since we execute an invalid instruction (for a static call that is) we spend
-        // _all_ the gas allocated to the call (so 0xFFFF or 65535)
+        // _all_ the gas allocated to the call (so 0xFFFF or 68035)
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
             logs: vec![],
             result: ExecutionResult::CallSucceeded(ExitSucceed::Stopped, vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 532678536,
+            estimated_ticks_used: 552941036,
         }));
 
         // assert that call succeeds
@@ -1852,12 +1834,11 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
 
         let expected_gas = 21000 // base cost
-        + 65535 // staticcall allocated gas
+        + 68035 // staticcall allocated gas
         + 6 * 3 // cost for push
         + 100; // cost for staticcall
 
@@ -1869,7 +1850,7 @@ mod test {
             logs: vec![],
             result: ExecutionResult::CallSucceeded(ExitSucceed::Stopped, vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 532095791,
+            estimated_ticks_used: 552358291,
         }));
 
         // assert that call succeeds
@@ -1967,7 +1948,6 @@ mod test {
             true,
             1_000_000_000,
             false,
-            false,
             None,
         );
 
@@ -1984,14 +1964,14 @@ mod test {
         };
 
         let expected_gas = 21000 // base cost
-        + 1348; // execution cost (taken at face value from tests)
+        + 3848; // execution cost (taken at face value from tests)
 
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
             logs: vec![log_record1, log_record2],
             result: ExecutionResult::CallSucceeded(ExitSucceed::Stopped, vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 48062519,
+            estimated_ticks_used: 49452519,
         }));
 
         assert_eq!(result, expected_result);
@@ -2079,7 +2059,6 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
 
@@ -2090,14 +2069,14 @@ mod test {
         };
 
         let expected_gas = 21000 // base cost
-        + 911; // execution cost (taken at face value from tests)
+        + 3411; // execution cost (taken at face value from tests)
 
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
             logs: vec![log_record1],
             result: ExecutionResult::CallSucceeded(ExitSucceed::Stopped, vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 47793126,
+            estimated_ticks_used: 49183126,
         }));
 
         assert_eq!(result, expected_result);
@@ -2181,17 +2160,16 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
         let expected_gas = 21000 // base cost
-        + 5124; // execution gas cost (taken at face value from tests)
+        + 7624; // execution gas cost (taken at face value from tests)
         let expected_result = ExecutionOutcome {
             gas_used: expected_gas,
             logs: vec![],
             result: ExecutionResult::CallSucceeded(ExitSucceed::Stopped, vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 50578554,
+            estimated_ticks_used: 51968554,
         };
 
         assert_eq!(result.unwrap().unwrap(), expected_result);
@@ -2298,7 +2276,6 @@ mod test {
             true,
             10_000_000_000,
             false,
-            false,
             None,
         );
 
@@ -2307,7 +2284,7 @@ mod test {
             logs: vec![],
             result: ExecutionResult::Error(ExitError::InvalidCode(Opcode::INVALID)),
             withdrawals: vec![],
-            estimated_ticks_used: 50630887,
+            estimated_ticks_used: 52020887,
         }));
 
         assert_eq!(result, expected_result);
@@ -2396,7 +2373,6 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
 
@@ -2481,7 +2457,6 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
 
@@ -2562,7 +2537,6 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
 
@@ -2613,7 +2587,6 @@ mod test {
             transaction_value,
             true,
             DUMMY_ALLOCATED_TICKS,
-            false,
             false,
             None,
         );
@@ -2674,7 +2647,6 @@ mod test {
             transaction_value,
             true,
             DUMMY_ALLOCATED_TICKS,
-            false,
             false,
             None,
         );
@@ -2750,7 +2722,6 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
 
@@ -2822,7 +2793,6 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         );
 
@@ -2886,7 +2856,6 @@ mod test {
             U256::zero(),
             true,
             DUMMY_ALLOCATED_TICKS,
-            false,
             false,
             None,
         )
@@ -2992,7 +2961,6 @@ mod test {
             true,
             10_000_000_000,
             false,
-            false,
             None,
         );
 
@@ -3074,7 +3042,6 @@ mod test {
             U256::zero(),
             true,
             10_000_000_000,
-            false,
             false,
             None,
         );
@@ -3185,7 +3152,6 @@ mod test {
             true,
             10_000_000_000,
             false,
-            false,
             None,
         );
 
@@ -3266,7 +3232,6 @@ mod test {
             true,
             10_000_000_000,
             false,
-            false,
             None,
         );
 
@@ -3313,7 +3278,6 @@ mod test {
             transaction_value,
             true,
             DUMMY_ALLOCATED_TICKS,
-            false,
             false,
             None,
         );
@@ -3369,7 +3333,6 @@ mod test {
             U256::zero(),
             true,
             DUMMY_ALLOCATED_TICKS,
-            false,
             false,
             None,
         );
@@ -3459,7 +3422,6 @@ mod test {
             U256::zero(),
             true,
             DUMMY_ALLOCATED_TICKS,
-            false,
             false,
             None,
         );
@@ -3559,7 +3521,6 @@ mod test {
             true,
             10_000,
             retriable,
-            false,
             None,
         );
 
@@ -3691,7 +3652,6 @@ mod test {
             false,
             u64::MAX,
             false,
-            false,
             None,
         );
 
@@ -3777,7 +3737,6 @@ mod test {
             false,
             u64::MAX,
             false,
-            false,
             None,
         );
 
@@ -3816,7 +3775,6 @@ mod test {
             U256::zero(),
             false,
             u64::MAX,
-            false,
             false,
             None,
         );
@@ -3897,7 +3855,6 @@ mod test {
             U256::zero(),
             true,
             DUMMY_ALLOCATED_TICKS * 100,
-            false,
             false,
             None,
         )
@@ -3989,7 +3946,6 @@ mod test {
             true,
             DUMMY_ALLOCATED_TICKS,
             false,
-            false,
             None,
         )
         .unwrap()
@@ -4049,7 +4005,6 @@ mod test {
             U256::zero(),
             false,
             DUMMY_ALLOCATED_TICKS,
-            false,
             false,
             None,
         );

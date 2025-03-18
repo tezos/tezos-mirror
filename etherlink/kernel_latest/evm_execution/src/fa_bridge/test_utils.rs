@@ -99,7 +99,6 @@ pub fn deploy_mock_wrapper(
         false,
         1_000_000_000,
         false,
-        false,
         None,
     )
     .expect("Failed to deploy")
@@ -145,7 +144,6 @@ pub fn deploy_reentrancy_tester(
         U256::zero(),
         false,
         1_000_000_000,
-        false,
         false,
         None,
     )
@@ -405,7 +403,6 @@ pub fn fa_bridge_precompile_call_withdraw(
         &precompiles,
         1_000_000_000,
         U256::from(21000),
-        false,
         None,
     );
 

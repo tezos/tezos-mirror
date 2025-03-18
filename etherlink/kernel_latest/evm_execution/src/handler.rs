@@ -3204,7 +3204,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
@@ -3240,7 +3239,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
@@ -3283,7 +3281,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
@@ -3331,7 +3328,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
@@ -3402,7 +3398,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
@@ -3505,7 +3500,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
@@ -3609,7 +3603,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
@@ -3711,7 +3704,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
@@ -3792,7 +3784,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
@@ -3858,7 +3849,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
@@ -3933,7 +3923,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
@@ -4005,7 +3994,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
@@ -4076,7 +4064,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
@@ -4156,7 +4143,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
@@ -4184,7 +4170,6 @@ mod test {
             &precompiles,
             10_000,
             gas_price,
-            false,
             None,
         );
 
@@ -4252,7 +4237,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
@@ -4313,7 +4297,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
@@ -4408,7 +4391,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
@@ -4465,7 +4447,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             U256::one(),
-            false,
             None,
         );
 
@@ -4516,7 +4497,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
@@ -4601,7 +4581,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
@@ -4631,7 +4610,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             U256::one(),
-            false,
             None,
         );
 
@@ -4675,7 +4653,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
-            false,
             None,
         );
 
@@ -4765,7 +4742,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
-            false,
             None,
         );
 
@@ -4873,7 +4849,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
-            false,
             None,
         );
 
@@ -4939,7 +4914,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
-            true,
             None,
         );
 
@@ -5017,7 +4991,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             U256::from(21000),
-            false,
             None,
         );
 
@@ -5091,7 +5064,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS * 1000,
             gas_price,
-            false,
             None,
         );
 
@@ -5174,7 +5146,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
@@ -5231,7 +5202,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             U256::one(),
-            false,
             None,
         );
 
@@ -5281,7 +5251,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS * 1000,
             U256::from(21000),
-            false,
             None,
         );
 
@@ -5332,7 +5301,7 @@ mod test {
             .unwrap();
 
         // Gas cost: 21000(BASE) + 10 * 3(PUSH1) + 3(MSTORE) + 3(Memory expansion) + 100(Call) + 9000(Positive value cost) - 2300(Call Stipend)
-        assert_eq!(result.gas_used, 27836);
+        assert_eq!(result.gas_used, 30336);
 
         assert_eq!(
             result.result,
@@ -5363,7 +5332,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
-            false,
             None,
         );
 
@@ -5372,10 +5340,10 @@ mod test {
         // and the destination account is dead.
 
         let cases = [
-            (100_u32, 100_u8, 51003_u64), // transfer > 0 && non-existent destination
-            (100, 100, 26003),            // transfer > 0 && touched destination
-            (0, 101, 26003),              // transfer == 0 && non-existent destination
-            (0, 101, 26003),              // transfer == 0 && touched destination
+            (100_u32, 100_u8, 53603_u64), // transfer > 0 && non-existent destination
+            (100, 100, 28603),            // transfer > 0 && touched destination
+            (0, 101, 28603),              // transfer == 0 && non-existent destination
+            (0, 101, 28603),              // transfer == 0 && touched destination
         ];
 
         for (balance, destination, expected_gas) in cases {
@@ -5436,7 +5404,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
-            false,
             None,
         );
 
@@ -5447,12 +5414,12 @@ mod test {
         let address = H160::from_low_u64_be(110_u64);
 
         let cases = [
-            (100_u32, 10_u8, 100_u8, 52821_u64), // transfer > 0 && non-existent destination
-            (100, 10, 100, 27821),               // transfer > 0 && touched destination
-            (100, 0, 101, 21121), // transfer == 0 && non-existent destination
-            (100, 0, 101, 21121), // transger == 0 && touched destination
-            (0, 10, 102, 52821), // unsufficient balance && transfer > 0 && non-existent destination
-            (0, 10, 100, 27821), // unsufficient balance && transfer > 0 && touched destination
+            (100_u32, 10_u8, 100_u8, 55321_u64), // transfer > 0 && non-existent destination
+            (100, 10, 100, 30321),               // transfer > 0 && touched destination
+            (100, 0, 101, 23621), // transfer == 0 && non-existent destination
+            (100, 0, 101, 23621), // transger == 0 && touched destination
+            (0, 10, 102, 55321), // unsufficient balance && transfer > 0 && non-existent destination
+            (0, 10, 100, 30321), // unsufficient balance && transfer > 0 && touched destination
         ];
 
         for (balance, value, destination, expected_gas) in cases {
@@ -5520,7 +5487,6 @@ mod test {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
@@ -5560,14 +5526,14 @@ mod test {
         // At this point no refund is done
 
         let gas_used = handler.gas_used();
-        assert_eq!(gas_used, 2906);
+        assert_eq!(gas_used, 5006);
 
         let end_result = handler.end_initial_transaction(execution_result);
 
         // At this point refund is done as we ended the initial transaction
 
         match end_result {
-            Ok(ExecutionOutcome { gas_used, .. }) => assert_eq!(gas_used, 2325),
+            Ok(ExecutionOutcome { gas_used, .. }) => assert_eq!(gas_used, 4005),
             Err(_) => panic!("The transaction should have succeeded"),
         }
     }
