@@ -87,12 +87,6 @@ module type Dal = sig
 
     val slack_bot_token : string option
   end
-
-  module Alerts : sig
-    val section : Clap.section
-
-    val dal_slack_webhook : string option
-  end
 end
 
 module Dal () : Dal = struct
@@ -419,20 +413,6 @@ module Dal () : Dal = struct
         ~section
         ~long:"slack-bot-token"
         ~description:"The Slack bot token used to send reports and alerts"
-        ()
-  end
-
-  module Alerts = struct
-    let section =
-      Clap.section
-        ~description:"CLI arguments defining alert managing options"
-        "Cloud alerting"
-
-    let dal_slack_webhook =
-      Clap.optional_string
-        ~section
-        ~long:"dal-slack-webhook"
-        ~description:"The slack webhook url to send the alerts on"
         ()
   end
 end
