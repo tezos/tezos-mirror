@@ -540,7 +540,7 @@ let spawn_snapshot_info ?(json = false) node file =
     (["snapshot"; "info"] @ (if json then ["--json"] else []) @ [file])
 
 let snapshot_info ?json node file =
-  spawn_snapshot_info ?json node file |> Process.check
+  spawn_snapshot_info ?json node file |> Process.check_and_read_stdout
 
 let spawn_snapshot_import ?(force = false) ?(no_check = false)
     ?(reconstruct = false) node file =

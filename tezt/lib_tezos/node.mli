@@ -450,7 +450,7 @@ val spawn_snapshot_export :
   Process.t
 
 (** Run [octez-node snapshot info]. *)
-val snapshot_info : ?json:bool -> t -> string -> unit Lwt.t
+val snapshot_info : ?json:bool -> t -> string -> string Lwt.t
 
 (** Same as [snapshot_info], but do not wait for the process to
     exit. *)
