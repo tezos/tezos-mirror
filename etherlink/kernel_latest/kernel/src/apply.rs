@@ -347,13 +347,6 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         true,
         allocated_ticks,
         retriable,
-        // NB:
-        // We enable hot/cold accesses to help the tick model removal
-        // project.
-        // Once we get enough data on the actual impact of Mainnet, this
-        // option will be completely removed by:
-        // https://gitlab.com/tezos/tezos/-/merge_requests/17308
-        true,
         tracer_input,
     ) {
         Ok(outcome) => outcome,

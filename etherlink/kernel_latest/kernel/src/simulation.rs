@@ -496,13 +496,6 @@ impl Evaluation {
             false,
             allocated_ticks,
             false,
-            // NB:
-            // We enable hot/cold accesses to help the tick model removal
-            // project.
-            // Once we get enough data on the actual impact of Mainnet, this
-            // option will be completely removed by:
-            // https://gitlab.com/tezos/tezos/-/merge_requests/17308
-            true,
             tracer_input,
         ) {
             Ok(Some(outcome)) if !self.with_da_fees => {
@@ -804,13 +797,6 @@ mod tests {
             false,
             DUMMY_ALLOCATED_TICKS,
             false,
-            // NB:
-            // We enable hot/cold accesses to help the tick model removal
-            // project.
-            // Once we get enough data on the actual impact of Mainnet, this
-            // option will be completely removed by:
-            // https://gitlab.com/tezos/tezos/-/merge_requests/17308
-            true,
             None,
         );
         assert!(outcome.is_ok(), "contract should have been created");

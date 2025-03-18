@@ -263,7 +263,6 @@ pub fn run_transaction<'a, Host>(
     pay_for_gas: bool,
     allocated_ticks: u64,
     retriable: bool,
-    enable_warm_cold_access: bool,
     tracer: Option<TracerInput>,
 ) -> Result<Option<handler::ExecutionOutcome>, EthereumError>
 where
@@ -287,7 +286,6 @@ where
         precompiles,
         allocated_ticks,
         effective_gas_price,
-        enable_warm_cold_access,
         tracer,
     );
 

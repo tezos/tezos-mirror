@@ -159,13 +159,6 @@ pub fn execute_fa_deposit<'a, Host: Runtime>(
         precompiles,
         allocated_ticks,
         block.base_fee_per_gas(),
-        // NB:
-        // We enable hot/cold accesses to help the tick model removal
-        // project.
-        // Once we get enough data on the actual impact of Mainnet, this
-        // option will be completely removed by:
-        // https://gitlab.com/tezos/tezos/-/merge_requests/17308
-        true,
         tracer_input,
     );
 

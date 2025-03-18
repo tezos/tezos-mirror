@@ -407,9 +407,6 @@ pub struct EvmHandler<'a, Host: Runtime> {
     pub estimated_ticks_used: u64,
     /// The effective gas price of the current transaction
     effective_gas_price: U256,
-    /// Whether warm/cold storage and address access is enabled
-    /// If not, all access are considered warm
-    pub enable_warm_cold_access: bool,
     /// Tracer configuration for debugging.
     tracer: Option<TracerInput>,
     /// Storage cache during a given execution.
@@ -442,7 +439,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         precompiles: &'a dyn PrecompileSet<Host>,
         ticks_allocated: u64,
         effective_gas_price: U256,
-        enable_warm_cold_access: bool,
         tracer: Option<TracerInput>,
     ) -> Self {
         Self {
@@ -456,7 +452,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             ticks_allocated,
             estimated_ticks_used: 0,
             effective_gas_price,
-            enable_warm_cold_access,
             tracer,
             storage_cache: HashMap::with_capacity(10),
             original_storage_cache: HashMap::with_capacity(10),
@@ -651,10 +646,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         address: H160,
         index: H256,
     ) -> Result<(), ExitError> {
-        if !self.enable_warm_cold_access {
-            return Ok(());
-        }
-
         match self.transaction_data.last_mut() {
             Some(layer) => {
                 layer.accessed_storage_keys.insert_storage(address, index);
@@ -670,10 +661,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     /// cost of *CALL, BALANCE, EXT* and SELFDESTRUCT. Return type chosen for compatibility with the
     /// SputnikVM functions that need to call this function.
     fn mark_address_as_hot(&mut self, address: H160) -> Result<(), ExitError> {
-        if !self.enable_warm_cold_access {
-            return Ok(());
-        }
-
         match self.transaction_data.last_mut() {
             Some(layer) => {
                 layer.accessed_storage_keys.insert_address(address);
@@ -2615,10 +2602,6 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
     }
 
     fn is_cold(&mut self, address: H160, index: Option<H256>) -> Result<bool, ExitError> {
-        if !self.enable_warm_cold_access {
-            return Ok(false);
-        }
-
         // EIP-3651
         if self.config.warm_coinbase_address && address == self.block_coinbase() {
             return Ok(false);
