@@ -51,7 +51,7 @@ let estimate_gas_tps ~average_block_path () =
   let* average_block = Average_block.load average_block_path in
   let* () = Average_block.check_for_unknown_smart_contracts average_block in
   let delegates = make_delegates Constants.default_bootstraps_count in
-  let* baker = Baker.init ~protocol ~delegates node client in
+  let* baker = Agnostic_baker.init ~delegates node client in
   Log.info "Originating smart contracts" ;
   let* () =
     Client.stresstest_originate_smart_contracts originating_bootstrap client
@@ -70,7 +70,7 @@ let estimate_gas_tps ~average_block_path () =
   in
   Log.info "Gas TPS: %d" gas_tps ;
   let* _ = Node.kill node in
-  let* _ = Baker.kill baker in
+  let* _ = Agnostic_baker.terminate baker in
   Lwt.return
   @@ {average_block; transaction_costs; average_transaction_cost; gas_tps}
 
