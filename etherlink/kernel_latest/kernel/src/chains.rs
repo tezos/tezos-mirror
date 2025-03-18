@@ -77,6 +77,10 @@ impl ChainConfig {
         ChainConfig::Evm(EvmChainConfig::create_config(chain_id, limits, evm_config))
     }
 
+    pub fn new_michelson_config(chain_id: U256) -> Self {
+        ChainConfig::Michelson(MichelsonChainConfig::create_config(chain_id))
+    }
+
     pub fn get_chain_family(&self) -> ChainFamily {
         match self {
             ChainConfig::Evm(_) => ChainFamily::Evm,
