@@ -119,22 +119,24 @@ open struct
       ~level:Warning
       ("path", Data_encoding.(string))
 
-  let retry_fetching_node_config level prefix =
-    declare_2
+  let retry_fetching_info_from_l1 event_level =
+    declare_3
       ~section
       ~prefix_name_with_section:true
-      ~name:(prefix ^ "retry_fetching_config")
+      ~name:
+        (Internal_event.Level.to_string event_level ^ "_fetching_info_from_l1")
       ~msg:
-        "cannot fetch config from l1 node at {endpoint}, retrying in {delay}s"
-      ~level
+        "failed to fetch {info} from L1 node at {endpoint}, retry in {delay}s"
+      ~level:event_level
+      ("info", Data_encoding.string)
       ("endpoint", Data_encoding.string)
       ("delay", Data_encoding.float)
 
-  let retry_fetching_node_config_notice =
-    retry_fetching_node_config Internal_event.Notice "notice"
+  let retry_fetching_info_from_l1_notice =
+    retry_fetching_info_from_l1 Internal_event.Notice
 
-  let retry_fetching_node_config_warning =
-    retry_fetching_node_config Internal_event.Warning "warning"
+  let retry_fetching_info_from_l1_warning =
+    retry_fetching_info_from_l1 Internal_event.Warning
 
   let config_error_no_bootstrap =
     declare_0
@@ -176,13 +178,14 @@ open struct
       ~level:Notice
       ("number", Data_encoding.int31)
 
-  let fetched_config_success =
-    declare_1
+  let fetched_l1_info_success =
+    declare_2
       ~section
       ~prefix_name_with_section:true
-      ~name:"fetched_config_success"
-      ~msg:"success fetching config from l1 node at {endpoint}"
+      ~name:"fetched_l1_info_success"
+      ~msg:"successfully fetched {info} from L1 node at {endpoint}"
       ~level:Notice
+      ("info", Data_encoding.string)
       ("endpoint", Data_encoding.string)
 
   let failed_to_persist_profiles =
@@ -1035,11 +1038,13 @@ let emit_node_is_ready () = emit node_is_ready ()
 
 let emit_data_dir_not_found ~path = emit data_dir_not_found path
 
-let emit_retry_fetching_node_config_notice ~endpoint ~delay =
-  emit retry_fetching_node_config_notice (endpoint, delay)
-
-let emit_retry_fetching_node_config_warning ~endpoint ~delay =
-  emit retry_fetching_node_config_warning (endpoint, delay)
+let emit_retry_fetching_info_from_l1 ~endpoint ~delay ~requested_info
+    ~event_level =
+  match event_level with
+  | `Notice ->
+      emit retry_fetching_info_from_l1_notice (requested_info, endpoint, delay)
+  | `Warning ->
+      emit retry_fetching_info_from_l1_warning (requested_info, endpoint, delay)
 
 let emit_config_error_no_bootstrap () = emit config_error_no_bootstrap ()
 
@@ -1051,7 +1056,8 @@ let emit_resolved_bootstrap_no_points () = emit resolved_bootstrap_no_points ()
 let emit_resolved_bootstrap_points_total ~number =
   emit resolved_bootstrap_points_total number
 
-let emit_fetched_config_success ~endpoint = emit fetched_config_success endpoint
+let emit_fetched_l1_info_success ~requested_info ~endpoint =
+  emit fetched_l1_info_success (requested_info, endpoint)
 
 let emit_failed_to_persist_profiles ~profiles ~error =
   emit failed_to_persist_profiles (profiles, error)
