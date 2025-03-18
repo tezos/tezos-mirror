@@ -84,6 +84,8 @@ module type Dal = sig
 
   module Monitoring_app : sig
     val slack_channel_id : string option
+
+    val slack_bot_token : string option
   end
 
   module Alerts : sig
@@ -410,6 +412,13 @@ module Dal () : Dal = struct
         ~section
         ~long:"slack-channel-id"
         ~description:"The Slack channel id to send reports and alerts on"
+        ()
+
+    let slack_bot_token =
+      Clap.optional_string
+        ~section
+        ~long:"slack-bot-token"
+        ~description:"The Slack bot token used to send reports and alerts"
         ()
   end
 
