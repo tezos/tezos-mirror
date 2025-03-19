@@ -47,13 +47,10 @@ type t = {
 let init config profile_ctxt cryptobox shards_proofs_precomputation
     proto_plugins store gs_worker transport_layer cctxt ~last_finalized_level =
   let neighbors_cctxts =
-    List.map
-      (fun Configuration_file.{addr; port} ->
-        let endpoint =
-          Uri.of_string ("http://" ^ addr ^ ":" ^ string_of_int port)
-        in
-        Dal_node_client.make_unix_cctxt endpoint)
-      config.Configuration_file.neighbors
+    (* TODO: This early feature is not used anymore. An MR that cleans this part
+       of the code has been opened here:
+       https://gitlab.com/tezos/tezos/-/merge_requests/16444. *)
+    []
   in
   {
     config;
@@ -215,8 +212,9 @@ let get_fetched_assigned_shard_indices ctxt ~level ~pkh =
       |> Option.value ~default:[])
     (Committee_cache.find ctxt.committee_cache ~level)
 
-let version {config; _} =
-  let network_name = config.Configuration_file.network_name in
+let version _t =
+  (* WIP: will be fixed in the next MR. *)
+  let network_name = Configuration_file.default_network_name in
   Types.Version.make ~network_version:(Gossipsub.version ~network_name)
 
 let warn_if_attesters_not_delegates ctxt operator_profiles =

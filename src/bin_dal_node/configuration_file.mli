@@ -42,8 +42,6 @@ type t = {
   data_dir : string;  (** The path to the DAL node data directory. *)
   rpc_addr : P2p_point.Id.t;
       (** The TCP address the DAL node's RPC server listens to. *)
-  neighbors : neighbor list;
-      (** List of neighbors to monitor and download shards from via RPCs. *)
   listen_addr : P2p_point.Id.t;  (** The TCP address bound by the DAL node. *)
   public_addr : P2p_point.Id.t;
       (** The TCP address at which this instance can be reached. *)
@@ -53,8 +51,6 @@ type t = {
           dal_config.bootstrap_peers. *)
   expected_pow : float;
       (** The expected PoW difficulty level for the peers' identity. *)
-  network_name : string;
-      (** A string that identifies the network's name. E.g. dal-sandbox. *)
   endpoint : Uri.t;  (** The endpoint of a Tezos L1 node. *)
   metrics_addr : P2p_point.Id.t option;
       (** The TCP address of the node's server used to export metrics. *)
@@ -95,3 +91,5 @@ val identity_file : t -> string
 (** [peers_file config] returns the absolute path to the "peers.json"
     file of the DAL node, based on the configuration [config]. *)
 val peers_file : t -> string
+
+val default_network_name : string

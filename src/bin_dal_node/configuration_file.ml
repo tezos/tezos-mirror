@@ -25,8 +25,9 @@
 
 (* Version history:
    - 0: initial version, comes with octez v20 release
-   - 1: changed format of 'profile' field; added 'version' field *)
-let current_version = 1
+   - 1: changed format of 'profile' field; added 'version' field
+   - 2: removed fields network_name and neighbors. *)
+let current_version = 2
 
 type neighbor = {addr : string; port : int}
 
@@ -66,12 +67,10 @@ let history_mode_encoding =
 type t = {
   data_dir : string;
   rpc_addr : P2p_point.Id.t;
-  neighbors : neighbor list;
   listen_addr : P2p_point.Id.t;
   public_addr : P2p_point.Id.t;
   peers : string list;
   expected_pow : float;
-  network_name : string;
   endpoint : Uri.t;
   metrics_addr : P2p_point.Id.t option;
   profile : Profile_manager.t;
@@ -129,12 +128,10 @@ let default =
   {
     data_dir = default_data_dir;
     rpc_addr = default_rpc_addr;
-    neighbors = default_neighbors;
     listen_addr = default_listen_addr;
     public_addr = default_public_addr;
     peers = default_peers;
     expected_pow = default_expected_pow;
-    network_name = default_network_name;
     endpoint = default_endpoint;
     metrics_addr = None;
     history_mode = default_history_mode;
@@ -187,10 +184,8 @@ let encoding : t Data_encoding.t =
            rpc_addr;
            listen_addr;
            public_addr;
-           neighbors;
            peers;
            expected_pow;
-           network_name;
            endpoint;
            metrics_addr;
            history_mode;
@@ -206,10 +201,8 @@ let encoding : t Data_encoding.t =
           rpc_addr,
           listen_addr,
           public_addr,
-          neighbors,
           peers,
           expected_pow,
-          network_name,
           endpoint,
           metrics_addr ),
         ( history_mode,
@@ -224,10 +217,8 @@ let encoding : t Data_encoding.t =
              rpc_addr,
              listen_addr,
              public_addr,
-             neighbors,
              peers,
              expected_pow,
-             network_name,
              endpoint,
              metrics_addr ),
            ( history_mode,
@@ -243,10 +234,8 @@ let encoding : t Data_encoding.t =
         rpc_addr;
         listen_addr;
         public_addr;
-        neighbors;
         peers;
         expected_pow;
-        network_name;
         endpoint;
         metrics_addr;
         history_mode;
@@ -259,7 +248,7 @@ let encoding : t Data_encoding.t =
         verbose;
       })
     (merge_objs
-       (obj10
+       (obj8
           (dft
              "data-dir"
              ~description:"Location of the data dir"
@@ -281,11 +270,6 @@ let encoding : t Data_encoding.t =
              P2p_point.Id.encoding
              default_listen_addr)
           (dft
-             "neighbors"
-             ~description:"DAL Neighbors"
-             (list neighbor_encoding)
-             default_neighbors)
-          (dft
              "peers"
              ~description:"P2P addresses of remote peers"
              (list string)
@@ -295,11 +279,6 @@ let encoding : t Data_encoding.t =
              ~description:"Expected P2P identity's PoW"
              float
              default_expected_pow)
-          (dft
-             "network-name"
-             ~description:"The name that identifies the network"
-             string
-             default_network_name)
           (dft
              "endpoint"
              ~description:"The Tezos node endpoint"
@@ -405,10 +384,10 @@ module V0 = struct
           rpc_addr,
           listen_addr,
           public_addr,
-          neighbors,
+          _neighbors,
           peers,
           expected_pow,
-          network_name,
+          _network_name,
           endpoint,
           metrics_addr ),
         (history_mode, profile) ) =
@@ -417,10 +396,8 @@ module V0 = struct
       rpc_addr;
       listen_addr;
       public_addr;
-      neighbors;
       peers;
       expected_pow;
-      network_name;
       endpoint;
       metrics_addr = Some metrics_addr;
       history_mode;
@@ -431,6 +408,116 @@ module V0 = struct
       experimental_features = default_experimental_features;
       fetch_trusted_setup = true;
       verbose = false;
+    }
+end
+
+module V1 = struct
+  (* Legacy V1 configuration type used solely for migration purposes.
+
+     This type represents the legacy (V1) version of the configuration,
+     originally defined as a record. It is intentionally rewritten as a tuple
+     for the following reasons:
+
+     - Simplified Encoding/Decoding: Using a tuple allows removing
+     [Data_encoding.conv] and its field-by-field mapping, significantly reducing
+     boilerplate in the migration code.
+
+     - Read-Only & Migration-Only: The V1 type is no longer edited or used
+     beyond JSON decoding and transformation into the current configuration
+     version. Record semantics (field names, accessors) are unnecessary.
+
+     This design reflects the temporary, transitional nature of the V1
+     configuration and isolates legacy logic from the active codebase. *)
+  type t = tup1 * tup2
+
+  and tup1 =
+    string (* data_dir *)
+    * P2p_point.Id.t (* rpc_addr *)
+    * P2p_point.Id.t (*listen_addr  *)
+    * P2p_point.Id.t (* public_addr *)
+    * neighbor list (* neighbors *)
+    * string list (* peers *)
+    * float (* expected_pow *)
+    * string (*network_name  *)
+    * Uri.t (*endpoint  *)
+    * P2p_point.Id.t option (*metrics_addr  *)
+
+  and tup2 =
+    history_mode (* history_mode *)
+    * Profile_manager.t (* profile *)
+    * int (*version  *)
+    * string option (* service_name *)
+    * string option (*service_namespace  *)
+    * experimental_features (* experimental_features *)
+    * bool (* fetch_trusted_setup *)
+    * bool (* verbose *)
+
+  let encoding : t Data_encoding.t =
+    let open Data_encoding in
+    merge_objs
+      (obj10
+         (dft "data-dir" string default_data_dir)
+         (dft "rpc-addr" P2p_point.Id.encoding default_rpc_addr)
+         (dft "net-addr" P2p_point.Id.encoding default_listen_addr)
+         (dft "public-addr" P2p_point.Id.encoding default_listen_addr)
+         (dft "neighbors" (list neighbor_encoding) default_neighbors)
+         (dft "peers" (list string) default_peers)
+         (dft "expected-pow" float default_expected_pow)
+         (dft "network-name" string default_network_name)
+         (dft "endpoint" endpoint_encoding default_endpoint)
+         (dft "metrics-addr" (Encoding.option P2p_point.Id.encoding) None))
+      (obj8
+         (dft "history_mode" history_mode_encoding default_history_mode)
+         (dft "profiles" Profile_manager.encoding Profile_manager.empty)
+         (req "version" int31)
+         (dft "service_name" (Data_encoding.option Data_encoding.string) None)
+         (dft
+            "service_namespace"
+            (Data_encoding.option Data_encoding.string)
+            None)
+         (dft
+            "experimental_features"
+            experimental_features_encoding
+            default_experimental_features)
+         (dft "fetch_trusted_setup" bool true)
+         (dft "verbose" bool default.verbose))
+
+  let to_latest_version
+      ( ( data_dir,
+          rpc_addr,
+          listen_addr,
+          public_addr,
+          _neighbors,
+          peers,
+          expected_pow,
+          _network_name,
+          endpoint,
+          metrics_addr ),
+        ( history_mode,
+          profile,
+          version,
+          service_name,
+          service_namespace,
+          experimental_features,
+          fetch_trusted_setup,
+          verbose ) ) =
+    {
+      data_dir;
+      rpc_addr;
+      listen_addr;
+      public_addr;
+      peers;
+      expected_pow;
+      endpoint;
+      metrics_addr;
+      history_mode;
+      profile;
+      version;
+      service_name;
+      service_namespace;
+      experimental_features;
+      fetch_trusted_setup;
+      verbose;
     }
 end
 
@@ -470,11 +557,12 @@ let save config =
 
 let load =
   let open Lwt_result_syntax in
+  let destruct = Data_encoding.Json.destruct in
   let config_versions =
-    let open Data_encoding in
     [
-      (1, Json.destruct encoding);
-      (0, fun json -> Json.destruct V0.encoding json |> V0.to_latest_version);
+      (2, destruct encoding);
+      (1, fun json -> destruct V1.encoding json |> V1.to_latest_version);
+      (0, fun json -> destruct V0.encoding json |> V0.to_latest_version);
     ]
   in
   let rec try_decode json = function

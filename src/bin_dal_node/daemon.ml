@@ -1427,7 +1427,6 @@ let run ~data_dir ~configuration_override =
   in
   let*! () = Event.emit_starting_node () in
   let* ({
-          network_name;
           rpc_addr;
           (* These are not the cryptographic identities of peers, but the points
              (IP addresses + ports) of the nodes we want to connect to at
@@ -1544,6 +1543,8 @@ let run ~data_dir ~configuration_override =
   let points = get_bootstrap_points () in
   (* Create a transport (P2P) layer instance. *)
   let* transport_layer =
+    (* WIP: will be fixed in the next MR. *)
+    let network_name = Configuration_file.default_network_name in
     Gossipsub.Transport_layer.create
       ~public_addr
       ~is_bootstrap_peer:(profile = Profile_manager.bootstrap)
