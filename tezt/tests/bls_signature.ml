@@ -17,6 +17,10 @@ let team = Tag.layer1
 (** Tags shared by all tests in this file. *)
 let threshold_bls_tags = [team; "bls"; "staking"; "manager"]
 
+type kind = Client | RPC
+
+let kind_to_string x = match x with Client -> "Client" | RPC -> "RPC"
+
 module Local_helpers = struct
   let staking_parameters ~(delegate : Account.key) client =
     let pkh = delegate.public_key_hash in
@@ -235,6 +239,94 @@ module Local_helpers = struct
     let* receipt = Client.get_receipt_for ~operation:op_hash client in
     Log.info ~color:Log.Color.FG.gray "receipt for %s:\n%s" op_hash receipt ;
     return op_hash
+
+  let create_bls_proofs ~(signers : Account.key list) client =
+    Lwt_list.map_s
+      (fun (signer : Account.key) ->
+        let* proof = Client.create_bls_proof ~signer:signer.alias client in
+        return (signer.public_key, proof))
+      signers
+
+  let check_bls_proofs ~kind client pk_with_proofs =
+    match kind with
+    | Client ->
+        Lwt_list.iter_s
+          (fun (pk, proof) -> Client.check_bls_proof ~pk ~proof client)
+          pk_with_proofs
+    | RPC ->
+        Lwt_list.iter_s
+          (fun (pk, proof) ->
+            let* is_valid =
+              Client.RPC.call client @@ RPC.post_bls_check_proof ~pk ~proof ()
+            in
+            let () = Assert.is_true is_valid in
+            unit)
+          pk_with_proofs
+
+  let aggregate_bls_public_keys ~kind client pk_with_proofs =
+    (* Just to test the [check_proof] client command/RPC *)
+    let* () = check_bls_proofs ~kind client pk_with_proofs in
+    match kind with
+    | Client -> Client.aggregate_bls_public_keys client pk_with_proofs
+    | RPC ->
+        Client.RPC.call client
+        @@ RPC.post_bls_aggregate_public_keys pk_with_proofs
+
+  let mk_fake_account_from_bls_pk ~bls_pk ~bls_pkh ~alias : Account.key =
+    Log.info
+      ~color:Log.Color.FG.green
+      "Create a fake account for %s with pkh = %s."
+      alias
+      bls_pkh ;
+    Account.
+      {
+        alias;
+        public_key_hash = bls_pkh;
+        public_key = bls_pk;
+        secret_key = Encrypted "";
+      }
+
+  let sign_and_aggregate_signatures ~kind ~watermark
+      ~(signers : Account.key list) (msg : bytes) client =
+    let signatures =
+      List.map
+        (fun signer ->
+          Account.sign_bytes ~watermark ~signer msg
+          |> Tezos_crypto.Signature.to_b58check)
+        signers
+    in
+    match kind with
+    | Client -> Client.aggregate_bls_signatures client signatures
+    | RPC ->
+        Client.RPC.call client @@ RPC.post_bls_aggregate_signatures signatures
+
+  let inject_bls_group_sign_op ~baker ~group_signature (op : Operation.t) client
+      =
+    let group_signature =
+      Tezos_crypto.Signature.of_b58check_exn group_signature
+    in
+    (* inject an operation signed by a group *)
+    let* (`OpHash op_hash) =
+      Operation.inject ~signature:group_signature op client
+    in
+    let* () = Client.bake_for_and_wait ~keys:[baker] client in
+    let* receipt = Client.get_receipt_for ~operation:op_hash client in
+    Log.info ~color:Log.Color.FG.gray "receipt for %s:\n%s" op_hash receipt ;
+    return op_hash
+
+  let inject_aggregate_bls_sign_op ~kind ~baker ~(signers : Account.key list)
+      (op : Operation.t) client =
+    let* op_hex = Operation.hex op client in
+    let manager_op = Hex.to_bytes op_hex in
+    let* group_signature =
+      sign_and_aggregate_signatures
+        ~kind
+        ~watermark:Generic_operation
+        ~signers
+        manager_op
+        client
+    in
+    inject_bls_group_sign_op ~baker ~group_signature op client
 
   let print_parameters parameters =
     let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
