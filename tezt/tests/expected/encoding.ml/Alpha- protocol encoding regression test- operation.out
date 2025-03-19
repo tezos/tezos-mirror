@@ -25,6 +25,32 @@
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents": [
     {
+      "kind": "attestation_with_dal",
+      "level": 1331,
+      "block_payload_hash": "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG",
+      "dal_attestation": "2048",
+      "round": 0,
+      "slot": 0
+    }
+  ],
+  "signature": "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ"
+}'
+0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a817000000000533000000000000000000000000000000000000000000000000000000000000000000000000802066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
+
+./octez-codec decode alpha.operation from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a817000000000533000000000000000000000000000000000000000000000000000000000000000000000000802066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
+{ "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+  "contents":
+    [ { "kind": "attestation_with_dal", "slot": 0, "level": 1331, "round": 0,
+        "block_payload_hash":
+          "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG",
+        "dal_attestation": "2048" } ],
+  "signature":
+    "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ" }
+
+./octez-codec encode alpha.operation from '{
+  "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+  "contents": [
+    {
       "kind": "attestation",
       "level": 1331,
       "block_payload_hash": "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG",
@@ -44,6 +70,40 @@
           "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG" } ],
   "signature":
     "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ" }
+
+./octez-codec encode alpha.operation from '{
+  "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+  "contents": [
+    {
+      "kind": "attestations_aggregate",
+      "consensus_content": {
+        "level": 1331,
+        "round": 0,
+        "block_payload_hash": "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG"
+      },
+      "committee": [
+        0,
+        23,
+        51,
+        893
+      ]
+    }
+  ],
+  "signature": "BLsigBANTUiNcB2UB7VMj1yTn4SgX9NZabdSY3cHBZgDvFoDcJWrtYZZZshA8LEjY46wqxoWM7PvDTatLiDoiCTmc4p2LVdsXLC9CPtDmZYe7mr33uPgLyVutVSqMmrxRF1ej9Ce7p7nRH"
+}'
+0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81f0000053300000000000000000000000000000000000000000000000000000000000000000000000000000008000000170033037dff03aa9d7b7d96832a1d687a1be9a330ed89ba3fcb293de1dbbede4d9f69a22555f2e2c661f68ed427c4cafc7568554207ce0e2d6daa5abb0a07031ed7e5ee3d5c9c17cf827b1824a4b03afd7f13cdde07e37d8c38b053fd928815e462bdf9eb062d
+
+./octez-codec decode alpha.operation from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81f0000053300000000000000000000000000000000000000000000000000000000000000000000000000000008000000170033037dff03aa9d7b7d96832a1d687a1be9a330ed89ba3fcb293de1dbbede4d9f69a22555f2e2c661f68ed427c4cafc7568554207ce0e2d6daa5abb0a07031ed7e5ee3d5c9c17cf827b1824a4b03afd7f13cdde07e37d8c38b053fd928815e462bdf9eb062d
+{ "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+  "contents":
+    [ { "kind": "attestations_aggregate",
+        "consensus_content":
+          { "level": 1331, "round": 0,
+            "block_payload_hash":
+              "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG" },
+        "committee": [ 0, 23, 51, 893 ] } ],
+  "signature":
+    "BLsigBANTUiNcB2UB7VMj1yTn4SgX9NZabdSY3cHBZgDvFoDcJWrtYZZZshA8LEjY46wqxoWM7PvDTatLiDoiCTmc4p2LVdsXLC9CPtDmZYe7mr33uPgLyVutVSqMmrxRF1ej9Ce7p7nRH" }
 
 ./octez-codec encode alpha.operation from '{
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
@@ -559,3 +619,35 @@
           { "entrypoint": "action", "value": [ { "prim": "UNIT" } ] } } ],
   "signature":
     "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ" }
+
+./octez-codec encode alpha.operation from '{
+  "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+  "contents": [
+    {
+      "kind": "update_consensus_key",
+      "source": "tz4XsUYECWrJ5c4gktAnr1nkFC9mjDEVn3qh",
+      "fee": "33",
+      "counter": "732",
+      "gas_limit": "9451117",
+      "storage_limit": "57024931117",
+      "pk": "BLpk1xXdveUYh7YFsyf6LwGWfv5zAfLvnMG71byiMFDZc4CkXzZPVko3Dz4sD43Ln5uFNvdjiQJY",
+      "proof": "BLsigA5hv9bjFDmrbvVfam6CaXM87xZv1GYhFmn3uaR4LTXahHpADaNk9LcEcQb2EF1w9b72AutNqPxzVT5EhRFQN1Ue43XA3HkMfmCYTCHa3WiLsJYLmuQvchTwoMy8zx8EibsZAJ3Dug"
+    }
+  ],
+  "signature": "BLsigAV587qg1S78p9hRyfmcqM6cVxsafJ9MVRWLLxfykmdB7LcpMWgLZjSQfhbuffvJovUsS9vJpesiwJm9xEhZPjW93DB5tjSUkUrXcQpTVGoJe4KsGR16BUdVEZQuXeW2XjUk9BqYSP"
+}'
+0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a87203fad261084d3e363c48b61d2ad617de8b798841ff21dc05edecc004adcacdb7d40103b1835898e501798f26d7ee20cb772fedc4e4e0e963f6ef47a7925ac9cfb61d5100bde3ee7f1e9e37175842b3d378776dff000000608ed0b1d82e17ce7e927ffd9470f8208ec5d8d32556135c2c670000815f20a81b9de3f2ac50919751b4872644be2f75cb041108a9fbf9b550b6c5f90b5626d5a99f7784b11194561768220cff18e9a142a4246d279311f46de4ba9727740c6438ff03992e5281475b5634a6d9f0637d2da0e7d75a2b49d43893c68dcffdfa4d2e45c8d119d7a253e2e981ed1c788d3854d0020ffc9091e355c3287eda37d2163d0a56f3ef36268fcc176f063715a1fe97c746cbedf1f8cd76ee73e1e48c0d9c23ea0c
+
+./octez-codec decode alpha.operation from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a87203fad261084d3e363c48b61d2ad617de8b798841ff21dc05edecc004adcacdb7d40103b1835898e501798f26d7ee20cb772fedc4e4e0e963f6ef47a7925ac9cfb61d5100bde3ee7f1e9e37175842b3d378776dff000000608ed0b1d82e17ce7e927ffd9470f8208ec5d8d32556135c2c670000815f20a81b9de3f2ac50919751b4872644be2f75cb041108a9fbf9b550b6c5f90b5626d5a99f7784b11194561768220cff18e9a142a4246d279311f46de4ba9727740c6438ff03992e5281475b5634a6d9f0637d2da0e7d75a2b49d43893c68dcffdfa4d2e45c8d119d7a253e2e981ed1c788d3854d0020ffc9091e355c3287eda37d2163d0a56f3ef36268fcc176f063715a1fe97c746cbedf1f8cd76ee73e1e48c0d9c23ea0c
+{ "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+  "contents":
+    [ { "kind": "update_consensus_key",
+        "source": "tz4XsUYECWrJ5c4gktAnr1nkFC9mjDEVn3qh", "fee": "33",
+        "counter": "732", "gas_limit": "9451117",
+        "storage_limit": "57024931117",
+        "pk":
+          "BLpk1xXdveUYh7YFsyf6LwGWfv5zAfLvnMG71byiMFDZc4CkXzZPVko3Dz4sD43Ln5uFNvdjiQJY",
+        "proof":
+          "BLsigA5hv9bjFDmrbvVfam6CaXM87xZv1GYhFmn3uaR4LTXahHpADaNk9LcEcQb2EF1w9b72AutNqPxzVT5EhRFQN1Ue43XA3HkMfmCYTCHa3WiLsJYLmuQvchTwoMy8zx8EibsZAJ3Dug" } ],
+  "signature":
+    "BLsigAV587qg1S78p9hRyfmcqM6cVxsafJ9MVRWLLxfykmdB7LcpMWgLZjSQfhbuffvJovUsS9vJpesiwJm9xEhZPjW93DB5tjSUkUrXcQpTVGoJe4KsGR16BUdVEZQuXeW2XjUk9BqYSP" }
