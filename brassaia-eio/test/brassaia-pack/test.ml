@@ -18,7 +18,7 @@ let () =
   Eio_posix.run @@ fun env ->
   Brassaia_eio_test_helpers.Brassaia_test.Store.run
     ~__FILE__
-    "brassaia-pack"
+    "brassaia-eio-pack"
     ~misc:(Test_pack.misc @@ Eio.Stdenv.domain_mgr env)
     ~sleep:Eio_unix.sleep
     (List.map (fun s -> (`Quick, s)) Test_pack.suite)

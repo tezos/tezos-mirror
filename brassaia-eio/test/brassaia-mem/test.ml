@@ -18,7 +18,7 @@ let () =
   Eio_posix.run @@ fun _ ->
   Brassaia_eio_test_helpers.Brassaia_test.Store.run
     ~__FILE__
-    "brassaia-mem"
+    "brassaia-eio-mem"
     ~slow:true
     ~misc:[]
     ~sleep:Eio_unix.sleep

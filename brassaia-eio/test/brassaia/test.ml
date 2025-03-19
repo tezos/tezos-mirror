@@ -32,4 +32,4 @@ let () =
   Logs.set_level (Some Debug) ;
   Logs.set_reporter (Brassaia_eio_test_helpers.Brassaia_test.reporter ()) ;
   Random.self_init () ;
-  Eio_posix.run @@ fun _ -> Alcotest.run ~__FILE__ "brassaia" suite
+  Eio_posix.run @@ fun _ -> Alcotest.run ~__FILE__ "brassaia-eio" suite
