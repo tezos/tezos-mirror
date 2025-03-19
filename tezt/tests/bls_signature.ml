@@ -495,7 +495,106 @@ let test_single_staker_sign_staking_operation_consensus_key =
   in
   unit
 
+let test_single_staker_sign_staking_operation_consensus_key_op_core =
+  Protocol.register_test
+    ~__FILE__
+    ~title:
+      "single staker signs a staking operation with a consensus key \
+       (operation_core)"
+    ~tags:(threshold_bls_tags @ ["single"; "consensus_key"])
+    ~supports:(Protocol.From_protocol 023)
+  @@ fun protocol ->
+  let* parameters, client, default_baker, funder =
+    Local_helpers.init_node_and_client ~protocol
+  in
+  (* gen keys delegate -s bls *)
+  let* delegate =
+    Local_helpers.gen_and_show_keys ~alias:"delegate" ~sig_alg:"bls" client
+  in
+  (* transfer 150000 from bootstrap2 to delegate *)
+  let* () =
+    Local_helpers.transfer
+      ~baker:default_baker
+      ~amount:(Tez.of_int 150_000)
+      ~giver:funder
+      ~receiver:delegate.alias
+      client
+  in
+  (* reveal key for delegate *)
+  let* op_reveal = Local_helpers.mk_op_reveal delegate client in
+  let* _op_hash =
+    Local_helpers.inject_bls_sign_op
+      ~baker:default_baker
+      ~signer:delegate
+      op_reveal
+      client
+  in
+  (* set delegate for delegate to delegate *)
+  let* op_set_delegate =
+    Local_helpers.mk_op_set_delegate ~src:delegate ~delegate client
+  in
+  let* _op_hash =
+    Local_helpers.inject_bls_sign_op
+      ~baker:default_baker
+      ~signer:delegate
+      op_set_delegate
+      client
+  in
+  (* stake 140000 for delegate *)
+  let* op_stake =
+    Local_helpers.mk_op_stake
+      ~staker:delegate
+      ~amount:(Tez.of_int 140_000)
+      client
+  in
+  let* _op_hash =
+    Local_helpers.inject_bls_sign_op
+      ~baker:default_baker
+      ~signer:delegate
+      op_stake
+      client
+  in
+  (* gen keys delegate_consensus_key -s bls *)
+  let* delegate_consensus_key =
+    Local_helpers.gen_and_show_keys
+      ~alias:"delegate_consensus_key"
+      ~sig_alg:"bls"
+      client
+  in
+  (* create a proof for a consensus key *)
+  let proof = Local_helpers.create_proof ~signer:delegate_consensus_key in
+  (* set consensus key for delegate to delegate_consensus_key *)
+  let* op_update_consensus_key =
+    Local_helpers.mk_op_update_consensus_key
+      ~delegate
+      ~delegate_consensus_key
+      ~proof
+      client
+  in
+  let* _op_hash =
+    Local_helpers.inject_bls_sign_op
+      ~baker:default_baker
+      ~signer:delegate
+      op_update_consensus_key
+      client
+  in
+  let* () =
+    Local_helpers.bake_for_consensus_rights_delay_and_wait
+      ~baker:default_baker
+      ~parameters
+      ~delegate:delegate_consensus_key
+      client
+  in
+  let* () =
+    Local_helpers.check_staked_balance_increase_when_baking
+      ~baker:delegate_consensus_key
+      ~staker:delegate
+      client
+  in
+  unit
+
 let register ~protocols =
   test_single_staker_sign_staking_operation_self_delegate protocols ;
   test_single_staker_sign_staking_operation_external_delegate protocols ;
-  test_single_staker_sign_staking_operation_consensus_key protocols
+  test_single_staker_sign_staking_operation_consensus_key protocols ;
+  test_single_staker_sign_staking_operation_consensus_key_op_core protocols
