@@ -409,6 +409,91 @@ let apply_with_context ~chain_id ~faked_protocol_data ~user_activated_upgrades
     in
     return (shell_header, operations, manager_operations_infos, payload_hash)
 
+(* [aggregate_attestations attestations] aggregate [attestations] in a
+   single Attestations_aggregate operation. Each operation in [attestations] is
+   assumed to be eligible for aggregation, meaning that it :
+   - must include a BLS signature
+   - must not include DAL content *)
+let aggregate_attestations eligible_attestations =
+  let open Result_syntax in
+  let aggregate =
+    List.fold_left
+      (fun acc ({shell; protocol_data} : Kind.attestation Operation.t) ->
+        match (protocol_data.contents, protocol_data.signature) with
+        | ( Single (Attestation {consensus_content; dal_content = None}),
+            Some (Bls signature) ) -> (
+            let {slot; level; round; block_payload_hash} = consensus_content in
+            match acc with
+            | None ->
+                let consensus_content = {level; round; block_payload_hash} in
+                Some (shell, consensus_content, [slot], [signature])
+            | Some (shell, consensus_content, committee, signatures) ->
+                let committee = slot :: committee in
+                let signatures = signature :: signatures in
+                Some (shell, consensus_content, committee, signatures))
+        | _, _ -> assert false)
+      None
+      eligible_attestations
+  in
+  match aggregate with
+  | None -> return_none
+  | Some (shell, consensus_content, committee, signatures) -> (
+      (* We disable the subgroup check for better performance, as operations
+         come from the mempool where it has already been checked. *)
+      match
+        Signature.Bls.aggregate_signature_opt ~subgroup_check:false signatures
+      with
+      | Some signature ->
+          let contents =
+            Single (Attestations_aggregate {consensus_content; committee})
+          in
+          let protocol_data = {contents; signature = Some (Bls signature)} in
+          return (Some {shell; protocol_data = Operation_data protocol_data})
+      | None -> tzfail Signature_aggregation_failure)
+
+(* [partition_consensus_operations_on_proposal operations] partitions consensus
+   operations as follows :
+   - a list of tz4 attestations eligible for aggregation
+   - a Prioritized_operation_set of remaining operations *)
+let partition_consensus_operations_on_proposal consensus_operations =
+  let open Operation_pool in
+  Prioritized_operation_set.fold
+    (fun operation (eligible_attestations, remaining_operations) ->
+      let {shell; protocol_data = Operation_data protocol_data; _} =
+        Prioritized_operation.packed operation
+      in
+      match (protocol_data.contents, protocol_data.signature) with
+      | Single (Attestation {dal_content = None; _}), Some (Bls _) ->
+          let attestation : Kind.attestation Operation.t =
+            {shell; protocol_data}
+          in
+          let remaining_operations =
+            Prioritized_operation_set.remove operation remaining_operations
+          in
+          (attestation :: eligible_attestations, remaining_operations)
+      | _, _ -> (eligible_attestations, remaining_operations))
+    consensus_operations
+    ([], consensus_operations)
+
+(* [aggregate_attestations_on_proposal attestations] replaces all eligible
+   attestations from [attestations] by a single Attestations_aggregate.
+   Attestations are assumed to target the same shell, level, round and
+   block_payload_hash. *)
+let aggregate_attestations_on_proposal attestations =
+  let open Result_syntax in
+  let eligible_attestations, remaining_attestations =
+    partition_consensus_operations_on_proposal attestations
+  in
+  let* aggregate_opt = aggregate_attestations eligible_attestations in
+  match aggregate_opt with
+  | Some aggregate ->
+      let open Operation_pool in
+      return
+      @@ Prioritized_operation_set.add
+           (Prioritized_operation.extern ~priority:1 aggregate)
+           remaining_attestations
+  | None -> return remaining_attestations
+
 (* [forge] a new [unsigned_block] in accordance with [simulation_kind] and
    [simulation_mode] *)
 let forge (cctxt : #Protocol_client_context.full) ~chain_id
@@ -420,18 +505,24 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id
   let hard_gas_limit_per_block =
     constants.Constants.Parametric.hard_gas_limit_per_block
   in
-  let simulation_kind =
+  let* simulation_kind =
     match simulation_kind with
     | Filter operation_pool ->
-        (* We cannot include operations that are not live with respect
-           to our predecessor otherwise the node would reject the block. *)
-        let filtered_pool =
-          retain_live_operations_only
-            ~live_blocks:pred_live_blocks
-            operation_pool
-        in
-        Filter filtered_pool
-    | Apply _ as x -> x
+        if constants.aggregate_attestation then
+          let*? consensus =
+            aggregate_attestations_on_proposal operation_pool.consensus
+          in
+          return (Filter {operation_pool with consensus})
+        else
+          (* We cannot include operations that are not live with respect
+             to our predecessor otherwise the node would reject the block. *)
+          let filtered_pool =
+            retain_live_operations_only
+              ~live_blocks:pred_live_blocks
+              operation_pool
+          in
+          return (Filter filtered_pool)
+    | Apply _ as x -> return x
   in
   let* shell_header, operations, manager_operations_infos, payload_hash =
     match (simulation_mode, simulation_kind) with
