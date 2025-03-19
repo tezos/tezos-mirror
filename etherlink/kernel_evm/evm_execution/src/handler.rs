@@ -472,7 +472,21 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     /// Get the total amount of gas used for the duration of the current
     /// transaction.
     pub fn gas_used(&self) -> u64 {
-        // EIP-3529
+        self.transaction_data
+            .last()
+            .map(|layer| {
+                layer
+                    .gasometer
+                    .as_ref()
+                    .map(|g| g.total_used_gas())
+                    .unwrap_or_default()
+            })
+            .unwrap_or_default()
+    }
+
+    // Gas used at the end of the transaction as per EIP-3529.
+    // See: https://eips.ethereum.org/EIPS/eip-3529.
+    pub fn gas_used_after_refund(&self) -> u64 {
         let compute_gas = |g: &Gasometer| {
             let total_used_gas = g.total_used_gas();
             let max_refund_quotient = self.config.max_refund_quotient;
@@ -1715,7 +1729,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             ));
         }
 
-        let gas_used = self.gas_used();
+        let gas_used = self.gas_used_after_refund();
 
         if let Some(last_layer) = self.transaction_data.pop() {
             for address in last_layer.deleted_contracts.iter() {
@@ -1787,7 +1801,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             ));
         }
 
-        let gas_used = self.gas_used();
+        let gas_used = self.gas_used_after_refund();
 
         self.evm_account_storage
             .rollback_transaction(self.host)
