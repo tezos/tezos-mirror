@@ -220,4 +220,66 @@ module Local_helpers = struct
     unit
 end
 
-let register ~protocols:_ = ()
+let test_single_staker_sign_staking_operation_self_delegate =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"single staker signs a staking operation with a self delegate"
+    ~tags:(threshold_bls_tags @ ["single"; "self_delegate"])
+    ~supports:(Protocol.From_protocol 023)
+  @@ fun protocol ->
+  let* parameters, client, default_baker, funder =
+    Local_helpers.init_node_and_client ~protocol
+  in
+  (* gen keys delegate -s bls *)
+  (* transfer 150000 from bootstrap2 to delegate *)
+  let* delegate =
+    Local_helpers.create_and_fund_account
+      ~baker:default_baker
+      ~giver:funder
+      ~alias:"delegate"
+      ~amount:(Tez.of_int 150_000)
+      ~sig_alg:"bls"
+      client
+  in
+  (* set delegate for delegate to delegate *)
+  (* [delegate] registers as a self-delegate/baker. *)
+  let* () =
+    Local_helpers.set_delegate
+      ~baker:default_baker
+      ~src:delegate.alias
+      ~delegate
+      client
+  in
+  (* stake 140000 for delegate *)
+  (* To receive baking rights, [delegate] must stake at least
+     [minimal_frozen_stake] and its baking power must be at least
+     [minimal_stake]. *)
+  let* () =
+    Local_helpers.stake
+      ~baker:default_baker
+      ~staker:delegate.alias
+      ~amount:(Tez.of_int 140_000)
+      client
+  in
+  (* [delegate] cannot bake during the current and next full
+     [consensus_rights_delay] cycles, as it has no baking rights. So,
+     we wait for the cycle when we can bake with [delegate]. *)
+  let* () =
+    Local_helpers.bake_for_consensus_rights_delay_and_wait
+      ~baker:default_baker
+      ~parameters
+      ~delegate
+      client
+  in
+  (* [delegate] bakes a next block, so its staked balance is increased
+     due to the baking rewards. *)
+  let* () =
+    Local_helpers.check_staked_balance_increase_when_baking
+      ~baker:delegate
+      ~staker:delegate
+      client
+  in
+  unit
+
+let register ~protocols =
+  test_single_staker_sign_staking_operation_self_delegate protocols
