@@ -56,6 +56,10 @@ let non_bls_in_aggregate = function
   | Validate_errors.Consensus.Non_bls_key_in_aggregate -> true
   | _ -> false
 
+let conflicting_consensus_operation = function
+  | Validate_errors.Consensus.Conflicting_consensus_operation _ -> true
+  | _ -> false
+
 let find_aggregate_result receipt =
   let result_opt =
     List.find_map
@@ -155,6 +159,13 @@ let find_attester_with_non_bls_key =
       | (Ed25519 _ | Secp256k1 _ | P256 _), slot :: _ -> Some (attester, slot)
       | _ -> None)
 
+(* [filter_attesters_with_bls_key attesters] filter attesters with BLS keys. *)
+let filter_attesters_with_bls_key =
+  List.filter_map (fun (attester : RPC.Validators.t) ->
+      match (attester.consensus_key, attester.slots) with
+      | Bls _, slot :: _ -> Some (attester, slot)
+      | _ -> None)
+
 let test_aggregate_feature_flag_enabled () =
   let open Lwt_result_syntax in
   let* _genesis, attested_block =
@@ -208,14 +219,7 @@ let test_aggregate_attestation_with_multiple_bls_attestations () =
   in
   let* attesters = Context.get_attesters (B block) in
   (* Filter delegates with BLS keys that have at least one slot *)
-  let* bls_delegates_with_slots =
-    List.filter_map_es
-      (fun (attester : RPC.Validators.t) ->
-        match (attester.consensus_key, attester.slots) with
-        | Bls _, slot :: _ -> return_some (attester, slot)
-        | _ -> return_none)
-      attesters
-  in
+  let bls_delegates_with_slots = filter_attesters_with_bls_key attesters in
   let* attestations =
     List.map_es
       (fun (delegate, slot) ->
@@ -304,6 +308,25 @@ let test_aggregate_attestation_non_bls_delegate () =
       let*! res = Block.bake ~operation:aggregate block in
       Assert.proto_error ~loc:__LOC__ res non_bls_in_aggregate
 
+let test_multiple_aggregations_per_block_forbidden () =
+  let open Lwt_result_syntax in
+  let* _genesis, block =
+    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+  in
+  let* attesters = Context.get_attesters (B block) in
+  (* Filter delegates with BLS keys that have at least one slot *)
+  let bls_delegates_with_slots = filter_attesters_with_bls_key attesters in
+  (* Craft one aggregate per attester *)
+  let* aggregates =
+    List.map_es
+      (fun ((delegate : RPC.Validators.t), _) ->
+        Op.attestations_aggregate ~committee:[delegate.consensus_key] block)
+      bls_delegates_with_slots
+  in
+  (* Bake a block containing the multiple aggregates and expect an error *)
+  let*! res = Block.bake ~operations:aggregates block in
+  Assert.proto_error ~loc:__LOC__ res conflicting_consensus_operation
+
 let tests =
   [
     Tztest.tztest
@@ -330,6 +353,10 @@ let tests =
       "test_aggregate_attestation_non_bls_delegate"
       `Quick
       test_aggregate_attestation_non_bls_delegate;
+    Tztest.tztest
+      "test_multiple_aggregations_per_block_forbidden"
+      `Quick
+      test_multiple_aggregations_per_block_forbidden;
   ]
 
 let () =
