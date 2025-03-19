@@ -148,6 +148,94 @@ module Local_helpers = struct
     let* () = Client.bake_for_and_wait ~keys:[baker] client in
     unit
 
+  let mk_op_reveal (new_account : Account.key) client =
+    Log.info
+      ~color:Log.Color.FG.green
+      "Reveal a public key of %s with pkh = %s."
+      new_account.alias
+      new_account.public_key_hash ;
+    let module M = Operation.Manager in
+    let op_manager =
+      M.make ~gas_limit:1800 ~source:new_account @@ M.reveal new_account
+    in
+    let* op = M.operation [op_manager] client in
+    return op
+
+  let mk_op_set_delegate ~(src : Account.key) ~(delegate : Account.key) client =
+    Log.info
+      ~color:Log.Color.FG.green
+      "Set delegate for %s to %s."
+      src.alias
+      delegate.alias ;
+    let module M = Operation.Manager in
+    let op_manager =
+      M.make ~gas_limit:1800 ~source:src @@ M.delegation ~delegate ()
+    in
+    let* op = M.operation [op_manager] client in
+    return op
+
+  let mk_op_stake ~(staker : Account.key) ~amount client =
+    Log.info
+      ~color:Log.Color.FG.green
+      "Staker %s stakes %s tez."
+      staker.alias
+      (Tez.to_string amount) ;
+    let module M = Operation.Manager in
+    let op_manager =
+      M.make ~gas_limit:5300 ~source:staker
+      @@ M.call
+           ~dest:staker.public_key_hash
+           ~amount:(Tez.to_mutez amount)
+           ~entrypoint:"stake"
+           ()
+    in
+    let* op = M.operation [op_manager] client in
+    return op
+
+  let mk_op_update_consensus_key ~(delegate_consensus_key : Account.key)
+      ~(delegate : Account.key) ?proof client =
+    Log.info
+      ~color:Log.Color.FG.green
+      "Set consensus key for %s to %s."
+      delegate.alias
+      delegate_consensus_key.alias ;
+    let module M = Operation.Manager in
+    let op_manager =
+      M.make ~gas_limit:5300 ~source:delegate
+      @@ M.update_consensus_key
+           ~public_key:delegate_consensus_key.public_key
+           ?proof
+           ()
+    in
+    let* op = M.operation [op_manager] client in
+    return op
+
+  let create_proof ~(signer : Account.key) =
+    let public_key =
+      Tezos_crypto.Signature.Public_key.of_b58check_exn signer.public_key
+    in
+    let msg =
+      Data_encoding.Binary.to_bytes_exn
+        Tezos_crypto.Signature.Public_key.encoding
+        public_key
+    in
+    Account.sign_bytes ~signer msg |> Tezos_crypto.Signature.to_b58check
+
+  let inject_bls_sign_op ~baker ~(signer : Account.key) (op : Operation.t)
+      client =
+    let* op_hex = Operation.hex op client in
+    let signature =
+      Account.sign_bytes
+        ~watermark:Generic_operation
+        ~signer
+        (Hex.to_bytes op_hex)
+    in
+    let* (`OpHash op_hash) = Operation.inject ~signature op client in
+    let* () = Client.bake_for_and_wait ~keys:[baker] client in
+    let* receipt = Client.get_receipt_for ~operation:op_hash client in
+    Log.info ~color:Log.Color.FG.gray "receipt for %s:\n%s" op_hash receipt ;
+    return op_hash
+
   let print_parameters parameters =
     let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
     let consensus_rights_delay =
