@@ -596,7 +596,37 @@ let test_info_command =
   in
   unit
 
+let test_import_snapshot_force =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"snapshot import --force"
+    ~tags:[team; "storage"; "snapshot"; "export"; "import"; "force"]
+  @@ fun protocol ->
+  let* node = Node.init [] in
+  let* client = Client.init ~endpoint:(Node node) () in
+  let* () = Client.activate_protocol_and_wait ~protocol client in
+  (* Bake a few blocks to have non-empty storage. *)
+  let* () = bake_blocks node client ~blocks_to_bake:5 in
+  let* () = Node.terminate node in
+  (* Export a snapshot. *)
+  let snapshot_file = Temp.file "snapshot" in
+  let* () =
+    Node.snapshot_export ~history_mode:Node.Rolling_history node snapshot_file
+  in
+  (* Import the snapshot without [--force], it will fail because the directory
+     is not clean.. *)
+  let process = Node.spawn_snapshot_import ~no_check:true node snapshot_file in
+  let* () =
+    Process.check_error ~msg:(rex "Please provide a clean directory") process
+  in
+  (* Force the import, works fine as it cleans the directory before importing. *)
+  let* () =
+    Node.snapshot_import ~no_check:true ~force:true node snapshot_file
+  in
+  unit
+
 let register ~protocols =
   test_export_import_snapshots protocols ;
   test_drag_after_rolling_import protocols ;
-  test_info_command protocols
+  test_info_command protocols ;
+  test_import_snapshot_force protocols
