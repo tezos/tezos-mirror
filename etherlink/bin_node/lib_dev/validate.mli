@@ -16,6 +16,7 @@ type validation_mode =
     [tx_raw] and returns the next allowed nonce for the sender of the
     transaction alongside the transaction object. *)
 val is_tx_valid :
+  ?max_number_of_chunks:int ->
   (module Services_backend_sig.S) ->
   mode:validation_mode ->
   string ->

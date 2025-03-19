@@ -240,7 +240,6 @@ type parameters = {
   tx_timeout_limit : int64;
   tx_pool_addr_limit : int;
   tx_pool_tx_per_addr_limit : int;
-  max_number_of_chunks : int option;
 }
 
 module Types = struct
@@ -253,7 +252,6 @@ module Types = struct
     tx_timeout_limit : int64;
     tx_pool_addr_limit : int;
     tx_pool_tx_per_addr_limit : int;
-    max_number_of_chunks : int option;
     mutable locked : bool;
   }
 
@@ -405,18 +403,6 @@ module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
-let tx_data_size_limit_reached ~max_number_of_chunks ~tx_data =
-  let maximum_chunks_per_l1_level =
-    Option.value
-      ~default:Sequencer_blueprint.maximum_chunks_per_l1_level
-      max_number_of_chunks
-  in
-  Bytes.length tx_data
-  > Sequencer_blueprint.maximum_usable_space_in_blueprint
-      (* Minus one so that the "rest" of the raw transaction can
-         be contained within one of the chunks. *)
-      (maximum_chunks_per_l1_level - 1)
-
 let check_address_boundaries ~pool ~address ~tx_pool_addr_limit
     ~tx_pool_tx_per_addr_limit =
   let open Lwt_result_syntax in
@@ -446,68 +432,59 @@ let insert_valid_transaction state tx_raw
     pool;
     tx_pool_addr_limit;
     tx_pool_tx_per_addr_limit;
-    max_number_of_chunks;
     _;
   } =
     state
   in
-  let tx_data =
-    transaction_object.input |> Ethereum_types.hex_to_bytes |> Bytes.of_string
+  let add_transaction ~must_replace =
+    (* Add the transaction to the pool *)
+    match Pool.add ~must_replace pool tx_raw transaction_object with
+    | Ok pool ->
+        let*! () =
+          Tx_pool_events.add_transaction
+            ~transaction:(Ethereum_types.hash_to_string transaction_object.hash)
+        in
+        state.pool <- pool ;
+        return (Ok transaction_object.hash)
+    | Error msg -> return (Error msg)
   in
-  if tx_data_size_limit_reached ~max_number_of_chunks ~tx_data then
-    let*! () = Tx_pool_events.tx_data_size_limit_reached () in
-    return @@ Error "Transaction data exceeded the allowed size."
-  else
-    let add_transaction ~must_replace =
-      (* Add the transaction to the pool *)
-      match Pool.add ~must_replace pool tx_raw transaction_object with
-      | Ok pool ->
-          let*! () =
-            Tx_pool_events.add_transaction
-              ~transaction:
-                (Ethereum_types.hash_to_string transaction_object.hash)
-          in
-          state.pool <- pool ;
-          return (Ok transaction_object.hash)
-      | Error msg -> return (Error msg)
-    in
-    let*! res_boundaries =
-      check_address_boundaries
-        ~pool
-        ~address:transaction_object.from
-        ~tx_pool_addr_limit
-        ~tx_pool_tx_per_addr_limit
-    in
-    match res_boundaries with
-    | Error `MaxUsers ->
+  let*! res_boundaries =
+    check_address_boundaries
+      ~pool
+      ~address:transaction_object.from
+      ~tx_pool_addr_limit
+      ~tx_pool_tx_per_addr_limit
+  in
+  match res_boundaries with
+  | Error `MaxUsers ->
+      return
+        (Error
+           "The transaction pool has reached its maximum threshold for user \
+            transactions. Transaction is rejected.")
+  | Error (`MaxPerUser transactions) ->
+      let (Qty nonce) = transaction_object.nonce in
+      let max_nonce, nonce_exists =
+        Pool.Nonce_map.fold
+          (fun nonce' _tx (max_nonce, nonce_exists) ->
+            (Z.max max_nonce nonce', nonce_exists || nonce = nonce'))
+          transactions
+          (Z.zero, false)
+      in
+      if nonce_exists then
+        (* It must replace an existing one, otherwise it'll be above
+           the limit. *)
+        add_transaction ~must_replace:`Replace_existing
+      else if nonce < max_nonce then
+        (* If the nonce is smaller than the max nonce, we must shift the
+           list and drop one transaction. *)
+        add_transaction ~must_replace:(`Replace_shift max_nonce)
+      else
+        (* Otherwise we have just reached the limit of transactions. *)
         return
           (Error
-             "The transaction pool has reached its maximum threshold for user \
-              transactions. Transaction is rejected.")
-    | Error (`MaxPerUser transactions) ->
-        let (Qty nonce) = transaction_object.nonce in
-        let max_nonce, nonce_exists =
-          Pool.Nonce_map.fold
-            (fun nonce' _tx (max_nonce, nonce_exists) ->
-              (Z.max max_nonce nonce', nonce_exists || nonce = nonce'))
-            transactions
-            (Z.zero, false)
-        in
-        if nonce_exists then
-          (* It must replace an existing one, otherwise it'll be above
-             the limit. *)
-          add_transaction ~must_replace:`Replace_existing
-        else if nonce < max_nonce then
-          (* If the nonce is smaller than the max nonce, we must shift the
-             list and drop one transaction. *)
-          add_transaction ~must_replace:(`Replace_shift max_nonce)
-        else
-          (* Otherwise we have just reached the limit of transactions. *)
-          return
-            (Error
-               "Limit of transaction for a user was reached. Transaction is \
-                rejected.")
-    | Ok () -> add_transaction ~must_replace:`No
+             "Limit of transaction for a user was reached. Transaction is \
+              rejected.")
+  | Ok () -> add_transaction ~must_replace:`No
 
 (** Checks that the transaction can be paid given the [gas_price] that was set
     and the current [base_fee_per_gas]. *)
@@ -771,7 +748,6 @@ module Handlers = struct
          tx_timeout_limit;
          tx_pool_addr_limit;
          tx_pool_tx_per_addr_limit;
-         max_number_of_chunks;
        } :
         Types.parameters) =
     let state =
@@ -785,7 +761,6 @@ module Handlers = struct
           tx_timeout_limit;
           tx_pool_addr_limit;
           tx_pool_tx_per_addr_limit;
-          max_number_of_chunks;
           locked = false;
         }
     in
