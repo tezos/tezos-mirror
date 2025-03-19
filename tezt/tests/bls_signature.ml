@@ -333,6 +333,81 @@ let test_single_staker_sign_staking_operation_external_delegate =
   in
   unit
 
+let test_single_staker_sign_staking_operation_consensus_key =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"single staker signs a staking operation with a consensus key"
+    ~tags:(threshold_bls_tags @ ["single"; "consensus_key"])
+    ~supports:(Protocol.From_protocol 023)
+  @@ fun protocol ->
+  let* parameters, client, default_baker, funder =
+    Local_helpers.init_node_and_client ~protocol
+  in
+  (* gen keys delegate -s bls *)
+  (* transfer 150000 from bootstrap2 to delegate *)
+  let* delegate =
+    Local_helpers.create_and_fund_account
+      ~baker:default_baker
+      ~giver:funder
+      ~alias:"delegate"
+      ~amount:(Tez.of_int 150_000)
+      ~sig_alg:"bls"
+      client
+  in
+  (* gen keys delegate_consensus_key -s bls *)
+  let* delegate_consensus_key =
+    Local_helpers.gen_and_show_keys
+      ~alias:"delegate_consensus_key"
+      ~sig_alg:"bls"
+      client
+  in
+  (* register key delegate as delegate with consensus key delegate_consensus_key *)
+  (* [delegate] registers as a self-delegate/baker with a consensus
+     key [delegate_consensus_key] for consensus operations. *)
+  Log.info
+    ~color:Log.Color.FG.green
+    "Register key %s as delegate with consensus key %s."
+    delegate.alias
+    delegate_consensus_key.alias ;
+  let* () =
+    Client.register_key
+      ~consensus:delegate_consensus_key.alias
+      delegate.alias
+      client
+  in
+  let* () = Client.bake_for_and_wait ~keys:[default_baker] client in
+  (* stake 140000 for delegate *)
+  (* To receive baking rights, [delegate] must stake at least
+     [minimal_frozen_stake] and its baking power must be at least
+     [minimal_stake]. *)
+  let* () =
+    Local_helpers.stake
+      ~baker:default_baker
+      ~staker:delegate.alias
+      ~amount:(Tez.of_int 140_000)
+      client
+  in
+  (* a consensus key [delegate_consensus_key] becomes active in
+     [consensus_rights_delay] cycles. *)
+  let* () =
+    Local_helpers.bake_for_consensus_rights_delay_and_wait
+      ~baker:default_baker
+      ~parameters
+      ~delegate:delegate_consensus_key
+      client
+  in
+  (* [delegate] bakes a next block with a consensus key
+     [delegate_consensus_key], so its staked balance is increased due
+     to the baking rewards. *)
+  let* () =
+    Local_helpers.check_staked_balance_increase_when_baking
+      ~baker:delegate_consensus_key
+      ~staker:delegate
+      client
+  in
+  unit
+
 let register ~protocols =
   test_single_staker_sign_staking_operation_self_delegate protocols ;
-  test_single_staker_sign_staking_operation_external_delegate protocols
+  test_single_staker_sign_staking_operation_external_delegate protocols ;
+  test_single_staker_sign_staking_operation_consensus_key protocols
