@@ -17,6 +17,26 @@
 open! Import
 include Object_graph_intf
 
+module Events = struct
+  include Internal_event.Simple
+
+  let section = ["brassaia-eio"; "object_graph"]
+
+  let object_graph_iter =
+    declare_5
+      ~section
+      ~level:Debug
+      ~name:"object_graph_iter"
+      ~msg:
+        "iter: depth: {depth}; rev: {rev}; min: {min}; max: {max}; cache_size: \
+         {cache_size}"
+      ("depth", Data_encoding.int64)
+      ("rev", Data_encoding.bool)
+      ("min", Data_encoding.(list (option string)))
+      ("max", Data_encoding.(list (option string)))
+      ("cache_size", Data_encoding.(option int64))
+end
+
 let src = Logs.Src.create "brassaia.graph" ~doc:"Brassaia graph support"
 
 module Log = (val Logs.src_log src : Logs.LOG)
@@ -143,25 +163,16 @@ struct
 
   let edges g = G.fold_edges (fun k1 k2 list -> (k1, k2) :: list) g []
 
-  let pp_vertices = Fmt.Dump.list (Type.pp X.t)
-
-  let pp_depth ppf d = if d <> max_int then Fmt.pf ppf "depth=%d,@ " d
-
   type action = Visit of (X.t * int) | Treat of X.t
 
   let iter ?cache_size ?(depth = max_int) ~pred ~min ~max ~node ?edge ~skip ~rev
       () =
-    [%log.debug
-      "@[<2>iter:@ %arev=%b,@ min=%a,@ max=%a@, cache=%a@]"
-        pp_depth
-        depth
-        rev
-        pp_vertices
-        min
-        pp_vertices
-        max
-        Fmt.(Dump.option int)
-        cache_size] ;
+    Events.(emit__dont_wait__use_with_care object_graph_iter)
+      ( Int64.of_int depth,
+        rev,
+        List.map (Data_encoding.Binary.to_string_opt X.encoding) min,
+        List.map (Data_encoding.Binary.to_string_opt X.encoding) max,
+        Option.map Int64.of_int cache_size ) ;
     let marks = Table.create cache_size in
     let mark key level = Table.add marks key level in
     let todo = Stack.create () in
