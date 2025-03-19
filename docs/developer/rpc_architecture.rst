@@ -139,7 +139,7 @@ The case of streams and chunks
 ==============================
 
 In Resto, service handlers return an ``'a Answer.t`` (as defined in
-``resto/src/resto_directory.ml``). The type ``Answer.t`` models the
+:src:`resto/src/resto_directory.ml`). The type :package-api:`Answer.t <octez-libs/Tezos_rpc/Answer/index.html#type-t>` models the
 different possible `HTTP status
 codes <https://en.wikipedia.org/wiki/List_of_HTTP_status_codes>`__.
 Here’s an excerpt:
@@ -219,25 +219,25 @@ only once all the chunks have been sent.
 The client recovers the data by deserialising the concatenation of all
 the chunks received.
 
-Note that the chunking only really impacts the application/json media
+Note that the chunking only really impacts the ``application/json`` media
 type. This is because of historical reasons: the JSON serialisation is
 very costly and was blocking the node for noticeable spans of times. The
-serialisation to binary could be improve to benefit from chunking but
+serialisation to binary could be improved to benefit from chunking but
 this requires modifying the de/serialisation backend.
 
 OkStream
 --------
 
 :literal:`\`OkStream` is for returning not one single value but a
-sequence of different value that a variable can have in the
+sequence of different values that a variable can have in the
 ``octez-node``. E.g., the RPC entry point
-`/monito/heads/<chain_id> <https://tezos.gitlab.io/shell/rpc.html#get-monitor-heads-chain-id>`__
+`/monitor/heads/<chain_id> <https://tezos.gitlab.io/shell/rpc.html#get-monitor-heads-chain-id>`__
 sends a sequence of blocks, one for each time the node changes head on
 the chain passed as parameter.
 
 The server transmits each new value as a chunk using the chunk transfer
 encoding (see above). Unlike with :literal:`\`OkChunk` each of the chunk
-transmitted for :literal:`\`OkStream` is a fully form element of a
+transmitted for :literal:`\`OkStream` is a fully formed element of a
 stream. The client doesn’t concatenate the chunks together: it decodes
 them one after the other.
 
@@ -265,8 +265,8 @@ them one after the other.
        stream->>server: value
        server->>client: data
 
-The server never closes the connection (unless the stream ends which is
-not the case for the values monitored in the tezos stream RPCs).
+The server never closes the connection (unless the stream ends, which is
+not the case for the values monitored in the Tezos stream RPCs).
 
 The payload of the :literal:`\`OkStream` constructor is a ``stream``
 which is essentially a function ``next`` returning a promise for the
@@ -277,7 +277,7 @@ next available value:
    type 'a stream = {next : unit -> 'a option Lwt.t; shutdown : unit -> unit}
 
 The resto server (:src:`resto/src/server.ml`) transforms this ``stream``
-into an ``Lwt_stream`` and passes it to cohttp which does uses it to
+into an ``Lwt_stream`` and passes it to cohttp which uses it to
 request new values to be transmitted.
 
 Software stacks
@@ -289,7 +289,7 @@ of Tezos. This section presents them by theme.
 Declaring
 ---------
 
-In the “declaring” part of the stack, the services are merely described:
+In the "declaring" part of the stack, the services are merely described:
 how many parameters and of what type, what type of value is returned,
 etc. See above.
 
@@ -302,9 +302,9 @@ on it without introducing unneeded dependencies.
 The files declare services by calling into
 :src:`src/lib_rpc/RPC_service.ml` which:
 
-- instantiates the functor ``MakeServices`` from ``resto/ser/resto.ml`` with a de/serialisation
+- instantiates the functor ``MakeServices`` from :src:`resto/src/resto.ml` with a de/serialisation
   process, and
-- specialises the service type and constructors with tezos’ error-management type ``tzresult``
+- specialises the service type and constructors with the error-management type ``tzresult``
 
 .. mermaid::
 
@@ -317,13 +317,15 @@ The files declare services by calling into
 Serving
 -------
 
-In the “serving” part of the stack, the queries to the services are
+In the "serving" part of the stack, the queries to the services are
 answered.
 
-First, the services are assembled into a directory. In this step, the
+Setting up the serving part is done in two phases.
+
+First, the services are assembled into a directory, by declaring a directory and registering services into it. In this step, the
 services are associated to a handler: the *procedure* in *Remote
 Procedure Call*. This happens in multiple files peppered around the
-source code, generally in modules which have “directory” in their names.
+source code, generally in modules which have "directory" in their names.
 E.g., :src:`src/lib_shell/chain_directory.ml`.
 
 The registration into directory is done by calling into
@@ -410,7 +412,7 @@ used by ``octez-client`` to communicate with ``octez-node``.
 
 The ``octez-client`` (or another binary) obtains a description of the
 some services from the ``src/lib_*_services`` files. This is one of the
-reason service declaration and registrataion are separate steps: the
+reason service declaration and registration are separate steps: the
 former can be used by clients were the handler wouldn’t necessarily make
 sense.
 
@@ -441,7 +443,7 @@ the default cohttp client.
 The code in :src:`src/lib_rpc_http/RPC_client.ml` is a wrapper around
 :src:`resto/src/client.ml`. The wrapper provides:
 
-- glue between the logging mechanism of resto and tezos
+- glue between the logging mechanism of resto and Octez
 - error-management and error-related UI/UX (translating HTTP errors into more readable messages)
 - media-types management and de/serialisation.
 
