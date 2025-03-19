@@ -1511,7 +1511,22 @@ module Encoding = struct
       Manager_result.update_consensus_key_case
       (function
         | Contents_and_result
-            ( (Manager_operation {operation = Update_consensus_key _; _} as op),
+            ( (Manager_operation
+                 {operation = Update_consensus_key {kind = Consensus; _}; _} as
+               op),
+              res ) ->
+            Some (op, res)
+        | _ -> None)
+
+  let update_companion_key_case =
+    make_manager_case
+      Operation.Encoding.update_companion_key_case
+      Manager_result.update_consensus_key_case
+      (function
+        | Contents_and_result
+            ( (Manager_operation
+                 {operation = Update_consensus_key {kind = Companion; _}; _} as
+               op),
               res ) ->
             Some (op, res)
         | _ -> None)
@@ -1713,6 +1728,7 @@ let common_cases =
     set_deposits_limit_case;
     increase_paid_storage_case;
     update_consensus_key_case;
+    update_companion_key_case;
     transfer_ticket_case;
     dal_publish_commitment_case;
     sc_rollup_originate_case;

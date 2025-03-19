@@ -5032,6 +5032,8 @@ module Operation : sig
 
     val update_consensus_key_case : Kind.update_consensus_key Kind.manager case
 
+    val update_companion_key_case : Kind.update_consensus_key Kind.manager case
+
     val transfer_ticket_case : Kind.transfer_ticket Kind.manager case
 
     val dal_publish_commitment_case :
@@ -5094,6 +5096,8 @@ module Operation : sig
       val update_consensus_key_tag : int
 
       val update_consensus_key_case : Kind.update_consensus_key case
+
+      val update_companion_key_case : Kind.update_consensus_key case
 
       val register_global_constant_case : Kind.register_global_constant case
 

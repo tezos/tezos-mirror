@@ -775,19 +775,46 @@ module Encoding = struct
           tag = update_consensus_key_tag;
           name = "update_consensus_key";
           encoding =
-            obj3
+            obj2
               (req "pk" Signature.Public_key.encoding)
-              (req "kind" Delegate_consensus_key.kind_encoding)
               (opt "proof" (dynamic_size Bls.encoding));
           select =
             (function
-            | Manager (Update_consensus_key _ as op) -> Some op | _ -> None);
+            | Manager
+                (Update_consensus_key
+                   {public_key = _; proof = _; kind = Consensus} as op) ->
+                Some op
+            | _ -> None);
           proj =
-            (fun (Update_consensus_key {public_key; proof; kind}) ->
-              (public_key, kind, proof));
+            (fun (Update_consensus_key {public_key; proof; kind = _}) ->
+              (public_key, proof));
           inj =
-            (fun (public_key, kind, proof) ->
-              Update_consensus_key {public_key; proof; kind});
+            (fun (public_key, proof) ->
+              Update_consensus_key {public_key; proof; kind = Consensus});
+        }
+
+    let update_companion_key_case =
+      MCase
+        {
+          tag = 32;
+          name = "update_companion_key";
+          encoding =
+            obj2
+              (req "pk" Signature.Public_key.encoding)
+              (opt "proof" (dynamic_size Bls.encoding));
+          select =
+            (function
+            | Manager
+                (Update_consensus_key
+                   {public_key = _; proof = _; kind = Companion} as op) ->
+                Some op
+            | _ -> None);
+          proj =
+            (fun (Update_consensus_key {public_key; proof; kind = _}) ->
+              (public_key, proof));
+          inj =
+            (fun (public_key, proof) ->
+              Update_consensus_key {public_key; proof; kind = Companion});
         }
 
     let transfer_ticket_case =
@@ -1479,6 +1506,9 @@ module Encoding = struct
   let update_consensus_key_case =
     make_manager_case 114 Manager_operations.update_consensus_key_case
 
+  let update_companion_key_case =
+    make_manager_case 115 Manager_operations.update_companion_key_case
+
   let transfer_ticket_case =
     make_manager_case
       transfer_ticket_tag
@@ -1565,6 +1595,7 @@ module Encoding = struct
       PCase set_deposits_limit_case;
       PCase increase_paid_storage_case;
       PCase update_consensus_key_case;
+      PCase update_companion_key_case;
       PCase drain_delegate_case;
       PCase failing_noop_case;
       PCase register_global_constant_case;

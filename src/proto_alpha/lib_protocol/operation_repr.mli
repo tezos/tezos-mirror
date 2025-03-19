@@ -772,6 +772,8 @@ module Encoding : sig
 
   val update_consensus_key_case : Kind.update_consensus_key Kind.manager case
 
+  val update_companion_key_case : Kind.update_consensus_key Kind.manager case
+
   val register_global_constant_case :
     Kind.register_global_constant Kind.manager case
 
@@ -832,6 +834,8 @@ module Encoding : sig
     val update_consensus_key_tag : int
 
     val update_consensus_key_case : Kind.update_consensus_key case
+
+    val update_companion_key_case : Kind.update_consensus_key case
 
     val register_global_constant_case : Kind.register_global_constant case
 
