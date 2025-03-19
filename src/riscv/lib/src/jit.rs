@@ -1149,18 +1149,53 @@ mod tests {
 
         let scenarios: &[Scenario<F>] = &[
             // Equality
-            test_branch(I::new_beq, I::new_bne, 2, 3),
-            test_branch(I::new_bne, I::new_beq, 2, 2),
-            test_branch(I::new_beq, I::new_bne, 2, -3),
+            test_branch(I::new_branch_equal, I::new_branch_not_equal, 2, 3),
+            test_branch(I::new_branch_not_equal, I::new_branch_equal, 2, 2),
+            test_branch(I::new_branch_equal, I::new_branch_not_equal, 2, -3),
             // LessThanUnsigned + GreaterThanOrEqualUnsigned
-            test_branch(I::new_bltu, I::new_bgeu, 3, 2),
-            test_branch(I::new_bltu, I::new_bgeu, 2, 2),
-            test_branch(I::new_bgeu, I::new_bltu, 2, -3),
+            test_branch(
+                I::new_branch_less_than_unsigned,
+                I::new_branch_greater_than_or_equal_unsigned,
+                3,
+                2,
+            ),
+            test_branch(
+                I::new_branch_less_than_unsigned,
+                I::new_branch_greater_than_or_equal_unsigned,
+                2,
+                2,
+            ),
+            test_branch(
+                I::new_branch_greater_than_or_equal_unsigned,
+                I::new_branch_less_than_unsigned,
+                2,
+                -3,
+            ),
             // LessThanSigned + GreaterThanOrEqualSigned
-            test_branch(I::new_blt, I::new_bge, 3, 2),
-            test_branch(I::new_blt, I::new_bge, 2, 2),
-            test_branch(I::new_blt, I::new_bge, 2, -3),
-            test_branch(I::new_bge, I::new_blt, -4, -3),
+            test_branch(
+                I::new_branch_less_than_signed,
+                I::new_branch_greater_than_or_equal_signed,
+                3,
+                2,
+            ),
+            test_branch(
+                I::new_branch_less_than_signed,
+                I::new_branch_greater_than_or_equal_signed,
+                2,
+                2,
+            ),
+            test_branch(
+                I::new_branch_less_than_signed,
+                I::new_branch_greater_than_or_equal_signed,
+                2,
+                -3,
+            ),
+            test_branch(
+                I::new_branch_greater_than_or_equal_signed,
+                I::new_branch_less_than_signed,
+                -4,
+                -3,
+            ),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
@@ -1201,17 +1236,41 @@ mod tests {
 
         let scenarios: &[Scenario<F>] = &[
             // Equality
-            test_branch_compare_zero(I::new_beqz, I::new_bnez, 12),
-            test_branch_compare_zero(I::new_bnez, I::new_beqz, 0),
-            test_branch_compare_zero(I::new_beqz, I::new_bnez, -12),
+            test_branch_compare_zero(I::new_branch_equal_zero, I::new_branch_not_equal_zero, 12),
+            test_branch_compare_zero(I::new_branch_not_equal_zero, I::new_branch_equal_zero, 0),
+            test_branch_compare_zero(I::new_branch_equal_zero, I::new_branch_not_equal_zero, -12),
             // LessThan + GreaterThanOrEqual
-            test_branch_compare_zero(I::new_bltz, I::new_bgez, 12),
-            test_branch_compare_zero(I::new_bltz, I::new_bgez, 0),
-            test_branch_compare_zero(I::new_bgez, I::new_bltz, -12),
+            test_branch_compare_zero(
+                I::new_branch_less_than_zero,
+                I::new_branch_greater_than_or_equal_zero,
+                12,
+            ),
+            test_branch_compare_zero(
+                I::new_branch_less_than_zero,
+                I::new_branch_greater_than_or_equal_zero,
+                0,
+            ),
+            test_branch_compare_zero(
+                I::new_branch_greater_than_or_equal_zero,
+                I::new_branch_less_than_zero,
+                -12,
+            ),
             // LessThanOrEqual + GreaterThan
-            test_branch_compare_zero(I::new_bltez, I::new_bgz, 12),
-            test_branch_compare_zero(I::new_bgz, I::new_bltez, 0),
-            test_branch_compare_zero(I::new_bgz, I::new_bltez, -12),
+            test_branch_compare_zero(
+                I::new_branch_less_than_or_equal_zero,
+                I::new_branch_greater_than_zero,
+                12,
+            ),
+            test_branch_compare_zero(
+                I::new_branch_greater_than_zero,
+                I::new_branch_less_than_or_equal_zero,
+                0,
+            ),
+            test_branch_compare_zero(
+                I::new_branch_greater_than_zero,
+                I::new_branch_less_than_or_equal_zero,
+                -12,
+            ),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();

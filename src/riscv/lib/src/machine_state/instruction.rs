@@ -247,12 +247,12 @@ pub enum OpCode {
     Sd,
 
     // RV64I B-type instructions
-    Beq,
-    Bne,
-    Blt,
-    Bge,
-    Bltu,
-    Bgeu,
+    BranchEqual,
+    BranchNotEqual,
+    BranchLessThanSigned,
+    BranchGreaterThanOrEqualSigned,
+    BranchLessThanUnsigned,
+    BranchGreaterThanOrEqualUnsigned,
 
     // RV64I U-type instructions
     AddImmediateToPC,
@@ -393,8 +393,8 @@ pub enum OpCode {
     CFsdsp,
 
     // Internal OpCodes
-    Beqz,
-    Bnez,
+    BranchEqualZero,
+    BranchNotEqualZero,
     J,
     Mv,
     Li,
@@ -425,13 +425,13 @@ pub enum OpCode {
     /// Same as `Sb` but only using NonZeroXRegisters.
     Sbnz,
     /// Jump to `pc + imm` if `val(rs2) < 0`.
-    Bltz,
+    BranchLessThanZero,
     /// Jump to `pc + imm` if `val(rs2) >= 0`.
-    Bgez,
+    BranchGreaterThanOrEqualZero,
     /// Jump to `pc + imm` if `val(rs2) <= 0`.
-    Bltez,
+    BranchLessThanOrEqualZero,
     /// Jump to `pc + imm` if `val(rs2) > 0`.
-    Bgz,
+    BranchGreaterThanZero,
 }
 
 impl OpCode {
@@ -491,16 +491,18 @@ impl OpCode {
             Self::Swnz => Args::run_swnz,
             Self::Sd => Args::run_sd,
             Self::Sdnz => Args::run_sdnz,
-            Self::Beq => Args::run_beq,
-            Self::Bne => Args::run_bne,
-            Self::Blt => Args::run_blt,
-            Self::Bge => Args::run_bge,
-            Self::Bltz => Args::run_bltz,
-            Self::Bgez => Args::run_bgez,
-            Self::Bltez => Args::run_bltez,
-            Self::Bgz => Args::run_bgz,
-            Self::Bltu => Args::run_bltu,
-            Self::Bgeu => Args::run_bgeu,
+            Self::BranchEqual => Args::run_branch_equal,
+            Self::BranchNotEqual => Args::run_branch_not_equal,
+            Self::BranchLessThanSigned => Args::run_branch_less_than_signed,
+            Self::BranchGreaterThanOrEqualSigned => Args::run_branch_greater_than_or_equal_signed,
+            Self::BranchLessThanZero => Args::run_branch_less_than_zero,
+            Self::BranchGreaterThanOrEqualZero => Args::run_branch_greater_than_or_equal_zero,
+            Self::BranchLessThanOrEqualZero => Args::run_branch_less_than_equal_zero,
+            Self::BranchGreaterThanZero => Args::run_branch_greater_than_zero,
+            Self::BranchLessThanUnsigned => Args::run_branch_less_than_unsigned,
+            Self::BranchGreaterThanOrEqualUnsigned => {
+                Args::run_branch_greater_than_or_equal_unsigned
+            }
             Self::AddImmediateToPC => Args::run_add_immediate_to_pc,
             Self::Jal => Args::run_jal,
             Self::JalrImm => Args::run_jalr_imm,
@@ -613,8 +615,8 @@ impl OpCode {
             Self::JAbsolute => Args::run_j_absolute,
             Self::Jr => Args::run_jr,
             Self::Jalr => Args::run_jalr,
-            Self::Beqz => Args::run_beqz,
-            Self::Bnez => Args::run_bnez,
+            Self::BranchEqualZero => Args::run_branch_equal_zero,
+            Self::BranchNotEqualZero => Args::run_branch_not_equal_zero,
             Self::Li => Args::run_li,
             Self::Mv => Args::run_mv,
             Self::CAddw => Args::run_caddw,
@@ -664,18 +666,25 @@ impl OpCode {
             Self::SetLessThanImmediateSigned => Some(Args::run_set_less_than_immediate_signed),
             Self::SetLessThanImmediateUnsigned => Some(Args::run_set_less_than_immediate_unsigned),
             // Branching instructions
-            Self::Beq => Some(Args::run_beq),
-            Self::Beqz => Some(Args::run_beqz),
-            Self::Bne => Some(Args::run_bne),
-            Self::Bnez => Some(Args::run_bnez),
-            Self::Blt => Some(Args::run_blt),
-            Self::Bltu => Some(Args::run_bltu),
-            Self::Bltz => Some(Args::run_bltz),
-            Self::Bltez => Some(Args::run_bltez),
-            Self::Bge => Some(Args::run_bge),
-            Self::Bgeu => Some(Args::run_bgeu),
-            Self::Bgez => Some(Args::run_bgez),
-            Self::Bgz => Some(Args::run_bgz),
+            Self::BranchEqual => Some(Args::run_branch_equal),
+            Self::BranchEqualZero => Some(Args::run_branch_equal_zero),
+            Self::BranchNotEqual => Some(Args::run_branch_not_equal),
+            Self::BranchNotEqualZero => Some(Args::run_branch_not_equal_zero),
+
+            Self::BranchLessThanSigned => Some(Args::run_branch_less_than_signed),
+            Self::BranchLessThanUnsigned => Some(Args::run_branch_less_than_unsigned),
+            Self::BranchLessThanZero => Some(Args::run_branch_less_than_zero),
+            Self::BranchLessThanOrEqualZero => Some(Args::run_branch_less_than_equal_zero),
+
+            Self::BranchGreaterThanOrEqualSigned => {
+                Some(Args::run_branch_greater_than_or_equal_signed)
+            }
+            Self::BranchGreaterThanOrEqualUnsigned => {
+                Some(Args::run_branch_greater_than_or_equal_unsigned)
+            }
+            Self::BranchGreaterThanOrEqualZero => Some(Args::run_branch_greater_than_or_equal_zero),
+            Self::BranchGreaterThanZero => Some(Args::run_branch_greater_than_zero),
+
             _ => None,
         }
     }
@@ -1311,18 +1320,30 @@ impl Args {
     impl_store_type!(run_sbnz, non_zero);
 
     // Branching instructions
-    impl_branch!(run_beq, Predicate::Equal);
-    impl_branch!(run_bne, Predicate::NotEqual);
-    impl_branch!(run_blt, Predicate::LessThanSigned);
-    impl_branch!(run_bltu, Predicate::LessThanUnsigned);
-    impl_branch!(run_bge, Predicate::GreaterThanOrEqualSigned);
-    impl_branch!(run_bgeu, Predicate::GreaterThanOrEqualUnsigned);
-    impl_branch_compare_zero!(run_beqz, Predicate::Equal);
-    impl_branch_compare_zero!(run_bnez, Predicate::NotEqual);
-    impl_branch_compare_zero!(run_bltz, Predicate::LessThanSigned);
-    impl_branch_compare_zero!(run_bgez, Predicate::GreaterThanOrEqualSigned);
-    impl_branch_compare_zero!(run_bltez, Predicate::LessThanOrEqualSigned);
-    impl_branch_compare_zero!(run_bgz, Predicate::GreaterThanSigned);
+    impl_branch!(run_branch_equal, Predicate::Equal);
+    impl_branch!(run_branch_not_equal, Predicate::NotEqual);
+    impl_branch!(run_branch_less_than_signed, Predicate::LessThanSigned);
+    impl_branch!(run_branch_less_than_unsigned, Predicate::LessThanUnsigned);
+    impl_branch!(
+        run_branch_greater_than_or_equal_signed,
+        Predicate::GreaterThanOrEqualSigned
+    );
+    impl_branch!(
+        run_branch_greater_than_or_equal_unsigned,
+        Predicate::GreaterThanOrEqualUnsigned
+    );
+    impl_branch_compare_zero!(run_branch_equal_zero, Predicate::Equal);
+    impl_branch_compare_zero!(run_branch_not_equal_zero, Predicate::NotEqual);
+    impl_branch_compare_zero!(run_branch_less_than_zero, Predicate::LessThanSigned);
+    impl_branch_compare_zero!(
+        run_branch_greater_than_or_equal_zero,
+        Predicate::GreaterThanOrEqualSigned
+    );
+    impl_branch_compare_zero!(
+        run_branch_less_than_equal_zero,
+        Predicate::LessThanOrEqualSigned
+    );
+    impl_branch_compare_zero!(run_branch_greater_than_zero, Predicate::GreaterThanSigned);
 
     // RV64I U-type instructions
     /// SAFETY: This function must only be called on an `Args` belonging

@@ -459,15 +459,16 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Beq`].
-    pub(crate) fn new_beq(
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for
+    /// [`OpCode::BranchEqual`].
+    pub(crate) fn new_branch_equal(
         rs1: NonZeroXRegister,
         rs2: NonZeroXRegister,
         imm: i64,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Beq,
+            opcode: OpCode::BranchEqual,
             args: Args {
                 rs1: rs1.into(),
                 rs2: rs2.into(),
@@ -478,10 +479,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Beqz`].
-    pub(crate) fn new_beqz(rs1: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for
+    /// [`OpCode::BranchEqualZero`].
+    pub(crate) fn new_branch_equal_zero(
+        rs1: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
         Self {
-            opcode: OpCode::Beqz,
+            opcode: OpCode::BranchEqualZero,
             args: Args {
                 rs1: rs1.into(),
                 imm,
@@ -491,15 +497,16 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Bne`].
-    pub(crate) fn new_bne(
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for
+    /// [`OpCode::BranchNotEqual`].
+    pub(crate) fn new_branch_not_equal(
         rs1: NonZeroXRegister,
         rs2: NonZeroXRegister,
         imm: i64,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Bne,
+            opcode: OpCode::BranchNotEqual,
             args: Args {
                 rs1: rs1.into(),
                 rs2: rs2.into(),
@@ -510,10 +517,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Bnez`].
-    pub(crate) fn new_bnez(rs1: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for
+    /// [`OpCode::BranchNotEqualZero`].
+    pub(crate) fn new_branch_not_equal_zero(
+        rs1: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
         Self {
-            opcode: OpCode::Bnez,
+            opcode: OpCode::BranchNotEqualZero,
             args: Args {
                 rs1: rs1.into(),
                 imm,
@@ -869,15 +881,16 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Blt`].
-    pub(crate) fn new_blt(
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for
+    /// [`OpCode::BranchLessThanSigned`].
+    pub(crate) fn new_branch_less_than_signed(
         rs1: NonZeroXRegister,
         rs2: NonZeroXRegister,
         imm: i64,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Blt,
+            opcode: OpCode::BranchLessThanSigned,
             args: Args {
                 rs1: rs1.into(),
                 rs2: rs2.into(),
@@ -888,10 +901,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Bltz`].
-    pub(crate) fn new_bltz(rs1: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for
+    /// [`OpCode::BranchLessThanZero`].
+    pub(crate) fn new_branch_less_than_zero(
+        rs1: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
         Self {
-            opcode: OpCode::Bltz,
+            opcode: OpCode::BranchLessThanZero,
             args: Args {
                 rs1: rs1.into(),
                 imm,
@@ -901,10 +919,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Bltez`].
-    pub(crate) fn new_bltez(rs1: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for
+    /// [`OpCode::BranchLessThanOrEqualZero`].
+    pub(crate) fn new_branch_less_than_or_equal_zero(
+        rs1: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
         Self {
-            opcode: OpCode::Bltez,
+            opcode: OpCode::BranchLessThanOrEqualZero,
             args: Args {
                 rs1: rs1.into(),
                 imm,
@@ -914,15 +937,16 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Bge`].
-    pub(crate) fn new_bge(
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for
+    /// [`OpCode::BranchGreaterThanOrEqualSigned`].
+    pub(crate) fn new_branch_greater_than_or_equal_signed(
         rs1: NonZeroXRegister,
         rs2: NonZeroXRegister,
         imm: i64,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Bge,
+            opcode: OpCode::BranchGreaterThanOrEqualSigned,
             args: Args {
                 rs1: rs1.into(),
                 rs2: rs2.into(),
@@ -933,10 +957,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Bgez`].
-    pub(crate) fn new_bgez(rs1: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for
+    /// [`OpCode::BranchGreaterThanOrEqualZero`].
+    pub(crate) fn new_branch_greater_than_or_equal_zero(
+        rs1: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
         Self {
-            opcode: OpCode::Bgez,
+            opcode: OpCode::BranchGreaterThanOrEqualZero,
             args: Args {
                 rs1: rs1.into(),
                 imm,
@@ -946,10 +975,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Bgz`].
-    pub(crate) fn new_bgz(rs1: NonZeroXRegister, imm: i64, width: InstrWidth) -> Self {
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for
+    /// [`OpCode::BranchGreaterThanZero`].
+    pub(crate) fn new_branch_greater_than_zero(
+        rs1: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
         Self {
-            opcode: OpCode::Bgz,
+            opcode: OpCode::BranchGreaterThanZero,
             args: Args {
                 rs1: rs1.into(),
                 imm,
@@ -959,15 +993,16 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Bltu`].
-    pub(crate) fn new_bltu(
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for
+    /// [`OpCode::BranchLessThanUnsigned`].
+    pub(crate) fn new_branch_less_than_unsigned(
         rs1: NonZeroXRegister,
         rs2: NonZeroXRegister,
         imm: i64,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Bltu,
+            opcode: OpCode::BranchLessThanUnsigned,
             args: Args {
                 rs1: rs1.into(),
                 rs2: rs2.into(),
@@ -978,15 +1013,16 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Bgeu`].
-    pub(crate) fn new_bgeu(
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for
+    /// [`OpCode::BranchGreaterThanOrEqualUnsigned`].
+    pub(crate) fn new_branch_greater_than_or_equal_unsigned(
         rs1: NonZeroXRegister,
         rs2: NonZeroXRegister,
         imm: i64,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Bgeu,
+            opcode: OpCode::BranchGreaterThanOrEqualUnsigned,
             args: Args {
                 rs1: rs1.into(),
                 rs2: rs2.into(),
@@ -1398,10 +1434,10 @@ impl Instruction {
             }
             // If either register is x0, then the condition to branch is whether the other register stores 0.
             (X::NonZero(rs1), X::X0) | (X::X0, X::NonZero(rs1)) => {
-                Instruction::new_beqz(rs1, args.imm, InstrWidth::Uncompressed)
+                Instruction::new_branch_equal_zero(rs1, args.imm, InstrWidth::Uncompressed)
             }
             (X::NonZero(rs1), X::NonZero(rs2)) => {
-                Instruction::new_beq(rs1, rs2, args.imm, InstrWidth::Uncompressed)
+                Instruction::new_branch_equal(rs1, rs2, args.imm, InstrWidth::Uncompressed)
             }
         }
     }
@@ -1414,7 +1450,9 @@ impl Instruction {
         match split_x0(args.rd_rs1) {
             // If `rd_rs1` is zero, the result is an unconditional jump
             X::X0 => Instruction::new_j(args.imm, InstrWidth::Compressed),
-            X::NonZero(rd_rs1) => Instruction::new_beqz(rd_rs1, args.imm, InstrWidth::Compressed),
+            X::NonZero(rd_rs1) => {
+                Instruction::new_branch_equal_zero(rd_rs1, args.imm, InstrWidth::Compressed)
+            }
         }
     }
 
@@ -1431,10 +1469,10 @@ impl Instruction {
             }
             // If either register is x0, then the condition to branch is whether the other register doesn't store 0.
             (X::NonZero(rs1), X::X0) | (X::X0, X::NonZero(rs1)) => {
-                Instruction::new_bnez(rs1, args.imm, InstrWidth::Uncompressed)
+                Instruction::new_branch_not_equal_zero(rs1, args.imm, InstrWidth::Uncompressed)
             }
             (X::NonZero(rs1), X::NonZero(rs2)) => {
-                Instruction::new_bne(rs1, rs2, args.imm, InstrWidth::Uncompressed)
+                Instruction::new_branch_not_equal(rs1, rs2, args.imm, InstrWidth::Uncompressed)
             }
         }
     }
@@ -1447,7 +1485,9 @@ impl Instruction {
         match split_x0(args.rd_rs1) {
             // If `rd_rs1 == x0`, this will never branch.
             X::X0 => Instruction::new_nop(InstrWidth::Compressed),
-            X::NonZero(rd_rs1) => Instruction::new_bnez(rd_rs1, args.imm, InstrWidth::Compressed),
+            X::NonZero(rd_rs1) => {
+                Instruction::new_branch_not_equal_zero(rd_rs1, args.imm, InstrWidth::Compressed)
+            }
         }
     }
 
@@ -1624,15 +1664,18 @@ impl Instruction {
             }
             // If rs1 is x0, the condition to branch is whether `val(rs2) > 0`.
             (X::X0, X::NonZero(rs1)) => {
-                Instruction::new_bgz(rs1, args.imm, InstrWidth::Uncompressed)
+                Instruction::new_branch_greater_than_zero(rs1, args.imm, InstrWidth::Uncompressed)
             }
             // If rs2 is x0, the condition to branch is whether `val(rs1) < 0`.
             (X::NonZero(rs1), X::X0) => {
-                Instruction::new_bltz(rs1, args.imm, InstrWidth::Uncompressed)
+                Instruction::new_branch_less_than_zero(rs1, args.imm, InstrWidth::Uncompressed)
             }
-            (X::NonZero(rs1), X::NonZero(rs2)) => {
-                Instruction::new_blt(rs1, rs2, args.imm, InstrWidth::Uncompressed)
-            }
+            (X::NonZero(rs1), X::NonZero(rs2)) => Instruction::new_branch_less_than_signed(
+                rs1,
+                rs2,
+                args.imm,
+                InstrWidth::Uncompressed,
+            ),
         }
     }
 
@@ -1648,15 +1691,24 @@ impl Instruction {
                 Instruction::new_j(args.imm, InstrWidth::Uncompressed)
             }
             // If rs1 is x0, the condition to branch is whether `val(rs2) <= 0`.
-            (X::X0, X::NonZero(rs1)) => {
-                Instruction::new_bltez(rs1, args.imm, InstrWidth::Uncompressed)
-            }
+            (X::X0, X::NonZero(rs1)) => Instruction::new_branch_less_than_or_equal_zero(
+                rs1,
+                args.imm,
+                InstrWidth::Uncompressed,
+            ),
             // If rs2 is x0, the condition to branch is whether `val(rs1) >= 0`.
-            (X::NonZero(rs1), X::X0) => {
-                Instruction::new_bgez(rs1, args.imm, InstrWidth::Uncompressed)
-            }
+            (X::NonZero(rs1), X::X0) => Instruction::new_branch_greater_than_or_equal_zero(
+                rs1,
+                args.imm,
+                InstrWidth::Uncompressed,
+            ),
             (X::NonZero(rs1), X::NonZero(rs2)) => {
-                Instruction::new_bge(rs1, rs2, args.imm, InstrWidth::Uncompressed)
+                Instruction::new_branch_greater_than_or_equal_signed(
+                    rs1,
+                    rs2,
+                    args.imm,
+                    InstrWidth::Uncompressed,
+                )
             }
         }
     }
@@ -1675,11 +1727,14 @@ impl Instruction {
             }
             // If rs1 is x0, the condition to branch is whether `val(rs2) != 0`.
             (X::X0, X::NonZero(rs1)) => {
-                Instruction::new_bnez(rs1, args.imm, InstrWidth::Uncompressed)
+                Instruction::new_branch_not_equal_zero(rs1, args.imm, InstrWidth::Uncompressed)
             }
-            (X::NonZero(rs1), X::NonZero(rs2)) => {
-                Instruction::new_bltu(rs1, rs2, args.imm, InstrWidth::Uncompressed)
-            }
+            (X::NonZero(rs1), X::NonZero(rs2)) => Instruction::new_branch_less_than_unsigned(
+                rs1,
+                rs2,
+                args.imm,
+                InstrWidth::Uncompressed,
+            ),
         }
     }
 
@@ -1697,10 +1752,15 @@ impl Instruction {
             }
             // If rs1 is x0, the condition to branch is whether `val(rs2) == 0`.
             (X::X0, X::NonZero(rs1)) => {
-                Instruction::new_beqz(rs1, args.imm, InstrWidth::Uncompressed)
+                Instruction::new_branch_equal_zero(rs1, args.imm, InstrWidth::Uncompressed)
             }
             (X::NonZero(rs1), X::NonZero(rs2)) => {
-                Instruction::new_bgeu(rs1, rs2, args.imm, InstrWidth::Uncompressed)
+                Instruction::new_branch_greater_than_or_equal_unsigned(
+                    rs1,
+                    rs2,
+                    args.imm,
+                    InstrWidth::Uncompressed,
+                )
             }
         }
     }
