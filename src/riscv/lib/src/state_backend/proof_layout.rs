@@ -185,9 +185,9 @@ impl<'a> ProofTree<'a> {
     /// If the proof tree is absent, return absent branches and no proof hash.
     fn into_branches_with_hash<const LEN: usize>(
         self,
-    ) -> Result<(Vec<ProofTree<'a>>, Option<Hash>), PartialHashError> {
+    ) -> Result<(Box<[ProofTree<'a>; LEN]>, Option<Hash>), PartialHashError> {
         let ProofTree::Present(proof) = self else {
-            return Ok((vec![ProofTree::Absent; LEN], None));
+            return Ok((boxed_array![ProofTree::Absent; LEN], None));
         };
 
         match proof {
@@ -198,11 +198,19 @@ impl<'a> ProofTree<'a> {
                 },
             )),
             Tree::Node(branches) => Ok((
-                branches.iter().map(ProofTree::Present).collect::<Vec<_>>(),
+                branches
+                    .iter()
+                    .map(ProofTree::Present)
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice()
+                    .try_into()
+                    .map_err(|_| PartialHashError::Fatal)?,
                 None,
             )),
             Tree::Leaf(leaf) => match leaf {
-                MerkleProofLeaf::Blind(hash) => Ok((vec![ProofTree::Absent; LEN], Some(*hash))),
+                MerkleProofLeaf::Blind(hash) => {
+                    Ok((boxed_array![ProofTree::Absent; LEN], Some(*hash)))
+                }
                 _ => Err(FromProofError::UnexpectedLeaf)?,
             },
         }
@@ -356,20 +364,15 @@ impl<const LEN: usize> ProofLayout for DynArray<LEN> {
                 // Expecting a branching point.
                 // TODO RV-463: Nodes with fewer than `MERKLE_ARITY` children should also be accepted.
                 let branches = tree.into_branches::<{ MERKLE_ARITY }>()?;
-                let branch_max_length = length.div_ceil(MERKLE_ARITY);
 
-                let mut branch_start = start;
-                let mut length_left = length;
-                for branch in branches.into_iter() {
-                    let this_branch_length = branch_max_length.min(length_left);
-
-                    if this_branch_length > 0 {
-                        pipeline.push((branch_start, this_branch_length, branch));
-                    }
-
-                    branch_start = branch_start.saturating_add(this_branch_length);
-                    length_left = length_left.saturating_sub(this_branch_length);
-                }
+                push_work_items_for_branches(
+                    start,
+                    length,
+                    branches.as_slice(),
+                    |branch_start, branch_length, branch| {
+                        pipeline.push((branch_start, branch_length, branch));
+                    },
+                );
             }
         }
 
@@ -418,24 +421,14 @@ impl<const LEN: usize> ProofLayout for DynArray<LEN> {
                         let (branches, proof_hash) =
                             tree.into_branches_with_hash::<{ MERKLE_ARITY }>()?;
 
-                        let branch_max_length = length.div_ceil(MERKLE_ARITY);
-                        let mut branch_start = start;
-                        let mut length_left = length;
-
-                        for branch in branches.into_iter() {
-                            let this_branch_length = branch_max_length.min(length_left);
-
-                            if this_branch_length > 0 {
-                                queue.push_back(Event::Span(
-                                    branch_start,
-                                    this_branch_length,
-                                    branch,
-                                ));
-                            }
-
-                            branch_start = branch_start.saturating_add(this_branch_length);
-                            length_left = length_left.saturating_sub(this_branch_length);
-                        }
+                        push_work_items_for_branches(
+                            start,
+                            length,
+                            branches.as_ref(),
+                            |branch_start, branch_length, branch| {
+                                queue.push_back(Event::Span(branch_start, branch_length, branch));
+                            },
+                        );
 
                         queue.push_back(Event::Node(proof_hash));
                     }
@@ -793,6 +786,26 @@ where
         .collect::<Result<Vec<_>, _>>()?;
 
     MerkleTree::make_merkle_node(children)
+}
+
+fn push_work_items_for_branches<'a>(
+    mut branch_start: usize,
+    mut length_left: usize,
+    branches: &'_ [ProofTree<'a>],
+    mut push: impl FnMut(usize, usize, ProofTree<'a>),
+) {
+    let branch_max_length = length_left.div_ceil(MERKLE_ARITY);
+
+    for branch in branches.iter() {
+        let this_branch_length = branch_max_length.min(length_left);
+
+        if this_branch_length > 0 {
+            push(branch_start, this_branch_length, *branch);
+        }
+
+        branch_start = branch_start.saturating_add(this_branch_length);
+        length_left = length_left.saturating_sub(this_branch_length);
+    }
 }
 
 #[cfg(test)]
