@@ -289,13 +289,12 @@ let argv () = Array.to_list Sys.argv |> List.tl |> Stdlib.Option.get
 
 let () =
   Random.self_init () ;
-  let _ =
+  ignore
     Tezos_clic.(
       setup_formatter
-        Format.err_formatter
-        (if Unix.isatty Unix.stderr then Ansi else Plain)
-        Short)
-  in
+        ~isatty:(Unix.isatty Unix.stdout)
+        Format.std_formatter
+        Short) ;
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
   Tezos_base_unix.Event_loop.main_run (fun () ->
       Lwt_exit.wrap_and_exit (dispatch (argv ())))

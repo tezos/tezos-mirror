@@ -465,7 +465,7 @@ type format = Plain | Ansi | Html
 
 type verbosity = Terse | Short | Details | Full
 
-let setup_formatter ppf format verbosity =
+let internal_setup_formatter ppf format verbosity cols =
   let skip = ref false in
   let ((orig_out_functions, _, _) as orig_state) =
     ( Format.pp_get_formatter_out_functions ppf (),
@@ -473,6 +473,7 @@ let setup_formatter ppf format verbosity =
       Format.pp_get_print_tags ppf () )
   in
   (Format.pp_print_flush ppf () ;
+   Option.iter (fun c -> Format.pp_set_margin ppf (min 110 c)) cols ;
    Format.pp_set_formatter_out_functions
      ppf
      {
@@ -1949,7 +1950,9 @@ let add_manual ~executable_name ~global_options format ppf commands =
               match commands with
               | [] -> tzfail (No_manual_entry keywords)
               | _ ->
-                  let state = setup_formatter ppf format verbosity in
+                  let state =
+                    internal_setup_formatter ppf format verbosity None
+                  in
                   let commands = List.map (fun c -> Ex c) commands in
                   usage_internal
                     ppf
@@ -2072,3 +2075,8 @@ let usage ppf ~executable_name ~global_options commands =
     (List.map (fun c -> Ex c) commands)
 
 let map_command f (Command c) = Command {c with conv = (fun x -> c.conv (f x))}
+
+let setup_formatter ~isatty ppf verbosity =
+  let format = if isatty then Ansi else Plain in
+  let cols = if isatty then Terminal.Size.get_columns () else None in
+  internal_setup_formatter ppf format verbosity cols

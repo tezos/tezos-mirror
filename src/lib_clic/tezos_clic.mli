@@ -906,8 +906,12 @@ type verbosity = Terse | Short | Details | Full
     Wrapping a piece of text with a debug level means that the
     contents are only printed if the verbosity is equal to or
     above that level. Use prefix [=] for an exact match, or [-]
-    for the inverse interpretation. *)
-val setup_formatter : Format.formatter -> format -> verbosity -> formatter_state
+    for the inverse interpretation.
+
+    If [isatty] is [true], a maximum number of columns based on the terminal size
+    is enforced for [Format] boxes. *)
+val setup_formatter :
+  isatty:bool -> Format.formatter -> verbosity -> formatter_state
 
 (** Restore the formatter state after [setup_formatter]. *)
 val restore_formatter : Format.formatter -> formatter_state -> unit
