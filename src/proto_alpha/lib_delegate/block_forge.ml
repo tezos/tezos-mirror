@@ -26,6 +26,19 @@
 open Protocol
 open Alpha_context
 
+type error += Signature_aggregation_failure
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"Block_forge.signature_aggregation_failure"
+    ~title:"Signature aggregation failure"
+    ~description:"Signature aggregation failed."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Signature aggregation failed.")
+    Data_encoding.unit
+    (function Signature_aggregation_failure -> Some () | _ -> None)
+    (fun () -> Signature_aggregation_failure)
+
 type unsigned_block = {
   unsigned_block_header : Block_header.t;
   operations : Tezos_base.Operation.t list list;
