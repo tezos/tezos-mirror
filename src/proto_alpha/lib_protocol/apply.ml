@@ -1431,13 +1431,13 @@ let apply_manager_operation :
         in
         (ctxt, result, [])
     | Update_consensus_key {public_key; proof; kind} ->
-        (* TODO: handle companion *)
         let*! is_registered = Delegate.registered ctxt source in
         let*? () =
           error_unless
             is_registered
             (Update_consensus_key_on_unregistered_delegate (source, kind))
         in
+        (* Check proof *)
         let* ctxt =
           match (public_key, proof) with
           | Bls bls_public_key, Some proof ->
@@ -1466,13 +1466,26 @@ let apply_manager_operation :
                   (Signature.check public_key (Bls proof) bytes)
                   (Validate_errors.Manager
                    .Update_consensus_key_with_incorrect_proof
-                     {kind = Consensus; public_key; proof})
+                     {kind; public_key; proof})
               in
               return ctxt
           | _, _ -> return ctxt
         in
+        (* Register key *)
         let* ctxt =
-          Delegate.Consensus_key.register_update ctxt source public_key
+          match (public_key, kind) with
+          | _, Consensus ->
+              Delegate.Consensus_key.register_update ctxt source public_key
+          | Bls bls_pk, Companion ->
+              Delegate.Consensus_key.register_update_companion
+                ctxt
+                source
+                bls_pk
+          | (Ed25519 _ | Secp256k1 _ | P256 _), Companion ->
+              (* Should not happen if operation has been validated *)
+              tzfail
+                (Validate_errors.Manager.Update_companion_key_not_tz4
+                   {source; public_key})
         in
         return
           ( ctxt,

@@ -2389,6 +2389,9 @@ module Delegate : sig
 
     val register_update :
       context -> public_key_hash -> public_key -> context tzresult Lwt.t
+
+    val register_update_companion :
+      context -> public_key_hash -> Bls.Public_key.t -> context tzresult Lwt.t
   end
 
   (** See {!Stake_storage.prepare_stake_distribution}. *)
