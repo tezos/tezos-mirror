@@ -948,13 +948,19 @@ let dispatch_private_request (rpc_server_family : Rpc_types.rpc_server_family)
             | None -> (None, true)
           in
           let timestamp = Option.value timestamp ~default:(Misc.now ()) in
-          let* nb_transactions =
+          let* has_produced_block =
             Block_producer.Internal_for_tests.produce_block
               ~with_delayed_transactions
               ~force:true
               ~timestamp
           in
-          rpc_ok (Ethereum_types.quantity_of_z @@ Z.of_int nb_transactions)
+          match has_produced_block with
+          | `Block_produced nb_transactions ->
+              rpc_ok (Ethereum_types.quantity_of_z @@ Z.of_int nb_transactions)
+          | `No_block ->
+              rpc_error
+                (Rpc_errors.internal_error
+                   (Format.sprintf "Block production failed"))
         in
         build ~f module_ parameters
     | Method (Inject_transaction.Method, module_) ->

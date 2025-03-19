@@ -48,11 +48,12 @@ let loop_sequencer (sequencer_config : Configuration.sequencer) =
           let diff = Time.Protocol.(diff now last_produced_block) in
           diff >= Int64.of_float time_between_blocks
         in
-        let* nb_transactions =
+        let* has_produced_block =
           Block_producer.produce_block ~force ~timestamp:now
         and* () = Lwt.map Result.ok @@ Lwt_unix.sleep 0.5 in
-        if nb_transactions > 0 || force then loop now
-        else loop last_produced_block
+        match has_produced_block with
+        | `Block_produced _nb_transactions -> loop now
+        | `No_block -> loop last_produced_block
       in
       loop Misc.(now ())
 

@@ -78,7 +78,9 @@ end
 
 module Request = struct
   type ('a, 'b) t =
-    | Produce_block : (bool * Time.Protocol.t * bool) -> (int, tztrace) t
+    | Produce_block :
+        (bool * Time.Protocol.t * bool)
+        -> ([`Block_produced of int | `No_block], tztrace) t
 
   type view = View : _ t -> view
 
@@ -228,8 +230,8 @@ let produce_block_if_needed ~cctxt ~smart_rollup_address ~sequencer_key ~force
           ~confirmed_txs
       else Tx_pool.clear_popped_transactions ()
     in
-    return n
-  else return 0
+    return (`Block_produced n)
+  else return `No_block
 
 let head_info_and_delayed_transactions ~with_delayed_transactions
     maximum_number_of_chunks =
@@ -257,7 +259,7 @@ let produce_block ~uses_tx_queue ~cctxt ~smart_rollup_address ~sequencer_key
   in
   if is_locked then
     let*! () = Block_producer_events.production_locked () in
-    return 0
+    return `No_block
   else
     let* head_info, delayed_hashes, remaining_cumulative_size =
       head_info_and_delayed_transactions
@@ -271,7 +273,7 @@ let produce_block ~uses_tx_queue ~cctxt ~smart_rollup_address ~sequencer_key
       | None -> false
     in
     if is_going_to_upgrade then
-      let* _hashes (* empty because no txs given *) =
+      let* hashes =
         produce_block_with_transactions
           ~sequencer_key
           ~cctxt
@@ -281,7 +283,8 @@ let produce_block ~uses_tx_queue ~cctxt ~smart_rollup_address ~sequencer_key
           ~delayed_hashes:[]
           head_info
       in
-      return 0
+      (* Is always be zero, only to be "future" proof *)
+      return (`Block_produced (Seq.length hashes))
     else
       produce_block_if_needed
         ~cctxt
