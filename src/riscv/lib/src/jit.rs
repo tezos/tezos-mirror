@@ -1155,4 +1155,45 @@ mod tests {
             assert_eq!(jitted_steps, success.len());
         }
     });
+
+    backend_test!(test_add_immediate_to_pc, F, {
+        use crate::machine_state::registers::NonZeroXRegister::*;
+
+        let scenarios: &[Scenario<F>] = &[
+            ScenarioBuilder::default()
+                .set_initial_pc(1000)
+                .set_instructions(&[I::new_add_immediate_to_pc(x1, 4096, Compressed)])
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(core.hart.xregisters.read_nz(x1), 5096);
+                }))
+                .build(),
+            ScenarioBuilder::default()
+                .set_instructions(&[I::new_add_immediate_to_pc(x1, 0xFFFFF000, Uncompressed)])
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(core.hart.xregisters.read_nz(x1), 0xFFFFF000);
+                }))
+                .build(),
+            ScenarioBuilder::default()
+                .set_initial_pc(1000)
+                .set_instructions(&[I::new_add_immediate_to_pc(x1, -4096, Compressed)])
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(core.hart.xregisters.read_nz(x1), -3096_i64 as u64);
+                }))
+                .build(),
+            ScenarioBuilder::default()
+                .set_initial_pc(1000)
+                .set_instructions(&[I::new_add_immediate_to_pc(x1, 20, Compressed)])
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(core.hart.xregisters.read_nz(x1), 1020);
+                }))
+                .build(),
+        ];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
 }

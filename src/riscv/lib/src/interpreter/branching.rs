@@ -112,6 +112,17 @@ pub fn run_jr_imm<I: ICB>(icb: &mut I, imm: i64, rs1: NonZeroXRegister) -> <I as
     icb.xvalue_bitwise_and(intermediate, new_rhs)
 }
 
+/// Add the immediate `imm` to the PC and store the result in `rd`.
+///
+/// Relevant RISC-V opcodes:
+/// - AUIPC
+pub fn run_add_immediate_to_pc(icb: &mut impl ICB, imm: i64, rd: NonZeroXRegister) {
+    let lhs = icb.pc_read();
+    let rhs = icb.xvalue_of_imm(imm);
+    let result = icb.xvalue_wrapping_add(lhs, rhs);
+    icb.xregister_write_nz(rd, result);
+}
+
 #[cfg(test)]
 mod tests {
     use crate::backend_test;
@@ -184,6 +195,27 @@ mod tests {
 
             assert_eq!(state.hart.pc.read(), init_pc);
             assert_eq!(new_pc, res_pc);
+        }
+    });
+
+    backend_test!(test_auipc, F, {
+        let pc_imm_res_rd = [
+            (0, 0, 0, nz::a2),
+            (0, 0xFF_FFF0_0000, 0xFF_FFF0_0000, nz::a0),
+            (0x000A_AAAA, 0xFF_FFF0_0000, 0xFF_FFFA_AAAA, nz::a1),
+            (0xABCD_AAAA_FBC0_D3FE, 0, 0xABCD_AAAA_FBC0_D3FE, nz::t5),
+            (0xFFFF_FFFF_FFF0_0000, 0x10_000F, 15, nz::t6),
+        ];
+
+        for (init_pc, imm, res, rd) in pc_imm_res_rd {
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+
+            state.hart.pc.write(init_pc);
+            super::run_add_immediate_to_pc(&mut state, imm, rd);
+
+            let read_pc = state.hart.xregisters.read_nz(rd);
+
+            assert_eq!(read_pc, res);
         }
     });
 }

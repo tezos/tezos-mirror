@@ -56,13 +56,6 @@ impl<M> HartState<M>
 where
     M: backend::ManagerReadWrite,
 {
-    /// `AUIPC` U-type instruction
-    pub fn run_auipc(&mut self, imm: i64, rd: NonZeroXRegister) {
-        // U-type immediates have bits [31:12] set and the lower 12 bits zeroed.
-        let rval = self.pc.read().wrapping_add(imm as u64);
-        self.xregisters.write_nz(rd, rval);
-    }
-
     /// `EBREAK` instruction
     pub fn run_ebreak(&self) -> Exception {
         Exception::Breakpoint
@@ -366,30 +359,6 @@ mod tests {
     use crate::parser::instruction::FenceSet;
     use crate::parser::instruction::InstrWidth;
     use crate::traps::Exception;
-
-    backend_test!(test_auipc, F, {
-        let pc_imm_res_rd = [
-            (0, 0, 0, nz::a2),
-            (0, 0xFF_FFF0_0000, 0xFF_FFF0_0000, nz::a0),
-            (0x000A_AAAA, 0xFF_FFF0_0000, 0xFF_FFFA_AAAA, nz::a1),
-            (0xABCD_AAAA_FBC0_D3FE, 0, 0xABCD_AAAA_FBC0_D3FE, nz::t5),
-            (0xFFFF_FFFF_FFF0_0000, 0x10_0000, 0, nz::t6),
-        ];
-
-        for (init_pc, imm, res, rd) in pc_imm_res_rd {
-            let mut state = create_state!(HartState, F);
-
-            // U-type immediate only has upper 20 bits set, the lower 12 being set to 0
-            assert_eq!(imm, ((imm >> 20) & 0xF_FFFF) << 20);
-
-            state.pc.write(init_pc);
-            state.run_auipc(imm, rd);
-
-            let read_pc = state.xregisters.read_nz(rd);
-
-            assert_eq!(read_pc, res);
-        }
-    });
 
     macro_rules! test_b_instr {
         ($state:ident, $branch_fn:tt, $imm:expr,

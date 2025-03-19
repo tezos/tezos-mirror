@@ -995,6 +995,23 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::AddImmediateToPC`].
+    pub(crate) fn new_add_immediate_to_pc(
+        rd: NonZeroXRegister,
+        imm: i64,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::AddImmediateToPC,
+            args: Args {
+                rd: rd.into(),
+                imm,
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {

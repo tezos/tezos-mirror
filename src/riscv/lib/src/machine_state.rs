@@ -1416,7 +1416,7 @@ mod tests {
         let block_a = [
             // Store current instruction counter
             Instruction::try_from(TaggedInstruction {
-                opcode: OpCode::Auipc,
+                opcode: OpCode::AddImmediateToPC,
                 args: TaggedArgs {
                     rd: nz::a0.into(),
                     imm: 0,

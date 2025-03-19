@@ -379,7 +379,7 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | SetLessThanUnsigned
         | SetLessThanImmediateSigned
         | SetLessThanImmediateUnsigned
-        | Auipc => ArgsShape::XSrcNZXDest,
+        | AddImmediateToPC => ArgsShape::XSrcNZXDest,
     }
 }
 
