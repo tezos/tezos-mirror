@@ -59,7 +59,7 @@ val key_typ : key Check.typ
 
     Used for regular accounts. *)
 val sign_bytes :
-  watermark:Tezos_crypto.Signature.watermark ->
+  ?watermark:Tezos_crypto.Signature.watermark ->
   signer:key ->
   bytes ->
   Tezos_crypto.Signature.t
