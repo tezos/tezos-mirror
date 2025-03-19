@@ -27,7 +27,7 @@ module Slot_keyed_vector : Indexable.Maker_concrete_key1 = struct
     slot : int;
     hash : 'h;
     (* Sanity check that keys are used only w/ the stores that created them: *)
-    store_id : < >;
+    store_id : < >; 
   }
 
   let key_t hash_t =
