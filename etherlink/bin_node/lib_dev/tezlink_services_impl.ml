@@ -51,4 +51,10 @@ let current_level (module Backend : Services_backend_sig.S)
     }
 
 let michelson_services_methods backend constants =
-  {current_level = current_level backend constants}
+  {
+    current_level = current_level backend constants;
+    version =
+      (fun () ->
+        (* TODO: #7857 need proper implementation *)
+        Lwt_result_syntax.return Tezlink_version.mock);
+  }

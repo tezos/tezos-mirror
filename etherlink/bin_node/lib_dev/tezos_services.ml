@@ -141,6 +141,27 @@ let make_env (chain : Tezos_shell_services.Chain_services.chain)
     tezlink_rpc_context Lwt.t =
   Lwt.return {block; chain}
 
+module Tezlink_version = struct
+  type version = Tezos_version.Octez_node_version.t = {
+    version : Tezos_version.Version.t;
+    network_version : Tezos_version.Network_version.t;
+    commit_info : commit_info option;
+  }
+
+  and commit_info = Tezos_version.Octez_node_version.commit_info = {
+    commit_hash : string;
+    commit_date : string;
+  }
+
+  let mock =
+    Tezos_version.
+      {
+        version = Tezos_version_parser.default;
+        network_version = Network_version.Internal_for_tests.mock ();
+        commit_info = Some {commit_hash = ""; commit_date = ""};
+      }
+end
+
 (* This is where we import service declarations from the protocol. *)
 module Imported_services = struct
   module Protocol_plugin_services = Imported_protocol_plugin.RPC.S
@@ -156,6 +177,16 @@ module Imported_services = struct
         Protocol_types.Level.t )
       Tezos_rpc.Service.t =
     import_service Protocol_plugin_services.current_level
+
+  let version :
+      ( [`GET],
+        unit,
+        unit,
+        unit,
+        unit,
+        Tezlink_version.version )
+      Tezos_rpc.Service.t =
+    Tezos_shell_services.Version_services.S.version
 end
 
 type block = Tezos_shell_services.Block_services.block
@@ -173,6 +204,7 @@ type level_query = Imported_services.level_query = {offset : int32}
 type tezos_services_implementation = {
   current_level :
     chain -> block -> Imported_services.level_query -> level tzresult Lwt.t;
+  version : unit -> Tezlink_version.version tzresult Lwt.t;
 }
 
 (** Builds the directory registering services under `.../helpers`. *)
@@ -189,11 +221,17 @@ let build_helper_dir impl =
 (** Builds the root director. *)
 let build_dir impl =
   let helper_dir = build_helper_dir impl in
-  Tezos_rpc.Directory.prefix
-    block_directory_path
-    (Tezos_rpc.Directory.map
-       (fun (((), chain), block) -> make_env chain block)
-       helper_dir)
+  let root_directory =
+    Tezos_rpc.Directory.prefix
+      block_directory_path
+      (Tezos_rpc.Directory.map
+         (fun (((), chain), block) -> make_env chain block)
+         helper_dir)
+  in
+  Tezos_rpc.Directory.register
+    root_directory
+    Imported_services.version
+    (fun () () () -> impl.version ())
 
 let tezlink_root = Tezos_rpc.Path.(open_root / "tezlink")
 
