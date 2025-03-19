@@ -12645,6 +12645,72 @@ let test_block_producer_validation =
   Check.((txs = 2) int ~error_msg:"block has %L, but expected %R") ;
   unit
 
+(* Test that everyone agrees on what the storage version of the rollup
+   is. *)
+let test_durable_storage_consistency =
+  register_all
+    ~tags:["durable_storage"; "consistency"]
+    ~time_between_blocks:Nothing
+    ~title:"Everyone agrees on L1 level"
+  @@ fun {sequencer; observer; sc_rollup_node; _} _protocol ->
+  let key = Durable_storage_path.storage_version in
+  let* val_from_rollup_node_opt =
+    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks:Tezos_regression.rpc_hooks
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Value
+         ~key
+         ()
+  in
+  let val_from_rollup_node =
+    match val_from_rollup_node_opt with
+    | None ->
+        Test.fail
+          ~__LOC__
+          "No value found in durable storage from rollup node at path %S"
+          key
+    | Some v -> v
+  in
+  let () =
+    Log.info
+      "Value at path %S according to rollup node: %S"
+      key
+      val_from_rollup_node
+  in
+
+  (* Rpc.state_value calls a private RPC so we can only test the EVM
+     nodes for which a private RPC server exists and
+     [Evm_node.endpoint ~private_:true] succeeds so neither proxy nor
+     RPC EVM nodes. *)
+  let evm_nodes_with_private_servers = [sequencer; observer] in
+
+  let* () =
+    Lwt_list.iter_s
+      (fun evm_node ->
+        let*@ val_from_evm_node_opt = Rpc.state_value evm_node key in
+        match val_from_evm_node_opt with
+        | Some v when v = val_from_rollup_node -> unit
+        | Some val_from_evm_node ->
+            let () =
+              Log.info
+                "Value at path %S according to EVM node %s: %S (value \
+                 according to rollup node: %S)"
+                key
+                (Evm_node.name evm_node)
+                val_from_evm_node
+                val_from_rollup_node
+            in
+            unit
+        | None ->
+            Test.fail
+              ~__LOC__
+              "No value found in durable storage from EVM node %s at path %S"
+              (Evm_node.name evm_node)
+              key)
+      evm_nodes_with_private_servers
+  in
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -12816,6 +12882,7 @@ let () =
   test_withdrawal_events [Alpha] ;
   test_fa_deposit_and_withdrawals_events [Alpha] ;
   test_block_producer_validation [Alpha] ;
+  test_durable_storage_consistency [Alpha] ;
   test_tezlink_current_level [Alpha] ;
   test_tezlink_balance [Alpha] ;
   test_tezlink_protocols [Alpha] ;

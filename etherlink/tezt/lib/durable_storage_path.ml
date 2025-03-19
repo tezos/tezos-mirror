@@ -94,6 +94,8 @@ let enable_multichain = evm "/feature_flags/enable_multichain"
 let enable_fast_withdrawal =
   evm "/world_state/feature_flags/enable_fast_withdrawal"
 
+let storage_version = evm "/storage_version"
+
 module Ticket_table = struct
   let ticket_table =
     sf
