@@ -28,7 +28,6 @@ use self::state_access::JsaCalls;
 use self::state_access::JsaImports;
 use self::state_access::register_jsa_symbols;
 use crate::machine_state::MachineCoreState;
-use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::instruction::Instruction;
 use crate::machine_state::memory::MemoryConfig;
 use crate::state_backend::hash::Hash;
@@ -113,6 +112,12 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
     /// produce functions that can be run over the current
     /// memory configuration and manager.
     pub fn new() -> Result<Self, JitError> {
+        if std::mem::size_of::<usize>() != std::mem::size_of::<u64>() {
+            return Err(JitError::UnsupportedPlatform(
+                "octez-riscv JIT only supports 64-bit architectures",
+            ));
+        }
+
         let mut flag_builder = settings::builder();
         flag_builder.set("use_colocated_libcalls", "false")?;
         flag_builder.set("is_pic", "false")?;
@@ -163,16 +168,9 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
                 (lower)(i.args(), &mut builder)
             };
 
-            builder.steps += 1;
-            match pc_update {
-                ProgramCounterUpdate::Next(width) => {
-                    builder.pc_offset += width as u64;
-                }
-                ProgramCounterUpdate::Set(pc_val) => {
-                    builder.pc_offset = 0;
-                    builder.pc_val = pc_val;
-                    break;
-                }
+            if !builder.complete_step(pc_update) {
+                // We have encountered an unconditional jump, exit the block.
+                break;
             }
         }
 
@@ -206,30 +204,10 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
         self.ctx.func.signature.params.push(AbiParam::new(I64));
         self.ctx.func.signature.params.push(AbiParam::new(ptr));
 
-        let mut builder = FunctionBuilder::new(&mut self.ctx.func, &mut self.builder_context);
-
-        // Create the entry block, to start emitting code in.
-        let entry_block = builder.create_block();
-        builder.append_block_params_for_function_params(entry_block);
-        builder.switch_to_block(entry_block);
-        builder.seal_block(entry_block);
-
-        let core_ptr_val = builder.block_params(entry_block)[0];
-        let pc_val = builder.block_params(entry_block)[1];
-        let steps_ptr_val = builder.block_params(entry_block)[2];
-
+        let builder = FunctionBuilder::new(&mut self.ctx.func, &mut self.builder_context);
         let jsa_call = JsaCalls::func_calls(&mut self.module, &self.jsa_imports);
 
-        Builder::<'_, MC, JSA> {
-            builder,
-            ptr,
-            core_ptr_val,
-            steps_ptr_val,
-            steps: 0,
-            pc_val,
-            pc_offset: 0,
-            jsa_call,
-        }
+        Builder::<'_, MC, JSA>::new(ptr, builder, jsa_call)
     }
 
     /// Finalise the function currently under construction.
