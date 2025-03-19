@@ -341,17 +341,22 @@ let print_commandline ppf (highlights, options, args) =
   in
   let rec print : type a ctx. Format.formatter -> (a, ctx) params -> unit =
    fun ppf -> function
-    | Stop -> Format.fprintf ppf "%a" print_options_brief options
+    | Stop -> Format.fprintf ppf "@{<full>%a@}" print_options_brief options
     | Seq (n, _, _) when not (has_args options) ->
         Format.fprintf ppf "[@{<arg>%s@}...]" n
     | Seq (n, _, _) ->
-        Format.fprintf ppf "[@{<arg>%s@}...]@ %a" n print_options_brief options
+        Format.fprintf
+          ppf
+          "[@{<arg>%s@}...]@{<full>@ %a@}"
+          n
+          print_options_brief
+          options
     | NonTerminalSeq (n, _, _, suffix, Stop) when not (has_args options) ->
         Format.fprintf ppf "[@{<arg>%s@}...]@ @{<kwd>%a@}" n print_suffix suffix
     | NonTerminalSeq (n, _, _, suffix, next) ->
         Format.fprintf
           ppf
-          "[@{<arg>%s@}...]@ @{<kwd>%a@}@ %a@ %a"
+          "[@{<arg>%s@}...]@ @{<kwd>%a@}@ %a@{<full>@ %a@}"
           n
           print_suffix
           suffix
@@ -378,11 +383,11 @@ let print_commandline ppf (highlights, options, args) =
 let rec print_params_detailed :
     type a b ctx. (b, ctx) arg -> Format.formatter -> (a, ctx) params -> unit =
  fun spec ppf -> function
-  | Stop -> print_options_detailed ppf spec
+  | Stop -> Format.fprintf ppf "@{<details>%a@}" print_options_detailed spec
   | Seq (n, desc, _) ->
       Format.fprintf ppf "@[<hov 2>@{<arg>%s@}: %a@]" n print_desc (trim desc) ;
       if has_args spec then
-        Format.fprintf ppf "@,%a" print_options_detailed spec
+        Format.fprintf ppf "@{<details>@,%a@}" print_options_detailed spec
   | NonTerminalSeq (n, desc, _, _, next) ->
       Format.fprintf ppf "@[<hov 2>@{<arg>%s@}: %a@]" n print_desc (trim desc) ;
       if has_args spec then
@@ -391,7 +396,7 @@ let rec print_params_detailed :
   | Param (n, desc, _, Stop) ->
       Format.fprintf ppf "@[<hov 2>@{<arg>%s@}: %a@]" n print_desc (trim desc) ;
       if has_args spec then
-        Format.fprintf ppf "@,%a" print_options_detailed spec
+        Format.fprintf ppf "@{<details>@,%a@}" print_options_detailed spec
   | Param (n, desc, _, next) ->
       Format.fprintf
         ppf
@@ -427,7 +432,9 @@ let print_command :
   if contains_params_args params options then
     Format.fprintf
       ppf
-      "@{<command>%a%a@{<short>@,@{<commanddoc>@[<hov 0>%a@]@,%a@}@}@}"
+      "@{<command>%a%a@{<short>@,\
+       @{<commanddoc>@[<hov 0>%a@]@{<details>@,\
+       %a@}@}@}@}"
       prefix
       ()
       print_commandline
@@ -478,10 +485,10 @@ let group_commands commands =
 let print_group print_command ppf ({title; _}, commands) =
   Format.fprintf
     ppf
-    "@{<title>%s@}@,@,@{<list>%a@}"
+    "@{<title>%s@}@,@{<short>@,@}@{<list>%a@}"
     title
     (Format.pp_print_list
-       ~pp_sep:(fun ppf () -> Format.fprintf ppf "@,@,")
+       ~pp_sep:(fun ppf () -> Format.fprintf ppf "@,@{<short>@,@}")
        print_command)
     commands
 
@@ -1989,7 +1996,8 @@ let add_manual ~executable_name ~global_options format ppf commands =
               let verbosity =
                 match verbosity with
                 | Some verbosity -> verbosity
-                | None when Compare.List_length_with.(commands <= 3) -> Full
+                | None when Compare.List_length_with.(commands <= 1) -> Full
+                | None when Compare.List_length_with.(commands <= 3) -> Details
                 | None -> Short
               in
               let open Lwt_result_syntax in
@@ -2089,7 +2097,7 @@ let pp_cli_errors ppf ~executable_name ~global_options ~default errs =
           (Format.pp_print_list (fun ppf (Command {params; options; _}) ->
                print_commandline ppf ([], options, params)))
           commands ;
-        Some (List.map (fun c -> Ex c) commands)
+        None
     | err ->
         default ppf err ;
         None

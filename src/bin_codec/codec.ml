@@ -123,14 +123,14 @@ let main commands =
         setup_formatter
           ~isatty:(Unix.isatty Unix.stdout)
           Format.std_formatter
-          Short) ;
+          Details) ;
     warn_if_argv0_name_not_octez () ;
     ignore
       Tezos_clic.(
         setup_formatter
           ~isatty:(Unix.isatty Unix.stderr)
           Format.err_formatter
-          Short) ;
+          Details) ;
     let*! () = Tezos_base_unix.Internal_event_unix.init () in
     let* base_dir, argv = parse_config_args argv in
     let ctxt = new Client_context_unix.unix_logger ~base_dir in

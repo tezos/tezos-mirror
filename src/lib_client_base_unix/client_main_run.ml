@@ -442,13 +442,13 @@ let main (module C : M) ~select_commands ?cmd_args ?(disable_logging = false) ()
       setup_formatter
         ~isatty:(Unix.isatty Unix.stdout)
         Format.std_formatter
-        Short) ;
+        Details) ;
   ignore
     Tezos_clic.(
       setup_formatter
         ~isatty:(Unix.isatty Unix.stderr)
         Format.err_formatter
-        Short) ;
+        Details) ;
   warn_if_argv0_name_not_octez () ;
   let*! retcode =
     Lwt.catch
