@@ -1124,8 +1124,8 @@ let zk_rollup_origination ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
   let addr = originated_zk_rollup op in
   return (op, addr)
 
-let update_consensus_key ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
-    ?proof_signer ctxt (src : Contract.t) public_key =
+let update_consensus_or_companion ~kind ?force_reveal ?counter ?fee ?gas_limit
+    ?storage_limit ?proof_signer ctxt (src : Contract.t) public_key =
   let open Lwt_result_syntax in
   let* proof =
     match proof_signer with
@@ -1144,8 +1144,6 @@ let update_consensus_key ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
               "Can't forge an Update_consensus_key with a non-BLS proof of \
                possession.")
   in
-  (* TODO: handle companion *)
-  let kind = Delegate_consensus_key.Consensus in
   let* to_sign_op =
     manager_operation
       ?force_reveal
@@ -1159,6 +1157,10 @@ let update_consensus_key ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
   in
   let* account = Context.Contract.manager ctxt src in
   sign ctxt account.sk (Context.branch ctxt) to_sign_op
+
+let update_consensus_key = update_consensus_or_companion ~kind:Consensus
+
+let update_companion_key = update_consensus_or_companion ~kind:Companion
 
 let drain_delegate ctxt ~consensus_key ~delegate ~destination =
   let open Lwt_result_syntax in
