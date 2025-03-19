@@ -48,7 +48,7 @@ let () =
     Tezos_clic.(
       setup_formatter
         Format.std_formatter
-        (if Unix.isatty Unix.stdout then Ansi else Plain)
+        ~isatty:(Unix.isatty Unix.stdout)
         Short) ;
   (* 2. Setup context and dispatch commands *)
   let ctxt = (module Dummy_context : CONTEXT) in

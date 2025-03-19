@@ -1666,6 +1666,7 @@ let octez_clic =
         re;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         octez_lwt_result_stdlib;
+        terminal;
       ]
 
 let octez_clic_unix =

@@ -440,14 +440,14 @@ let main (module C : M) ~select_commands ?cmd_args ?(disable_logging = false) ()
   ignore
     Tezos_clic.(
       setup_formatter
+        ~isatty:(Unix.isatty Unix.stdout)
         Format.std_formatter
-        (if Unix.isatty Unix.stdout then Ansi else Plain)
         Short) ;
   ignore
     Tezos_clic.(
       setup_formatter
+        ~isatty:(Unix.isatty Unix.stderr)
         Format.err_formatter
-        (if Unix.isatty Unix.stderr then Ansi else Plain)
         Short) ;
   warn_if_argv0_name_not_octez () ;
   let*! retcode =

@@ -63,8 +63,8 @@ depends: [
   "conf-libev"
   "progress" { >= "0.1.0" }
   "camlp-streams" { >= "5.0.1" }
-  "uutf"
   "terminal"
+  "uutf"
   "eio"
   "eio_posix"
   "lwt_eio"
