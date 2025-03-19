@@ -355,7 +355,7 @@ let set_delegate cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing
     opt_delegate
 
 let build_update_consensus_key cctxt ?fee ?gas_limit ?storage_limit
-    ?secret_key_uri public_key =
+    ?secret_key_uri ~kind public_key =
   let open Lwt_result_syntax in
   let* proof =
     match ((public_key : Signature.public_key), secret_key_uri) with
@@ -371,11 +371,7 @@ let build_update_consensus_key cctxt ?fee ?gas_limit ?storage_limit
         | _ -> tzfail (Unexpected_proof_of_possession_format proof))
     | _ -> return_none
   in
-  let operation =
-    Update_consensus_key
-      {public_key; proof; kind = Delegate_consensus_key.Consensus}
-  in
-  (* TODO: handle companion *)
+  let operation = Update_consensus_key {public_key; proof; kind} in
   return
   @@ Injection.prepare_manager_operation
        ~fee:(Limit.of_option fee)
@@ -414,7 +410,12 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
   | Some (public_key, secret_key_uri) -> (
       let* operation =
         let+ operation_content =
-          build_update_consensus_key cctxt ?fee ?secret_key_uri public_key
+          build_update_consensus_key
+            cctxt
+            ~kind:Consensus
+            ?fee
+            ?secret_key_uri
+            public_key
         in
         Annotated_manager_operation.Cons_manager
           ( delegate_op,
@@ -448,13 +449,13 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
             Single_and_result ((Manager_operation _ as op2), res2) ) ->
           return ((oph, op1, res1), Some (op2, res2)))
 
-let update_consensus_key cctxt ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?fee ?secret_key_uri ~public_key ~manager_sk
-    ~fee_parameter src_pk =
+let update_consensus_or_companion_key ~kind cctxt ~chain ~block ?confirmations
+    ?dry_run ?verbose_signing ?simulation ?fee ?secret_key_uri ~public_key
+    ~manager_sk ~fee_parameter src_pk =
   let open Lwt_result_syntax in
   let source = Signature.Public_key.hash src_pk in
   let* operation =
-    build_update_consensus_key cctxt ?fee ?secret_key_uri public_key
+    build_update_consensus_key cctxt ?fee ?secret_key_uri ~kind public_key
   in
   let operation = Annotated_manager_operation.Single_manager operation in
   let* oph, _, op, result =
@@ -479,6 +480,12 @@ let update_consensus_key cctxt ~chain ~block ?confirmations ?dry_run
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
+
+let update_consensus_key cctxt =
+  update_consensus_or_companion_key ~kind:Consensus cctxt
+
+let update_companion_key cctxt =
+  update_consensus_or_companion_key ~kind:Companion cctxt
 
 let drain_delegate cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing
     ?simulation ~consensus_sk ~consensus_pkh ?(destination = consensus_pkh)
