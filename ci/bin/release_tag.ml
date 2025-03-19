@@ -205,6 +205,17 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
              Artifacts job_static_arm64_release;
            ])
       ~variables:[("S3_BUCKET", "release-page-test.nomadic-labs.com")]
+      ~before_script:
+        (if test then
+           [
+             "export \
+              AWS_ACCESS_KEY_ID=${AWS_KEY_RELEASE_PUBLISH:?AWS_KEY_RELEASE_PUBLISH \
+              is not set}";
+             "export \
+              AWS_SECRET_ACCESS_KEY=${AWS_SECRET_RELEASE_PUBLISH:?AWS_SECRET_RELEASE_PUBLISH \
+              is not set}";
+           ]
+         else [])
       ["./scripts/releases/publish_release_page.sh"]
   in
   let job_opam_release ?(dry_run = false) () : Tezos_ci.tezos_job =
