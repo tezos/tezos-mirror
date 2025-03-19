@@ -1,5 +1,398 @@
 
 ./octez-evm-node list events --json
+applied_upgrade:
+  description: kernel successfully upgraded to {root_hash} with blueprint {level}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* applied_upgrade version 0 */
+      "applied_upgrade.v0":
+        { "root_hash": $unistring,
+          "level": $positive_bignum } }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+block_producer_locked:
+  description: transaction pool and block production are locked
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* block_producer_locked version 0 */
+      "block_producer_locked.v0": any }
+  
+block_producer_started:
+  description: block producer has been started
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* block_producer_started version 0 */
+      "block_producer_started.v0": any }
+  
+block_producer_transaction_injected:
+  description: transaction {transaction} has been selected for a block
+  level: info
+  section: evm_node.dev
+  json format:
+    { /* block_producer_transaction_injected version 0 */
+      "block_producer_transaction_injected.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+blueprint_application:
+  description: head is now {level}, applied in {process_time}{timestamp}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* blueprint_application version 0 */
+      "blueprint_application.v0":
+        { "level": $positive_bignum,
+          "timestamp": $timestamp.rfc,
+          "txs_nb": integer ∈ [-2^30, 2^30],
+          "gas_used": $positive_bignum,
+          "block_hash": $unistring,
+          "process_time": $timespan.system } }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+    $timespan.system:
+      /* A span of time, as seen by the local computer. */
+      number
+    $timestamp.rfc:
+      /* RFC 3339 formatted timestamp
+         A date in RFC 3339 notation. */
+      $unistring
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+blueprint_catchup:
+  description: catching-up from level {min} to {max}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* blueprint_catchup version 0 */
+      "blueprint_catchup.v0":
+        { "min": $positive_bignum,
+          "max": $positive_bignum } }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
+blueprint_injection:
+  description: injecting a blueprint for level {level}
+  level: info
+  section: evm_node.dev
+  json format:
+    { /* blueprint_injection version 0 */
+      "blueprint_injection.v0": $positive_bignum }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
+blueprint_injection_failure:
+  description: injecting a blueprint for level {level} failed with {trace}
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* blueprint_injection_failure version 0 */
+      "blueprint_injection_failure.v0":
+        { "level": $positive_bignum,
+          "trace": any } }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
+blueprint_injection_on_DAL:
+  description: injecting on the DAL a blueprint for level {level} containing {nb_chunks} chunks
+  level: debug
+  section: evm_node.dev
+  json format:
+    { /* blueprint_injection_on_DAL version 0 */
+      "blueprint_injection_on_DAL.v0":
+        { "level": $positive_bignum,
+          "nb_chunks": integer ∈ [-2^30, 2^30] } }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
+blueprint_injection_on_inbox:
+  description: injecting on the shared inbox a blueprint for level {level}
+  level: debug
+  section: evm_node.dev
+  json format:
+    { /* blueprint_injection_on_inbox version 0 */
+      "blueprint_injection_on_inbox.v0": $positive_bignum }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
+blueprint_invalid:
+  description: produced an invalid blueprint at level {level}
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* blueprint_invalid version 0 */
+      "blueprint_invalid.v0": $positive_bignum }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
+blueprint_invalid_applied:
+  description: failed to apply received blueprint for level {level}
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* blueprint_invalid_applied version 0 */
+      "blueprint_invalid_applied.v0": $positive_bignum }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
+blueprint_production:
+  description: produced a blueprint for level {level} in {process_time}
+  level: info
+  section: evm_node.dev
+  json format:
+    { /* blueprint_production version 0 */
+      "blueprint_production.v0":
+        { "level": $positive_bignum,
+          "process_time": $timespan.system } }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+    $timespan.system:
+      /* A span of time, as seen by the local computer. */
+      number
+  
+blueprint_proposal:
+  description: crafted a blueprint proposal for level {level} in {process_time}
+  level: debug
+  section: evm_node.dev
+  json format:
+    { /* blueprint_proposal version 0 */
+      "blueprint_proposal.v0":
+        { "level": $positive_bignum,
+          "process_time": $timespan.system } }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+    $timespan.system:
+      /* A span of time, as seen by the local computer. */
+      number
+  
+blueprint_publisher_is_ready:
+  description: blueprint publisher is ready
+  level: info
+  section: evm_node.dev
+  json format:
+    { /* blueprint_publisher_is_ready version 0 */
+      "blueprint_publisher_is_ready.v0": any }
+  
+blueprint_publisher_shutdown:
+  description: blueprint publishing is shutting down
+  level: info
+  section: evm_node.dev
+  json format:
+    { /* blueprint_publisher_shutdown version 0 */
+      "blueprint_publisher_shutdown.v0": any }
+  
+blueprints_publisher_request_failed:
+  description: request {view} failed: {errors}
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* blueprints_publisher_request_failed version 0 */
+      "blueprints_publisher_request_failed.v0":
+        { "view":
+            { /* Publish */
+              "request": "publish",
+              "level": $positive_bignum,
+              "payload":
+                { /* Blueprint */
+                  "chunks":
+                    [ { "value": /^([a-zA-Z0-9][a-zA-Z0-9])*$/,
+                        "number": $unistring,
+                        "nb_chunks": integer ∈ [-2^30, 2^30],
+                        "chunk_index": integer ∈ [-2^30, 2^30],
+                        "signature": $Signature.V1 } ... ],
+                  "inbox_payload": [ $unistring ... ] }
+                || [ $unistring ... ]
+                /* Inbox */ }
+            || { /* New_rollup_node_block */
+                 "request": "new_l2_head",
+                 "rollup_head": integer ∈ [-2^31-1, 2^31] },
+          "errors": any } }
+    $Signature.V1:
+      /* A Ed25519, Secp256k1, P256 or BLS signature (Base58Check-encoded) */
+      $unistring
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+call_tracer_read_line:
+  description: Call tracer read a line {line} of tx {tx}
+  level: debug
+  section: evm_node.dev.tracer
+  json format:
+    { /* call_tracer_read_line version 0 */
+      "call_tracer_read_line.v0":
+        { "line": $positive_bignum,
+          "tx": $unistring } }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+callback_log:
+  description: uri: {uri}
+method: {method}
+body: {body}
+
+  level: debug
+  section: evm_node.dev
+  json format:
+    { /* callback_log version 0 */
+      "callback_log.v0":
+        { "uri": $unistring,
+          "method": $unistring,
+          "body": $unistring } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+cannot_fetch_time_between_blocks:
+  description: could not fetch the maximum time between blocks from remote EVM endpoint, default to {tbb}: {trace}
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* cannot_fetch_time_between_blocks version 0 */
+      "cannot_fetch_time_between_blocks.v0":
+        { "tbb": $time_between_blocks,
+          "trace": any } }
+    $time_between_blocks: number /* Some */ || null /* None */
+  
+catching_up:
+  description: the EVM node is catching up on evm event from {from} to {to}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* catching_up version 0 */
+      "catching_up.v0":
+        { "from": integer ∈ [-2^31-1, 2^31],
+          "to": integer ∈ [-2^31-1, 2^31] } }
+  
+compressing_snapshot:
+  description: compressing snapshot {filename}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* compressing_snapshot version 0 */
+      "compressing_snapshot.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+counter_inc_assertion_warning:
+  description: assertion failed while updating a Counter metric: the increment ({increment} occuring at {label}) is negative; the value will not be updated
+  level: warning
+  section: evm_node.dev.metrics
+  json format:
+    { /* counter_inc_assertion_warning version 0 */
+      "counter_inc_assertion_warning.v0":
+        { "increment": number,
+          "label": $unistring } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+deprecation_note:
+  description: {msg}
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* deprecation_note version 0 */
+      "deprecation_note.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+download_failed:
+  description: downloading {url} failed with {error}
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* download_failed version 0 */
+      "download_failed.v0":
+        { "url": $unistring,
+          "error":
+            { /* http_error */
+              "kind": "http_error",
+              "status_code": integer ∈ [-2^30, 2^30] }
+            || { /* exn */
+                 "kind": "exception",
+                 "description": $unistring } } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+downloading_snapshot:
+  description: downloading {url}{size}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* downloading_snapshot version 0 */
+      "downloading_snapshot.v0":
+        { "url": $unistring,
+          "size": integer ∈ [-2^30, 2^30] /* Some */ || null /* None */ } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 dream_websocket:
   description: websocket support in Dream is known to be buggy, consider using Resto as an RPC server or disabling websockets
   level: warning
@@ -7,109 +400,288 @@ dream_websocket:
   json format:
     { /* dream_websocket version 0 */
       "dream_websocket.v0": any }
-
-sequencer_disabled_native_execution:
-  description: native execution is disabled in sequencer mode
-  level: warning
-  section: evm_node
+  
+evm_context_gc_finished:
+  description: garbage collection finished for level {gc_level} at head level {head_level} (took {duration})
+  level: info
+  section: evm_node.dev.evm_context
   json format:
-    { /* sequencer_disabled_native_execution version 0 */
-      "sequencer_disabled_native_execution.v0": any }
-
-start:
-  description: starting the EVM node ({mode})
-  level: notice
-  section: evm_node
-  json format:
-    { /* start version 0 */
-      "start.v0": $unistring }
+    { /* evm_context_gc_finished version 0 */
+      "evm_context_gc_finished.v0":
+        { "gc_level": $unistring,
+          "head_level": $unistring,
+          "duration": number } }
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-rollup_node_follower_stream_failed:
-  description: stream from the rollup node failed with {trace}
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* rollup_node_follower_stream_failed version 0 */
-      "rollup_node_follower_stream_failed.v0": any }
-
-rollup_node_follower_connection_failed:
-  description: connection with the rollup node failed with {trace}
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* rollup_node_follower_connection_failed version 0 */
-      "rollup_node_follower_connection_failed.v0": any }
-
-rollup_node_follower_trying_reconnection:
-  description: waiting {duration} seconds before trying to reconnect to the rollup node
+  
+evm_context_gc_split:
+  description: splitting Irmin context at level {level} ({timestamp})
   level: info
-  section: evm_node.dev
+  section: evm_node.dev.evm_context
   json format:
-    { /* rollup_node_follower_trying_reconnection version 0 */
-      "rollup_node_follower_trying_reconnection.v0": number }
-
-rollup_node_follower_connection_lost:
-  description: connection with the rollup node has been lost
+    { /* evm_context_gc_split version 0 */
+      "evm_context_gc_split.v0":
+        { "level": $unistring,
+          "timestamp": $timestamp.protocol } }
+    $timestamp.protocol:
+      /* A timestamp as seen by the protocol: second-level precision, epoch
+         based. */
+      $unistring
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+evm_context_gc_started:
+  description: garbage collection started for level {gc_level} at head level {head_level}
+  level: info
+  section: evm_node.dev.evm_context
+  json format:
+    { /* evm_context_gc_started version 0 */
+      "evm_context_gc_started.v0":
+        { "gc_level": $unistring,
+          "head_level": $unistring } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+evm_context_gc_waiter_failed:
+  description: garbage collector waiter failed with an exception: {exn}
+  level: warning
+  section: evm_node.dev.evm_context
+  json format:
+    { /* evm_context_gc_waiter_failed version 0 */
+      "evm_context_gc_waiter_failed.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+evm_context_get_block_failed:
+  description: get block by number failed for level {level}{trace}
   level: error
-  section: evm_node.dev
+  section: evm_node.dev.evm_context
   json format:
-    { /* rollup_node_follower_connection_lost version 0 */
-      "rollup_node_follower_connection_lost.v0": any }
-
-rollup_node_follower_connection_acquired:
-  description: rollup node follower connected to the rollup node
+    { /* evm_context_get_block_failed version 0 */
+      "evm_context_get_block_failed.v0":
+        { "level": $unistring,
+          "trace": any } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+evm_context_is_ready:
+  description: EVM context worker is ready
   level: info
-  section: evm_node.dev
+  section: evm_node.dev.evm_context
   json format:
-    { /* rollup_node_follower_connection_acquired version 0 */
-      "rollup_node_follower_connection_acquired.v0": any }
-
-shutting_down_rollup_node_follower:
-  description: stopping the rollup node follower
-  level: notice
-  section: evm_node.dev
+    { /* evm_context_is_ready version 0 */
+      "evm_context_is_ready.v0": any }
+  
+evm_context_missing_state:
+  description: cannot find state at level {level}
+  level: warning
+  section: evm_node.dev.evm_context
   json format:
-    { /* shutting_down_rollup_node_follower version 0 */
-      "shutting_down_rollup_node_follower.v0": any }
-
-rollup_node_follower_new_block:
-  description: rollup node follower detected a new block (level {block})
+    { /* evm_context_missing_state version 0 */
+      "evm_context_missing_state.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+evm_context_observer_potential_reorg:
+  description: potential reorganization happening at level {level}
+  level: warning
+  section: evm_node.dev.evm_context
+  json format:
+    { /* evm_context_observer_potential_reorg version 0 */
+      "evm_context_observer_potential_reorg.v0": $positive_bignum }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
+evm_context_observer_reorg_cannot_decode_blueprint:
+  description: EVM endpoint provided a blueprint (level {level}) we cannot decode
+  level: warning
+  section: evm_node.dev.evm_context
+  json format:
+    { /* evm_context_observer_reorg_cannot_decode_blueprint version 0 */
+      "evm_context_observer_reorg_cannot_decode_blueprint.v0":
+        $positive_bignum }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
+evm_context_observer_reorg_cannot_find_divergence:
+  description: potential blueprint of reorg is at level {level1}, cannot find block {level2} locally
+  level: warning
+  section: evm_node.dev.evm_context
+  json format:
+    { /* evm_context_observer_reorg_cannot_find_divergence version 0 */
+      "evm_context_observer_reorg_cannot_find_divergence.v0":
+        { "level1": $positive_bignum,
+          "level2": $positive_bignum } }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
+evm_context_observer_reorg_cannot_find_state:
+  description: reorganization needs state at level {level} but checkpoint is missing
+  level: warning
+  section: evm_node.dev.evm_context
+  json format:
+    { /* evm_context_observer_reorg_cannot_find_state version 0 */
+      "evm_context_observer_reorg_cannot_find_state.v0": $positive_bignum }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
+evm_context_observer_reorg_old_blueprint:
+  description: EVM endpoint provided an old known blueprint (level {level})
+  level: warning
+  section: evm_node.dev.evm_context
+  json format:
+    { /* evm_context_observer_reorg_old_blueprint version 0 */
+      "evm_context_observer_reorg_old_blueprint.v0": $positive_bignum }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
+evm_context_processed_l1_level:
+  description: processed L1 level {level}. Last finalized blueprint is: {finalized_blueprint}
   level: info
-  section: evm_node.dev
+  section: evm_node.dev.evm_context
   json format:
-    { /* rollup_node_follower_new_block version 0 */
-      "rollup_node_follower_new_block.v0": integer ∈ [-2^31-1, 2^31] }
-
-rollup_node_follower_started:
-  description: rollup node follower has been started
-  level: notice
-  section: evm_node.dev
+    { /* evm_context_processed_l1_level version 0 */
+      "evm_context_processed_l1_level.v0":
+        { "level": integer ∈ [-2^31-1, 2^31],
+          "finalized_blueprint": $positive_bignum } }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
+evm_context_request_failed:
+  description: request {view} failed: {errors}
+  level: error
+  section: evm_node.dev.evm_context
   json format:
-    { /* rollup_node_follower_started version 0 */
-      "rollup_node_follower_started.v0": any }
-
-rollup_node_follower_disabled:
-  description: rollup node follower is disabled
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* rollup_node_follower_disabled version 0 */
-      "rollup_node_follower_disabled.v0": any }
-
-flush_delayed_inbox:
-  description: rollup node flushed the delayed inbox at level {level} ({timestamp})
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* flush_delayed_inbox version 0 */
-      "flush_delayed_inbox.v0":
-        { "timestamp": $timestamp.protocol,
-          "level": $positive_bignum } }
+    { /* evm_context_request_failed version 0 */
+      "evm_context_request_failed.v0":
+        { "view":
+            { /* Apply_evm_events */
+              "request": "apply_evm_events",
+              "finalized_level"?: integer ∈ [-2^31-1, 2^31],
+              "events":
+                [ { /* kernel_upgrade */
+                    "kind": $unistring,
+                    "event": [ $unistring, $timestamp.protocol ] }
+                  || { /* sequencer_upgrade */
+                       "kind": $unistring,
+                       "event":
+                         [ $Signature.Public_key,
+                           $unistring,
+                           $timestamp.protocol ] }
+                  || { /* blueprint_applied */
+                       "kind": $unistring,
+                       "event": [ $bignum, $unistring ] }
+                  || { /* new_delayed_transaction */
+                       "kind": $unistring,
+                       "event":
+                         [ "transaction" || "deposit" || "fa_deposit",
+                           $unistring,
+                           /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] }
+                  || { /* flush_delayed_inbox */
+                       "kind": $unistring,
+                       "event":
+                         [ [ [ "transaction" || "deposit" || "fa_deposit",
+                               $unistring,
+                               /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
+                           $timestamp.protocol,
+                           $positive_bignum ] } ... ] }
+            || { /* Apply_blueprint */
+                 "request": "apply_blueprint",
+                 "events"?:
+                   [ { /* kernel_upgrade */
+                       "kind": $unistring,
+                       "event": [ $unistring, $timestamp.protocol ] }
+                     || { /* sequencer_upgrade */
+                          "kind": $unistring,
+                          "event":
+                            [ $Signature.Public_key,
+                              $unistring,
+                              $timestamp.protocol ] }
+                     || { /* blueprint_applied */
+                          "kind": $unistring,
+                          "event": [ $bignum, $unistring ] }
+                     || { /* new_delayed_transaction */
+                          "kind": $unistring,
+                          "event":
+                            [ "transaction" || "deposit" || "fa_deposit",
+                              $unistring,
+                              /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] }
+                     || { /* flush_delayed_inbox */
+                          "kind": $unistring,
+                          "event":
+                            [ [ [ "transaction" || "deposit" || "fa_deposit",
+                                  $unistring,
+                                  /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
+                              $timestamp.protocol,
+                              $positive_bignum ] } ... ],
+                 "timestamp": $timestamp.protocol,
+                 "payload": [ /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ... ],
+                 "delayed_transactions":
+                   [ [ "transaction" || "deposit" || "fa_deposit",
+                       $unistring,
+                       /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ] }
+            || { /* Last_known_L1_level */
+                 "request": "last_known_l1_level" }
+            || { /* Delayed_inbox_hashes */
+                 "request": "Delayed_inbox_hashes" }
+            || { /* Patch_state */
+                 "request": "patch_state",
+                 "commit": boolean,
+                 "key": $unistring,
+                 "block_number"?: $unistring }
+            || { /* Wasm_pvm_version */
+                 "request": "wasm_pvm_version" }
+            || { /* Potential_observer_reorg */
+                 "request": "potential_observer_reorg",
+                 "evm_node_endpoint": $unistring,
+                 "blueprint_with_events":
+                   { "delayed_transactions":
+                       [ [ "transaction" || "deposit" || "fa_deposit",
+                           $unistring,
+                           /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
+                     "kernel_upgrade"?: [ $unistring, $timestamp.protocol ],
+                     "blueprint":
+                       { "number": $positive_bignum,
+                         "timestamp": $timestamp.protocol,
+                         "payload": [ /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ... ] } } },
+          "errors": any } }
+    $Signature.Public_key:
+      /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
+      $unistring
+    $bignum:
+      /* Big number
+         Decimal representation of a big number */
+      string
     $positive_bignum:
       /* Positive big number
          Decimal representation of a positive big number */
@@ -123,123 +695,74 @@ flush_delayed_inbox:
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-evm_events_follower_fallback:
-  description: rollup node does not support fetching all events, falling back to multiple RPCs fetching
-  level: warning
-  section: evm_node.dev
-  json format:
-    { /* evm_events_follower_fallback version 0 */
-      "evm_events_follower_fallback.v0": any }
-
-evm_events_follower_rollup_level_already_processed:
-  description: rollup node level {level} was already processed, skipping it
-  level: info
-  section: evm_node.dev
-  json format:
-    { /* evm_events_follower_rollup_level_already_processed version 0 */
-      "evm_events_follower_rollup_level_already_processed.v0":
-        integer ∈ [-2^31-1, 2^31] }
-
-evm_events_follower_unexpected_number_of_events:
-  description: unexpected number of events in /evm/events, fetched {fetched}, expected {expected}
-  level: warning
-  section: evm_node.dev
-  json format:
-    { /* evm_events_follower_unexpected_number_of_events version 0 */
-      "evm_events_follower_unexpected_number_of_events.v0":
-        { "expected": integer ∈ [-2^30, 2^30],
-          "fetched": integer ∈ [-2^30, 2^30] } }
-
-evm_events_follower_unexpected_key:
-  description: unexpected key in {key} /evm/events
-  level: warning
-  section: evm_node.dev
-  json format:
-    { /* evm_events_follower_unexpected_key version 0 */
-      "evm_events_follower_unexpected_key.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-evm_events_request_failed:
-  description: request {view} failed: {errors}
-  level: warning
-  section: evm_node.dev
-  json format:
-    { /* evm_events_request_failed version 0 */
-      "evm_events_request_failed.v0":
-        { "view":
-            { /* New_rollup_node_block */
-              "request": "new_rollup_node_block",
-              "rollup_head": integer ∈ [-2^31-1, 2^31] }
-            || { /* Apply_evm_events */
-                 "request": "apply_evm_events",
-                 "rollup_lvl": integer ∈ [-2^31-1, 2^31] },
-          "errors": any } }
-
-evm_events_follower_out_of_sync:
-  description: rollup node confimed block {received}, but we have applied block {expected}
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* evm_events_follower_out_of_sync version 0 */
-      "evm_events_follower_out_of_sync.v0":
-        { "received": integer ∈ [-2^31-1, 2^31],
-          "expected": integer ∈ [-2^31-1, 2^31] } }
-
-evm_events_follower_rollup_node_ahead:
-  description: rollup node confirmed block {level} before we received it
-  level: warning
-  section: evm_node.dev
-  json format:
-    { /* evm_events_follower_rollup_node_ahead version 0 */
-      "evm_events_follower_rollup_node_ahead.v0": $positive_bignum }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-
-evm_events_follower_missing_blueprint:
-  description: rollup node diverged at {level}, {expected_hash} not found locally
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* evm_events_follower_missing_blueprint version 0 */
-      "evm_events_follower_missing_blueprint.v0":
-        { "level": $positive_bignum,
-          "expected_hash": $unistring } }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-evm_events_follower_upstream_blueprint_applied:
-  description: rollup node confirmed block {level}
+  
+evm_context_reset_at_level:
+  description: resetting to finalized block {level}
   level: notice
-  section: evm_node.dev
+  section: evm_node.dev.evm_context
   json format:
-    { /* evm_events_follower_upstream_blueprint_applied version 0 */
-      "evm_events_follower_upstream_blueprint_applied.v0":
-        { "level": $positive_bignum,
-          "hash": $unistring } }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
+    { /* evm_context_reset_at_level version 0 */
+      "evm_context_reset_at_level.v0": $unistring }
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
+  
+evm_context_reset_impossible_missing_finalized_state:
+  description: cannot found finalized state we must exit on divergence
+  level: warning
+  section: evm_node.dev.evm_context
+  json format:
+    { /* evm_context_reset_impossible_missing_finalized_state version 0 */
+      "evm_context_reset_impossible_missing_finalized_state.v0": any }
+  
+evm_context_shutdown:
+  description: EVM context worker is shutting down
+  level: info
+  section: evm_node.dev.evm_context
+  json format:
+    { /* evm_context_shutdown version 0 */
+      "evm_context_shutdown.v0": any }
+  
+evm_context_start_history_mode:
+  description: running with history mode {mode}
+  level: notice
+  section: evm_node.dev.evm_context
+  json format:
+    { /* evm_context_start_history_mode version 0 */
+      "evm_context_start_history_mode.v0": $history_mode }
+    $history_mode:
+      /* Compact notation for the history mode. Can either be `archive` and
+         `rolling:N` with `N` being the number of days to use as the
+         retention period */
+      "archive" | "rolling:n"
+  
+evm_context_switch_history_mode:
+  description: switching history mode from {from} to {to_}
+  level: warning
+  section: evm_node.dev.evm_context
+  json format:
+    { /* evm_context_switch_history_mode version 0 */
+      "evm_context_switch_history_mode.v0":
+        { "from": $history_mode,
+          "to_": $history_mode } }
+    $history_mode:
+      /* Compact notation for the history mode. Can either be `archive` and
+         `rolling:N` with `N` being the number of days to use as the
+         retention period */
+      "archive" | "rolling:n"
+  
+evm_context_unexpected_l1_block:
+  description: received L1 block of level {provided_level} to process, but was expected level {expected_level}
+  level: warning
+  section: evm_node.dev.evm_context
+  json format:
+    { /* evm_context_unexpected_l1_block version 0 */
+      "evm_context_unexpected_l1_block.v0":
+        { "expected_level": integer ∈ [-2^31-1, 2^31],
+          "provided_level": integer ∈ [-2^31-1, 2^31] } }
+  
 evm_events_follower_diverged:
   description: rollup node diverged on level {level}, confirmed {expected_hash} instead of {found_hash}
   level: error
@@ -259,15 +782,115 @@ evm_events_follower_diverged:
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-shutting_down_evm_events_follower:
-  description: stopping the evm events follower
+  
+evm_events_follower_fallback:
+  description: rollup node does not support fetching all events, falling back to multiple RPCs fetching
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* evm_events_follower_fallback version 0 */
+      "evm_events_follower_fallback.v0": any }
+  
+evm_events_follower_missing_blueprint:
+  description: rollup node diverged at {level}, {expected_hash} not found locally
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* evm_events_follower_missing_blueprint version 0 */
+      "evm_events_follower_missing_blueprint.v0":
+        { "level": $positive_bignum,
+          "expected_hash": $unistring } }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+evm_events_follower_out_of_sync:
+  description: rollup node confimed block {received}, but we have applied block {expected}
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* evm_events_follower_out_of_sync version 0 */
+      "evm_events_follower_out_of_sync.v0":
+        { "received": integer ∈ [-2^31-1, 2^31],
+          "expected": integer ∈ [-2^31-1, 2^31] } }
+  
+evm_events_follower_rollup_level_already_processed:
+  description: rollup node level {level} was already processed, skipping it
+  level: info
+  section: evm_node.dev
+  json format:
+    { /* evm_events_follower_rollup_level_already_processed version 0 */
+      "evm_events_follower_rollup_level_already_processed.v0":
+        integer ∈ [-2^31-1, 2^31] }
+  
+evm_events_follower_rollup_node_ahead:
+  description: rollup node confirmed block {level} before we received it
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* evm_events_follower_rollup_node_ahead version 0 */
+      "evm_events_follower_rollup_node_ahead.v0": $positive_bignum }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
+evm_events_follower_started:
+  description: evm events follower has been started
   level: notice
   section: evm_node.dev
   json format:
-    { /* shutting_down_evm_events_follower version 0 */
-      "shutting_down_evm_events_follower.v0": any }
-
+    { /* evm_events_follower_started version 0 */
+      "evm_events_follower_started.v0": any }
+  
+evm_events_follower_unexpected_key:
+  description: unexpected key in {key} /evm/events
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* evm_events_follower_unexpected_key version 0 */
+      "evm_events_follower_unexpected_key.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+evm_events_follower_unexpected_number_of_events:
+  description: unexpected number of events in /evm/events, fetched {fetched}, expected {expected}
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* evm_events_follower_unexpected_number_of_events version 0 */
+      "evm_events_follower_unexpected_number_of_events.v0":
+        { "expected": integer ∈ [-2^30, 2^30],
+          "fetched": integer ∈ [-2^30, 2^30] } }
+  
+evm_events_follower_upstream_blueprint_applied:
+  description: rollup node confirmed block {level}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* evm_events_follower_upstream_blueprint_applied version 0 */
+      "evm_events_follower_upstream_blueprint_applied.v0":
+        { "level": $positive_bignum,
+          "hash": $unistring } }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 evm_events_new_event:
   description: {event}
   level: debug
@@ -319,7 +942,23 @@ evm_events_new_event:
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
+  
+evm_events_request_failed:
+  description: request {view} failed: {errors}
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* evm_events_request_failed version 0 */
+      "evm_events_request_failed.v0":
+        { "view":
+            { /* New_rollup_node_block */
+              "request": "new_rollup_node_block",
+              "rollup_head": integer ∈ [-2^31-1, 2^31] }
+            || { /* Apply_evm_events */
+                 "request": "apply_evm_events",
+                 "rollup_lvl": integer ∈ [-2^31-1, 2^31] },
+          "errors": any } }
+  
 evm_events_unreadable_event:
   description: evm events follower could not parse event {index} of level {level}
   level: error
@@ -329,226 +968,79 @@ evm_events_unreadable_event:
       "evm_events_unreadable_event.v0":
         { "index": integer ∈ [-2^30, 2^30],
           "level": integer ∈ [-2^31-1, 2^31] } }
-
-evm_events_follower_started:
-  description: evm events follower has been started
+  
+exporting_snapshot:
+  description: exporting snapshot {filename}
   level: notice
   section: evm_node.dev
   json format:
-    { /* evm_events_follower_started version 0 */
-      "evm_events_follower_started.v0": any }
-
-evm_context_switch_history_mode:
-  description: switching history mode from {from} to {to_}
-  level: warning
-  section: evm_node.dev.evm_context
-  json format:
-    { /* evm_context_switch_history_mode version 0 */
-      "evm_context_switch_history_mode.v0":
-        { "from": $history_mode,
-          "to_": $history_mode } }
-    $history_mode:
-      /* Compact notation for the history mode. Can either be `archive` and
-         `rolling:N` with `N` being the number of days to use as the
-         retention period */
-      "archive" | "rolling:n"
-
-evm_context_start_history_mode:
-  description: running with history mode {mode}
-  level: notice
-  section: evm_node.dev.evm_context
-  json format:
-    { /* evm_context_start_history_mode version 0 */
-      "evm_context_start_history_mode.v0": $history_mode }
-    $history_mode:
-      /* Compact notation for the history mode. Can either be `archive` and
-         `rolling:N` with `N` being the number of days to use as the
-         retention period */
-      "archive" | "rolling:n"
-
-evm_context_get_block_failed:
-  description: get block by number failed for level {level}{trace}
-  level: error
-  section: evm_node.dev.evm_context
-  json format:
-    { /* evm_context_get_block_failed version 0 */
-      "evm_context_get_block_failed.v0":
-        { "level": $unistring,
-          "trace": any } }
+    { /* exporting_snapshot version 0 */
+      "exporting_snapshot.v0": $unistring }
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-evm_context_observer_reorg_cannot_find_state:
-  description: reorganization needs state at level {level} but checkpoint is missing
-  level: warning
-  section: evm_node.dev.evm_context
+  
+extract_snapshot_archive_in_progress:
+  description: still extracting archive {name} after {elapsed_time}
+  level: notice
+  section: evm_node.dev
   json format:
-    { /* evm_context_observer_reorg_cannot_find_state version 0 */
-      "evm_context_observer_reorg_cannot_find_state.v0": $positive_bignum }
+    { /* extract_snapshot_archive_in_progress version 0 */
+      "extract_snapshot_archive_in_progress.v0":
+        { "name": $unistring,
+          "elapsed_time": $timespan.system } }
+    $timespan.system:
+      /* A span of time, as seen by the local computer. */
+      number
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+failed_upgrade:
+  description: kernel failed to upgrade to {root_hash} with blueprint {level}
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* failed_upgrade version 0 */
+      "failed_upgrade.v0":
+        { "root_hash": $unistring,
+          "level": $positive_bignum } }
     $positive_bignum:
       /* Positive big number
          Decimal representation of a positive big number */
       string
-
-evm_context_observer_reorg_cannot_find_divergence:
-  description: potential blueprint of reorg is at level {level1}, cannot find block {level2} locally
-  level: warning
-  section: evm_node.dev.evm_context
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+finished_exporting_snapshot:
+  description: finished exporting snapshot {filename}
+  level: notice
+  section: evm_node.dev
   json format:
-    { /* evm_context_observer_reorg_cannot_find_divergence version 0 */
-      "evm_context_observer_reorg_cannot_find_divergence.v0":
-        { "level1": $positive_bignum,
-          "level2": $positive_bignum } }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-
-evm_context_observer_reorg_cannot_decode_blueprint:
-  description: EVM endpoint provided a blueprint (level {level}) we cannot decode
-  level: warning
-  section: evm_node.dev.evm_context
+    { /* finished_exporting_snapshot version 0 */
+      "finished_exporting_snapshot.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+flush_delayed_inbox:
+  description: rollup node flushed the delayed inbox at level {level} ({timestamp})
+  level: notice
+  section: evm_node.dev
   json format:
-    { /* evm_context_observer_reorg_cannot_decode_blueprint version 0 */
-      "evm_context_observer_reorg_cannot_decode_blueprint.v0":
-        $positive_bignum }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-
-evm_context_observer_reorg_old_blueprint:
-  description: EVM endpoint provided an old known blueprint (level {level})
-  level: warning
-  section: evm_node.dev.evm_context
-  json format:
-    { /* evm_context_observer_reorg_old_blueprint version 0 */
-      "evm_context_observer_reorg_old_blueprint.v0": $positive_bignum }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-
-evm_context_observer_potential_reorg:
-  description: potential reorganization happening at level {level}
-  level: warning
-  section: evm_node.dev.evm_context
-  json format:
-    { /* evm_context_observer_potential_reorg version 0 */
-      "evm_context_observer_potential_reorg.v0": $positive_bignum }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-
-evm_context_request_failed:
-  description: request {view} failed: {errors}
-  level: error
-  section: evm_node.dev.evm_context
-  json format:
-    { /* evm_context_request_failed version 0 */
-      "evm_context_request_failed.v0":
-        { "view":
-            { /* Apply_evm_events */
-              "request": "apply_evm_events",
-              "finalized_level"?: integer ∈ [-2^31-1, 2^31],
-              "events":
-                [ { /* kernel_upgrade */
-                    "kind": $unistring,
-                    "event": [ $unistring, $timestamp.protocol ] }
-                  || { /* sequencer_upgrade */
-                       "kind": $unistring,
-                       "event":
-                         [ $Signature.Public_key,
-                           $unistring,
-                           $timestamp.protocol ] }
-                  || { /* blueprint_applied */
-                       "kind": $unistring,
-                       "event": [ $bignum, $unistring ] }
-                  || { /* new_delayed_transaction */
-                       "kind": $unistring,
-                       "event":
-                         [ "transaction" || "deposit" || "fa_deposit",
-                           $unistring,
-                           /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] }
-                  || { /* flush_delayed_inbox */
-                       "kind": $unistring,
-                       "event":
-                         [ [ [ "transaction" || "deposit" || "fa_deposit",
-                               $unistring,
-                               /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
-                           $timestamp.protocol,
-                           $positive_bignum ] } ... ] }
-            || { /* Apply_blueprint */
-                 "request": "apply_blueprint",
-                 "events"?:
-                   [ { /* kernel_upgrade */
-                       "kind": $unistring,
-                       "event": [ $unistring, $timestamp.protocol ] }
-                     || { /* sequencer_upgrade */
-                          "kind": $unistring,
-                          "event":
-                            [ $Signature.Public_key,
-                              $unistring,
-                              $timestamp.protocol ] }
-                     || { /* blueprint_applied */
-                          "kind": $unistring,
-                          "event": [ $bignum, $unistring ] }
-                     || { /* new_delayed_transaction */
-                          "kind": $unistring,
-                          "event":
-                            [ "transaction" || "deposit" || "fa_deposit",
-                              $unistring,
-                              /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] }
-                     || { /* flush_delayed_inbox */
-                          "kind": $unistring,
-                          "event":
-                            [ [ [ "transaction" || "deposit" || "fa_deposit",
-                                  $unistring,
-                                  /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
-                              $timestamp.protocol,
-                              $positive_bignum ] } ... ],
-                 "timestamp": $timestamp.protocol,
-                 "payload": [ /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ... ],
-                 "delayed_transactions":
-                   [ [ "transaction" || "deposit" || "fa_deposit",
-                       $unistring,
-                       /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ] }
-            || { /* Last_known_L1_level */
-                 "request": "last_known_l1_level" }
-            || { /* Delayed_inbox_hashes */
-                 "request": "Delayed_inbox_hashes" }
-            || { /* Patch_state */
-                 "request": "patch_state",
-                 "commit": boolean,
-                 "key": $unistring,
-                 "block_number"?: $unistring }
-            || { /* Wasm_pvm_version */
-                 "request": "wasm_pvm_version" }
-            || { /* Potential_observer_reorg */
-                 "request": "potential_observer_reorg",
-                 "evm_node_endpoint": $unistring,
-                 "blueprint_with_events":
-                   { "delayed_transactions":
-                       [ [ "transaction" || "deposit" || "fa_deposit",
-                           $unistring,
-                           /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
-                     "kernel_upgrade"?: [ $unistring, $timestamp.protocol ],
-                     "blueprint":
-                       { "number": $positive_bignum,
-                         "timestamp": $timestamp.protocol,
-                         "payload": [ /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ... ] } } },
-          "errors": any } }
-    $Signature.Public_key:
-      /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
-      $unistring
-    $bignum:
-      /* Big number
-         Decimal representation of a big number */
-      string
+    { /* flush_delayed_inbox version 0 */
+      "flush_delayed_inbox.v0":
+        { "timestamp": $timestamp.protocol,
+          "level": $positive_bignum } }
     $positive_bignum:
       /* Positive big number
          Decimal representation of a positive big number */
@@ -562,191 +1054,178 @@ evm_context_request_failed:
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-evm_context_reset_at_level:
-  description: resetting to finalized block {level}
+  
+ignored_kernel_arg:
+  description: ignored the kernel command-line argument since the EVM state was already initialized
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* ignored_kernel_arg version 0 */
+      "ignored_kernel_arg.v0": any }
+  
+ignored_periodic_snapshot_arg:
+  description: ignored the periodic snapshot feature since the EVM node is running in Archive mode
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* ignored_periodic_snapshot_arg version 0 */
+      "ignored_periodic_snapshot_arg.v0": any }
+  
+import_finished:
+  description: snapshot import is finished
   level: notice
-  section: evm_node.dev.evm_context
+  section: evm_node.dev
   json format:
-    { /* evm_context_reset_at_level version 0 */
-      "evm_context_reset_at_level.v0": $unistring }
+    { /* import_finished version 0 */
+      "import_finished.v0": any }
+  
+importing_snapshot:
+  description: importing snapshot
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* importing_snapshot version 0 */
+      "importing_snapshot.v0": any }
+  
+is_ready:
+  description: the EVM node RPC server ({backend}) is listening to {addr}:{port} {websockets}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* is_ready version 0 */
+      "is_ready.v0":
+        { "addr": $unistring,
+          "port": integer ∈ [0, 2^16-1],
+          "backend": "dream" | "resto",
+          "websockets": boolean } }
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-evm_context_missing_state:
-  description: cannot find state at level {level}
+  
+kernel_log_debug:
+  description: {msg}
+  level: debug
+  section: evm_node.dev.kernel.simulation
+  json format:
+    { /* kernel_log_debug version 0 */
+      "kernel_log_debug.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+kernel_log_debug:
+  description: {msg}
+  level: debug
+  section: evm_node.dev.kernel.application
+  json format:
+    { /* kernel_log_debug version 0 */
+      "kernel_log_debug.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+kernel_log_error:
+  description: {msg}
+  level: error
+  section: evm_node.dev.kernel.simulation
+  json format:
+    { /* kernel_log_error version 0 */
+      "kernel_log_error.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+kernel_log_error:
+  description: {msg}
+  level: error
+  section: evm_node.dev.kernel.application
+  json format:
+    { /* kernel_log_error version 0 */
+      "kernel_log_error.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+kernel_log_fatal:
+  description: {msg}
+  level: fatal
+  section: evm_node.dev.kernel.simulation
+  json format:
+    { /* kernel_log_fatal version 0 */
+      "kernel_log_fatal.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+kernel_log_fatal:
+  description: {msg}
+  level: fatal
+  section: evm_node.dev.kernel.application
+  json format:
+    { /* kernel_log_fatal version 0 */
+      "kernel_log_fatal.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+kernel_log_info:
+  description: {msg}
+  level: info
+  section: evm_node.dev.kernel.simulation
+  json format:
+    { /* kernel_log_info version 0 */
+      "kernel_log_info.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+kernel_log_notice:
+  description: {msg}
+  level: notice
+  section: evm_node.dev.kernel.application
+  json format:
+    { /* kernel_log_notice version 0 */
+      "kernel_log_notice.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+legacy_mode:
+  description: node is using the (deprecated) legacy block storage, import a recent snapshot to start using the new block storage
   level: warning
-  section: evm_node.dev.evm_context
+  section: evm_node.dev
   json format:
-    { /* evm_context_missing_state version 0 */
-      "evm_context_missing_state.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-evm_context_reset_impossible_missing_finalized_state:
-  description: cannot found finalized state we must exit on divergence
-  level: warning
-  section: evm_node.dev.evm_context
-  json format:
-    { /* evm_context_reset_impossible_missing_finalized_state version 0 */
-      "evm_context_reset_impossible_missing_finalized_state.v0": any }
-
-evm_context_processed_l1_level:
-  description: processed L1 level {level}. Last finalized blueprint is: {finalized_blueprint}
-  level: info
-  section: evm_node.dev.evm_context
-  json format:
-    { /* evm_context_processed_l1_level version 0 */
-      "evm_context_processed_l1_level.v0":
-        { "level": integer ∈ [-2^31-1, 2^31],
-          "finalized_blueprint": $positive_bignum } }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-
-evm_context_unexpected_l1_block:
-  description: received L1 block of level {provided_level} to process, but was expected level {expected_level}
-  level: warning
-  section: evm_node.dev.evm_context
-  json format:
-    { /* evm_context_unexpected_l1_block version 0 */
-      "evm_context_unexpected_l1_block.v0":
-        { "expected_level": integer ∈ [-2^31-1, 2^31],
-          "provided_level": integer ∈ [-2^31-1, 2^31] } }
-
-evm_context_gc_waiter_failed:
-  description: garbage collector waiter failed with an exception: {exn}
-  level: warning
-  section: evm_node.dev.evm_context
-  json format:
-    { /* evm_context_gc_waiter_failed version 0 */
-      "evm_context_gc_waiter_failed.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-evm_context_gc_finished:
-  description: garbage collection finished for level {gc_level} at head level {head_level} (took {duration})
-  level: info
-  section: evm_node.dev.evm_context
-  json format:
-    { /* evm_context_gc_finished version 0 */
-      "evm_context_gc_finished.v0":
-        { "gc_level": $unistring,
-          "head_level": $unistring,
-          "duration": number } }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-evm_context_gc_started:
-  description: garbage collection started for level {gc_level} at head level {head_level}
-  level: info
-  section: evm_node.dev.evm_context
-  json format:
-    { /* evm_context_gc_started version 0 */
-      "evm_context_gc_started.v0":
-        { "gc_level": $unistring,
-          "head_level": $unistring } }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-evm_context_gc_split:
-  description: splitting Irmin context at level {level} ({timestamp})
-  level: info
-  section: evm_node.dev.evm_context
-  json format:
-    { /* evm_context_gc_split version 0 */
-      "evm_context_gc_split.v0":
-        { "level": $unistring,
-          "timestamp": $timestamp.protocol } }
-    $timestamp.protocol:
-      /* A timestamp as seen by the protocol: second-level precision, epoch
-         based. */
-      $unistring
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-reconstruct_replace_mainnet_kernel:
-  description: replacing initial mainnet kernel
-  level: info
-  section: evm_node.dev.evm_context
-  json format:
-    { /* reconstruct_replace_mainnet_kernel version 0 */
-      "reconstruct_replace_mainnet_kernel.v0": any }
-
-evm_context_shutdown:
-  description: EVM context worker is shutting down
-  level: info
-  section: evm_node.dev.evm_context
-  json format:
-    { /* evm_context_shutdown version 0 */
-      "evm_context_shutdown.v0": any }
-
-evm_context_is_ready:
-  description: EVM context worker is ready
-  level: info
-  section: evm_node.dev.evm_context
-  json format:
-    { /* evm_context_is_ready version 0 */
-      "evm_context_is_ready.v0": any }
-
-blueprints_publisher_request_failed:
-  description: request {view} failed: {errors}
+    { /* legacy_mode version 0 */
+      "legacy_mode.v0": any }
+  
+migrations_from_the_future:
+  description: store has {applied} migrations applied but the EVM node is only aware of {known}
   level: error
   section: evm_node.dev
   json format:
-    { /* blueprints_publisher_request_failed version 0 */
-      "blueprints_publisher_request_failed.v0":
-        { "view":
-            { /* Publish */
-              "request": "publish",
-              "level": $positive_bignum,
-              "payload":
-                { /* Blueprint */
-                  "chunks":
-                    [ { "value": /^([a-zA-Z0-9][a-zA-Z0-9])*$/,
-                        "number": $unistring,
-                        "nb_chunks": integer ∈ [-2^30, 2^30],
-                        "chunk_index": integer ∈ [-2^30, 2^30],
-                        "signature": $Signature.V1 } ... ],
-                  "inbox_payload": [ $unistring ... ] }
-                || [ $unistring ... ]
-                /* Inbox */ }
-            || { /* New_rollup_node_block */
-                 "request": "new_l2_head",
-                 "rollup_head": integer ∈ [-2^31-1, 2^31] },
-          "errors": any } }
-    $Signature.V1:
-      /* A Ed25519, Secp256k1, P256 or BLS signature (Base58Check-encoded) */
-      $unistring
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
+    { /* migrations_from_the_future version 0 */
+      "migrations_from_the_future.v0":
+        { "applied": integer ∈ [-2^30, 2^30],
+          "known": integer ∈ [-2^30, 2^30] } }
+  
 missing_blueprints:
   description: store is missing {count} blueprints in the range [{from}; {to_}]
   level: error
@@ -761,317 +1240,163 @@ missing_blueprints:
       /* Positive big number
          Decimal representation of a positive big number */
       string
-
-blueprint_invalid_applied:
-  description: failed to apply received blueprint for level {level}
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* blueprint_invalid_applied version 0 */
-      "blueprint_invalid_applied.v0": $positive_bignum }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-
-blueprint_invalid:
-  description: produced an invalid blueprint at level {level}
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* blueprint_invalid version 0 */
-      "blueprint_invalid.v0": $positive_bignum }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-
-blueprint_production:
-  description: produced a blueprint for level {level} in {process_time}
-  level: info
-  section: evm_node.dev
-  json format:
-    { /* blueprint_production version 0 */
-      "blueprint_production.v0":
-        { "level": $positive_bignum,
-          "process_time": $timespan.system } }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-    $timespan.system:
-      /* A span of time, as seen by the local computer. */
-      number
-
-blueprint_proposal:
-  description: crafted a blueprint proposal for level {level} in {process_time}
-  level: debug
-  section: evm_node.dev
-  json format:
-    { /* blueprint_proposal version 0 */
-      "blueprint_proposal.v0":
-        { "level": $positive_bignum,
-          "process_time": $timespan.system } }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-    $timespan.system:
-      /* A span of time, as seen by the local computer. */
-      number
-
-blueprint_catchup:
-  description: catching-up from level {min} to {max}
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* blueprint_catchup version 0 */
-      "blueprint_catchup.v0":
-        { "min": $positive_bignum,
-          "max": $positive_bignum } }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-
-blueprint_injection_failure:
-  description: injecting a blueprint for level {level} failed with {trace}
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* blueprint_injection_failure version 0 */
-      "blueprint_injection_failure.v0":
-        { "level": $positive_bignum,
-          "trace": any } }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-
-blueprint_injection_on_DAL:
-  description: injecting on the DAL a blueprint for level {level} containing {nb_chunks} chunks
-  level: debug
-  section: evm_node.dev
-  json format:
-    { /* blueprint_injection_on_DAL version 0 */
-      "blueprint_injection_on_DAL.v0":
-        { "level": $positive_bignum,
-          "nb_chunks": integer ∈ [-2^30, 2^30] } }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-
-blueprint_injection_on_inbox:
-  description: injecting on the shared inbox a blueprint for level {level}
-  level: debug
-  section: evm_node.dev
-  json format:
-    { /* blueprint_injection_on_inbox version 0 */
-      "blueprint_injection_on_inbox.v0": $positive_bignum }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-
-blueprint_injection:
-  description: injecting a blueprint for level {level}
-  level: info
-  section: evm_node.dev
-  json format:
-    { /* blueprint_injection version 0 */
-      "blueprint_injection.v0": $positive_bignum }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-
-blueprint_application:
-  description: head is now {level}, applied in {process_time}{timestamp}
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* blueprint_application version 0 */
-      "blueprint_application.v0":
-        { "level": $positive_bignum,
-          "timestamp": $timestamp.rfc,
-          "txs_nb": integer ∈ [-2^30, 2^30],
-          "gas_used": $positive_bignum,
-          "block_hash": $unistring,
-          "process_time": $timespan.system } }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-    $timespan.system:
-      /* A span of time, as seen by the local computer. */
-      number
-    $timestamp.rfc:
-      /* RFC 3339 formatted timestamp
-         A date in RFC 3339 notation. */
-      $unistring
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-blueprint_publisher_shutdown:
-  description: blueprint publishing is shutting down
-  level: info
-  section: evm_node.dev
-  json format:
-    { /* blueprint_publisher_shutdown version 0 */
-      "blueprint_publisher_shutdown.v0": any }
-
-blueprint_publisher_is_ready:
-  description: blueprint publisher is ready
-  level: info
-  section: evm_node.dev
-  json format:
-    { /* blueprint_publisher_is_ready version 0 */
-      "blueprint_publisher_is_ready.v0": any }
-
-block_producer_locked:
-  description: transaction pool and block production are locked
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* block_producer_locked version 0 */
-      "block_producer_locked.v0": any }
-
-shutting_down_block_producer:
-  description: stopping the block producer follower
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* shutting_down_block_producer version 0 */
-      "shutting_down_block_producer.v0": any }
-
-block_producer_started:
-  description: block producer has been started
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* block_producer_started version 0 */
-      "block_producer_started.v0": any }
-
-block_producer_transaction_injected:
-  description: transaction {transaction} has been selected for a block
-  level: info
-  section: evm_node.dev
-  json format:
-    { /* block_producer_transaction_injected version 0 */
-      "block_producer_transaction_injected.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-signal_publisher_signal_signed:
-  description: signed the following signals: {signals} (slot_index, published_level) for smart rollup address {smart_rollup_address}
-  level: info
-  section: evm_node.dev.signal_publisher
-  json format:
-    { /* signal_publisher_signal_signed version 0 */
-      "signal_publisher_signal_signed.v0":
-        { "signals":
-            [ { "slot_index": integer ∈ [0, 255],
-                "published_level": integer ∈ [-2^31-1, 2^31] } ... ],
-          "smart_rollup_address": $smart_rollup_address } }
-    $smart_rollup_address:
-      /* A smart rollup address (Base58Check-encoded) */
-      $unistring
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-signal_publisher_commited_or_included_injector_id:
-  description: the injection id {injector_op_hash} has been reported commited or included, and finalized, by the rollup node and published at L1 level {publish_level}
-  level: debug
-  section: evm_node.dev.signal_publisher
-  json format:
-    { /* signal_publisher_commited_or_included_injector_id version 0 */
-      "signal_publisher_commited_or_included_injector_id.v0":
-        { "injector_op_hash": $injector_operation_hash,
-          "publish_level": integer ∈ [-2^31-1, 2^31] } }
-    $injector_operation_hash:
-      /* An identifier (hash) for an operation in the injector
-         (Base58Check-encoded) */
-      $unistring
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-signal_publisher_untracking:
-  description: the injection id {injector_op_hash} is not longer tracked by the signal publisher
-  level: debug
-  section: evm_node.dev.signal_publisher
-  json format:
-    { /* signal_publisher_untracking version 0 */
-      "signal_publisher_untracking.v0": $injector_operation_hash }
-    $injector_operation_hash:
-      /* An identifier (hash) for an operation in the injector
-         (Base58Check-encoded) */
-      $unistring
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-signal_publisher_shutting_down:
-  description: stopping the signals publisher worker
-  level: info
-  section: evm_node.dev.signal_publisher
-  json format:
-    { /* signal_publisher_shutting_down version 0 */
-      "signal_publisher_shutting_down.v0": any }
-
-signal_publisher_is_ready:
-  description: signal publisher is ready
-  level: info
-  section: evm_node.dev.signal_publisher
-  json format:
-    { /* signal_publisher_is_ready version 0 */
-      "signal_publisher_is_ready.v0": any }
-
-websocket_monitoring_exception:
-  description: monitoring for websocket {conn} raised exception {exception}
+  
+missing_chain_id:
+  description: missing chain id: skipping consistency check with selected network
   level: warning
-  section: evm_node.websocket
+  section: evm_node.dev
   json format:
-    { /* websocket_monitoring_exception version 0 */
-      "websocket_monitoring_exception.v0":
-        { "conn": $unistring,
-          "exception": $unistring } }
+    { /* missing_chain_id version 0 */
+      "missing_chain_id.v0": any }
+  
+multichain_node_singlechain_kernel:
+  description: the configuration for the `l2_chains` experimental feature was ignored because the multichain feature is not yet enabled in the rollup
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* multichain_node_singlechain_kernel version 0 */
+      "multichain_node_singlechain_kernel.v0": any }
+  
+no_l1_latest_level:
+  description: no l1 level processed, no EVM events catch up will occur
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* no_l1_latest_level version 0 */
+      "no_l1_latest_level.v0": any }
+  
+node_da_fees:
+  description: internal: node gives {node_da_fees} DA fees, whereas kernel gives {kernel_da_fees} on block {block_number} with {call}
+  level: fatal
+  section: evm_node.dev
+  json format:
+    { /* node_da_fees version 0 */
+      "node_da_fees.v0":
+        { "node_da_fees": $bignum,
+          "kernel_da_fees": $bignum,
+          "block_number": $unistring /* Some */ || null /* None */,
+          "call": any } }
+    $bignum:
+      /* Big number
+         Decimal representation of a big number */
+      string
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-websocket_unsubscribe:
-  description: unsubscribe {id} for connection {conn}: {reason}
+  
+patched_state:
+  description: key {key} successfully patched, starting from level {level}
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* patched_state version 0 */
+      "patched_state.v0": { "key": $unistring,
+                            "level": $unistring } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+pending_upgrade:
+  description: pending upgrade to root hash {root_hash} expected to activate at {timestamp}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* pending_upgrade version 0 */
+      "pending_upgrade.v0":
+        { "root_hash": $unistring,
+          "timestamp": $timestamp.protocol } }
+    $timestamp.protocol:
+      /* A timestamp as seen by the protocol: second-level precision, epoch
+         based. */
+      $unistring
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+predownload_kernel:
+  description: kernel {version} successfully predownloaded
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* predownload_kernel version 0 */
+      "predownload_kernel.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+predownload_kernel_failed:
+  description: failed to predownload kernel {version} due to: {error}
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* predownload_kernel_failed version 0 */
+      "predownload_kernel_failed.v0": { "version": $unistring,
+                                        "error": any } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+preloaded_kernel:
+  description: kernel {version} successfully preloaded
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* preloaded_kernel version 0 */
+      "preloaded_kernel.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+private_server_is_ready:
+  description: the EVM node private RPC server ({backend}) is listening to {addr}:{port} {websockets}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* private_server_is_ready version 0 */
+      "private_server_is_ready.v0":
+        { "addr": $unistring,
+          "port": integer ∈ [0, 2^16-1],
+          "backend": "dream" | "resto",
+          "websockets": boolean } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+received_upgrade:
+  description: received an upgrade payload: {payload}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* received_upgrade version 0 */
+      "received_upgrade.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+reconstruct_replace_mainnet_kernel:
+  description: replacing initial mainnet kernel
   level: info
-  section: evm_node.websocket
+  section: evm_node.dev.evm_context
   json format:
-    { /* websocket_unsubscribe version 0 */
-      "websocket_unsubscribe.v0":
-        { "conn": $unistring,
-          "id": $unistring,
-          "reason": $unistring } }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
+    { /* reconstruct_replace_mainnet_kernel version 0 */
+      "reconstruct_replace_mainnet_kernel.v0": any }
+  
 request_completed_debug:
   description: {view} {worker_status}
   level: debug
@@ -1115,7 +1440,7 @@ request_completed_debug:
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
+  
 request_failed:
   description: request {view} failed ({worker_status}): {errors}
   level: warning
@@ -1160,345 +1485,98 @@ request_failed:
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-websocket_missing_worker:
-  description: no worker for websocket connection {conn}
-  level: error
-  section: evm_node.websocket
-  json format:
-    { /* websocket_missing_worker version 0 */
-      "websocket_missing_worker.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-websocket_starting:
-  description: starting worker for websocket connection {conn}
-  level: notice
-  section: evm_node.websocket
-  json format:
-    { /* websocket_starting version 0 */
-      "websocket_starting.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-websocket_shutdown:
-  description: shutting down websocket worker for connection {conn}: {reason} ({subscriptions} subscriptions)
-  level: notice
-  section: evm_node.websocket
-  json format:
-    { /* websocket_shutdown version 0 */
-      "websocket_shutdown.v0":
-        { "conn": $unistring,
-          "reason": $unistring,
-          "subscriptions": integer ∈ [-2^30, 2^30] } }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-tracer_input:
-  description: Tracer with input {inputs} 
-  level: debug
-  section: evm_node.dev.tracer
-  json format:
-    { /* tracer_input version 0 */
-      "tracer_input.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-call_tracer_read_line:
-  description: Call tracer read a line {line} of tx {tx}
-  level: debug
-  section: evm_node.dev.tracer
-  json format:
-    { /* call_tracer_read_line version 0 */
-      "call_tracer_read_line.v0":
-        { "line": $positive_bignum,
-          "tx": $unistring } }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-shutting_down_tx_pool:
-  description: stopping the tx-pool
+  
+retrying_connect:
+  description: cannot connect to {endpoint}, retrying in {delay} seconds
   level: notice
   section: evm_node.dev
   json format:
-    { /* shutting_down_tx_pool version 0 */
-      "shutting_down_tx_pool.v0": any }
-
-tx_pool_stopped:
-  description: tx-pool has been stopped
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* tx_pool_stopped version 0 */
-      "tx_pool_stopped.v0": any }
-
-tx_pool_connection_lost:
-  description: connection with the rollup node has been lost, retrying...
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* tx_pool_connection_lost version 0 */
-      "tx_pool_connection_lost.v0": any }
-
-tx_pool_transaction_injection_failed:
-  description: injection of transactions failed
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* tx_pool_transaction_injection_failed version 0 */
-      "tx_pool_transaction_injection_failed.v0": any }
-
-tx_pool_transaction_injected:
-  description: transaction {transaction} has been injected
+    { /* retrying_connect version 0 */
+      "retrying_connect.v0": { "endpoint": $unistring,
+                               "delay": number } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+rollup_node_follower_connection_acquired:
+  description: rollup node follower connected to the rollup node
   level: info
   section: evm_node.dev
   json format:
-    { /* tx_pool_transaction_injected version 0 */
-      "tx_pool_transaction_injected.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-tx_data_size_limit_reached:
-  description: the transaction data size is beyond the allowed threshold
-  level: info
-  section: evm_node.dev
-  json format:
-    { /* tx_data_size_limit_reached version 0 */
-      "tx_data_size_limit_reached.v0": any }
-
-txs_per_user_threshold_reached:
-  description: user {address} has reached the maximum threshold for transactions
-  level: info
-  section: evm_node.dev
-  json format:
-    { /* txs_per_user_threshold_reached version 0 */
-      "txs_per_user_threshold_reached.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-tx_pool_users_threshold_reached:
-  description: the transaction pool has reached its maximum threshold for user transactions
-  level: info
-  section: evm_node.dev
-  json format:
-    { /* tx_pool_users_threshold_reached version 0 */
-      "tx_pool_users_threshold_reached.v0": any }
-
-tx_pool_invalid_transaction:
-  description: transaction {transaction} is not valid
-  level: info
-  section: evm_node.dev
-  json format:
-    { /* tx_pool_invalid_transaction version 0 */
-      "tx_pool_invalid_transaction.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-tx_pool_add_transaction:
-  description: add transaction {transaction} to the tx-pool
-  level: info
-  section: evm_node.dev
-  json format:
-    { /* tx_pool_add_transaction version 0 */
-      "tx_pool_add_transaction.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-tx_pool_started:
-  description: tx-pool has been started
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* tx_pool_started version 0 */
-      "tx_pool_started.v0": any }
-
-tx_queue_callback_error:
-  description: A callback produced an error: [<v 2>@{error}@]
-  level: error
-  section: evm_node.dev.tx_queue
-  json format:
-    { /* tx_queue_callback_error version 0 */
-      "tx_queue_callback_error.v0": any }
-
-tx_queue_rpc_error:
-  description: an RPC produced the error :
-	code:{code},
-	message:{message}
-  level: error
-  section: evm_node.dev.tx_queue
-  json format:
-    { /* tx_queue_rpc_error version 0 */
-      "tx_queue_rpc_error.v0":
-        { "code": integer ∈ [-2^31-1, 2^31],
-          "message": $unistring } }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-tx_queue_cleared:
-  description: cleared the tx queue
-  level: notice
-  section: evm_node.dev.tx_queue
-  json format:
-    { /* tx_queue_cleared version 0 */
-      "tx_queue_cleared.v0": any }
-
-shutting_down_tx_queue:
-  description: stopping the tx queue
-  level: notice
-  section: evm_node.dev.tx_queue
-  json format:
-    { /* shutting_down_tx_queue version 0 */
-      "shutting_down_tx_queue.v0": any }
-
-tx_queue_is_ready:
-  description: tx queue is ready
-  level: notice
-  section: evm_node.dev.tx_queue
-  json format:
-    { /* tx_queue_is_ready version 0 */
-      "tx_queue_is_ready.v0": any }
-
-no_l1_latest_level:
-  description: no l1 level processed, no EVM events catch up will occur
-  level: warning
-  section: evm_node.dev
-  json format:
-    { /* no_l1_latest_level version 0 */
-      "no_l1_latest_level.v0": any }
-
-migrations_from_the_future:
-  description: store has {applied} migrations applied but the EVM node is only aware of {known}
+    { /* rollup_node_follower_connection_acquired version 0 */
+      "rollup_node_follower_connection_acquired.v0": any }
+  
+rollup_node_follower_connection_failed:
+  description: connection with the rollup node failed with {trace}
   level: error
   section: evm_node.dev
   json format:
-    { /* migrations_from_the_future version 0 */
-      "migrations_from_the_future.v0":
-        { "applied": integer ∈ [-2^30, 2^30],
-          "known": integer ∈ [-2^30, 2^30] } }
-
-store_applied_migration:
-  description: applied migration {name} to the store in {time}
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* store_applied_migration version 0 */
-      "store_applied_migration.v0":
-        { "name": $unistring,
-          "time": $timespan.system } }
-    $timespan.system:
-      /* A span of time, as seen by the local computer. */
-      number
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-store_init:
-  description: store is being initialized for the first time
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* store_init version 0 */
-      "store_init.v0": any }
-
-counter_inc_assertion_warning:
-  description: assertion failed while updating a Counter metric: the increment ({increment} occuring at {label}) is negative; the value will not be updated
-  level: warning
-  section: evm_node.dev.metrics
-  json format:
-    { /* counter_inc_assertion_warning version 0 */
-      "counter_inc_assertion_warning.v0":
-        { "increment": number,
-          "label": $unistring } }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-multichain_node_singlechain_kernel:
-  description: the configuration for the `l2_chains` experimental feature was ignored because the multichain feature is not yet enabled in the rollup
-  level: warning
-  section: evm_node.dev
-  json format:
-    { /* multichain_node_singlechain_kernel version 0 */
-      "multichain_node_singlechain_kernel.v0": any }
-
-wasm_pvm_fallback:
-  description: the node needs to fallback to the WASM PVM to execute a block
-  level: warning
-  section: evm_node.dev
-  json format:
-    { /* wasm_pvm_fallback version 0 */
-      "wasm_pvm_fallback.v0": any }
-
-node_da_fees:
-  description: internal: node gives {node_da_fees} DA fees, whereas kernel gives {kernel_da_fees} on block {block_number} with {call}
-  level: fatal
-  section: evm_node.dev
-  json format:
-    { /* node_da_fees version 0 */
-      "node_da_fees.v0":
-        { "node_da_fees": $bignum,
-          "kernel_da_fees": $bignum,
-          "block_number": $unistring /* Some */ || null /* None */,
-          "call": any } }
-    $bignum:
-      /* Big number
-         Decimal representation of a big number */
-      string
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-cannot_fetch_time_between_blocks:
-  description: could not fetch the maximum time between blocks from remote EVM endpoint, default to {tbb}: {trace}
+    { /* rollup_node_follower_connection_failed version 0 */
+      "rollup_node_follower_connection_failed.v0": any }
+  
+rollup_node_follower_connection_lost:
+  description: connection with the rollup node has been lost
   level: error
   section: evm_node.dev
   json format:
-    { /* cannot_fetch_time_between_blocks version 0 */
-      "cannot_fetch_time_between_blocks.v0":
-        { "tbb": $time_between_blocks,
-          "trace": any } }
-    $time_between_blocks: number /* Some */ || null /* None */
-
+    { /* rollup_node_follower_connection_lost version 0 */
+      "rollup_node_follower_connection_lost.v0": any }
+  
+rollup_node_follower_disabled:
+  description: rollup node follower is disabled
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* rollup_node_follower_disabled version 0 */
+      "rollup_node_follower_disabled.v0": any }
+  
+rollup_node_follower_new_block:
+  description: rollup node follower detected a new block (level {block})
+  level: info
+  section: evm_node.dev
+  json format:
+    { /* rollup_node_follower_new_block version 0 */
+      "rollup_node_follower_new_block.v0": integer ∈ [-2^31-1, 2^31] }
+  
+rollup_node_follower_started:
+  description: rollup node follower has been started
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* rollup_node_follower_started version 0 */
+      "rollup_node_follower_started.v0": any }
+  
+rollup_node_follower_stream_failed:
+  description: stream from the rollup node failed with {trace}
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* rollup_node_follower_stream_failed version 0 */
+      "rollup_node_follower_stream_failed.v0": any }
+  
+rollup_node_follower_trying_reconnection:
+  description: waiting {duration} seconds before trying to reconnect to the rollup node
+  level: info
+  section: evm_node.dev
+  json format:
+    { /* rollup_node_follower_trying_reconnection version 0 */
+      "rollup_node_follower_trying_reconnection.v0": number }
+  
+rpc_server_error:
+  description: RPC server error: {exception}
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* rpc_server_error version 0 */
+      "rpc_server_error.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 sandbox_started:
   description: starting sandbox mode at level {level}
   level: notice
@@ -1510,297 +1588,135 @@ sandbox_started:
       /* Big number
          Decimal representation of a big number */
       string
-
-predownload_kernel_failed:
-  description: failed to predownload kernel {version} due to: {error}
+  
+sequencer_disabled_native_execution:
+  description: native execution is disabled in sequencer mode
   level: warning
-  section: evm_node.dev
+  section: evm_node
   json format:
-    { /* predownload_kernel_failed version 0 */
-      "predownload_kernel_failed.v0": { "version": $unistring,
-                                        "error": any } }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-predownload_kernel:
-  description: kernel {version} successfully predownloaded
+    { /* sequencer_disabled_native_execution version 0 */
+      "sequencer_disabled_native_execution.v0": any }
+  
+shutting_down:
+  description: stopping the EVM node with {exit_status}
   level: notice
   section: evm_node.dev
   json format:
-    { /* predownload_kernel version 0 */
-      "predownload_kernel.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-preloaded_kernel:
-  description: kernel {version} successfully preloaded
+    { /* shutting_down version 0 */
+      "shutting_down.v0": integer ∈ [-128, 127] }
+  
+shutting_down_block_producer:
+  description: stopping the block producer follower
   level: notice
   section: evm_node.dev
   json format:
-    { /* preloaded_kernel version 0 */
-      "preloaded_kernel.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-patched_state:
-  description: key {key} successfully patched, starting from level {level}
-  level: warning
+    { /* shutting_down_block_producer version 0 */
+      "shutting_down_block_producer.v0": any }
+  
+shutting_down_evm_events_follower:
+  description: stopping the evm events follower
+  level: notice
   section: evm_node.dev
   json format:
-    { /* patched_state version 0 */
-      "patched_state.v0": { "key": $unistring,
-                            "level": $unistring } }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-kernel_log_fatal:
-  description: {msg}
-  level: fatal
-  section: evm_node.dev.kernel.simulation
+    { /* shutting_down_evm_events_follower version 0 */
+      "shutting_down_evm_events_follower.v0": any }
+  
+shutting_down_rollup_node_follower:
+  description: stopping the rollup node follower
+  level: notice
+  section: evm_node.dev
   json format:
-    { /* kernel_log_fatal version 0 */
-      "kernel_log_fatal.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-kernel_log_fatal:
-  description: {msg}
-  level: fatal
-  section: evm_node.dev.kernel.application
+    { /* shutting_down_rollup_node_follower version 0 */
+      "shutting_down_rollup_node_follower.v0": any }
+  
+shutting_down_tx_pool:
+  description: stopping the tx-pool
+  level: notice
+  section: evm_node.dev
   json format:
-    { /* kernel_log_fatal version 0 */
-      "kernel_log_fatal.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-kernel_log_error:
-  description: {msg}
-  level: error
-  section: evm_node.dev.kernel.simulation
+    { /* shutting_down_tx_pool version 0 */
+      "shutting_down_tx_pool.v0": any }
+  
+shutting_down_tx_queue:
+  description: stopping the tx queue
+  level: notice
+  section: evm_node.dev.tx_queue
   json format:
-    { /* kernel_log_error version 0 */
-      "kernel_log_error.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-kernel_log_error:
-  description: {msg}
-  level: error
-  section: evm_node.dev.kernel.application
+    { /* shutting_down_tx_queue version 0 */
+      "shutting_down_tx_queue.v0": any }
+  
+signal_publisher_commited_or_included_injector_id:
+  description: the injection id {injector_op_hash} has been reported commited or included, and finalized, by the rollup node and published at L1 level {publish_level}
+  level: debug
+  section: evm_node.dev.signal_publisher
   json format:
-    { /* kernel_log_error version 0 */
-      "kernel_log_error.v0": $unistring }
+    { /* signal_publisher_commited_or_included_injector_id version 0 */
+      "signal_publisher_commited_or_included_injector_id.v0":
+        { "injector_op_hash": $injector_operation_hash,
+          "publish_level": integer ∈ [-2^31-1, 2^31] } }
+    $injector_operation_hash:
+      /* An identifier (hash) for an operation in the injector
+         (Base58Check-encoded) */
+      $unistring
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-kernel_log_info:
-  description: {msg}
+  
+signal_publisher_is_ready:
+  description: signal publisher is ready
   level: info
-  section: evm_node.dev.kernel.simulation
+  section: evm_node.dev.signal_publisher
   json format:
-    { /* kernel_log_info version 0 */
-      "kernel_log_info.v0": $unistring }
+    { /* signal_publisher_is_ready version 0 */
+      "signal_publisher_is_ready.v0": any }
+  
+signal_publisher_shutting_down:
+  description: stopping the signals publisher worker
+  level: info
+  section: evm_node.dev.signal_publisher
+  json format:
+    { /* signal_publisher_shutting_down version 0 */
+      "signal_publisher_shutting_down.v0": any }
+  
+signal_publisher_signal_signed:
+  description: signed the following signals: {signals} (slot_index, published_level) for smart rollup address {smart_rollup_address}
+  level: info
+  section: evm_node.dev.signal_publisher
+  json format:
+    { /* signal_publisher_signal_signed version 0 */
+      "signal_publisher_signal_signed.v0":
+        { "signals":
+            [ { "slot_index": integer ∈ [0, 255],
+                "published_level": integer ∈ [-2^31-1, 2^31] } ... ],
+          "smart_rollup_address": $smart_rollup_address } }
+    $smart_rollup_address:
+      /* A smart rollup address (Base58Check-encoded) */
+      $unistring
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-kernel_log_notice:
-  description: {msg}
-  level: notice
-  section: evm_node.dev.kernel.application
-  json format:
-    { /* kernel_log_notice version 0 */
-      "kernel_log_notice.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-kernel_log_debug:
-  description: {msg}
+  
+signal_publisher_untracking:
+  description: the injection id {injector_op_hash} is not longer tracked by the signal publisher
   level: debug
-  section: evm_node.dev.kernel.simulation
+  section: evm_node.dev.signal_publisher
   json format:
-    { /* kernel_log_debug version 0 */
-      "kernel_log_debug.v0": $unistring }
+    { /* signal_publisher_untracking version 0 */
+      "signal_publisher_untracking.v0": $injector_operation_hash }
+    $injector_operation_hash:
+      /* An identifier (hash) for an operation in the injector
+         (Base58Check-encoded) */
+      $unistring
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-kernel_log_debug:
-  description: {msg}
-  level: debug
-  section: evm_node.dev.kernel.application
-  json format:
-    { /* kernel_log_debug version 0 */
-      "kernel_log_debug.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-download_failed:
-  description: downloading {url} failed with {error}
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* download_failed version 0 */
-      "download_failed.v0":
-        { "url": $unistring,
-          "error":
-            { /* http_error */
-              "kind": "http_error",
-              "status_code": integer ∈ [-2^30, 2^30] }
-            || { /* exn */
-                 "kind": "exception",
-                 "description": $unistring } } }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-extract_snapshot_archive_in_progress:
-  description: still extracting archive {name} after {elapsed_time}
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* extract_snapshot_archive_in_progress version 0 */
-      "extract_snapshot_archive_in_progress.v0":
-        { "name": $unistring,
-          "elapsed_time": $timespan.system } }
-    $timespan.system:
-      /* A span of time, as seen by the local computer. */
-      number
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-import_finished:
-  description: snapshot import is finished
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* import_finished version 0 */
-      "import_finished.v0": any }
-
-still_compressing_snapshot:
-  description: still compressing snapshot {filename} after {elapsed_time} ({progress}% done)
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* still_compressing_snapshot version 0 */
-      "still_compressing_snapshot.v0":
-        { "filename": $unistring,
-          "elapsed_time": $timespan.system,
-          "progress": number } }
-    $timespan.system:
-      /* A span of time, as seen by the local computer. */
-      number
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-compressing_snapshot:
-  description: compressing snapshot {filename}
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* compressing_snapshot version 0 */
-      "compressing_snapshot.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-finished_exporting_snapshot:
-  description: finished exporting snapshot {filename}
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* finished_exporting_snapshot version 0 */
-      "finished_exporting_snapshot.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-still_exporting_snapshot:
-  description: still exporting snapshot {filename} after {elapsed_time} ({progress}% done)
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* still_exporting_snapshot version 0 */
-      "still_exporting_snapshot.v0":
-        { "filename": $unistring,
-          "elapsed_time": $timespan.system,
-          "progress": number } }
-    $timespan.system:
-      /* A span of time, as seen by the local computer. */
-      number
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-exporting_snapshot:
-  description: exporting snapshot {filename}
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* exporting_snapshot version 0 */
-      "exporting_snapshot.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-importing_snapshot:
-  description: importing snapshot
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* importing_snapshot version 0 */
-      "importing_snapshot.v0": any }
-
+  
 snapshot_download_in_progress:
   description: still downloading {url} after {elapsed_time}{progress}
   level: notice
@@ -1824,114 +1740,7 @@ snapshot_download_in_progress:
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-downloading_snapshot:
-  description: downloading {url}{size}
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* downloading_snapshot version 0 */
-      "downloading_snapshot.v0":
-        { "url": $unistring,
-          "size": integer ∈ [-2^30, 2^30] /* Some */ || null /* None */ } }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-missing_chain_id:
-  description: missing chain id: skipping consistency check with selected network
-  level: warning
-  section: evm_node.dev
-  json format:
-    { /* missing_chain_id version 0 */
-      "missing_chain_id.v0": any }
-
-deprecation_note:
-  description: {msg}
-  level: warning
-  section: evm_node.dev
-  json format:
-    { /* deprecation_note version 0 */
-      "deprecation_note.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-retrying_connect:
-  description: cannot connect to {endpoint}, retrying in {delay} seconds
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* retrying_connect version 0 */
-      "retrying_connect.v0": { "endpoint": $unistring,
-                               "delay": number } }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-callback_log:
-  description: uri: {uri}
-method: {method}
-body: {body}
-
-  level: debug
-  section: evm_node.dev
-  json format:
-    { /* callback_log version 0 */
-      "callback_log.v0":
-        { "uri": $unistring,
-          "method": $unistring,
-          "body": $unistring } }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-shutting_down:
-  description: stopping the EVM node with {exit_status}
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* shutting_down version 0 */
-      "shutting_down.v0": integer ∈ [-128, 127] }
-
-rpc_server_error:
-  description: RPC server error: {exception}
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* rpc_server_error version 0 */
-      "rpc_server_error.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-private_server_is_ready:
-  description: the EVM node private RPC server ({backend}) is listening to {addr}:{port} {websockets}
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* private_server_is_ready version 0 */
-      "private_server_is_ready.v0":
-        { "addr": $unistring,
-          "port": integer ∈ [0, 2^16-1],
-          "backend": "dream" | "resto",
-          "websockets": boolean } }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
+  
 spawn_rpc_is_ready:
   description: the rpc process is ready
   level: notice
@@ -1939,172 +1748,396 @@ spawn_rpc_is_ready:
   json format:
     { /* spawn_rpc_is_ready version 0 */
       "spawn_rpc_is_ready.v0": any }
-
-legacy_mode:
-  description: node is using the (deprecated) legacy block storage, import a recent snapshot to start using the new block storage
+  
+start:
+  description: starting the EVM node ({mode})
+  level: notice
+  section: evm_node
+  json format:
+    { /* start version 0 */
+      "start.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+still_compressing_snapshot:
+  description: still compressing snapshot {filename} after {elapsed_time} ({progress}% done)
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* still_compressing_snapshot version 0 */
+      "still_compressing_snapshot.v0":
+        { "filename": $unistring,
+          "elapsed_time": $timespan.system,
+          "progress": number } }
+    $timespan.system:
+      /* A span of time, as seen by the local computer. */
+      number
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+still_exporting_snapshot:
+  description: still exporting snapshot {filename} after {elapsed_time} ({progress}% done)
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* still_exporting_snapshot version 0 */
+      "still_exporting_snapshot.v0":
+        { "filename": $unistring,
+          "elapsed_time": $timespan.system,
+          "progress": number } }
+    $timespan.system:
+      /* A span of time, as seen by the local computer. */
+      number
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+store_applied_migration:
+  description: applied migration {name} to the store in {time}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* store_applied_migration version 0 */
+      "store_applied_migration.v0":
+        { "name": $unistring,
+          "time": $timespan.system } }
+    $timespan.system:
+      /* A span of time, as seen by the local computer. */
+      number
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+store_init:
+  description: store is being initialized for the first time
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* store_init version 0 */
+      "store_init.v0": any }
+  
+tracer_input:
+  description: Tracer with input {inputs} 
+  level: debug
+  section: evm_node.dev.tracer
+  json format:
+    { /* tracer_input version 0 */
+      "tracer_input.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+tx_data_size_limit_reached:
+  description: the transaction data size is beyond the allowed threshold
+  level: info
+  section: evm_node.dev
+  json format:
+    { /* tx_data_size_limit_reached version 0 */
+      "tx_data_size_limit_reached.v0": any }
+  
+tx_pool_add_transaction:
+  description: add transaction {transaction} to the tx-pool
+  level: info
+  section: evm_node.dev
+  json format:
+    { /* tx_pool_add_transaction version 0 */
+      "tx_pool_add_transaction.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+tx_pool_connection_lost:
+  description: connection with the rollup node has been lost, retrying...
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* tx_pool_connection_lost version 0 */
+      "tx_pool_connection_lost.v0": any }
+  
+tx_pool_invalid_transaction:
+  description: transaction {transaction} is not valid
+  level: info
+  section: evm_node.dev
+  json format:
+    { /* tx_pool_invalid_transaction version 0 */
+      "tx_pool_invalid_transaction.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+tx_pool_started:
+  description: tx-pool has been started
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* tx_pool_started version 0 */
+      "tx_pool_started.v0": any }
+  
+tx_pool_stopped:
+  description: tx-pool has been stopped
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* tx_pool_stopped version 0 */
+      "tx_pool_stopped.v0": any }
+  
+tx_pool_transaction_injected:
+  description: transaction {transaction} has been injected
+  level: info
+  section: evm_node.dev
+  json format:
+    { /* tx_pool_transaction_injected version 0 */
+      "tx_pool_transaction_injected.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+tx_pool_transaction_injection_failed:
+  description: injection of transactions failed
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* tx_pool_transaction_injection_failed version 0 */
+      "tx_pool_transaction_injection_failed.v0": any }
+  
+tx_pool_users_threshold_reached:
+  description: the transaction pool has reached its maximum threshold for user transactions
+  level: info
+  section: evm_node.dev
+  json format:
+    { /* tx_pool_users_threshold_reached version 0 */
+      "tx_pool_users_threshold_reached.v0": any }
+  
+tx_queue_callback_error:
+  description: A callback produced an error: [<v 2>@{error}@]
+  level: error
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_callback_error version 0 */
+      "tx_queue_callback_error.v0": any }
+  
+tx_queue_cleared:
+  description: cleared the tx queue
+  level: notice
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_cleared version 0 */
+      "tx_queue_cleared.v0": any }
+  
+tx_queue_is_ready:
+  description: tx queue is ready
+  level: notice
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_is_ready version 0 */
+      "tx_queue_is_ready.v0": any }
+  
+tx_queue_rpc_error:
+  description: an RPC produced the error :
+	code:{code},
+	message:{message}
+  level: error
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_rpc_error version 0 */
+      "tx_queue_rpc_error.v0":
+        { "code": integer ∈ [-2^31-1, 2^31],
+          "message": $unistring } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+txs_per_user_threshold_reached:
+  description: user {address} has reached the maximum threshold for transactions
+  level: info
+  section: evm_node.dev
+  json format:
+    { /* txs_per_user_threshold_reached version 0 */
+      "txs_per_user_threshold_reached.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+wasm_pvm_fallback:
+  description: the node needs to fallback to the WASM PVM to execute a block
   level: warning
   section: evm_node.dev
   json format:
-    { /* legacy_mode version 0 */
-      "legacy_mode.v0": any }
-
-is_ready:
-  description: the EVM node RPC server ({backend}) is listening to {addr}:{port} {websockets}
-  level: notice
-  section: evm_node.dev
+    { /* wasm_pvm_fallback version 0 */
+      "wasm_pvm_fallback.v0": any }
+  
+websocket_missing_worker:
+  description: no worker for websocket connection {conn}
+  level: error
+  section: evm_node.websocket
   json format:
-    { /* is_ready version 0 */
-      "is_ready.v0":
-        { "addr": $unistring,
-          "port": integer ∈ [0, 2^16-1],
-          "backend": "dream" | "resto",
-          "websockets": boolean } }
+    { /* websocket_missing_worker version 0 */
+      "websocket_missing_worker.v0": $unistring }
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-catching_up:
-  description: the EVM node is catching up on evm event from {from} to {to}
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* catching_up version 0 */
-      "catching_up.v0":
-        { "from": integer ∈ [-2^31-1, 2^31],
-          "to": integer ∈ [-2^31-1, 2^31] } }
-
-ignored_periodic_snapshot_arg:
-  description: ignored the periodic snapshot feature since the EVM node is running in Archive mode
+  
+websocket_monitoring_exception:
+  description: monitoring for websocket {conn} raised exception {exception}
   level: warning
-  section: evm_node.dev
+  section: evm_node.websocket
   json format:
-    { /* ignored_periodic_snapshot_arg version 0 */
-      "ignored_periodic_snapshot_arg.v0": any }
-
-ignored_kernel_arg:
-  description: ignored the kernel command-line argument since the EVM state was already initialized
-  level: warning
-  section: evm_node.dev
-  json format:
-    { /* ignored_kernel_arg version 0 */
-      "ignored_kernel_arg.v0": any }
-
-failed_upgrade:
-  description: kernel failed to upgrade to {root_hash} with blueprint {level}
-  level: warning
-  section: evm_node.dev
-  json format:
-    { /* failed_upgrade version 0 */
-      "failed_upgrade.v0":
-        { "root_hash": $unistring,
-          "level": $positive_bignum } }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
+    { /* websocket_monitoring_exception version 0 */
+      "websocket_monitoring_exception.v0":
+        { "conn": $unistring,
+          "exception": $unistring } }
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-applied_upgrade:
-  description: kernel successfully upgraded to {root_hash} with blueprint {level}
+  
+websocket_shutdown:
+  description: shutting down websocket worker for connection {conn}: {reason} ({subscriptions} subscriptions)
   level: notice
-  section: evm_node.dev
+  section: evm_node.websocket
   json format:
-    { /* applied_upgrade version 0 */
-      "applied_upgrade.v0":
-        { "root_hash": $unistring,
-          "level": $positive_bignum } }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
+    { /* websocket_shutdown version 0 */
+      "websocket_shutdown.v0":
+        { "conn": $unistring,
+          "reason": $unistring,
+          "subscriptions": integer ∈ [-2^30, 2^30] } }
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-pending_upgrade:
-  description: pending upgrade to root hash {root_hash} expected to activate at {timestamp}
+  
+websocket_starting:
+  description: starting worker for websocket connection {conn}
   level: notice
-  section: evm_node.dev
+  section: evm_node.websocket
   json format:
-    { /* pending_upgrade version 0 */
-      "pending_upgrade.v0":
-        { "root_hash": $unistring,
-          "timestamp": $timestamp.protocol } }
-    $timestamp.protocol:
-      /* A timestamp as seen by the protocol: second-level precision, epoch
-         based. */
-      $unistring
+    { /* websocket_starting version 0 */
+      "websocket_starting.v0": $unistring }
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-received_upgrade:
-  description: received an upgrade payload: {payload}
-  level: notice
-  section: evm_node.dev
+  
+websocket_unsubscribe:
+  description: unsubscribe {id} for connection {conn}: {reason}
+  level: info
+  section: evm_node.websocket
   json format:
-    { /* received_upgrade version 0 */
-      "received_upgrade.v0": $unistring }
+    { /* websocket_unsubscribe version 0 */
+      "websocket_unsubscribe.v0":
+        { "conn": $unistring,
+          "id": $unistring,
+          "reason": $unistring } }
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 
 ./octez-evm-node list events --level error --json
-rollup_node_follower_stream_failed:
-  description: stream from the rollup node failed with {trace}
+block_producer_locked:
+  description: transaction pool and block production are locked
   level: error
   section: evm_node.dev
   json format:
-    { /* rollup_node_follower_stream_failed version 0 */
-      "rollup_node_follower_stream_failed.v0": any }
-
-rollup_node_follower_connection_failed:
-  description: connection with the rollup node failed with {trace}
+    { /* block_producer_locked version 0 */
+      "block_producer_locked.v0": any }
+  
+blueprint_injection_failure:
+  description: injecting a blueprint for level {level} failed with {trace}
   level: error
   section: evm_node.dev
   json format:
-    { /* rollup_node_follower_connection_failed version 0 */
-      "rollup_node_follower_connection_failed.v0": any }
-
-rollup_node_follower_connection_lost:
-  description: connection with the rollup node has been lost
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* rollup_node_follower_connection_lost version 0 */
-      "rollup_node_follower_connection_lost.v0": any }
-
-evm_events_follower_out_of_sync:
-  description: rollup node confimed block {received}, but we have applied block {expected}
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* evm_events_follower_out_of_sync version 0 */
-      "evm_events_follower_out_of_sync.v0":
-        { "received": integer ∈ [-2^31-1, 2^31],
-          "expected": integer ∈ [-2^31-1, 2^31] } }
-
-evm_events_follower_missing_blueprint:
-  description: rollup node diverged at {level}, {expected_hash} not found locally
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* evm_events_follower_missing_blueprint version 0 */
-      "evm_events_follower_missing_blueprint.v0":
+    { /* blueprint_injection_failure version 0 */
+      "blueprint_injection_failure.v0":
         { "level": $positive_bignum,
-          "expected_hash": $unistring } }
+          "trace": any } }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
+blueprint_invalid:
+  description: produced an invalid blueprint at level {level}
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* blueprint_invalid version 0 */
+      "blueprint_invalid.v0": $positive_bignum }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
+blueprint_invalid_applied:
+  description: failed to apply received blueprint for level {level}
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* blueprint_invalid_applied version 0 */
+      "blueprint_invalid_applied.v0": $positive_bignum }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
+blueprints_publisher_request_failed:
+  description: request {view} failed: {errors}
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* blueprints_publisher_request_failed version 0 */
+      "blueprints_publisher_request_failed.v0":
+        { "view":
+            { /* Publish */
+              "request": "publish",
+              "level": $positive_bignum,
+              "payload":
+                { /* Blueprint */
+                  "chunks":
+                    [ { "value": /^([a-zA-Z0-9][a-zA-Z0-9])*$/,
+                        "number": $unistring,
+                        "nb_chunks": integer ∈ [-2^30, 2^30],
+                        "chunk_index": integer ∈ [-2^30, 2^30],
+                        "signature": $Signature.V1 } ... ],
+                  "inbox_payload": [ $unistring ... ] }
+                || [ $unistring ... ]
+                /* Inbox */ }
+            || { /* New_rollup_node_block */
+                 "request": "new_l2_head",
+                 "rollup_head": integer ∈ [-2^31-1, 2^31] },
+          "errors": any } }
+    $Signature.V1:
+      /* A Ed25519, Secp256k1, P256 or BLS signature (Base58Check-encoded) */
+      $unistring
     $positive_bignum:
       /* Positive big number
          Decimal representation of a positive big number */
@@ -2114,37 +2147,39 @@ evm_events_follower_missing_blueprint:
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-evm_events_follower_diverged:
-  description: rollup node diverged on level {level}, confirmed {expected_hash} instead of {found_hash}
+  
+cannot_fetch_time_between_blocks:
+  description: could not fetch the maximum time between blocks from remote EVM endpoint, default to {tbb}: {trace}
   level: error
   section: evm_node.dev
   json format:
-    { /* evm_events_follower_diverged version 0 */
-      "evm_events_follower_diverged.v0":
-        { "level": $positive_bignum,
-          "expected_hash": $unistring,
-          "found_hash": $unistring } }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
+    { /* cannot_fetch_time_between_blocks version 0 */
+      "cannot_fetch_time_between_blocks.v0":
+        { "tbb": $time_between_blocks,
+          "trace": any } }
+    $time_between_blocks: number /* Some */ || null /* None */
+  
+download_failed:
+  description: downloading {url} failed with {error}
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* download_failed version 0 */
+      "download_failed.v0":
+        { "url": $unistring,
+          "error":
+            { /* http_error */
+              "kind": "http_error",
+              "status_code": integer ∈ [-2^30, 2^30] }
+            || { /* exn */
+                 "kind": "exception",
+                 "description": $unistring } } }
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-evm_events_unreadable_event:
-  description: evm events follower could not parse event {index} of level {level}
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* evm_events_unreadable_event version 0 */
-      "evm_events_unreadable_event.v0":
-        { "index": integer ∈ [-2^30, 2^30],
-          "level": integer ∈ [-2^31-1, 2^31] } }
-
+  
 evm_context_get_block_failed:
   description: get block by number failed for level {level}{trace}
   level: error
@@ -2159,7 +2194,7 @@ evm_context_get_block_failed:
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
+  
 evm_context_request_failed:
   description: request {view} failed: {errors}
   level: error
@@ -2278,36 +2313,17 @@ evm_context_request_failed:
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-blueprints_publisher_request_failed:
-  description: request {view} failed: {errors}
+  
+evm_events_follower_diverged:
+  description: rollup node diverged on level {level}, confirmed {expected_hash} instead of {found_hash}
   level: error
   section: evm_node.dev
   json format:
-    { /* blueprints_publisher_request_failed version 0 */
-      "blueprints_publisher_request_failed.v0":
-        { "view":
-            { /* Publish */
-              "request": "publish",
-              "level": $positive_bignum,
-              "payload":
-                { /* Blueprint */
-                  "chunks":
-                    [ { "value": /^([a-zA-Z0-9][a-zA-Z0-9])*$/,
-                        "number": $unistring,
-                        "nb_chunks": integer ∈ [-2^30, 2^30],
-                        "chunk_index": integer ∈ [-2^30, 2^30],
-                        "signature": $Signature.V1 } ... ],
-                  "inbox_payload": [ $unistring ... ] }
-                || [ $unistring ... ]
-                /* Inbox */ }
-            || { /* New_rollup_node_block */
-                 "request": "new_l2_head",
-                 "rollup_head": integer ∈ [-2^31-1, 2^31] },
-          "errors": any } }
-    $Signature.V1:
-      /* A Ed25519, Secp256k1, P256 or BLS signature (Base58Check-encoded) */
-      $unistring
+    { /* evm_events_follower_diverged version 0 */
+      "evm_events_follower_diverged.v0":
+        { "level": $positive_bignum,
+          "expected_hash": $unistring,
+          "found_hash": $unistring } }
     $positive_bignum:
       /* Positive big number
          Decimal representation of a positive big number */
@@ -2317,7 +2333,108 @@ blueprints_publisher_request_failed:
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
+  
+evm_events_follower_missing_blueprint:
+  description: rollup node diverged at {level}, {expected_hash} not found locally
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* evm_events_follower_missing_blueprint version 0 */
+      "evm_events_follower_missing_blueprint.v0":
+        { "level": $positive_bignum,
+          "expected_hash": $unistring } }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+evm_events_follower_out_of_sync:
+  description: rollup node confimed block {received}, but we have applied block {expected}
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* evm_events_follower_out_of_sync version 0 */
+      "evm_events_follower_out_of_sync.v0":
+        { "received": integer ∈ [-2^31-1, 2^31],
+          "expected": integer ∈ [-2^31-1, 2^31] } }
+  
+evm_events_unreadable_event:
+  description: evm events follower could not parse event {index} of level {level}
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* evm_events_unreadable_event version 0 */
+      "evm_events_unreadable_event.v0":
+        { "index": integer ∈ [-2^30, 2^30],
+          "level": integer ∈ [-2^31-1, 2^31] } }
+  
+kernel_log_error:
+  description: {msg}
+  level: error
+  section: evm_node.dev.kernel.simulation
+  json format:
+    { /* kernel_log_error version 0 */
+      "kernel_log_error.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+kernel_log_error:
+  description: {msg}
+  level: error
+  section: evm_node.dev.kernel.application
+  json format:
+    { /* kernel_log_error version 0 */
+      "kernel_log_error.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+kernel_log_fatal:
+  description: {msg}
+  level: fatal
+  section: evm_node.dev.kernel.simulation
+  json format:
+    { /* kernel_log_fatal version 0 */
+      "kernel_log_fatal.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+kernel_log_fatal:
+  description: {msg}
+  level: fatal
+  section: evm_node.dev.kernel.application
+  json format:
+    { /* kernel_log_fatal version 0 */
+      "kernel_log_fatal.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+migrations_from_the_future:
+  description: store has {applied} migrations applied but the EVM node is only aware of {known}
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* migrations_from_the_future version 0 */
+      "migrations_from_the_future.v0":
+        { "applied": integer ∈ [-2^30, 2^30],
+          "known": integer ∈ [-2^30, 2^30] } }
+  
 missing_blueprints:
   description: store is missing {count} blueprints in the range [{from}; {to_}]
   level: error
@@ -2332,117 +2449,7 @@ missing_blueprints:
       /* Positive big number
          Decimal representation of a positive big number */
       string
-
-blueprint_invalid_applied:
-  description: failed to apply received blueprint for level {level}
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* blueprint_invalid_applied version 0 */
-      "blueprint_invalid_applied.v0": $positive_bignum }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-
-blueprint_invalid:
-  description: produced an invalid blueprint at level {level}
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* blueprint_invalid version 0 */
-      "blueprint_invalid.v0": $positive_bignum }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-
-blueprint_injection_failure:
-  description: injecting a blueprint for level {level} failed with {trace}
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* blueprint_injection_failure version 0 */
-      "blueprint_injection_failure.v0":
-        { "level": $positive_bignum,
-          "trace": any } }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-
-block_producer_locked:
-  description: transaction pool and block production are locked
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* block_producer_locked version 0 */
-      "block_producer_locked.v0": any }
-
-websocket_missing_worker:
-  description: no worker for websocket connection {conn}
-  level: error
-  section: evm_node.websocket
-  json format:
-    { /* websocket_missing_worker version 0 */
-      "websocket_missing_worker.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-tx_pool_connection_lost:
-  description: connection with the rollup node has been lost, retrying...
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* tx_pool_connection_lost version 0 */
-      "tx_pool_connection_lost.v0": any }
-
-tx_pool_transaction_injection_failed:
-  description: injection of transactions failed
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* tx_pool_transaction_injection_failed version 0 */
-      "tx_pool_transaction_injection_failed.v0": any }
-
-tx_queue_callback_error:
-  description: A callback produced an error: [<v 2>@{error}@]
-  level: error
-  section: evm_node.dev.tx_queue
-  json format:
-    { /* tx_queue_callback_error version 0 */
-      "tx_queue_callback_error.v0": any }
-
-tx_queue_rpc_error:
-  description: an RPC produced the error :
-	code:{code},
-	message:{message}
-  level: error
-  section: evm_node.dev.tx_queue
-  json format:
-    { /* tx_queue_rpc_error version 0 */
-      "tx_queue_rpc_error.v0":
-        { "code": integer ∈ [-2^31-1, 2^31],
-          "message": $unistring } }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-migrations_from_the_future:
-  description: store has {applied} migrations applied but the EVM node is only aware of {known}
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* migrations_from_the_future version 0 */
-      "migrations_from_the_future.v0":
-        { "applied": integer ∈ [-2^30, 2^30],
-          "known": integer ∈ [-2^30, 2^30] } }
-
+  
 node_da_fees:
   description: internal: node gives {node_da_fees} DA fees, whereas kernel gives {kernel_da_fees} on block {block_number} with {call}
   level: fatal
@@ -2463,91 +2470,31 @@ node_da_fees:
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-cannot_fetch_time_between_blocks:
-  description: could not fetch the maximum time between blocks from remote EVM endpoint, default to {tbb}: {trace}
+  
+rollup_node_follower_connection_failed:
+  description: connection with the rollup node failed with {trace}
   level: error
   section: evm_node.dev
   json format:
-    { /* cannot_fetch_time_between_blocks version 0 */
-      "cannot_fetch_time_between_blocks.v0":
-        { "tbb": $time_between_blocks,
-          "trace": any } }
-    $time_between_blocks: number /* Some */ || null /* None */
-
-kernel_log_fatal:
-  description: {msg}
-  level: fatal
-  section: evm_node.dev.kernel.simulation
-  json format:
-    { /* kernel_log_fatal version 0 */
-      "kernel_log_fatal.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-kernel_log_fatal:
-  description: {msg}
-  level: fatal
-  section: evm_node.dev.kernel.application
-  json format:
-    { /* kernel_log_fatal version 0 */
-      "kernel_log_fatal.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-kernel_log_error:
-  description: {msg}
-  level: error
-  section: evm_node.dev.kernel.simulation
-  json format:
-    { /* kernel_log_error version 0 */
-      "kernel_log_error.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-kernel_log_error:
-  description: {msg}
-  level: error
-  section: evm_node.dev.kernel.application
-  json format:
-    { /* kernel_log_error version 0 */
-      "kernel_log_error.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
-download_failed:
-  description: downloading {url} failed with {error}
+    { /* rollup_node_follower_connection_failed version 0 */
+      "rollup_node_follower_connection_failed.v0": any }
+  
+rollup_node_follower_connection_lost:
+  description: connection with the rollup node has been lost
   level: error
   section: evm_node.dev
   json format:
-    { /* download_failed version 0 */
-      "download_failed.v0":
-        { "url": $unistring,
-          "error":
-            { /* http_error */
-              "kind": "http_error",
-              "status_code": integer ∈ [-2^30, 2^30] }
-            || { /* exn */
-                 "kind": "exception",
-                 "description": $unistring } } }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-
+    { /* rollup_node_follower_connection_lost version 0 */
+      "rollup_node_follower_connection_lost.v0": any }
+  
+rollup_node_follower_stream_failed:
+  description: stream from the rollup node failed with {trace}
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* rollup_node_follower_stream_failed version 0 */
+      "rollup_node_follower_stream_failed.v0": any }
+  
 rpc_server_error:
   description: RPC server error: {exception}
   level: error
@@ -2560,3 +2507,58 @@ rpc_server_error:
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+tx_pool_connection_lost:
+  description: connection with the rollup node has been lost, retrying...
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* tx_pool_connection_lost version 0 */
+      "tx_pool_connection_lost.v0": any }
+  
+tx_pool_transaction_injection_failed:
+  description: injection of transactions failed
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* tx_pool_transaction_injection_failed version 0 */
+      "tx_pool_transaction_injection_failed.v0": any }
+  
+tx_queue_callback_error:
+  description: A callback produced an error: [<v 2>@{error}@]
+  level: error
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_callback_error version 0 */
+      "tx_queue_callback_error.v0": any }
+  
+tx_queue_rpc_error:
+  description: an RPC produced the error :
+	code:{code},
+	message:{message}
+  level: error
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_rpc_error version 0 */
+      "tx_queue_rpc_error.v0":
+        { "code": integer ∈ [-2^31-1, 2^31],
+          "message": $unistring } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+websocket_missing_worker:
+  description: no worker for websocket connection {conn}
+  level: error
+  section: evm_node.websocket
+  json format:
+    { /* websocket_missing_worker version 0 */
+      "websocket_missing_worker.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
