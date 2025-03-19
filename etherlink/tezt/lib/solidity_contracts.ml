@@ -252,6 +252,30 @@ let call_selfdestruct () =
     ~contract:"C1"
     ~evm_version:"london"
 
+(** The info for the "call_selfdestruct_behavior.sol" contract. *)
+let call_selfdestruct_behavior () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/call_selfdestruct_behavior.sol")
+    ~label:"call_selfdestruct"
+    ~contract:"Parent"
+    ~evm_version:"cancun"
+
+(** The info for the "mcopy.sol" contract. *)
+let mcopy () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/mcopy.sol")
+    ~label:"mcopy"
+    ~contract:"MCOPY"
+    ~evm_version:"cancun"
+
+(** The info for the "transient_storage_multiplier.sol" contract. *)
+let transient_storage_multiplier () =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/transient_storage_multiplier.sol")
+    ~label:"transient_storage_multiplier"
+    ~contract:"TransientStorageMultiplier"
+    ~evm_version:"cancun"
+
 (** The info for the "recursive.sol" contract. *)
 let recursive () =
   compile_contract

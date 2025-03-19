@@ -5267,6 +5267,180 @@ let test_l2_call_selfdetruct_contract_in_same_transaction =
   in
   unit
 
+let test_l2_call_selfdetruct_contract_in_same_transaction_and_separate_transaction
+    =
+  register_both
+    ~kernels:[Kernel.Latest]
+    ~tags:["evm"; "l2_call"; "selfdestruct"; "cancun"]
+    ~title:"Check SELFDESTRUCT's behavior as stated by Cancun's EIP-6780"
+  @@ fun ~protocol:_ ~evm_setup:({endpoint; produce_block; _} as evm_setup) ->
+  let*@ _ = produce_block () in
+  let* call_selfdestruct_behavior_resolved = call_selfdestruct_behavior () in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* address, _tx =
+    deploy ~contract:call_selfdestruct_behavior_resolved ~sender evm_setup
+  in
+  let destruct () =
+    Eth_cli.contract_send
+      ~endpoint
+      ~abi_label:call_selfdestruct_behavior_resolved.label
+      ~address
+      ~method_call:"destruct_child_in_separate_tx()"
+      ~source_private_key:sender.private_key
+      ()
+  in
+  let* tx = wait_for_application ~produce_block destruct in
+  let* () = check_tx_succeeded ~endpoint ~tx in
+  let* selfdestruct_at_create_codesize =
+    let* res =
+      Eth_cli.contract_call
+        ()
+        ~endpoint
+        ~abi_label:call_selfdestruct_behavior_resolved.label
+        ~address
+        ~method_call:"codesize_after_delete_in_same_tx()"
+    in
+    return @@ Int64.of_string @@ String.trim res
+  in
+  let* selfdestrct_post_create_codesize =
+    let* res =
+      Eth_cli.contract_call
+        ()
+        ~endpoint
+        ~abi_label:call_selfdestruct_behavior_resolved.label
+        ~address
+        ~method_call:"codesize_after_delete_in_separate_tx()"
+    in
+    return @@ Int64.of_string @@ String.trim res
+  in
+  Check.(
+    (selfdestruct_at_create_codesize = 0L)
+      int64
+      ~error_msg:
+        "The contract should have a code size of 0 when SELFDESTRUCT is called \
+         in the same transaction as the contract creation") ;
+  Check.(
+    (selfdestrct_post_create_codesize > 0L)
+      int64
+      ~error_msg:
+        "The contract should have a code size greater than 0 when SELFDESTRUCT \
+         is called in a separate transaction from the contract creation") ;
+  unit
+
+let test_mcopy_opcode =
+  register_both
+    ~kernels:[Kernel.Latest]
+    ~tags:["evm"; "mcopy"; "cancun"]
+    ~title:"Check MCOPY's behavior as stated by Cancun's EIP-5656"
+  @@ fun ~protocol:_ ~evm_setup:({endpoint; produce_block; _} as evm_setup) ->
+  let*@ _ = evm_setup.produce_block () in
+  let* mcopy_resolved = mcopy () in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* address, _tx = deploy ~contract:mcopy_resolved ~sender evm_setup in
+  let* source =
+    Eth_cli.contract_call
+      ()
+      ~endpoint
+      ~abi_label:mcopy_resolved.label
+      ~address
+      ~method_call:"getSource()"
+  in
+  let* dst =
+    Eth_cli.contract_call
+      ()
+      ~endpoint
+      ~abi_label:mcopy_resolved.label
+      ~address
+      ~method_call:"getDestination()"
+  in
+  Check.(
+    (source <> dst)
+      string
+      ~error_msg:
+        "The source and destination should not be the same before the MCOPY \
+         operation") ;
+  let mcopy () =
+    Eth_cli.contract_send
+      ~endpoint
+      ~abi_label:mcopy_resolved.label
+      ~address
+      ~method_call:"mcopy()"
+      ~source_private_key:sender.private_key
+      ()
+  in
+  let* tx = wait_for_application ~produce_block mcopy in
+  let* () = check_tx_succeeded ~endpoint ~tx in
+  let* source =
+    Eth_cli.contract_call
+      ()
+      ~endpoint
+      ~abi_label:mcopy_resolved.label
+      ~address
+      ~method_call:"getSource()"
+  in
+  let* dst =
+    Eth_cli.contract_call
+      ()
+      ~endpoint
+      ~abi_label:mcopy_resolved.label
+      ~address
+      ~method_call:"getDestination()"
+  in
+  Check.(
+    (source = dst)
+      string
+      ~error_msg:
+        "The source and destination should be the same after the MCOPY \
+         operation") ;
+  unit
+
+let test_transient_storage =
+  register_both
+    ~kernels:[Kernel.Latest]
+    ~tags:["evm"; "transient_storage"; "cancun"]
+    ~title:"Check TSTORE/TLOAD behavior as stated by Cancun's EIP-1153"
+  @@ fun ~protocol:_ ~evm_setup:({endpoint; produce_block; _} as evm_setup) ->
+  let*@ _ = evm_setup.produce_block () in
+  let* transient_storage_multiplier_resolved =
+    transient_storage_multiplier ()
+  in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* address, _tx =
+    deploy ~contract:transient_storage_multiplier_resolved ~sender evm_setup
+  in
+  let input, mul = (21L, 2L) in
+  let res = Int64.mul input mul in
+  let send_values () =
+    Eth_cli.contract_send
+      ~endpoint
+      ~abi_label:transient_storage_multiplier_resolved.label
+      ~address
+      ~method_call:(Printf.sprintf "multiply(%Ld, %Ld)" input mul)
+      ~source_private_key:sender.private_key
+      ()
+  in
+  let* tx = wait_for_application ~produce_block send_values in
+  let* () = check_tx_succeeded ~endpoint ~tx in
+  let* output =
+    let* response =
+      Eth_cli.contract_call
+        ()
+        ~endpoint
+        ~abi_label:transient_storage_multiplier_resolved.label
+        ~address
+        ~method_call:"get_output()"
+    in
+    return @@ Int64.of_string @@ String.trim response
+  in
+  Check.(
+    (output = res)
+      int64
+      ~error_msg:
+        "The output should be equal to the multiplication of the input and the \
+         multiplier") ;
+
+  unit
+
 let test_call_recursive_contract_estimate_gas =
   Protocol.register_test
     ~__FILE__
@@ -6427,6 +6601,10 @@ let register_evm_node ~protocols =
   test_ghostnet_kernel protocols ;
   test_estimate_gas_out_of_ticks protocols ;
   test_l2_call_selfdetruct_contract_in_same_transaction protocols ;
+  test_l2_call_selfdetruct_contract_in_same_transaction_and_separate_transaction
+    protocols ;
+  test_mcopy_opcode protocols ;
+  test_transient_storage protocols ;
   test_reveal_storage protocols ;
   test_call_recursive_contract_estimate_gas protocols ;
   test_limited_stack_depth protocols ;
