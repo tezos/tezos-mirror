@@ -350,160 +350,89 @@ let encoding : t Data_encoding.t =
              default.verbose)))
 
 module V0 = struct
-  type t = {
-    data_dir : string;
-    rpc_addr : P2p_point.Id.t;
-    neighbors : neighbor list;
-    listen_addr : P2p_point.Id.t;
-    public_addr : P2p_point.Id.t;
-    peers : string list;
-    expected_pow : float;
-    network_name : string;
-    endpoint : Uri.t;
-    metrics_addr : P2p_point.Id.t;
-    profile : Profile_manager.t;
-    history_mode : history_mode;
-  }
+  (* Legacy V0 configuration type used solely for migration purposes.
+
+     This type represents the legacy (V0) version of the configuration,
+     originally defined as a record. It is intentionally rewritten as a tuple
+     for the following reasons:
+
+     - Simplified Encoding/Decoding: Using a tuple allows removing
+     [Data_encoding.conv] and its field-by-field mapping, significantly reducing
+     boilerplate in the migration code.
+
+     - Read-Only & Migration-Only: The V0 type is no longer edited or used
+     beyond JSON decoding and transformation into the current configuration
+     version. Record semantics (field names, accessors) are unnecessary.
+
+     This design reflects the temporary, transitional nature of the V0
+     configuration and isolates legacy logic from the active codebase. *)
+  type t = tup1 * tup2
+
+  and tup1 =
+    string (* data_dir *)
+    * P2p_point.Id.t (* rpc_addr *)
+    * P2p_point.Id.t (* listen_addr *)
+    * P2p_point.Id.t (* public_addr *)
+    * neighbor list (* neighbors *)
+    * string list (* peers *)
+    * float (* expected_pow *)
+    * string (* network_name *)
+    * Uri.t (* endpoint *)
+    * P2p_point.Id.t (* metrics_addr *)
+
+  and tup2 = history_mode (* history_mode *) * Profile_manager.t (* profile *)
 
   let encoding : t Data_encoding.t =
     let open Data_encoding in
-    conv
-      (fun {
-             data_dir;
-             rpc_addr;
-             listen_addr;
-             public_addr;
-             neighbors;
-             peers;
-             expected_pow;
-             network_name;
-             endpoint;
-             metrics_addr;
-             history_mode;
-             profile;
-           } ->
-        ( ( data_dir,
-            rpc_addr,
-            listen_addr,
-            public_addr,
-            neighbors,
-            peers,
-            expected_pow,
-            network_name,
-            endpoint,
-            metrics_addr ),
-          (history_mode, profile) ))
-      (fun ( ( data_dir,
-               rpc_addr,
-               listen_addr,
-               public_addr,
-               neighbors,
-               peers,
-               expected_pow,
-               network_name,
-               endpoint,
-               metrics_addr ),
-             (history_mode, profile) ) ->
-        {
-          data_dir;
-          rpc_addr;
-          listen_addr;
-          public_addr;
-          neighbors;
-          peers;
-          expected_pow;
-          network_name;
-          endpoint;
-          metrics_addr;
-          history_mode;
-          profile;
-        })
-      (merge_objs
-         (obj10
-            (dft
-               "data-dir"
-               ~description:"Location of the data dir"
-               string
-               default_data_dir)
-            (dft
-               "rpc-addr"
-               ~description:"RPC address"
-               P2p_point.Id.encoding
-               default_rpc_addr)
-            (dft
-               "net-addr"
-               ~description:"P2P address of this node"
-               P2p_point.Id.encoding
-               default_listen_addr)
-            (dft
-               "public-addr"
-               ~description:"P2P address of this node"
-               P2p_point.Id.encoding
-               default_listen_addr)
-            (dft
-               "neighbors"
-               ~description:"DAL Neighbors"
-               (list neighbor_encoding)
-               default_neighbors)
-            (dft
-               "peers"
-               ~description:"P2P addresses of remote peers"
-               (list string)
-               default_peers)
-            (dft
-               "expected-pow"
-               ~description:"Expected P2P identity's PoW"
-               float
-               default_expected_pow)
-            (dft
-               "network-name"
-               ~description:"The name that identifies the network"
-               string
-               default_network_name)
-            (dft
-               "endpoint"
-               ~description:"The Tezos node endpoint"
-               endpoint_encoding
-               default_endpoint)
-            (dft
-               "metrics-addr"
-               ~description:"The point for the DAL node metrics server"
-               P2p_point.Id.encoding
-               default_metrics_addr))
-         (obj2
-            (dft
-               "history_mode"
-               ~description:"The history mode for the DAL node"
-               history_mode_encoding
-               default_history_mode)
-            (dft
-               "profiles"
-               ~description:"The Octez DAL node profiles"
-               Profile_manager.encoding
-               Profile_manager.empty)))
-end
+    merge_objs
+      (obj10
+         (dft "data-dir" string default_data_dir)
+         (dft "rpc-addr" P2p_point.Id.encoding default_rpc_addr)
+         (dft "net-addr" P2p_point.Id.encoding default_listen_addr)
+         (dft "public-addr" P2p_point.Id.encoding default_listen_addr)
+         (dft "neighbors" (list neighbor_encoding) default_neighbors)
+         (dft "peers" (list string) default_peers)
+         (dft "expected-pow" float default_expected_pow)
+         (dft "network-name" string default_network_name)
+         (dft "endpoint" endpoint_encoding default_endpoint)
+         (dft "metrics-addr" P2p_point.Id.encoding default_metrics_addr))
+      (obj2
+         (dft "history_mode" history_mode_encoding default_history_mode)
+         (dft "profiles" Profile_manager.encoding Profile_manager.empty))
 
-let from_v0 v0 =
-  {
-    data_dir = v0.V0.data_dir;
-    rpc_addr = v0.rpc_addr;
-    listen_addr = v0.listen_addr;
-    public_addr = v0.public_addr;
-    neighbors = v0.neighbors;
-    peers = v0.peers;
-    expected_pow = v0.expected_pow;
-    network_name = v0.network_name;
-    endpoint = v0.endpoint;
-    metrics_addr = Some v0.metrics_addr;
-    history_mode = v0.history_mode;
-    profile = v0.profile;
-    version = current_version;
-    service_name = None;
-    service_namespace = None;
-    experimental_features = default_experimental_features;
-    fetch_trusted_setup = true;
-    verbose = false;
-  }
+  let to_latest_version
+      ( ( data_dir,
+          rpc_addr,
+          listen_addr,
+          public_addr,
+          neighbors,
+          peers,
+          expected_pow,
+          network_name,
+          endpoint,
+          metrics_addr ),
+        (history_mode, profile) ) =
+    {
+      data_dir;
+      rpc_addr;
+      listen_addr;
+      public_addr;
+      neighbors;
+      peers;
+      expected_pow;
+      network_name;
+      endpoint;
+      metrics_addr = Some metrics_addr;
+      history_mode;
+      profile;
+      version = current_version;
+      service_name = None;
+      service_namespace = None;
+      experimental_features = default_experimental_features;
+      fetch_trusted_setup = true;
+      verbose = false;
+    }
+end
 
 type error += DAL_node_unable_to_write_configuration_file of string
 
@@ -539,25 +468,44 @@ let save config =
        (fun _ -> [DAL_node_unable_to_write_configuration_file file])
        v)
 
-let load ~data_dir =
+let load =
   let open Lwt_result_syntax in
-  let* json =
-    let*! json = Lwt_utils_unix.Json.read_file (filename ~data_dir) in
-    match json with
-    | Ok json -> return json
-    | Error (Exn _ :: _ as e) -> fail e
-    | Error e -> fail e
+  let config_versions =
+    let open Data_encoding in
+    [
+      (1, Json.destruct encoding);
+      (0, fun json -> Json.destruct V0.encoding json |> V0.to_latest_version);
+    ]
   in
-  let* config =
-    Lwt.catch
-      (fun () -> Data_encoding.Json.destruct encoding json |> return)
-      (fun _e ->
-        Data_encoding.Json.destruct V0.encoding json |> from_v0 |> return)
+  let rec try_decode json = function
+    | [] -> failwith "Unreachable. Expecting to have at least one version"
+    | (version, version_decoder) :: older_versions -> (
+        try
+          let res = version_decoder json in
+          let*! () =
+            if version = current_version then Lwt.return_unit
+            else
+              Event.emit_upgrading_configuration
+                ~from:version
+                ~into:current_version
+          in
+          return res
+        with e ->
+          if List.is_empty older_versions then tzfail (Exn e)
+          else try_decode json older_versions)
   in
-  let config = {config with data_dir} in
-  (* We save the config so that its format is that of the latest version. *)
-  let* () = save config in
-  return config
+  fun ~data_dir ->
+    let* json =
+      let*! json = Lwt_utils_unix.Json.read_file (filename ~data_dir) in
+      match json with
+      | Ok json -> return json
+      | Error (Exn _ :: _ as e) | Error e -> fail e
+    in
+    let* config = try_decode json config_versions in
+    let config = {config with data_dir} in
+    (* We save the config so that its format is that of the latest version. *)
+    let* () = save config in
+    return config
 
 let identity_file {data_dir; _} = Filename.concat data_dir "identity.json"
 
