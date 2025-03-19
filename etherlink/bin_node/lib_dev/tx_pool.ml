@@ -268,7 +268,11 @@ module Request = struct
         Ethereum_types.legacy_transaction_object * string
         -> ((Ethereum_types.hash, string) result, tztrace) t
     | Pop_transactions :
-        int
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7889 *)
+        (* We need the chain_family to verify if we are in Tezlink mode *)
+        (* If so, deactivate the pop_transactions and returns an empty list *)
+        L2_types.chain_family
+        * int
         -> ((string * Ethereum_types.legacy_transaction_object) list, tztrace) t
     | Pop_and_inject_transactions : (unit, tztrace) t
     | Lock_transactions : (unit, tztrace) t
@@ -306,15 +310,16 @@ module Request = struct
         case
           (Tag 1)
           ~title:"Pop_transactions"
-          (obj2
+          (obj3
              (req "request" (constant "pop_transactions"))
+             (req "chain_family" L2_types.Chain_family.encoding)
              (req "maximum_cumulatize_size" int31))
           (function
-            | View (Pop_transactions maximum_cumulative_size) ->
-                Some ((), maximum_cumulative_size)
+            | View (Pop_transactions (chain_family, maximum_cumulative_size)) ->
+                Some ((), chain_family, maximum_cumulative_size)
             | _ -> None)
-          (fun ((), maximum_cumulative_size) ->
-            View (Pop_transactions maximum_cumulative_size));
+          (fun ((), chain_family, maximum_cumulative_size) ->
+            View (Pop_transactions (chain_family, maximum_cumulative_size)));
         case
           (Tag 2)
           ~title:"Pop_and_inject_transactions"
@@ -368,7 +373,7 @@ module Request = struct
           ppf
           "Add tx [%s] to tx-pool"
           (Hex.of_string tx_raw |> Hex.show)
-    | Pop_transactions maximum_cumulative_size ->
+    | Pop_transactions (_chain_family, maximum_cumulative_size) ->
         Format.fprintf
           ppf
           "Popping transactions of maximum cumulative size %d bytes"
@@ -488,7 +493,7 @@ let transaction_timed_out ~tx_timeout_limit ~current_timestamp
     ~inclusion_timestamp =
   Time.Protocol.diff current_timestamp inclusion_timestamp >= tx_timeout_limit
 
-let pop_transactions state ~maximum_cumulative_size =
+let pop_transactions state ~chain_family ~maximum_cumulative_size =
   let open Lwt_result_syntax in
   let Types.
         {
@@ -500,7 +505,7 @@ let pop_transactions state ~maximum_cumulative_size =
         } =
     state
   in
-  if locked then return []
+  if locked || chain_family = L2_types.Michelson then return []
   else
     (* Get all the addresses in the tx-pool. *)
     let addresses = Pool.addresses pool in
@@ -618,7 +623,7 @@ let clear_popped_transactions state = state.Types.popped_txs <- []
     are forwarded to a rollup node, in observer mode to the next evm
     node. The sequencer is not supposed to use this function, using it
     would make transaction disappear from the tx pool. *)
-let pop_and_inject_transactions state =
+let pop_and_inject_transactions ~chain_family state =
   let open Lwt_result_syntax in
   let open Types in
   (* We over approximate the number of transactions to pop in proxy and
@@ -629,7 +634,7 @@ let pop_and_inject_transactions state =
     Sequencer_blueprint.maximum_usable_space_in_blueprint
       Sequencer_blueprint.maximum_chunks_per_l1_level
   in
-  let* txs = pop_transactions state ~maximum_cumulative_size in
+  let* txs = pop_transactions state ~chain_family ~maximum_cumulative_size in
   if not (List.is_empty txs) then
     let (module Backend : Services_backend_sig.S) = state.backend in
     let*! hashes =
@@ -710,10 +715,12 @@ module Handlers = struct
         let* res = insert_valid_transaction state txn transaction_object in
         let* () = relay_self_inject_request w in
         return res
-    | Request.Pop_transactions maximum_cumulative_size ->
-        protect @@ fun () -> pop_transactions state ~maximum_cumulative_size
+    | Request.Pop_transactions (chain_family, maximum_cumulative_size) ->
+        protect @@ fun () ->
+        pop_transactions state ~chain_family ~maximum_cumulative_size
     | Request.Pop_and_inject_transactions ->
-        protect @@ fun () -> pop_and_inject_transactions state
+        protect @@ fun () ->
+        pop_and_inject_transactions ~chain_family:L2_types.EVM state
     | Request.Lock_transactions ->
         protect @@ fun () -> return (lock_transactions state)
     | Request.Unlock_transactions -> return (unlock_transactions state)
@@ -830,12 +837,12 @@ let nonce pkey =
   in
   Pool.next_nonce pkey current_nonce pool
 
-let pop_transactions ~maximum_cumulative_size =
+let pop_transactions ~chain_family ~maximum_cumulative_size =
   let open Lwt_result_syntax in
   let*? worker = Lazy.force worker in
   Worker.Queue.push_request_and_wait
     worker
-    (Request.Pop_transactions maximum_cumulative_size)
+    (Request.Pop_transactions (chain_family, maximum_cumulative_size))
   |> handle_request_error
 
 let pop_and_inject_transactions () =
