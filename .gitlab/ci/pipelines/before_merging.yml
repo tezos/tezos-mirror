@@ -525,6 +525,7 @@ oc.build:static-x86_64-linux-binaries:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - cohttp/**/*
     - data-encoding/**/*
@@ -618,6 +619,7 @@ oc.build:static-arm64-linux-binaries:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - cohttp/**/*
     - data-encoding/**/*
@@ -712,6 +714,7 @@ oc.build_x86_64-released:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - client-libs/**/*
     - cohttp/**/*
@@ -826,6 +829,7 @@ oc.build_x86_64-exp-dev-extra:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - client-libs/**/*
     - cohttp/**/*
@@ -1089,6 +1093,7 @@ oc.build_kernels:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - client-libs/**/*
     - cohttp/**/*
@@ -1170,6 +1175,7 @@ oc.build_dsn_node:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - client-libs/**/*
     - cohttp/**/*
@@ -1243,6 +1249,7 @@ oc.tezt:fetch-records:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - cohttp/**/*
     - data-encoding/**/*
@@ -1604,6 +1611,7 @@ select_tezts:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - cohttp/**/*
     - data-encoding/**/*
@@ -1988,6 +1996,7 @@ oc.integration:compiler-rejections:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - cohttp/**/*
     - data-encoding/**/*
@@ -2050,6 +2059,7 @@ oc.script:test-gen-genesis:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - cohttp/**/*
     - data-encoding/**/*
@@ -2171,6 +2181,7 @@ oc.script:test_octez_release_versions:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - cohttp/**/*
     - data-encoding/**/*
@@ -2924,6 +2935,7 @@ oc.unit:non-proto-x86_64:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - cohttp/**/*
     - data-encoding/**/*
@@ -3077,6 +3089,7 @@ oc.unit:other-x86_64:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - cohttp/**/*
     - data-encoding/**/*
@@ -3163,6 +3176,7 @@ oc.unit:proto-x86_64:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - cohttp/**/*
     - data-encoding/**/*
@@ -3249,6 +3263,7 @@ oc.unit:non-proto-arm64:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - cohttp/**/*
     - data-encoding/**/*
@@ -3324,6 +3339,7 @@ oc.unit:webassembly-x86_64:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - cohttp/**/*
     - data-encoding/**/*
@@ -3370,6 +3386,7 @@ oc.unit:protocol_compiles:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - cohttp/**/*
     - data-encoding/**/*
@@ -3609,6 +3626,7 @@ tezt:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - cohttp/**/*
     - data-encoding/**/*
@@ -3698,6 +3716,7 @@ tezt-memory-3k:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - cohttp/**/*
     - data-encoding/**/*
@@ -3787,6 +3806,7 @@ tezt-memory-4k:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - cohttp/**/*
     - data-encoding/**/*
@@ -3876,6 +3896,7 @@ tezt-time-sensitive:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - cohttp/**/*
     - data-encoding/**/*
@@ -3964,6 +3985,7 @@ tezt-slow:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - cohttp/**/*
     - data-encoding/**/*
@@ -4050,6 +4072,7 @@ tezt-flaky:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - cohttp/**/*
     - data-encoding/**/*
@@ -4140,6 +4163,7 @@ tezt:static-binaries:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - cohttp/**/*
     - data-encoding/**/*
@@ -4221,6 +4245,7 @@ oc.unified_coverage:
     - CHANGES.rst
     - LICENSES/**/*
     - Makefile
+    - brassaia-eio/**/*
     - brassaia/**/*
     - cohttp/**/*
     - data-encoding/**/*
