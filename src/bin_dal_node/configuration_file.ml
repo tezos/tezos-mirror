@@ -479,8 +479,17 @@ let load =
   in
   let rec try_decode json = function
     | [] -> failwith "Unreachable. Expecting to have at least one version"
-    | (_version, version_decoder) :: older_versions -> (
-        try version_decoder json |> return
+    | (version, version_decoder) :: older_versions -> (
+        try
+          let res = version_decoder json in
+          let*! () =
+            if version = current_version then Lwt.return_unit
+            else
+              Event.emit_upgrading_configuration
+                ~from:version
+                ~into:current_version
+          in
+          return res
         with e ->
           if List.is_empty older_versions then tzfail (Exn e)
           else try_decode json older_versions)

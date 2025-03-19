@@ -323,6 +323,16 @@ open struct
       ~level:Notice
       ()
 
+  let upgrading_configuration =
+    declare_2
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"upgrading_configuration"
+      ~msg:"upgrading configuration from version {from_version} to {to_version}"
+      ~level:Notice
+      ("from_version", Data_encoding.int31)
+      ("to_version", Data_encoding.int31)
+
   let stored_slot_content =
     declare_2
       ~section
@@ -1088,6 +1098,9 @@ let emit_history_mode_warning ~stored_levels ~storage_period =
   emit history_mode_warning (stored_levels, storage_period)
 
 let emit_configuration_loaded () = emit configuration_loaded ()
+
+let emit_upgrading_configuration ~from ~into =
+  emit upgrading_configuration (from, into)
 
 let emit_stored_slot_content ~published_level ~slot_index =
   emit stored_slot_content (published_level, slot_index)
