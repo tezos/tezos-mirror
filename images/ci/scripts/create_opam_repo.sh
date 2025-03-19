@@ -103,11 +103,10 @@ echo "Add safer hashes."
 opam admin list --short | while read -r line; do
   for i in $(seq 1 $MAX_RETRIES); do
     if opam admin add-hashes sha256 sha512 -p "$line"; then
-      echo "Hashes added successfully."
       break
     else
       echo "Failed to add hashes. Attempt $i of $MAX_RETRIES ❌"
-      if [ $i -lt $MAX_RETRIES ]; then
+      if [ "$i" -lt $MAX_RETRIES ]; then
         echo "Retrying in $RETRY_DELAY seconds..."
         sleep $RETRY_DELAY
         # Use exponential backoff
