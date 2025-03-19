@@ -82,10 +82,10 @@ module type Dal = sig
 
   val proxy_localhost : bool
 
-  module Alerts : sig
-    val section : Clap.section
+  module Monitoring_app : sig
+    val slack_channel_id : string option
 
-    val dal_slack_webhook : string option
+    val slack_bot_token : string option
   end
 end
 
@@ -395,17 +395,24 @@ module Dal () : Dal = struct
          will be removed once the bug is fixed"
       false
 
-  module Alerts = struct
+  module Monitoring_app = struct
     let section =
       Clap.section
-        ~description:"CLI arguments defining alert managing options"
-        "Cloud alerting"
+        ~description:"Define report and alert managing options"
+        "Cloud reporting and alerting options"
 
-    let dal_slack_webhook =
+    let slack_channel_id =
       Clap.optional_string
         ~section
-        ~long:"dal-slack-webhook"
-        ~description:"The slack webhook url to send the alerts on"
+        ~long:"slack-channel-id"
+        ~description:"The Slack channel id to send reports and alerts on"
+        ()
+
+    let slack_bot_token =
+      Clap.optional_string
+        ~section
+        ~long:"slack-bot-token"
+        ~description:"The Slack bot token used to send reports and alerts"
         ()
   end
 end

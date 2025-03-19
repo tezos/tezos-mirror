@@ -443,7 +443,10 @@ type etherlink_configuration = {
   chain_id : int option;
 }
 
-type monitor_app_configuration = {dal_slack_webhook : Uri.t}
+type monitor_app_configuration = {
+  slack_bot_token : string;
+  slack_channel_id : string;
+}
 
 type configuration = {
   with_dal : bool;
@@ -1129,7 +1132,41 @@ module Monitoring_app = struct
                  ~some:(fun data -> [("accessory", data)])
                  accessory);
         ]
+
+    let make_payload ~slack_channel_id ?ts content =
+      let open Ezjsonm in
+      `O
+        (("channel", string slack_channel_id)
+        :: ("blocks", `A content)
+        :: Option.fold ~none:[] ~some:(fun ts -> [("thread_ts", string ts)]) ts
+        )
   end
+
+  let post_message ?ts ~slack_channel_id ~slack_bot_token data =
+    let data = Format_app.make_payload ?ts ~slack_channel_id data in
+    let slack_endpoint =
+      {Endpoint.scheme = "https"; host = "slack.com"; port = 443}
+    in
+    let rpc =
+      RPC_core.make
+        ~data:(Data data)
+        POST
+        ["api"; "chat.postMessage"]
+        (fun _json -> ())
+    in
+    let* response =
+      RPC_core.call_raw
+        ~extra_headers:
+          [("Authorization", Format.sprintf "Bearer %s" slack_bot_token)]
+        slack_endpoint
+        rpc
+    in
+    let thread_id =
+      let open JSON in
+      parse ~origin:"DAL.Monitoring_app.chat_postMessage" response.body
+      |-> "ts" |> as_string
+    in
+    return thread_id
 
   module Tasks = struct
     let endpoint_from_prometheus_query ~query =
@@ -1349,7 +1386,7 @@ module Monitoring_app = struct
         Lwt.return
           ("• Baker performance ranked from worst to best (truncated to 10 \
             bakers):" :: view_bakers worst_bakers
-          @ ("..." :: view_bakers best_bakers))
+          @ ("▪ ..." :: view_bakers best_bakers))
 
     let fetch_slots_info network =
       if network = `Mainnet then
@@ -1366,7 +1403,7 @@ module Monitoring_app = struct
         in
         Lwt.return (view_slot_info data)
 
-    let action ~webhook ~configuration () =
+    let action ~slack_bot_token ~slack_channel_id ~configuration () =
       let network = configuration.network in
       let title_info =
         Format.sprintf
@@ -1387,35 +1424,20 @@ module Monitoring_app = struct
       in
       let* bakers_info = fetch_bakers_info network in
       let data =
-        let open Ezjsonm in
         let open Format_app in
-        `O
-          [
-            ("text", string "DAL reporting");
-            ( "blocks",
-              `A
-                (section [title_info] ()
-                @ section ["*Network overview*"] ()
-                @ section
-                    network_overview_info
-                    ~accessory:
-                      (Format_app.image
-                         ~url:(network_to_image_url network)
-                         ~alt:(Network.to_string network))
-                    ()
-                @ section ["*Baker performance overview*"] ()
-                @ section bakers_info ()) );
-          ]
+        section [title_info] ()
+        @ section ["*Network overview*"] ()
+        @ section
+            network_overview_info
+            ~accessory:
+              (Format_app.image
+                 ~url:(network_to_image_url network)
+                 ~alt:(Network.to_string network))
+            ()
+        @ section ["*Baker performance overview*"] ()
+        @ section bakers_info ()
       in
-      let rpc =
-        RPC_core.make
-          ~data:(Data data)
-          POST
-          (String.split_on_char '/' (Uri.path webhook))
-          (fun _json -> ())
-      in
-      let endpoint = endpoint_of_webhook webhook in
-      let* _response = RPC_core.call_raw endpoint rpc in
+      let* _ts = post_message ~slack_channel_id ~slack_bot_token data in
       Lwt.return_unit
 
     (* Relies on UTC (Universal Time Coordinated).
@@ -1424,18 +1446,19 @@ module Monitoring_app = struct
        time (summer months), Paris switches to Central European Summer
        Time (CEST), which is UTC+2.
     *)
-    let tasks ~dal_slack_webhook ~configuration =
-      match dal_slack_webhook with
+    let tasks ~configuration =
+      match configuration.monitor_app_configuration with
       | None -> []
-      | Some webhook ->
-          let webhook = Uri.of_string webhook in
-          let action () = action ~webhook ~configuration () in
+      | Some {slack_bot_token; slack_channel_id; _} ->
+          let action () =
+            action ~slack_bot_token ~slack_channel_id ~configuration ()
+          in
           [Chronos.task ~name:"network-overview" ~tm:"0 0-23/6 * * *" ~action]
   end
 
   module Alert = struct
-    let report_lost_dal_rewards ~webhook ~network ~level ~cycle
-        ~lost_dal_rewards =
+    let report_lost_dal_rewards ~slack_channel_id ~slack_bot_token ~network
+        ~level ~cycle ~lost_dal_rewards =
       let data =
         let header =
           Format.sprintf
@@ -1458,23 +1481,15 @@ module Monitoring_app = struct
                 (change / 100_000))
             lost_dal_rewards
         in
-        `O [("blocks", `A (Format_app.section (header :: content) ()))]
+        Format_app.section (header :: content) ()
       in
-      let endpoint = endpoint_of_webhook webhook in
-      let rpc =
-        RPC_core.make
-          ~data:(Data data)
-          POST
-          (String.split_on_char '/' (Uri.path webhook))
-          (fun _json -> ())
-      in
-      let* _response = RPC_core.call_raw endpoint rpc in
+      let* _ts = post_message ~slack_channel_id ~slack_bot_token data in
       Lwt.return_unit
 
     let check_for_lost_dal_rewards t ~metadata =
       match t.configuration.monitor_app_configuration with
       | None -> unit
-      | Some {dal_slack_webhook = webhook} ->
+      | Some {slack_channel_id; slack_bot_token; _} ->
           let cycle = JSON.(metadata |-> "level_info" |-> "cycle" |> as_int) in
           let level = JSON.(metadata |-> "level_info" |-> "level" |> as_int) in
           let balance_updates =
@@ -1504,7 +1519,8 @@ module Monitoring_app = struct
           else
             let network = t.configuration.network in
             report_lost_dal_rewards
-              ~webhook
+              ~slack_channel_id
+              ~slack_bot_token
               ~network
               ~level
               ~cycle
@@ -1520,7 +1536,8 @@ module Monitoring_app = struct
             (Printexc.to_string exn) ;
           unit)
 
-    let report_dal_accusations ~webhook ~network ~level ~cycle dal_accusations =
+    let report_dal_accusations ~slack_channel_id ~slack_bot_token ~network
+        ~level ~cycle dal_accusations =
       let data =
         let header =
           Format.sprintf
@@ -1546,23 +1563,15 @@ module Monitoring_app = struct
                 hash)
             dal_accusations
         in
-        `O [("blocks", `A (Format_app.section (header :: content) ()))]
+        Format_app.section (header :: content) ()
       in
-      let endpoint = endpoint_of_webhook webhook in
-      let rpc =
-        RPC_core.make
-          ~data:(Data data)
-          POST
-          (String.split_on_char '/' (Uri.path webhook))
-          (fun _json -> ())
-      in
-      let* _response = RPC_core.call_raw endpoint rpc in
+      let* _ts = post_message ~slack_channel_id ~slack_bot_token data in
       Lwt.return_unit
 
     let check_for_dal_accusations t ~cycle ~level ~operations ~endpoint =
       match t.configuration.monitor_app_configuration with
       | None -> unit
-      | Some {dal_slack_webhook = webhook} ->
+      | Some {slack_channel_id; slack_bot_token; _} ->
           let open JSON in
           let accusations =
             operations |> as_list |> Fun.flip List.nth 2 |> as_list
@@ -1634,7 +1643,8 @@ module Monitoring_app = struct
           else
             let network = t.configuration.network in
             report_dal_accusations
-              ~webhook
+              ~slack_channel_id
+              ~slack_bot_token
               ~network
               ~cycle
               ~level
@@ -3319,10 +3329,20 @@ let register (module Cli : Scenarios_cli.Dal) =
     let external_rpc = Cli.node_external_rpc_server in
     let dal_incentives = Cli.dal_incentives in
     let monitor_app_configuration =
-      Option.map
-        (fun dal_slack_webhook ->
-          {dal_slack_webhook = Uri.of_string dal_slack_webhook})
-        Cli.Alerts.dal_slack_webhook
+      match Cli.Monitoring_app.(slack_bot_token, slack_channel_id) with
+      | None, None -> None
+      | Some _, None ->
+          Log.warn
+            "A Slack bot token has been provided but no Slack channel id. No \
+             reports or alerts will be sent." ;
+          None
+      | None, Some _ ->
+          Log.warn
+            "A Slack channel ID has been provided but no Slack bot token. No \
+             reports or alerts will be sent." ;
+          None
+      | Some slack_bot_token, Some slack_channel_id ->
+          Some {slack_channel_id; slack_bot_token}
     in
     let t =
       {
@@ -3451,10 +3471,7 @@ let register (module Cli : Scenarios_cli.Dal) =
       | Some fundraiser_key -> ["--fundraiser"; fundraiser_key])
     ~__FILE__
     ~title:"DAL node benchmark"
-    ~tasks:
-      (Monitoring_app.Tasks.tasks
-         ~dal_slack_webhook:Cli.Alerts.dal_slack_webhook
-         ~configuration)
+    ~tasks:(Monitoring_app.Tasks.tasks ~configuration)
     ~tags:[]
     (fun cloud ->
       toplog "Creating the agents" ;
