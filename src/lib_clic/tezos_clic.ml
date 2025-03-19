@@ -185,14 +185,15 @@ let print_desc ppf doc =
           Some (String.sub doc (len + 1) (String.length doc - len - 1)) )
   in
   match long with
-  | None -> Format.fprintf ppf "%s" short
-  | Some doc ->
+  | None -> Format.pp_print_text ppf short
+  | Some long ->
       Format.fprintf
         ppf
-        "%s@{<full>@\n  @[<hov 0>%a@]@}"
+        "%a@{<full>@\n%a@}"
+        Format.pp_print_text
         short
         Format.pp_print_text
-        doc
+        long
 
 let print_label ppf = function
   | {long; short = None} -> Format.fprintf ppf "--%s" long
@@ -204,7 +205,7 @@ let rec print_options_detailed :
   | Arg {label; placeholder; doc; _} ->
       Format.fprintf
         ppf
-        "@{<opt>%a <%s>@}: %a"
+        "@[<hov 2>@{<opt>%a <%s>@}: %a@]"
         print_label
         label
         placeholder
@@ -213,7 +214,7 @@ let rec print_options_detailed :
   | MultipleArg {label; placeholder; doc; _} ->
       Format.fprintf
         ppf
-        "@{<opt>%a <%s>@}: %a"
+        "@[<hov 2>@{<opt>%a <%s>@}: %a@]"
         print_label
         label
         placeholder
@@ -222,7 +223,7 @@ let rec print_options_detailed :
   | DefArg {label; placeholder; doc; default; _} ->
       Format.fprintf
         ppf
-        "@{<opt>%a <%s>@}: %a"
+        "@[<hov 2>@{<opt>%a <%s>@}: %a@]"
         print_label
         label
         placeholder
@@ -231,14 +232,20 @@ let rec print_options_detailed :
   | ArgDefSwitch {label; placeholder; doc; default; _} ->
       Format.fprintf
         ppf
-        "@{<opt>%a [%s]@}: %a"
+        "@[<hov 2>@{<opt>%a [%s]@}: %a@]"
         print_label
         label
         placeholder
         print_desc
         (doc ^ "\nDefaults to `" ^ default ^ "`.")
   | Switch {label; doc} ->
-      Format.fprintf ppf "@{<opt>%a@}: %a" print_label label print_desc doc
+      Format.fprintf
+        ppf
+        "@[<hov 2>@{<opt>%a@}: %a@]"
+        print_label
+        label
+        print_desc
+        doc
   | Constant _ -> ()
   | Pair (speca, specb) ->
       Format.fprintf
@@ -311,13 +318,13 @@ let print_commandline ppf (highlights, options, args) =
     | Seq (n, _, _) when not (has_args options) ->
         Format.fprintf ppf "[@{<arg>%s@}...]" n
     | Seq (n, _, _) ->
-        Format.fprintf ppf "[@{<arg>%s@}...] %a" n print_options_brief options
+        Format.fprintf ppf "[@{<arg>%s@}...]@ %a" n print_options_brief options
     | NonTerminalSeq (n, _, _, suffix, Stop) when not (has_args options) ->
-        Format.fprintf ppf "[@{<arg>%s@}...] @{<kwd>%a@}" n print_suffix suffix
+        Format.fprintf ppf "[@{<arg>%s@}...]@ @{<kwd>%a@}" n print_suffix suffix
     | NonTerminalSeq (n, _, _, suffix, next) ->
         Format.fprintf
           ppf
-          "[@{<arg>%s@}...] @{<kwd>%a@} %a %a"
+          "[@{<arg>%s@}...]@ @{<kwd>%a@}@ %a@ %a"
           n
           print_suffix
           suffix
@@ -330,14 +337,14 @@ let print_commandline ppf (highlights, options, args) =
     | Prefix (n, next) ->
         Format.fprintf
           ppf
-          "@{<kwd>%a@} %a"
+          "@{<kwd>%a@}@ %a"
           (print_highlight highlights)
           n
           print
           next
     | Param (n, _, _, Stop) when not (has_args options) ->
         Format.fprintf ppf "@{<arg>%s@}" n
-    | Param (n, _, _, next) -> Format.fprintf ppf "@{<arg>%s@} %a" n print next
+    | Param (n, _, _, next) -> Format.fprintf ppf "@{<arg>%s@}@ %a" n print next
   in
   Format.fprintf ppf "@{<commandline>%a@}" print args
 
@@ -346,22 +353,22 @@ let rec print_params_detailed :
  fun spec ppf -> function
   | Stop -> print_options_detailed ppf spec
   | Seq (n, desc, _) ->
-      Format.fprintf ppf "@{<arg>%s@}: %a" n print_desc (trim desc) ;
+      Format.fprintf ppf "@[<hov 2>@{<arg>%s@}: %a@]" n print_desc (trim desc) ;
       if has_args spec then
         Format.fprintf ppf "@,%a" print_options_detailed spec
   | NonTerminalSeq (n, desc, _, _, next) ->
-      Format.fprintf ppf "@{<arg>%s@}: %a" n print_desc (trim desc) ;
+      Format.fprintf ppf "@[<hov 2>@{<arg>%s@}: %a@]" n print_desc (trim desc) ;
       if has_args spec then
         Format.fprintf ppf "@,%a" (print_params_detailed spec) next
   | Prefix (_, next) -> print_params_detailed spec ppf next
   | Param (n, desc, _, Stop) ->
-      Format.fprintf ppf "@{<arg>%s@}: %a" n print_desc (trim desc) ;
+      Format.fprintf ppf "@[<hov 2>@{<arg>%s@}: %a@]" n print_desc (trim desc) ;
       if has_args spec then
         Format.fprintf ppf "@,%a" print_options_detailed spec
   | Param (n, desc, _, next) ->
       Format.fprintf
         ppf
-        "@{<arg>%s@}: %a@,%a"
+        "@[<hov 2>@{<arg>%s@}: %a@]@,%a"
         n
         print_desc
         (trim desc)
@@ -393,7 +400,7 @@ let print_command :
   if contains_params_args params options then
     Format.fprintf
       ppf
-      "@{<command>%a%a@{<short>@,@{<commanddoc>%a@,%a@}@}@}"
+      "@{<command>%a%a@{<short>@,@{<commanddoc>@[<hov 0>%a@]@,%a@}@}@}"
       prefix
       ()
       print_commandline
@@ -405,7 +412,7 @@ let print_command :
   else
     Format.fprintf
       ppf
-      "@{<command>%a%a@{<short>@,@{<commanddoc>%a@}@}@}"
+      "@{<command>%a%a@{<short>@,@{<commanddoc>@[<hov 0>%a@]@}@}@}"
       prefix
       ()
       print_commandline
