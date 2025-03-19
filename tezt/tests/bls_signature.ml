@@ -281,5 +281,58 @@ let test_single_staker_sign_staking_operation_self_delegate =
   in
   unit
 
+let test_single_staker_sign_staking_operation_external_delegate =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"single staker signs a staking operation with an external delegate"
+    ~tags:(threshold_bls_tags @ ["single"; "external_delegate"])
+    ~supports:(Protocol.From_protocol 023)
+  @@ fun protocol ->
+  let* _parameters, client, default_baker, funder, delegate =
+    Local_helpers.init_node_and_client_with_external_delegate ~protocol
+  in
+  (* gen keys staker -s bls *)
+  (* transfer 150000 from bootstrap2 to staker *)
+  let* staker =
+    Local_helpers.create_and_fund_account
+      ~baker:default_baker
+      ~giver:funder
+      ~alias:"staker"
+      ~amount:(Tez.of_int 150_000)
+      ~sig_alg:"bls"
+      client
+  in
+  (* set delegate for staker to delegate *)
+  (* [staker] chooses an external delegate/baker. *)
+  let* () =
+    Local_helpers.set_delegate
+      ~baker:default_baker
+      ~src:staker.alias
+      ~delegate
+      client
+  in
+  (* stake 140000 for staker *)
+  (* [staker] stakes with a baker to get staking rewards, for example,
+     when its baker bakes a block. *)
+  let* () =
+    Local_helpers.stake
+      ~baker:default_baker
+      ~staker:staker.alias
+      ~amount:(Tez.of_int 140_000)
+      client
+  in
+  (* [staker]'s baker bakes a next block, so [staker]'s staked balance
+     is increased due to the baking rewards. The change happens
+     immediately without waiting for [consensus_rights_delay]
+     cycles. *)
+  let* () =
+    Local_helpers.check_staked_balance_increase_when_baking
+      ~baker:delegate
+      ~staker
+      client
+  in
+  unit
+
 let register ~protocols =
-  test_single_staker_sign_staking_operation_self_delegate protocols
+  test_single_staker_sign_staking_operation_self_delegate protocols ;
+  test_single_staker_sign_staking_operation_external_delegate protocols
