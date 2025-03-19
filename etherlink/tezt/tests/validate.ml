@@ -7,7 +7,7 @@
 (*****************************************************************************)
 
 open Rpc.Syntax
-open Helpers
+open Test_helpers
 
 type transaction_type = Legacy | Eip1559 | Eip2930
 
@@ -38,7 +38,7 @@ let register ?maximum_gas_per_transaction ?set_account_code ?da_fee_per_byte
       @@ fun () ->
       let patch_config = Evm_node.patch_config_with_experimental_feature () in
       let* sequencer =
-        Helpers.init_sequencer_sandbox
+        init_sequencer_sandbox
           ?maximum_gas_per_transaction
           ?set_account_code
           ?da_fee_per_byte

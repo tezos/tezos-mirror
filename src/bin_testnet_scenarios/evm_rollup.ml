@@ -248,7 +248,10 @@ let rps_perf ~configuration_path ~testnet =
   in
 
   let* receipt =
-    Helpers.wait_for_transaction_receipt ~evm_node ~transaction_hash:tx_hash ()
+    Test_helpers.wait_for_transaction_receipt
+      ~evm_node
+      ~transaction_hash:tx_hash
+      ()
   in
 
   let contract_address =

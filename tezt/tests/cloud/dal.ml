@@ -2631,7 +2631,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
     Sc_rollup_helpers.Agent.originate_sc_rollup
       ~kind:pvm_kind
       ~boot_sector:output
-      ~parameters_ty:Tezt_etherlink.Helpers.evm_type
+      ~parameters_ty:Tezt_etherlink.Test_helpers.evm_type
       ~src:account.alias
       client
   in

@@ -18,7 +18,7 @@
 *)
 
 open Setup
-open Helpers
+open Test_helpers
 
 let register ?genesis_timestamp ?bootstrap_accounts ?(kernels = Kernel.all)
     ?preimages_dir ?maximum_allowed_ticks ?enable_fa_bridge ?rollup_history_mode

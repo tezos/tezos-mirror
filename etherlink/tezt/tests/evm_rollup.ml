@@ -23,7 +23,7 @@
    Invocation:   dune exec etherlink/tezt/tests/main.exe -- --file evm_rollup.ml
 *)
 open Sc_rollup_helpers
-open Helpers
+open Test_helpers
 open Rpc.Syntax
 open Contract_path
 open Solidity_contracts
@@ -167,11 +167,7 @@ let get_value_in_storage sc_rollup_node address nth =
   @@ Sc_rollup_rpc.get_global_block_durable_state_value
        ~pvm_kind
        ~operation:Sc_rollup_rpc.Value
-       ~key:
-         (Durable_storage_path.storage
-            address
-            ~key:(Helpers.hex_256_of_int nth)
-            ())
+       ~key:(Durable_storage_path.storage address ~key:(hex_256_of_int nth) ())
        ()
 
 let check_str_in_storage ~evm_setup ~address ~nth ~expected =
@@ -185,7 +181,7 @@ let check_nb_in_storage ~evm_setup ~address ~nth ~expected =
     ~evm_setup
     ~address
     ~nth
-    ~expected:(Helpers.hex_256_of_int expected)
+    ~expected:(hex_256_of_int expected)
 
 let get_storage_size sc_rollup_node ~address =
   let* storage =
@@ -738,7 +734,7 @@ let deploy ~contract ~sender full_evm_setup =
       ~abi:contract.label
       ~bin:contract.bin
   in
-  Helpers.wait_for_application ~produce_block send_deploy
+  wait_for_application ~produce_block send_deploy
 
 type deploy_checks = {contract : contract; expected_address : string}
 
@@ -886,7 +882,7 @@ let test_rpc_getBalance =
       ~endpoint:evm_node_endpoint
       ()
   in
-  Check.((balance = Helpers.default_bootstrap_account_balance) Wei.typ)
+  Check.((balance = default_bootstrap_account_balance) Wei.typ)
     ~error_msg:
       (sf
          "Expected balance of %s should be %%R, but got %%L"
@@ -1396,14 +1392,14 @@ let test_l2_deploy_erc20 =
     [
       ( address,
         [transfer_event_topic; zero_address; hex_256_of_address sender],
-        "0x" ^ Helpers.hex_256_of_int amount );
+        "0x" ^ hex_256_of_int amount );
     ]
   in
   let burn_logs sender amount =
     [
       ( address,
         [transfer_event_topic; hex_256_of_address sender; zero_address],
-        "0x" ^ Helpers.hex_256_of_int amount );
+        "0x" ^ hex_256_of_int amount );
     ]
   in
   (* sender mints 42 *)
@@ -1753,7 +1749,7 @@ let transfer ?data ~da_fee_per_byte ~expected_execution_gas ~evm_setup () =
        } =
     make_transfer
       ?data
-      ~value:Wei.(Helpers.default_bootstrap_account_balance - one_eth)
+      ~value:Wei.(default_bootstrap_account_balance - one_eth)
       ~sender
       ~receiver
       evm_setup
@@ -2072,7 +2068,7 @@ let test_simulate =
       in
       let simulated_block_number =
         match simulation_result.insights with
-        | [insight] -> Option.map Helpers.hex_string_to_int insight
+        | [insight] -> Option.map hex_string_to_int insight
         | _ -> None
       in
       Check.(
@@ -3343,7 +3339,7 @@ let test_mainnet_ghostnet_kernel_migration =
   let scenario_prior ~evm_setup =
     let* transfer_result =
       make_transfer
-        ~value:Wei.(Helpers.default_bootstrap_account_balance - one_eth)
+        ~value:Wei.(default_bootstrap_account_balance - one_eth)
         ~sender
         ~receiver
         evm_setup
@@ -3438,7 +3434,7 @@ let test_latest_kernel_migration protocols =
     let scenario_prior ~evm_setup =
       let* transfer_result =
         make_transfer
-          ~value:Wei.(Helpers.default_bootstrap_account_balance - one_eth)
+          ~value:Wei.(default_bootstrap_account_balance - one_eth)
           ~sender
           ~receiver
           evm_setup
@@ -4170,15 +4166,13 @@ let test_rpc_getStorageAt =
   let* () = check_tx_succeeded ~endpoint ~tx in
   let*@ hex_value = Rpc.get_storage_at ~address ~pos:"0x0" evm_node in
   Check.(
-    (Durable_storage_path.no_0x hex_value
-    = Helpers.hex_256_of_int expected_value0)
+    (Durable_storage_path.no_0x hex_value = hex_256_of_int expected_value0)
       string)
     ~error_msg:"Expected %R, but got %L" ;
-  let pos = Helpers.mapping_position sender.address 1 in
+  let pos = mapping_position sender.address 1 in
   let*@ hex_value = Rpc.get_storage_at ~address ~pos evm_node in
   Check.(
-    (Durable_storage_path.no_0x hex_value
-    = Helpers.hex_256_of_int expected_value1)
+    (Durable_storage_path.no_0x hex_value = hex_256_of_int expected_value1)
       string)
     ~error_msg:"Expected %R, but got %L" ;
   unit
@@ -4342,7 +4336,7 @@ let test_rpc_getLogs =
     [
       ( address,
         [transfer_event_topic; hex_256_of_address sender; zero_address],
-        "0x" ^ Helpers.hex_256_of_int amount );
+        "0x" ^ hex_256_of_int amount );
     ]
   in
   (* sender mints 42 *)
