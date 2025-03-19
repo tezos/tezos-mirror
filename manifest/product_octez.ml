@@ -8262,6 +8262,7 @@ let _octez_node =
          lwt_exit;
          uri;
          octez_base_p2p_identity_file |> open_;
+         memtrace;
        ]
       @ protocol_deps)
     ~linkall:true
