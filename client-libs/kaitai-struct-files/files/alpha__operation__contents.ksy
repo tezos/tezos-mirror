@@ -185,6 +185,9 @@ types:
     - id: update_consensus_key
       type: update_consensus_key
       if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::update_consensus_key)
+    - id: update_companion_key
+      type: update_companion_key
+      if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::update_companion_key)
     - id: drain_delegate
       type: drain_delegate
       if: (alpha__operation__alpha__contents_tag == alpha__operation__alpha__contents_tag::drain_delegate)
@@ -1438,6 +1441,28 @@ types:
       type: new_state_0
     - id: proof
       type: bytes_dyn_uint30
+  update_companion_key:
+    seq:
+    - id: source
+      type: public_key_hash
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+    - id: fee
+      type: alpha__mutez
+    - id: counter
+      type: n
+    - id: gas_limit
+      type: n
+    - id: storage_limit
+      type: n
+    - id: pk
+      type: public_key
+      doc: A Ed25519, Secp256k1, or P256 public key
+    - id: proof_tag
+      type: u1
+      enum: bool
+    - id: proof
+      type: proof_0
+      if: (proof_tag == bool::true)
   update_consensus_key:
     seq:
     - id: source
@@ -1991,6 +2016,7 @@ enums:
     112: set_deposits_limit
     113: increase_paid_storage
     114: update_consensus_key
+    115: update_companion_key
     158: transfer_ticket
     200: smart_rollup_originate
     201: smart_rollup_add_messages
