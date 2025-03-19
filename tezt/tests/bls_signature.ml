@@ -286,6 +286,26 @@ module Local_helpers = struct
         secret_key = Encrypted "";
       }
 
+  let mk_account_from_bls_sk ~bls_sk ~alias =
+    let sk = Tezos_crypto.Signature.Bls.Secret_key.of_b58check_exn bls_sk in
+    let pk = Tezos_crypto.Signature.Bls.Secret_key.to_public_key sk in
+    let pkh =
+      Tezos_crypto.Signature.Bls.Public_key.hash pk
+      |> Tezos_crypto.Signature.Bls.Public_key_hash.to_b58check
+    in
+    let public_key = Tezos_crypto.Signature.Bls.Public_key.to_b58check pk in
+    let secret_key = Account.Unencrypted bls_sk in
+    Log.info
+      ~color:Log.Color.FG.green
+      "Create an account for %s with pkh = %s."
+      alias
+      pkh ;
+    Account.{alias; public_key_hash = pkh; public_key; secret_key}
+
+  let bls_sk_to_b58_string (sk : Bls12_381_signature.sk) =
+    Tezos_crypto.Signature.Bls sk
+    |> Tezos_crypto.Signature.Secret_key.to_b58check
+
   let sign_and_aggregate_signatures ~kind ~watermark
       ~(signers : Account.key list) (msg : bytes) client =
     let signatures =
@@ -299,6 +319,23 @@ module Local_helpers = struct
     | Client -> Client.aggregate_bls_signatures client signatures
     | RPC ->
         Client.RPC.call client @@ RPC.post_bls_aggregate_signatures signatures
+
+  let sign_and_recover_threshold_signature ~kind ~watermark
+      ~(signers : (int * Account.key) list) (msg : bytes) client =
+    let signatures =
+      List.map
+        (fun (id, signer) ->
+          let signature =
+            Account.sign_bytes ~watermark ~signer msg
+            |> Tezos_crypto.Signature.to_b58check
+          in
+          (id, signature))
+        signers
+    in
+    match kind with
+    | Client -> Client.threshold_bls_signatures client signatures
+    | RPC ->
+        Client.RPC.call client @@ RPC.post_bls_threshold_signatures signatures
 
   let inject_bls_group_sign_op ~baker ~group_signature (op : Operation.t) client
       =
@@ -327,6 +364,36 @@ module Local_helpers = struct
         client
     in
     inject_bls_group_sign_op ~baker ~group_signature op client
+
+  let inject_threshold_bls_sign_op ~kind ~baker
+      ~(signers : (int * Account.key) list) (op : Operation.t) client =
+    let* op_hex = Operation.hex op client in
+    let manager_op = Hex.to_bytes op_hex in
+    let* group_signature =
+      sign_and_recover_threshold_signature
+        ~kind
+        ~watermark:Generic_operation
+        ~signers
+        manager_op
+        client
+    in
+    inject_bls_group_sign_op ~baker ~group_signature op client
+
+  let create_accounts_from_master_sk ~sk ~m ~n client =
+    if not (1 < m && m <= n) then
+      Test.fail "Invalid parameters for N = %d and M = %d" n m ;
+    let* group_pk, group_pkh, secret_shares =
+      Client.share_bls_secret_key ~sk ~n:5 ~m:3 client
+    in
+    let stakers =
+      List.map
+        (fun (id, bls_sk) ->
+          ( id,
+            mk_account_from_bls_sk ~bls_sk ~alias:("staker_" ^ string_of_int id)
+          ))
+        secret_shares
+    in
+    return (group_pk, group_pkh, stakers)
 
   let print_parameters parameters =
     let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
