@@ -382,14 +382,69 @@ module Withdrawals = struct
     let insert =
       (withdrawal_log ->. unit)
       @@ {sql|
-      REPLACE INTO withdrawals
+      INSERT INTO withdrawals
       (transactionHash,
        transactionIndex, logIndex, blockHash, blockNumber,
        removed, kind, ticket_owner, amount, sender, receiver, withdrawal_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      ON CONFLICT (transactionHash, transactionIndex, logIndex) DO UPDATE SET
+        blockHash = $4,
+        blockNumber = $5,
+        removed = $6,
+        kind = $7,
+        ticket_owner = $8,
+        amount = $9,
+        sender = $10,
+        receiver = $11,
+        withdrawal_id = $12
       |sql}
   end
 
   let store ?conn db log =
     with_connection db conn @@ fun conn -> Sqlite.Db.exec conn Q.insert log
+end
+
+module Pointers = struct
+  module Make (N : sig
+    val name : string
+  end) =
+  struct
+    module Q = struct
+      open Types
+
+      let set =
+        (level ->. unit)
+        @@ Format.sprintf
+             {sql|REPLACE INTO pointers (name, value) VALUES (%S, ?)|sql}
+             N.name
+
+      let get =
+        (unit ->? level)
+        @@ Format.sprintf
+             {sql|SELECT value from pointers WHERE name = %S|sql}
+             N.name
+    end
+
+    let set ?conn db level =
+      with_connection db conn @@ fun conn -> Sqlite.Db.exec conn Q.set level
+
+    let get ?conn db =
+      with_connection db conn @@ fun conn -> Sqlite.Db.find_opt conn Q.get ()
+  end
+
+  module type S = sig
+    val set :
+      ?conn:Sqlite.conn -> t -> Ethereum_types.quantity -> unit tzresult Lwt.t
+
+    val get :
+      ?conn:Sqlite.conn -> t -> Ethereum_types.quantity option tzresult Lwt.t
+  end
+
+  module Finalized_L1_head = Make (struct
+    let name = "finalized_l1_head"
+  end)
+
+  module L2_head = Make (struct
+    let name = "l2_head"
+  end)
 end

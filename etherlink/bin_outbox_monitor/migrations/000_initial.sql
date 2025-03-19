@@ -22,3 +22,8 @@ CREATE TABLE withdrawals (
   outbox_transaction_index INTEGER,
   PRIMARY KEY(transactionHash, transactionIndex, logIndex)
 );
+
+CREATE TABLE pointers (
+  name varchar VARCHAR PRIMARY KEY,
+  value INTEGER NOT NULL
+);
