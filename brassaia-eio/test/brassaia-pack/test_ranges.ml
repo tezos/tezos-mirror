@@ -33,4 +33,4 @@ let test () =
   let expected = [(90, 10); (87, 1); (70, 15); (50, 17)] in
   Alcotest.(check (list (pair int int))) "out of order" expected !output
 
-let tests = [Alcotest.test_case "test ranges" `Quick test]
+let tests = [Common.Alcotest.test_case_eio "test ranges" `Quick test]

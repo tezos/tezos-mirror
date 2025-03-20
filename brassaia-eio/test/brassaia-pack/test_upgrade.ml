@@ -19,16 +19,20 @@ open Common
 
 let ( / ) = Filename.concat
 
-let archive_v2_minimal = "test" / "brassaia-pack" / "data" / "version_2_minimal"
+let archive_v2_minimal =
+  "brassaia-eio" / "test" / "brassaia-pack" / "data" / "version_2_minimal"
 
-let archive_v2_always = "test" / "brassaia-pack" / "data" / "version_2_always"
+let archive_v2_always =
+  "brassaia-eio" / "test" / "brassaia-pack" / "data" / "version_2_always"
 
-let archive_v3_minimal = "test" / "brassaia-pack" / "data" / "version_3_minimal"
+let archive_v3_minimal =
+  "brassaia-eio" / "test" / "brassaia-pack" / "data" / "version_3_minimal"
 
-let archive_v3_always = "test" / "brassaia-pack" / "data" / "version_3_always"
+let archive_v3_always =
+  "brassaia-eio" / "test" / "brassaia-pack" / "data" / "version_3_always"
 
 let archive_v3_minimal_gced =
-  "test" / "brassaia-pack" / "data" / "version_3_minimal_gced"
+  "brassaia-eio" / "test" / "brassaia-pack" / "data" / "version_3_minimal_gced"
 
 let root_local_build = "_build" / "test-upgrade"
 
@@ -720,8 +724,8 @@ let test start_mode () =
 (** Product on start_mode *)
 let tests =
   [
-    Alcotest.test_case "upgrade From_v3" `Quick (test From_v3);
-    Alcotest.test_case "upgrade From_v2" `Quick (test From_v2);
-    Alcotest.test_case "upgrade From_scratch" `Quick (test From_scratch);
-    Alcotest.test_case "upgrade From_v3 after Gc" `Quick test_gced_store;
+    Alcotest.test_case_eio "upgrade From_v3" `Quick (test From_v3);
+    Alcotest.test_case_eio "upgrade From_v2" `Quick (test From_v2);
+    Alcotest.test_case_eio "upgrade From_scratch" `Quick (test From_scratch);
+    Alcotest.test_case_eio "upgrade From_v3 after Gc" `Quick test_gced_store;
   ]

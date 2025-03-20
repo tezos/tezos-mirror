@@ -2485,7 +2485,7 @@ let suite sleep (speed, x) =
   let module T_graph = Store_graph.Make (S) in
   let module T_watch = Store_watch.Make (Log) (Zzz) (S) in
   let with_tree_enabled =
-    (* Disabled for flakiness. See https://github.com/mirage/brassaia/issues/1090. *)
+    (* Disabled for flakiness. See https://github.com/mirage/irmin/issues/1090. *)
     not
       (List.mem
          ~equal:String.equal

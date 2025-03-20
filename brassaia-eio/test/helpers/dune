@@ -10,6 +10,7 @@
   astring
   fmt
   octez-libs.brassaia_eio
+  octez-libs.base.unix
   jsonm
   logs
   eio
@@ -19,4 +20,5 @@
  (flags
   (:standard)
   -w -66-68
-  -open Octez_alcotezt))
+  -open Octez_alcotezt
+  -open Tezos_base_unix))

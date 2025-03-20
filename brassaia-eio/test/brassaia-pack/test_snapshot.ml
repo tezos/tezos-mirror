@@ -302,7 +302,7 @@ let test_export_import_reexport () =
   S.Repo.close repo_export
 
 let tests =
-  let tc name f = Alcotest.test_case name `Quick f in
+  let tc name f = Alcotest.test_case_eio name `Quick f in
   [
     tc "in memory minimal" test_in_memory_minimal;
     tc "in memory always" test_in_memory_always;

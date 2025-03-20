@@ -102,4 +102,4 @@ let test_read () =
 
   File_manager.close fm |> Errs.raise_if_error
 
-let tests = [Alcotest.test_case "read" `Quick test_read]
+let tests = [Alcotest.test_case_eio "read" `Quick test_read]

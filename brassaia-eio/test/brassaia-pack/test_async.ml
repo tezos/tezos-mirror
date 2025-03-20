@@ -34,6 +34,9 @@ let test_exception_in_task () =
 
 let tests =
   [
-    Alcotest.test_case "Successful task" `Quick test_success;
-    Alcotest.test_case "Exception occurs in task" `Quick test_exception_in_task;
+    Alcotest.test_case_eio "Successful task" `Quick test_success;
+    Alcotest.test_case_eio
+      "Exception occurs in task"
+      `Quick
+      test_exception_in_task;
   ]

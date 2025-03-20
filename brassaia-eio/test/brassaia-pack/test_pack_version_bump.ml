@@ -77,7 +77,8 @@ module Util = struct
 
   (** More specific utils from here *)
 
-  let v1_store_archive_dir = "test" / "brassaia-pack" / "data" / "version_1"
+  let v1_store_archive_dir =
+    "brassaia-eio" / "test" / "brassaia-pack" / "data" / "version_1"
 
   (** Find the project root, that contains the v1_store_archive_dir *)
   let project_root () =
@@ -164,6 +165,6 @@ let tests =
   let f g () = g () in
   Alcotest.
     [
-      test_case "test_RO_no_migration" `Quick (f test_RO_no_migration);
-      test_case "test_open_RW" `Quick (f test_open_RW);
+      test_case_eio "test_RO_no_migration" `Quick (f test_RO_no_migration);
+      test_case_eio "test_open_RW" `Quick (f test_open_RW);
     ]

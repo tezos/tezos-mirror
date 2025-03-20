@@ -626,26 +626,32 @@ let test_reexport_node () =
 
 let tests =
   [
-    Alcotest.test_case "fold over keys in sorted order" `Quick test_fold_sorted;
-    Alcotest.test_case "fold over keys in random order" `Quick test_fold_random;
-    Alcotest.test_case
+    Alcotest.test_case_eio
+      "fold over keys in sorted order"
+      `Quick
+      test_fold_sorted;
+    Alcotest.test_case_eio
+      "fold over keys in random order"
+      `Quick
+      test_fold_random;
+    Alcotest.test_case_eio
       "fold over keys in undefined order"
       `Quick
       test_fold_undefined;
-    Alcotest.test_case
+    Alcotest.test_case_eio
       "test Merkle proof for large inodes"
       `Quick
       test_large_inode;
-    Alcotest.test_case
+    Alcotest.test_case_eio
       "test Merkle proof for small inodes"
       `Quick
       test_small_inode;
-    Alcotest.test_case
+    Alcotest.test_case_eio
       "test Merkle proof for Tree.length"
       `Quick
       test_length_proof;
-    Alcotest.test_case "test deeper Merkle proof" `Quick test_deeper_proof;
-    Alcotest.test_case "test large Merkle proof" `Slow test_large_proofs;
-    Alcotest.test_case "test hardcoded proof" `Quick test_hardcoded_proof;
-    Alcotest.test_case "test reexport node" `Quick test_reexport_node;
+    Alcotest.test_case_eio "test deeper Merkle proof" `Quick test_deeper_proof;
+    Alcotest.test_case_eio "test large Merkle proof" `Slow test_large_proofs;
+    Alcotest.test_case_eio "test hardcoded proof" `Quick test_hardcoded_proof;
+    Alcotest.test_case_eio "test reexport node" `Quick test_reexport_node;
   ]

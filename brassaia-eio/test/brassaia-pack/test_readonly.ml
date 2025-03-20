@@ -119,7 +119,7 @@ let ro_batch () =
   S.Repo.close rw
 
 let tests =
-  let tc name test = Alcotest.test_case name `Quick test in
+  let tc name test = Alcotest.test_case_eio name `Quick test in
   [
     tc "Test open ro after rw closed" open_ro_after_rw_closed;
     tc "Test ro reload after add" ro_reload_after_add;

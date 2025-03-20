@@ -32,7 +32,9 @@ let fresh_name =
 
 let create_v1_test_env () =
   let ( / ) = Filename.concat in
-  let root_archive = "test" / "brassaia-pack" / "data" / "version_1_large" in
+  let root_archive =
+    "brassaia-eio" / "test" / "brassaia-pack" / "data" / "version_1_large"
+  in
   let root_local_build = "_build" / "test-v1-gc" in
   setup_test_env ~root_archive ~root_local_build ;
   root_local_build
@@ -40,7 +42,7 @@ let create_v1_test_env () =
 let create_from_v2_always_test_env () =
   let ( / ) = Filename.concat in
   let root_archive =
-    "test" / "brassaia-pack" / "data" / "version_2_to_3_always"
+    "brassaia-eio" / "test" / "brassaia-pack" / "data" / "version_2_to_3_always"
   in
   let root_local_build = "_build" / "test-from-v2-always-gc" in
   setup_test_env ~root_archive ~root_local_build ;
@@ -48,12 +50,14 @@ let create_from_v2_always_test_env () =
 
 let create_test_env () =
   let ( / ) = Filename.concat in
-  let root_archive = "test" / "brassaia-pack" / "data" / "version_3_minimal" in
+  let root_archive =
+    "brassaia-eio" / "test" / "brassaia-pack" / "data" / "version_3_minimal"
+  in
   let root_local_build = "_build" / "test-gc" in
   setup_test_env ~root_archive ~root_local_build ;
   root_local_build
 
-let tc name f = Alcotest.test_case name `Quick f
+let tc name f = Alcotest.test_case_eio name `Quick f
 
 module Store = struct
   module S = struct

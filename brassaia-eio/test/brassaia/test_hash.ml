@@ -15,6 +15,7 @@
  *)
 
 open Brassaia_eio.Brassaia
+module Alcotest = Common.Alcotest
 
 let test_short_hash () =
   let h = Hash.BLAKE2B.hash (fun f -> f "") in
@@ -34,4 +35,4 @@ let test_short_hash () =
   in
   ()
 
-let suite = [Alcotest.test_case "short_hash" `Quick test_short_hash]
+let suite = [Alcotest.test_case_eio "short_hash" `Quick test_short_hash]

@@ -201,7 +201,7 @@ struct
 end
 
 module Alcotest = struct
-  include Alcotest
+  include Helpers.Alcotest
 
   let int63 = testable Int63.pp Int63.equal
 

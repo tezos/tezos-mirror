@@ -195,8 +195,8 @@ module Dict = struct
 
   let tests =
     [
-      Alcotest.test_case "dict" `Quick test_dict;
-      Alcotest.test_case "RO dict" `Quick test_readonly_dict;
+      Alcotest.test_case_eio "dict" `Quick test_dict;
+      Alcotest.test_case_eio "RO dict" `Quick test_readonly_dict;
     ]
 end
 
@@ -419,15 +419,15 @@ module Pack = struct
 
   let tests =
     [
-      Alcotest.test_case "pack" `Quick test_pack;
-      Alcotest.test_case "RO pack" `Quick test_readonly_pack;
-      Alcotest.test_case "close" `Quick test_close_pack;
-      Alcotest.test_case "close readonly" `Quick test_close_pack_more;
-      Alcotest.test_case
+      Alcotest.test_case_eio "pack" `Quick test_pack;
+      Alcotest.test_case_eio "RO pack" `Quick test_readonly_pack;
+      Alcotest.test_case_eio "close" `Quick test_close_pack;
+      Alcotest.test_case_eio "close readonly" `Quick test_close_pack_more;
+      Alcotest.test_case_eio
         "readonly reload, index flush"
         `Quick
         readonly_reload_index_flush;
-      Alcotest.test_case
+      Alcotest.test_case_eio
         "readonly find, index flush"
         `Quick
         readonly_find_index_flush;
@@ -512,8 +512,8 @@ module Branch = struct
 
   let tests =
     [
-      Alcotest.test_case "branch" `Quick test_branch;
-      Alcotest.test_case "branch close" `Quick test_close_branch;
+      Alcotest.test_case_eio "branch" `Quick test_branch;
+      Alcotest.test_case_eio "branch close" `Quick test_close_branch;
     ]
 end
 
@@ -563,18 +563,18 @@ module Layout = struct
 
   let tests =
     [
-      Alcotest.test_case
+      Alcotest.test_case_eio
         "classify upper files"
         `Quick
         test_classify_upper_filename;
-      Alcotest.test_case
+      Alcotest.test_case_eio
         "classify volume files"
         `Quick
         test_classify_volume_filename;
     ]
 end
 
-let misc d_mgr =
+let misc =
   [
     ("hashes", Test_hashes.tests);
     ("dict-files", Dict.tests);
@@ -603,5 +603,4 @@ let misc d_mgr =
     ("indexing strategy", Test_indexing_strategy.tests);
     ("lower: direct", Test_lower.Direct.tests);
     ("lower: store", Test_lower.Store.tests);
-    ("multicore", Test_multicore.tests d_mgr);
   ]

@@ -16,5 +16,4 @@
 
 val suite : Brassaia_eio_test_helpers.Brassaia_test.Suite.t list
 
-val misc :
-  _ Eio.Domain_manager.t -> (string * unit Alcotest.test_case list) list
+val misc : (string * unit Alcotest.test_case list) list

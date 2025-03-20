@@ -83,7 +83,7 @@ let test_corrupted_control_file () =
 
 let tests =
   [
-    Alcotest.test_case
+    Alcotest.test_case_eio
       "Corrupted control file"
       `Quick
       test_corrupted_control_file;

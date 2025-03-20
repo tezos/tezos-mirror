@@ -2421,6 +2421,7 @@ let brassaia_eio_test_helpers =
         astring;
         fmt;
         brassaia_eio;
+        octez_base_unix |> open_;
         jsonm;
         logs;
         eio;

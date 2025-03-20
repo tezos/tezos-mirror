@@ -349,7 +349,8 @@ module Store_tc = struct
   let test_migrate_v2 () =
     let ( / ) = Filename.concat in
     let root_archive =
-      "test" / "brassaia-pack" / "data" / "version_2_to_3_always"
+      "brassaia-eio" / "test" / "brassaia-pack" / "data"
+      / "version_2_to_3_always"
     in
     let root = "_build" / "test_lower_migrate_v2" in
     setup_test_env ~root_archive ~root_local_build:root ;
@@ -363,7 +364,7 @@ module Store_tc = struct
     (* minimal indexing *)
     let ( / ) = Filename.concat in
     let root_archive =
-      "test" / "brassaia-pack" / "data" / "version_3_minimal"
+      "brassaia-eio" / "test" / "brassaia-pack" / "data" / "version_3_minimal"
     in
     let root = "_build" / "test_lower_migrate_v3_minimal" in
     setup_test_env ~root_archive ~root_local_build:root ;
@@ -375,7 +376,9 @@ module Store_tc = struct
 
     (* always indexing *)
     let ( / ) = Filename.concat in
-    let root_archive = "test" / "brassaia-pack" / "data" / "version_3_always" in
+    let root_archive =
+      "brassaia-eio" / "test" / "brassaia-pack" / "data" / "version_3_always"
+    in
     let root = "_build" / "test_lower_migrate_v3_always" in
     setup_test_env ~root_archive ~root_local_build:root ;
     let lower_root = root / "lower" in
@@ -540,20 +543,20 @@ module Store = struct
   let tests =
     Alcotest.
       [
-        quick_tc "create store" test_create;
-        quick_tc "create nested" test_create_nested;
-        quick_tc "open rw with lower" test_open_rw_lower;
-        quick_tc "add volume with no lower" test_add_volume_wo_lower;
-        quick_tc "add volume during gc" test_add_volume_during_gc;
-        quick_tc "control file updated after add" test_add_volume_reopen;
-        quick_tc "add volume and reopen" test_add_volume_reopen;
-        quick_tc "create without lower then migrate" test_migrate;
-        quick_tc "migrate v2" test_migrate_v2;
-        quick_tc "migrate v3" test_migrate_v3;
-        quick_tc "migrate then gc" test_migrate_then_gc;
-        quick_tc "migrate then gc in lower" test_migrate_then_gc_in_lower;
-        quick_tc "test data locality" test_volume_data_locality;
-        quick_tc "test cleanup" test_cleanup;
+        quick_tc_eio "create store" test_create;
+        quick_tc_eio "create nested" test_create_nested;
+        quick_tc_eio "open rw with lower" test_open_rw_lower;
+        quick_tc_eio "add volume with no lower" test_add_volume_wo_lower;
+        quick_tc_eio "add volume during gc" test_add_volume_during_gc;
+        quick_tc_eio "control file updated after add" test_add_volume_reopen;
+        quick_tc_eio "add volume and reopen" test_add_volume_reopen;
+        quick_tc_eio "create without lower then migrate" test_migrate;
+        quick_tc_eio "migrate v2" test_migrate_v2;
+        quick_tc_eio "migrate v3" test_migrate_v3;
+        quick_tc_eio "migrate then gc" test_migrate_then_gc;
+        quick_tc_eio "migrate then gc in lower" test_migrate_then_gc_in_lower;
+        quick_tc_eio "test data locality" test_volume_data_locality;
+        quick_tc_eio "test cleanup" test_cleanup;
       ]
 end
 
@@ -563,12 +566,12 @@ module Direct = struct
   let tests =
     Alcotest.
       [
-        quick_tc "empty lower" test_empty;
-        quick_tc "volume_num too high" test_volume_num;
-        quick_tc "add volume" test_add_volume;
-        quick_tc "add volume ro" test_add_volume_ro;
-        quick_tc "add multiple empty" test_add_multiple_empty;
-        quick_tc "find volume" test_find_volume;
-        quick_tc "test read_exn" test_read_exn;
+        quick_tc_eio "empty lower" test_empty;
+        quick_tc_eio "volume_num too high" test_volume_num;
+        quick_tc_eio "add volume" test_add_volume;
+        quick_tc_eio "add volume ro" test_add_volume_ro;
+        quick_tc_eio "add multiple empty" test_add_multiple_empty;
+        quick_tc_eio "find volume" test_find_volume;
+        quick_tc_eio "test read_exn" test_read_exn;
       ]
 end

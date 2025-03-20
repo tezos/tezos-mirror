@@ -235,6 +235,6 @@ let test_reload () =
 
 let tests =
   [
-    Alcotest.test_case "Reload during flush stages" `Quick test_flush;
-    Alcotest.test_case "Flush during reload stages" `Quick test_reload;
+    Alcotest.test_case_eio "Reload during flush stages" `Quick test_flush;
+    Alcotest.test_case_eio "Flush during reload stages" `Quick test_reload;
   ]

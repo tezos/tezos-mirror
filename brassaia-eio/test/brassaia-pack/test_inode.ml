@@ -1004,7 +1004,7 @@ module Child_ordering = struct
 end
 
 let tests =
-  let tc_sync name f = Alcotest.test_case name `Quick f in
+  let tc_sync name f = Alcotest.test_case_eio name `Quick f in
   let tc name f = tc_sync name f in
   (* Test disabled because it relies on being able to serialise concrete inodes,
      which is not possible following the introduction of structured keys. *)

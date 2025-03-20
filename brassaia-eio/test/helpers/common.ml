@@ -241,6 +241,7 @@ module Make_helpers (S : Generic_key) = struct
   let ignore_thunk_errors f = try f () with _ -> ()
 
   let run (x : Suite.t) test =
+    Tezos_base_unix.Event_loop.main_run_eio @@ fun _env ->
     let repo_ptr = ref None in
     let config_ptr = ref None in
     try
@@ -361,4 +362,14 @@ module T = Brassaia.Type
 
 module type Sleep = sig
   val sleep : float -> unit
+end
+
+module Alcotest = struct
+  include Alcotest
+
+  let test_case_eio name speed_level f =
+    test_case name speed_level (fun arg ->
+        Tezos_base_unix.Event_loop.main_run_eio @@ fun _env -> f arg)
+
+  let quick_tc_eio name f = test_case_eio name `Quick f
 end

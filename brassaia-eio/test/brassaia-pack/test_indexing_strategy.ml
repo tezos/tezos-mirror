@@ -115,7 +115,7 @@ let test_unique_when_switched () =
 
 let tests =
   [
-    Alcotest.test_case
+    Alcotest.test_case_eio
       "test unique when switching strategies"
       `Quick
       test_unique_when_switched;

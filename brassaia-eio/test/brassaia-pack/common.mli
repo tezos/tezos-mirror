@@ -76,6 +76,10 @@ module Alcotest : sig
 
   (** Convenience to create a `Quick test_case *)
   val quick_tc : string -> (unit -> unit) -> unit test_case
+
+  val test_case_eio : string -> speed_level -> ('a -> return) -> 'a test_case
+
+  val quick_tc_eio : string -> (unit -> unit) -> unit test_case
 end
 
 module Index : module type of Brassaia_pack_unix.Index.Make (Schema.Hash)

@@ -329,7 +329,7 @@ module Test_V1 = struct
 end
 
 let tests =
-  let tc name f = Alcotest.test_case name `Quick f in
+  let tc name f = Alcotest.test_case_eio name `Quick f in
   [
     tc "contents hash" Test_tezos_conf.contents_hash;
     tc "inode_values hash" Test_tezos_conf.inode_values_hash;

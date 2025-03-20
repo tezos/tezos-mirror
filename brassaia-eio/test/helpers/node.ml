@@ -156,7 +156,7 @@ end = struct
   end
 
   let suite =
-    let tc (name, f) = Alcotest.test_case name `Quick f in
+    let tc (name, f) = Common.Alcotest.test_case_eio name `Quick f in
     let module Suite_node = Suite (struct
       include Node
       include Extras

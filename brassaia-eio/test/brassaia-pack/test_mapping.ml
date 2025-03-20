@@ -104,9 +104,10 @@ let test ~full_seg_length ~random_test_count =
   aux 0
 
 let tests =
+  let module Alcotest = Common.Alcotest in
   [
-    Alcotest.test_case "test mapping on small inputs" `Quick (fun () ->
+    Alcotest.test_case_eio "test mapping on small inputs" `Quick (fun () ->
         test ~full_seg_length:10 ~random_test_count:1000);
-    Alcotest.test_case "test mapping on large inputs" `Quick (fun () ->
+    Alcotest.test_case_eio "test mapping on large inputs" `Quick (fun () ->
         test ~full_seg_length:10000 ~random_test_count:100);
   ]

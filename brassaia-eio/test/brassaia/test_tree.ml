@@ -49,7 +49,7 @@ type diffs = (string list * (Contents.t * Metadata.t) Diff.t) list
 type kind = [`Contents | `Node] [@@deriving brassaia]
 
 module Alcotest = struct
-  include Alcotest
+  include Common.Alcotest
 
   let gtestable typ = testable (Type.pp_dump typ) Type.(unstage (equal typ))
 
@@ -901,21 +901,21 @@ let test_of_concrete () =
 
 let suite =
   [
-    Alcotest.test_case "bindings" `Quick test_bindings;
-    Alcotest.test_case "paginated bindings" `Quick test_paginated_bindings;
-    Alcotest.test_case "diff" `Quick test_diff;
-    Alcotest.test_case "empty" `Quick test_empty;
-    Alcotest.test_case "add" `Quick test_add;
-    Alcotest.test_case "remove" `Quick test_remove;
-    Alcotest.test_case "update" `Quick test_update;
-    Alcotest.test_case "clear" `Quick test_clear;
-    Alcotest.test_case "minimal_reads" `Quick test_minimal_reads;
-    Alcotest.test_case "fold" `Quick test_fold_force;
-    Alcotest.test_case "Broken.hashes" `Quick Broken.test_hashes;
-    Alcotest.test_case "Broken.trees" `Quick Broken.test_trees;
-    Alcotest.test_case "Broken.pruned_fold" `Quick Broken.test_pruned_fold;
-    Alcotest.test_case "kind of empty path" `Quick test_kind_empty_path;
-    Alcotest.test_case "generic equality" `Quick test_generic_equality;
-    Alcotest.test_case "is_empty" `Quick test_is_empty;
-    Alcotest.test_case "of_concrete" `Quick test_of_concrete;
+    Alcotest.test_case_eio "bindings" `Quick test_bindings;
+    Alcotest.test_case_eio "paginated bindings" `Quick test_paginated_bindings;
+    Alcotest.test_case_eio "diff" `Quick test_diff;
+    Alcotest.test_case_eio "empty" `Quick test_empty;
+    Alcotest.test_case_eio "add" `Quick test_add;
+    Alcotest.test_case_eio "remove" `Quick test_remove;
+    Alcotest.test_case_eio "update" `Quick test_update;
+    Alcotest.test_case_eio "clear" `Quick test_clear;
+    Alcotest.test_case_eio "minimal_reads" `Quick test_minimal_reads;
+    Alcotest.test_case_eio "fold" `Quick test_fold_force;
+    Alcotest.test_case_eio "Broken.hashes" `Quick Broken.test_hashes;
+    Alcotest.test_case_eio "Broken.trees" `Quick Broken.test_trees;
+    Alcotest.test_case_eio "Broken.pruned_fold" `Quick Broken.test_pruned_fold;
+    Alcotest.test_case_eio "kind of empty path" `Quick test_kind_empty_path;
+    Alcotest.test_case_eio "generic equality" `Quick test_generic_equality;
+    Alcotest.test_case_eio "is_empty" `Quick test_is_empty;
+    Alcotest.test_case_eio "of_concrete" `Quick test_of_concrete;
   ]
