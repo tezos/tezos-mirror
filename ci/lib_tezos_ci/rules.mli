@@ -25,6 +25,12 @@ val scheduled : If.t
 (** A rule that is true if [CI_PIPELINE_SOURCE] is [api]. *)
 val api : If.t
 
+(** A rule that is true for created via API release page publish pipeline.
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [api] and
+    [TZ_API_KIND] set to [RELEASE_PAGE]. *)
+val api_release_page : If.t
+
 (** A rule that is true if [CI_MERGE_REQUEST_EVENT_TYPE] is [detached].
 
     Merge request pipelines are {i detached} when:
