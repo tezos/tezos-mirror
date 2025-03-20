@@ -1016,32 +1016,47 @@ module Consensus = struct
         in
         return_unit
 
-  (* Check conflicts and register each attestations in the conflict map *)
-  let handle_attestation_aggregate_conflicts validation_state oph
+  let handle_attestation_aggregate_conflicts
+      {info; operation_state; block_state} oph
       ({shell; protocol_data = {contents = Single content; _}} :
         Kind.attestations_aggregate operation) =
     let open Lwt_result_syntax in
+    (* Check that no other Attestations_aggregate operation was previously
+       recorded in the operation state *)
+    let*? () =
+      check_attestations_aggregate_conflict operation_state oph
+      |> wrap_attestations_aggregate_conflict
+    in
+    (* Record the aggregate in the operation state *)
+    let operation_state = add_attestations_aggregate operation_state oph in
+    (* Check for attestations conflicts and register each attestations in the
+       operation state *)
     let (Attestations_aggregate {consensus_content; committee}) = content in
     let {level; round; block_payload_hash} : consensus_aggregate_content =
       consensus_content
     in
-    List.fold_left_es
-      (fun {info; operation_state; block_state} slot ->
-        let attestation : Kind.attestation operation =
-          let consensus_content = {slot; level; round; block_payload_hash} in
-          let contents =
-            Single (Attestation {consensus_content; dal_content = None})
+    let* operation_state =
+      List.fold_left_es
+        (fun operation_state slot ->
+          let attestation : Kind.attestation operation =
+            let consensus_content = {slot; level; round; block_payload_hash} in
+            let contents =
+              Single (Attestation {consensus_content; dal_content = None})
+            in
+            {shell; protocol_data = {contents; signature = None}}
           in
-          {shell; protocol_data = {contents; signature = None}}
-        in
-        let*? () =
-          check_attestation_conflict operation_state oph attestation
-          |> wrap_attestation_conflict
-        in
-        let operation_state = add_attestation operation_state oph attestation in
-        return {info; operation_state; block_state})
-      validation_state
-      committee
+          let*? () =
+            check_attestation_conflict operation_state oph attestation
+            |> wrap_attestation_conflict
+          in
+          let operation_state =
+            add_attestation operation_state oph attestation
+          in
+          return operation_state)
+        operation_state
+        committee
+    in
+    return {info; operation_state; block_state}
 
   let validate_attestations_aggregate ~check_signature info operation_state
       block_state oph
@@ -1103,7 +1118,8 @@ module Consensus = struct
             check_attestation_aggregate_signature info public_keys op
           else return_unit
         in
-        (* Check conflicts and register each attestation in the conflict map *)
+        (* Check for conflicts and register the aggregate and its underlying
+           attestations in the validation state. *)
         let* validation_state =
           handle_attestation_aggregate_conflicts
             {info; operation_state; block_state}
