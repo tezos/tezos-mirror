@@ -22,6 +22,9 @@ val push : If.t
 (** A rule that is true if [CI_PIPELINE_SOURCE] is [scheduled]. *)
 val scheduled : If.t
 
+(** A rule that is true if [CI_PIPELINE_SOURCE] is [api]. *)
+val api : If.t
+
 (** A rule that is true if [CI_MERGE_REQUEST_EVENT_TYPE] is [detached].
 
     Merge request pipelines are {i detached} when:

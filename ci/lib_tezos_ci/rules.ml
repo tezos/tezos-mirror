@@ -28,13 +28,14 @@ let merged_result = merge_request_event_type_eq Merged_result
 let merge_train = merge_request_event_type_eq Merge_train
 
 (** The source of a pipeline. *)
-type pipeline_source = Schedule | Merge_request_event | Push
+type pipeline_source = Schedule | Merge_request_event | Push | Api
 
 (** Convert at {!pipeline_source} to string. *)
 let pipeline_source_to_string = function
   | Schedule -> "schedule"
   | Merge_request_event -> "merge_request_event"
   | Push -> "push"
+  | Api -> "api"
 
 let pipeline_source_eq pipeline_source =
   Predefined_vars.ci_pipeline_source
@@ -43,6 +44,8 @@ let pipeline_source_eq pipeline_source =
 let merge_request = pipeline_source_eq Merge_request_event
 
 let push = pipeline_source_eq Push
+
+let api = pipeline_source_eq Api
 
 let scheduled = pipeline_source_eq Schedule
 
