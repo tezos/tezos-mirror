@@ -1172,8 +1172,12 @@ publish:release-page:
   - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
-  allow_failure: true
   timeout: 60 minutes
+  before_script:
+  - export AWS_ACCESS_KEY_ID=${AWS_KEY_RELEASE_PUBLISH:?AWS_KEY_RELEASE_PUBLISH is
+    not set}
+  - export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_RELEASE_PUBLISH:?AWS_SECRET_RELEASE_PUBLISH
+    is not set}
   script:
   - ./scripts/releases/publish_release_page.sh
   variables:

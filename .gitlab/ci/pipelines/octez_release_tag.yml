@@ -1136,3 +1136,26 @@ opam:release:
   interruptible: false
   script:
   - ./scripts/ci/opam-release.sh
+
+publish:release-page:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: publish_release
+  tags:
+  - gcp
+  rules:
+  - when: manual
+    allow_failure: true
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build:static-x86_64-linux-binaries
+  - oc.build:static-arm64-linux-binaries
+  dependencies:
+  - oc.docker:ci:amd64
+  - oc.build:static-x86_64-linux-binaries
+  - oc.build:static-arm64-linux-binaries
+  timeout: 60 minutes
+  before_script: []
+  script:
+  - ./scripts/releases/publish_release_page.sh
+  variables:
+    S3_BUCKET: s3://site-prod.octez.tezos.com/releases/

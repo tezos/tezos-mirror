@@ -14,11 +14,8 @@ fi
 # We use a file to list versions so that we can control what is actually displayed.
 versions_list_filename="versions.json"
 
-if [ -n "${AWS_KEY_RELEASE_PUBLISH}" ] && [ -n "${AWS_SECRET_RELEASE_PUBLISH}" ]; then
-  export AWS_ACCESS_KEY_ID="${AWS_KEY_RELEASE_PUBLISH}"
-  export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_RELEASE_PUBLISH}"
-else
-  echo "The AWS credentials are not found. Make sure AWS_KEY_RELEASE_PUBLISH and AWS_SECRET_RELEASE_PUBLISH are set."
+if [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
+  echo "The AWS credentials are not found. Make sure AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are set."
   exit 1
 fi
 
