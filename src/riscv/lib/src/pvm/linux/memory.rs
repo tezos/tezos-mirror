@@ -95,9 +95,7 @@ impl<M: ManagerBase> SupervisorState<M> {
 
         // Ensure the program break is in the break area. This means at or above the end of the
         // program, and below or at the lowest heap address.
-        let min_brk = self.program_end.read();
-        let max_brk = self.heap_start.read();
-        let new_brk = if new_brk > max_brk || new_brk < min_brk {
+        let new_brk = if new_brk > self.heap.start || new_brk < self.program.end {
             brk
         } else {
             new_brk
@@ -185,10 +183,8 @@ impl<M: ManagerBase> SupervisorState<M> {
             return Err(Error::NoMemory);
         };
 
-        let stack_guard = self.stack_guard_start.read();
-
         // Cannot allocate beyond the heap which ends at the stack guard
-        if new_next_free > stack_guard {
+        if new_next_free > self.stack_guard.start {
             return Err(Error::NoMemory);
         }
 
@@ -211,7 +207,7 @@ impl<M: ManagerBase> SupervisorState<M> {
             return Err(Error::NoMemory);
         };
 
-        let program_end = self.program_end.read();
+        let program_end = self.program.end;
         let program_break = self.program_break.read();
 
         // We only allow fixed mappings in the break area
