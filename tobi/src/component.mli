@@ -45,3 +45,9 @@ val relative_cache_dir : t -> (string, [> `failed] error) result
     This thus assumes that the current directory is the root of the repository,
     and that the cache is not brocken. *)
 val available_in_cache : t -> (bool, [> `failed] error) result
+
+(** Find whether a component is installed.
+
+    If it is, return the commit hash corresponding to the installed version. *)
+val get_installed_commit_hash :
+  string -> (string option, [> `failed] error) result

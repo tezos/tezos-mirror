@@ -60,6 +60,13 @@ module CLI = struct
   module Command = struct
     let list =
       Clap.case "list" ~description:"List components." @@ fun () ->
+      let installed =
+        Clap.flag
+          ~set_long:"installed"
+          ~set_short:'i'
+          ~description:"Only list installed components."
+          false
+      in
       let version =
         Clap.default
           Type.version
@@ -71,7 +78,7 @@ module CLI = struct
              version in the working directory."
           Dev
       in
-      `list version
+      `list (version, `installed installed)
 
     let install =
       Clap.case "install" ~description:"Install some component(s)." @@ fun () ->
@@ -117,7 +124,8 @@ let main () =
 
   (* Dispatch commands. *)
   match CLI.command with
-  | `list version -> Cmd_list.run ~verbose:CLI.verbose version
+  | `list (version, `installed installed) ->
+      Cmd_list.run ~verbose:CLI.verbose ~installed version
   | `install (components, `jobs jobs) ->
       Cmd_install.run ~verbose:CLI.verbose ~dry_run:CLI.dry_run ~jobs components
   | `reset -> Cmd_reset.run ~verbose:CLI.verbose ~dry_run:CLI.dry_run
