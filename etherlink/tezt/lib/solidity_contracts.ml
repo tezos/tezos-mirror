@@ -8,6 +8,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Test_helpers
+
 type contract = {
   label : string;
   abi : string;
@@ -348,8 +350,8 @@ let call_withdrawal () =
 let callcode_withdrawal =
   {
     label = "callcode_withdrawal";
-    abi = Helpers.kernel_inputs_path ^ "/callcode_withdrawal.abi";
-    bin = Helpers.kernel_inputs_path ^ "/callcode_withdrawal.bin";
+    abi = kernel_inputs_path ^ "/callcode_withdrawal.abi";
+    bin = kernel_inputs_path ^ "/callcode_withdrawal.bin";
     (* This field is unused as the deployment check is done directly within the called
        contract. *)
     deployed_bin = "";

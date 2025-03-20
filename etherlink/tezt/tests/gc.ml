@@ -19,7 +19,7 @@
 *)
 
 open Rpc.Syntax
-open Helpers
+open Test_helpers
 
 let register ?genesis_timestamp ?(history_mode = Evm_node.Rolling 5) ~title
     ~tags f =
@@ -39,11 +39,7 @@ let register ?genesis_timestamp ?(history_mode = Evm_node.Rolling 5) ~title
   @@ fun () ->
   let patch_config = Evm_node.patch_config_with_experimental_feature () in
   let* sequencer =
-    Helpers.init_sequencer_sandbox
-      ?genesis_timestamp
-      ~history_mode
-      ~patch_config
-      ()
+    init_sequencer_sandbox ?genesis_timestamp ~history_mode ~patch_config ()
   in
   f sequencer
 

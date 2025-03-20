@@ -19,7 +19,7 @@
    Invocation:   dune exec etherlink/tezt/tests/main.exe -- --file dal_sequencer.ml
 *)
 
-open Helpers
+open Test_helpers
 open Setup
 open Rpc.Syntax
 

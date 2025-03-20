@@ -468,7 +468,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ~keys:[]
       ~kind:"wasm_2_0_0"
       ~boot_sector:("file:" ^ output)
-      ~parameters_ty:Helpers.evm_type
+      ~parameters_ty:Test_helpers.evm_type
       client
   in
   let* () =

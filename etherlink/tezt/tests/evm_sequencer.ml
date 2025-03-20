@@ -42,7 +42,7 @@ module Sequencer_rpc = struct
     return (JSON.as_string res)
 end
 
-open Helpers
+open Test_helpers
 open Setup
 
 module Delayed_inbox = struct
@@ -164,7 +164,7 @@ let send_fa_deposit_to_delayed_inbox ?(proxy = "") ~amount ~l1_contracts
            "Pair %S (Pair (Right (Right %s%s)) 0)"
            sc_rollup_address
            receiver
-           (Helpers.remove_0x proxy))
+           (remove_0x proxy))
       ~amount:Tez.zero
       ~giver:depositor.Account.public_key_hash
       ~receiver:l1_contracts.ticket_router_tester
@@ -229,7 +229,7 @@ let register_sandbox ?tx_pool_tx_per_addr_limit ~title ?set_account_code
       ]
   @@ fun () ->
   let* sequencer =
-    Helpers.init_sequencer_sandbox
+    init_sequencer_sandbox
       ?tx_pool_tx_per_addr_limit
       ?set_account_code
       ?da_fee_per_byte
@@ -504,7 +504,7 @@ let test_current_level =
       ~keys:[]
       ~kind:"wasm_2_0_0"
       ~boot_sector:("file:" ^ kernel)
-      ~parameters_ty:Helpers.evm_type
+      ~parameters_ty:Test_helpers.evm_type
       client
   in
   let* () =
@@ -711,7 +711,7 @@ let test_make_l2_kernel_installer_config chain_family =
       ~keys:[]
       ~kind:"wasm_2_0_0"
       ~boot_sector:("file:" ^ kernel)
-      ~parameters_ty:Helpers.evm_type
+      ~parameters_ty:evm_type
       client
   in
   let* () =
@@ -756,7 +756,7 @@ let test_make_l2_kernel_installer_config chain_family =
 
   (* Verify that the balance of the bootstrap account is set by the command
      `make_l2_kernel_installer_config` *)
-  let address_in_durable = Helpers.remove_0x (String.lowercase_ascii address) in
+  let address_in_durable = remove_0x (String.lowercase_ascii address) in
   let address_balance =
     world_state_path ^ "eth_accounts/" ^ address_in_durable ^ "/balance"
   in
@@ -806,7 +806,7 @@ let test_make_l2_kernel_installer_config chain_family =
         "Unexpected value decoded at path %s in durable storage"
         chain_ids
 
-(* The test uses a very specific setup, so it doesn't use general helpers. *)
+(* The test uses a very specific setup, so it doesn't use general  *)
 let test_observer_reset =
   Protocol.register_test
     ~__FILE__
@@ -879,7 +879,7 @@ let test_observer_reset =
       ~keys:[]
       ~kind:"wasm_2_0_0"
       ~boot_sector:("file:" ^ valid_kernel)
-      ~parameters_ty:Helpers.evm_type
+      ~parameters_ty:evm_type
       client
   in
   let* () =
@@ -6669,9 +6669,7 @@ let test_blueprint_is_limited_in_size =
     ~use_dal:ci_enabled_dal_registration
   @@ fun {sc_rollup_node; client; sequencer; _} _protocol ->
   let txs = read_tx_from_file () |> List.map (fun (tx, _hash) -> tx) in
-  let* requests, hashes =
-    Helpers.batch_n_transactions ~evm_node:sequencer txs
-  in
+  let* requests, hashes = batch_n_transactions ~evm_node:sequencer txs in
   (* Each transaction is about 114 bytes, hence 100 * 114 = 11400 bytes, which
      will fit in two blueprints of two chunks each. *)
   let* () = next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client in
@@ -6779,7 +6777,7 @@ let test_blueprint_limit_with_delayed_inbox =
         unit)
   in
   let* _requests, _hashes =
-    Helpers.batch_n_transactions ~evm_node:sequencer direct_txs
+    batch_n_transactions ~evm_node:sequencer direct_txs
   in
   (* Due to the overapproximation of 4096 bytes per delayed transactions, there
      should be only a single delayed transaction per blueprints with 2 chunks. *)
@@ -7463,7 +7461,7 @@ let check_trace expect_null expected_returned_value receipt trace =
      it is encoded into a H256. *)
   (match expected_returned_value with
   | Some value ->
-      let expected_value = Helpers.hex_256_of_int value in
+      let expected_value = hex_256_of_int value in
       Check.(
         (returned_value = expected_value)
           string
@@ -8839,7 +8837,7 @@ let test_fast_withdrawal_l2_caller =
       ~endpoint
       ~abi:withdrawal_forwarder_contract.label
       ~bin:withdrawal_forwarder_contract.bin
-    |> Helpers.wait_for_application ~produce_block
+    |> wait_for_application ~produce_block
   in
 
   let withdraw_amount = Tez.of_int 50 in
@@ -9644,15 +9642,13 @@ let test_batch_limit_size_rpc =
   in
 
   (* We first check that we can inject the first batch. *)
-  let* _ = Helpers.batch_n_transactions ~evm_node:sequencer below_limit_txs in
+  let* _ = batch_n_transactions ~evm_node:sequencer below_limit_txs in
 
   (* We then demonstrate that we cannot inject the second batch. *)
   let* has_failed =
     Lwt.catch
       (fun () ->
-        let* _ =
-          Helpers.batch_n_transactions ~evm_node:sequencer above_limit_txs
-        in
+        let* _ = batch_n_transactions ~evm_node:sequencer above_limit_txs in
         return false)
       (fun _ -> return true)
   in
@@ -9667,7 +9663,7 @@ let test_batch_limit_size_rpc =
   in
 
   (* We demonstrate it is now possible to inject the batch. *)
-  let* _ = Helpers.batch_n_transactions ~evm_node:sequencer above_limit_txs in
+  let* _ = batch_n_transactions ~evm_node:sequencer above_limit_txs in
 
   unit
 
@@ -10078,7 +10074,7 @@ let test_websocket_rpcs =
       ~address:Eth_account.bootstrap_accounts.(0).address
       sequencer
   in
-  Check.((balance = Helpers.default_bootstrap_account_balance) Wei.typ)
+  Check.((balance = default_bootstrap_account_balance) Wei.typ)
     ~error_msg:
       (sf
          "Expected balance of %s should be %%R, but got %%L"
@@ -10490,7 +10486,7 @@ let test_websocket_logs_event =
     in
     Check.((address = logs.address) string)
       ~error_msg:"Received logs address was %R, expected %L" ;
-    Check.(("0x" ^ Helpers.hex_256_of_int value = logs.data) string)
+    Check.(("0x" ^ hex_256_of_int value = logs.data) string)
       ~error_msg:"Received logs data was %R, expected %L" ;
     Check.(
       (sender_burn_logs.topics
