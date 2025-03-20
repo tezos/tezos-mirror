@@ -394,6 +394,7 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
       ?delayed_inbox_min_levels
       ?maximum_allowed_ticks
       ~enable_dal
+      ?enable_fa_bridge
       ?enable_fast_withdrawal
       ?dal_slots
       ?max_blueprint_lookahead_in_seconds
