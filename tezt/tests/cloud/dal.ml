@@ -3247,7 +3247,6 @@ let update_bakers_infos t =
   Lwt.return_unit
 
 let on_new_level t level ~metadata =
-  let* () = wait_for_level t level in
   toplog "Start process level %d" level ;
   clean_up t (level - t.configuration.blocks_history) ;
   let* () =
@@ -3300,6 +3299,7 @@ let on_new_cycle t ~level =
   Monitoring_app.Alert.check_for_lost_dal_rewards t ~metadata
 
 let on_new_block t ~level =
+  let* () = wait_for_level t level in
   let endpoint = t.bootstrap.node_rpc_endpoint in
   let block = string_of_int level in
   let* metadata =
