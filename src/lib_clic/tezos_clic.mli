@@ -127,6 +127,7 @@ val default_arg :
   long:string ->
   placeholder:string ->
   default:string ->
+  ?pp_default:(Format.formatter -> unit) ->
   ?env:string ->
   ('a, 'ctx) parameter ->
   ('a, 'ctx) arg
