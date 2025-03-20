@@ -41,6 +41,11 @@
 - Augment L1/L2 relationships with a new table to keep more accurate
   information. (!16848)
 
+### Documentation changes
+
+- Improves and cleans up the `man` command of the node. (!17289 !17311 !17282
+  !17295 !17331 !17317 !17309)
+
 ### Experimental features changes
 
 *No guarantees are provided regarding backward compatibility of experimental

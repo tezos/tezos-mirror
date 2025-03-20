@@ -1,5 +1,5 @@
 
-./octez-evm-node man -v 2
+./octez-evm-node man -v 3
 Usage:
   octez-evm-node command [command options]
   octez-evm-node --help (for global options)
@@ -12,19 +12,33 @@ To browse the documentation:
 
 Access the documentation:
 
-  man [<keyword>...]
+  man [<keyword>...] [-v --verbosity <0|1|2|3>]
+      [--format <plain|colors|html>]
     Print documentation of commands.
+    Add search keywords to narrow list.
+    Will display only the commands by default, unless [-verbosity <2|3>] is
+    passed or the list of matching commands if less than 3.
     <keyword>: keyword to search for
+      If several are given they must all appear in the command.
     -v --verbosity <0|1|2|3>: level of details
+      0. Only shows command mnemonics, without documentation.
+      1. Shows command mnemonics with short descriptions.
+      2. Show commands and arguments with short descriptions
+      3. Show everything
     --format <plain|colors|html>: the manual's output format
+      Defaults to `plain`.
 
 Snapshots commands:
 
-  snapshot export 
+  snapshot export [--data-dir <data-dir>] [--config-file <path>]
+      [-s --snapshot-file <path>] [--compress-on-the-fly] [--uncompressed]
     Export a snapshot of the EVM node.
     --data-dir <data-dir>: The path to the EVM node data directory
+      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
+      if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
+      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
     -s --snapshot-file <path>: Path to the snapshot file to create, with
       string interpolation. %r is replaced by the short form of the Smart
       Rollup address, %R by the complete Smart Rollup address, %l by the
@@ -38,22 +52,43 @@ Snapshots commands:
       around the size of the data dir.
     --uncompressed: Produce an uncompressed snapshot.
   
-  snapshot import <snapshot> 
+  snapshot import <snapshot> [--data-dir <data-dir>] [-f --force]
     Import a snapshot of the EVM node.
     <snapshot>: Snapshot archive file or URL
     --data-dir <data-dir>: The path to the EVM node data directory
+      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
+      if it exists, or `$HOME/.octez-evm-node` otherwise.
     -f --force: Allow importing snapshot in already populated data dir
       (previous contents is removed first, even if the snapshot is
       corrupted), or importing a legacy snapshot in an empty data dir.
 
 Miscellaneous commands:
 
-  run sandbox 
+  run sandbox [--data-dir <data-dir>] [--config-file <path>]
+      [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
+      [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
+      [--max-number-blocks <100>] [--max-number-logs <1000>]
+      [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
+      [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
+      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
+      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
+      [--whitelisted-rpcs <whitelist>] [--finalized-view]
+      [--preimages-dir <_evm_installer_preimages>]
+      [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
+      [--time-between-blocks <10.>] [--max-number-of-chunks <10.>]
+      [--private-rpc-port <PORT>]
+      [--genesis-timestamp <[TIMESTAMP]>]
+      [--kernel <evm_kernel.wasm>] [-d --wallet-dir <path>]
+      [-f --password-filename <filename>] [--network <network>]
+      [--init-from-snapshot [snapshot url]] [--fund <0x...>]
     Start the EVM node in sandbox mode. The sandbox mode is a sequencer-like
     mode that produces blocks with a fake key and no rollup node connection.
     --data-dir <data-dir>: The path to the EVM node data directory
+      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
+      if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
+      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
     --rpc-addr <ADDR>: The EVM node server rpc address.
     --rpc-port <PORT>: The EVM node server rpc port.
     --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a
@@ -103,11 +138,14 @@ Miscellaneous commands:
       genesis block, uses machine's clock if not provided
     --kernel <evm_kernel.wasm>: Path to the EVM kernel used to launch the
       PVM, it will be loaded from storage afterward
-    -d --wallet-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR
-      env)
+    -d --wallet-dir <path>: The directory where the Tezos client stores all
+      its wallet data
+      Defaults to the value of the environment variable `$TEZOS_CLIENT_DIR`
+      if it exists, or `$HOME/.tezos-client` otherwise.
     -f --password-filename <filename>: path to the password filename
     --network <network>: The network the EVM node will be connecting to. Can
       be `mainnet` or `testnet`.
+      If set, defaults to the value of EVM_NODE_NETWORK.
     --init-from-snapshot [snapshot url]: Automatically download and import a
       recent snapshot for supported networks on fresh data directories. If no
       snapshot provider is given e.g. `--init-from-snapshot` with no
@@ -117,14 +155,28 @@ Miscellaneous commands:
       address, %n by the network (given by the argument --network), %h by the
       history mode used by the node, and %% by %. Also accepts a path to an
       existing snapshot.
+      Defaults to
+      `https://snapshotter-sandbox.nomadic-labs.eu/local/etherlink-%n/%h/etherlink-%n-%h-latest.gz`.
     --fund <0x...>: The address of an account to provide with funds in the
       sandbox (can be repeated to fund multiple accounts)
   
-  run proxy 
+  run proxy [--data-dir <data-dir>] [--config-file <path>]
+      [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
+      [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
+      [--max-number-blocks <100>] [--max-number-logs <1000>]
+      [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
+      [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
+      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
+      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
+      [--whitelisted-rpcs <whitelist>] [--finalized-view] [--read-only]
+      [--ignore-block-param] [--evm-node-endpoint <url>]
     Start the EVM node in proxy mode.
     --data-dir <data-dir>: The path to the EVM node data directory
+      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
+      if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
+      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
     --rpc-addr <ADDR>: The EVM node server rpc address.
     --rpc-port <PORT>: The EVM node server rpc port.
     --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a
@@ -163,11 +215,32 @@ Miscellaneous commands:
       block for unsupported blocks.
     --evm-node-endpoint <url>: The address of an EVM node to connect to.
   
-  run sequencer 
+  run sequencer [--data-dir <data-dir>] [--config-file <path>]
+      [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
+      [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
+      [--max-number-blocks <100>] [--max-number-logs <1000>]
+      [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
+      [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
+      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
+      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
+      [--whitelisted-rpcs <whitelist>] [--finalized-view]
+      [--preimages-dir <_evm_installer_preimages>]
+      [--preimages-endpoint <url>] [--time-between-blocks <10.>]
+      [--max-number-of-chunks <10.>] [--private-rpc-port <PORT>]
+      [--sequencer-key <edsk...>] [--maximum-blueprints-lag <LAG>]
+      [--maximum-blueprints-ahead <AHEAD>]
+      [--maximum-blueprints-catch-up <CATCH_UP>]
+      [--catch-up-cooldown <COOLDOWN>]
+      [--genesis-timestamp <[TIMESTAMP]>]
+      [--initial-kernel <evm_installer.wasm>] [-d --wallet-dir <path>]
+      [-f --password-filename <filename>] [--dal-slots <slot indices>]
     Start the EVM node in sequencer mode
     --data-dir <data-dir>: The path to the EVM node data directory
+      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
+      if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
+      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
     --rpc-addr <ADDR>: The EVM node server rpc address.
     --rpc-port <PORT>: The EVM node server rpc port.
     --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a
@@ -224,17 +297,36 @@ Miscellaneous commands:
       genesis block, uses machine's clock if not provided
     --initial-kernel <evm_installer.wasm>: Path to the EVM kernel used to
       launch the PVM, it will be loaded from storage afterward
-    -d --wallet-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR
-      env)
+    -d --wallet-dir <path>: The directory where the Tezos client stores all
+      its wallet data
+      Defaults to the value of the environment variable `$TEZOS_CLIENT_DIR`
+      if it exists, or `$HOME/.tezos-client` otherwise.
     -f --password-filename <filename>: path to the password filename
     --dal-slots <slot indices>: The DAL slots indices on which the sequencer
       is allowed to send blueprints.
   
-  run observer 
+  run observer [--data-dir <data-dir>] [--config-file <path>]
+      [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
+      [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
+      [--max-number-blocks <100>] [--max-number-logs <1000>]
+      [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
+      [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
+      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
+      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
+      [--whitelisted-rpcs <whitelist>] [--finalized-view]
+      [--evm-node-endpoint <url>] [--bundler-node-endpoint <url>]
+      [--preimages-dir <_evm_installer_preimages>]
+      [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
+      [--initial-kernel <evm_installer.wasm>] [--dont-track-rollup-node]
+      [--no-sync] [--init-from-snapshot [snapshot url]]
+      [--history <archive | rolling:n | full:n>] [--network <network>]
     Start the EVM node in observer mode
     --data-dir <data-dir>: The path to the EVM node data directory
+      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
+      if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
+      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
     --rpc-addr <ADDR>: The EVM node server rpc address.
     --rpc-port <PORT>: The EVM node server rpc port.
     --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a
@@ -293,17 +385,34 @@ Miscellaneous commands:
       address, %n by the network (given by the argument --network), %h by the
       history mode used by the node, and %% by %. Also accepts a path to an
       existing snapshot.
+      Defaults to
+      `https://snapshotter-sandbox.nomadic-labs.eu/local/etherlink-%n/%h/etherlink-%n-%h-latest.gz`.
     --history <archive | rolling:n | full:n>: History mode for the EVM node.
       ':n' means n days of history.
     --network <network>: The network the EVM node will be connecting to. Can
       be `mainnet` or `testnet`. If set, additional sanity checks are
       performed on the node’s startup.
+      If set, defaults to the value of EVM_NODE_NETWORK.
   
-  experimental run rpc 
+  experimental run rpc [--data-dir <data-dir>] [--config-file <path>]
+      [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
+      [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
+      [--max-number-blocks <100>] [--max-number-logs <1000>]
+      [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
+      [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
+      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
+      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
+      [--whitelisted-rpcs <whitelist>] [--finalized-view]
+      [--evm-node-endpoint <url>] [--evm-node-private-endpoint <url>]
+      [--preimages-dir <_evm_installer_preimages>]
+      [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
     Start the EVM node in rpc mode
     --data-dir <data-dir>: The path to the EVM node data directory
+      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
+      if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
+      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
     --rpc-addr <ADDR>: The EVM node server rpc address.
     --rpc-port <PORT>: The EVM node server rpc port.
     --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a
@@ -352,15 +461,22 @@ Miscellaneous commands:
     Display information about an EVM node snapshot file.
     <snapshot_file>: Snapshot archive file
   
-  switch history to <history> 
+  switch history to <history> [--data-dir <data-dir>] [--config-file <path>]
     Switch history mode of the node
     <history>: History mode, either archive, rolling:n or full:n where n is
       the number of days of history to retain.
     --data-dir <data-dir>: The path to the EVM node data directory
+      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
+      if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
+      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
   
-  chunk data [<data or file>...]
+  chunk data [<data or file>...] [--rollup-address <sr1...>] [--as-blueprint]
+      [--timestamp <[TIMESTAMP]>] [--number <0>]
+      [--parent-hash <ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff>]
+      [--sequencer-key <edsk...>] [-d --wallet-dir <path>]
+      [-f --password-filename <filename>]
     Chunk hexadecimal data according to the message representation of the EVM
     rollup
     <data or file>: Data to prepare and chunk with the EVM rollup format. If
@@ -368,14 +484,21 @@ Miscellaneous commands:
       filename and can contain a list of data separated by a whitespace.
     --rollup-address <sr1...>: The smart rollup address in Base58 encoding
       used to produce the chunked messages
+      Defaults to `[SMART_ROLLUP_HASH]`.
     --as-blueprint: Chunk the data into a blueprint usable in sequencer mode
     --timestamp <[TIMESTAMP]>: 
+      Defaults to `0`.
     --number <0>: Level of the blueprint
+      Defaults to `0`.
     --parent-hash <ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff>: Blueprint's
       parent hash
+      Defaults to
+      `ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff`.
     --sequencer-key <edsk...>: key to sign the blueprints.
-    -d --wallet-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR
-      env)
+    -d --wallet-dir <path>: The directory where the Tezos client stores all
+      its wallet data
+      Defaults to the value of the environment variable `$TEZOS_CLIENT_DIR`
+      if it exists, or `$HOME/.tezos-client` otherwise.
     -f --password-filename <filename>: path to the password filename
   
   make upgrade payload with root hash <preimage_hash> at activation timestamp
@@ -387,46 +510,60 @@ Miscellaneous commands:
   
   make sequencer upgrade payload with pool address <pool_address> at
       activation timestamp <activation_timestamp> for <sequencer-key>
-      
+      [-d --wallet-dir <path>]
     Create bytes payload for the sequencer upgrade entrypoint
     <pool_address>: pool address of the sequencer
     <activation_timestamp>: After activation timestamp, the kernel will
       upgrade to this value
     <sequencer-key>: key to sign the blueprints.
-    -d --wallet-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR
-      env)
+    -d --wallet-dir <path>: The directory where the Tezos client stores all
+      its wallet data
+      Defaults to the value of the environment variable `$TEZOS_CLIENT_DIR`
+      if it exists, or `$HOME/.tezos-client` otherwise.
   
-  init from rollup node <rollup-node-data-dir> 
+  init from rollup node <rollup-node-data-dir> [--data-dir <data-dir>]
+      [--config-file <path>] [--omit-delayed-tx-events]
     initialises the EVM node data-dir using the data-dir of a rollup node.
     <rollup-node-data-dir>: The path to the rollup node data directory.
     --data-dir <data-dir>: The path to the EVM node data directory
+      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
+      if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
+      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
     --omit-delayed-tx-events: Don't populate the delayed transactions in the
       store of the EVM node. This is necessary when creating the data dir for
       an observer EVM node because delayed transactions are going to be
       fetched from the sequencer.
   
-  transform dump <dump.json> to rlp <dump.rlp> 
+  transform dump <dump.json> to rlp <dump.rlp> [-k --keep-everything]
     Transforms the JSON list of instructions to a RLP list
     <dump.json>: Description
     <dump.rlp>: Description
     -k --keep-everything: Do not filter out files outside of the `/evm`
       directory
   
-  reset at <level> 
+  reset at <level> [--data-dir <data-dir>] [-f --force]
     Reset evm node data-dir to a specific block level.
     <level>: level to reset to state to.
     --data-dir <data-dir>: The path to the EVM node data directory
+      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
+      if it exists, or `$HOME/.octez-evm-node` otherwise.
     -f --force: force suppression of data to reset state of sequencer to a
       specified l2 level.
   
-  replay blueprint <level> 
+  replay blueprint <level> [--data-dir <data-dir>] [--config-file <path>]
+      [--preimages-dir <_evm_installer_preimages>]
+      [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
+      [--kernel <evm_kernel.wasm>] [--kernel-verbosity <info>] [--profile]
     Replay a specific block level.
     <level>: level to replay
     --data-dir <data-dir>: The path to the EVM node data directory
+      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
+      if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
+      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
     --preimages-dir <_evm_installer_preimages>: Path to the preimages
       directory
     --preimages-endpoint <url>: The address of a service which provides
@@ -441,26 +578,57 @@ Miscellaneous commands:
       `fatal`, `error`, `info`, `debug`
     --profile: Profile the execution of the WASM PVM
   
-  patch kernel with <kernel_path> 
+  patch kernel with <kernel_path> [--data-dir <data-dir>]
+      [--config-file <path>] [--block-number <N>] [-f --force]
     Patch the kernel used by the EVM node from its current HEAD. This is an
     unsafe command, which can lead to the EVM node diverging from the
     Etherlink main branch if the new kernel is not compatible with the one
     deployed on the network.
     <kernel_path>: Path to the kernel
     --data-dir <data-dir>: The path to the EVM node data directory
+      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
+      if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
+      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
     --block-number <N>: If provided, the state resulting in the application
       of the requested block will be used instead of the latest state. In
       that case, the patch will only impact replays of the successor block
       only.
     -f --force: Force patching the kernel
   
-  init config 
+  init config [--data-dir <data-dir>] [--config-file <path>]
+      [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
+      [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
+      [--max-number-blocks <100>] [--max-number-logs <1000>]
+      [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
+      [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
+      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
+      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
+      [--whitelisted-rpcs <whitelist>] [--finalized-view]
+      [--preimages-dir <_evm_installer_preimages>]
+      [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
+      [--time-between-blocks <10.>] [--max-number-of-chunks <10.>]
+      [--private-rpc-port <PORT>] [--sequencer-key <edsk...>]
+      [--maximum-blueprints-lag <LAG>] [--maximum-blueprints-ahead <AHEAD>]
+      [--maximum-blueprints-catch-up <CATCH_UP>]
+      [--catch-up-cooldown <COOLDOWN>] [--evm-node-endpoint <url>]
+      [--bundler-node-endpoint <url>] [--sequencer-sidecar-endpoint <url>]
+      [--history <archive | rolling:n | full:n>] [--dont-track-rollup-node]
+      [-d --wallet-dir <path>] [-f --force] [--dal-slots <slot indices>]
+      [--network <network>]
     Create an initial config with default value.
+    If the <rollup-node-endpoint> is set then adds the configuration for the
+    proxy mode. If the  <sequencer-key> is set,then adds the configuration
+    for the sequencer and threshold encryption sequencer modes. If the
+    <evm-node-endpoint> is set then adds the configuration for the observer
+    mode.
     --data-dir <data-dir>: The path to the EVM node data directory
+      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
+      if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
+      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
     --rpc-addr <ADDR>: The EVM node server rpc address.
     --rpc-port <PORT>: The EVM node server rpc port.
     --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a
@@ -526,31 +694,56 @@ Miscellaneous commands:
     --dont-track-rollup-node: Disable tracking the head of the rollup node.
       Tracking the state of a rollup node allows to confirm the blocks
       received from the upstream EVM node.
-    -d --wallet-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR
-      env)
+    -d --wallet-dir <path>: The directory where the Tezos client stores all
+      its wallet data
+      Defaults to the value of the environment variable `$TEZOS_CLIENT_DIR`
+      if it exists, or `$HOME/.tezos-client` otherwise.
     -f --force: Overwrites the configuration file when it exists.
     --dal-slots <slot indices>: The DAL slots indices on which the sequencer
       is allowed to send blueprints.
     --network <network>: The network the EVM node will be connecting to. Can
       be `mainnet` or `testnet`. If set, some configuration options defaults
       to well-known values for the selected network.
+      If set, defaults to the value of EVM_NODE_NETWORK.
   
-  check config 
+  check config [--data-dir <data-dir>] [--config-file <path>] [-p --print]
+      [--network <network>]
     Read and validate configuration files. By default, look for config.json
     in the data-dir. If --filename is used, check this config file instead.
     --data-dir <data-dir>: The path to the EVM node data directory
+      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
+      if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
+      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
     -p --print: Print the full configuration to the standard output
     --network <network>: The network the EVM node will be connecting to. Can
       be `mainnet` or `testnet`. If set, check as if `--network N` is set
       when running the node (as it turns some required configuration fields
       into optional ones).
+      If set, defaults to the value of EVM_NODE_NETWORK.
   
   describe config
     Prints the JSON schema of the configuration file to the standard output.
   
-  make kernel installer config <kernel config file> 
+  make kernel installer config <kernel config file> [--mainnet-compat]
+      [--kernel-root-hash <root hash>] [--chain-id <chain id>]
+      [--sequencer <edpk...>] [--delayed-bridge <KT1...>]
+      [--ticketer <KT1...>] [--admin <KT1..>]
+      [--sequencer-governance <KT1...>] [--kernel-governance <KT1...>]
+      [--kernel-security-governance <KT1...>]
+      [--minimum-base-fee-per-gas <111...>] [--da-fee-per-byte <111...>]
+      [--delayed-inbox-timeout <111...>]
+      [--delayed-inbox-min-levels <111...>]
+      [--sequencer-pool-address <0x...>] [--maximum-allowed-ticks <11000...>]
+      [--maximum-gas-per-transaction <30000...>]
+      [--max-blueprint-lookahead-in-seconds <500>] [--remove-whitelist]
+      [--bootstrap-balance <9999000000000000000000>]
+      [--bootstrap-account <0x...>] [--set-code <0x...,0x....>]
+      [--enable-fa-bridge] [--enable-dal] [--dal-slots <0,1,4,6,...>]
+      [--enable-multichain] [--l2-chain-id <1>]
+      [--max-delayed-inbox-blueprint-length <1000>]
+      [--enable-fast-withdrawal]
     Transforms the JSON list of instructions to a RLP list
     <kernel config file>: file path where the config will be written to
     --mainnet-compat: Generate a configuration compatible with the first
@@ -588,6 +781,7 @@ Miscellaneous commands:
     --remove-whitelist: enable flag remove_whitelist in the installer config
     --bootstrap-balance <9999000000000000000000>: balance of the bootstrap
       accounts
+      Defaults to `9999000000000000000000`.
     --bootstrap-account <0x...>: add a bootstrap account in the installer
       config.
     --set-code <0x...,0x....>: add code to an account in the installer
@@ -605,7 +799,13 @@ Miscellaneous commands:
       installer config
   
   make l2 kernel installer config <kernel config file>
-      
+      [--minimum-base-fee-per-gas <111...>] [--da-fee-per-byte <111...>]
+      [--sequencer-pool-address <0x...>]
+      [--maximum-gas-per-transaction <30000...>]
+      [--bootstrap-balance <9999000000000000000000>]
+      [--bootstrap-account <0x...>] [--set-code <0x...,0x....>]
+      [--world-state-path </evm/world_state/<chain_id>>] [--l2-chain-id <1>]
+      [--l2-chain-family <EVM>]
     Produce a file containing the part of the kernel configuration
     instructions related to a particular L2 chain.
     <kernel config file>: file path where the config will be written to
@@ -619,6 +819,7 @@ Miscellaneous commands:
       maximum_gas_per_transaction in the installer config
     --bootstrap-balance <9999000000000000000000>: balance of the bootstrap
       accounts
+      Defaults to `9999000000000000000000`.
     --bootstrap-account <0x...>: add a bootstrap account in the installer
       config.
     --set-code <0x...,0x....>: add code to an account in the installer
@@ -628,26 +829,36 @@ Miscellaneous commands:
     --l2-chain-id <1>: L2 chain id
     --l2-chain-family <EVM>: Configure the family (either EVM or Michelson)
       of the L2 chain.
+      Defaults to `EVM`.
   
-  patch state at <path> with <value> 
+  patch state at <path> with <value> [--data-dir <data-dir>]
+      [--config-file <path>] [--block-number <N>] [-f --force]
     Patches the state with an arbitrary value. This is an unsafe command, it
     should be used for debugging only. Patched state is persisted and you
     need to use the command `reset` to revert the changes.
     <path>: Durable storage path
     <value>: Patched value
     --data-dir <data-dir>: The path to the EVM node data directory
+      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
+      if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
+      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
     --block-number <N>: If provided, the state resulting in the application
       of the requested block will be used instead of the latest state.
     -f --force: Force patching the state
   
-  download kernel with root hash <root hash> 
+  download kernel with root hash <root hash> [--data-dir <data-dir>]
+      [--config-file <path>] [--preimages-dir <_evm_installer_preimages>]
+      [--preimages-endpoint <url>] [--retry <1>]
     Transforms the JSON list of instructions to a RLP list
     <root hash>: root hash of the kernel to download
     --data-dir <data-dir>: The path to the EVM node data directory
+      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
+      if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
+      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
     --preimages-dir <_evm_installer_preimages>: Path to the preimages
       directory
     --preimages-endpoint <url>: The address of a service which provides
@@ -663,8 +874,9 @@ Miscellaneous commands:
   list metrics
     List the metrics exported by the EVM node.
   
-  list events 
+  list events [-l --level <info>] [-j --json]
     List the events emitted by the EVM node.
     -l --level <info>: Set list_events filter level to either `fatal`,
       `error`, `warning`, `notice` `info`, `debug`
+      Defaults to `none`.
     -j --json: Enables the display of json schemas

@@ -1580,7 +1580,7 @@ let debug_print_store_schemas ?(path = Uses.path Constant.octez_evm_node) ?hooks
   Process.check process
 
 let man ?(path = Uses.path Constant.octez_evm_node) ?hooks () =
-  let args = ["man"; "-v"; "2"] in
+  let args = ["man"; "-v"; "3"] in
   let process = Process.spawn ?hooks path @@ args in
   Process.check process
 

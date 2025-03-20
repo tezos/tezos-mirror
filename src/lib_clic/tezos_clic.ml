@@ -239,10 +239,12 @@ let rec print_options_detailed :
       in
       let doc =
         match env with
-        | None -> Format.sprintf "%s\nDefaults to `%s`." doc default
+        | None -> Format.asprintf "%s\nDefaults to `%a`." doc pp_default default
         | Some env ->
             Format.asprintf
-              "%s\nIf set, defaults to the value of %s, or `%a` otherwise."
+              "%s\n\
+               Defaults to the value of the environment variable `$%s` if it \
+               exists, or `%a` otherwise."
               doc
               env
               pp_default

@@ -201,18 +201,10 @@ let wallet_dir_arg =
     ~long:"wallet-dir"
     ~short:'d'
     ~placeholder:"path"
+    ~env:Client_config.base_dir_env_name
     ~default:Client_config.default_base_dir
-    ~doc:
-      (Format.asprintf
-         "@[<v>@[<2>client data directory (absent: %s env)@,\
-          The directory where the Tezos client stores all its wallet data.@,\
-          If absent, its value is the value of the %s@,\
-          environment variable. If %s is itself not specified,@,\
-          defaults to %s@]@]@."
-         Client_config.base_dir_env_name
-         Client_config.base_dir_env_name
-         Client_config.base_dir_env_name
-         Client_config.default_base_dir)
+    ~pp_default:(fun fmt -> Format.pp_print_string fmt "$HOME/.tezos-client")
+    ~doc:"The directory where the Tezos client stores all its wallet data"
     Params.string
 
 let rpc_addr_arg =
@@ -1622,13 +1614,12 @@ let init_config_command =
   let open Lwt_result_syntax in
   command
     ~desc:
-      {|Create an initial config with default value.
-If the <rollup-node-endpoint> is set then adds the configuration for the proxy
-mode.
-If the  <sequencer-key> is set,then adds the configuration for the sequencer and
-threshold encryption sequencer modes.
-If the <evm-node-endpoint> is set then adds the configuration for the observer
-mode.|}
+      "Create an initial config with default value.\n\
+       If the <rollup-node-endpoint> is set then adds the configuration for \
+       the proxy mode. If the  <sequencer-key> is set,then adds the \
+       configuration for the sequencer and threshold encryption sequencer \
+       modes. If the <evm-node-endpoint> is set then adds the configuration \
+       for the observer mode."
     (merge_options
        common_config_args
        (args20
