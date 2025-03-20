@@ -257,7 +257,7 @@ module Manager : sig
       }
     | Update_consensus_key_with_incorrect_proof of {
         public_key : public_key;
-        proof : signature;
+        proof : Bls.t;
       }
     | Update_consensus_key_with_unused_proof of {
         source : public_key_hash;

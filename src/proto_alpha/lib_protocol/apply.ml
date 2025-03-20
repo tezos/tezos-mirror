@@ -1433,7 +1433,7 @@ let apply_manager_operation :
         in
         let* ctxt =
           match (public_key, proof) with
-          | Bls bls_public_key, Some ((Bls _ | Unknown _) as proof) ->
+          | Bls bls_public_key, Some proof ->
               let*? ctxt =
                 let gas_cost_for_sig_check =
                   let open Saturation_repr.Syntax in
@@ -1456,7 +1456,7 @@ let apply_manager_operation :
               in
               let* () =
                 fail_unless
-                  (Signature.check public_key proof bytes)
+                  (Signature.check public_key (Bls proof) bytes)
                   (Validate_errors.Manager
                    .Update_consensus_key_with_incorrect_proof
                      {public_key; proof})

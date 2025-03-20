@@ -427,7 +427,7 @@ and _ manager_operation =
      [proof] is a signature over the public key itself. *)
   | Update_consensus_key : {
       public_key : Signature.Public_key.t;
-      proof : Signature.signature option;
+      proof : Bls.t option;
     }
       -> Kind.update_consensus_key manager_operation
       (** [Transfer_ticket] allows an implicit account (the "claimer") to receive
