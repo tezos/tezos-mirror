@@ -2854,13 +2854,13 @@ let () =
       setup_formatter
         ~isatty:(Unix.isatty Unix.stdout)
         Format.std_formatter
-        Short) ;
+        Details) ;
   ignore
     Tezos_clic.(
       setup_formatter
         ~isatty:(Unix.isatty Unix.stderr)
         Format.err_formatter
-        Short) ;
+        Details) ;
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
   Tezos_base_unix.Event_loop.main_run (fun () ->
       Lwt_exit.wrap_and_exit (dispatch (argv ())))
