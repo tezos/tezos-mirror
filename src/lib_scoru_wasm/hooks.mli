@@ -13,6 +13,7 @@ type t = {
   fast_exec_panicked : (exn -> unit Lwt.t) option;
   fast_exec_completed : (unit -> unit Lwt.t) option;
   fast_exec_fallback : bool;
+  pvm_reboot : (int64 -> unit Lwt.t) option;
 }
 
 (** [no_hooks] is the empty collection of hooks, which can be used as a
@@ -44,3 +45,7 @@ val on_fast_exec_completed : (unit -> unit Lwt.t) -> t -> t
     It is true by default, but keep in mind the Fast Execution is {b very b}
     slow. *)
 val fast_exec_fallback : bool -> t -> t
+
+(** [on_pvm_reboot k hooks] {b replaces b} the hook executed when
+    the PVM reaches a reboot point by [k] in [hooks]. *)
+val on_pvm_reboot : (int64 -> unit Lwt.t) -> t -> t
