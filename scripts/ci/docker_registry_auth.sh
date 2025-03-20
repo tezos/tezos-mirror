@@ -29,6 +29,8 @@ echo "RUST_TOOLCHAIN_IMAGE_NAME=${RUST_TOOLCHAIN_IMAGE_NAME:-}"
 echo "CI_COMMIT_REF_PROTECTED=${CI_COMMIT_REF_PROTECTED:-}"
 
 # Export Google Auth token to build DockerFile
+echo "Current active user:"
+gcloud config get-value account
 echo -n "$(gcloud auth print-access-token)" > /tmp/npm_token.txt
 
 # Allow to push to private GCP Artifact Registry if the CI/CD variable is defined
@@ -43,6 +45,9 @@ if [ -n "${GCP_REGISTRY:-}" ]; then
     gcloud auth activate-service-account --key-file=protected_sa.json
     gcloud auth configure-docker us.gcr.io
     gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev
+    TOKEN=$(gcloud auth print-access-token)
+    echo "$TOKEN" | docker login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev
+    echo -n "$TOKEN" > /tmp/npm_token.txt
     rm protected_sa.json
   else
     echo "### Logging into standard GCP Artifact Registry for pushing images"
