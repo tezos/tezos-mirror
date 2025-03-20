@@ -97,9 +97,13 @@ module CLI = struct
           20
       in
       `install (components, `jobs jobs)
+
+    let reset =
+      Clap.case "reset" ~description:"Uninstall all installed components."
+      @@ fun () -> `reset
   end
 
-  let command = Clap.subcommand Command.[list; install]
+  let command = Clap.subcommand Command.[list; install; reset]
 
   let () = Clap.close ()
 end
@@ -116,6 +120,7 @@ let main () =
   | `list version -> Cmd_list.run ~verbose:CLI.verbose version
   | `install (components, `jobs jobs) ->
       Cmd_install.run ~verbose:CLI.verbose ~dry_run:CLI.dry_run ~jobs components
+  | `reset -> Cmd_reset.run ~verbose:CLI.verbose ~dry_run:CLI.dry_run
 
 (* Entrypoint: call [main] and handle errors. *)
 let () =
