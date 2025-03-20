@@ -339,9 +339,9 @@ documentation:rst-check:
   - gcp
   rules:
   - changes:
+    - '**/*.rst'
     - .gitlab-ci.yml
     - .gitlab/**/*
-    - docs/**/*.rst
     when: on_success
   dependencies:
   - oc.docker:ci:amd64
