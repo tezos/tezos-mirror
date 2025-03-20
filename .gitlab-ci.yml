@@ -95,6 +95,10 @@ workflow:
     variables:
       PIPELINE_TYPE: schedule_container_scanning_evm_node_releases
     when: always
+  - if: $CI_PIPELINE_SOURCE == "api" && $TZ_API_KIND == "RELEASE_PAGE"
+    variables:
+      PIPELINE_TYPE: publish_release_page
+    when: always
 
 default:
   interruptible: true
@@ -214,4 +218,8 @@ include:
 - local: .gitlab/ci/pipelines/schedule_container_scanning_evm_node_releases.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_EVM_NODE_RELEASES"
+    when: always
+- local: .gitlab/ci/pipelines/publish_release_page.yml
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "api" && $TZ_API_KIND == "RELEASE_PAGE"
     when: always
