@@ -2658,6 +2658,8 @@ let test_delayed_deposit_from_init_rollup_node =
            sc_rollup_node;
            sequencer;
            proxy;
+           l2_chains;
+           enable_multichain;
            _;
          }
              _protocol ->
@@ -2688,11 +2690,24 @@ let test_delayed_deposit_from_init_rollup_node =
 
   (* Run a new sequencer that is initialized from a rollup node that has the
      delayed deposit in its state. *)
+  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let new_sequencer =
     let mode = Evm_node.mode sequencer |> Evm_node.mode_with_new_private_rpc in
-    Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.create ?spawn_rpc ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature
+            ~l2_chains
+            ?spawn_rpc
+            ()
+        in
+        Evm_node.Config_file.update new_sequencer patch_config
+    | false -> unit
+  in
   let* () =
     Evm_node.init_from_rollup_node_data_dir new_sequencer sc_rollup_node
   in
