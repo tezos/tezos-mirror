@@ -521,7 +521,7 @@ type options = {
   listen_addr : P2p_point.Id.t option;
   public_addr : P2p_point.Id.t option;
   endpoint : Uri.t option;
-  profile : Profile_manager.t option;
+  profile : Profile_manager.unresolved_profile option;
   metrics_addr : P2p_point.Id.t option;
   peers : string list;
   history_mode : Configuration_file.history_mode option;

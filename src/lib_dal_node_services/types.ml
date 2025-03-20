@@ -345,7 +345,7 @@ type slot_header = {
   status : header_status;
 }
 
-type profile = Bootstrap | Operator of Operator_profile.t | Random_observer
+type profile = Bootstrap | Operator of Operator_profile.t
 
 type with_proof = {with_proof : bool}
 
@@ -458,7 +458,7 @@ let profile_encoding =
   union
     [
       case
-        ~title:"Boostrap node"
+        ~title:"Bootstrap node"
         (Tag 1)
         (obj1 (req "kind" (constant "bootstrap")))
         (function Bootstrap -> Some () | _ -> None)
@@ -473,12 +473,6 @@ let profile_encoding =
           | Operator operator_profiles -> Some ((), operator_profiles)
           | _ -> None)
         (function (), operator_profiles -> Operator operator_profiles);
-      case
-        ~title:"Random_observer"
-        (Tag 3)
-        (obj1 (req "kind" (constant "random_observer")))
-        (function Random_observer -> Some () | _ -> None)
-        (function () -> Random_observer);
     ]
 
 let with_proof_encoding =

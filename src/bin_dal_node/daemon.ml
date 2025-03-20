@@ -92,17 +92,15 @@ let infer_dal_network_name cctxt =
     Format.sprintf "DAL_%s" (l1_version.network_version.chain_name :> string)
     |> Distributed_db_version.Name.of_string
 
-let init_cryptobox config proto_parameters =
+let init_cryptobox config proto_parameters profile =
   let open Lwt_result_syntax in
-  let prover_srs =
-    Profile_manager.is_prover_profile config.Configuration_file.profile
-  in
+  let prover_srs = Profile_manager.is_prover_profile profile in
   let* () =
     if prover_srs then
       let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
       Cryptobox.init_prover_dal
         ~find_srs_files
-        ~fetch_trusted_setup:config.fetch_trusted_setup
+        ~fetch_trusted_setup:config.Configuration_file.fetch_trusted_setup
         ()
     else return_unit
   in
@@ -1195,7 +1193,7 @@ let build_profile_context config =
          profiles provided in the config file. *)
       Profile_manager.merge_profiles
         ~lower_prio:config.Configuration_file.profile
-        ~higher_prio:loaded_profile
+        ~higher_prio:(Profile_manager.Profile loaded_profile)
       |> return
   | Error error ->
       let*! () = Event.emit_loading_profiles_failed ~error in
@@ -1517,6 +1515,34 @@ let run ~data_dir ~configuration_override =
   in
   let* p2p_config = Transport_layer_parameters.p2p_config config in
   let p2p_limits = Transport_layer_parameters.p2p_limits in
+  (* Get the current L1 head and its DAL plugin and parameters. *)
+  let* header, (module Plugin : Dal_plugin.T) =
+    wait_for_block_with_plugin cctxt
+  in
+  let head_level = header.Block_header.shell.level in
+  let* proto_parameters =
+    Plugin.get_constants `Main (`Level head_level) cctxt
+  in
+  let proto_plugins =
+    Proto_plugins.singleton
+      ~first_level:head_level
+      ~proto_level:header.shell.proto_level
+      (module Plugin)
+      proto_parameters
+  in
+  (* Set proto number of slots hook. *)
+  Value_size_hooks.set_number_of_slots proto_parameters.number_of_slots ;
+  let* profile_ctxt =
+    let+ profile_ctxt = build_profile_context config in
+    Profile_manager.resolve_profile
+      profile_ctxt
+      ~number_of_slots:proto_parameters.number_of_slots
+  in
+  let*? () =
+    Profile_manager.validate_slot_indexes
+      profile_ctxt
+      ~number_of_slots:proto_parameters.number_of_slots
+  in
   (* Create and start a GS worker *)
   let gs_worker =
     let rng =
@@ -1528,7 +1554,7 @@ let run ~data_dir ~configuration_override =
     in
     let open Worker_parameters in
     let limits =
-      if Profile_manager.is_bootstrap_profile profile then
+      if Profile_manager.is_bootstrap_profile profile_ctxt then
         (* Bootstrap nodes should always have a mesh size of zero.
            so all grafts are responded with prunes with PX. See:
            https://github.com/libp2p/specs/blob/f5c5829ef9753ef8b8a15d36725c59f0e9af897e/pubsub/gossipsub/gossipsub-v1.1.md#recommendations-for-network-operators
@@ -1590,34 +1616,6 @@ let run ~data_dir ~configuration_override =
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _exit_status ->
         Gossipsub.Transport_layer.shutdown transport_layer)
   in
-  (* Get the current L1 head and its DAL plugin and parameters. *)
-  let* header, (module Plugin : Dal_plugin.T) =
-    wait_for_block_with_plugin cctxt
-  in
-  let head_level = header.Block_header.shell.level in
-  let* proto_parameters =
-    Plugin.get_constants `Main (`Level head_level) cctxt
-  in
-  let proto_plugins =
-    Proto_plugins.singleton
-      ~first_level:head_level
-      ~proto_level:header.shell.proto_level
-      (module Plugin)
-      proto_parameters
-  in
-  (* Set proto number of slots hook. *)
-  Value_size_hooks.set_number_of_slots proto_parameters.number_of_slots ;
-  let* profile_ctxt =
-    let+ profile_ctxt = build_profile_context config in
-    Profile_manager.resolve_random_observer_profile
-      profile_ctxt
-      ~number_of_slots:proto_parameters.number_of_slots
-  in
-  let*? () =
-    Profile_manager.validate_slot_indexes
-      profile_ctxt
-      ~number_of_slots:proto_parameters.number_of_slots
-  in
   (* Initialize store *)
   let* store = Store.init config in
   let* last_processed_level =
@@ -1645,7 +1643,7 @@ let run ~data_dir ~configuration_override =
      Instead of recomputing these parameters, they could be stored
      (for a given cryptobox). *)
   let* cryptobox, shards_proofs_precomputation =
-    init_cryptobox config proto_parameters
+    init_cryptobox config proto_parameters profile_ctxt
   in
   (* Set crypto box share size hook. *)
   Value_size_hooks.set_share_size

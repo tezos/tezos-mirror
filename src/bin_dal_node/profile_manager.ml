@@ -27,51 +27,72 @@
 (** A profile context stores profile-specific data used by the daemon.  *)
 type t = Types.profile
 
-let empty = Types.Operator Operator_profile.empty
-
 let encoding = Types.profile_encoding
 
-let bootstrap = Types.Bootstrap
+type unresolved_profile = Profile of t | Random_observer | Empty
 
-let random_observer = Types.Random_observer
+let unresolved_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"Profile"
+        (Tag 1)
+        (obj2
+           (req "kind" (constant "controller"))
+           (req "controller_profile" encoding))
+        (function Profile t -> Some ((), t) | _ -> None)
+        (function (), t -> Profile t);
+      case
+        ~title:"Random_observer"
+        (Tag 2)
+        (obj1 (req "kind" (constant "random_observer")))
+        (function Random_observer -> Some () | _ -> None)
+        (function () -> Random_observer);
+      case
+        ~title:"Empty"
+        (Tag 3)
+        (obj1 (req "kind" (constant "empty")))
+        (function Empty -> Some () | _ -> None)
+        (function () -> Empty);
+    ]
 
-let operator operator_profile = Types.Operator operator_profile
+let empty = Types.Operator Operator_profile.empty
+
+let bootstrap = Profile Types.Bootstrap
+
+let random_observer = Random_observer
+
+let operator operator_profile = Profile (Types.Operator operator_profile)
 
 let is_bootstrap_profile = function
   | Types.Bootstrap -> true
-  | Random_observer | Operator _ -> false
+  | Operator _ -> false
 
 let is_prover_profile = function
   | Types.Bootstrap -> false
-  | Types.Random_observer -> true
   | Types.Operator p -> Operator_profile.(has_observer p || has_producer p)
 
 let is_empty = function
   | Types.Bootstrap -> false
-  | Types.Random_observer -> false
   | Types.Operator operator_profile ->
       Operator_profile.is_empty operator_profile
 
 let is_attester_only_profile = function
   | Types.Bootstrap -> false
-  | Types.Random_observer -> false
   | Types.Operator p -> Operator_profile.(attester_only p)
 
 let can_publish_on_slot_index slot_index = function
   | Types.Bootstrap -> false
-  | Types.Random_observer -> false
   | Types.Operator p ->
       Operator_profile.(can_publish_on_slot_index slot_index p)
 
 let merge_profiles ~lower_prio ~higher_prio =
   match (lower_prio, higher_prio) with
-  | Types.Bootstrap, Types.Bootstrap -> Types.Bootstrap
-  | Operator _, Bootstrap -> Bootstrap
-  | Bootstrap, Operator op -> Operator op
-  | Operator op1, Operator op2 -> Operator (Operator_profile.merge op1 op2)
-  | Random_observer, Random_observer -> Random_observer
-  | Random_observer, ((Operator _ | Bootstrap) as profile) -> profile
-  | (Operator _ | Bootstrap), Random_observer -> Random_observer
+  | Profile (Operator op1), Profile (Operator op2) ->
+      Profile (Operator (Operator_profile.merge op1 op2))
+  | lower_prio, Empty -> lower_prio
+  | _ -> higher_prio
 
 let add_and_register_operator_profile t ~number_of_slots gs_worker
     (operator_profile : Operator_profile.t) =
@@ -91,26 +112,19 @@ let add_and_register_operator_profile t ~number_of_slots gs_worker
                ~on_new_attester
                operator_sets
                operator_profile))
-  | Random_observer ->
-      Stdlib.failwith
-        "Profile_manager.add_and_register_operator_profile: random observer \
-         should have a slot index assigned at this point"
 
-let resolve_random_observer_profile t ~number_of_slots =
+let resolve_profile t ~number_of_slots =
   match t with
-  | Types.Bootstrap | Operator _ -> t
+  | Profile t -> t
   | Random_observer ->
       let slot_index = Random.int number_of_slots in
       let operator_profile = Operator_profile.make ~observers:[slot_index] () in
-      Operator operator_profile
+      Types.Operator operator_profile
+  | Empty -> empty
 
 let register_profile t ~number_of_slots gs_worker =
   match t with
   | Types.Bootstrap -> t
-  | Random_observer ->
-      Stdlib.failwith
-        "Profile_manager.register_profile: random observer should have a slot \
-         index assigned at this point"
   | Operator operator_profile -> (
       let t_opt =
         add_and_register_operator_profile
@@ -131,10 +145,6 @@ let validate_slot_indexes t ~number_of_slots =
   let open Result_syntax in
   match t with
   | Types.Bootstrap -> return_unit
-  | Random_observer ->
-      Stdlib.failwith
-        "Profile_manager.validate_slot_indexes: random observer should have a \
-         slot index assigned at this point"
   | Operator o -> (
       match Operator_profile.producer_slot_out_of_bounds number_of_slots o with
       | Some slot_index ->
@@ -170,11 +180,8 @@ let join_topics_for_bootstrap ~number_of_slots gs_worker committee =
 
 let on_new_head t ~number_of_slots gs_worker committee =
   match t with
-  | Types.Random_observer ->
-      Stdlib.failwith
-        "Profile_manager.add_operator_profiles: random observer should have a \
-         slot index assigned at this point"
-  | Bootstrap -> join_topics_for_bootstrap ~number_of_slots gs_worker committee
+  | Types.Bootstrap ->
+      join_topics_for_bootstrap ~number_of_slots gs_worker committee
   | Operator op ->
       (* The topics associated to observers and producers can change
          if there new active bakers. However, for attesters, new slots
@@ -186,14 +193,9 @@ let get_profiles t =
   match t with
   | Types.Bootstrap -> Types.Bootstrap
   | Operator profiles -> Operator profiles
-  | Random_observer ->
-      Stdlib.failwith
-        "Profile_manager.get_profiles: random observer should have a slot \
-         index assigned at this point"
 
 let supports_refutations t =
   match get_profiles t with
-  | Random_observer -> false
   | Operator op -> Operator_profile.(has_producer op)
   | Bootstrap -> false
 
@@ -222,7 +224,6 @@ let get_attested_data_default_store_period t proto_parameters =
   let default_period = 150 in
   let supports_refutations_bis, period =
     match get_profiles t with
-    | Random_observer -> (false, default_period)
     | Operator op ->
         let has_producer = Operator_profile.(has_producer op) in
         let period =
