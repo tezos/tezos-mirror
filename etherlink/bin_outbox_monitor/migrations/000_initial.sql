@@ -27,3 +27,12 @@ CREATE TABLE pointers (
   name varchar VARCHAR PRIMARY KEY,
   value INTEGER NOT NULL
 );
+
+CREATE TABLE levels (
+  l1 INTEGER PRIMARY KEY,
+  start_l2 INTEGER NOT NULL,
+  end_l2 INTEGER NOT NULL
+);
+
+CREATE INDEX idx_start_l2_levels ON levels(start_l2);
+CREATE INDEX idx_end_l2_levels ON levels(end_l2);

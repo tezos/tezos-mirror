@@ -123,6 +123,28 @@ module Event = struct
       ~level:Notice
       ("levels", Data_encoding.z)
       ~pp1:Z.pp_print
+
+  let finalized_l2_levels =
+    declare_3
+      ~section
+      ~name:"finalized_l2_levels"
+      ~msg:
+        "Finalized L2 levels {first_l2_level} to {last_l2_level} at L1 level \
+         {l1_level}"
+      ~level:Info
+      ("l1_level", Data_encoding.int32)
+      ("first_l2_level", Db.quantity_hum_encoding)
+      ("last_l2_level", Db.quantity_hum_encoding)
+      ~pp2:Ethereum_types.pp_quantity
+      ~pp3:Ethereum_types.pp_quantity
+
+  let empty_l1_level =
+    declare_1
+      ~section
+      ~name:"empty_l1_level"
+      ~msg:"Empty L1 level {l1_level}"
+      ~level:Info
+      ("l1_level", Data_encoding.int32)
 end
 
 type error +=
@@ -512,13 +534,44 @@ let monitor_heads db ws_client =
   in
   return_unit
 
+let monitor_l2_l1_levels db ws_client ~last_levels =
+  let open Lwt_result_syntax in
+  let last_l1_level = Option.map fst last_levels in
+  (* TODO: https://gitlab.com/tezos/tezos/-/merge_requests/16879
+     When last_l1_level = None, fetch 2 weeks history. *)
+  let* levels_subscription =
+    Websocket_client.subscribe_l1_l2_levels
+      ws_client
+      ?start_l1_level:(Option.map Int32.succ last_l1_level)
+  in
+  let* () =
+    lwt_stream_iter_es
+      (fun ({l1_level; start_l2_level; end_l2_level} :
+             Ethereum_types.Subscription.l1_l2_levels_output) ->
+        let*! () =
+          if Ethereum_types.Qty.(start_l2_level = end_l2_level) then
+            Event.(emit empty_l1_level) l1_level
+          else
+            Event.(emit finalized_l2_levels)
+              (l1_level, Ethereum_types.Qty.next start_l2_level, end_l2_level)
+        in
+        Db.Levels.store db ~l1_level ~start_l2_level ~end_l2_level)
+      levels_subscription.stream
+  in
+  return_unit
+
 let start db ~evm_node_endpoint =
   let open Lwt_result_syntax in
   let*! ws_client =
     Websocket_client.connect Media_type.json evm_node_endpoint
   in
   let* last_l2_head = Db.Pointers.L2_head.get db in
+  let* last_levels = Db.Levels.last db in
   let monitor_withdrawals = monitor_withdrawals db ws_client in
+  let monitor_l2_l1_levels = monitor_l2_l1_levels db ws_client ~last_levels in
   let* () = catch_up_withdrawals db ws_client ~last_l2_head in
-  let* () = Lwt.pick [monitor_withdrawals; monitor_heads db ws_client] in
+  let* () =
+    Lwt.pick
+      [monitor_withdrawals; monitor_heads db ws_client; monitor_l2_l1_levels]
+  in
   return_unit

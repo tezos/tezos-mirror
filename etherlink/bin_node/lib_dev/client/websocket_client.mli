@@ -75,3 +75,9 @@ val subscribe_logs :
   ?topics:Ethereum_types.Filter.topic option list ->
   t ->
   Ethereum_types.transaction_log subscription tzresult Lwt.t
+
+(** Subscribe to L1/L2 levels associations. *)
+val subscribe_l1_l2_levels :
+  ?start_l1_level:int32 ->
+  t ->
+  Ethereum_types.Subscription.l1_l2_levels_output subscription tzresult Lwt.t
