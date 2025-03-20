@@ -35,7 +35,10 @@ type operation_conflict =
 
 (** Errors that may arise while validating a consensus operation. *)
 module Consensus : sig
-  type consensus_operation_kind = Preattestation | Attestation
+  type consensus_operation_kind =
+    | Preattestation
+    | Attestation
+    | Attestations_aggregate
 
   (** Errors for preattestations and attestations. *)
   type error +=
