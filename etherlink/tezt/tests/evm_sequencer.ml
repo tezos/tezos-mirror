@@ -5691,13 +5691,23 @@ let test_force_kernel_upgrade_too_early =
                client;
                sequencer;
                proxy;
+               l2_chains;
+               enable_multichain;
                _;
              }
              _protocol ->
   (* Wait for the sequencer to publish its genesis block. *)
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let patch_config =
+    Evm_node.patch_config_with_experimental_feature
+      ?l2_chains:(if enable_multichain then Some l2_chains else None)
+      ()
+  in
   let* proxy =
-    Evm_node.init ~mode:Proxy (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.init
+      ~patch_config
+      ~mode:Proxy
+      (Sc_rollup_node.endpoint sc_rollup_node)
   in
 
   (* Assert the kernel version is the same at start up. *)
