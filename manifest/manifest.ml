@@ -4679,17 +4679,18 @@ let generate_opam_dependency_graph ?(source = []) ?(without = [])
 let generate_tobi_cfg () =
   write "tobi/config" @@ fun fmt ->
   pp_do_not_edit ~comment_start:"#" fmt () ;
-  (* The following paths are needed to build most components:
-     - [dune-project]: Dune always needs such a file, and in our case it also
-       needs it for packages to be declared;
-     - [dune]: contains some rules that are needed to build various components,
-       such as the rule for [static-link-flags.sexp] which is used by most executables;
-     - [scripts/custom-flags.sh]: needed by a rule from the [dune] file;
-     - [src/rustzcash_deps/include]: needed to build a dependency of [octez-libs]. *)
-  Format.fprintf
-    fmt
-    "__pervasive: dune, dune-project, scripts/custom-flags.sh, \
-     src/rustzcash_deps/include@." ;
+  (* Include manual rules from tobi/config-manual. *)
+  (let input = open_in "tobi/config-manual" in
+   Fun.protect ~finally:(fun () -> close_in input) @@ fun () ->
+   let rec copy () =
+     match input_line input with
+     | exception End_of_file -> ()
+     | line ->
+         Format.fprintf fmt "%s@." line ;
+         copy ()
+   in
+   copy ()) ;
+  (* Add automatic rules. *)
   Target.iter_internal_by_opam @@ fun package internals ->
   let paths =
     List.fold_left
