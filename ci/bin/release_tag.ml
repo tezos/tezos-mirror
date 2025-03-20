@@ -197,7 +197,6 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
          pushed in [site.prod.octez.tezos.com]. Then its [index.html] is \
          updated accordingly."
       ~name:"publish:release-page"
-      ~allow_failure:Yes
       ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ()]
       ~dependencies:
         (Dependent

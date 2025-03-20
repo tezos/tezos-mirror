@@ -1172,7 +1172,6 @@ publish:release-page:
   - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
-  allow_failure: true
   timeout: 60 minutes
   before_script:
   - export AWS_ACCESS_KEY_ID=${AWS_KEY_RELEASE_PUBLISH:?AWS_KEY_RELEASE_PUBLISH is
