@@ -114,6 +114,12 @@ val run :
   t ->
   unit Lwt.t
 
+(** Return pid of the process if running. *)
+val pid : t -> int option
+
+(** Return the path of the daemon. *)
+val path : t -> string
+
 (** Send SIGTERM and wait for the process to terminate.
 
     Default [timeout] is 30 seconds, after which SIGKILL is sent. *)

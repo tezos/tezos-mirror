@@ -312,6 +312,12 @@ val data_dir : t -> string
 (** Get the identity file of a node. *)
 val identity_file : t -> string
 
+(** Get the pid of the node, or none if it is not yet running. *)
+val pid : t -> int option
+
+(** Get the executable path of the node. *)
+val path : t -> string
+
 (** Get the runner associated to a node.
 
     Return [None] if the node runs on the local machine. *)
