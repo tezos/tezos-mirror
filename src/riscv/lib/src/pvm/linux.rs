@@ -346,8 +346,11 @@ where
             auxv.push((AuxVectorKey::ProgramHeadersPtr, prog_headers_ptr));
         }
 
-        self.machine_state
-            .init_linux_stack(&[c"tezos-smart-rollup"], &[], &auxv)?;
+        self.machine_state.init_linux_stack(
+            &[c"tezos-smart-rollup"],
+            &[c"RUST_BACKTRACE=full"],
+            &auxv,
+        )?;
 
         // The user program may not access the M or S privilege level
         self.machine_state.core.hart.mode.write(Mode::User);
