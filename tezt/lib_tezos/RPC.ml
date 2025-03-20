@@ -1235,9 +1235,11 @@ let get_chain_block_context_smart_rollups_smart_rollup_whitelist
       | Some l -> Some (List.map JSON.as_string l)
       | None -> None)
 
-let get_chain_block_context_delegates ?(chain = "main") ?(block = "head") () =
+let get_chain_block_context_delegates ?(chain = "main") ?(block = "head")
+    ?query_string () =
   make
     GET
+    ?query_string
     ["chains"; chain; "blocks"; block; "context"; "delegates"]
     (fun contracts -> JSON.as_list contracts |> List.map JSON.as_string)
 
