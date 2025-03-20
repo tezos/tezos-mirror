@@ -108,9 +108,19 @@ module CLI = struct
     let reset =
       Clap.case "reset" ~description:"Uninstall all installed components."
       @@ fun () -> `reset
+
+    let build =
+      Clap.case "build" ~description:"Build some component(s)." @@ fun () ->
+      let components =
+        Clap.list_string
+          ~placeholder:"COMPONENT"
+          ~description:"Name of a component to build."
+          ()
+      in
+      `build components
   end
 
-  let command = Clap.subcommand Command.[list; install; reset]
+  let command = Clap.subcommand Command.[list; install; reset; build]
 
   let () = Clap.close ()
 end
@@ -129,6 +139,8 @@ let main () =
   | `install (components, `jobs jobs) ->
       Cmd_install.run ~verbose:CLI.verbose ~dry_run:CLI.dry_run ~jobs components
   | `reset -> Cmd_reset.run ~verbose:CLI.verbose ~dry_run:CLI.dry_run
+  | `build components ->
+      Cmd_build.run ~verbose:CLI.verbose ~dry_run:CLI.dry_run components
 
 (* Entrypoint: call [main] and handle errors. *)
 let () =
