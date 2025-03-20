@@ -106,7 +106,7 @@ let default_peers = []
 let default_expected_pow =
   Gossipsub.Transport_layer.Default_parameters.P2p_config.expected_pow
 
-let default_network_name = "dal-sandbox"
+let legacy_network_name = "dal-sandbox"
 
 let default_endpoint = Uri.of_string "http://localhost:8732"
 
@@ -372,7 +372,7 @@ module V0 = struct
          (dft "neighbors" (list neighbor_encoding) default_neighbors)
          (dft "peers" (list string) default_peers)
          (dft "expected-pow" float default_expected_pow)
-         (dft "network-name" string default_network_name)
+         (dft "network-name" string legacy_network_name)
          (dft "endpoint" endpoint_encoding default_endpoint)
          (dft "metrics-addr" P2p_point.Id.encoding default_metrics_addr))
       (obj2
@@ -463,7 +463,7 @@ module V1 = struct
          (dft "neighbors" (list neighbor_encoding) default_neighbors)
          (dft "peers" (list string) default_peers)
          (dft "expected-pow" float default_expected_pow)
-         (dft "network-name" string default_network_name)
+         (dft "network-name" string legacy_network_name)
          (dft "endpoint" endpoint_encoding default_endpoint)
          (dft "metrics-addr" (Encoding.option P2p_point.Id.encoding) None))
       (obj8

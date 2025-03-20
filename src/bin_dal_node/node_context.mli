@@ -31,6 +31,7 @@ type t
 (** [init] creates a [t] value based on the given arguments. *)
 val init :
   Configuration_file.t ->
+  network_name:Distributed_db_version.Name.t ->
   Profile_manager.t ->
   Cryptobox.t ->
   Cryptobox.shards_proofs_precomputation option ->

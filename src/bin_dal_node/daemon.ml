@@ -58,6 +58,40 @@ let fetch_dal_config cctxt =
     ~rpc:Config_services.dal_config
     ~requested_info:"DAL config"
 
+let fetch_l1_version_info cctxt =
+  fetch_info_from_l1
+    cctxt
+    ~rpc:Version_services.version
+    ~requested_info:"version info"
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/7851
+
+   Remove the legacy case from this function once the migration to V23 is complete.
+
+   The function below infers the DAL network name based on the L1 chain name and
+   the DAL node version.
+
+   - For DAL node versions <= V22, the legacy "dal-sandbox" network name is used.
+   - For versions >= V23, the new naming scheme "DAL_<L1_CHAIN_NAME>" is used.
+
+   This ensures a smooth transition during the migration period.
+
+   For the new naming scheme, the function queries the L1 node to retrieve its
+   chain name and constructs the corresponding DAL network name by prefixing
+   it with "DAL_".
+*)
+let infer_dal_network_name cctxt =
+  let open Lwt_result_syntax in
+  let version = Tezos_version_value.Current_git_info.octez_version in
+  if version.major <= 22 then
+    return
+      (Distributed_db_version.Name.of_string
+         Configuration_file.legacy_network_name) (* legacy "dal-sandbox" *)
+  else
+    let+ l1_version = fetch_l1_version_info cctxt in
+    Format.sprintf "DAL_%s" (l1_version.network_version.chain_name :> string)
+    |> Distributed_db_version.Name.of_string
+
 let init_cryptobox config proto_parameters =
   let open Lwt_result_syntax in
   let prover_srs =
@@ -1451,6 +1485,7 @@ let run ~data_dir ~configuration_override =
   let*! () = Event.emit_configuration_loaded () in
   let cctxt = Rpc_context.make endpoint in
   let* dal_config = fetch_dal_config cctxt in
+  let* network_name = infer_dal_network_name cctxt in
   let bootstrap_names = points @ dal_config.bootstrap_peers in
   let*! () =
     if bootstrap_names = [] then Event.emit_config_error_no_bootstrap ()
@@ -1543,8 +1578,6 @@ let run ~data_dir ~configuration_override =
   let points = get_bootstrap_points () in
   (* Create a transport (P2P) layer instance. *)
   let* transport_layer =
-    (* WIP: will be fixed in the next MR. *)
-    let network_name = Configuration_file.default_network_name in
     Gossipsub.Transport_layer.create
       ~public_addr
       ~is_bootstrap_peer:(profile = Profile_manager.bootstrap)
@@ -1629,6 +1662,7 @@ let run ~data_dir ~configuration_override =
       transport_layer
       cctxt
       ~last_finalized_level:head_level
+      ~network_name
   in
   let* () =
     match Profile_manager.get_profiles profile_ctxt with

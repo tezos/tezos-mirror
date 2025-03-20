@@ -26,6 +26,7 @@
 
 type t = {
   config : Configuration_file.t;
+  network_name : Distributed_db_version.Name.t;
   cryptobox : Cryptobox.t;
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
   mutable proto_plugins : Proto_plugins.t;
@@ -44,8 +45,9 @@ type t = {
          it is the highest level the node is aware of) *)
 }
 
-let init config profile_ctxt cryptobox shards_proofs_precomputation
-    proto_plugins store gs_worker transport_layer cctxt ~last_finalized_level =
+let init config ~network_name profile_ctxt cryptobox
+    shards_proofs_precomputation proto_plugins store gs_worker transport_layer
+    cctxt ~last_finalized_level =
   let neighbors_cctxts =
     (* TODO: This early feature is not used anymore. An MR that cleans this part
        of the code has been opened here:
@@ -54,6 +56,7 @@ let init config profile_ctxt cryptobox shards_proofs_precomputation
   in
   {
     config;
+    network_name;
     cryptobox;
     shards_proofs_precomputation;
     proto_plugins;
@@ -212,9 +215,7 @@ let get_fetched_assigned_shard_indices ctxt ~level ~pkh =
       |> Option.value ~default:[])
     (Committee_cache.find ctxt.committee_cache ~level)
 
-let version _t =
-  (* WIP: will be fixed in the next MR. *)
-  let network_name = Configuration_file.default_network_name in
+let version {network_name; _} =
   Types.Version.make ~network_version:(Gossipsub.version ~network_name)
 
 let warn_if_attesters_not_delegates ctxt operator_profiles =

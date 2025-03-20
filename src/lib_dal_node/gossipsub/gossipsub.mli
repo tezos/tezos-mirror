@@ -85,7 +85,7 @@ module Transport_layer : sig
       creates a new instance of type {!t}. It is a wrapper on top of
       {!P2p.create}. *)
   val create :
-    network_name:string ->
+    network_name:Distributed_db_version.Name.t ->
     public_addr:P2p_point.Id.t ->
     is_bootstrap_peer:bool ->
     P2p.config ->
@@ -198,4 +198,4 @@ module Transport_layer_hooks : sig
 end
 
 (** [version ~network_name] returns the current version of the P2P. *)
-val version : network_name:string -> Network_version.t
+val version : network_name:Distributed_db_version.Name.t -> Network_version.t
