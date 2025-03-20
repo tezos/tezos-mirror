@@ -56,6 +56,38 @@ let monitoring_child_pipeline =
         Teztale.job_build ~expire_in:Never ~arch:Amd64 ();
       ]
 
+let job_release_page ~test ?dependencies () =
+  job
+    ~__POS__
+    ~image:Images.CI.test
+    ~stage:Stages.publish_release
+    ~description:
+      "A job  to update the Octez release page. If running in a test pipleine, \
+       the assets are pushed in the [release-page-test.nomadic-labs.com] \
+       bucket. Otherwise they are pushed in [site.prod.octez.tezos.com]. Then \
+       its [index.html] is updated accordingly."
+    ~name:"publish:release-page"
+    ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ()]
+    ?dependencies
+    ~variables:
+      [
+        ( "S3_BUCKET",
+          if test then "release-page-test.nomadic-labs.com"
+          else "s3://site-prod.octez.tezos.com/releases/" );
+      ]
+    ~before_script:
+      (if test then
+         [
+           "export \
+            AWS_ACCESS_KEY_ID=${AWS_KEY_RELEASE_PUBLISH:?AWS_KEY_RELEASE_PUBLISH \
+            is not set}";
+           "export \
+            AWS_SECRET_ACCESS_KEY=${AWS_SECRET_RELEASE_PUBLISH:?AWS_SECRET_RELEASE_PUBLISH \
+            is not set}";
+         ]
+       else [])
+    ["./scripts/releases/publish_release_page.sh"]
+
 (** Create an Octez release tag pipeline of type {!release_tag_pipeline_type}.
 
     If [test] is true (default is [false]), then the Docker images are
@@ -186,42 +218,15 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
     | _ -> job_gitlab_release ~dependencies
   in
   let job_release_page =
-    job
-      ~__POS__
-      ~image:Images.CI.test
-      ~stage:Stages.publish_release
-      ~description:
-        "A job  to update the Octez release page. If running in a test \
-         pipleine, the assets are pushed in the \
-         [release-page-test.nomadic-labs.com] bucket. Otherwise they are \
-         pushed in [site.prod.octez.tezos.com]. Then its [index.html] is \
-         updated accordingly."
-      ~name:"publish:release-page"
-      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ()]
+    job_release_page
+      ~test
       ~dependencies:
         (Dependent
            [
              Artifacts job_static_x86_64_release;
              Artifacts job_static_arm64_release;
            ])
-      ~variables:
-        [
-          ( "S3_BUCKET",
-            if test then "release-page-test.nomadic-labs.com"
-            else "s3://site-prod.octez.tezos.com/releases/" );
-        ]
-      ~before_script:
-        (if test then
-           [
-             "export \
-              AWS_ACCESS_KEY_ID=${AWS_KEY_RELEASE_PUBLISH:?AWS_KEY_RELEASE_PUBLISH \
-              is not set}";
-             "export \
-              AWS_SECRET_ACCESS_KEY=${AWS_SECRET_RELEASE_PUBLISH:?AWS_SECRET_RELEASE_PUBLISH \
-              is not set}";
-           ]
-         else [])
-      ["./scripts/releases/publish_release_page.sh"]
+      ()
   in
   let job_opam_release ?(dry_run = false) () : Tezos_ci.tezos_job =
     job
