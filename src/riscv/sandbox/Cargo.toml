@@ -32,3 +32,4 @@ path = "../lib"
 default = []
 inline-jit = []
 metrics = ["octez-riscv/metrics"]
+supervisor = ["octez-riscv/supervisor"]

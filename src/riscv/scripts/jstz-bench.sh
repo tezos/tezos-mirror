@@ -8,25 +8,32 @@
 
 set -e
 
-USAGE="Usage: -t <num_transfers> [ -s: static inbox ] [ -p: profile with samply ] [ -n: run natively ] [ -i <num_iterations>: number of runs ] [ -j: enable inline jit ] [ -m <all | jit-unsupported>: enable metrics ]"
+USAGE="Usage: -t <num_transfers> [ -s: static inbox ] [ -p: profile with samply ] [ -n: run natively ] [ -i <num_iterations>: number of runs ] [ -j: enable inline jit ] [ -m <all | jit-unsupported>: enable metrics ] [ -l: enable supervisor ]"
 DEFAULT_ROLLUP_ADDRESS="sr163Lv22CdE8QagCwf48PWDTquk6isQwv57"
 
 ITERATIONS="1"
 TX=""
 STATIC_INBOX=""
 SANDBOX_BIN="riscv-sandbox"
-SANDBOX_ENABLE_FEATURES=""
+SANDBOX_ENABLE_FEATURES=()
 PROFILING_WRAPPER=""
 SAMPLY_OUT="riscv-sandbox-profile.json"
 METRICS=""
 METRICS_ARGS=()
 NATIVE=""
+JSTZ_MAKE_TARGET="build-kernel"
+JSTZ_SANDBOX_PARAMS=(
+  "--input"
+  "assets/hermit-loader"
+  "--initrd"
+  "jstz/target/riscv64gc-unknown-hermit/release/jstz"
+)
 
 CURR=$(pwd)
 RISCV_DIR=$(dirname "$0")/..
 cd "$RISCV_DIR"
 
-while getopts "i:t:m:spnj" OPTION; do
+while getopts "i:t:m:spnjl" OPTION; do
   case "$OPTION" in
   i)
     ITERATIONS="$OPTARG"
@@ -45,10 +52,15 @@ while getopts "i:t:m:spnj" OPTION; do
     NATIVE=$(make --silent -C jstz print-native-target | grep -wv make)
     ;;
   j)
-    SANDBOX_ENABLE_FEATURES="${SANDBOX_ENABLE_FEATURES} inline-jit"
+    SANDBOX_ENABLE_FEATURES+=("inline-jit")
+    ;;
+  l)
+    SANDBOX_ENABLE_FEATURES+=("supervisor")
+    JSTZ_SANDBOX_PARAMS=("--input" "jstz/target/riscv64gc-unknown-linux-musl/release/jstz")
+    JSTZ_MAKE_TARGET="build-kernel-linux-musl"
     ;;
   m)
-    SANDBOX_ENABLE_FEATURES="${SANDBOX_ENABLE_FEATURES} metrics"
+    SANDBOX_ENABLE_FEATURES+=("metrics")
     METRICS="y"
 
     case "$OPTARG" in
@@ -81,7 +93,7 @@ if [ -n "$NATIVE" ] && [ -z "$STATIC_INBOX" ]; then
 fi
 
 echo "[INFO]: building sandbox"
-make SANDBOX_ENABLE_FEATURES="$SANDBOX_ENABLE_FEATURES" "$SANDBOX_BIN" &> /dev/null
+make "SANDBOX_ENABLE_FEATURES=${SANDBOX_ENABLE_FEATURES[*]}" "$SANDBOX_BIN" &> /dev/null
 echo "[INFO]: building bench tool"
 make -C jstz inbox-bench &> /dev/null
 
@@ -108,7 +120,7 @@ build_jstz_riscv() {
     RUN_INBOX="$DATA_DIR"/empty.json
     echo "[]" > "$RUN_INBOX"
   else
-    make -C jstz build-kernel &> /dev/null
+    make -C jstz "$JSTZ_MAKE_TARGET" &> /dev/null
   fi
 }
 
@@ -116,8 +128,7 @@ run_jstz_riscv() {
   LOG="$DATA_DIR/log.$1.log"
   $PROFILING_WRAPPER "./$SANDBOX_BIN" run \
     --pvm \
-    --input assets/hermit-loader \
-    --initrd jstz/target/riscv64gc-unknown-hermit/release/jstz \
+    "${JSTZ_SANDBOX_PARAMS[@]}" \
     --inbox-file "$RUN_INBOX" \
     --address "$DEFAULT_ROLLUP_ADDRESS" \
     "${METRICS_ARGS[@]}" \
