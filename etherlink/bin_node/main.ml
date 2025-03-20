@@ -831,6 +831,20 @@ let snapshot_file_arg =
        information."
     Params.string
 
+module Groups = struct
+  let run = Tezos_clic.{name = "run"; title = "Run commands"}
+
+  let config = Tezos_clic.{name = "config"; title = "Configuration commands"}
+
+  let snapshot = Tezos_clic.{name = "snapshot"; title = "Snapshots commands"}
+
+  let storage = Tezos_clic.{name = "storage"; title = "Storage commands"}
+
+  let kernel = Tezos_clic.{name = "kernel"; title = "Kernel commands"}
+
+  let debug = Tezos_clic.{name = "debug"; title = "Debug commands"}
+end
+
 let websocket_checks config =
   match config.experimental_features with
   | {enable_websocket = true; rpc_server = Dream; _} ->
@@ -1055,6 +1069,7 @@ let rpc_command =
   let open Lwt_result_syntax in
   let open Tezos_clic in
   command
+    ~group:Groups.run
     ~desc:"Start the EVM node in rpc mode"
     (merge_options common_config_args rpc_run_args)
     (prefixes ["experimental"; "run"; "rpc"] stop)
@@ -1282,6 +1297,7 @@ let chunker_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
+    ~group:Groups.kernel
     ~desc:
       "Chunk hexadecimal data according to the message representation of the \
        EVM rollup"
@@ -1348,6 +1364,7 @@ let make_upgrade_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
+    ~group:Groups.kernel
     ~desc:"Create bytes payload for the upgrade entrypoint"
     no_options
     (prefixes ["make"; "upgrade"; "payload"; "with"; "root"; "hash"]
@@ -1374,6 +1391,7 @@ let make_sequencer_upgrade_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
+    ~group:Groups.kernel
     ~desc:"Create bytes payload for the sequencer upgrade entrypoint"
     (args1 wallet_dir_arg)
     (prefixes ["make"; "sequencer"; "upgrade"; "payload"]
@@ -1418,6 +1436,7 @@ let init_from_rollup_node_command =
       Params.string
   in
   command
+    ~group:Groups.run
     ~desc:
       "initialises the EVM node data-dir using the data-dir of a rollup node."
     (args3 data_dir_arg config_path_arg omit_delayed_tx_events_arg)
@@ -1439,6 +1458,7 @@ let dump_to_rlp_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
+    ~group:Groups.debug
     ~desc:"Transforms the JSON list of instructions to a RLP list"
     (args1 keep_everything_arg)
     (prefixes ["transform"; "dump"]
@@ -1484,6 +1504,7 @@ let dump_to_rlp_command =
 let reset_command =
   let open Tezos_clic in
   command
+    ~group:Groups.debug
     ~desc:"Reset evm node data-dir to a specific block level."
     (args2
        data_dir_arg
@@ -1509,6 +1530,7 @@ let reset_command =
 let replay_command =
   let open Tezos_clic in
   command
+    ~group:Groups.debug
     ~desc:"Replay a specific block level."
     (args8
        data_dir_arg
@@ -1559,6 +1581,7 @@ let replay_command =
 let patch_kernel_command =
   let open Tezos_clic in
   command
+    ~group:Groups.kernel
     ~desc:
       "Patch the kernel used by the EVM node from its current HEAD. This is an \
        unsafe command, which can lead to the EVM node diverging from the \
@@ -1601,6 +1624,7 @@ let describe_config_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
+    ~group:Groups.config
     ~desc:
       {|Prints the JSON schema of the configuration file to the standard output.|}
     no_options
@@ -1613,6 +1637,7 @@ let init_config_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
+    ~group:Groups.config
     ~desc:
       "Create an initial config with default value.\n\
        If the <rollup-node-endpoint> is set then adds the configuration for \
@@ -1758,6 +1783,7 @@ let check_config_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
+    ~group:Groups.config
     ~desc:
       "Read and validate configuration files. By default, look for config.json \
        in the data-dir. If --filename is used, check this config file instead."
@@ -1820,6 +1846,7 @@ let make_l2_kernel_config_command =
   let open Lwt_result_syntax in
   let open Evm_node_lib_dev_encoding.Ethereum_types in
   command
+    ~group:Groups.kernel
     ~desc:
       "Produce a file containing the part of the kernel configuration \
        instructions related to a particular L2 chain."
@@ -1906,7 +1933,8 @@ let make_kernel_config_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
-    ~desc:"Transforms the JSON list of instructions to a RLP list"
+    ~group:Groups.kernel
+    ~desc:"Create a configuration for the kernel installer"
     (merge_options
        (args25
           mainnet_compat_arg
@@ -2029,6 +2057,7 @@ let make_kernel_config_command =
 let proxy_command =
   let open Tezos_clic in
   command
+    ~group:Groups.run
     ~desc:"Start the EVM node in proxy mode."
     (merge_options
        common_config_args
@@ -2129,6 +2158,7 @@ let sandbox_config_args =
 let sequencer_command =
   let open Tezos_clic in
   command
+    ~group:Groups.run
     ~desc:"Start the EVM node in sequencer mode"
     (merge_options common_config_args sequencer_config_args)
     (prefixes ["run"; "sequencer"] stop)
@@ -2211,6 +2241,7 @@ let sequencer_command =
 let sandbox_command =
   let open Tezos_clic in
   command
+    ~group:Groups.run
     ~desc:
       "Start the EVM node in sandbox mode. The sandbox mode is a \
        sequencer-like mode that produces blocks with a fake key and no rollup \
@@ -2328,6 +2359,7 @@ let observer_run_args =
 let observer_command =
   let open Tezos_clic in
   command
+    ~group:Groups.run
     ~desc:"Start the EVM node in observer mode"
     (merge_options common_config_args observer_run_args)
     (prefixes ["run"; "observer"] stop)
@@ -2424,13 +2456,10 @@ let export_snapshot
   Format.printf "Snapshot exported to %s@." snapshot_file ;
   return_unit
 
-let snapshot_group =
-  Tezos_clic.{name = "snapshot"; title = "Snapshots commands"}
-
 let export_snapshot_command =
   let open Tezos_clic in
   command
-    ~group:snapshot_group
+    ~group:Groups.snapshot
     ~desc:"Export a snapshot of the EVM node."
     (args5
        data_dir_arg
@@ -2444,7 +2473,7 @@ let export_snapshot_command =
 let import_snapshot_command =
   let open Tezos_clic in
   command
-    ~group:snapshot_group
+    ~group:Groups.snapshot
     ~desc:"Import a snapshot of the EVM node."
     (args2
        data_dir_arg
@@ -2470,6 +2499,7 @@ let import_snapshot_command =
 let snapshot_info_command =
   let open Tezos_clic in
   command
+    ~group:Groups.snapshot
     ~desc:"Display information about an EVM node snapshot file."
     no_options
     (prefixes ["snapshot"; "info"] @@ Params.snapshot_file @@ stop)
@@ -2546,6 +2576,7 @@ let snapshot_info_command =
 let switch_history_mode_command =
   let open Tezos_clic in
   command
+    ~group:Groups.storage
     ~desc:"Switch history mode of the node"
     (args2 data_dir_arg config_path_arg)
     (prefixes ["switch"; "history"; "to"] @@ Params.history @@ stop)
@@ -2590,6 +2621,7 @@ let patch_state_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
+    ~group:Groups.debug
     ~desc:
       "Patches the state with an arbitrary value. This is an unsafe command, \
        it should be used for debugging only. Patched state is persisted and \
@@ -2629,7 +2661,8 @@ let patch_state_command =
 let preemptive_kernel_download_command =
   let open Tezos_clic in
   command
-    ~desc:"Transforms the JSON list of instructions to a RLP list"
+    ~group:Groups.kernel
+    ~desc:"Preemptively download a kernel before running the EVM node"
     (args5
        data_dir_arg
        config_path_arg
@@ -2681,6 +2714,7 @@ let preemptive_kernel_download_command =
 let debug_print_store_schemas_command =
   let open Tezos_clic in
   command
+    ~group:Groups.debug
     ~desc:"Print SQL statements describing the tables created in the store"
     no_options
     (prefixes ["debug"; "print"; "store"; "schemas"] @@ stop)
@@ -2697,6 +2731,7 @@ let debug_print_store_schemas_command =
 let list_metrics_command =
   let open Tezos_clic in
   command
+    ~group:Groups.debug
     ~desc:"List the metrics exported by the EVM node."
     no_options
     (prefixes ["list"; "metrics"] @@ stop)
@@ -2709,6 +2744,7 @@ let list_metrics_command =
 let list_events_command =
   let open Tezos_clic in
   command
+    ~group:Groups.debug
     ~desc:"List the events emitted by the EVM node."
     (args2 level_arg json_arg)
     (prefixes ["list"; "events"] stop)
@@ -2769,6 +2805,7 @@ let commands =
     sequencer_command;
     observer_command;
     rpc_command;
+    init_config_command;
     snapshot_info_command;
     export_snapshot_command;
     import_snapshot_command;
@@ -2777,17 +2814,16 @@ let commands =
     make_upgrade_command;
     make_sequencer_upgrade_command;
     init_from_rollup_node_command;
-    dump_to_rlp_command;
     reset_command;
     replay_command;
     patch_kernel_command;
-    init_config_command;
     check_config_command;
     describe_config_command;
     make_kernel_config_command;
     make_l2_kernel_config_command;
-    patch_state_command;
     preemptive_kernel_download_command;
+    dump_to_rlp_command;
+    patch_state_command;
     debug_print_store_schemas_command;
     list_metrics_command;
     list_events_command;
