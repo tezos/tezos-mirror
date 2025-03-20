@@ -29,6 +29,14 @@ let wait_for_active_protocol_waiting agnostic_baker =
     "waiting_for_active_protocol.v0"
     (fun _json -> Some ())
 
+let wait_for_become_old_baker agnostic_baker =
+  Agnostic_baker.wait_for agnostic_baker "become_old_baker.v0" (fun _json ->
+      Some ())
+
+let wait_for_stopping_baker agnostic_baker =
+  Agnostic_baker.wait_for agnostic_baker "stopping_baker.v0" (fun _json ->
+      Some ())
+
 let remote_sign client =
   let* () = Client.forget_all_keys client in
   let keys = Constant.activator :: (Account.Bootstrap.keys |> Array.to_list) in
@@ -75,6 +83,11 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
   Log.info "Protocol %s activated" (Protocol.hash migrate_from) ;
   Log.info "Baking at least %d blocks to trigger migration" migration_level ;
   let* _level = Node.wait_for_level node migration_level in
+  let wait_for_become_old_baker = wait_for_become_old_baker baker in
+  Log.info
+    "Check that the baking process for %s is not killed"
+    (Protocol.tag migrate_from) ;
+  let* () = wait_for_become_old_baker in
   (* Ensure that the block before migration is consistent *)
   Log.info "Checking migration block consistency" ;
   let* () =
@@ -96,6 +109,17 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
       ~migrate_to
       ~level:(migration_level + 1)
   in
+  Log.info
+    "Check that baker for protocol %s is killed after %d levels"
+    (Protocol.tag migrate_from)
+    Agnostic_baker.extra_levels_for_old_baker ;
+  let wait_for_stopping_baker = wait_for_stopping_baker baker in
+  let* _level =
+    Node.wait_for_level
+      node
+      (migration_level + Agnostic_baker.extra_levels_for_old_baker)
+  in
+  let* () = wait_for_stopping_baker in
   (* Test that we can still bake after migration *)
   let* _level = Node.wait_for_level node baked_blocks_after_migration in
   let* () = Agnostic_baker.terminate baker in
