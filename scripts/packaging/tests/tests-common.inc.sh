@@ -1,43 +1,65 @@
 #!/bin/sh
 
-#shellcheck disable=SC2317
-# Function to run apt-get with retries and exponential backoff for a specific error
-apt_get_with_retries() {
-  set +x
+apt_get_analysis_errors() {
+  output="$1"
+
+  case "$output" in
+  *"Mirror sync in progress"*)
+    return 1 # Retry
+    ;;
+  *"Unknown error executing apt-key"*)
+    return 1 # Retry
+    ;;
+  *)
+    return 0 # No retry
+    ;;
+  esac
+}
+
+dnf_analysis_errors() {
+  output="$1"
+
+  case "$output" in
+  *"Downloading successful, but checksum doesn't match."*)
+    return 1 # Retry
+    ;;
+  *)
+    return 0 # No retry
+    ;;
+  esac
+}
+
+run_package_manager_with_retries() {
+  package_manager="$1"
+  shift
+  output_analysis_func="$1"
+  shift
+
   # Maximum retries
   max_retries=5
   # Initial delay in seconds
   delay=1
 
-  # Loop for retries
   for i in $(seq 1 "$max_retries"); do
-
     set +e
-    # Run apt-get and capture the output and exit status
-    output=$(apt-get "$@" 2>&1)
+    # Run the package manager command and capture the output and exit status
+    echo "$package_manager" "$@"
+    output=$("$package_manager" "$@" 2>&1)
     status=$?
     set -e
 
-    # Check if apt-get succeeded
+    # Check if the command succeeded
     if [ "$status" -eq 0 ]; then
       echo "$output"
-      set -x
       return 0
     fi
 
-    case "$output" in
-    *"Mirror sync in progress"*)
-      retry=1
-      ;;
-    *"Unknown error executing apt-key"*)
-      retry=1
-      ;;
-    *)
-      retry=0
-      ;;
-    esac
+    set +e
+    # Call the passed error analysis function
+    "$output_analysis_func" "$output"
+    retry=$?
+    set -e
 
-    #shellcheck disable=SC2181
     if [ "$retry" -eq 1 ]; then
       # If the specific error occurs, retry with exponential backoff
       echo "-----------"
@@ -47,20 +69,29 @@ apt_get_with_retries() {
       echo "-----------"
       sleep "$delay"
       # Exponential backoff (doubling the delay)
-      # 1 + 3 + 9 + 27 + 81 = 31, so we wait 121s maximum
-      # in total with max_retries = 5.
       delay=$((delay * 3))
     else
       # If the error is not the one we are looking for, exit with failure
-      echo "apt-get failed with an unexpected error. Exiting."
+      echo "$package_manager failed with an unexpected error. Exiting."
       echo "$output"
       exit 1
     fi
   done
 
-  echo "apt-get failed after $max_retries attempts."
+  echo "$package_manager failed after $max_retries attempts."
   exit 1
+}
+
+apt_get_with_retries() {
+  run_package_manager_with_retries apt-get apt_get_analysis_errors "$@"
 }
 
 # Replace apt-get with the new function
 alias apt-get="apt_get_with_retries"
+
+dnf_with_retries() {
+  run_package_manager_with_retries dnf dnf_analysis_errors "$@"
+}
+
+# Replace dnf with the new function
+alias dnf="dnf_with_retries"
