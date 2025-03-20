@@ -412,17 +412,6 @@ pub fn check_skip(test_file_path: &Path) -> bool {
         | "value_transfer_gas_calculation_2.json"
         | "value_transfer_gas_calculation_3.json"
 
-        // Reason: those test the refund mechanism
-        // see https://gitlab.com/tezos/tezos/-/merge_requests/11835
-        | "refund_getEtherBack.json"
-        | "refund50_2.json"
-        | "refundSSTORE.json"
-        | "refund50_1.json"
-        | "refund_NoOOG_1.json"
-        | "refund_CallA.json"
-        | "refund50percentCap.json"
-        | "refund600.json"
-
         // Reason: these tests are assuming EIP-7610 is implemented in Cancun.
         // The EIP is slated for inclusion in the upcoming Pectra upgrade.
         | "RevertInCreateInInit_Paris.json"
