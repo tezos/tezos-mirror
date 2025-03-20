@@ -3145,7 +3145,17 @@ let test_get_block_by_number_block_param =
     ~tags:["evm"; "sequencer"; "rpc"; "get_block_by_number"; "block_param"]
     ~title:"RPC method getBlockByNumber uses block parameter"
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; observer; sc_rollup_node; proxy; client; _} _protocols ->
+  @@ fun {
+           sequencer;
+           observer;
+           sc_rollup_node;
+           proxy;
+           client;
+           enable_multichain;
+           l2_chains;
+           _;
+         }
+             _protocols ->
   let observer_offset = 3l in
   let* () =
     repeat Int32.(to_int observer_offset) @@ fun () ->
@@ -3174,6 +3184,15 @@ let test_get_block_by_number_block_param =
   in
   let* () =
     Process.check @@ Evm_node.spawn_init_config observer_partial_history
+  in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature ~l2_chains ()
+        in
+        Evm_node.Config_file.update observer_partial_history patch_config
+    | false -> unit
   in
   let* () =
     Evm_node.init_from_rollup_node_data_dir
