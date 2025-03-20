@@ -83,6 +83,7 @@ type ('a, 'ctx) arg =
       doc : string;
       label : label;
       placeholder : string;
+      env : string option;
       kind : ('p, 'ctx) parameter;
     }
       -> ('p option, 'ctx) arg
@@ -97,6 +98,7 @@ type ('a, 'ctx) arg =
       doc : string;
       label : label;
       placeholder : string;
+      env : string option;
       kind : ('p, 'ctx) parameter;
       default : string;
     }
@@ -168,6 +170,8 @@ type error += Option_expected_argument : string * 'ctx command option -> error
 
 type error += Bad_option_argument : string * 'ctx command option -> error
 
+type error += Bad_env_argument : string * 'ctx command option -> error
+
 type error += Multiple_occurrences : string * 'ctx command option -> error
 
 type error += Extra_arguments : string list * 'ctx command -> error
@@ -202,7 +206,13 @@ let print_label ppf = function
 let rec print_options_detailed :
     type ctx a. Format.formatter -> (a, ctx) options -> unit =
  fun ppf -> function
-  | Arg {label; placeholder; doc; _} ->
+  | Arg {label; placeholder; doc; env; _} ->
+      let doc =
+        match env with
+        | None -> doc
+        | Some env ->
+            Format.sprintf "%s\nIf set, defaults to the value of %s." doc env
+      in
       Format.fprintf
         ppf
         "@[<hov 2>@{<opt>%a <%s>@}: %a@]"
@@ -220,7 +230,17 @@ let rec print_options_detailed :
         placeholder
         print_desc
         doc
-  | DefArg {label; placeholder; doc; default; _} ->
+  | DefArg {label; placeholder; doc; default; env; _} ->
+      let doc =
+        match env with
+        | None -> Format.sprintf "%s\nDefaults to `%s`." doc default
+        | Some env ->
+            Format.sprintf
+              "%s\nIf set, defaults to the value of %s, or `%s` otherwise."
+              doc
+              env
+              default
+      in
       Format.fprintf
         ppf
         "@[<hov 2>@{<opt>%a <%s>@}: %a@]"
@@ -228,7 +248,7 @@ let rec print_options_detailed :
         label
         placeholder
         print_desc
-        (doc ^ "\nDefaults to `" ^ default ^ "`.")
+        doc
   | ArgDefSwitch {label; placeholder; doc; default; _} ->
       Format.fprintf
         ppf
@@ -837,14 +857,14 @@ let usage_internal ppf ~executable_name ~global_options ?(highlights = [])
 
 let constant c = Constant c
 
-let arg ~doc ?short ~long ~placeholder kind =
-  Arg {doc; label = {long; short}; placeholder; kind}
+let arg ~doc ?short ~long ~placeholder ?env kind =
+  Arg {doc; label = {long; short}; placeholder; env; kind}
 
 let multiple_arg ~doc ?short ~long ~placeholder kind =
   MultipleArg {doc; label = {long; short}; placeholder; kind}
 
-let default_arg ~doc ?short ~long ~placeholder ~default kind =
-  DefArg {doc; placeholder; label = {long; short}; kind; default}
+let default_arg ~doc ?short ~long ~placeholder ~default ?env kind =
+  DefArg {doc; placeholder; label = {long; short}; kind; env; default}
 
 let arg_or_switch ~doc ?short ~long ~placeholder ~default kind =
   ArgDefSwitch {doc; placeholder; label = {long; short}; kind; default}
@@ -1045,6 +1065,13 @@ let switch ~doc ?short ~long () = Switch {doc; label = {long; short}}
 
 type occurrence = Occ_empty | Occ_with_value of string
 
+let with_env ~default ?env k =
+  let open Lwt_result_syntax in
+  match env with
+  | None -> return default
+  | Some env -> (
+      match Sys.getenv_opt env with Some s -> k env s | None -> return default)
+
 (* Argument parsing *)
 let rec parse_arg :
     type a ctx.
@@ -1056,9 +1083,15 @@ let rec parse_arg :
  fun ?command spec args_dict ctx ->
   let open Lwt_result_syntax in
   match spec with
-  | Arg {label = {long; short = _}; kind = {converter; _}; _} -> (
+  | Arg {label = {long; short = _}; kind = {converter; _}; env; _} -> (
       match StringMap.find_opt long args_dict with
-      | None | Some [] -> return_none
+      | None | Some [] ->
+          with_env ~default:None ?env @@ fun env s ->
+          let+ x =
+            trace_eval (fun () -> Bad_env_argument (env, command))
+            @@ converter ctx s
+          in
+          Some x
       | Some [Occ_with_value s] ->
           let+ x =
             trace_eval (fun () -> Bad_option_argument ("--" ^ long, command))
@@ -1087,7 +1120,8 @@ let rec parse_arg :
               l
           in
           Some x)
-  | DefArg {label = {long; short = _}; kind = {converter; _}; default; _} -> (
+  | DefArg {label = {long; short = _}; kind = {converter; _}; default; env; _}
+    -> (
       let*! r = converter ctx default in
       match r with
       | Error _ ->
@@ -1098,7 +1132,9 @@ let rec parse_arg :
                long)
       | Ok default -> (
           match StringMap.find_opt long args_dict with
-          | None | Some [] -> return default
+          | None | Some [] ->
+              with_env ~default ?env @@ fun env s ->
+              trace (Bad_env_argument (env, command)) (converter ctx s)
           | Some [Occ_with_value s] ->
               trace (Bad_option_argument (long, command)) (converter ctx s)
           | Some [Occ_empty] ->
@@ -1982,6 +2018,12 @@ let pp_cli_errors ppf ~executable_name ~global_options ~default errs =
           ppf
           "Wrong value for command line option @{<opt>%s@}."
           arg ;
+        Some (Option.fold ~some:(fun command -> [Ex command]) ~none:[] command)
+    | Bad_env_argument (env, command) ->
+        Format.fprintf
+          ppf
+          "Wrong value for environment variable argument @{<opt>%s@}."
+          env ;
         Some (Option.fold ~some:(fun command -> [Ex command]) ~none:[] command)
     | Multiple_occurrences (arg, command) ->
         Format.fprintf

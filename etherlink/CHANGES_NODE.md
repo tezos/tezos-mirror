@@ -10,6 +10,15 @@
   (!17214)
 - It is now possible to pass `--config-file` to the commands of the EVM node,
   to locate the configuration file outside of the data directory. (!17216)
+- Supports selecting the data-directory using the `EVM_NODE_DATA_DIR`
+  environment variable. If `--data-dir` is passed and `EVM_NODE_DATA_DIR` is
+  set, `--data-dir` is selected. (!17282)
+- Supports selecting the configuration file using the `EVM_NODE_CONFIG_FILE`
+  environment variable. If `--config-file` is passed and `EVM_NODE_CONFIG_FILE`
+  is set, `--config-file` is selected. (!17282)
+- Supports selecting the network using the `EVM_NODE_NETWORK` environment
+  variable. If `--network` is passed and `EVM_NODE_NETWORK` is set, `--network`
+  is selected. (!17282)
 
 ### RPCs changes
 

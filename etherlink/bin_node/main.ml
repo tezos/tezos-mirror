@@ -27,6 +27,8 @@
 
 open Configuration
 
+let config_env name = "EVM_NODE_" ^ name
+
 module Event = struct
   let section = ["evm_node"]
 
@@ -374,6 +376,7 @@ let config_filename ~data_dir = function
 let data_dir_arg =
   let default = Filename.concat (Sys.getenv "HOME") ".octez-evm-node" in
   Tezos_clic.default_arg
+    ~env:(config_env "DATA_DIR")
     ~long:"data-dir"
     ~placeholder:"data-dir"
     ~doc:"The path to the EVM node data directory"
@@ -383,6 +386,7 @@ let data_dir_arg =
 let config_path_arg =
   Tezos_clic.arg
     ~long:"config-file"
+    ~env:(config_env "CONFIG_FILE")
     ~placeholder:"path"
     ~doc:
       "Path to a configuration file. Defaults to `config.json` inside the data \
@@ -479,6 +483,7 @@ let native_execution_policy_arg =
 
 let supported_network_arg ?why () =
   Tezos_clic.arg
+    ~env:(config_env "NETWORK")
     ~long:"network"
     ~placeholder:"network"
     ~doc:
