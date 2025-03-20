@@ -234,6 +234,23 @@ pub fn run_set_less_than_unsigned(
     icb.xregister_write_nz(rd, res);
 }
 
+/// Multiply val(rs1) with val(rs2) and store the lower 64 bits of the result
+/// in register `rd`.
+///
+/// Relevant RISC-V opcodes:
+/// - MUL
+pub fn run_mul(
+    icb: &mut impl ICB,
+    rs1: NonZeroXRegister,
+    rs2: NonZeroXRegister,
+    rd: NonZeroXRegister,
+) {
+    let lhs = icb.xregister_read_nz(rs1);
+    let rhs = icb.xregister_read_nz(rs2);
+    let result = icb.xvalue_wrapping_mul(lhs, rhs);
+    icb.xregister_write_nz(rd, result)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::backend_test;

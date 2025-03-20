@@ -457,6 +457,7 @@ pub enum InstrCacheable {
     Divu(RTypeArgs),
     Divw(RTypeArgs),
     Divuw(RTypeArgs),
+    /// `MUL` - Perform bitwise-multiplication of val(rs1) with val(rs2).
     Mul(RTypeArgs),
     Mulh(RTypeArgs),
     Mulhsu(RTypeArgs),

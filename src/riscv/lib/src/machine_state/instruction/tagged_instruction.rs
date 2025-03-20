@@ -342,9 +342,9 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         Lb | Lh | Lw | Lbu | Lhu | Lwu | Ld | Sb | Sh | Sw | Sd | Lrw | Scw | Amoswapw
         | Amoaddw | Amoxorw | Amoandw | Amoorw | Amominw | Amomaxw | Amominuw | Amomaxuw | Lrd
         | Scd | Amoswapd | Amoaddd | Amoxord | Amoandd | Amoord | Amomind | Amomaxd | Amominud
-        | Amomaxud | Rem | Remu | Remw | Remuw | Div | Divu | Divw | Divuw | Mul | Mulh
-        | Mulhsu | Mulhu | Mulw | Csrrw | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci | CAddw
-        | CSubw | Unknown => ArgsShape::XSrcXDest,
+        | Amomaxud | Rem | Remu | Remw | Remuw | Div | Divu | Divw | Divuw | Mulh | Mulhsu
+        | Mulhu | Mulw | Csrrw | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci | CAddw | CSubw
+        | Unknown => ArgsShape::XSrcXDest,
 
         Fadds | Fsubs | Fmuls | Fdivs | Fsqrts | Fmins | Fmaxs | Fsgnjs | Fsgnjns | Fsgnjxs
         | Fmadds | Fmsubs | Fnmsubs | Fnmadds | Faddd | Fsubd | Fmuld | Fdivd | Fsqrtd | Fmind
@@ -359,10 +359,10 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
 
         Fsw | Fsd | CFsd | CFsdsp => ArgsShape::XSrcFSrc,
 
-        Addi | Andi | Ori | Xori | Slli | Srli | Srai | Add | Sub | Mv | Neg | And | Or | Xor
-        | Sll | Srl | Sra | Jal | J | JrImm | JAbsolute | JalrAbsolute | Jr | Jalr | CAddiw
-        | Li | Nop | Beq | Beqz | Bne | Bnez | Blt | Bge | Bltu | Bgeu | JalrImm | Ldnz | Sdnz
-        | Lwnz | Swnz | Lhnz | Shnz | Lbnz | Sbnz | Bltz | Bgez | Bltez | Bgz => {
+        Addi | Andi | Ori | Xori | Slli | Srli | Srai | Add | Sub | Mul | Mv | Neg | And | Or
+        | Xor | Sll | Srl | Sra | Jal | J | JrImm | JAbsolute | JalrAbsolute | Jr | Jalr
+        | CAddiw | Li | Nop | Beq | Beqz | Bne | Bnez | Blt | Bge | Bltu | Bgeu | JalrImm
+        | Ldnz | Sdnz | Lwnz | Swnz | Lhnz | Shnz | Lbnz | Sbnz | Bltz | Bgez | Bltez | Bgz => {
             ArgsShape::NZXSrcNZXDest
         }
 

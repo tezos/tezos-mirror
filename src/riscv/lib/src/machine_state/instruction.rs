@@ -650,6 +650,7 @@ impl OpCode {
             Self::Sub => Some(Args::run_sub),
             Self::And => Some(Args::run_and),
             Self::Or => Some(Args::run_or),
+            Self::Mul => Some(Args::run_mul),
             Self::Li => Some(Args::run_li),
             Self::AddImmediateToPC => Some(Args::run_add_immediate_to_pc),
             Self::J => Some(Args::run_j),
@@ -1362,7 +1363,7 @@ impl Args {
     impl_r_type!(run_divu);
     impl_r_type!(run_divw);
     impl_r_type!(run_divuw);
-    impl_r_type!(run_mul);
+    impl_r_type!(integer::run_mul, run_mul, non_zero);
     impl_r_type!(run_mulh);
     impl_r_type!(run_mulhsu);
     impl_r_type!(run_mulhu);
@@ -1766,10 +1767,7 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Divuw,
                 args: args.into(),
             },
-            InstrCacheable::Mul(args) => Instruction {
-                opcode: OpCode::Mul,
-                args: args.into(),
-            },
+            InstrCacheable::Mul(args) => Instruction::from_ic_mul(args),
             InstrCacheable::Mulh(args) => Instruction {
                 opcode: OpCode::Mulh,
                 args: args.into(),

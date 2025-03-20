@@ -212,6 +212,11 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
         self.builder.ins().isub(lhs, rhs)
     }
 
+    fn xvalue_wrapping_mul(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
+        // wrapping mul; does not depend on whether operands are signed
+        self.builder.ins().imul(lhs, rhs)
+    }
+
     fn xvalue_bitwise_and(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
         self.builder.ins().band(lhs, rhs)
     }
