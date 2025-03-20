@@ -2735,7 +2735,17 @@ let test_init_from_rollup_node_data_dir =
          fixed. Enable DAL once it is done. *)
     ~use_dal:Register_without_feature
     ~rollup_history_mode:Archive
-  @@ fun {sc_rollup_node; sequencer; observer; proxy; client; _} _protocol ->
+  @@ fun {
+           sc_rollup_node;
+           sequencer;
+           observer;
+           proxy;
+           client;
+           l2_chains;
+           enable_multichain;
+           _;
+         }
+             _protocol ->
   (* a sequencer is needed to produce an initial block *)
   let* () =
     repeat 5 (fun () ->
@@ -2745,12 +2755,26 @@ let test_init_from_rollup_node_data_dir =
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
   let* () = Evm_node.terminate sequencer
   and* () = Evm_node.terminate observer in
+  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let evm_node' =
     Evm_node.create
+      ?spawn_rpc
       ~mode:(Evm_node.mode sequencer)
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config evm_node' in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature
+            ~l2_chains
+            ?spawn_rpc
+            ()
+        in
+        Evm_node.Config_file.update evm_node' patch_config
+    | false -> unit
+  in
   let* () =
     (* bake 2 blocks so rollup context is for the finalized l1 level
        and can't be reorged. *)
