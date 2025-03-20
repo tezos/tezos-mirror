@@ -7089,6 +7089,8 @@ let test_preimages_endpoint =
            sequencer;
            observer;
            proxy;
+           l2_chains;
+           enable_multichain;
            _;
          }
              _protocol ->
@@ -7104,12 +7106,26 @@ let test_preimages_endpoint =
         Evm_node.Threshold_encryption_sequencer {mode with preimage_dir = None}
     | _ -> assert false
   in
+  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let new_sequencer =
     Evm_node.create
       ~mode:sequencer_mode_without_preimages_dir
+      ?spawn_rpc
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature
+            ~l2_chains
+            ?spawn_rpc
+            ()
+        in
+        Evm_node.Config_file.update new_sequencer patch_config
+    | false -> unit
+  in
   (* Prepares the observer without [preimages-dir], to force the use of
      preimages endpoint. *)
   let observer_mode_without_preimages_dir () =
@@ -7136,6 +7152,18 @@ let test_preimages_endpoint =
 
   let* () = Process.check @@ Evm_node.spawn_init_config new_observer in
   let* () = Process.check @@ Evm_node.spawn_init_config new_observer2 in
+
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature ~l2_chains ()
+        in
+        let* () = Evm_node.Config_file.update new_observer patch_config in
+        let* () = Evm_node.Config_file.update new_observer2 patch_config in
+        Lwt.return_unit
+    | false -> Lwt.return_unit
+  in
 
   let* () =
     repeat 2 (fun () ->
