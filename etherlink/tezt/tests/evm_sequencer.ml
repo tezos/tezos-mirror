@@ -6321,7 +6321,17 @@ let test_sequencer_diverge =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "diverge"]
     ~title:"Runs two sequencers, one diverge and stop"
-  @@ fun {sc_rollup_node; client; sequencer; observer; proxy; enable_dal; _}
+  @@ fun {
+           sc_rollup_node;
+           client;
+           sequencer;
+           observer;
+           proxy;
+           enable_dal;
+           enable_multichain;
+           l2_chains;
+           _;
+         }
              _protocol ->
   let* () =
     repeat 4 (fun () ->
@@ -6340,6 +6350,7 @@ let test_sequencer_diverge =
   (* We duplicate the sequencer by creating a snapshot and importing it *)
   let* _ = Evm_node.terminate sequencer in
   let* snapshot_file = Runnable.run @@ Evm_node.export_snapshot sequencer in
+  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let* sequencer_bis =
     let* mode =
       match Evm_node.mode sequencer with
@@ -6360,9 +6371,22 @@ let test_sequencer_diverge =
                }
       | _ -> Test.fail "impossible case, it's a sequencer"
     in
-    return @@ Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+    return
+    @@ Evm_node.create ?spawn_rpc ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config sequencer_bis in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature
+            ~l2_chains
+            ?spawn_rpc
+            ()
+        in
+        Evm_node.Config_file.update sequencer_bis patch_config
+    | false -> unit
+  in
   let* () =
     Runnable.run @@ Evm_node.import_snapshot sequencer_bis ~snapshot_file
   in
