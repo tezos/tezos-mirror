@@ -479,10 +479,11 @@ let group_commands commands =
   in
   List.map
     (fun (g, c) -> (g, List.rev !c))
-    (match ungrouped with
-    | [] -> grouped
+    (match List.rev ungrouped with
+    | [] -> List.rev grouped
     | l ->
-        grouped @ [({name = "misc"; title = "Miscellaneous commands"}, ref l)])
+        List.rev grouped
+        @ [({name = "misc"; title = "Miscellaneous commands"}, ref l)])
 
 let print_group print_command ppf ({title; _}, commands) =
   Format.fprintf
@@ -1928,98 +1929,92 @@ let manual_group = {name = "man"; title = "Access the documentation"}
 let add_manual ~executable_name ~global_options format ppf commands =
   let rec with_manual =
     lazy
-      (commands
-      @ [
-          command
-            ~group:manual_group
-            ~desc:
-              "Print documentation of commands.\n\
-               Add search keywords to narrow list.\n\
-               Will display only the commands by default, unless [-verbosity \
-               <2|3>] is passed or the list of matching commands if less than \
-               3."
-            (args2
-               (arg
-                  ~doc:
-                    "level of details\n\
-                     0. Only shows command mnemonics, without documentation.\n\
-                     1. Shows command mnemonics with short descriptions.\n\
-                     2. Show commands and arguments with short descriptions\n\
-                     3. Show everything"
-                  ~long:"verbosity"
-                  ~short:'v'
-                  ~placeholder:"0|1|2|3"
-                  (parameter
-                     ~autocomplete:(fun _ -> Lwt.return_ok ["0"; "1"; "2"; "3"])
-                     (fun _ arg ->
-                       let open Lwt_result_syntax in
-                       match arg with
-                       | "0" -> return Terse
-                       | "1" -> return Short
-                       | "2" -> return Details
-                       | "3" -> return Full
-                       | _ -> failwith "Level of details out of range")))
-               (default_arg
-                  ~doc:"the manual's output format"
-                  ~placeholder:"plain|colors|html"
-                  ~long:"format"
-                  ~default:
-                    (match format with
-                    | Ansi -> "colors"
-                    | Plain -> "plain"
-                    | Html -> "html")
-                  (parameter
-                     ~autocomplete:(fun _ ->
-                       Lwt.return_ok ["colors"; "plain"; "html"])
-                     (fun _ arg ->
-                       let open Lwt_result_syntax in
-                       match arg with
-                       | "colors" -> return Ansi
-                       | "plain" -> return Plain
-                       | "html" -> return Html
-                       | _ -> failwith "Unknown manual format"))))
-            (prefix
-               "man"
-               (seq_of_param
-                  (string
-                     ~name:"keyword"
-                     ~desc:
-                       "keyword to search for\n\
-                        If several are given they must all appear in the \
-                        command.")))
-            (fun (verbosity, format) keywords _ ->
-              let commands =
-                List.fold_left
-                  (fun commands keyword ->
-                    List.filter (search_command keyword) commands)
-                  (Lazy.force with_manual)
-                  keywords
-              in
-              let verbosity =
-                match verbosity with
-                | Some verbosity -> verbosity
-                | None when Compare.List_length_with.(commands <= 1) -> Full
-                | None when Compare.List_length_with.(commands <= 3) -> Details
-                | None -> Short
-              in
-              let open Lwt_result_syntax in
-              match commands with
-              | [] -> tzfail (No_manual_entry keywords)
-              | _ ->
-                  let state =
-                    internal_setup_formatter ppf format verbosity None
-                  in
-                  let commands = List.map (fun c -> Ex c) commands in
-                  usage_internal
-                    ppf
-                    ~prefix_executable:(format = Html)
-                    ~executable_name
-                    ~global_options
-                    ~highlights:keywords
-                    commands ;
-                  restore_formatter ppf state ;
-                  return_unit);
-        ])
+      (command
+         ~group:manual_group
+         ~desc:
+           "Print documentation of commands.\n\
+            Add search keywords to narrow list.\n\
+            Will display only the commands by default, unless [-verbosity \
+            <2|3>] is passed or the list of matching commands if less than 3."
+         (args2
+            (arg
+               ~doc:
+                 "level of details\n\
+                  0. Only shows command mnemonics, without documentation.\n\
+                  1. Shows command mnemonics with short descriptions.\n\
+                  2. Show commands and arguments with short descriptions\n\
+                  3. Show everything"
+               ~long:"verbosity"
+               ~short:'v'
+               ~placeholder:"0|1|2|3"
+               (parameter
+                  ~autocomplete:(fun _ -> Lwt.return_ok ["0"; "1"; "2"; "3"])
+                  (fun _ arg ->
+                    let open Lwt_result_syntax in
+                    match arg with
+                    | "0" -> return Terse
+                    | "1" -> return Short
+                    | "2" -> return Details
+                    | "3" -> return Full
+                    | _ -> failwith "Level of details out of range")))
+            (default_arg
+               ~doc:"the manual's output format"
+               ~placeholder:"plain|colors|html"
+               ~long:"format"
+               ~default:
+                 (match format with
+                 | Ansi -> "colors"
+                 | Plain -> "plain"
+                 | Html -> "html")
+               (parameter
+                  ~autocomplete:(fun _ ->
+                    Lwt.return_ok ["colors"; "plain"; "html"])
+                  (fun _ arg ->
+                    let open Lwt_result_syntax in
+                    match arg with
+                    | "colors" -> return Ansi
+                    | "plain" -> return Plain
+                    | "html" -> return Html
+                    | _ -> failwith "Unknown manual format"))))
+         (prefix
+            "man"
+            (seq_of_param
+               (string
+                  ~name:"keyword"
+                  ~desc:
+                    "keyword to search for\n\
+                     If several are given they must all appear in the command.")))
+         (fun (verbosity, format) keywords _ ->
+           let commands =
+             List.fold_left
+               (fun commands keyword ->
+                 List.filter (search_command keyword) commands)
+               (Lazy.force with_manual)
+               keywords
+           in
+           let verbosity =
+             match verbosity with
+             | Some verbosity -> verbosity
+             | None when Compare.List_length_with.(commands <= 1) -> Full
+             | None when Compare.List_length_with.(commands <= 3) -> Details
+             | None -> Short
+           in
+           let open Lwt_result_syntax in
+           match commands with
+           | [] -> tzfail (No_manual_entry keywords)
+           | _ ->
+               let state = internal_setup_formatter ppf format verbosity None in
+               let commands = List.map (fun c -> Ex c) commands in
+               usage_internal
+                 ppf
+                 ~prefix_executable:(format = Html)
+                 ~executable_name
+                 ~global_options
+                 ~highlights:keywords
+                 commands ;
+               restore_formatter ppf state ;
+               return_unit)
+      :: commands)
   in
   Lazy.force with_manual
 
