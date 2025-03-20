@@ -290,6 +290,7 @@ type setup_mode =
       time_between_blocks : Evm_node.time_between_blocks option;
       sequencer : Account.key;
       max_blueprints_ahead : int option;
+      genesis_timestamp : Client.timestamp option;
     }
   | Setup_proxy
 
@@ -453,8 +454,13 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
               return (Ok l)),
             evm_node )
     | Setup_sequencer
-        {return_sequencer; time_between_blocks; sequencer; max_blueprints_ahead}
-      ->
+        {
+          return_sequencer;
+          time_between_blocks;
+          sequencer;
+          max_blueprints_ahead;
+          genesis_timestamp;
+        } ->
         let patch_config =
           Evm_node.patch_config_with_experimental_feature
             ?enable_websocket:websockets
@@ -469,7 +475,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
               private_rpc_port;
               time_between_blocks;
               sequencer = sequencer.alias;
-              genesis_timestamp = None;
+              genesis_timestamp;
               max_blueprints_lag = None;
               max_blueprints_ahead;
               max_blueprints_catchup = None;
@@ -630,7 +636,8 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
     ?challenge_window ?bootstrap_accounts ?da_fee_per_byte
     ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
     ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs
-    ?max_blueprints_ahead ?websockets ?evm_version f protocols =
+    ?max_blueprints_ahead ?websockets ?evm_version ?genesis_timestamp f
+    protocols =
   let register ~enable_dal ~enable_multichain : unit =
     register_test
       ~title
@@ -661,6 +668,7 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
              time_between_blocks;
              sequencer = Constant.bootstrap1;
              max_blueprints_ahead;
+             genesis_timestamp;
            })
   in
   register ~enable_dal:false ~enable_multichain:false ;
@@ -4500,26 +4508,29 @@ let test_block_hash_regression =
       ])
     ~title:"Regression test for L2 block hash"
   @@ fun protocol ->
-  (* We use a timestamp equal to the next day after genesis.
-     The genesis timestamp can be found in tezt/lib_tezos/client.ml *)
-  let* {produce_block; evm_node; _} =
+  (* We use a timestamp equal to the next day after genesis. The
+     genesis timestamp can be found in tezt/lib_tezos/client.ml *)
+  let* {evm_node; _} =
     setup_evm_kernel
-      ~bootstrap_accounts:
-        (List.map
-           (fun account -> account.Eth_account.address)
-           (Array.to_list Eth_account.bootstrap_accounts)
-        @ Eth_account.lots_of_address)
+      ~setup_mode:
+        (Setup_sequencer
+           {
+             return_sequencer = true;
+             time_between_blocks = Some Nothing;
+             sequencer = Constant.bootstrap1;
+             max_blueprints_ahead = None;
+             genesis_timestamp =
+               Some (At (Option.get @@ Ptime.of_date (2018, 7, 1)));
+           })
       ~admin:None
-      ~timestamp:(At (Option.get @@ Ptime.of_date (2018, 7, 1)))
       ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
       protocol
   in
-  let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 3) in
-  let raw_txs, _tx_hashes = List.split txs in
-  let* _requests, receipt, _hashes =
-    send_n_transactions ~produce_block ~evm_node raw_txs
-  in
-  Regression.capture @@ sf "Block hash: %s" receipt.blockHash ;
+  let* () = Evm_node.wait_for_blueprint_applied evm_node 0 in
+  let timestamp = "2018-07-01T00:00:01Z" in
+  let*@ _ = produce_block ~timestamp evm_node in
+  let*@ block = Rpc.get_block_by_number ~block:"latest" evm_node in
+  Regression.capture @@ sf "Block hash: %s" block.hash ;
   unit
 
 let test_l2_revert_returns_unused_gas =
@@ -5903,6 +5914,7 @@ let test_tx_pool_timeout =
         time_between_blocks = Some Nothing;
         sequencer = sequencer_admin;
         max_blueprints_ahead = None;
+        genesis_timestamp = None;
       }
   in
   let ttl = 15 in
@@ -5994,6 +6006,7 @@ let test_tx_pool_address_boundaries =
         time_between_blocks = Some Nothing;
         sequencer = sequencer_admin;
         max_blueprints_ahead = None;
+        genesis_timestamp = None;
       }
   in
   let* {evm_node = sequencer_node; produce_block; _} =
@@ -6106,6 +6119,7 @@ let test_tx_pool_transaction_size_exceeded =
         time_between_blocks = Some Nothing;
         sequencer = sequencer_admin;
         max_blueprints_ahead = None;
+        genesis_timestamp = None;
       }
   in
   let* {evm_node = sequencer_node; _} =
