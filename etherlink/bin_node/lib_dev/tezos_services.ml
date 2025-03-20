@@ -195,7 +195,10 @@ let build_dir impl =
        (fun (((), chain), block) -> make_env chain block)
        helper_dir)
 
+let tezlink_root = Tezos_rpc.Path.(open_root / "tezlink")
+
 (* module entrypoint *)
 let register_tezlink_services impl =
-  let tezlink_directory = build_dir impl in
+  let directory = build_dir impl in
+  let tezlink_directory = Tezos_rpc.Directory.prefix tezlink_root directory in
   Evm_directory.init_from_resto_directory tezlink_directory

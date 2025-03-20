@@ -569,7 +569,8 @@ let test_current_level =
       |> Option.value ~default:""
     in
     let path =
-      "/chains/main/blocks/" ^ block ^ "/helpers/current_level" ^ offset_str
+      "/tezlink/chains/main/blocks/" ^ block ^ "/helpers/current_level"
+      ^ offset_str
     in
     let* res =
       Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
