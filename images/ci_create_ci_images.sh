@@ -110,6 +110,7 @@ echo "Build CI images with image_tag_suffix $image_tag_suffix"
   --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
   --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
   --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
+  --secret "id=npm_token,src=/tmp/npm_token.txt" \
   --push \
   $docker_no_cache_option_placeholder
 
