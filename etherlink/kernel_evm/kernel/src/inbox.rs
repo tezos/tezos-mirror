@@ -7,7 +7,7 @@
 
 use crate::blueprint_storage::store_sequencer_blueprint;
 use crate::bridge::Deposit;
-use crate::chains::ChainConfig;
+use crate::chains::{ChainConfig, ChainFamily};
 use crate::configuration::{DalConfiguration, TezosContracts};
 use crate::dal::fetch_and_parse_sequencer_blueprint_from_dal;
 use crate::dal_slot_import_signal::DalSlotImportSignals;
@@ -17,7 +17,6 @@ use crate::parsing::{
     SequencerParsingContext, MAX_SIZE_PER_CHUNK,
 };
 
-use crate::fees::tx_execution_gas_limit;
 use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
 use crate::storage::{
     chunked_hash_transaction_path, chunked_transaction_num_chunks,
@@ -25,176 +24,28 @@ use crate::storage::{
     read_last_info_per_level_timestamp, remove_chunked_transaction, remove_sequencer,
     store_l1_level, store_last_info_per_level_timestamp, store_transaction_chunk,
 };
-use crate::tick_model::constants::{BASE_GAS, TICKS_FOR_BLUEPRINT_INTERCEPT};
+use crate::tick_model::constants::TICKS_FOR_BLUEPRINT_INTERCEPT;
 use crate::tick_model::maximum_ticks_for_sequencer_chunk;
+use crate::transaction::{
+    Transaction, TransactionContent, Transactions,
+    Transactions::{EthTxs, TezTxs},
+};
 use crate::upgrade::*;
 use crate::Error;
 use crate::{simulation, upgrade};
-use evm_execution::fa_bridge::{deposit::FaDeposit, FA_DEPOSIT_PROXY_GAS_LIMIT};
-use evm_execution::EthereumError;
+use evm_execution::fa_bridge::deposit::FaDeposit;
 use primitive_types::U256;
-use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_ethereum::block::BlockFees;
-use tezos_ethereum::rlp_helpers::{decode_field, decode_tx_hash, next};
-use tezos_ethereum::transaction::{
-    TransactionHash, TransactionType, TRANSACTION_HASH_SIZE,
-};
+use tezos_ethereum::transaction::{TransactionHash, TRANSACTION_HASH_SIZE};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, PartialEq, Clone)]
-pub enum TransactionContent {
-    Ethereum(EthereumTransactionCommon),
-    Deposit(Deposit),
-    EthereumDelayed(EthereumTransactionCommon),
-    FaDeposit(FaDeposit),
-}
-
-const ETHEREUM_TX_TAG: u8 = 1;
-const DEPOSIT_TX_TAG: u8 = 2;
-const ETHEREUM_DELAYED_TX_TAG: u8 = 3;
-const FA_DEPOSIT_TX_TAG: u8 = 4;
-
-impl Encodable for TransactionContent {
-    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.begin_list(2);
-        match &self {
-            TransactionContent::Ethereum(eth) => {
-                stream.append(&ETHEREUM_TX_TAG);
-                eth.rlp_append(stream)
-            }
-            TransactionContent::Deposit(dep) => {
-                stream.append(&DEPOSIT_TX_TAG);
-                dep.rlp_append(stream)
-            }
-            TransactionContent::EthereumDelayed(eth) => {
-                stream.append(&ETHEREUM_DELAYED_TX_TAG);
-                eth.rlp_append(stream)
-            }
-            TransactionContent::FaDeposit(fa_dep) => {
-                stream.append(&FA_DEPOSIT_TX_TAG);
-                fa_dep.rlp_append(stream)
-            }
-        }
-    }
-}
-
-impl Decodable for TransactionContent {
-    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
-        if !decoder.is_list() {
-            return Err(DecoderError::RlpExpectedToBeList);
-        }
-        if decoder.item_count()? != 2 {
-            return Err(DecoderError::RlpIncorrectListLen);
-        }
-        let tag: u8 = decoder.at(0)?.as_val()?;
-        let tx = decoder.at(1)?;
-        match tag {
-            DEPOSIT_TX_TAG => {
-                let deposit = Deposit::decode(&tx)?;
-                Ok(Self::Deposit(deposit))
-            }
-            ETHEREUM_TX_TAG => {
-                let eth = EthereumTransactionCommon::decode(&tx)?;
-                Ok(Self::Ethereum(eth))
-            }
-            ETHEREUM_DELAYED_TX_TAG => {
-                let eth = EthereumTransactionCommon::decode(&tx)?;
-                Ok(Self::EthereumDelayed(eth))
-            }
-            FA_DEPOSIT_TX_TAG => {
-                let fa_deposit = FaDeposit::decode(&tx)?;
-                Ok(Self::FaDeposit(fa_deposit))
-            }
-            _ => Err(DecoderError::Custom("Unknown transaction tag.")),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Transaction {
-    pub tx_hash: TransactionHash,
-    pub content: TransactionContent,
-}
-
-impl Transaction {
-    pub fn data_size(&self) -> u64 {
-        match &self.content {
-            TransactionContent::Deposit(_) => 0,
-            TransactionContent::Ethereum(e) | TransactionContent::EthereumDelayed(e) => {
-                // FIXME: probably need to take into account the access list
-                e.data.len() as u64
-            }
-            TransactionContent::FaDeposit(_) => 0,
-        }
-    }
-
-    pub fn is_delayed(&self) -> bool {
-        match &self.content {
-            TransactionContent::Deposit(_)
-            | TransactionContent::EthereumDelayed(_)
-            | TransactionContent::FaDeposit(_) => true,
-            TransactionContent::Ethereum(_) => false,
-        }
-    }
-
-    pub fn execution_gas_limit(&self, fees: &BlockFees) -> Result<u64, EthereumError> {
-        match &self.content {
-            TransactionContent::Deposit(_) => Ok(BASE_GAS),
-            TransactionContent::Ethereum(e) => tx_execution_gas_limit(e, fees, false),
-            TransactionContent::EthereumDelayed(e) => {
-                tx_execution_gas_limit(e, fees, true)
-            }
-            TransactionContent::FaDeposit(_) => Ok(FA_DEPOSIT_PROXY_GAS_LIMIT),
-        }
-    }
-}
-
-impl Encodable for Transaction {
-    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.begin_list(2);
-        stream.append_iter(self.tx_hash);
-        stream.append(&self.content);
-    }
-}
-
-impl Decodable for Transaction {
-    fn decode(decoder: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        if !decoder.is_list() {
-            return Err(DecoderError::RlpExpectedToBeList);
-        }
-        if decoder.item_count()? != 2 {
-            return Err(DecoderError::RlpIncorrectListLen);
-        }
-        let mut it = decoder.iter();
-        let tx_hash: TransactionHash = decode_tx_hash(next(&mut it)?)?;
-        let content: TransactionContent =
-            decode_field(&next(&mut it)?, "Transaction content")?;
-        Ok(Transaction { tx_hash, content })
-    }
-}
-
-impl Transaction {
-    pub fn type_(&self) -> TransactionType {
-        match &self.content {
-            // The deposit is considered arbitrarily as a legacy transaction
-            TransactionContent::Deposit(_) | TransactionContent::FaDeposit(_) => {
-                TransactionType::Legacy
-            }
-            TransactionContent::Ethereum(tx)
-            | TransactionContent::EthereumDelayed(tx) => tx.type_,
-        }
-    }
-}
-
 #[derive(Debug, PartialEq)]
 pub struct ProxyInboxContent {
-    pub transactions: Vec<Transaction>,
+    pub transactions: Transactions,
 }
 
 pub fn read_input<Host: Runtime, Mode: Parsable>(
@@ -626,9 +477,11 @@ pub fn read_proxy_inbox<Host: Runtime>(
     garbage_collect_blocks: bool,
     chain_configuration: &ChainConfig,
 ) -> Result<Option<ProxyInboxContent>, anyhow::Error> {
-    let mut res = ProxyInboxContent {
-        transactions: vec![],
+    let transactions = match ChainConfig::get_chain_family(chain_configuration) {
+        ChainFamily::Evm => EthTxs(vec![]),
+        ChainFamily::Michelson => TezTxs,
     };
+    let mut res = ProxyInboxContent { transactions };
     // The mutable variable is used to retrieve the information of whether the
     // inbox was empty or not. As we consume all the inbox in one go, if the
     // variable remains true, that means that the inbox was already consumed
@@ -778,11 +631,12 @@ mod tests {
     use crate::dal_slot_import_signal::{
         DalSlotIndicesList, DalSlotIndicesOfLevel, UnsignedDalSlotSignals,
     };
-    use crate::inbox::TransactionContent::Ethereum;
     use crate::parsing::RollupType;
     use crate::storage::*;
     use crate::tick_model::constants::MAX_ALLOWED_TICKS;
+    use crate::transaction::TransactionContent::Ethereum;
     use primitive_types::U256;
+    use rlp::Encodable;
     use std::fmt::Write;
     use tezos_crypto_rs::hash::SmartRollupHash;
     use tezos_crypto_rs::hash::UnknownSignature;
@@ -936,7 +790,7 @@ mod tests {
             tx_hash,
             content: Ethereum(tx),
         }];
-        assert_eq!(inbox_content.transactions, expected_transactions);
+        assert_eq!(inbox_content.transactions, EthTxs(expected_transactions));
     }
 
     #[test]
@@ -968,7 +822,7 @@ mod tests {
             tx_hash,
             content: Ethereum(tx),
         }];
-        assert_eq!(inbox_content.transactions, expected_transactions);
+        assert_eq!(inbox_content.transactions, EthTxs(expected_transactions));
     }
 
     #[test]
@@ -1220,7 +1074,7 @@ mod tests {
         assert_eq!(
             inbox_content,
             ProxyInboxContent {
-                transactions: vec![],
+                transactions: EthTxs(vec![]),
             }
         );
 
@@ -1244,7 +1098,7 @@ mod tests {
             tx_hash,
             content: Ethereum(tx),
         }];
-        assert_eq!(inbox_content.transactions, expected_transactions);
+        assert_eq!(inbox_content.transactions, EthTxs(expected_transactions));
     }
 
     #[test]
@@ -1306,7 +1160,7 @@ mod tests {
             tx_hash,
             content: Ethereum(tx),
         }];
-        assert_eq!(inbox_content.transactions, expected_transactions);
+        assert_eq!(inbox_content.transactions, EthTxs(expected_transactions));
     }
 
     #[test]

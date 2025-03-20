@@ -254,8 +254,9 @@ pub fn rlp_roundtrip<S: Encodable + Decodable + PartialEq + std::fmt::Debug>(v: 
 mod tests {
     use super::{rlp_roundtrip, SequencerBlueprint, UnsignedSequencerBlueprint};
     use crate::blueprint::Blueprint;
-    use crate::inbox::Transaction;
-    use crate::inbox::TransactionContent::Ethereum;
+    use crate::transaction::Transaction;
+    use crate::transaction::TransactionContent::Ethereum;
+    use crate::transaction::Transactions::EthTxs;
     use primitive_types::{H160, U256};
     use tezos_crypto_rs::hash::UnknownSignature;
     use tezos_ethereum::{
@@ -292,7 +293,7 @@ mod tests {
     }
 
     fn dummy_blueprint_unsigned(chain_id: Option<U256>) -> UnsignedSequencerBlueprint {
-        let transactions = vec![dummy_transaction(0), dummy_transaction(1)];
+        let transactions = EthTxs(vec![dummy_transaction(0), dummy_transaction(1)]);
         let timestamp = Timestamp::from(42);
         let blueprint = Blueprint {
             timestamp,

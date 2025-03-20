@@ -17,8 +17,8 @@ use crate::configuration::ConfigurationMode;
 use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
 use crate::event::Event;
-use crate::inbox::Transaction;
 use crate::storage;
+use crate::transaction::Transaction;
 use crate::upgrade;
 use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
@@ -620,14 +620,15 @@ mod tests {
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
     use crate::fees::DA_FEE_PER_BYTE;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
-    use crate::inbox::Transaction;
-    use crate::inbox::TransactionContent;
-    use crate::inbox::TransactionContent::Ethereum;
-    use crate::inbox::TransactionContent::EthereumDelayed;
     use crate::storage::read_block_in_progress;
     use crate::storage::read_last_info_per_level_timestamp;
     use crate::storage::{read_transaction_receipt, read_transaction_receipt_status};
     use crate::tick_model::constants::MAX_ALLOWED_TICKS;
+    use crate::transaction::Transaction;
+    use crate::transaction::TransactionContent;
+    use crate::transaction::TransactionContent::Ethereum;
+    use crate::transaction::TransactionContent::EthereumDelayed;
+    use crate::transaction::Transactions::EthTxs;
     use crate::{retrieve_block_fees, retrieve_chain_id};
     use evm_execution::account_storage::{
         account_path, init_account_storage, EthereumAccountStorage,
@@ -647,7 +648,7 @@ mod tests {
 
     fn blueprint(transactions: Vec<Transaction>) -> Blueprint {
         Blueprint {
-            transactions,
+            transactions: EthTxs(transactions),
             timestamp: Timestamp::from(0i64),
         }
     }

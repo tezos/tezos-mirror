@@ -14,8 +14,8 @@ use crate::tick_model::constants::{
 use crate::{
     bridge::Deposit,
     dal_slot_import_signal::DalSlotImportSignals,
-    inbox::{Transaction, TransactionContent},
     sequencer_blueprint::{SequencerBlueprint, UnsignedSequencerBlueprint},
+    transaction::{Transaction, TransactionContent},
     upgrade::KernelUpgrade,
     upgrade::SequencerUpgrade,
 };

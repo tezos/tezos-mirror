@@ -15,7 +15,7 @@
 //!
 //! Additionally, we charge a _data-availability_ fee, for each tx posted through L1.
 
-use crate::inbox::TransactionContent;
+use crate::transaction::TransactionContent;
 
 use evm_execution::account_storage::{account_path, EthereumAccountStorage};
 use evm_execution::handler::ExecutionOutcome;

@@ -4,9 +4,9 @@
 use crate::{
     bridge::Deposit,
     event::Event,
-    inbox::{Transaction, TransactionContent},
     linked_list::LinkedList,
     storage::{self, read_last_info_per_level_timestamp},
+    transaction::{Transaction, TransactionContent},
 };
 use anyhow::Result;
 use evm_execution::fa_bridge::deposit::FaDeposit;
@@ -387,13 +387,13 @@ impl DelayedInbox {
 mod tests {
     use super::DelayedInbox;
     use super::Hash;
-    use crate::inbox::Transaction;
     use crate::storage::read_last_info_per_level_timestamp;
+    use crate::transaction::Transaction;
     use primitive_types::{H160, U256};
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
-    use crate::inbox::TransactionContent::{Ethereum, EthereumDelayed};
+    use crate::transaction::TransactionContent::{Ethereum, EthereumDelayed};
     use tezos_ethereum::{
         transaction::TRANSACTION_HASH_SIZE, tx_common::EthereumTransactionCommon,
     };

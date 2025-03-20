@@ -4,7 +4,7 @@
 
 use tezos_ethereum::transaction::IndexedLog;
 
-use crate::inbox::Transaction;
+use crate::transaction::Transaction;
 
 use self::constants::TICKS_FOR_CRYPTO;
 
@@ -131,7 +131,7 @@ pub fn ticks_of_valid_transaction(
     transaction: &Transaction,
     resulting_ticks: u64,
 ) -> u64 {
-    use crate::inbox::TransactionContent::*;
+    use crate::transaction::TransactionContent::*;
 
     match &transaction.content {
         Ethereum(_) | EthereumDelayed(_) => {

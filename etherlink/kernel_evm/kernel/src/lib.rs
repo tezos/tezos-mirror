@@ -64,6 +64,7 @@ mod simulation;
 mod stage_one;
 mod storage;
 mod tick_model;
+mod transaction;
 mod upgrade;
 
 extern crate alloc;
@@ -379,7 +380,7 @@ mod tests {
     };
     use crate::{
         blueprint::Blueprint,
-        inbox::{Transaction, TransactionContent},
+        transaction::{Transaction, TransactionContent},
         upgrade::KernelUpgrade,
     };
     use evm::Config;
@@ -406,6 +407,7 @@ mod tests {
     };
     use tezos_evm_runtime::runtime::MockKernelHost;
 
+    use crate::transaction::Transactions::EthTxs;
     use tezos_evm_runtime::runtime::Runtime;
     use tezos_smart_rollup::michelson::ticket::FA2_1Ticket;
     use tezos_smart_rollup::michelson::{
@@ -481,7 +483,7 @@ mod tests {
 
     fn blueprint(transactions: Vec<Transaction>) -> Blueprint {
         Blueprint {
-            transactions,
+            transactions: EthTxs(transactions),
             timestamp: Timestamp::from(0i64),
         }
     }
