@@ -101,6 +101,7 @@ type ('a, 'ctx) arg =
       env : string option;
       kind : ('p, 'ctx) parameter;
       default : string;
+      pp_default : (Format.formatter -> unit) option;
     }
       -> ('p, 'ctx) arg
   | ArgDefSwitch : {
@@ -230,15 +231,21 @@ let rec print_options_detailed :
         placeholder
         print_desc
         doc
-  | DefArg {label; placeholder; doc; default; env; _} ->
+  | DefArg {label; placeholder; doc; default; pp_default; env; _} ->
+      let pp_default =
+        match pp_default with
+        | Some pp -> fun fmt _s -> pp fmt
+        | None -> Format.pp_print_string
+      in
       let doc =
         match env with
         | None -> Format.sprintf "%s\nDefaults to `%s`." doc default
         | Some env ->
-            Format.sprintf
-              "%s\nIf set, defaults to the value of %s, or `%s` otherwise."
+            Format.asprintf
+              "%s\nIf set, defaults to the value of %s, or `%a` otherwise."
               doc
               env
+              pp_default
               default
       in
       Format.fprintf
@@ -865,8 +872,9 @@ let arg ~doc ?short ~long ~placeholder ?env kind =
 let multiple_arg ~doc ?short ~long ~placeholder kind =
   MultipleArg {doc; label = {long; short}; placeholder; kind}
 
-let default_arg ~doc ?short ~long ~placeholder ~default ?env kind =
-  DefArg {doc; placeholder; label = {long; short}; kind; env; default}
+let default_arg ~doc ?short ~long ~placeholder ~default ?pp_default ?env kind =
+  DefArg
+    {doc; placeholder; label = {long; short}; kind; env; default; pp_default}
 
 let arg_or_switch ~doc ?short ~long ~placeholder ~default kind =
   ArgDefSwitch {doc; placeholder; label = {long; short}; kind; default}

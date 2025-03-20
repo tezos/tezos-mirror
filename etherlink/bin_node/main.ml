@@ -380,6 +380,7 @@ let data_dir_arg =
     ~long:"data-dir"
     ~placeholder:"data-dir"
     ~doc:"The path to the EVM node data directory"
+    ~pp_default:(fun fmt -> Format.fprintf fmt "$HOME/.octez-evm-node")
     ~default
     Params.string
 
