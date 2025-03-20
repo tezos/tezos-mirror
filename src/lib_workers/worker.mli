@@ -226,6 +226,9 @@ module type T = sig
   (** Access the internal state, once initialized. *)
   val state : _ t -> Types.state
 
+  (** Access the internal state if available. *)
+  val state_opt : _ t -> Types.state option
+
   (** [with_state w f] calls [f] on the current state of worker [w] if
       it was intialized and not closed or crashed, otherwise
       returns immediately. *)

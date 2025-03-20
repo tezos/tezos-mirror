@@ -199,6 +199,9 @@ module type T = sig
   (** Access the internal state, once initialized. *)
   val state : _ t -> Types.state
 
+  (** Access the internal state if available. *)
+  val state_opt : _ t -> Types.state option
+
   val with_state :
     _ t -> (Types.state -> (unit, 'b) result Lwt.t) -> (unit, 'b) result Lwt.t
 
@@ -822,6 +825,8 @@ struct
              w.name)
     | None, _ -> assert false
     | Some state, _ -> state
+
+  let state_opt w = w.state
 
   let with_state :
       _ t -> (Types.state -> (unit, 'b) result Lwt.t) -> (unit, 'b) result Lwt.t
