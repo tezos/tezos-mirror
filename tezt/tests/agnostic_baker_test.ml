@@ -29,6 +29,18 @@ let wait_for_active_protocol_waiting agnostic_baker =
     "waiting_for_active_protocol.v0"
     (fun _json -> Some ())
 
+let remote_sign client =
+  let* () = Client.forget_all_keys client in
+  let keys = Constant.activator :: (Account.Bootstrap.keys |> Array.to_list) in
+  let* signer = Signer.init ~keys () in
+  (* tell the baker to ask the signer for the bootstrap keys *)
+  let uri = Signer.uri signer in
+  Lwt_list.iter_s
+    (fun account ->
+      let Account.{alias; public_key_hash; _} = account in
+      Client.import_signer_key client ~alias ~public_key_hash ~signer:uri)
+    keys
+
 (* Performs a protocol migration thanks to a UAU and the agnostic baker. *)
 let perform_protocol_migration ?node_name ?client_name ?parameter_file
     ?(use_remote_signer = false) ~blocks_per_cycle ~migration_level
@@ -43,22 +55,7 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
       ~migrate_to
       ()
   in
-  let* () =
-    if use_remote_signer then
-      let* () = Client.forget_all_keys client in
-      let keys =
-        Constant.activator :: (Account.Bootstrap.keys |> Array.to_list)
-      in
-      let* signer = Signer.init ~keys () in
-      (* tell the baker to ask the signer for the bootstrap keys *)
-      let uri = Signer.uri signer in
-      Lwt_list.iter_s
-        (fun account ->
-          let Account.{alias; public_key_hash; _} = account in
-          Client.import_signer_key client ~alias ~public_key_hash ~signer:uri)
-        keys
-    else unit
-  in
+  let* () = if use_remote_signer then remote_sign client else unit in
   Log.info "Node %s initialized" (Node.name node) ;
   let baker = Agnostic_baker.create node client in
   let wait_for_active_protocol_waiting =
