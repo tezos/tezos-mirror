@@ -10,7 +10,18 @@ __pervasive: dune, dune-project
 # A consequence of the previous line: this script is needed by one of the rules in "dune".
 __pervasive: scripts/custom-flags.sh
 
-# Needed to build a dependency of octez-libs.
-__pervasive: src/rustzcash_deps/include
+# Needed to build "tezos-sapling" in "src/lib_sapling".
+octez-libs: src/rustzcash_deps/include
+
+# Needed to build Rust components.
+__pervasive: rust-toolchain
+
+# Information present in the "deps" stanzas of "src/rust_deps/dune".
+# Note that src/rust_deps itself is included automatically (recursively),
+# so we only need to manually add paths that start with "../" in "src/rust_deps/dune".
+octez-rust-deps: src/rustzcash_deps, src/riscv, src/kernel_sdk, sdk/rust
+
+# Information present in the "copy_files" stanza of "src/lib_riscv/api/dune".
+octez-riscv-api: src/riscv/lib
 
 ### END OF tobi/config-manual
