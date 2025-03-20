@@ -5517,4 +5517,75 @@ mod test {
             );
         }
     }
+
+    #[test]
+    fn eip3529_check_gas_refund_is_done_at_the_end() {
+        let mut mock_runtime = MockKernelHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockKernelHost>(false);
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let gas_price = U256::from(21000);
+        let config = EVMVersion::current_test_config();
+        let caller = H160::from_low_u64_be(666_u64);
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS,
+            gas_price,
+            false,
+            None,
+        );
+
+        set_balance(&mut handler, &caller, U256::from(100_000_u32));
+
+        let address = H160::from_low_u64_be(999_u64);
+        let index = H256::zero();
+        let value = H256::from_low_u64_be(251195_u64); // non-zero value
+
+        // {Small code sample to get a refund by restoring a storage slot}
+        // PUSH1 0x00  <| Value to store (0)
+        // PUSH1 0x00  <| Storage slot index (0)
+        // SSTORE      <| Store 0 at slot 0
+        // STOP
+        let code = hex::decode("600060005500").unwrap();
+
+        let mut account = handler.get_or_create_account(address).unwrap();
+        account.set_storage(handler.host, &index, &value).unwrap();
+        account.set_code(handler.host, &code).unwrap();
+
+        let gas_limit = Some(100000);
+
+        let call_context = CallContext {
+            is_static: false,
+            is_creation: false,
+        };
+
+        let transaction_context = TransactionContext::new(caller, address, U256::zero());
+
+        handler
+            .begin_initial_transaction(call_context, gas_limit)
+            .unwrap();
+
+        let execution_result =
+            handler.execute_call(address, None, vec![], transaction_context);
+
+        // At this point no refund is done
+
+        let gas_used = handler.gas_used();
+        assert_eq!(gas_used, 2906);
+
+        let end_result = handler.end_initial_transaction(execution_result);
+
+        // At this point refund is done as we ended the initial transaction
+
+        match end_result {
+            Ok(ExecutionOutcome { gas_used, .. }) => assert_eq!(gas_used, 2325),
+            Err(_) => panic!("The transaction should have succeeded"),
+        }
+    }
 }
