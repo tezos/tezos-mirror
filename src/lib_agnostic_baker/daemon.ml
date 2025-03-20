@@ -17,12 +17,6 @@ type process = {thread : int Lwt.t; canceller : int Lwt.u}
 
 type baker = {protocol_hash : Protocol_hash.t; process : process}
 
-let shutdown_baker baker =
-  let open Lwt_syntax in
-  let* () = Agnostic_baker_events.(emit stopping_baker) baker.protocol_hash in
-  Lwt.wakeup baker.process.canceller 0 ;
-  return_unit
-
 (** [run_thread ~protocol_hash ~baker_commands ~baker_args ~cancel_promise ~logs_path]
     returns the main running thread for the baker given its protocol [~procol_hash],
     corresponding commands [~baker_commands], with the command line arguments given by
@@ -160,6 +154,23 @@ let hot_swap_baker ~state ~current_protocol_hash ~next_protocol_hash
   state.current_baker <- Some new_baker ;
   return_unit
 
+(** [maybe_kill_old_baker state head_level] checks whether the [old_baker] process
+    from the [state] of the agnostic baker has surpassed its lifetime and it stops
+    it if that is the case. *)
+let maybe_kill_old_baker state head_level =
+  let open Lwt_syntax in
+  match state.old_baker with
+  | None -> return_unit
+  | Some (old_baker, kill_level) ->
+      if head_level >= kill_level then (
+        let* () =
+          Agnostic_baker_events.(emit stopping_baker) old_baker.protocol_hash
+        in
+        Lwt.wakeup old_baker.process.canceller 0 ;
+        state.old_baker <- None ;
+        return_unit)
+      else return_unit
+
 (** [monitor_voting_periods ~state head_stream] continuously monitors [heads_stream]
     to detect protocol changes. It will:
     - Shut down an old baker it its time has come;
@@ -178,18 +189,8 @@ let monitor_voting_periods ~state head_stream =
         let*! () =
           Agnostic_baker_events.(emit period_status) (period_kind, remaining)
         in
-        (* Kill old baker if its safe period has elapsed. *)
-        let* () =
-          match state.old_baker with
-          | None -> return_unit
-          | Some (old_baker, kill_level) ->
-              let* head_level = Rpc_services.get_level ~node_addr in
-              if head_level >= kill_level then (
-                let*! () = shutdown_baker old_baker in
-                state.old_baker <- None ;
-                return_unit)
-              else return_unit
-        in
+        let* head_level = Rpc_services.get_level ~node_addr in
+        let*! () = maybe_kill_old_baker state head_level in
         let* next_protocol_hash =
           Rpc_services.get_next_protocol_hash ~node_addr
         in
@@ -201,7 +202,6 @@ let monitor_voting_periods ~state head_stream =
         let* () =
           if not (Protocol_hash.equal current_protocol_hash next_protocol_hash)
           then
-            let* head_level = Rpc_services.get_level ~node_addr in
             hot_swap_baker
               ~state
               ~current_protocol_hash
