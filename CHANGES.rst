@@ -159,6 +159,11 @@ DAL node
   parameters that the DAL node uses for a given level, which by default is the
   last finalized level the node is aware of. (MR :gl:`!16704`)
 
+- The configuration file was updated to version 2. Unused field ``neighbors``
+  has been deleted. Field ``network_name`` is also deleted since it is now inferred
+  from the layer 1 node (MR :gl:`!17284`). Profile encoding has been modified
+  (MR :gl:`!17200`).
+
 Protocol
 ~~~~~~~~
 
