@@ -8,6 +8,7 @@ STORAGE_MODE ?= default
 		-J vendor/ \
 		--ext-str node_instance_label="$(NODE_INSTANCE_LABEL)" \
 		--ext-str storage_mode="$(STORAGE_MODE)" \
+		--ext-str mountpoints="$(MOUNTPOINTS)" \
 		src/$@ \
 			> output/$*.json
 

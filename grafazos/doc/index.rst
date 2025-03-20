@@ -82,3 +82,11 @@ Optionnally you can enable storage monitoring with ``filecheck``:
 .. code-block:: shell
 
     STORAGE_MODE=filecheck
+
+
+If you want to selectively change mountpoints to ``/`` and ``/opt``, you can enable it with
+
+.. code-block:: shell
+
+    MOUNTPOINTS=opt
+

@@ -31,6 +31,8 @@ local graph = base.graph;
 
 local filecheck = std.extVar('storage_mode') == 'filecheck';
 
+local mountpoints = std.extVar('mountpoints') == 'opt';
+
 //##
 // Node Hardware related stats
 //##
@@ -71,14 +73,17 @@ local filecheck = std.extVar('storage_mode') == 'filecheck';
 
   storage(h, w, x, y):
     local q =
-      if filecheck then self.query('netdata_filecheck_dir_size_bytes_average', '{{dimension}}')
-      else self.query('netdata_disk_space_GiB_average{chart="disk_space._",dimension="used"}', '{{dimension}}');
+      if filecheck then self.query('netdata_filecheck_dir_size_bytes_average{' + base.node_instance + '="$node_instance"}', '{{dimension}}')
+      else self.query('netdata_disk_space_GiB_average{dimension="used", ' + base.node_instance + '="$node_instance"}', '{{family}}');
     graph.new('Storage', [q], h, w, x, y)
     + timeSeries.standardOptions.withUnit('bytes'),
 
   diskFreeSpace(h, w, x, y):
-    local q = self.query('node_filesystem_free_bytes{mountpoint="/"}', 'Available bytes on disk');
-    graph.new('Disk free space', [q], h, w, x, y)
+    local qall = self.query('node_filesystem_free_bytes{' + base.node_instance + '="$node_instance"}', 'Available bytes on disk {{mountpoint}}');
+    local qroot = self.query('node_filesystem_free_bytes{mountpoint="/",' + base.node_instance + '="$node_instance"}', 'Available bytes on disk {{mountpoint}}');
+    local qopt = self.query('node_filesystem_free_bytes{mountpoint="/opt",' + base.node_instance + '="$node_instance"}', 'Available bytes on disk {{mountpoint}}');
+    local mountq = if mountpoints then [qroot, qopt] else [qall];
+    graph.new('Disk free space', mountq, h, w, x, y)
     + stat.standardOptions.withUnit('decbytes')
     + stat.options.withReduceOptions(stat.options.reduceOptions.withCalcs(['lastNotNull'])),
 
@@ -100,16 +105,9 @@ local filecheck = std.extVar('storage_mode') == 'filecheck';
     + graph.withQueryColor([[total, 'light-green'], [sockets, 'light-yellow'], [files, 'light-blue'], [pipes, 'light-orange']]),
 
   networkIOS(h, w, x, y):
-    local receivedQuery = self.query('irate(node_network_receive_bytes_total[5m]) > 0', 'Bytes received');
-    local transmittedQuery = self.query('irate(node_network_transmit_bytes_total[5m]) > 0', 'Bytes transmitted');
+    local receivedQuery = self.query('-(irate(node_network_receive_bytes_total{' + base.node_instance + '="$node_instance"}[5m]))', 'Bytes received');
+    local transmittedQuery = self.query('irate(node_network_transmit_bytes_total{' + base.node_instance + '="$node_instance"}[5m])', 'Bytes transmitted');
     graph.new('Network traffic', [receivedQuery, transmittedQuery], h, w, x, y)
     + timeSeries.standardOptions.withUnit('Bps')
-    + graph.withLegendBottom(calcs=['current', 'mean', 'max'])
-    + timeSeries.standardOptions.withOverrides(
-      {
-        alias: '/.*received/',
-        transform: 'negative-Y',
-      }
-    ),
-
+    + graph.withLegendBottom(calcs=['current', 'mean', 'max']),
 }

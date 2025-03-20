@@ -44,10 +44,10 @@ local graph = base.graph;
     local writesAccuser = 'writes accuser';
     local readsBaker = 'reads baker';
     local writesBaker = 'writes baker';
-    local readsAccuserQuery = self.query('netdata_apps_lreads_KiB_persec_average{dimension="octez-accuser"}', readsAccuser);
-    local writesAccuserQuery = self.query('netdata_apps_lwrites_KiB_persec_average{dimension="octez-accuser"}', writesAccuser);
-    local readsBakerQuery = self.query('netdata_apps_lreads_KiB_persec_average{dimension="octez-baker"}', readsBaker);
-    local writesBakerQuery = self.query('netdata_apps_lwrites_KiB_persec_average{dimension="octez-baker"}', writesBaker);
+    local readsAccuserQuery = self.query('netdata_app_disk_logical_io_KiB_persec_average{dimension="reads", app_group="octez-accuser",' + base.node_instance + '="$node_instance"}', readsAccuser);
+    local writesAccuserQuery = self.query('netdata_app_disk_logical_io_KiB_persec_average{dimension="writes", app_group="octez-accuser",' + base.node_instance + '="$node_instance"}', writesAccuser);
+    local readsBakerQuery = self.query('netdata_app_disk_logical_io_KiB_persec_average{dimension="reads", app_group"octez-baker",' + base.node_instance + '="$node_instance"}', readsBaker);
+    local writesBakerQuery = self.query('netdata_app_disk_logical_io_KiB_persec_average{dimension="writes", app_groupoctez-baker",' + base.node_instance + '="$node_instance"}', writesBaker);
     graph.new('IOs', [readsAccuserQuery, writesAccuserQuery, readsBakerQuery, writesBakerQuery], h, w, x, y)
     + timeSeries.standardOptions.withUnit('kbytes')
     + graph.withLegendBottom(calcs=['current', 'mean', 'max'])
@@ -56,8 +56,8 @@ local graph = base.graph;
   cpu(h, w, x, y):
     local loadAccuser = 'Cpu load accuser';
     local loadBaker = 'Cpu load baker';
-    local loadAccuserQuery = self.query('netdata_apps_cpu_percentage_average{dimension="octez-accuser"}', loadAccuser);
-    local loadBakerQuery = self.query('netdata_apps_cpu_percentage_average{dimension="octez-baker"}', loadBaker);
+    local loadAccuserQuery = self.query('netdata_app_cpu_utilization_percentage_average{app_group="octez-accuser",' + base.node_instance + '="$node_instance"}', loadAccuser);
+    local loadBakerQuery = self.query('netdata_app_cpu_utilization_percentage_average{app_group="octez-baker",' + base.node_instance + '="$node_instance"}', loadBaker);
     graph.new('Cpu activity', [loadAccuserQuery, loadBakerQuery], h, w, x, y)
     + timeSeries.standardOptions.withUnit('percent')
     + graph.withQueryColor([[loadAccuser, 'light-yellow'], [loadBaker, 'light-red']]),
@@ -67,14 +67,13 @@ local graph = base.graph;
     local swapAccuser = 'Swap usage accuser';
     local ramBaker = 'Memory usage baker';
     local swapBaker = 'Swap usage baker';
-    local ramAccuserQuery = self.query('netdata_apps_mem_MiB_average{dimension="octez-accuser"}', ramAccuser);
-    local swapAccuserQuery = self.query('netdata_apps_swap_MiB_average{dimension="octez-accuser"}', swapAccuser);
-    local ramBakerQuery = self.query('netdata_apps_mem_MiB_average{dimension="octez-baker"}', ramBaker);
-    local swapBakerQuery = self.query('netdata_apps_swap_MiB_average{dimension="octez-baker"}', swapBaker);
+    local ramAccuserQuery = self.query('netdata_app_mem_usage_MiB_average{app_group="octez-accuser",' + base.node_instance + '="$node_instance"}', ramAccuser);
+    local swapAccuserQuery = self.query('netdata_app_swap_usage_MiB_average{app_group="octez-accuser",' + base.node_instance + '="$node_instance"}', swapAccuser);
+    local ramBakerQuery = self.query('netdata_app_mem_usage_MiB_average{app_group="octez-baker",' + base.node_instance + '="$node_instance"}', ramBaker);
+    local swapBakerQuery = self.query('netdata_app_swap_usage_MiB_average{app_group="octez-baker",' + base.node_instance + '="$node_instance"}', swapBaker);
     graph.new('Memory usage', [ramAccuserQuery, swapAccuserQuery, ramBakerQuery, swapBakerQuery], h, w, x, y)
     + timeSeries.standardOptions.withUnit('mbytes')
     + graph.withLegendBottom(calcs=['current', 'mean', 'max'])
     + graph.withQueryColor([[ramAccuser, 'dark-yellow'], [swapAccuser, 'light-yellow'], [ramBaker, 'dark-red'], [swapBaker, 'light-red']]),
-
-
 }
+
