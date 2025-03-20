@@ -7258,6 +7258,8 @@ let test_preimages_endpoint_retry =
            client;
            sequencer;
            proxy;
+           l2_chains;
+           enable_multichain;
            _;
          }
              _protocol ->
@@ -7278,12 +7280,26 @@ let test_preimages_endpoint_retry =
         Evm_node.Threshold_encryption_sequencer {mode with preimage_dir = None}
     | _ -> assert false
   in
+  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let new_sequencer =
     Evm_node.create
       ~mode:sequencer_mode_without_preimages_dir
+      ?spawn_rpc
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature
+            ~l2_chains
+            ?spawn_rpc
+            ()
+        in
+        Evm_node.Config_file.update new_sequencer patch_config
+    | false -> unit
+  in
   let* () = finalizeL1 () in
   let* () =
     Evm_node.init_from_rollup_node_data_dir new_sequencer sc_rollup_node
