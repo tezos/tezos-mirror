@@ -82,6 +82,16 @@ module CLI = struct
 
     let install =
       Clap.case "install" ~description:"Install some component(s)." @@ fun () ->
+      let jobs =
+        (* TODO: default value should be the number of CPU cores *)
+        Clap.default_int
+          ~long:"jobs"
+          ~short:'j'
+          ~description:
+            "Maximum number of processes to spawn when stuff can be done in \
+             parallel."
+          20
+      in
       let components =
         Clap.list
           Type.component_and_version
@@ -92,16 +102,6 @@ module CLI = struct
              or tag. It cannot be 'dev'. If VERSION is omitted, it defaults to \
              HEAD."
           ()
-      in
-      let jobs =
-        (* TODO: default value should be the number of CPU cores *)
-        Clap.default_int
-          ~long:"jobs"
-          ~short:'j'
-          ~description:
-            "Maximum number of processes to spawn when stuff can be done in \
-             parallel."
-          20
       in
       `install (components, `jobs jobs)
 
