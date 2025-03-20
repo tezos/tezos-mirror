@@ -1764,6 +1764,7 @@ let run ~data_dir ~configuration_override =
   (* Register topics with gossipsub worker. *)
   let* () = update_and_register_profiles ctxt in
   (* Start never-ending monitoring daemons *)
-  let*! () = Event.emit_node_is_ready ~network_name in
+  let version = Tezos_version_value.Bin_version.octez_version_string in
+  let*! () = Event.emit_node_is_ready ~network_name ~version in
   let* () = daemonize [Handler.new_finalized_head ctxt cctxt crawler] in
   return_unit

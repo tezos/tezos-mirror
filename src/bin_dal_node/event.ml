@@ -101,13 +101,15 @@ open struct
       ()
 
   let node_is_ready =
-    declare_1
+    declare_2
       ~section
       ~prefix_name_with_section:true
       ~name:"is_ready"
-      ~msg:"the DAL node is ready (network {network})"
+      ~msg:
+        "the DAL node is ready (network: {network}, octez version: {version})"
       ~level:Notice
       ("network", Distributed_db_version.Name.encoding)
+      ("version", Data_encoding.string)
 
   let data_dir_not_found =
     declare_1
@@ -1044,7 +1046,8 @@ let emit_dal_node_sqlite3_store_init () = emit dal_node_sqlite3_store_init ()
 
 let emit_store_is_ready () = emit store_is_ready ()
 
-let emit_node_is_ready ~network_name = emit node_is_ready network_name
+let emit_node_is_ready ~network_name ~version =
+  emit node_is_ready (network_name, version)
 
 let emit_data_dir_not_found ~path = emit data_dir_not_found path
 
