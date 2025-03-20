@@ -2812,6 +2812,8 @@ let test_init_from_rollup_node_with_delayed_inbox =
            client;
            l1_contracts;
            sc_rollup_address;
+           l2_chains;
+           enable_multichain;
            _;
          }
              _protocol ->
@@ -2836,12 +2838,26 @@ let test_init_from_rollup_node_with_delayed_inbox =
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
 
   (* Start a new sequencer, the previous sequencer is doomed. *)
+  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let sequencer =
     Evm_node.create
+      ?spawn_rpc
       ~mode:(Evm_node.mode sequencer)
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config sequencer in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature
+            ~l2_chains
+            ?spawn_rpc
+            ()
+        in
+        Evm_node.Config_file.update sequencer patch_config
+    | false -> unit
+  in
   let* () = Evm_node.init_from_rollup_node_data_dir sequencer sc_rollup_node in
   let* () = Evm_node.run sequencer in
   (* The sequencer should have items in its delayed inbox. *)
@@ -2853,6 +2869,15 @@ let test_init_from_rollup_node_with_delayed_inbox =
     Evm_node.create ~mode:(Evm_node.mode observer) (Evm_node.endpoint sequencer)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config observer in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature ~l2_chains ()
+        in
+        Evm_node.Config_file.update observer patch_config
+    | false -> unit
+  in
   let* () =
     Evm_node.init_from_rollup_node_data_dir
       ~omit_delayed_tx_events:true
