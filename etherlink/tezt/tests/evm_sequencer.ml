@@ -11226,6 +11226,8 @@ let test_tx_queue_clear =
   let* () =
     Evm_node.run ~extra_arguments:["--dont-track-rollup-node"] observer
   in
+
+  let* () = Evm_node.wait_for_blueprint_applied observer 0 in
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
 
   let* raw_tx =
@@ -11249,8 +11251,11 @@ let test_tx_queue_clear =
       raw_tx
   in
 
+  let wait_for_tx_queue_injected =
+    Evm_node.wait_for_tx_queue_injecting_transaction observer
+  in
   let* _ = Rpc.send_raw_transaction ~raw_tx observer
-  and* _ = Evm_node.wait_for_tx_queue_injecting_transaction observer in
+  and* _ = wait_for_tx_queue_injected in
   let*@ pending, queued = Rpc.txpool_content observer in
   Check.((List.length pending = 1) int)
     ~error_msg:"Amount of 'Pending' tx should be 1" ;
