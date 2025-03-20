@@ -148,6 +148,9 @@ module type T = sig
       Cannot be called from within the handlers.  *)
   val shutdown : _ t -> unit Lwt.t
 
+  (** Waits for completion, but doesn't trigger the shutdown. *)
+  val wait_for_completion : _ t -> unit Lwt.t
+
   module type BOX = sig
     type t
 
@@ -798,6 +801,8 @@ struct
     let* () = Worker_events.(emit triggering_shutdown) () in
     let* () = Error_monad.cancel_with_exceptions w.canceler in
     w.worker
+
+  let wait_for_completion w = w.worker
 
   let state w =
     match (w.state, w.status) with
