@@ -7399,7 +7399,13 @@ let test_store_smart_rollup_address =
   let* () = Evm_node.terminate sequencer in
   (* Originate another rollup. *)
   let* other_rollup_address =
-    originate_sc_rollup ~keys:[] ~kind:"wasm_2_0_0" ~alias:"vbot" client
+    originate_sc_rollup
+      ~keys:[]
+      ~kind:"wasm_2_0_0"
+      ~alias:"vbot"
+      ~src:"bootstrap2"
+        (* We cannot use bootstrap1 because it already has an operation in the mempool. *)
+      client
   in
   let other_rollup_node =
     Sc_rollup_node.create Observer node ~base_dir:(Client.base_dir client)
