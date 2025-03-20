@@ -383,48 +383,73 @@ module Config_file = struct
     in
     JSON.put ("shell", peer_validator) old_config
 
-  let sandbox_network_config =
+  let mk_genesis ~timestamp ~block ~protocol =
+    `O
+      [
+        ("timestamp", `String timestamp);
+        ("block", `String block);
+        ("protocol", `String protocol);
+      ]
+
+  let mk_genesis_parameters ~genesis_pubkey =
+    `O [("values", `O [("genesis_pubkey", `String genesis_pubkey)])]
+
+  let sandbox_network_config : JSON.u =
     `O
       [
         ( "genesis",
-          `O
-            [
-              ("timestamp", `String "2018-06-30T16:07:32Z");
-              ( "block",
-                `String "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2" );
-              ("protocol", `String Protocol.genesis_hash);
-            ] );
+          mk_genesis
+            ~timestamp:"2018-06-30T16:07:32Z"
+            ~block:"BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2"
+            ~protocol:Protocol.genesis_hash );
         ( "genesis_parameters",
-          `O
-            [
-              ( "values",
-                `O [("genesis_pubkey", `String Constant.activator.public_key)]
-              );
-            ] );
+          mk_genesis_parameters ~genesis_pubkey:Constant.activator.public_key );
         ("chain_name", `String "TEZOS");
         ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
       ]
 
-  let ghostnet_sandbox_network_config =
+  let ghostnet_sandbox_network_config : JSON.u =
     `O
       [
         ( "genesis",
-          `O
-            [
-              ("timestamp", `String "2022-01-25T15:00:00Z");
-              ( "block",
-                `String "BLockGenesisGenesisGenesisGenesisGenesis1db77eJNeJ9" );
-              ("protocol", `String Protocol.genesis_hash);
-            ] );
+          mk_genesis
+            ~timestamp:"2022-01-25T15:00:00Z"
+            ~block:"BLockGenesisGenesisGenesisGenesisGenesis1db77eJNeJ9"
+            ~protocol:Protocol.genesis_hash );
         ( "genesis_parameters",
-          `O
-            [
-              ( "values",
-                `O [("genesis_pubkey", `String Constant.activator.public_key)]
-              );
-            ] );
+          mk_genesis_parameters ~genesis_pubkey:Constant.activator.public_key );
         ("chain_name", `String "TEZOS");
         ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
+      ]
+
+  (* Copied from Octez_node_config.Config_file *)
+  let ghostnet_network_config : JSON.u =
+    `O
+      [
+        ( "genesis",
+          mk_genesis
+            ~timestamp:"2022-01-25T15:00:00Z"
+            ~block:"BLockGenesisGenesisGenesisGenesisGenesis1db77eJNeJ9"
+            ~protocol:"Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P" );
+        ( "genesis_parameters",
+          mk_genesis_parameters
+            ~genesis_pubkey:
+              "edpkuYLienS3Xdt5c1vfRX1ibMxQuvfM67ByhJ9nmRYYKGAAoTq1UC" );
+        ("chain_name", `String "TEZOS_ITHACANET_2022-01-25T15:00:00Z");
+        ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
+      ]
+
+  (* Copied from Octez_node_config.Config_file *)
+  let mainnet_network_config : JSON.u =
+    `O
+      [
+        ( "genesis",
+          mk_genesis
+            ~timestamp:"2018-06-30T16:07:32Z"
+            ~block:"BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2"
+            ~protocol:"Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P" );
+        ("chain_name", `String "TEZOS_MAINNET");
+        ("sandboxed_chain_name", `String "SANDBOXED_TEZOS_MAINNET");
       ]
 
   let put_user_activated_upgrades upgrade_points =
@@ -540,7 +565,7 @@ let spawn_snapshot_info ?(json = false) node file =
     (["snapshot"; "info"] @ (if json then ["--json"] else []) @ [file])
 
 let snapshot_info ?json node file =
-  spawn_snapshot_info ?json node file |> Process.check
+  spawn_snapshot_info ?json node file |> Process.check_and_read_stdout
 
 let spawn_snapshot_import ?(force = false) ?(no_check = false)
     ?(reconstruct = false) node file =

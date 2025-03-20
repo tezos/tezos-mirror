@@ -428,6 +428,8 @@ module type Layer1 = sig
 
   val maintenance_delay : int option
 
+  val migration_offset : int option
+
   val snapshot : string option
 
   val sync : bool
@@ -533,6 +535,15 @@ module Layer1 () = struct
       ~description:
         "Each baker has maintenance delayed by (position in the list * N). \
          Default is 1. Use 0 for disabling mainteance delay"
+      ()
+
+  let migration_offset =
+    Clap.optional_int
+      ~section
+      ~long:"migration-offset"
+      ~description:
+        "After how many levels we will perform a UAU to upgrade to the next \
+         protocol."
       ()
 
   let snapshot =
