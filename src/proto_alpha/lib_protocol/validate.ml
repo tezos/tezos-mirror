@@ -980,7 +980,7 @@ module Consensus = struct
         };
     }
 
-  let check_attestation_aggregate_signature info public_keys
+  let check_attestations_aggregate_signature info public_keys
       ({shell; protocol_data = {contents = Single content; signature}} :
         Kind.attestations_aggregate Operation.t) =
     let open Lwt_result_syntax in
@@ -1016,7 +1016,7 @@ module Consensus = struct
         in
         return_unit
 
-  let handle_attestation_aggregate_conflicts
+  let handle_attestations_aggregate_conflicts
       {info; operation_state; block_state} oph
       ({shell; protocol_data = {contents = Single content; _}} :
         Kind.attestations_aggregate operation) =
@@ -1115,13 +1115,13 @@ module Consensus = struct
         (* Check signature *)
         let* () =
           if check_signature then
-            check_attestation_aggregate_signature info public_keys op
+            check_attestations_aggregate_signature info public_keys op
           else return_unit
         in
         (* Check for conflicts and register the aggregate and its underlying
            attestations in the validation state. *)
         let* validation_state =
-          handle_attestation_aggregate_conflicts
+          handle_attestations_aggregate_conflicts
             {info; operation_state; block_state}
             oph
             op
