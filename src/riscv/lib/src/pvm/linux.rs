@@ -472,7 +472,124 @@ impl<M: ManagerBase> SupervisorState<M> {
                 try_blocks::try_block! {
                     paste::paste! {
                         let arg1 = core.hart.xregisters.try_read(registers::a0)?;
-                        let result = self.[<handle_$system_call>](arg1)?;
+                        let result = self.[<handle_$system_call>](core, arg1)?;
+                        core.hart.xregisters.write(registers::a0, result.into());
+                        true
+                    }
+                }
+            }};
+        }
+
+        // `dispatch2!(system_call_no)`
+        // Converts the system call name to the handler
+        #[allow(unused_macros)]
+        macro_rules! dispatch2 {
+            ($system_call:ty) => {{
+                try_blocks::try_block! {
+                    paste::paste! {
+                        let arg1 = core.hart.xregisters.try_read(registers::a0)?;
+                        let arg2 = core.hart.xregisters.try_read(registers::a1)?;
+                        let result = self.[<handle_$system_call>](core, arg1, arg2)?;
+                        core.hart.xregisters.write(registers::a0, result.into());
+                        true
+                    }
+                }
+            }};
+        }
+
+        // `dispatch3!(system_call_no)`
+        // Converts the system call name to the handler
+        #[allow(unused_macros)]
+        macro_rules! dispatch3 {
+            ($system_call:ty) => {{
+                try_blocks::try_block! {
+                    paste::paste! {
+                        let arg1 = core.hart.xregisters.try_read(registers::a0)?;
+                        let arg2 = core.hart.xregisters.try_read(registers::a1)?;
+                        let arg3 = core.hart.xregisters.try_read(registers::a2)?;
+                        let result = self.[<handle_$system_call>](core, arg1, arg2, arg3)?;
+                        core.hart.xregisters.write(registers::a0, result.into());
+                        true
+                    }
+                }
+            }};
+        }
+
+        // `dispatch4!(system_call_no)`
+        // Converts the system call name to the handler
+        #[allow(unused_macros)]
+        macro_rules! dispatch4 {
+            ($system_call:ty) => {{
+                try_blocks::try_block! {
+                    paste::paste! {
+                        let arg1 = core.hart.xregisters.try_read(registers::a0)?;
+                        let arg2 = core.hart.xregisters.try_read(registers::a1)?;
+                        let arg3 = core.hart.xregisters.try_read(registers::a2)?;
+                        let arg4 = core.hart.xregisters.try_read(registers::a3)?;
+                        let result = self.[<handle_$system_call>](core, arg1, arg2, arg3, arg4)?;
+                        core.hart.xregisters.write(registers::a0, result.into());
+                        true
+                    }
+                }
+            }};
+        }
+
+        // `dispatch5!(system_call_no)`
+        // Converts the system call name to the handler
+        #[allow(unused_macros)]
+        macro_rules! dispatch5 {
+            ($system_call:ty) => {{
+                try_blocks::try_block! {
+                    paste::paste! {
+                        let arg1 = core.hart.xregisters.try_read(registers::a0)?;
+                        let arg2 = core.hart.xregisters.try_read(registers::a1)?;
+                        let arg3 = core.hart.xregisters.try_read(registers::a2)?;
+                        let arg4 = core.hart.xregisters.try_read(registers::a3)?;
+                        let arg5 = core.hart.xregisters.try_read(registers::a4)?;
+                        let result = self.[<handle_$system_call>](core, arg1, arg2, arg3, arg4, arg5)?;
+                        core.hart.xregisters.write(registers::a0, result.into());
+                        true
+                    }
+                }
+            }};
+        }
+
+        // `dispatch6!(system_call_no)`
+        // Converts the system call name to the handler
+        #[allow(unused_macros)]
+        macro_rules! dispatch6 {
+            ($system_call:ty) => {{
+                try_blocks::try_block! {
+                    paste::paste! {
+                        let arg1 = core.hart.xregisters.try_read(registers::a0)?;
+                        let arg2 = core.hart.xregisters.try_read(registers::a1)?;
+                        let arg3 = core.hart.xregisters.try_read(registers::a2)?;
+                        let arg4 = core.hart.xregisters.try_read(registers::a3)?;
+                        let arg5 = core.hart.xregisters.try_read(registers::a4)?;
+                        let arg6 = core.hart.xregisters.try_read(registers::a5)?;
+                        let result = self.[<handle_$system_call>](core, arg1, arg2, arg3, arg4, arg5, arg6)?;
+                        core.hart.xregisters.write(registers::a0, result.into());
+                        true
+                    }
+                }
+            }};
+        }
+
+        // `dispatch7!(system_call_no)`
+        // Converts the system call name to the handler
+        #[allow(unused_macros)]
+        macro_rules! dispatch7 {
+            ($system_call:ty) => {{
+                try_blocks::try_block! {
+                    paste::paste! {
+                        let arg1 = core.hart.xregisters.try_read(registers::a0)?;
+                        let arg2 = core.hart.xregisters.try_read(registers::a1)?;
+                        let arg3 = core.hart.xregisters.try_read(registers::a2)?;
+                        let arg4 = core.hart.xregisters.try_read(registers::a3)?;
+                        let arg5 = core.hart.xregisters.try_read(registers::a4)?;
+                        let arg6 = core.hart.xregisters.try_read(registers::a5)?;
+                        let arg7 = core.hart.xregisters.try_read(registers::a6)?;
+                        let result = self.[<handle_$system_call>](core, arg1, arg2, arg3, arg4, arg5, arg6, arg7)?;
                         core.hart.xregisters.write(registers::a0, result.into());
                         true
                     }
@@ -542,7 +659,11 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// Handle `set_tid_address` system call.
     ///
     /// See: <https://www.man7.org/linux/man-pages/man2/set_tid_address.2.html>
-    fn handle_set_tid_address(&mut self, tid_address: VirtAddr) -> Result<u64, Error>
+    fn handle_set_tid_address(
+        &mut self,
+        _: &mut MachineCoreState<impl MemoryConfig, M>,
+        tid_address: VirtAddr,
+    ) -> Result<u64, Error>
     where
         M: ManagerRead + ManagerWrite,
     {
