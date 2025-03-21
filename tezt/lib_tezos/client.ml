@@ -900,7 +900,8 @@ let bake_for_and_wait_level ?env ?endpoint ?protocol ?keys ?minimal_fees
       ?state_recorder
       client
   in
-  Node.wait_for_level node (actual_level_before + 1)
+  let levels_to_bake = Option.value ~default:1 count in
+  Node.wait_for_level node (actual_level_before + levels_to_bake)
 
 let bake_for_and_wait ?env ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
