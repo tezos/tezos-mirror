@@ -45,6 +45,10 @@ baker run the baker process for `<protocol>`, information obtained from the node
 
 Notice that the two types of arguments are separated by a clear `--`.
 
+With the introduction of the agnostic baker, a unification of the CLI has also been
+achieved, therefore there will not be incompatibilities between two consecutive protocol
+baking commands.
+
 ## How it works
 
 1. **Initialization**: The daemon starts and connects to the specified Tezos node.
@@ -53,4 +57,5 @@ Notice that the two types of arguments are separated by a clear `--`.
 4. **Baker Execution**: The chosen baker process is executed with the specified arguments
 (`[OCTEZ-BAKER-COMMANDS]`).
 5. **Chain Monitoring**: The daemon continuously monitors the chain for new blocks and protocol changes (based on the voting period).
-6. **Protocol Updates**: If a new protocol is encountered, the daemon stops the current baker process and starts a new one matching the new protocol. This is currently done via an Lwt cancelling mechanism.
+6. **Protocol Updates**: If a new protocol is encountered, the daemon stops the old baker process after a few levels have
+passed since the migration (for safety purposes), and starts a new baker process for the new protocol. This is currently done via an Lwt cancelling mechanism.

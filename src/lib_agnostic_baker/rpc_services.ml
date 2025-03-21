@@ -43,6 +43,27 @@ let call_and_wrap_rpc ~node_addr ~uri ~f =
       in
       raise Not_found
 
+let get_level ~node_addr =
+  let open Lwt_result_syntax in
+  let f json =
+    (* Level field in the RPC result *)
+    let name = "level" in
+    let* v =
+      match json with
+      | `O fields -> (
+          match List.assoc_opt ~equal:( = ) name fields with
+          | None -> tzfail (Cannot_decode_node_data ("missing field " ^ name))
+          | Some node -> return node)
+      | _ -> tzfail (Cannot_decode_node_data "not an object")
+    in
+    let level = Ezjsonm.get_int v in
+    return level
+  in
+  let uri =
+    Format.sprintf "%s/chains/main/blocks/head/header/shell" node_addr
+  in
+  call_and_wrap_rpc ~node_addr ~uri ~f
+
 let get_next_protocol_hash ~node_addr =
   let open Lwt_result_syntax in
   let f json =
@@ -60,19 +81,6 @@ let get_next_protocol_hash ~node_addr =
     return hash
   in
   let uri = Format.sprintf "%s/chains/main/blocks/head/metadata" node_addr in
-  call_and_wrap_rpc ~node_addr ~uri ~f
-
-let get_current_proposal ~node_addr =
-  let open Lwt_result_syntax in
-  let f json =
-    match json with
-    | `Null -> return_none
-    | `String s -> return_some @@ Protocol_hash.of_b58check_exn s
-    | _ -> tzfail (Cannot_decode_node_data "not an object")
-  in
-  let uri =
-    Format.sprintf "%s/chains/main/blocks/head/votes/current_proposal" node_addr
-  in
   call_and_wrap_rpc ~node_addr ~uri ~f
 
 let get_current_period ~node_addr =

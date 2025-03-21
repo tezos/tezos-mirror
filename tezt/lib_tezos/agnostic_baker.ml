@@ -22,6 +22,10 @@ type protocol_status = Active | Frozen | Ignore
 
 let protocol_status = function Protocol.Alpha -> Ignore | _ -> Active
 
+(* This is hard-coded after the same value from [Daemon] module from
+   [src/lib_agnostic_baker]. *)
+let extra_levels_for_old_baker = 3
+
 module Parameters = struct
   type persistent_state = {
     delegates : string list;

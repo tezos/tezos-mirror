@@ -80,6 +80,11 @@ type protocol_status = Active | Frozen | Ignore
 (** Returns the protocol status given the full protocol value. *)
 val protocol_status : Protocol.t -> protocol_status
 
+(** Number of extra levels to keep the old baker alive before shutting it down.
+   This extra time is used to avoid halting the chain in cases such as
+   reorganization or high round migration blocks. *)
+val extra_levels_for_old_baker : int
+
 (** Create a agnostic baker.
 
     This function just creates a value of type [t], it does not call {!val:run}.
