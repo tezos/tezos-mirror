@@ -33,6 +33,7 @@ type multichain_sequencer_setup = {
   enable_dal : bool;
   evm_version : Evm_version.t;
   enable_multichain : bool;
+  l2_chains : Evm_node.l2_setup list;
 }
 
 type sequencer_setup = {
@@ -49,6 +50,7 @@ type sequencer_setup = {
   enable_dal : bool;
   evm_version : Evm_version.t;
   enable_multichain : bool;
+  l2_chains : Evm_node.l2_setup list;
 }
 
 let default_bootstrap_accounts =
@@ -88,6 +90,7 @@ let multichain_setup_to_single ~(setup : multichain_sequencer_setup) =
     enable_dal = setup.enable_dal;
     enable_multichain = setup.enable_multichain;
     evm_version = setup.evm_version;
+    l2_chains = setup.l2_chains;
   }
 
 let uses _protocol =
@@ -641,6 +644,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       enable_dal;
       evm_version;
       enable_multichain;
+      l2_chains;
     }
 
 let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
