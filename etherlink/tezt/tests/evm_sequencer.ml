@@ -1278,16 +1278,31 @@ let test_snapshots_import_empty =
     ~title:"Import sequencer snapshot in empty data dir"
     ~time_between_blocks:Nothing
     ~history_mode:(Rolling 1)
-  @@ fun ({sequencer; sc_rollup_node; _} as setup) _protocol ->
+  @@ fun ({sequencer; sc_rollup_node; l2_chains; enable_multichain; _} as setup)
+             _protocol ->
   let* _snapshot_file_before, snapshot_file, block_number =
     snapshots_setup setup
   in
   Log.info "Create new sequencer from snapshot." ;
+  (* patch sequencer config if multichain *)
+  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let new_sequencer =
     let mode = Evm_node.mode sequencer |> Evm_node.mode_with_new_private_rpc in
-    Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.create ~mode ?spawn_rpc (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature
+            ~l2_chains
+            ?spawn_rpc
+            ()
+        in
+        Evm_node.Config_file.update new_sequencer patch_config
+    | false -> unit
+  in
   let*! () = Evm_node.import_snapshot new_sequencer ~snapshot_file in
   Log.info "Start new sequencer." ;
   let* () = Evm_node.run new_sequencer in
