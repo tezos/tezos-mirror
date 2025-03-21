@@ -342,6 +342,17 @@ let () =
       "Scheduled pipeline for scanning vulnerabilities in latest \
        tezos/tezos:octez-evm-node-vX.Y Docker image"
 
+(** {Manual pipelines} *)
+
+let () =
+  let open Pipeline in
+  let open Rules in
+  register
+    "publish_release_page"
+    api_release_page
+    ~jobs:[Common.job_datadog_pipeline_trace]
+    ~description:"Pipeline that updates and publishes the release page."
+
 (** {2 Entry point of the generator binary} *)
 
 let () =
