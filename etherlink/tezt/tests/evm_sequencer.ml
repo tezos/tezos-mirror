@@ -11762,7 +11762,8 @@ let test_observer_init_from_snapshot =
   register_all
     ~tags:["observer"; "init"; "from"; "snapshot"]
     ~title:"Observer successfully inits from a rolling snapshot"
-  @@ fun {sequencer; sc_rollup_node; _} _protocol ->
+  @@ fun {sequencer; sc_rollup_node; l2_chains; enable_multichain; _} _protocol
+    ->
   (* Restart the sequencer in rolling:3 *)
   let* () = Evm_node.terminate sequencer in
   let*! () = Evm_node.switch_history_mode sequencer (Rolling 2) in
@@ -11795,6 +11796,15 @@ let test_observer_init_from_snapshot =
       (Evm_node.endpoint sequencer)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config observer in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature ~l2_chains ()
+        in
+        Evm_node.Config_file.update observer patch_config
+    | false -> unit
+  in
   let extra_arguments =
     ["--init-from-snapshot"; snapshot_file; "--history"; "rolling:5"]
   in
