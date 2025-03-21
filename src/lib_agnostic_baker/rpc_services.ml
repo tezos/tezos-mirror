@@ -64,6 +64,25 @@ let get_level ~node_addr =
   in
   call_and_wrap_rpc ~node_addr ~uri ~f
 
+let get_block_hash ~node_addr =
+  let open Lwt_result_syntax in
+  let f json =
+    (* Hash field in the RPC result *)
+    let name = "hash" in
+    let* v =
+      match json with
+      | `O fields -> (
+          match List.assoc_opt ~equal:( = ) name fields with
+          | None -> tzfail (Cannot_decode_node_data ("missing field " ^ name))
+          | Some node -> return node)
+      | _ -> tzfail (Cannot_decode_node_data "not an object")
+    in
+    let block_hash = Block_hash.of_b58check_exn @@ Ezjsonm.get_string v in
+    return block_hash
+  in
+  let uri = Format.sprintf "%s/chains/main/blocks/head/header" node_addr in
+  call_and_wrap_rpc ~node_addr ~uri ~f
+
 let get_next_protocol_hash ~node_addr =
   let open Lwt_result_syntax in
   let f json =

@@ -93,12 +93,15 @@ let waiting_for_active_protocol =
     ()
 
 let period_status =
-  declare_2
+  declare_3
     ~section
     ~alternative_color
     ~level:Notice
     ~name:"period_status"
-    ~msg:"new block on {period} period (remaining period duration {remaining})"
+    ~msg:
+      "new block ({block}) on {period} period (remaining period duration \
+       {remaining})"
+    ("block", Block_hash.encoding)
     ("period", string)
     ("remaining", int31)
 

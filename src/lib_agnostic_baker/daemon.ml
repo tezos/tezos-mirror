@@ -169,29 +169,20 @@ let hot_swap_baker ~state ~current_protocol_hash ~next_protocol_hash
   state.current_baker <- Some new_baker ;
   return_unit
 
-(** [parse_level head_info] retrieves the ["level"] field information from the
-    json information of the chain from [head_info]. *)
-let parse_level head_info =
-  let json = Ezjsonm.from_string head_info in
-  Ezjsonm.find json ["level"] |> Ezjsonm.get_int
-
-(** [parse_block_hash head_info] retrieves the ["hash"] field information from the
-    json information of the chain from [head_info]. *)
-let[@warning "-32"] parse_block_hash head_info =
-  let json = Ezjsonm.from_string head_info in
-  Ezjsonm.find json ["hash"] |> Ezjsonm.get_string |> Block_hash.of_b58check_exn
-
-(** [maybe_kill_old_baker state head_info] checks whether the [old_baker] process
+(** [maybe_kill_old_baker state node_addr] checks whether the [old_baker] process
     from the [state] of the agnostic baker has surpassed its lifetime and it stops
     it if that is the case. *)
-let maybe_kill_old_baker state head_info =
-  let open Lwt_syntax in
+let maybe_kill_old_baker state node_addr =
+  let open Lwt_result_syntax in
   match state.old_baker with
   | None -> return_unit
   | Some {baker; level_to_kill} ->
-      let head_level = parse_level head_info in
+      let* head_level =
+        (Rpc_services.get_level
+           ~node_addr [@profiler.record_s {verbosity = Notice} "get_level"])
+      in
       if head_level >= level_to_kill then (
-        let* () =
+        let*! () =
           Agnostic_baker_events.(emit stopping_baker) baker.protocol_hash
         in
         Lwt.wakeup
@@ -210,25 +201,30 @@ let monitor_voting_periods ~state head_stream =
   let open Lwt_result_syntax in
   let node_addr = state.node_endpoint in
   let rec loop () =
-    let*! head_info_opt = Lwt_stream.get head_stream in
-    match head_info_opt with
+    let*! v = Lwt_stream.get head_stream in
+    match v with
     | None -> tzfail Lost_node_connection
-    | Some head_info ->
+    | Some _tick ->
+        let* block_hash =
+          (Rpc_services.get_block_hash
+             ~node_addr
+           [@profiler.record_s {verbosity = Notice} "get_block_hash"])
+        in
         ()
-        [@profiler.reset_block_section
-          {profiler_module = Profiler} (parse_block_hash head_info)] ;
+        [@profiler.reset_block_section {profiler_module = Profiler} block_hash] ;
         let* period_kind, remaining =
           (Rpc_services.get_current_period
              ~node_addr
            [@profiler.record_s {verbosity = Notice} "get_current_period"])
         in
         let*! () =
-          Agnostic_baker_events.(emit period_status) (period_kind, remaining)
+          Agnostic_baker_events.(emit period_status)
+            (block_hash, period_kind, remaining)
         in
-        let*! () =
+        let* () =
           (maybe_kill_old_baker
              state
-             head_info
+             node_addr
            [@profiler.record_s {verbosity = Notice} "maybe_kill_old_baker"])
         in
         let* next_protocol_hash =
@@ -244,13 +240,17 @@ let monitor_voting_periods ~state head_stream =
         let* () =
           if not (Protocol_hash.equal current_protocol_hash next_protocol_hash)
           then
-            hot_swap_baker
-              ~state
-              ~current_protocol_hash
-              ~next_protocol_hash
-              ~level_to_kill_old_baker:
-                (parse_level head_info + extra_levels_for_old_baker)
-            [@profiler.record_s {verbosity = Notice} "hot_swap_baker"]
+            let* head_level =
+              (Rpc_services.get_level
+                 ~node_addr
+               [@profiler.record_s {verbosity = Notice} "get_level"])
+            in
+            (hot_swap_baker
+               ~state
+               ~current_protocol_hash
+               ~next_protocol_hash
+               ~level_to_kill_old_baker:(head_level + extra_levels_for_old_baker)
+             [@profiler.record_s {verbosity = Notice} "hot_swap_baker"])
           else return_unit
         in
         loop ()

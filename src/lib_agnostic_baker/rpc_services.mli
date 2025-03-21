@@ -16,6 +16,10 @@ val request_uri :
 (** [get_level ~node_addr] returns the level of the block. *)
 val get_level : node_addr:string -> (int, error trace) result Lwt.t
 
+(** [get_level ~node_addr] returns the hash of the block. *)
+val get_block_hash :
+  node_addr:string -> (Block_hash.t, error trace) result Lwt.t
+
 (** [get_next_protocol_hash ~node_addr] returns the protocol hash
     contained in the [next_protocol] field of the metadata of a
     block. *)
