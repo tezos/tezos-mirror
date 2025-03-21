@@ -6,6 +6,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [is_help_cmd args] returns [true] iff [--help] is amongst [args]. *)
+val is_help_cmd : string list -> bool
+
+(** [is_version_cmd args] returns [true] iff [--version] is amongst [args]. *)
+val is_version_cmd : string list -> bool
+
 (** Simple wrapper to handle the arguments of the agnostic baker. *)
 type args = {
   node_endpoint : string;

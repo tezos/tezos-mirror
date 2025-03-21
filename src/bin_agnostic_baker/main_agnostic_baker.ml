@@ -6,6 +6,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Main entrypoint for the agnostic baker binary.
+
+   We distinguish two cases:
+   1. If the binary is called against a `--help` or `--version` command, then
+   there is no reason to connect to a node, find the current protocol etc.
+   2. Otherwise, we run the agnostic baker daemon, which first obtains the
+   current protocol from the connected node, and then it monitors the chain
+   to determine when to switch to a new protocol baker process. *)
+
 let[@warning "-32"] may_start_profiler baking_dir =
   match Tezos_profiler_unix.Profiler_instance.selected_backend () with
   | Some {instance_maker; _} ->
@@ -13,7 +22,7 @@ let[@warning "-32"] may_start_profiler baking_dir =
       Agnostic_baker_profiler.init profiler_maker
   | None -> ()
 
-let run () =
+let lwt_run () =
   let open Lwt_result_syntax in
   let Run_args.{node_endpoint; base_dir; baker_args} =
     Run_args.parse_args Sys.argv
@@ -34,10 +43,10 @@ let run () =
   let*! () = Lwt_utils.never_ending () in
   return_unit
 
-let () =
+let run () =
   let open Lwt_result_syntax in
   let main_promise =
-    Lwt.catch run (function
+    Lwt.catch lwt_run (function
         | Failure msg -> failwith "%s" msg
         | exn -> failwith "%s" (Printexc.to_string exn))
   in
@@ -55,3 +64,12 @@ let () =
          Format.pp_print_flush Format.std_formatter () ;
          let*! () = Tezos_base_unix.Internal_event_unix.close () in
          Lwt.return retcode))
+
+let () =
+  let open Tezos_client_base_unix in
+  let args = Array.to_list Sys.argv in
+  if Run_args.(is_help_cmd args || is_version_cmd args) then
+    Client_main_run.run
+      (module Daemon_config)
+      ~select_commands:(fun _ _ -> Lwt_result_syntax.return_nil)
+  else run ()
