@@ -90,11 +90,13 @@ let spawn_baker protocol_hash ~baker_args =
   let*! () = Agnostic_baker_events.(emit baker_running) protocol_hash in
   return {protocol_hash; process = {thread; canceller}}
 
+type baker_to_kill = {baker : baker; level_to_kill : int}
+
 type 'a state = {
   node_endpoint : string;
   baker_args : string list;
   mutable current_baker : baker option;
-  mutable old_baker : (baker * int) option;
+  mutable old_baker : baker_to_kill option;
 }
 
 type 'a t = 'a state
@@ -146,7 +148,8 @@ let hot_swap_baker ~state ~current_protocol_hash ~next_protocol_hash
     Agnostic_baker_events.(emit become_old_baker)
       (current_protocol_hash, level_to_kill_old_baker)
   in
-  state.old_baker <- Some (current_baker, level_to_kill_old_baker) ;
+  state.old_baker <-
+    Some {baker = current_baker; level_to_kill = level_to_kill_old_baker} ;
   state.current_baker <- None ;
   let* new_baker =
     spawn_baker next_protocol_hash ~baker_args:state.baker_args
@@ -161,12 +164,12 @@ let maybe_kill_old_baker state head_level =
   let open Lwt_syntax in
   match state.old_baker with
   | None -> return_unit
-  | Some (old_baker, kill_level) ->
-      if head_level >= kill_level then (
+  | Some {baker; level_to_kill} ->
+      if head_level >= level_to_kill then (
         let* () =
-          Agnostic_baker_events.(emit stopping_baker) old_baker.protocol_hash
+          Agnostic_baker_events.(emit stopping_baker) baker.protocol_hash
         in
-        Lwt.wakeup old_baker.process.canceller 0 ;
+        Lwt.wakeup baker.process.canceller 0 ;
         state.old_baker <- None ;
         return_unit)
       else return_unit
