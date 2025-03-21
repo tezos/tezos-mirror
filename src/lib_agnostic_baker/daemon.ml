@@ -85,7 +85,11 @@ let spawn_baker protocol_hash ~baker_args =
   let baker_args = "./mock-binary" :: baker_args in
   let cancel_promise, canceller = Lwt.wait () in
   let* thread =
-    let*? plugin = Protocol_plugins.proto_plugin_for_protocol protocol_hash in
+    let*? plugin =
+      (Protocol_plugins.proto_plugin_for_protocol
+         protocol_hash
+       [@profiler.record_f {verbosity = Notice} "proto_plugin_for_protocol"])
+    in
     let baker_commands = Commands.baker_commands plugin in
     return
     @@ run_thread
@@ -190,7 +194,9 @@ let maybe_kill_old_baker state head_info =
         let* () =
           Agnostic_baker_events.(emit stopping_baker) baker.protocol_hash
         in
-        Lwt.wakeup baker.process.canceller 0 ;
+        Lwt.wakeup
+          baker.process.canceller
+          0 [@profiler.record_f {verbosity = Notice} "kill old baker"] ;
         state.old_baker <- None ;
         return_unit)
       else return_unit
@@ -211,14 +217,23 @@ let monitor_voting_periods ~state head_stream =
         [@profiler.reset_block_section
           {profiler_module = Profiler} (parse_block_hash head_info)] ;
         let* period_kind, remaining =
-          Rpc_services.get_current_period ~node_addr
+          (Rpc_services.get_current_period
+             ~node_addr
+           [@profiler.record_s {verbosity = Notice} "get_current_period"])
         in
         let*! () =
           Agnostic_baker_events.(emit period_status) (period_kind, remaining)
         in
-        let*! () = maybe_kill_old_baker state head_info in
+        let*! () =
+          (maybe_kill_old_baker
+             state
+             head_info
+           [@profiler.record_s {verbosity = Notice} "maybe_kill_old_baker"])
+        in
         let* next_protocol_hash =
-          Rpc_services.get_next_protocol_hash ~node_addr
+          (Rpc_services.get_next_protocol_hash
+             ~node_addr
+           [@profiler.record_s {verbosity = Notice} "get_next_protocol_hash"])
         in
         let* current_protocol_hash =
           match state.current_baker with
@@ -234,6 +249,7 @@ let monitor_voting_periods ~state head_stream =
               ~next_protocol_hash
               ~level_to_kill_old_baker:
                 (parse_level head_info + extra_levels_for_old_baker)
+            [@profiler.record_s {verbosity = Notice} "hot_swap_baker"]
           else return_unit
         in
         loop ()
