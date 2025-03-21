@@ -1423,12 +1423,14 @@ let test_sequencer_too_ahead =
         unit)
   in
   let* () =
-    let*@ _ = produce_block ~wait_on_blueprint_applied:false sequencer in
+    (* Failing as the block_producer is locked. *)
+    let*@? _ = produce_block ~wait_on_blueprint_applied:false sequencer in
     unit
   and* () = Evm_node.wait_for_block_producer_locked sequencer in
   let* () =
+    (* Repeating won't make the production magically successful. *)
     repeat max_blueprints_ahead (fun () ->
-        let*@ _ = produce_block ~wait_on_blueprint_applied:false sequencer in
+        let*@? _ = produce_block ~wait_on_blueprint_applied:false sequencer in
         unit)
   in
   let*@ block_number = Rpc.block_number sequencer in
