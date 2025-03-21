@@ -32,9 +32,14 @@ let systemd_test_debian_packages_image = build_debian_packages_image
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
 let debian_package_release_matrix = function
-  | Partial -> [[("RELEASE", ["bookworm"]); ("TAGS", ["gcp"])]]
+  | Partial -> [[("RELEASE", ["bookworm"]); ("TAGS", ["gcp_very_high_cpu"])]]
   | Full | Release ->
-      [[("RELEASE", ["unstable"; "bookworm"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
+      [
+        [
+          ("RELEASE", ["unstable"; "bookworm"]);
+          ("TAGS", ["gcp_very_high_cpu"; "gcp_arm64"]);
+        ];
+      ]
 
 (** These are the set of Ubuntu release-architecture combinations for
     which we build deb packages in the job
