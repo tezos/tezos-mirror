@@ -49,16 +49,35 @@ let execute ?(wasm_pvm_fallback = false) ?(profile = false)
   in
   let eval evm_state =
     if profile then
-      let* evm_state, _, _ =
-        Wasm_debugger.profile
+      let filename =
+        Filename.concat
+          (kernel_logs_directory ~data_dir)
+          (log_file ^ "_ticks_per_reboot.csv")
+      in
+      Lwt_io.with_file ~mode:Lwt_io.Output filename @@ fun oc ->
+      let*! () = Lwt_io.fprintf oc "ticks,reboot limit %%\n" in
+      let*! () = Events.replay_csv_available filename in
+      let reboot_limit = 30_000_000_000L in
+      let hooks =
+        Tezos_scoru_wasm.Hooks.(
+          no_hooks
+          |> on_pvm_reboot (fun ticks ->
+                 let percentage =
+                   Int64.to_float ticks /. Int64.to_float reboot_limit *. 100.0
+                 in
+                 let*! () = Lwt_io.fprintf oc "%Ld,%.6f%%\n" ticks percentage in
+                 Lwt_io.flush oc))
+      in
+      let* evm_state, _ticks, _inboxes, _level =
+        Wasm_debugger.eval
+          ~hooks
           ~migrate_to:Proto_alpha
-          ~collapse:false
-          ~with_time:true
-          ~no_reboot:false
+          ~write_debug
+          ~wasm_entrypoint
           0l
           inbox
           {config with flamecharts_directory = data_dir}
-          Octez_smart_rollup_wasm_debugger_lib.Custom_section.FuncMap.empty
+          Inbox
           evm_state
       in
       return evm_state

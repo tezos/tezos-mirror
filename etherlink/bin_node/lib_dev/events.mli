@@ -130,6 +130,10 @@ val invalid_node_da_fees :
 
 val deprecation_note : string -> unit Lwt.t
 
+(** [replay_csv_available filename] advertises that [filename]
+    is now available for analysis or debugging purposes. *)
+val replay_csv_available : string -> unit Lwt.t
+
 (** [wasm_pvm_fallback ()] advertises that the node has to fallback to the PVM
     to execute a block, which is slow. *)
 val wasm_pvm_fallback : unit -> unit Lwt.t

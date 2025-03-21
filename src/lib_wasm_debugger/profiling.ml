@@ -524,8 +524,8 @@ end
 module Make (Wasm_utils : Wasm_utils_intf.S) = struct
   (** [eval_and_profile ?write_debug ?reveal_builtins symbols tree] profiles a
     kernel up to the next result, and returns the call stack. *)
-  let eval_and_profile ?write_debug ?reveal_builtins ~with_time ~no_reboot
-      symbols tree =
+  let eval_and_profile ?write_debug ?reveal_builtins ?hooks ~with_time
+      ~no_reboot symbols tree =
     let open Lwt_syntax in
     (* Initialize the state and the instrumented `should_compute` function. *)
     let profiler_state, instrumented_should_compute, instrumented_write_debug =
@@ -543,6 +543,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
             ~wasm_entrypoint:Constants.wasm_entrypoint
             ?write_debug:instrumented_write_debug
             ?reveal_builtins
+            ?hooks
             ~max_steps:(Z.to_int64 pvm_state.max_nb_ticks)
             instrumented_should_compute
             tree

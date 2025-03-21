@@ -194,6 +194,14 @@ let event_deprecation_note =
     ~level:Warning
     ("msg", Data_encoding.string)
 
+let replay_csv_available =
+  Internal_event.Simple.declare_1
+    ~section
+    ~name:"replay_csv_available"
+    ~msg:"Replay data will be streamlined to {path}."
+    ~level:Notice
+    ("path", Data_encoding.string)
+
 type kernel_log_kind = Application | Simulation
 
 type kernel_log_level = Debug | Info | Error | Fatal
@@ -582,6 +590,8 @@ let invalid_node_da_fees ~node_da_fees ~kernel_da_fees ~block_number ~call =
   emit invalid_node_da_fees (node_da_fees, kernel_da_fees, block_number, call)
 
 let deprecation_note msg = emit event_deprecation_note msg
+
+let replay_csv_available msg = emit replay_csv_available msg
 
 let wasm_pvm_fallback () = emit wasm_pvm_fallback ()
 

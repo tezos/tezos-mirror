@@ -55,8 +55,6 @@ let read_kernel = function
 let check_kernel =
   Octez_smart_rollup_wasm_debugger_lib.Wasm_debugger.check_kernel
 
-let profile = Wasm.Commands.profile
-
 let set_durable_value = Wasm.set_durable_value
 
 let start ~tree version = function
