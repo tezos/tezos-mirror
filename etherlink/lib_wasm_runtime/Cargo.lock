@@ -3156,6 +3156,7 @@ dependencies = [
  "tezos-smart-rollup-utils",
  "tezos_crypto_rs",
  "thiserror",
+ "try-blocks",
  "vm-fdt",
 ]
 
@@ -5165,6 +5166,12 @@ dependencies = [
  "hash-db",
  "rlp",
 ]
+
+[[package]]
+name = "try-blocks"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "296cc7892cc05ae83e113b20c113d3fd9020eac7abbbaaeaf69c424ef872be7a"
 
 [[package]]
 name = "try-lock"

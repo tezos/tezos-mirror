@@ -465,6 +465,21 @@ impl<M: ManagerBase> SupervisorState<M> {
         MC: MemoryConfig,
         M: ManagerReadWrite,
     {
+        // `dispatch1!(system_call_no)`
+        // Converts the system call name to the handler
+        macro_rules! dispatch1 {
+            ($system_call:ty) => {{
+                try_blocks::try_block! {
+                    paste::paste! {
+                        let arg1 = core.hart.xregisters.try_read(registers::a0)?;
+                        let result = self.[<handle_$system_call>](arg1)?;
+                        core.hart.xregisters.write(registers::a0, result.into());
+                        true
+                    }
+                }
+            }};
+        }
+
         // We need to jump to the next instruction. The ECall instruction which triggered this
         // function is 4 byte wide.
         let pc = core.hart.pc.read().saturating_add(4);
@@ -481,7 +496,7 @@ impl<M: ManagerBase> SupervisorState<M> {
             PPOLL => self.handle_ppoll(core),
             READLINKAT => self.handle_readlinkat(),
             EXIT | EXITGROUP => self.handle_exit(core),
-            SET_TID_ADDRESS => self.handle_set_tid_address(core),
+            SET_TID_ADDRESS => dispatch1!(set_tid_address),
             TKILL => self.handle_tkill(core),
             SIGALTSTACK => self.handle_sigaltstack(core),
             RT_SIGACTION => self.handle_rt_sigaction(core),
@@ -527,10 +542,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// Handle `set_tid_address` system call.
     ///
     /// See: <https://www.man7.org/linux/man-pages/man2/set_tid_address.2.html>
-    fn handle_set_tid_address(
-        &mut self,
-        core: &mut MachineCoreState<impl MemoryConfig, M>,
-    ) -> Result<bool, Error>
+    fn handle_set_tid_address(&mut self, tid_address: VirtAddr) -> Result<u64, Error>
     where
         M: ManagerRead + ManagerWrite,
     {
@@ -539,14 +551,9 @@ impl<M: ManagerBase> SupervisorState<M> {
         // In the future, when we add threading, this system call needs to be implemented to
         // support informing other (waiting) threads of termination.
 
-        // The address is passed as the first and only parameter
-        let tid_address = core.hart.xregisters.read(registers::a0).into();
         self.tid_address.write(tid_address);
-
         // The caller expects the Thread ID to be returned
-        core.hart.xregisters.write(registers::a0, MAIN_THREAD_ID);
-
-        Ok(true)
+        Ok(MAIN_THREAD_ID)
     }
 
     fn handle_exit(
