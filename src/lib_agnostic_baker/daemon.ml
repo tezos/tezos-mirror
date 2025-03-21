@@ -204,7 +204,8 @@ let maybe_kill_old_baker state head_info =
 (** [monitor_voting_periods ~state head_stream] continuously monitors [heads_stream]
     to detect protocol changes. It will:
     - Shut down an old baker it its time has come;
-    - Spawn and "hot-swap" to a new baker if the next protocol hash is different. *)
+    - Spawn and "hot-swap" to a new baker if the next protocol hash is different. 
+    The voting period information is used for logging purposes. *)
 let monitor_voting_periods ~state head_stream =
   let open Lwt_result_syntax in
   let node_addr = state.node_endpoint in
