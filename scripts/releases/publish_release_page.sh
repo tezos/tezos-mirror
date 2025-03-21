@@ -42,7 +42,8 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
     # [gitlab_release_rc_version], [gitlab_release_major_version] and [gitlab_release_minor_version] defined in [./scripts/ci/octez-release.sh]
     if [ -n "${gitlab_release_rc_version}" ]; then
       rc="${gitlab_release_rc_version}"
-      jq ". += [{\"major\":${gitlab_release_major_version}, \"minor\":${gitlab_release_minor_version},\"rc\":${rc}}]" "./${versions_list_filename}" > "./tmp.json" && mv "./tmp.json" "./${versions_list_filename}"
+      announcement="https://octez.tezos.com/docs/releases/version-${gitlab_release_major_version}.html"
+      jq ". += [{\"major\":${gitlab_release_major_version}, \"minor\":${gitlab_release_minor_version},\"rc\":${rc},\"announcement\":${announcement}}]" "./${versions_list_filename}" > "./tmp.json" && mv "./tmp.json" "./${versions_list_filename}"
     else
       # This is a release, we assume it's the latest.
       # All the others are marked [latest = false].

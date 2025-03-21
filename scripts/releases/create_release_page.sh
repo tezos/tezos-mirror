@@ -20,18 +20,18 @@ echo "# Octez Releases" >> index.md
 
 # [versions] is a 2D array representation of the [$versions_list_filename] JSON:
 # - one line per release or release candidate
-# - each line has three elements: "[major].[minor] [rc] [latest]"
+# - each line has four elements: "[major].[minor] [rc] [latest] [announcement]"
 #   - [rc] is "null" if it is not a release candidate
 #   - [latest] is "null" if it is not the latest release
 # shellcheck disable=SC2162
-mapfile -t versions < <(jq -r '[.[] | "\(.major).\(.minor) \(.rc // "null") \(.latest // "null")"] | reverse | .[]' "${versions_list_filename}")
+mapfile -t versions < <(jq -r '[.[] | "\(.major).\(.minor) \(.rc // "null") \(.latest // "null") \(.announcement)"] | reverse | .[]' "${versions_list_filename}")
 
 # Define the content of the release page.
 # We iterate on the [$versions] array, distinguishing between three cases:
 # - release candidate
 # - release
 # - latest release
-while read -r version rc latest; do
+while read -r version rc latest announcement; do
   if [[ ${rc} != null ]]; then
     echo "## Octez Release Candidate ${version}~rc${rc}" >> index.md
     version="${version}-rc${rc}"
@@ -42,7 +42,12 @@ while read -r version rc latest; do
       echo "## Octez $version" >> index.md
     fi
   fi
-  echo "### Static Binaries" >> index.md
+
+  {
+    echo -e "Details and changelogs available in [the documentation](${announcement})\n"
+    echo "### Static Binaries"
+  } >> index.md
+
   for arch in x86_64 arm64; do
     echo "#### $arch" >> index.md
 
