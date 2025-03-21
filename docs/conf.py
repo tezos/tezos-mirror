@@ -139,6 +139,20 @@ html_theme_options = {
     'use_download_button': False,
     'use_fullscreen_button': True,
     'use_source_button': True,
+    "icon_links": [
+        {
+            "name": "Up to Tezos docs",
+            "url": "https://docs.tezos.com/",
+            "icon": "_static/tezosdocs.png",
+            "type": "local",
+        },
+        {
+            "name": "Documentation map",
+            "url": "https://docs.tezos.com/overview/resources",
+            "icon": "_static/map.png",
+            "type": "local",
+        },
+    ],
 }
 
 html_theme_options["analytics"] = {
