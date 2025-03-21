@@ -6,6 +6,43 @@
 
 ### Configuration changes
 
+### RPCs changes
+
+### Metrics changes
+
+### Execution changes
+
+### Storage changes
+
+### Documentation changes
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.20 (2025-03-21)
+
+This release contains general UX improvements with the configuration and command
+line interface documentation. Configuration files can now be placed outside the
+data directory and important options can be set up using environment variables,
+both of which should facilitate cloud deployments.
+
+The node will apply one migration to its internal store (version 20), meaning
+it is not possible to downgrade to the previous version. This migration can take
+a couple seconds depending on the machine and is necessary to better track
+relationships between L2 blocks and L1 blocks (information which is exposed in
+new RPCs).
+
+EVM nodes with configuration produced by v0.18 or v0.17 may emit the
+warning `the configuration for the l2_chains experimental feature was
+ignored`. In this case, remove the field `experimental_features.l2_chains` from
+your configuration file to be compatible with future versions.
+
+### Configuration changes
+
 - Fixes `check config` ignoring `--data-dir` when passed `--config-file`.
   (!17214)
 - It is now possible to pass `--config-file` to the commands of the EVM node,
@@ -28,8 +65,6 @@
   finalized. (!16923)
 - New Etherlink specific JSONRPC ``tez_getFinalizedBlocksOfL1Level``
   to retrieve the finalized L2 levels for a given L1 level. (!16923)
-
-### Metrics changes
 
 ### Execution changes
 
