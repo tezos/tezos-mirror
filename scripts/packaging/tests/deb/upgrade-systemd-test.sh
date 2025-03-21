@@ -8,6 +8,9 @@ REPOOLD="https://storage.googleapis.com/$GCP_LINUX_PACKAGES_BUCKET/old/$CI_COMMI
 DISTRO=$1
 RELEASE=$2
 
+# include apt-get function with retry
+. scripts/packaging/tests/tests-common.inc.sh
+
 # For the upgrade script in the CI, we do not want debconf to ask questions
 export DEBIAN_FRONTEND=noninteractive
 
@@ -22,12 +25,12 @@ sudo curl "$REPOOLD/$DISTRO/octez.asc" | sudo gpg --dearmor -o /etc/apt/trusted.
 
 reposityory="deb $REPOOLD/$DISTRO $RELEASE main"
 echo "$reposityory" | sudo tee /etc/apt/sources.list.d/octez-current.list
-sudo apt-get update
+apt-get update
 
 # [install octez]
-sudo apt-get install -y octez-client
-sudo apt-get install -y octez-node
-sudo apt-get install -y octez-baker
+apt-get install -y octez-client
+apt-get install -y octez-node
+apt-get install -y octez-baker
 dpkg -l octez-\*
 
 # [setup Octez node]
@@ -60,25 +63,25 @@ sudo su tezos -c "octez-node config show"
 # [add next repository]
 repository="deb $REPO/$DISTRO $RELEASE main"
 echo "$repository" | sudo tee /etc/apt/sources.list.d/octez-next.list
-sudo apt-get update
+apt-get update
 
 # [upgrade octez]
 # --force-overwrite is necessary because legacy package shipped the zcash
 # parameters as part of the octez-node package.
-sudo apt-get upgrade -y -o DPkg::options::="--force-overwrite" octez-baker
+apt-get upgrade -y -o DPkg::options::="--force-overwrite" octez-baker
 
 cat /etc/default/octez-node
 cat /etc/default/octez-baker
 
-sudo systemctl restart octez-node.service
-sudo systemctl status octez-node.service
+systemctl restart octez-node.service
+systemctl status octez-node.service
 
-sudo systemctl enable octez-baker
-sudo systemctl restart octez-baker.service
+systemctl enable octez-baker
+systemctl restart octez-baker.service
 
-sudo systemctl status octez-baker.service
+systemctl status octez-baker.service
 
-sudo systemctl status octez-baker.service
+systemctl status octez-baker.service
 
 ERR=0
 

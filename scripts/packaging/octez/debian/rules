@@ -43,6 +43,8 @@ override_dh_installlogrotate:
 
 override_dh_install:
 	dh_install
+	mkdir -p debian/octez-baker/etc/default/
+	cp debian/octez-baker.octez-accuser.default debian/octez-baker/etc/default/octez-accuser
 	dh_installdebconf
 
 override_dh_fixperms:

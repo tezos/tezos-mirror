@@ -43,6 +43,9 @@ echo "SNAPSHOT_NO_CHECK=" >> /etc/default/octez-node
 #shellcheck disable=SC1091
 . /etc/default/octez-node
 
+echo "RUNTIME_OPTS=\"--keep-alive --dal-node http://127.0.0.1:10732\"" >> /etc/default/octez-baker
+echo "LQVOTE=off" >> /etc/default/octez-baker
+
 rm -f "$DATADIR/config.json"
 su tezos -c "/usr/bin/octez-node config init \
       --data-dir=$DATADIR \
@@ -54,30 +57,8 @@ su tezos -c "/usr/bin/octez-node config init \
 # if systemd is available we test the service scripts
 if [ "$(ps --no-headers -o comm 1)" = "systemd" ]; then
 
-  systemctl enable octez-node
-  systemctl start octez-node
-
-  systemctl enable octez-baker
-  systemctl start octez-baker.service
-
-  systemctl status octez-baker.service
-
-  sudo su tezos -c "octez-node config show"
-
-  echo "-----------------------"
-  cat /etc/default/octez-node
-
-  echo "-----------------------"
-  cat /etc/default/octez-baker
-
-  echo "-----------------------"
-  tail /var/log/tezos/node.log
-
-  echo "-----------------------"
-  for logfile in /var/log/tezos/baker-P*.log; do
-    if [ -e "$logfile" ]; then
-      tail "$logfile"
-    fi
-  done
+  # This file include the systemd tests and diagnistic common
+  # to both rpm and deb
+  . scripts/packaging/tests/tests-systemd-common.inc.sh
 
 fi

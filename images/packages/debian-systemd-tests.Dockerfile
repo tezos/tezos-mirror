@@ -10,9 +10,11 @@ COPY scripts/ci/systemd-entrypoint.service /etc/systemd/system/bash.service
 #hadolint ignore=DL3045
 COPY scripts/ci/systemd-entrypoint.sh /entrypoint.sh
 #hadolint ignore=DL3045
-COPY docs/introduction/install-bin-deb.sh docs/introduction/install-bin-deb.sh
-#hadolint ignore=DL3045
 COPY scripts/ci/octez-packages-version.sh scripts/ci/octez-packages-version.sh
+#hadolint ignore=DL3045
+COPY scripts/packaging/tests/tests-common.inc.sh scripts/packaging/tests/tests-common.inc.sh
+#hadolint ignore=DL3045
+COPY scripts/packaging/tests/tests-systemd-common.inc.sh scripts/packaging/tests/tests-systemd-common.inc.sh
 #hadolint ignore=DL3045
 COPY script-inputs/active_protocol_versions_without_number script-inputs/active_protocol_versions_without_number
 RUN chown root:root /entrypoint.sh \

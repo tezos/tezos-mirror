@@ -4,4 +4,4 @@
 
 # Other options
 # Keep the daemon process alive
-RUNTIME_OPTS="--keep-alive"
+RUNTIME_OPTS="--keep-alive --dal-node http://127.0.0.1:10732"
