@@ -430,7 +430,7 @@ let default_config =
     data_dir = default_data_dir;
     p2p = default_p2p;
     rpc = default_rpc;
-    log = Logs_simple_config.default_cfg;
+    log = Logs_simple_config.{default_cfg with advertise_levels = true};
     internal_events = None;
     shell = Shell_limits.default_limits;
     blockchain_network = blockchain_network_mainnet;
