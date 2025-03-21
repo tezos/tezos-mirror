@@ -8,6 +8,9 @@ protocol=$(head -1 script-inputs/active_protocol_versions_without_number)
 
 . scripts/ci/octez-packages-version.sh
 
+# include apt-get function with retry
+. scripts/packaging/tests/tests-common.inc.sh
+
 case "$RELEASETYPE" in
 ReleaseCandidate | TestReleaseCandidate)
   distribution="RC/${distroname}"
@@ -71,12 +74,12 @@ fi
 dnf -y install sudo
 
 # [install octez]
-sudo dnf -y install octez-node
-sudo dnf -y install octez-client
-sudo dnf -y install octez-node
-sudo dnf -y install octez-baker
-sudo dnf -y install octez-dal-node
-sudo dnf -y install octez-smart-rollup-node
+dnf -y install octez-node
+dnf -y install octez-client
+dnf -y install octez-node
+dnf -y install octez-baker
+dnf -y install octez-dal-node
+dnf -y install octez-smart-rollup-node
 # [end install octez]
 
 # [test executables]
@@ -86,4 +89,4 @@ octez-node --version
 "octez-accuser-$protocol" --version
 
 # [test autopurge]
-sudo dnf -y remove octez-node octez-client octez-baker octez-dal-node octez-smart-rollup-node
+dnf -y remove octez-node octez-client octez-baker octez-dal-node octez-smart-rollup-node

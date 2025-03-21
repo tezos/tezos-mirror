@@ -23,6 +23,9 @@ dnf_analysis_errors() {
   *"Downloading successful, but checksum doesn't match."*)
     return 1 # Retry
     ;;
+  *"All mirrors were tried"*)
+    return 1 # Retry
+    ;;
   *)
     return 0 # No retry
     ;;
