@@ -1079,6 +1079,14 @@ import_finished:
     { /* import_finished version 0 */
       "import_finished.v0": any }
   
+importing_legacy_snapshot:
+  description: Importing a legacy snapshot. Consider using a snapshot generated from a more recent node.
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* importing_legacy_snapshot version 0 */
+      "importing_legacy_snapshot.v0": any }
+  
 importing_snapshot:
   description: importing snapshot
   level: notice

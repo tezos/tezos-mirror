@@ -109,6 +109,16 @@ let legacy_mode =
        snapshot to start using the new block storage"
     ()
 
+let importing_legacy_snapshot =
+  Internal_event.Simple.declare_0
+    ~section
+    ~name:"importing_legacy_snapshot"
+    ~level:Warning
+    ~msg:
+      "Importing a legacy snapshot. Consider using a snapshot generated from a \
+       more recent node."
+    ()
+
 let spawn_rpc_is_ready =
   Internal_event.Simple.declare_0
     ~section
@@ -597,6 +607,8 @@ let download_in_progress ~size ~remaining_size ~elapsed_time url =
 let download_failed url reason = emit download_failed (url, reason)
 
 let importing_snapshot () = emit importing_snapshot ()
+
+let importing_legacy_snapshot () = emit importing_legacy_snapshot ()
 
 let exporting_snapshot snapshot = emit exporting_snapshot snapshot
 

@@ -364,6 +364,9 @@ you start using them, you probably want to use `octez-evm-node check config
 
 - New snapshot header for Sqlite3 block storage. Snapshots in the previous
   format are called legacy as reported by the `snapshot info` command. (!16435)
+- Disallow importing of snapshots in the legacy format, unless the flag
+ `--force` is provided, or the data dir already contains block storage in the
+ legacy format. (!16438)
 
 ## Version 0.14 (2025-01-21)
 

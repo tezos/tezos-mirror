@@ -2460,7 +2460,8 @@ let import_snapshot_command =
        (force_arg
           ~doc:
             "Allow importing snapshot in already populated data dir (previous \
-             contents is removed first, even if the snapshot is corrupted)"))
+             contents is removed first, even if the snapshot is corrupted), or \
+             importing a legacy snapshot in an empty data dir."))
     (prefixes ["snapshot"; "import"] @@ Params.snapshot_file_or_url @@ stop)
     (fun (data_dir, force) snapshot_file () ->
       let open Lwt_result_syntax in

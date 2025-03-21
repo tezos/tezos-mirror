@@ -309,20 +309,35 @@ let check_snapshot_exists snapshot_file =
   let*! snapshot_file_exists = Lwt_unix.file_exists snapshot_file in
   fail_when (not snapshot_file_exists) (File_not_found snapshot_file)
 
-let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
-    =
+let check_header ~populated ~force ~data_dir (header : Header.t) :
+    unit tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let header_rollup_address, Qty header_current_level, header_history =
+  let ( header_rollup_address,
+        Qty header_current_level,
+        header_history,
+        header_legacy ) =
     match header with
     | V0_legacy {rollup_address; current_level} ->
-        (rollup_address, current_level, None)
+        (rollup_address, current_level, None, true)
     | V1 {rollup_address; current_level; history_mode; first_level} ->
-        (rollup_address, current_level, Some (history_mode, first_level))
+        (rollup_address, current_level, Some (history_mode, first_level), false)
+  in
+  let* () =
+    if (not populated) && header_legacy && not force then
+      failwith
+        "Snapshot uses legacy block storage, please import a snapshot \
+         generated from a more recent node (or use --force to still import the \
+         legacy snapshot)."
+    else if header_legacy then
+      let*! () = Events.importing_legacy_snapshot () in
+      return_unit
+    else return_unit
   in
   when_ populated @@ fun () ->
   let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
   Evm_store.use store @@ fun conn ->
   let* metadata = Evm_store.Metadata.find conn in
+  let* legacy = Evm_store.Block_storage_mode.legacy conn in
   let* () =
     match metadata with
     | None -> return_unit
@@ -330,6 +345,17 @@ let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
         fail_unless
           Address.(header_rollup_address = r)
           (Incorrect_rollup (header_rollup_address, r))
+  in
+  let* () =
+    match (header_legacy, legacy) with
+    | true, _ ->
+        (* Legacy block storage will be replaced with new block storage *)
+        return_unit
+    | false, false -> return_unit
+    | false, true ->
+        failwith
+          "Snapshot uses legacy block storage but already populated with new \
+           Sqlite3 block storage"
   in
   let* () =
     match (header_history, metadata) with
@@ -400,7 +426,7 @@ let import ~force ~data_dir ~snapshot_file =
     extract
       reader
       stdlib_writer
-      (check_header ~populated ~data_dir)
+      (check_header ~force ~populated ~data_dir)
       ~cancellable:true
       ~display_progress:
         (`Periodic_event
