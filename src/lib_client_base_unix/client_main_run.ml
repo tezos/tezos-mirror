@@ -418,8 +418,7 @@ let warn_if_argv0_name_not_octez () =
         executable_name
 
 (* Main (lwt) entry *)
-let main (module C : M) ~select_commands ?cmd_args ?(disable_logging = false) ()
-    =
+let main (module C : M) ~select_commands ?(disable_logging = false) () =
   let open Lwt_result_syntax in
   let global_options = C.global_options () in
   let executable_name = Filename.basename Sys.executable_name in
@@ -432,7 +431,7 @@ let main (module C : M) ~select_commands ?cmd_args ?(disable_logging = false) ()
       | x :: rest -> move_autocomplete_token_upfront (x :: acc) rest
       | [] -> (List.rev acc, None)
     in
-    match Option.value ~default:(Array.to_list Sys.argv) cmd_args with
+    match Array.to_list Sys.argv with
     | _ :: args -> move_autocomplete_token_upfront [] args
     | [] -> ([], None)
   in
@@ -657,8 +656,8 @@ let lwt_run (module M : M)
     ~(select_commands :
        RPC_client_unix.http_ctxt ->
        Client_config.cli_args ->
-       Client_context.full Tezos_clic.command list tzresult Lwt.t) ?cmd_args
+       Client_context.full Tezos_clic.command list tzresult Lwt.t)
     ?disable_logging () =
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
   Lwt_exit.wrap_and_forward
-  @@ main (module M) ~select_commands ?cmd_args ?disable_logging ()
+  @@ main (module M) ~select_commands ?disable_logging ()

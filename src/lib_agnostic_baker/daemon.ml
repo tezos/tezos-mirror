@@ -25,14 +25,12 @@ type process = {thread : int Lwt.t; canceller : int Lwt.u}
 
 type baker = {protocol_hash : Protocol_hash.t; process : process}
 
-(** [run_thread ~protocol_hash ~baker_commands ~baker_args ~cancel_promise ~logs_path]
+(** [run_thread ~protocol_hash ~baker_commands ~cancel_promise ~logs_path]
     returns the main running thread for the baker given its protocol [~procol_hash],
-    corresponding commands [~baker_commands], with the command line arguments given by
-    [~baker_args] and Lwt cancellation promise [~cancel_promise].
+    corresponding commands [~baker_commands] and Lwt cancellation promise [~cancel_promise].
 
     The event logs are stored according to [~logs_path]. *)
-let run_thread ~protocol_hash ~baker_commands ~baker_args ~cancel_promise
-    ~logs_path =
+let run_thread ~protocol_hash ~baker_commands ~cancel_promise ~logs_path =
   let () =
     Client_commands.register protocol_hash @@ fun _network -> baker_commands
   in
@@ -58,26 +56,16 @@ let run_thread ~protocol_hash ~baker_commands ~baker_args ~cancel_promise
       Client_main_run.lwt_run
         (module Config)
         ~select_commands
-        ~cmd_args:baker_args
           (* The underlying logging from the baker must not be initialised, otherwise we double log. *)
         ~disable_logging:true
         ();
       cancel_promise;
     ]
 
-(** [spawn_baker protocol_hash ~baker_args] spawns a new baker process for the
-    given [protocol_hash] with command-line arguments [~baker_args]. *)
-let spawn_baker protocol_hash ~baker_args =
+(** [spawn_baker protocol_hash] spawns a new baker process for the given [protocol_hash]. *)
+let spawn_baker protocol_hash =
   let open Lwt_result_syntax in
-  let args_as_string =
-    String.concat " " @@ Option.value ~default:[] @@ List.tl baker_args
-  in
-  let*! () =
-    Agnostic_baker_events.(emit starting_baker) (protocol_hash, args_as_string)
-  in
-  (* Prepend a dummy binary argument required for command-line parsing. The argument
-     will be discarded, so its value is not important. *)
-  let baker_args = "./mock-binary" :: baker_args in
+  let*! () = Agnostic_baker_events.(emit starting_baker) protocol_hash in
   let cancel_promise, canceller = Lwt.wait () in
   let* thread =
     let*? plugin =
@@ -90,7 +78,6 @@ let spawn_baker protocol_hash ~baker_args =
     @@ run_thread
          ~protocol_hash
          ~baker_commands
-         ~baker_args
          ~cancel_promise
          ~logs_path:Parameters.default_daily_logs_path
   in
@@ -101,7 +88,6 @@ type baker_to_kill = {baker : baker; level_to_kill : int}
 
 type 'a state = {
   node_endpoint : string;
-  baker_args : string list;
   mutable current_baker : baker option;
   mutable old_baker : baker_to_kill option;
 }
@@ -158,9 +144,7 @@ let hot_swap_baker ~state ~current_protocol_hash ~next_protocol_hash
   state.old_baker <-
     Some {baker = current_baker; level_to_kill = level_to_kill_old_baker} ;
   state.current_baker <- None ;
-  let* new_baker =
-    spawn_baker next_protocol_hash ~baker_args:state.baker_args
-  in
+  let* new_baker = spawn_baker next_protocol_hash in
   state.current_baker <- Some new_baker ;
   return_unit
 
@@ -285,9 +269,7 @@ let may_start_initial_baker state =
     in
     match proto_status with
     | Active ->
-        let* current_baker =
-          spawn_baker protocol_hash ~baker_args:state.baker_args
-        in
+        let* current_baker = spawn_baker protocol_hash in
         state.current_baker <- Some current_baker ;
         return_unit
     | Frozen -> (
@@ -315,8 +297,8 @@ let may_start_initial_baker state =
   in
   may_start ~head_stream:None ()
 
-let create ~node_endpoint ~baker_args =
-  {node_endpoint; baker_args; current_baker = None; old_baker = None}
+let create ~node_endpoint =
+  {node_endpoint; current_baker = None; old_baker = None}
 
 let run state =
   let open Lwt_result_syntax in

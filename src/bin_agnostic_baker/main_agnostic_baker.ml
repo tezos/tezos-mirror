@@ -24,9 +24,7 @@ let[@warning "-32"] may_start_profiler baking_dir =
 
 let lwt_run () =
   let open Lwt_result_syntax in
-  let Run_args.{node_endpoint; base_dir; baker_args} =
-    Run_args.parse_args Sys.argv
-  in
+  let Run_args.{node_endpoint; base_dir} = Run_args.parse_args Sys.argv in
   let base_dir =
     Option.value
       ~default:Tezos_client_base_unix.Client_config.Cfg_file.default.base_dir
@@ -38,7 +36,7 @@ let lwt_run () =
       ()
   in
   () [@profiler.overwrite may_start_profiler base_dir] ;
-  let daemon = Daemon.create ~node_endpoint ~baker_args in
+  let daemon = Daemon.create ~node_endpoint in
   let* (_ : unit) = Daemon.run daemon in
   let*! () = Lwt_utils.never_ending () in
   return_unit

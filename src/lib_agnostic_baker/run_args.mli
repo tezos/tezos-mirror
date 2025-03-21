@@ -13,13 +13,9 @@ val is_help_cmd : string list -> bool
 val is_version_cmd : string list -> bool
 
 (** Simple wrapper to handle the arguments of the agnostic baker. *)
-type args = {
-  node_endpoint : string;
-  base_dir : string option;
-  baker_args : string list;
-}
+type args = {node_endpoint : string; base_dir : string option}
 
 (** [parse_args args] is a raw utility that aims to parse the given
     arguments from the command line and to return, respectively, the
-    [endpoint], [base_dir] and [baker_args]. *)
+    [endpoint] and [base_dir]. *)
 val parse_args : string array -> args
