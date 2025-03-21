@@ -74,7 +74,7 @@ In the above cases, it would be possible to create a new (sub-)issue, and refere
 Therefore, in such cases, it can be more convenient to refer to an MR directly.
 
 Note that the reference to an existing issue or MR on the first line is mandatory, to facilitate searches of specific evolutions.
-These tags might be checked automatically by the :ref:`Merge-Request Bot <merge_bot>`, e.g. to signal tags that refer to non-existent issues or MRs, to closed issues, or to already merged MRs.
+These tags might be checked automatically, e.g. to signal tags that refer to non-existent issues or MRs, to closed issues, or to already merged MRs.
 The reference to an issue may be one of:
 
 - a URL such as ``https://gitlab.com/tezos/tezos/-/issues/1377``

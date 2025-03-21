@@ -70,7 +70,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Tezos'
-copyright = '2018-2024'
+copyright = '2018-2025'
 author = 'Contributors to the Octez & Tezos protocol documentation'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -262,6 +262,8 @@ linkcheck_ignore = [
     r'^https://crates\.io/crates/tezos-smart-rollup',
     r'^https://rpc\.ghostnet\.teztnets\.com/chains/main/blocks/',
     r'^https://gitlab\.com/tezos/tezos/-/merge_requests/2771',
+    r'^https://gitlab\.com/tezos/tezos/-/merge_requests/3163',
+    r'^https://gitlab\.com/tezos/tezos/-/merge_requests/3225',
 ]
 linkcheck_allowed_redirects = dict(
     [
