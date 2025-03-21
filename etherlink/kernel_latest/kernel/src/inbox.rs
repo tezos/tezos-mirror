@@ -7,7 +7,7 @@
 
 use crate::blueprint_storage::store_sequencer_blueprint;
 use crate::bridge::Deposit;
-use crate::chains::{ChainConfig, ChainFamily};
+use crate::chains::{ChainConfigTrait, ChainFamily, EvmChainConfig};
 use crate::configuration::{DalConfiguration, TezosContracts};
 use crate::dal::fetch_and_parse_sequencer_blueprint_from_dal;
 use crate::dal_slot_import_signal::DalSlotImportSignals;
@@ -26,13 +26,10 @@ use crate::storage::{
 };
 use crate::tick_model::constants::TICKS_FOR_BLUEPRINT_INTERCEPT;
 use crate::tick_model::maximum_ticks_for_sequencer_chunk;
-use crate::transaction::{
-    Transaction, TransactionContent, Transactions,
-    Transactions::{EthTxs, TezTxs},
-};
+use crate::transaction::{Transaction, TransactionContent, Transactions};
+use crate::upgrade;
 use crate::upgrade::*;
 use crate::Error;
-use crate::{simulation, upgrade};
 use evm_execution::fa_bridge::deposit::FaDeposit;
 use primitive_types::U256;
 use sha3::{Digest, Keccak256};
@@ -416,7 +413,11 @@ enum ReadStatus {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn read_and_dispatch_input<Host: Runtime, Mode: Parsable + InputHandler>(
+fn read_and_dispatch_input<
+    Host: Runtime,
+    Mode: Parsable + InputHandler,
+    ChainConfig: ChainConfigTrait,
+>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
@@ -453,14 +454,7 @@ fn read_and_dispatch_input<Host: Runtime, Mode: Parsable + InputHandler>(
             // kernel enters in simulation mode, reading will be done by the
             // simulation and all the previous and next transactions are
             // discarded.
-            match chain_configuration {
-                ChainConfig::Evm(evm) => simulation::start_simulation_mode(
-                    host,
-                    enable_fa_bridge,
-                    evm.get_evm_config(),
-                ),
-                ChainConfig::Michelson(_) => Ok(()),
-            }?;
+            chain_configuration.start_simulation_mode(host, enable_fa_bridge)?;
             Ok(ReadStatus::FinishedIgnore)
         }
         InputResult::Input(input) => {
@@ -482,20 +476,18 @@ pub fn read_proxy_inbox<Host: Runtime>(
     tezos_contracts: &TezosContracts,
     enable_fa_bridge: bool,
     garbage_collect_blocks: bool,
-    chain_configuration: &ChainConfig,
+    chain_configuration: &EvmChainConfig,
 ) -> Result<Option<ProxyInboxContent>, anyhow::Error> {
-    let transactions = match ChainConfig::get_chain_family(chain_configuration) {
-        ChainFamily::Evm => EthTxs(vec![]),
-        ChainFamily::Michelson => TezTxs,
+    let mut res = ProxyInboxContent {
+        transactions: Transactions::EthTxs(vec![]),
     };
-    let mut res = ProxyInboxContent { transactions };
     // The mutable variable is used to retrieve the information of whether the
     // inbox was empty or not. As we consume all the inbox in one go, if the
     // variable remains true, that means that the inbox was already consumed
     // during this kernel run.
     let mut inbox_is_empty = true;
     loop {
-        match read_and_dispatch_input::<Host, ProxyInput>(
+        match read_and_dispatch_input::<Host, ProxyInput, EvmChainConfig>(
             host,
             smart_rollup_address,
             tezos_contracts,
@@ -546,7 +538,7 @@ pub enum StageOneStatus {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn read_sequencer_inbox<Host: Runtime>(
+pub fn read_sequencer_inbox<Host: Runtime, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
@@ -587,7 +579,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
             );
             return Ok(StageOneStatus::Reboot);
         };
-        match read_and_dispatch_input::<Host, SequencerInput>(
+        match read_and_dispatch_input::<Host, SequencerInput, ChainConfig>(
             host,
             smart_rollup_address,
             tezos_contracts,
@@ -633,7 +625,7 @@ mod tests {
         blueprint_path, store_current_block_header, BlockHeader, BlueprintHeader,
         ChainHeader, EVMBlockHeader,
     };
-    use crate::chains::test_chain_config;
+    use crate::chains::test_evm_chain_config;
     use crate::configuration::TezosContracts;
     use crate::dal_slot_import_signal::{
         DalSlotIndicesList, DalSlotIndicesOfLevel, UnsignedDalSlotSignals,
@@ -641,7 +633,7 @@ mod tests {
     use crate::parsing::RollupType;
     use crate::storage::*;
     use crate::tick_model::constants::MAX_ALLOWED_TICKS;
-    use crate::transaction::TransactionContent::Ethereum;
+    use crate::transaction::{TransactionContent::Ethereum, Transactions::EthTxs};
     use primitive_types::U256;
     use rlp::Encodable;
     use std::fmt::Write;
@@ -789,7 +781,7 @@ mod tests {
             &TezosContracts::default(),
             false,
             false,
-            &test_chain_config(),
+            &test_evm_chain_config(),
         )
         .unwrap()
         .unwrap();
@@ -821,7 +813,7 @@ mod tests {
             &TezosContracts::default(),
             false,
             false,
-            &test_chain_config(),
+            &test_evm_chain_config(),
         )
         .unwrap()
         .unwrap();
@@ -878,7 +870,7 @@ mod tests {
             },
             false,
             false,
-            &test_chain_config(),
+            &test_evm_chain_config(),
         )
         .unwrap()
         .unwrap();
@@ -925,7 +917,7 @@ mod tests {
             &TezosContracts::default(),
             false,
             false,
-            &test_chain_config(),
+            &test_evm_chain_config(),
         )
         .unwrap();
 
@@ -977,7 +969,7 @@ mod tests {
             &TezosContracts::default(),
             false,
             false,
-            &test_chain_config(),
+            &test_evm_chain_config(),
         )
         .unwrap();
 
@@ -1017,7 +1009,7 @@ mod tests {
             &TezosContracts::default(),
             false,
             false,
-            &test_chain_config(),
+            &test_evm_chain_config(),
         )
         .unwrap();
 
@@ -1074,7 +1066,7 @@ mod tests {
             &TezosContracts::default(),
             false,
             false,
-            &test_chain_config(),
+            &test_evm_chain_config(),
         )
         .unwrap()
         .unwrap();
@@ -1096,7 +1088,7 @@ mod tests {
             &TezosContracts::default(),
             false,
             false,
-            &test_chain_config(),
+            &test_evm_chain_config(),
         )
         .unwrap()
         .unwrap();
@@ -1159,7 +1151,7 @@ mod tests {
             &TezosContracts::default(),
             false,
             false,
-            &test_chain_config(),
+            &test_evm_chain_config(),
         )
         .unwrap()
         .unwrap();
@@ -1184,7 +1176,7 @@ mod tests {
             &TezosContracts::default(),
             false,
             false,
-            &test_chain_config(),
+            &test_evm_chain_config(),
         )
         .unwrap();
         assert!(inbox_content.is_some());
@@ -1196,7 +1188,7 @@ mod tests {
             &TezosContracts::default(),
             false,
             false,
-            &test_chain_config(),
+            &test_evm_chain_config(),
         )
         .unwrap();
         assert!(inbox_content.is_none());
@@ -1303,7 +1295,7 @@ mod tests {
             MAX_ALLOWED_TICKS,
             None,
             false,
-            &test_chain_config(),
+            &test_evm_chain_config(),
         )
         .unwrap();
 

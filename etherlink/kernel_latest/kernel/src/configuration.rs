@@ -247,9 +247,7 @@ pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
                 },
                 Err(err) => {
                     log!(host, Fatal, "The kernel failed to created the delayed inbox, reverting configuration to proxy ({:?})", err);
-                    Configuration {
-                        ..Configuration::default()
-                    }
+                    Configuration::default()
                 }
             }
         }

@@ -90,21 +90,12 @@ impl Decodable for TransactionContent {
 #[derive(PartialEq, Debug, Clone)]
 pub enum Transactions {
     EthTxs(Vec<Transaction>),
-    TezTxs,
 }
 
 impl Transactions {
-    pub fn number_of_txs(&self) -> usize {
-        match self {
-            Self::EthTxs(transactions) => transactions.len(),
-            Self::TezTxs => 0,
-        }
-    }
-
     pub fn push(&mut self, tx: Transaction) {
         match self {
             Self::EthTxs(transactions) => transactions.push(tx),
-            Self::TezTxs => (),
         }
     }
 }
@@ -114,9 +105,6 @@ impl Encodable for Transactions {
         match self {
             Self::EthTxs(transactions) => {
                 s.append_list(transactions);
-            }
-            Self::TezTxs => {
-                s.append_list::<Transaction, Transaction>(&[]);
             }
         }
     }

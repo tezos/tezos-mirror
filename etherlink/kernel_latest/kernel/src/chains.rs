@@ -3,10 +3,32 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    fees::MINIMUM_BASE_FEE_PER_GAS, tick_model::constants::MAXIMUM_GAS_LIMIT, CHAIN_ID,
+    block::{eth_bip_from_blueprint, BlockComputationResult, TickCounter},
+    block_in_progress::EthBlockInProgress,
+    blueprint::Blueprint,
+    blueprint_storage::{
+        DelayedTransactionFetchingResult, EVMBlockHeader, TezBlockHeader,
+    },
+    delayed_inbox::DelayedInbox,
+    fees::MINIMUM_BASE_FEE_PER_GAS,
+    l2block::L2Block,
+    simulation::start_simulation_mode,
+    tick_model::constants::MAXIMUM_GAS_LIMIT,
+    transaction::Transactions::EthTxs,
+    CHAIN_ID,
 };
-use evm_execution::configuration::EVMVersion;
-use primitive_types::U256;
+use anyhow::Context;
+use evm_execution::{
+    configuration::EVMVersion, precompiles::PrecompileBTreeMap, trace::TracerInput,
+};
+use primitive_types::{H160, H256, U256};
+use rlp::{Decodable, Encodable};
+use std::fmt::{Debug, Display};
+use tezos_evm_logging::{log, Level::*};
+use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
+use tezos_smart_rollup_host::path::Path;
+use tezos_tezlink::block::TezBlock;
 
 #[derive(Clone, Copy, Debug)]
 pub enum ChainFamily {
@@ -42,31 +64,271 @@ pub struct MichelsonChainConfig {
     chain_id: U256,
 }
 
+pub trait BlockInProgressTrait {
+    fn number(&self) -> U256;
+}
+
+impl BlockInProgressTrait for EthBlockInProgress {
+    fn number(&self) -> U256 {
+        self.number
+    }
+}
+
+pub struct TezBlockInProgress {
+    number: U256,
+    timestamp: Timestamp,
+    previous_hash: H256,
+}
+
+impl BlockInProgressTrait for TezBlockInProgress {
+    fn number(&self) -> U256 {
+        self.number
+    }
+}
+
 pub enum ChainConfig {
     Evm(Box<EvmChainConfig>),
     Michelson(MichelsonChainConfig),
 }
 
-pub trait ChainConfigTrait: std::fmt::Debug {
-    fn get_chain_id(&self) -> U256;
+pub trait TransactionsTrait {
+    fn extend(&mut self, other: Self);
+    fn number_of_txs(&self) -> usize;
+}
 
-    fn fmt(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-        chain_family: ChainFamily,
-    ) -> std::fmt::Result {
-        write!(f, "{{Chain family: {}, {:?}}}", chain_family, self)
+impl TransactionsTrait for crate::transaction::Transactions {
+    fn extend(&mut self, other: Self) {
+        let EthTxs(ref mut txs) = self;
+        let EthTxs(other) = other;
+        txs.extend(other)
+    }
+    fn number_of_txs(&self) -> usize {
+        let EthTxs(txs) = self;
+        txs.len()
     }
 }
 
+#[derive(Debug)]
+pub struct TezTransactions {}
+
+impl TransactionsTrait for TezTransactions {
+    fn extend(&mut self, _: Self) {}
+
+    fn number_of_txs(&self) -> usize {
+        0
+    }
+}
+
+impl Encodable for TezTransactions {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        let Self {} = self;
+        stream.begin_list(0);
+    }
+}
+
+impl Decodable for TezTransactions {
+    fn decode(_decoder: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
+        Ok(Self {})
+    }
+}
+
+pub trait ChainHeaderTrait {
+    fn hash(&self) -> H256;
+
+    fn genesis_header() -> Self;
+}
+
+impl ChainHeaderTrait for crate::blueprint_storage::EVMBlockHeader {
+    fn hash(&self) -> H256 {
+        self.hash
+    }
+    fn genesis_header() -> Self {
+        EVMBlockHeader {
+            hash: crate::block::GENESIS_PARENT_HASH,
+            receipts_root: vec![0; 32],
+            transactions_root: vec![0; 32],
+        }
+    }
+}
+
+impl ChainHeaderTrait for crate::blueprint_storage::TezBlockHeader {
+    fn hash(&self) -> H256 {
+        self.hash
+    }
+
+    fn genesis_header() -> Self {
+        Self {
+            hash: TezBlock::genesis_block_hash(),
+        }
+    }
+}
+
+pub trait ChainConfigTrait: Debug {
+    type Transactions: TransactionsTrait + Encodable + Decodable + Debug;
+
+    type BlockInProgress: BlockInProgressTrait;
+
+    type ChainHeader: ChainHeaderTrait + Decodable;
+
+    fn get_chain_id(&self) -> U256;
+
+    fn get_chain_family(&self) -> ChainFamily;
+
+    fn fmt_with_family(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let chain_family = self.get_chain_family();
+        write!(f, "{{Chain family: {}, {:?}}}", chain_family, self)
+    }
+
+    fn fetch_hashes_from_delayed_inbox(
+        host: &mut impl Runtime,
+        delayed_hashes: Vec<crate::delayed_inbox::Hash>,
+        delayed_inbox: &mut DelayedInbox,
+        current_blueprint_size: usize,
+    ) -> anyhow::Result<(DelayedTransactionFetchingResult<Self::Transactions>, usize)>;
+
+    fn transactions_from_bytes(bytes: Vec<Vec<u8>>)
+        -> anyhow::Result<Self::Transactions>;
+
+    fn block_in_progress_from_blueprint(
+        &self,
+        host: &impl Runtime,
+        tick_counter: &crate::block::TickCounter,
+        current_block_number: U256,
+        previous_chain_header: Self::ChainHeader,
+        blueprint: Blueprint<Self::Transactions>,
+    ) -> Self::BlockInProgress;
+
+    fn read_block_in_progress(
+        host: &impl Runtime,
+    ) -> anyhow::Result<Option<Self::BlockInProgress>>;
+
+    #[allow(clippy::too_many_arguments)]
+    fn compute_bip<Host: Runtime>(
+        &self,
+        host: &mut Host,
+        outbox_queue: &OutboxQueue<'_, impl Path>,
+        block_in_progress: Self::BlockInProgress,
+        precompiles: &PrecompileBTreeMap<Host>,
+        tick_counter: &mut TickCounter,
+        sequencer_pool_address: Option<H160>,
+        maximum_allowed_ticks: u64,
+        tracer_input: Option<TracerInput>,
+        da_fee_per_byte: U256,
+        coinbase: H160,
+    ) -> anyhow::Result<BlockComputationResult>;
+
+    fn start_simulation_mode(
+        &self,
+        host: &mut impl Runtime,
+        enable_fa_bridge: bool,
+    ) -> anyhow::Result<()>;
+}
+
 impl ChainConfigTrait for EvmChainConfig {
+    type Transactions = crate::transaction::Transactions;
+
+    type BlockInProgress = crate::block_in_progress::EthBlockInProgress;
+
+    type ChainHeader = crate::blueprint_storage::EVMBlockHeader;
+
     fn get_chain_id(&self) -> U256 {
         self.chain_id
+    }
+
+    fn get_chain_family(&self) -> ChainFamily {
+        ChainFamily::Evm
+    }
+
+    fn block_in_progress_from_blueprint(
+        &self,
+        host: &impl Runtime,
+        tick_counter: &crate::block::TickCounter,
+        current_block_number: U256,
+        header: Self::ChainHeader,
+        blueprint: Blueprint<Self::Transactions>,
+    ) -> Self::BlockInProgress {
+        eth_bip_from_blueprint(
+            host,
+            self,
+            tick_counter,
+            current_block_number,
+            header,
+            blueprint,
+        )
+    }
+
+    fn transactions_from_bytes(
+        bytes: Vec<Vec<u8>>,
+    ) -> anyhow::Result<Self::Transactions> {
+        Ok(EthTxs(crate::blueprint_storage::transactions_from_bytes(
+            bytes,
+        )?))
+    }
+
+    fn fetch_hashes_from_delayed_inbox(
+        host: &mut impl Runtime,
+        delayed_hashes: Vec<crate::delayed_inbox::Hash>,
+        delayed_inbox: &mut DelayedInbox,
+        current_blueprint_size: usize,
+    ) -> anyhow::Result<(DelayedTransactionFetchingResult<Self::Transactions>, usize)>
+    {
+        crate::blueprint_storage::fetch_hashes_from_delayed_inbox(
+            host,
+            delayed_hashes,
+            delayed_inbox,
+            current_blueprint_size,
+        )
+    }
+
+    fn read_block_in_progress(
+        host: &impl Runtime,
+    ) -> anyhow::Result<Option<Self::BlockInProgress>> {
+        crate::storage::read_block_in_progress(host)
+    }
+
+    fn compute_bip<Host: Runtime>(
+        &self,
+        host: &mut Host,
+        outbox_queue: &OutboxQueue<'_, impl Path>,
+        block_in_progress: Self::BlockInProgress,
+        precompiles: &PrecompileBTreeMap<Host>,
+        tick_counter: &mut TickCounter,
+        sequencer_pool_address: Option<H160>,
+        maximum_allowed_ticks: u64,
+        tracer_input: Option<TracerInput>,
+        da_fee_per_byte: U256,
+        coinbase: H160,
+    ) -> anyhow::Result<BlockComputationResult> {
+        log!(host, Debug, "Computing the BlockInProgress for Etherlink");
+
+        crate::block::compute_bip(
+            host,
+            outbox_queue,
+            block_in_progress,
+            precompiles,
+            tick_counter,
+            sequencer_pool_address,
+            &self.limits,
+            maximum_allowed_ticks,
+            tracer_input,
+            self.chain_id,
+            da_fee_per_byte,
+            coinbase,
+            &self.evm_config,
+        )
+    }
+
+    fn start_simulation_mode(
+        &self,
+        host: &mut impl Runtime,
+        enable_fa_bridge: bool,
+    ) -> anyhow::Result<()> {
+        start_simulation_mode(host, enable_fa_bridge, &self.evm_config)
     }
 }
 
 impl EvmChainConfig {
-    fn create_config(
+    pub fn create_config(
         chain_id: U256,
         limits: EvmLimits,
         evm_config: evm_execution::Config,
@@ -88,8 +350,99 @@ impl EvmChainConfig {
 }
 
 impl ChainConfigTrait for MichelsonChainConfig {
+    type Transactions = TezTransactions;
+    type BlockInProgress = TezBlockInProgress;
+    type ChainHeader = TezBlockHeader;
+
     fn get_chain_id(&self) -> U256 {
         self.chain_id
+    }
+
+    fn get_chain_family(&self) -> ChainFamily {
+        ChainFamily::Michelson
+    }
+
+    fn block_in_progress_from_blueprint(
+        &self,
+        _host: &impl Runtime,
+        _tick_counter: &crate::block::TickCounter,
+        current_block_number: U256,
+        header: Self::ChainHeader,
+        blueprint: Blueprint<Self::Transactions>,
+    ) -> Self::BlockInProgress {
+        TezBlockInProgress {
+            number: current_block_number,
+            timestamp: blueprint.timestamp,
+            previous_hash: header.hash,
+        }
+    }
+
+    fn fetch_hashes_from_delayed_inbox(
+        _host: &mut impl Runtime,
+        _delayed_hashes: Vec<crate::delayed_inbox::Hash>,
+        _delayed_inbox: &mut DelayedInbox,
+        current_blueprint_size: usize,
+    ) -> anyhow::Result<(DelayedTransactionFetchingResult<Self::Transactions>, usize)>
+    {
+        Ok((
+            DelayedTransactionFetchingResult::Ok(TezTransactions {}),
+            current_blueprint_size,
+        ))
+    }
+
+    fn transactions_from_bytes(
+        _bytes: Vec<Vec<u8>>,
+    ) -> anyhow::Result<Self::Transactions> {
+        Ok(TezTransactions {})
+    }
+
+    fn read_block_in_progress(
+        _host: &impl Runtime,
+    ) -> anyhow::Result<Option<Self::BlockInProgress>> {
+        Ok(None)
+    }
+
+    fn compute_bip<Host: Runtime>(
+        &self,
+        host: &mut Host,
+        _outbox_queue: &OutboxQueue<'_, impl Path>,
+        block_in_progress: Self::BlockInProgress,
+        _precompiles: &PrecompileBTreeMap<Host>,
+        _tick_counter: &mut TickCounter,
+        _sequencer_pool_address: Option<H160>,
+        _maximum_allowed_ticks: u64,
+        _tracer_input: Option<TracerInput>,
+        _da_fee_per_byte: U256,
+        _coinbase: H160,
+    ) -> anyhow::Result<BlockComputationResult> {
+        let TezBlockInProgress {
+            number,
+            timestamp,
+            previous_hash,
+        } = block_in_progress;
+        log!(
+            host,
+            Debug,
+            "Computing the BlockInProgress for Tezlink at level {}",
+            number
+        );
+
+        let tezblock = TezBlock::new(number, timestamp, previous_hash);
+        let new_block = L2Block::Tezlink(tezblock);
+        crate::block_storage::store_current(host, &new_block)
+            .context("Failed to store the current block")?;
+        Ok(BlockComputationResult::Finished {
+            included_delayed_transactions: vec![],
+            block: new_block,
+        })
+    }
+
+    fn start_simulation_mode(
+        &self,
+        _host: &mut impl Runtime,
+        _enable_fa_bridge: bool,
+    ) -> anyhow::Result<()> {
+        Ok(())
     }
 }
 
@@ -131,7 +484,7 @@ impl ChainConfig {
     }
 }
 
-impl std::fmt::Display for ChainFamily {
+impl Display for ChainFamily {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Evm => write!(f, "EVM"),
@@ -161,13 +514,12 @@ impl Default for ChainConfig {
     }
 }
 
-impl std::fmt::Display for ChainConfig {
+impl Display for ChainConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let chain_family = self.get_chain_family();
         match self {
-            ChainConfig::Evm(evm_chain_config) => evm_chain_config.fmt(f, chain_family),
+            ChainConfig::Evm(evm_chain_config) => evm_chain_config.fmt_with_family(f),
             ChainConfig::Michelson(michelson_chain_config) => {
-                michelson_chain_config.fmt(f, chain_family)
+                michelson_chain_config.fmt_with_family(f)
             }
         }
     }
@@ -184,10 +536,15 @@ impl Default for EvmChainConfig {
 }
 
 #[cfg(test)]
-pub fn test_chain_config() -> ChainConfig {
-    ChainConfig::new_evm_config(
+pub fn test_evm_chain_config() -> EvmChainConfig {
+    EvmChainConfig::create_config(
         U256::from(CHAIN_ID),
         EvmLimits::default(),
         EVMVersion::current_test_config(),
     )
+}
+
+#[cfg(test)]
+pub fn test_chain_config() -> ChainConfig {
+    ChainConfig::Evm(Box::new(test_evm_chain_config()))
 }

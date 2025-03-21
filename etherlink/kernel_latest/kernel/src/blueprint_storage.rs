@@ -3,9 +3,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::block::GENESIS_PARENT_HASH;
 use crate::blueprint::Blueprint;
-use crate::chains::ChainFamily;
+use crate::chains::{ChainConfigTrait, ChainHeaderTrait, TransactionsTrait};
 use crate::configuration::{Configuration, ConfigurationMode};
 use crate::error::{Error, StorageError};
 use crate::l2block::L2Block;
@@ -13,9 +12,7 @@ use crate::sequencer_blueprint::{
     BlueprintWithDelayedHashes, UnsignedSequencerBlueprint,
 };
 use crate::storage::read_last_info_per_level_timestamp;
-use crate::transaction::{
-    Transaction, TransactionContent, Transactions, Transactions::EthTxs,
-};
+use crate::transaction::{Transaction, TransactionContent, Transactions};
 use crate::{delayed_inbox, DelayedInbox};
 use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
@@ -133,36 +130,6 @@ pub struct TezBlockHeader {
 pub enum ChainHeader {
     Tez(TezBlockHeader),
     Eth(EVMBlockHeader),
-}
-
-impl ChainHeader {
-    fn evm_genesis() -> Self {
-        Self::Eth(EVMBlockHeader {
-            hash: GENESIS_PARENT_HASH,
-            receipts_root: vec![0; 32],
-            transactions_root: vec![0; 32],
-        })
-    }
-
-    fn tez_genesis() -> Self {
-        Self::Tez(TezBlockHeader {
-            hash: TezBlock::genesis_block_hash(),
-        })
-    }
-
-    pub fn genesis_header(chain_family: ChainFamily) -> ChainHeader {
-        match chain_family {
-            ChainFamily::Evm => Self::evm_genesis(),
-            ChainFamily::Michelson => Self::tez_genesis(),
-        }
-    }
-
-    pub fn hash(&self) -> H256 {
-        match self {
-            Self::Eth(header) => header.hash,
-            Self::Tez(header) => header.hash,
-        }
-    }
 }
 
 impl From<EthBlock> for BlockHeader<ChainHeader> {
@@ -417,34 +384,6 @@ pub fn read_current_blueprint_header<Host: Runtime>(
     Ok(block_header.blueprint_header)
 }
 
-pub fn read_current_block_header_for_family<Host: Runtime>(
-    host: &Host,
-    chain_family: &ChainFamily,
-) -> Result<BlockHeader<ChainHeader>, Error> {
-    match chain_family {
-        ChainFamily::Evm => {
-            let BlockHeader {
-                blueprint_header,
-                chain_header,
-            } = read_current_block_header::<Host, EVMBlockHeader>(host)?;
-            Ok(BlockHeader {
-                blueprint_header,
-                chain_header: ChainHeader::Eth(chain_header),
-            })
-        }
-        ChainFamily::Michelson => {
-            let BlockHeader {
-                blueprint_header,
-                chain_header,
-            } = read_current_block_header::<Host, TezBlockHeader>(host)?;
-            Ok(BlockHeader {
-                blueprint_header,
-                chain_header: ChainHeader::Tez(chain_header),
-            })
-        }
-    }
-}
-
 /// For the tick model we only accept blueprints where cumulative size of chunks
 /// less or equal than 512kB. A chunk weights 4kB, then (512 * 1024) / 4096 =
 /// 128.
@@ -475,12 +414,12 @@ pub enum DelayedTransactionFetchingResult<Txs> {
     DelayedHashMissing(delayed_inbox::Hash),
 }
 
-fn fetch_hashes_from_delayed_inbox<Host: Runtime>(
+pub fn fetch_hashes_from_delayed_inbox<Host: Runtime>(
     host: &mut Host,
     delayed_hashes: Vec<delayed_inbox::Hash>,
     delayed_inbox: &mut DelayedInbox,
     current_blueprint_size: usize,
-) -> anyhow::Result<(DelayedTransactionFetchingResult<Vec<Transaction>>, usize)> {
+) -> anyhow::Result<(DelayedTransactionFetchingResult<Transactions>, usize)> {
     let mut delayed_txs = vec![];
     let mut total_size = current_blueprint_size;
     for tx_hash in delayed_hashes {
@@ -506,12 +445,12 @@ fn fetch_hashes_from_delayed_inbox<Host: Runtime>(
         }
     }
     Ok((
-        DelayedTransactionFetchingResult::Ok(delayed_txs),
+        DelayedTransactionFetchingResult::Ok(Transactions::EthTxs(delayed_txs)),
         total_size,
     ))
 }
 
-fn transactions_from_bytes(
+pub fn transactions_from_bytes(
     transactions: Vec<Vec<u8>>,
 ) -> anyhow::Result<Vec<Transaction>> {
     transactions
@@ -528,36 +467,37 @@ fn transactions_from_bytes(
         .collect::<anyhow::Result<Vec<Transaction>>>()
 }
 
-fn fetch_delayed_txs<Host: Runtime>(
+pub fn fetch_delayed_txs<Host: Runtime, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     blueprint_with_hashes: BlueprintWithDelayedHashes,
     delayed_inbox: &mut DelayedInbox,
     current_blueprint_size: usize,
-) -> anyhow::Result<(BlueprintValidity<Transactions>, usize)> {
-    let (mut delayed_txs, total_size) = match fetch_hashes_from_delayed_inbox(
-        host,
-        blueprint_with_hashes.delayed_hashes,
-        delayed_inbox,
-        current_blueprint_size,
-    )? {
-        (DelayedTransactionFetchingResult::Ok(delayed_txs), total_size) => {
-            (delayed_txs, total_size)
-        }
-        (DelayedTransactionFetchingResult::BlueprintTooLarge, total_size) => {
-            return Ok((BlueprintValidity::BlueprintTooLarge, total_size));
-        }
-        (DelayedTransactionFetchingResult::DelayedHashMissing(hash), total_size) => {
-            return Ok((BlueprintValidity::DelayedHashMissing(hash), total_size));
-        }
-    };
+) -> anyhow::Result<(BlueprintValidity<ChainConfig::Transactions>, usize)> {
+    let (mut delayed_txs, total_size) =
+        match ChainConfig::fetch_hashes_from_delayed_inbox(
+            host,
+            blueprint_with_hashes.delayed_hashes,
+            delayed_inbox,
+            current_blueprint_size,
+        )? {
+            (DelayedTransactionFetchingResult::Ok(delayed_txs), total_size) => {
+                (delayed_txs, total_size)
+            }
+            (DelayedTransactionFetchingResult::BlueprintTooLarge, total_size) => {
+                return Ok((BlueprintValidity::BlueprintTooLarge, total_size));
+            }
+            (DelayedTransactionFetchingResult::DelayedHashMissing(hash), total_size) => {
+                return Ok((BlueprintValidity::DelayedHashMissing(hash), total_size));
+            }
+        };
 
     let transactions_with_hashes =
-        transactions_from_bytes(blueprint_with_hashes.transactions)?;
+        ChainConfig::transactions_from_bytes(blueprint_with_hashes.transactions)?;
 
     delayed_txs.extend(transactions_with_hashes);
     Ok((
         BlueprintValidity::Valid(Blueprint {
-            transactions: EthTxs(delayed_txs),
+            transactions: delayed_txs,
             timestamp: blueprint_with_hashes.timestamp,
         }),
         total_size,
@@ -572,16 +512,16 @@ fn fetch_delayed_txs<Host: Runtime>(
 pub const DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS: i64 = 300i64;
 
 #[allow(clippy::too_many_arguments)]
-fn parse_and_validate_blueprint<Host: Runtime>(
+fn parse_and_validate_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     bytes: &[u8],
     delayed_inbox: &mut DelayedInbox,
     current_blueprint_size: usize,
     evm_node_flag: bool,
     max_blueprint_lookahead_in_seconds: i64,
-    parent_chain_header: &ChainHeader,
+    parent_chain_header: &ChainConfig::ChainHeader,
     head_timestamp: Timestamp,
-) -> anyhow::Result<(BlueprintValidity<Transactions>, usize)> {
+) -> anyhow::Result<(BlueprintValidity<ChainConfig::Transactions>, usize)> {
     // Decode
     match rlp::decode::<BlueprintWithDelayedHashes>(bytes) {
         Err(e) => Ok((BlueprintValidity::DecoderError(e), bytes.len())),
@@ -633,7 +573,7 @@ fn parse_and_validate_blueprint<Host: Runtime>(
             }
 
             // Fetch delayed transactions
-            fetch_delayed_txs(
+            fetch_delayed_txs::<_, ChainConfig>(
                 host,
                 blueprint_with_hashes,
                 delayed_inbox,
@@ -659,27 +599,27 @@ fn invalidate_blueprint<Host: Runtime, Txs: Debug>(
     host.store_delete(blueprint_path)
 }
 
-fn read_all_chunks_and_validate<Host: Runtime>(
+fn read_all_chunks_and_validate<Host: Runtime, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     blueprint_path: &OwnedPath,
     nb_chunks: u16,
     config: &mut Configuration,
-    previous_chain_header: &ChainHeader,
+    previous_chain_header: &ChainConfig::ChainHeader,
     previous_timestamp: Timestamp,
-) -> anyhow::Result<(Option<Blueprint<Transactions>>, usize)> {
+) -> anyhow::Result<(Option<Blueprint<ChainConfig::Transactions>>, usize)> {
     let mut chunks = vec![];
     let mut size = 0;
     if nb_chunks > MAXIMUM_NUMBER_OF_CHUNKS {
-        invalidate_blueprint(
+        invalidate_blueprint::<_, ChainConfig::Transactions>(
             host,
             blueprint_path,
-            &BlueprintValidity::<Transactions>::BlueprintTooLarge,
+            &BlueprintValidity::BlueprintTooLarge,
         )?;
         return Ok((None, 0));
     };
     for i in 0..nb_chunks {
         let path = blueprint_chunk_path(blueprint_path, i)?;
-        let stored_chunk = read_rlp::<StoreBlueprint<Transactions>>(host, &path)?;
+        let stored_chunk = read_rlp(host, &path)?;
         // The tick model is based on the size of the chunk, we overapproximate it.
         size += MAX_INPUT_MESSAGE_SIZE;
         match stored_chunk {
@@ -699,16 +639,17 @@ fn read_all_chunks_and_validate<Host: Runtime>(
             max_blueprint_lookahead_in_seconds,
             ..
         } => {
-            let validity = parse_and_validate_blueprint(
-                host,
-                chunks.concat().as_slice(),
-                delayed_inbox,
-                size,
-                *evm_node_flag,
-                *max_blueprint_lookahead_in_seconds,
-                previous_chain_header,
-                previous_timestamp,
-            )?;
+            let validity: (BlueprintValidity<ChainConfig::Transactions>, usize) =
+                parse_and_validate_blueprint::<_, ChainConfig>(
+                    host,
+                    chunks.concat().as_slice(),
+                    delayed_inbox,
+                    size,
+                    *evm_node_flag,
+                    *max_blueprint_lookahead_in_seconds,
+                    previous_chain_header,
+                    previous_timestamp,
+                )?;
             if let (BlueprintValidity::Valid(blueprint), size_with_delayed_transactions) =
                 validity
             {
@@ -727,13 +668,13 @@ fn read_all_chunks_and_validate<Host: Runtime>(
     }
 }
 
-pub fn read_blueprint<Host: Runtime>(
+pub fn read_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     config: &mut Configuration,
     number: U256,
     previous_timestamp: Timestamp,
-    previous_chain_header: &ChainHeader,
-) -> anyhow::Result<(Option<Blueprint<Transactions>>, usize)> {
+    previous_chain_header: &ChainConfig::ChainHeader,
+) -> anyhow::Result<(Option<Blueprint<ChainConfig::Transactions>>, usize)> {
     let blueprint_path = blueprint_path(number)?;
     let exists = host.store_has(&blueprint_path)?.is_some();
     if exists {
@@ -748,7 +689,7 @@ pub fn read_blueprint<Host: Runtime>(
         let available_chunks = n_subkeys as u16 - 1;
         if available_chunks == nb_chunks {
             // All chunks are available
-            let (blueprint, size) = read_all_chunks_and_validate(
+            let (blueprint, size) = read_all_chunks_and_validate::<_, ChainConfig>(
                 host,
                 &blueprint_path,
                 nb_chunks,
@@ -784,10 +725,9 @@ pub fn read_blueprint<Host: Runtime>(
 pub fn read_next_blueprint<Host: Runtime>(
     host: &mut Host,
     config: &mut Configuration,
-) -> anyhow::Result<(Option<Blueprint<Transactions>>, usize)> {
-    let chain_family = ChainFamily::Evm;
+) -> anyhow::Result<(Option<Blueprint<crate::transaction::Transactions>>, usize)> {
     let (number, previous_timestamp, block_header) =
-        match read_current_block_header_for_family(host, &chain_family) {
+        match read_current_block_header::<_, EVMBlockHeader>(host) {
             Ok(BlockHeader {
                 blueprint_header,
                 chain_header,
@@ -799,10 +739,16 @@ pub fn read_next_blueprint<Host: Runtime>(
             Err(_) => (
                 U256::zero(),
                 Timestamp::from(0),
-                ChainHeader::genesis_header(chain_family),
+                EVMBlockHeader::genesis_header(),
             ),
         };
-    read_blueprint(host, config, number, previous_timestamp, &block_header)
+    read_blueprint::<_, crate::chains::EvmChainConfig>(
+        host,
+        config,
+        number,
+        previous_timestamp,
+        &block_header,
+    )
 }
 
 pub fn drop_blueprint<Host: Runtime>(host: &mut Host, number: U256) -> Result<(), Error> {
@@ -823,6 +769,7 @@ mod tests {
 
     use super::*;
     use crate::block::GENESIS_PARENT_HASH;
+    use crate::chains::EvmChainConfig;
     use crate::configuration::{DalConfiguration, TezosContracts};
     use crate::delayed_inbox::Hash;
     use crate::sequencer_blueprint::{rlp_roundtrip, rlp_roundtrip_f};
@@ -899,18 +846,18 @@ mod tests {
         let mut delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
         // Blueprint should have invalid parent hash
-        let validity = parse_and_validate_blueprint(
+        let validity = parse_and_validate_blueprint::<_, EvmChainConfig>(
             &mut host,
             blueprint_with_hashes_bytes.as_ref(),
             &mut delayed_inbox,
             0,
             false,
             500,
-            &ChainHeader::Eth(EVMBlockHeader {
+            &EVMBlockHeader {
                 hash: GENESIS_PARENT_HASH,
                 receipts_root: vec![0; 32],
                 transactions_root: vec![0; 32],
-            }),
+            },
             Timestamp::from(0),
         )
         .expect("Should be able to parse blueprint");
@@ -965,18 +912,18 @@ mod tests {
         let mut delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
         // Blueprint should have invalid parent hash
-        let validity = parse_and_validate_blueprint(
+        let validity = parse_and_validate_blueprint::<_, EvmChainConfig>(
             &mut host,
             blueprint_with_hashes_bytes.as_ref(),
             &mut delayed_inbox,
             0,
             false,
             500,
-            &ChainHeader::Eth(EVMBlockHeader {
+            &EVMBlockHeader {
                 hash: GENESIS_PARENT_HASH,
                 receipts_root: vec![0; 32],
                 transactions_root: vec![0; 32],
-            }),
+            },
             Timestamp::from(0),
         )
         .expect("Should be able to parse blueprint");

@@ -5,7 +5,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::chains::ChainConfig;
 use crate::configuration::{
     fetch_chain_configuration, fetch_configuration, Configuration, CHAIN_ID,
 };
@@ -109,7 +108,7 @@ pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Err
 pub fn stage_one<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
-    chain_config: &ChainConfig,
+    chain_config: &chains::ChainConfig,
     configuration: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error> {
     log!(host, Debug, "Entering stage one.");
@@ -300,13 +299,22 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     #[cfg(not(feature = "benchmark-bypass-stage2"))]
     {
         log!(host, Debug, "Entering stage two.");
-        if let block::ComputationResult::RebootNeeded = block::produce(
-            host,
-            &chain_configuration,
-            &mut configuration,
-            sequencer_pool_address,
-            trace_input,
-        )
+        if let block::ComputationResult::RebootNeeded = match chain_configuration {
+            chains::ChainConfig::Evm(chain_configuration) => block::produce(
+                host,
+                &*chain_configuration,
+                &mut configuration,
+                sequencer_pool_address,
+                trace_input,
+            ),
+            chains::ChainConfig::Michelson(chain_configuration) => block::produce(
+                host,
+                &chain_configuration,
+                &mut configuration,
+                sequencer_pool_address,
+                trace_input,
+            ),
+        }
         .context("Failed during stage 2")?
         {
             host.mark_for_reboot()?;
@@ -384,7 +392,7 @@ mod tests {
 
     use crate::block_storage;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
-    use crate::chains::{ChainConfig, EvmLimits};
+    use crate::chains::test_evm_chain_config;
     use crate::configuration::Configuration;
     use crate::fees;
     use crate::main;
@@ -397,9 +405,7 @@ mod tests {
         transaction::{Transaction, TransactionContent, Transactions},
         upgrade::KernelUpgrade,
     };
-    use evm::Config;
     use evm_execution::account_storage::{self, EthereumAccountStorage};
-    use evm_execution::configuration::EVMVersion;
     use evm_execution::fa_bridge::deposit::{ticket_hash, FaDeposit};
     use evm_execution::fa_bridge::test_utils::{
         convert_h160, convert_u256, dummy_ticket, kernel_wrapper, ticket_balance_add,
@@ -440,14 +446,6 @@ mod tests {
     const DUMMY_CHAIN_ID: U256 = U256::one();
     const DUMMY_BASE_FEE_PER_GAS: u64 = 12345u64;
     const DUMMY_DA_FEE: u64 = 2_000_000_000_000u64;
-
-    fn dummy_configuration(evm_configuration: Config) -> ChainConfig {
-        ChainConfig::new_evm_config(
-            DUMMY_CHAIN_ID,
-            EvmLimits::default(),
-            evm_configuration,
-        )
-    }
 
     fn dummy_block_fees() -> BlockFees {
         BlockFees::new(
@@ -613,7 +611,6 @@ mod tests {
         let block_fees = dummy_block_fees();
 
         // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
-        let chain_config = dummy_configuration(EVMVersion::current_test_config());
         let mut configuration = Configuration {
             maximum_allowed_ticks: 9_000_000_000,
             ..Configuration::default()
@@ -629,7 +626,7 @@ mod tests {
         // If the upgrade is started, it should raise an error
         let computation_result = crate::block::produce(
             &mut host,
-            &chain_config,
+            &test_evm_chain_config(),
             &mut configuration,
             None,
             None,
