@@ -92,7 +92,7 @@ parameters:
    the maximum portion of external stake by stakers over the
    delegate’s own staked funds. It defaults to 0 – which entails that
    delegates do not accept external stakes by default. It is moreover
-   capped by a global constant, set to 5 starting in the Paris
+   capped by a global constant, set to 9 starting in the Quebec
    protocol, which ensures the baker controls a significant part of
    the stake.
 
