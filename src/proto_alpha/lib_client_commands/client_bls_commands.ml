@@ -29,6 +29,42 @@ let public_key_parameter ~name ~desc =
          | Some pk -> return pk
          | None -> cctxt#error "Failed to read a BLS public key"))
 
+type public_key_with_proof = {
+  pk : Signature.Bls.Public_key.t;
+  proof : Signature.Bls.t;
+}
+
+let public_key_with_proof_encoding =
+  let open Data_encoding in
+  conv
+    (fun {pk; proof} -> (pk, proof))
+    (fun (pk, proof) -> {pk; proof})
+    (obj2
+       (req "public_key" Signature.Bls.Public_key.encoding)
+       (req "proof" Signature.Bls.encoding))
+
+type public_key_and_public_key_hash = {
+  pk : Signature.Bls.Public_key.t;
+  pkh : Signature.Bls.Public_key_hash.t;
+}
+
+let public_key_and_public_key_hash_encoding =
+  let open Data_encoding in
+  conv
+    (fun {pk; pkh} -> (pk, pkh))
+    (fun (pk, pkh) -> {pk; pkh})
+    (obj2
+       (req "public_key" Signature.Bls.Public_key.encoding)
+       (req "public_key_hash" Signature.Bls.Public_key_hash.encoding))
+
+let check_public_key_with_proof pk proof =
+  let msg =
+    Data_encoding.Binary.to_bytes_exn
+      Signature.Public_key.encoding
+      (Signature.Bls pk)
+  in
+  Signature.Bls.check pk proof msg
+
 let commands () =
   let open Lwt_result_syntax in
   [
@@ -87,14 +123,43 @@ let commands () =
       @@ stop)
       (fun () proof pk (cctxt : #Protocol_client_context.full) ->
         let open Lwt_result_syntax in
-        let msg =
-          Data_encoding.Binary.to_bytes_exn
-            Signature.Public_key.encoding
-            (Signature.Bls pk)
-        in
-        let is_valid = Signature.Bls.check pk proof msg in
+        let is_valid = check_public_key_with_proof pk proof in
         if is_valid then
           let*! () = cctxt#message "Proof check is successful." in
           return_unit
         else cctxt#error "Invalid proof");
+    command
+      ~group
+      ~desc:"Aggregate BLS public keys after checking their BLS proofs"
+      no_options
+      (prefixes ["aggregate"; "bls"; "public"; "keys"]
+      @@ Client_proto_args.json_encoded_param
+           ~name:"list of BLS public keys with proofs"
+           ~desc:"list of B58 encoded BLS public key and signature"
+           (Data_encoding.list public_key_with_proof_encoding)
+      @@ stop)
+      (fun () pks_with_pops (cctxt : #Protocol_client_context.full) ->
+        let pop_checks =
+          List.for_all
+            (fun (s : public_key_with_proof) ->
+              check_public_key_with_proof s.pk s.proof)
+            pks_with_pops
+        in
+        if pop_checks then
+          let pks =
+            List.map (fun (s : public_key_with_proof) -> s.pk) pks_with_pops
+          in
+          let pk = Signature.Bls.aggregate_public_key_opt pks in
+          match pk with
+          | Some pk ->
+              let pkh = Signature.Bls.Public_key.hash pk in
+              let json =
+                Data_encoding.Json.construct
+                  public_key_and_public_key_hash_encoding
+                  {pk; pkh}
+              in
+              let*! () = cctxt#message "%a@." Data_encoding.Json.pp json in
+              return_unit
+          | None -> cctxt#error "Failed to aggregate the public keys"
+        else cctxt#error "Failed to check proofs");
   ]
