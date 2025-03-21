@@ -17,6 +17,7 @@ use super::proof_backend::merkle::MERKLE_ARITY;
 use super::proof_backend::merkle::MERKLE_LEAF_SIZE;
 use super::proof_backend::merkle::chunks_to_writer;
 use crate::default::ConstDefault;
+use crate::state_backend::hash::build_custom_merkle_hash;
 
 /// [`Layouts`] which may be used for commitments
 ///
@@ -147,7 +148,11 @@ where
     T: CommitmentLayout,
 {
     fn state_hash<M: ManagerSerialise>(state: AllocatedOf<Self, M>) -> Result<Hash, HashError> {
-        iter_state_hash::<_, T, M, LEN>(state)
+        let hashes: Vec<Hash> = state
+            .into_iter()
+            .map(T::state_hash)
+            .collect::<Result<Vec<_>, _>>()?;
+        Hash::combine(&hashes)
     }
 }
 
@@ -156,20 +161,10 @@ where
     T: CommitmentLayout,
 {
     fn state_hash<M: ManagerSerialise>(state: AllocatedOf<Self, M>) -> Result<Hash, HashError> {
-        iter_state_hash::<_, T, M, LEN>(state)
+        let nodes: Vec<Hash> = state
+            .into_iter()
+            .map(T::state_hash)
+            .collect::<Result<Vec<_>, _>>()?;
+        build_custom_merkle_hash(MERKLE_ARITY, nodes)
     }
-}
-
-fn iter_state_hash<I, T, M, const LEN: usize>(iter: I) -> Result<Hash, HashError>
-where
-    M: ManagerSerialise,
-    I: IntoIterator<Item = AllocatedOf<T, M>>,
-    T: CommitmentLayout,
-{
-    let hashes: Vec<Hash> = iter
-        .into_iter()
-        .map(T::state_hash)
-        .collect::<Result<Vec<_>, _>>()?;
-
-    Hash::combine(&hashes)
 }

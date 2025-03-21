@@ -306,22 +306,7 @@ impl MerkleWriter {
             self.flush_buffer()?;
         }
 
-        if self.leaves.is_empty() {
-            return Err(HashError::NonEmptyBufferExpected);
-        }
-
-        let mut next_level = Vec::with_capacity(self.leaves.len().div_ceil(self.arity));
-
-        while self.leaves.len() > 1 {
-            for chunk in self.leaves.chunks(self.arity) {
-                next_level.push(MerkleTree::make_merkle_node(chunk.to_vec())?)
-            }
-
-            std::mem::swap(&mut self.leaves, &mut next_level);
-            next_level.truncate(0);
-        }
-
-        Ok(self.leaves[0].clone())
+        build_custom_merkle_tree(self.arity, self.leaves)
     }
 }
 
@@ -380,6 +365,37 @@ impl MerkleTree {
         }
         true
     }
+}
+
+/// Build a Merkle tree whose leaves are the elements of `nodes` and in which
+/// each node has the given `arity`.
+pub(crate) fn build_custom_merkle_tree(
+    arity: usize,
+    mut nodes: Vec<MerkleTree>,
+) -> Result<MerkleTree, HashError> {
+    if nodes.is_empty() {
+        return Err(HashError::NonEmptyBufferExpected);
+    }
+
+    let mut next_level = Vec::with_capacity(nodes.len().div_ceil(arity));
+
+    while nodes.len() > 1 {
+        for chunk in nodes.chunks(arity) {
+            next_level.push(MerkleTree::make_merkle_node(chunk.to_vec())?)
+        }
+
+        std::mem::swap(&mut nodes, &mut next_level);
+        next_level.truncate(0);
+    }
+
+    Ok(nodes.pop().unwrap_or_else(|| {
+        unreachable!(
+            "After the loop, `nodes` could only have 0 or 1 elements. It had \
+             more than 1 element at the beginning of the last iteration of the \
+             loop and exactly one element was pushed to it because `nodes.chunks` \
+             could not have resulted in 0 chunks for a non-empty vector."
+        )
+    }))
 }
 
 #[cfg(test)]
