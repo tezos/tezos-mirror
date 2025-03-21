@@ -40,6 +40,9 @@ Baker
 Agnostic Baker
 --------------
 
+- The agnostic baker now has the same CLI as the classical baker, getting rid of the
+  ``--`` separator. (MR :gl:`!17348`)
+
 - The agnostic baker has a unified CLI such that incompatibilities between baking arguments
   for consecutive protocols can occur much harder, and will probably generate compilation
   errors. (MR :gl:`!16968`)
