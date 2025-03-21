@@ -35,7 +35,6 @@ type t = {
     (bytes, Errors.other) result Lwt.t Types.Slot_id.Map.t;
   store : Store.t;
   tezos_node_cctxt : Tezos_rpc.Context.generic;
-  neighbors_cctxts : Dal_node_client.cctxt list;
   committee_cache : Committee_cache.t;
   gs_worker : Gossipsub.Worker.t;
   transport_layer : Gossipsub.Transport_layer.t;
@@ -48,12 +47,6 @@ type t = {
 let init config ~network_name profile_ctxt cryptobox
     shards_proofs_precomputation proto_plugins store gs_worker transport_layer
     cctxt ~last_finalized_level =
-  let neighbors_cctxts =
-    (* TODO: This early feature is not used anymore. An MR that cleans this part
-       of the code has been opened here:
-       https://gitlab.com/tezos/tezos/-/merge_requests/16444. *)
-    []
-  in
   {
     config;
     network_name;
@@ -64,7 +57,6 @@ let init config ~network_name profile_ctxt cryptobox
     slots_under_reconstruction = Types.Slot_id.Map.empty;
     store;
     tezos_node_cctxt = cctxt;
-    neighbors_cctxts;
     committee_cache =
       Committee_cache.create ~max_size:Constants.committee_cache_size;
     gs_worker;
@@ -182,8 +174,6 @@ let get_shards_proofs_precomputation ctxt = ctxt.shards_proofs_precomputation
 let get_store ctxt = ctxt.store
 
 let get_gs_worker ctxt = ctxt.gs_worker
-
-let get_neighbors_cctxts ctxt = ctxt.neighbors_cctxts
 
 let get_ongoing_amplifications ctxt = ctxt.ongoing_amplifications
 
