@@ -70,12 +70,7 @@ let run_thread ~protocol_hash ~baker_commands ~baker_args ~cancel_promise
 let spawn_baker protocol_hash ~baker_args =
   let open Lwt_result_syntax in
   let args_as_string =
-    Format.asprintf
-      "%a"
-      (Format.pp_print_list
-         ~pp_sep:Format.pp_print_space
-         Format.pp_print_string)
-      baker_args
+    String.concat " " @@ Option.value ~default:[] @@ List.tl baker_args
   in
   let*! () =
     Agnostic_baker_events.(emit starting_baker) (protocol_hash, args_as_string)
