@@ -82,14 +82,27 @@ end
 
 module Pointers : sig
   module type S = sig
-    val set :
-      ?conn:Sqlite.conn -> t -> Ethereum_types.quantity -> unit tzresult Lwt.t
+    type value
 
-    val get :
-      ?conn:Sqlite.conn -> t -> Ethereum_types.quantity option tzresult Lwt.t
+    val set : ?conn:Sqlite.conn -> t -> value -> unit tzresult Lwt.t
+
+    val get : ?conn:Sqlite.conn -> t -> value option tzresult Lwt.t
   end
 
-  module Finalized_L1_head : S
+  module Finalized_L1_head : S with type value := Ethereum_types.quantity
 
-  module L2_head : S
+  module L2_head : S with type value := Ethereum_types.quantity
+
+  module LCC : S with type value := int32
+end
+
+module Outbox_messages : sig
+  val store :
+    ?conn:Sqlite.conn ->
+    t ->
+    outbox_level:int32 ->
+    message_index:int ->
+    transaction_index:int ->
+    Octez_smart_rollup.Outbox_message.transaction_summary ->
+    unit tzresult Lwt.t
 end

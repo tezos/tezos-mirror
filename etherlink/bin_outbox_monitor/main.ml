@@ -42,6 +42,12 @@ module Arg = struct
       ~long:"evm-node"
       ~doc:"Websocket endpoint to reach EVM node"
 
+  let rollup_node_endpoint =
+    endpoint
+      ~default:"http://127.0.0.1:8932"
+      ~long:"rollup-node"
+      ~doc:"REST endpoint to reach the rollup node"
+
   let data_dir =
     Tezos_clic.arg
       ~long:"data-dir"
@@ -96,13 +102,13 @@ let run_command =
   let open Tezos_clic in
   om_command
     ~desc:"Start monitoring outbox"
-    (args1 Arg.evm_node_endpoint)
+    (args2 Arg.evm_node_endpoint Arg.rollup_node_endpoint)
     (prefixes ["run"] @@ stop)
-    (fun {data_dir; verbosity} evm_node_endpoint _ ->
+    (fun {data_dir; verbosity} (evm_node_endpoint, rollup_node_endpoint) _ ->
       let open Lwt_result_syntax in
       let*! () = log_config ~verbosity () in
       let* db = Db.init ~data_dir `Read_write in
-      Etherlink_monitor.start db ~evm_node_endpoint)
+      Etherlink_monitor.start db ~evm_node_endpoint ~rollup_node_endpoint)
 
 let commands = [run_command]
 
