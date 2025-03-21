@@ -900,7 +900,7 @@ mod tests {
     use proptest::prop_assert;
     use proptest::prop_assert_eq;
     use proptest::proptest;
-    use tests::verify_backend::handle_not_found;
+    use tests::verify_backend::handle_stepper_panics;
 
     use super::*;
     use crate::state_backend::Cells;
@@ -953,7 +953,7 @@ mod tests {
             // The second component of the state is fully blinded: no values can
             // be read from the array.
             for i in 0..CELLS_SIZE {
-                prop_assert!(handle_not_found(|| verifier_state.1.read(i)).is_err());
+                prop_assert!(handle_stepper_panics(|| verifier_state.1.read(i)).is_err());
             };
 
             let ref_verifier_state = (

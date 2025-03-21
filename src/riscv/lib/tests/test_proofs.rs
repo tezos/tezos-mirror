@@ -88,7 +88,7 @@ where
             let final_state_hash = proof.final_state_hash();
 
             eprintln!("> Verifying ...");
-            assert!(stepper.verify_proof(proof));
+            assert!(stepper.verify_proof(proof).is_ok());
 
             // Run one final step, which is the step proven by `proof`, and check that its
             // state hash matches the final state hash of `proof`.

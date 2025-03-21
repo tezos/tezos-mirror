@@ -43,7 +43,9 @@ use crate::state_backend::hash::Hash;
 use crate::state_backend::owned_backend::Owned;
 use crate::state_backend::proof_backend::ProofGen;
 use crate::state_backend::proof_backend::proof::Proof;
+use crate::state_backend::verify_backend::ProofVerificationFailure;
 use crate::state_backend::verify_backend::Verifier;
+use crate::state_backend::verify_backend::handle_stepper_panics;
 use crate::storage::binary;
 
 /// Error during PVM stepping
@@ -293,17 +295,13 @@ impl<'hooks, MC: MemoryConfig, CL: CacheLayouts, M: ManagerReadWrite>
     }
 
     /// Verify a Merkle proof. The [`PvmStepper`] is used for inbox information.
-    pub fn verify_proof(&self, proof: Proof) -> bool {
-        // Allow some warnings while this method goes through iterations.
-        #![allow(unreachable_code, unused_variables, clippy::diverging_sub_expression)]
-
+    pub fn verify_proof(&self, proof: Proof) -> Result<(), ProofVerificationFailure> {
         let proof_tree = ProofTree::Present(proof.tree());
-        let Some(space) = PvmLayout::<MC, CL>::from_proof(proof_tree).ok() else {
-            return false;
-        };
+        let space = PvmLayout::<MC, CL>::from_proof(proof_tree)
+            .map_err(|_| ProofVerificationFailure::UnexpectedProofShape)?;
 
         let pvm = Pvm::<MC, CL, Interpreted<_, _>, Verifier>::bind(space, InterpretedBlockBuilder);
-        let mut stepper = PvmStepper {
+        let stepper = PvmStepper {
             pvm,
             rollup_address: self.rollup_address,
             origination_level: self.origination_level,
@@ -320,15 +318,18 @@ impl<'hooks, MC: MemoryConfig, CL: CacheLayouts, M: ManagerReadWrite>
             reveal_request_response_map: self.reveal_request_response_map.clone(),
         };
 
-        if !stepper.try_step() {
-            return false;
-        };
+        let stepper = stepper.try_step_partial()?;
 
         let refs = stepper.pvm.struct_ref::<FnManagerIdent>();
-        match PvmLayout::<MC, CL>::partial_state_hash(refs, proof_tree) {
-            Ok(final_hash) => final_hash == proof.final_state_hash(),
-            Err(_) => false,
+        let final_hash = PvmLayout::<MC, CL>::partial_state_hash(refs, proof_tree)?;
+        if final_hash != proof.final_state_hash() {
+            return Err(ProofVerificationFailure::FinalHashMismatch {
+                expected: proof.final_state_hash(),
+                computed: final_hash,
+            });
         }
+
+        Ok(())
     }
 }
 
@@ -338,6 +339,34 @@ impl<'hooks, MC: MemoryConfig, CL: CacheLayouts, M: ManagerReadWrite>
     /// Perform one evaluation step.
     pub fn eval_one(&mut self) {
         self.pvm.eval_one(&mut self.hooks)
+    }
+}
+
+impl<'hooks, MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, Verifier>>
+    PvmStepper<'hooks, MC, CL, Verifier, B>
+{
+    /// Try to take one step. Stepping with the [`Verifier`] backend may panic
+    /// when attempting to access absent data. Return [`NotFound`] panics, which
+    /// are expected in the case of verifying an invalid proof, as
+    /// [`ProofVerificationFailure::AbsentDataAccess`] and all other panics
+    /// as [`ProofVerificationFailure::StepperPanic`].
+    ///
+    /// [`NotFound`]: crate::state_backend::verify_backend::NotFound
+    fn try_step_partial(self) -> Result<Self, ProofVerificationFailure> {
+        // Wrapping the stepper in a Mutex, which implements poisoning, in order to pass it
+        // across the unwind boundary.
+        let mutex = std::sync::Mutex::new(self);
+        handle_stepper_panics(move || {
+            {
+                let mut stepper = mutex.lock().unwrap();
+                if !stepper.try_step() {
+                    return Err(ProofVerificationFailure::StepperError);
+                };
+            }
+            // Since all panics were handled and returned as errors, at this point
+            // the mutex cannot be poisoned.
+            Ok(mutex.into_inner().unwrap())
+        })?
     }
 }
 

@@ -23,35 +23,55 @@ use super::ManagerReadWrite;
 use super::ManagerWrite;
 use super::PartialHashError;
 use super::Ref;
+use crate::state_backend::hash::Hash;
 use crate::state_backend::owned_backend::Owned;
 use crate::state_backend::proof_backend::merkle::MERKLE_LEAF_SIZE;
 
 /// Panic payload that is raised when a value isn't present in a part of the Verifier backend.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) struct NotFound;
+#[derive(Copy, Clone, Debug, Eq, PartialEq, derive_more::Display, thiserror::Error)]
+pub struct NotFound;
 
 /// Raise a [`NotFound`] panic.
 fn not_found() -> ! {
-    // TODO: RV-350: Ensure that panics are handled upstream
-
     // We use [`resume_unwind`] over [`panic_any`] to avoid calling the panic hook.
-    // XXX: This fails without a message when there is no matching [`handle_not_found`] wrapper.
+    // XXX: This fails without a message when there is no matching [`handle_stepper_panics`] wrapper.
     resume_unwind(Box::new(NotFound))
 }
 
 /// Catch errors that the verifier backend may raise during the invocation of `f` and return them
 /// as [`Err`].
-#[cfg(test)]
-pub(crate) fn handle_not_found<R, F: FnOnce() -> R + std::panic::UnwindSafe>(
+pub(crate) fn handle_stepper_panics<R, F: FnOnce() -> R + std::panic::UnwindSafe>(
     f: F,
-) -> Result<R, NotFound> {
+) -> Result<R, ProofVerificationFailure> {
     match std::panic::catch_unwind(f) {
         Ok(res) => Ok(res),
         Err(err) => match err.downcast::<NotFound>() {
-            Ok(not_found) => Err(*not_found),
-            Err(other) => resume_unwind(other),
+            Ok(not_found) => Err(ProofVerificationFailure::AbsentDataAccess(*not_found)),
+            Err(other) => Err(ProofVerificationFailure::StepperPanic(other)),
         },
     }
+}
+
+/// Error during proof verification
+#[derive(Debug, thiserror::Error)]
+pub enum ProofVerificationFailure {
+    #[error("Unexpected proof shape")]
+    UnexpectedProofShape,
+
+    #[error("Stepper error")]
+    StepperError,
+
+    #[error("Stepper panic")]
+    StepperPanic(Box<dyn std::any::Any + Send>),
+
+    #[error("Attempted to access absent data")]
+    AbsentDataAccess(#[from] NotFound),
+
+    #[error("Error computing final state hash: {0}")]
+    PartialHashError(#[from] PartialHashError),
+
+    #[error("Final state hash mismatch (expected {expected}, computed {computed})")]
+    FinalHashMismatch { expected: Hash, computed: Hash },
 }
 
 /// Proof verification backend
@@ -672,7 +692,7 @@ mod tests {
             let mut cells: Cells<_, 32, Verifier> = arb_to_cells(Some(reg.clone()));
 
             for i in 0..32 {
-                let value = handle_not_found(|| cells.read(i)).ok();
+                let value = handle_stepper_panics(|| cells.read(i)).ok();
                 proptest::prop_assert_eq!(value, reg[i]);
 
                 let new_value = rand::random();
@@ -690,7 +710,7 @@ mod tests {
         let cells: Cells<u64, 32, Verifier> = arb_to_cells(None);
 
         for i in 0..32 {
-            let value = handle_not_found(|| cells.read(i)).ok();
+            let value = handle_stepper_panics(|| cells.read(i)).ok();
             assert_eq!(value, None);
         }
     }
@@ -730,10 +750,10 @@ mod tests {
         proptest::proptest!(|(initial: Option<u64>)| {
             let mut cell = arb_to_enriched_cell::<Ident>(initial);
 
-            let stored = handle_not_found(|| cell.read_stored()).ok();
+            let stored = handle_stepper_panics(|| cell.read_stored()).ok();
             proptest::prop_assert_eq!(stored, initial);
 
-            let derived = handle_not_found(|| cell.read_derived()).ok();
+            let derived = handle_stepper_panics(|| cell.read_derived()).ok();
             let expected_derived = initial.as_ref().map(<Ident as EnrichedValueLinked>::derive);
             proptest::prop_assert_eq!(derived, expected_derived);
 
@@ -751,13 +771,16 @@ mod tests {
 
     macro_rules! assert_eq_found {
         ( $left:expr, $right:expr ) => {
-            assert_eq!(handle_not_found(|| { $left }), Ok($right));
+            assert!(handle_stepper_panics(|| { $left }).is_ok_and(|v| v == $right))
         };
     }
 
     macro_rules! assert_not_found {
         ( $body:expr ) => {
-            assert_eq!(handle_not_found(|| { $body }), Err(NotFound));
+            assert!(
+                handle_stepper_panics(|| { $body })
+                    .is_err_and(|e| matches!(e, ProofVerificationFailure::AbsentDataAccess(_)))
+            )
         };
     }
 
@@ -810,7 +833,7 @@ mod tests {
         assert_not_found!(dyn_cells.clone().write(LEAF_SIZE * 3, 0u8));
 
         // Add more to the third leaf.
-        let dyn_cells = handle_not_found(move || {
+        let dyn_cells = handle_stepper_panics(move || {
             dyn_cells.write(LEAF_SIZE * 2, [255u8, 0]);
             dyn_cells
         })
@@ -863,7 +886,7 @@ mod tests {
         assert_not_found!(dyn_cells.read::<[u8; LEAF_SIZE]>(LEAF_SIZE));
 
         // Write within the gap.
-        let dyn_cells = handle_not_found(move || {
+        let dyn_cells = handle_stepper_panics(move || {
             dyn_cells.write(LEAF_SIZE - 1, [1u8, 1, 3]);
             dyn_cells
         })
