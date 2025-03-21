@@ -7,6 +7,7 @@
 
 use crate::instruction_context::ICB;
 use crate::instruction_context::Predicate;
+use crate::instruction_context::arithmetic::Arithmetic;
 use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::hart_state::HartState;
 use crate::machine_state::memory::Address;
@@ -85,7 +86,7 @@ where
 pub fn run_j<I: ICB>(icb: &mut I, imm: i64) -> <I as ICB>::XValue {
     let imm = icb.xvalue_of_imm(imm);
     let current_pc = icb.pc_read();
-    icb.xvalue_wrapping_add(current_pc, imm)
+    current_pc.add(imm, icb)
 }
 
 /// Performs an unconditional control transfer to the address in register `rs1`.
@@ -98,7 +99,7 @@ pub fn run_jr<I: ICB>(icb: &mut I, rs1: NonZeroXRegister) -> <I as ICB>::XValue 
     // least-significant bit of the address in rs1 to zero
     let lhs = icb.xregister_read_nz(rs1);
     let rhs = icb.xvalue_of_imm(!1);
-    icb.xvalue_bitwise_and(lhs, rhs)
+    lhs.and(rhs, icb)
 }
 
 /// Performs an unconditional control transfer to the target address,
@@ -109,9 +110,12 @@ pub fn run_jr<I: ICB>(icb: &mut I, rs1: NonZeroXRegister) -> <I as ICB>::XValue 
 pub fn run_jr_imm<I: ICB>(icb: &mut I, imm: i64, rs1: NonZeroXRegister) -> <I as ICB>::XValue {
     let lhs = icb.xregister_read_nz(rs1);
     let rhs = icb.xvalue_of_imm(imm);
-    let intermediate: <I as ICB>::XValue = icb.xvalue_wrapping_add(lhs, rhs);
-    let new_rhs = icb.xvalue_of_imm(!1);
-    icb.xvalue_bitwise_and(intermediate, new_rhs)
+    let lhs = lhs.add(rhs, icb);
+
+    // The target address is obtained by setting the
+    // least-significant bit of the address in rs1 to zero
+    let rhs = icb.xvalue_of_imm(!1);
+    lhs.and(rhs, icb)
 }
 
 /// Add the immediate `imm` to the PC and store the result in `rd`.
@@ -121,8 +125,8 @@ pub fn run_jr_imm<I: ICB>(icb: &mut I, imm: i64, rs1: NonZeroXRegister) -> <I as
 pub fn run_add_immediate_to_pc(icb: &mut impl ICB, imm: i64, rd: NonZeroXRegister) {
     let lhs = icb.pc_read();
     let rhs = icb.xvalue_of_imm(imm);
-    let result = icb.xvalue_wrapping_add(lhs, rhs);
-    icb.xregister_write_nz(rd, result);
+    let lhs = lhs.add(rhs, icb);
+    icb.xregister_write_nz(rd, lhs);
 }
 
 /// Performs a conditional ( `predicate(val(rs1), val(rs2))` ) control transfer.

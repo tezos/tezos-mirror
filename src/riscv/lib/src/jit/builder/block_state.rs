@@ -4,10 +4,10 @@
 
 //! State that is kept per Cranelift-IR block.
 
-use cranelift::codegen::ir;
 use cranelift::codegen::ir::InstBuilder;
 use cranelift::frontend::FunctionBuilder;
 
+use super::X64;
 use crate::machine_state::ProgramCounterUpdate;
 
 /// Program Counter update, within the context of JIT-compilation.
@@ -22,11 +22,11 @@ pub enum PCUpdate {
     Offset(i64),
     /// The program counter is set to an absolute address, irrelevant to the
     /// current value of the program counter.
-    Absolute(ir::Value),
+    Absolute(X64),
 }
 
-impl From<ProgramCounterUpdate<ir::Value>> for PCUpdate {
-    fn from(value: ProgramCounterUpdate<ir::Value>) -> Self {
+impl From<ProgramCounterUpdate<X64>> for PCUpdate {
+    fn from(value: ProgramCounterUpdate<X64>) -> Self {
         match value {
             ProgramCounterUpdate::Next(width) => Self::Offset(width as i64),
             ProgramCounterUpdate::Set(address) => Self::Absolute(address),
@@ -59,7 +59,7 @@ pub struct DynamicValues {
     ///
     /// Doing this offset-mechanism allows us to avoid updating the `pc` on every step, effectively
     /// updating it in one go, only when it matters.
-    pc_val: ir::Value,
+    pc_val: X64,
 
     /// The current offset of the pc, as a result of steps taken
     /// so far.
@@ -68,7 +68,7 @@ pub struct DynamicValues {
 
 impl DynamicValues {
     /// Create a new set of values, given an initial program counter.
-    pub fn new(pc_val: ir::Value) -> Self {
+    pub fn new(pc_val: X64) -> Self {
         Self {
             pc_val,
             steps: 0,
@@ -78,17 +78,17 @@ impl DynamicValues {
 
     /// The current value of the program counter may be offset from the original
     /// instruction counter given during construction.
-    pub fn read_pc(&mut self, builder: &mut FunctionBuilder<'_>) -> ir::Value {
+    pub fn read_pc(&mut self, builder: &mut FunctionBuilder<'_>) -> X64 {
         if self.pc_offset == 0 {
             return self.pc_val;
         }
 
-        let new_pc = builder.ins().iadd_imm(self.pc_val, self.pc_offset);
+        let new_pc = builder.ins().iadd_imm(self.pc_val.0, self.pc_offset);
 
-        self.pc_val = new_pc;
+        self.pc_val = X64(new_pc);
         self.pc_offset = 0;
 
-        new_pc
+        X64(new_pc)
     }
 
     /// Complete a step, updating the program counter in the process.

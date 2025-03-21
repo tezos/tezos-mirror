@@ -37,6 +37,7 @@ use cranelift_module::Linkage;
 use cranelift_module::Module;
 use cranelift_module::ModuleResult;
 
+use super::builder::X64;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::registers::NonZeroXRegister;
@@ -198,13 +199,13 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         core_ptr: Value,
-        pc_val: Value,
+        pc_val: X64,
     ) {
         let pc_write = self.pc_write.get_or_insert_with(|| {
             self.module
                 .declare_func_in_func(self.imports.pc_write, builder.func)
         });
-        builder.ins().call(*pc_write, &[core_ptr, pc_val]);
+        builder.ins().call(*pc_write, &[core_ptr, pc_val.0]);
     }
 
     /// Emit the required IR to read the value from the given xregister.
@@ -213,14 +214,14 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
         builder: &mut FunctionBuilder<'_>,
         core_ptr: Value,
         reg: NonZeroXRegister,
-    ) -> Value {
+    ) -> X64 {
         let xreg_read = self.xreg_read.get_or_insert_with(|| {
             self.module
                 .declare_func_in_func(self.imports.xreg_read, builder.func)
         });
         let reg = builder.ins().iconst(I8, reg as i64);
         let call = builder.ins().call(*xreg_read, &[core_ptr, reg]);
-        builder.inst_results(call)[0]
+        X64(builder.inst_results(call)[0])
     }
 
     /// Emit the required IR to write the value to the given xregister.
@@ -229,13 +230,13 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
         builder: &mut FunctionBuilder<'_>,
         core_ptr: Value,
         reg: NonZeroXRegister,
-        value: Value,
+        value: X64,
     ) {
         let xreg_write = self.xreg_write.get_or_insert_with(|| {
             self.module
                 .declare_func_in_func(self.imports.xreg_write, builder.func)
         });
         let reg = builder.ins().iconst(I8, reg as i64);
-        builder.ins().call(*xreg_write, &[core_ptr, reg, value]);
+        builder.ins().call(*xreg_write, &[core_ptr, reg, value.0]);
     }
 }
