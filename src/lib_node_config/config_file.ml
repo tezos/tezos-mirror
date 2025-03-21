@@ -776,28 +776,28 @@ let encoding =
           "data-dir"
           ~description:"Location of the data dir on disk."
           string
-          default_data_dir)
+          default_config.data_dir)
        (dft
           "disable-config-validation"
           ~description:"Disable the node configuration validation."
           bool
-          default_disable_config_validation)
+          default_config.disable_config_validation)
        (dft
           "rpc"
           ~description:"Configuration of rpc parameters"
           rpc
-          default_rpc)
+          default_config.rpc)
        (dft
           "p2p"
           ~description:"Configuration of network parameters"
           p2p
-          default_p2p)
+          default_config.p2p)
        (dft
           "log"
           ~description:
             "Configuration of the Lwt-log sink (part of the logging framework)"
           Logs_simple_config.cfg_encoding
-          Logs_simple_config.default_cfg)
+          default_config.log)
        (opt
           "internal-events"
           ~description:"Configuration of the structured logging framework"
@@ -806,12 +806,12 @@ let encoding =
           "shell"
           ~description:"Configuration of network parameters"
           Shell_limits.limits_encoding
-          Shell_limits.default_limits)
+          default_config.shell)
        (dft
           "network"
           ~description:"Configuration of which network/blockchain to connect to"
           sugared_blockchain_network_encoding
-          blockchain_network_mainnet)
+          default_config.blockchain_network)
        (dft
           "metrics_addr"
           ~description:"Configuration of the Prometheus metrics endpoint"
