@@ -251,7 +251,7 @@ blueprints_publisher_request_failed:
                         "number": $unistring,
                         "nb_chunks": integer ∈ [-2^30, 2^30],
                         "chunk_index": integer ∈ [-2^30, 2^30],
-                        "signature": $Signature.V1 } ... ],
+                        "signature": $Signature.V2 } ... ],
                   "inbox_payload": [ $unistring ... ] }
                 || [ $unistring ... ]
                 /* Inbox */ }
@@ -259,7 +259,7 @@ blueprints_publisher_request_failed:
                  "request": "new_l2_head",
                  "rollup_head": integer ∈ [-2^31-1, 2^31] },
           "errors": any } }
-    $Signature.V1:
+    $Signature.V2:
       /* A Ed25519, Secp256k1, P256 or BLS signature (Base58Check-encoded) */
       $unistring
     $positive_bignum:
@@ -2150,7 +2150,7 @@ blueprints_publisher_request_failed:
                         "number": $unistring,
                         "nb_chunks": integer ∈ [-2^30, 2^30],
                         "chunk_index": integer ∈ [-2^30, 2^30],
-                        "signature": $Signature.V1 } ... ],
+                        "signature": $Signature.V2 } ... ],
                   "inbox_payload": [ $unistring ... ] }
                 || [ $unistring ... ]
                 /* Inbox */ }
@@ -2158,7 +2158,7 @@ blueprints_publisher_request_failed:
                  "request": "new_l2_head",
                  "rollup_head": integer ∈ [-2^31-1, 2^31] },
           "errors": any } }
-    $Signature.V1:
+    $Signature.V2:
       /* A Ed25519, Secp256k1, P256 or BLS signature (Base58Check-encoded) */
       $unistring
     $positive_bignum:
