@@ -160,7 +160,7 @@ html_theme_options = {
         },
         {
             "name": "Documentation map",
-            "url": "https://docs.tezos.com/overview/resources",
+            "url": "https://docs.tezos.com/overview/resources#documentation-map",
             "icon": "_static/map.png",
             "type": "local",
         },
