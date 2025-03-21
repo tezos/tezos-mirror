@@ -101,16 +101,16 @@ val generate_key :
     total because [Signature_v1] supports more signature kinds than
     {!Signature_v0}. *)
 module Of_V0 : sig
-  (** Convert a public key hash from V0 to V1. *)
+  (** Convert a public key hash from V0 to V2. *)
   val public_key_hash : Signature_v0.Public_key_hash.t -> Public_key_hash.t
 
-  (** Convert a public key from V0 to V1. *)
+  (** Convert a public key from V0 to V2. *)
   val public_key : Signature_v0.Public_key.t -> Public_key.t
 
-  (** Convert a secret key from V0 to V1. *)
+  (** Convert a secret key from V0 to V2. *)
   val secret_key : Signature_v0.Secret_key.t -> Secret_key.t
 
-  (** Convert a signature from V0 to V1. *)
+  (** Convert a signature from V0 to V2. *)
   val signature : Signature_v0.t -> t
 end
 

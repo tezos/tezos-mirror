@@ -537,7 +537,7 @@ type splitted = {prefix : prefix option; suffix : Bytes.t}
 
 type t = signature
 
-let name = "Signature.V1"
+let name = "Signature.V2"
 
 let title = "A Ed25519, Secp256k1, P256 or BLS signature"
 
