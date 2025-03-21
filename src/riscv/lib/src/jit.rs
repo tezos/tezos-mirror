@@ -269,6 +269,7 @@ mod tests {
     use crate::machine_state::registers::NonZeroXRegister;
     use crate::machine_state::registers::XRegister;
     use crate::machine_state::registers::nz;
+    use crate::parser::instruction::InstrWidth;
     use crate::parser::instruction::InstrWidth::*;
     use crate::state_backend::FnManagerIdent;
     use crate::state_backend::ManagerRead;
@@ -1105,6 +1106,171 @@ mod tests {
             test_slt_imm(I::new_set_less_than_immediate_unsigned, (x1, 3), 5, TRUE),
             test_slt_imm(I::new_set_less_than_immediate_unsigned, (x3, 5), -15, TRUE),
             test_slt_imm(I::new_set_less_than_immediate_unsigned, (x3, -7), -6, TRUE),
+        ];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
+
+    backend_test!(test_branch, F, {
+        let test_branch =
+            |non_branch: fn(NonZeroXRegister, NonZeroXRegister, i64, InstrWidth) -> I,
+             branch: fn(NonZeroXRegister, NonZeroXRegister, i64, InstrWidth) -> I,
+             lhs: i64,
+             rhs: i64|
+             -> Scenario<F> {
+                let initial_pc: u64 = 0x1000;
+                let imm: i64 = -0x2000;
+                let expected_pc_branch = initial_pc.wrapping_add(imm as u64).wrapping_add(8);
+
+                ScenarioBuilder::default()
+                    .set_initial_pc(initial_pc)
+                    .set_instructions(&[
+                        I::new_li(nz::a1, lhs, InstrWidth::Compressed),
+                        I::new_li(nz::a2, rhs, InstrWidth::Compressed),
+                        non_branch(nz::a1, nz::a2, imm, InstrWidth::Uncompressed),
+                        branch(nz::a1, nz::a2, imm, InstrWidth::Uncompressed),
+                        I::new_nop(InstrWidth::Compressed),
+                    ])
+                    .set_expected_steps(4)
+                    .set_assert_hook(assert_hook!(core, F, {
+                        assert_eq!(
+                            expected_pc_branch,
+                            core.hart.pc.read(),
+                            "Expected {expected_pc_branch} pc for B*Zero cmp {lhs}, {rhs}"
+                        )
+                    }))
+                    .build()
+            };
+
+        let scenarios: &[Scenario<F>] = &[
+            // Equality
+            test_branch(I::new_branch_equal, I::new_branch_not_equal, 2, 3),
+            test_branch(I::new_branch_not_equal, I::new_branch_equal, 2, 2),
+            test_branch(I::new_branch_equal, I::new_branch_not_equal, 2, -3),
+            // LessThanUnsigned + GreaterThanOrEqualUnsigned
+            test_branch(
+                I::new_branch_less_than_unsigned,
+                I::new_branch_greater_than_or_equal_unsigned,
+                3,
+                2,
+            ),
+            test_branch(
+                I::new_branch_less_than_unsigned,
+                I::new_branch_greater_than_or_equal_unsigned,
+                2,
+                2,
+            ),
+            test_branch(
+                I::new_branch_greater_than_or_equal_unsigned,
+                I::new_branch_less_than_unsigned,
+                2,
+                -3,
+            ),
+            // LessThanSigned + GreaterThanOrEqualSigned
+            test_branch(
+                I::new_branch_less_than_signed,
+                I::new_branch_greater_than_or_equal_signed,
+                3,
+                2,
+            ),
+            test_branch(
+                I::new_branch_less_than_signed,
+                I::new_branch_greater_than_or_equal_signed,
+                2,
+                2,
+            ),
+            test_branch(
+                I::new_branch_less_than_signed,
+                I::new_branch_greater_than_or_equal_signed,
+                2,
+                -3,
+            ),
+            test_branch(
+                I::new_branch_greater_than_or_equal_signed,
+                I::new_branch_less_than_signed,
+                -4,
+                -3,
+            ),
+        ];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
+
+    backend_test!(test_branch_compare_zero, F, {
+        let test_branch_compare_zero = |non_branch: fn(NonZeroXRegister, i64, InstrWidth) -> I,
+                                        branch: fn(NonZeroXRegister, i64, InstrWidth) -> I,
+                                        val: i64|
+         -> Scenario<F> {
+            let initial_pc: u64 = 0x1000;
+            let imm: i64 = 0x2000;
+            let expected_pc_branch = initial_pc + imm as u64 + 4;
+
+            ScenarioBuilder::default()
+                .set_initial_pc(initial_pc)
+                .set_instructions(&[
+                    I::new_li(nz::ra, val, InstrWidth::Compressed),
+                    non_branch(nz::ra, imm, InstrWidth::Compressed),
+                    branch(nz::ra, imm, InstrWidth::Uncompressed),
+                    I::new_nop(InstrWidth::Compressed),
+                ])
+                .set_expected_steps(3)
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(
+                        expected_pc_branch,
+                        core.hart.pc.read(),
+                        "Expected {expected_pc_branch} pc for B*Zero cmp {val:?}"
+                    )
+                }))
+                .build()
+        };
+
+        let scenarios: &[Scenario<F>] = &[
+            // Equality
+            test_branch_compare_zero(I::new_branch_equal_zero, I::new_branch_not_equal_zero, 12),
+            test_branch_compare_zero(I::new_branch_not_equal_zero, I::new_branch_equal_zero, 0),
+            test_branch_compare_zero(I::new_branch_equal_zero, I::new_branch_not_equal_zero, -12),
+            // LessThan + GreaterThanOrEqual
+            test_branch_compare_zero(
+                I::new_branch_less_than_zero,
+                I::new_branch_greater_than_or_equal_zero,
+                12,
+            ),
+            test_branch_compare_zero(
+                I::new_branch_less_than_zero,
+                I::new_branch_greater_than_or_equal_zero,
+                0,
+            ),
+            test_branch_compare_zero(
+                I::new_branch_greater_than_or_equal_zero,
+                I::new_branch_less_than_zero,
+                -12,
+            ),
+            // LessThanOrEqual + GreaterThan
+            test_branch_compare_zero(
+                I::new_branch_less_than_or_equal_zero,
+                I::new_branch_greater_than_zero,
+                12,
+            ),
+            test_branch_compare_zero(
+                I::new_branch_greater_than_zero,
+                I::new_branch_less_than_or_equal_zero,
+                0,
+            ),
+            test_branch_compare_zero(
+                I::new_branch_greater_than_zero,
+                I::new_branch_less_than_or_equal_zero,
+                -12,
+            ),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();

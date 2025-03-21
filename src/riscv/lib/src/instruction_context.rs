@@ -15,6 +15,7 @@ use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::registers::XRegister;
 use crate::machine_state::registers::XValue;
 use crate::parser::XRegisterParsed;
+use crate::parser::instruction::InstrWidth;
 use crate::parser::split_x0;
 use crate::state_backend::ManagerReadWrite;
 use crate::traps::Exception;
@@ -89,6 +90,19 @@ pub trait ICB {
     /// - `true -> 1`
     /// - `false -> 0`
     fn xvalue_from_bool(&mut self, value: Self::Bool) -> Self::XValue;
+
+    /// Branching instruction.
+    ///
+    /// If `predicate` is true, the branch will be taken. The PC update
+    /// will be to the address returned by `take_branch`.
+    ///
+    /// If false, the PC update is to the next instruction.
+    fn branch(
+        &mut self,
+        condition: Self::Bool,
+        offset: i64,
+        instr_width: InstrWidth,
+    ) -> ProgramCounterUpdate<Self::XValue>;
 
     /// Representation for the manipulation of fallible operations.
     type IResult<Value>;
@@ -214,6 +228,22 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
         value as XValue
     }
 
+    #[inline(always)]
+    fn branch(
+        &mut self,
+        predicate: Self::Bool,
+        offset: i64,
+        instr_width: InstrWidth,
+    ) -> ProgramCounterUpdate<Self::XValue> {
+        if predicate {
+            let pc = self.pc_read();
+            let address = pc.wrapping_add(offset as u64);
+            ProgramCounterUpdate::Set(address)
+        } else {
+            ProgramCounterUpdate::Next(instr_width)
+        }
+    }
+
     type IResult<In> = Result<In, Exception>;
 
     #[inline(always)]
@@ -240,8 +270,14 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
 
 /// Operators for producing a boolean from two values.
 pub enum Predicate {
+    Equal,
+    NotEqual,
     LessThanSigned,
     LessThanUnsigned,
+    LessThanOrEqualSigned,
+    GreaterThanSigned,
+    GreaterThanOrEqualSigned,
+    GreaterThanOrEqualUnsigned,
 }
 
 impl Predicate {
@@ -249,8 +285,14 @@ impl Predicate {
     #[inline(always)]
     fn eval(self, lhs: XValue, rhs: XValue) -> bool {
         match self {
+            Self::Equal => lhs == rhs,
+            Self::NotEqual => lhs != rhs,
             Self::LessThanSigned => (lhs as i64) < (rhs as i64),
             Self::LessThanUnsigned => lhs < rhs,
+            Self::LessThanOrEqualSigned => (lhs as i64) <= (rhs as i64),
+            Self::GreaterThanSigned => (lhs as i64) > (rhs as i64),
+            Self::GreaterThanOrEqualSigned => (lhs as i64) >= (rhs as i64),
+            Self::GreaterThanOrEqualUnsigned => lhs >= rhs,
         }
     }
 }

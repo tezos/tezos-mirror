@@ -20,8 +20,10 @@ use super::state_access::JitStateAccess;
 use super::state_access::JsaCalls;
 use crate::instruction_context::ICB;
 use crate::instruction_context::Predicate;
+use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::registers::NonZeroXRegister;
+use crate::parser::instruction::InstrWidth;
 
 pub(super) mod block_state;
 
@@ -137,6 +139,7 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
 
         // Clearing the context is done via `finalize`, which internally clears the
         // buffers to allow re-use.
+        self.builder.seal_all_blocks();
         self.builder.finalize();
     }
 
@@ -249,6 +252,36 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
         self.builder.ins().icmp(comparison, lhs, rhs)
     }
 
+    fn branch(
+        &mut self,
+        condition: Self::Bool,
+        offset: i64,
+        instr_width: InstrWidth,
+    ) -> ProgramCounterUpdate<Self::XValue> {
+        let branch_block = self.builder.create_block();
+        let fallthrough_block = self.builder.create_block();
+
+        self.builder
+            .ins()
+            .brif(condition, branch_block, &[], fallthrough_block, &[]);
+
+        let snapshot = self.dynamic;
+
+        // Handle branching block
+        self.builder.switch_to_block(branch_block);
+
+        self.complete_step(block_state::PCUpdate::Offset(offset));
+        self.jump_to_end();
+
+        self.builder.seal_block(branch_block);
+
+        // Continue on the fallthrough block
+        self.dynamic = snapshot;
+        self.builder.switch_to_block(fallthrough_block);
+
+        ProgramCounterUpdate::Next(instr_width)
+    }
+
     fn ok<Value>(&mut self, val: Value) -> Self::IResult<Value> {
         val
     }
@@ -271,8 +304,14 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
 impl From<Predicate> for IntCC {
     fn from(value: Predicate) -> Self {
         match value {
+            Predicate::Equal => IntCC::Equal,
+            Predicate::NotEqual => IntCC::NotEqual,
             Predicate::LessThanSigned => IntCC::SignedLessThan,
             Predicate::LessThanUnsigned => IntCC::UnsignedLessThan,
+            Predicate::LessThanOrEqualSigned => IntCC::SignedLessThanOrEqual,
+            Predicate::GreaterThanSigned => IntCC::SignedGreaterThan,
+            Predicate::GreaterThanOrEqualSigned => IntCC::SignedGreaterThanOrEqual,
+            Predicate::GreaterThanOrEqualUnsigned => IntCC::UnsignedGreaterThanOrEqual,
         }
     }
 }
