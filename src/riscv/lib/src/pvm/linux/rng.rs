@@ -6,7 +6,6 @@ use super::SupervisorState;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::memory::Memory;
 use crate::machine_state::memory::MemoryConfig;
-use crate::machine_state::registers;
 use crate::pvm::linux::error::Error;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerReadWrite;
@@ -21,13 +20,12 @@ impl<M: ManagerBase> SupervisorState<M> {
     pub(super) fn handle_getrandom(
         &mut self,
         core: &mut MachineCoreState<impl MemoryConfig, M>,
-    ) -> Result<bool, Error>
+        buffer: u64,
+        length: u64,
+    ) -> Result<u64, Error>
     where
         M: ManagerReadWrite,
     {
-        let buffer = core.hart.xregisters.read(registers::a0);
-        let length = core.hart.xregisters.read(registers::a1);
-
         let actual_length = length.min(RANDOM.len() as u64);
         let data = &RANDOM[..actual_length as usize];
 
@@ -35,9 +33,7 @@ impl<M: ManagerBase> SupervisorState<M> {
         // it's doing for now.
         core.main_memory.write_all(buffer, data)?;
 
-        core.hart.xregisters.write(registers::a0, actual_length);
-
-        Ok(true)
+        Ok(actual_length)
     }
 }
 
