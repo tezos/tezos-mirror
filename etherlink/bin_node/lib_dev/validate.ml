@@ -34,22 +34,13 @@ let validate_nonce ~next_nonce:(Qty next_nonce)
   if transaction.nonce >= next_nonce then return (Ok ())
   else return (Error "Nonce too low")
 
-let validate_gas_limit (module Backend_rpc : Services_backend_sig.S)
+let validate_gas_limit ~maximum_gas_limit:(Qty maximum_gas_limit)
+    ~da_fee_per_byte ~base_fee_per_gas:(Qty gas_price)
     (transaction : Transaction.transaction) :
     (unit, string) result tzresult Lwt.t =
   let open Lwt_result_syntax in
   (* Constants defined in the kernel: *)
   let gas_limit = transaction.gas_limit in
-  let* state = Backend_rpc.Reader.get_state () in
-  let* (Qty maximum_gas_limit) =
-    Durable_storage.maximum_gas_per_transaction (Backend_rpc.Reader.read state)
-  in
-  let* da_fee_per_byte =
-    Durable_storage.da_fee_per_byte (Backend_rpc.Reader.read state)
-  in
-  let* (Qty gas_price) =
-    Durable_storage.base_fee_per_gas (Backend_rpc.Reader.read state)
-  in
   let gas_for_da_fees =
     Fees.gas_for_fees
       ~da_fee_per_byte
@@ -81,10 +72,9 @@ let validate_sender_not_a_contract (module Backend_rpc : Services_backend_sig.S)
   if code = "" then return (Ok ())
   else return (Error "Sender is a contract which is not possible")
 
-let validate_max_fee_per_gas (module Backend_rpc : Services_backend_sig.S)
+let validate_max_fee_per_gas ~base_fee_per_gas:(Qty base_fee_per_gas)
     (transaction : Transaction.transaction) =
   let open Lwt_result_syntax in
-  let* (Qty base_fee_per_gas) = Backend_rpc.base_fee_per_gas () in
   if transaction.max_fee_per_gas >= base_fee_per_gas then return (Ok ())
   else return (Error "Max gas fee too low")
 
@@ -100,7 +90,7 @@ let validate_balance_is_enough (transaction : Transaction.transaction) ~balance
   in
   if gas_cost > balance then return (Error "Cannot prepay transaction.")
   else if total_cost > balance then return (Error "Not enough funds")
-  else return (Ok ())
+  else return (Ok total_cost)
 
 let validate_stateless ~next_nonce backend_rpc transaction ~caller =
   let open Lwt_result_syntax in
@@ -109,16 +99,44 @@ let validate_stateless ~next_nonce backend_rpc transaction ~caller =
   let** () = validate_sender_not_a_contract backend_rpc caller in
   return (Ok ())
 
-let validate_with_state (module Backend_rpc : Services_backend_sig.S)
-    transaction ~caller =
+let validate_balance_and_gas ~base_fee_per_gas ~maximum_gas_limit
+    ~da_fee_per_byte ~transaction ~from_balance:(Qty from_balance) =
   let open Lwt_result_syntax in
-  let* (Qty balance) =
+  let** () = validate_max_fee_per_gas ~base_fee_per_gas transaction in
+  let** () =
+    validate_gas_limit
+      ~maximum_gas_limit
+      ~da_fee_per_byte
+      ~base_fee_per_gas
+      transaction
+  in
+  let** total_cost =
+    validate_balance_is_enough transaction ~balance:from_balance
+  in
+  return (Ok total_cost)
+
+let validate_with_state_from_backend
+    (module Backend_rpc : Services_backend_sig.S) transaction ~caller =
+  let open Lwt_result_syntax in
+  let* from_balance =
     Backend_rpc.balance caller Block_parameter.(Block_parameter Latest)
   in
-  let backend_rpc = (module Backend_rpc : Services_backend_sig.S) in
-  let** () = validate_max_fee_per_gas backend_rpc transaction in
-  let** () = validate_gas_limit backend_rpc transaction in
-  let** () = validate_balance_is_enough transaction ~balance in
+  let* base_fee_per_gas = Backend_rpc.base_fee_per_gas () in
+  let* state = Backend_rpc.Reader.get_state () in
+  let* maximum_gas_limit =
+    Durable_storage.maximum_gas_per_transaction (Backend_rpc.Reader.read state)
+  in
+  let* da_fee_per_byte =
+    Durable_storage.da_fee_per_byte (Backend_rpc.Reader.read state)
+  in
+  let** _total_cost =
+    validate_balance_and_gas
+      ~base_fee_per_gas
+      ~maximum_gas_limit
+      ~da_fee_per_byte
+      ~transaction
+      ~from_balance
+  in
   return (Ok ())
 
 type validation_mode = Stateless | With_state | Full
@@ -137,10 +155,10 @@ let valid_transaction_object ~backend_rpc ~hash ~mode tx =
   let** () =
     match mode with
     | Stateless -> validate_stateless backend_rpc ~next_nonce tx ~caller
-    | With_state -> validate_with_state backend_rpc tx ~caller
+    | With_state -> validate_with_state_from_backend backend_rpc tx ~caller
     | Full ->
         let** () = validate_stateless ~next_nonce backend_rpc tx ~caller in
-        let** () = validate_with_state backend_rpc tx ~caller in
+        let** () = validate_with_state_from_backend backend_rpc tx ~caller in
         return (Ok ())
   in
 
@@ -151,3 +169,89 @@ let is_tx_valid ((module Backend_rpc : Services_backend_sig.S) as backend_rpc)
   let hash = Ethereum_types.hash_raw_tx tx_raw in
   let**? tx = Transaction.decode tx_raw in
   valid_transaction_object ~backend_rpc ~hash ~mode tx
+
+type validation_config = {
+  base_fee_per_gas : Ethereum_types.quantity;
+  maximum_gas_limit : Ethereum_types.quantity;
+  da_fee_per_byte : Ethereum_types.quantity;
+  next_nonce :
+    Ethereum_types.address -> Ethereum_types.quantity option tzresult Lwt.t;
+  balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t;
+}
+
+type validation_state = {
+  config : validation_config;
+  addr_balance : Z.t String.Map.t;
+  addr_nonce : Z.t String.Map.t;
+}
+
+let validate_balance_gas_nonce_with_validation_state validation_state
+    ~(caller : Ethereum_types.address) (transaction : Transaction.transaction) :
+    (validation_state, string) result tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let (Address (Hex caller_str)) = caller in
+  let* next_nonce =
+    let nonce = String.Map.find caller_str validation_state.addr_nonce in
+    match nonce with
+    | Some nonce -> return nonce
+    | None -> (
+        let* nonce = validation_state.config.next_nonce caller in
+        match nonce with
+        | Some (Qty nonce) -> return nonce
+        | None -> return Z.zero)
+  in
+  let** () =
+    let tx_nonce = transaction.nonce in
+    if Z.equal tx_nonce next_nonce then return (Ok ())
+    else return (Error "Transaction nonce is not the expected nonce.")
+  in
+  let* from_balance =
+    let from_balance =
+      String.Map.find caller_str validation_state.addr_balance
+    in
+    match from_balance with
+    | Some balance -> return balance
+    | None ->
+        let* (Qty balance) = validation_state.config.balance caller in
+        return balance
+  in
+  let** total_cost =
+    validate_balance_and_gas
+      ~base_fee_per_gas:validation_state.config.base_fee_per_gas
+      ~maximum_gas_limit:validation_state.config.maximum_gas_limit
+      ~da_fee_per_byte:validation_state.config.da_fee_per_byte
+      ~transaction
+      ~from_balance:(Qty from_balance)
+  in
+  let* addr_balance =
+    match transaction.to_ with
+    | None -> return validation_state.addr_balance
+    | Some to_ ->
+        let (`Hex to_) = Hex.of_bytes to_ in
+        let to_balance = String.Map.find to_ validation_state.addr_balance in
+        let* to_balance =
+          match to_balance with
+          | Some balance -> return balance
+          | None ->
+              let* (Qty balance) =
+                validation_state.config.balance (Address (Hex to_))
+              in
+              return balance
+        in
+        let new_to_balance = Z.add transaction.value to_balance in
+        let addr_balance =
+          String.Map.add to_ new_to_balance validation_state.addr_balance
+        in
+        return addr_balance
+  in
+  let validation_state =
+    let new_from_balance = Z.sub from_balance total_cost in
+    let addr_balance =
+      String.Map.add caller_str new_from_balance addr_balance
+    in
+    let addr_nonce =
+      String.Map.add caller_str (Z.succ next_nonce) validation_state.addr_nonce
+    in
+    {validation_state with addr_balance; addr_nonce}
+  in
+  return (Ok validation_state)

@@ -188,6 +188,60 @@ let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
   in
   return confirmed_txs
 
+let validate_tx ~maximum_cumulative_size (current_size, validation_state) raw_tx
+    (tx_object : Ethereum_types.legacy_transaction_object) =
+  let open Lwt_result_syntax in
+  let new_size = current_size + String.length raw_tx in
+  if new_size > maximum_cumulative_size then return `Stop
+  else
+    let*? transaction =
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7785
+         This decoding can be removed when switching the codebase to
+         transaction_object. It's ok for a first version. *)
+      Result.map_error (fun msg -> [error_of_fmt "%s" msg])
+      @@ Transaction.decode raw_tx
+    in
+    let* validation_state_res =
+      Validate.validate_balance_gas_nonce_with_validation_state
+        validation_state
+        ~caller:tx_object.from
+        transaction
+    in
+    match validation_state_res with
+    | Ok validation_state -> return (`Keep (new_size, validation_state))
+    | Error msg ->
+        let*! () =
+          Block_producer_events.transaction_rejected tx_object.hash msg
+        in
+        return `Drop
+
+let tx_queue_pop_valid_tx (head_info : Evm_context.head)
+    ~maximum_cumulative_size =
+  let open Lwt_result_syntax in
+  let read = Evm_state.read head_info.evm_state in
+  let* base_fee_per_gas = Durable_storage.base_fee_per_gas read in
+  let* maximum_gas_limit = Durable_storage.maximum_gas_per_transaction read in
+  let* da_fee_per_byte = Durable_storage.da_fee_per_byte read in
+  let config =
+    Validate.
+      {
+        base_fee_per_gas;
+        maximum_gas_limit;
+        da_fee_per_byte;
+        next_nonce = (fun addr -> Durable_storage.nonce read addr);
+        balance = (fun addr -> Durable_storage.balance read addr);
+      }
+  in
+  let initial_validation_state =
+    ( 0,
+      Validate.
+        {config; addr_balance = String.Map.empty; addr_nonce = String.Map.empty}
+    )
+  in
+  Tx_queue.pop_transactions
+    ~validate_tx:(validate_tx ~maximum_cumulative_size)
+    ~initial_validation_state
+
 (** Produces a block if we find at least one valid transaction in the transaction
     pool or if [force] is true. *)
 let produce_block_if_needed ~cctxt ~smart_rollup_address ~sequencer_key ~force
@@ -200,14 +254,10 @@ let produce_block_if_needed ~cctxt ~smart_rollup_address ~sequencer_key ~force
     if remaining_cumulative_size <= minimum_ethereum_transaction_size then
       return []
     else if uses_tx_queue then
-      (* TODO: https://gitlab.com/tezos/tezos/-/merge_requests/17211
-         Validates transactions with regards to balance for
-         example (with_state validation) *)
-      Tx_queue.pop_transactions
+      tx_queue_pop_valid_tx
+        head_info
         ~maximum_cumulative_size:remaining_cumulative_size
     else
-      (* When the tx_pool is removed, we could keep the sequence instead
-         of creating a list in the popped transaction of the tx_queue. *)
       Tx_pool.pop_transactions
         ~maximum_cumulative_size:remaining_cumulative_size
   in

@@ -272,7 +272,12 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~rpc_server_family:
         (if enable_multichain then Rpc_types.Multichain_sequencer_rpc_server
          else Rpc_types.Single_chain_node_rpc_server EVM)
-      Full
+      (* When the tx_queue is enabled the validation is done in the
+         block_producer instead of in the RPC. This allows for a more
+         accurate validation as it's delayed up to when the block is
+         created. *)
+      (if Configuration.is_tx_queue_enabled configuration then Stateless
+       else Full)
       configuration
       (backend, smart_rollup_address_typed)
   in

@@ -589,10 +589,7 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
               match block_param with
               | Ethereum_types.Block_parameter.(Block_parameter Pending) ->
                   let* nonce =
-                    if
-                      Option.is_some
-                        config.experimental_features.enable_tx_queue
-                    then
+                    if Configuration.is_tx_queue_enabled config then
                       let* next_nonce = Backend_rpc.nonce address block_param in
                       let next_nonce =
                         Option.value ~default:Qty.zero next_nonce
@@ -969,25 +966,31 @@ let dispatch_private_request (rpc_server_family : Rpc_types.rpc_server_family)
             ( (transaction_object : Ethereum_types.legacy_transaction_object),
               raw_txn ) =
           let* is_valid =
-            let* mode = Tx_pool.mode () in
-            match mode with
-            | Sequencer ->
-                Validate.is_tx_valid
-                  (module Backend_rpc)
-                  ~mode:With_state
-                  raw_txn
-            | _ ->
-                let* next_nonce =
-                  Backend_rpc.nonce
-                    transaction_object.from
-                    (Block_parameter Latest)
-                in
-                let next_nonce =
-                  match next_nonce with
-                  | None -> Ethereum_types.Qty Z.zero
-                  | Some next_nonce -> next_nonce
-                in
-                return @@ Ok (next_nonce, transaction_object)
+            let get_nonce () =
+              let* next_nonce =
+                Backend_rpc.nonce
+                  transaction_object.from
+                  (Block_parameter Latest)
+              in
+              let next_nonce =
+                match next_nonce with
+                | None -> Ethereum_types.Qty Z.zero
+                | Some next_nonce -> next_nonce
+              in
+              return @@ Ok (next_nonce, transaction_object)
+            in
+            (* If the tx_queue is enabled the `with_state` validation
+               will be done in the block producer *)
+            if Configuration.is_tx_queue_enabled config then get_nonce ()
+            else
+              let* mode = Tx_pool.mode () in
+              match mode with
+              | Sequencer ->
+                  Validate.is_tx_valid
+                    (module Backend_rpc)
+                    ~mode:With_state
+                    raw_txn
+              | _ -> get_nonce ()
           in
           match is_valid with
           | Error err ->

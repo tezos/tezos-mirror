@@ -109,17 +109,23 @@ val is_locked : unit -> bool tzresult Lwt.t
     are not equal to {!Tx_pool.get_tx_pool_content} *)
 val content : unit -> Ethereum_types.txpool tzresult Lwt.t
 
-(** [pop_transactions ~maximum_cumulative_size] pops as much valid
-    transactions as possible from the pool, until their cumulative
-    size exceeds [maximum_cumulative_size].
+(** [pop_transactions ~validate_tx ~initial_validation_state] pops as
+    many transactions as possible from the queue, validating them with
+    [validate_tx]. If [validate_tx] returns [`Keep validation_state]
+    then the evaluated transaction is popped, else if it returns
+    [`Drop], it's considered invalid and it's callback is called with
+    [`Refused]. If [validate_tx] returns [`Stop] then the caller has
+    enough transactions.
 
     If the tx_queue is locked (c.f. {!lock_transactions} then returns
-    the empty list.
-
-    All returned transaction are considered as accepted and all
-    associated callbacks are called with [`Accepted]. *)
+    the empty list. *)
 val pop_transactions :
-  maximum_cumulative_size:int ->
+  validate_tx:
+    ('a ->
+    string ->
+    Ethereum_types.legacy_transaction_object ->
+    [`Keep of 'a | `Drop | `Stop] tzresult Lwt.t) ->
+  initial_validation_state:'a ->
   (string * Ethereum_types.legacy_transaction_object) list tzresult Lwt.t
 
 (** [confirm_transactions ~clear_pending_queue_after ~confirmed_txs]

@@ -54,6 +54,10 @@ val inspect : t -> string -> bytes option Lwt.t
     [evm_state]. *)
 val subkeys : t -> string -> string trace Lwt.t
 
+(** [read evm_state key] returns the bytes stored under [key] in
+    [evm_state]. *)
+val read : t -> string -> bytes option tzresult Lwt.t
+
 (** [execute_and_inspect ~data_dir ?wasm_entrypoint ~config ~input
     evm_state] executes the [wasm_entrypoint] function (default to
     [kernel_run]) with [input] within the inbox of [evm_state], and

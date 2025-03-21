@@ -24,3 +24,24 @@ val is_tx_valid :
   result
   tzresult
   Lwt.t
+
+type validation_config = {
+  base_fee_per_gas : Ethereum_types.quantity;
+  maximum_gas_limit : Ethereum_types.quantity;
+  da_fee_per_byte : Ethereum_types.quantity;
+  next_nonce :
+    Ethereum_types.address -> Ethereum_types.quantity option tzresult Lwt.t;
+  balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t;
+}
+
+type validation_state = {
+  config : validation_config;
+  addr_balance : Z.t String.Map.t;
+  addr_nonce : Z.t String.Map.t;
+}
+
+val validate_balance_gas_nonce_with_validation_state :
+  validation_state ->
+  caller:Ethereum_types.address ->
+  Transaction.transaction ->
+  (validation_state, string) result tzresult Lwt.t

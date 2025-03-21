@@ -179,6 +179,11 @@ let exists evm_state key =
   let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable in
   Tezos_scoru_wasm.Durable.exists durable key
 
+let read state key =
+  let open Lwt_result_syntax in
+  let*! res = inspect state key in
+  return res
+
 let kernel_version evm_state =
   let open Lwt_syntax in
   let+ version = inspect evm_state Durable_storage_path.kernel_version in
@@ -330,13 +335,7 @@ let clear_delayed_inbox evm_state =
 
 let wasm_pvm_version state = Wasm_debugger.get_wasm_version state
 
-let storage_version state =
-  let open Lwt_result_syntax in
-  let read key =
-    let*! res = inspect state key in
-    return res
-  in
-  Durable_storage.storage_version read
+let storage_version state = Durable_storage.storage_version (read state)
 
 let irmin_store_path ~data_dir = Filename.Infix.(data_dir // "store")
 

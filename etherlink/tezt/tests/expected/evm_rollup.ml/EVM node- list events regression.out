@@ -48,6 +48,21 @@ block_producer_transaction_injected:
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
+block_producer_transaction_rejected:
+  description: transaction {tx_hash} is not valid with current state: {error}
+  level: debug
+  section: evm_node.dev
+  json format:
+    { /* block_producer_transaction_rejected version 0 */
+      "block_producer_transaction_rejected.v0":
+        { "tx_hash": $unistring,
+          "error": $unistring } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 blueprint_application:
   description: head is now {level}, applied in {process_time}{timestamp}
   level: notice
