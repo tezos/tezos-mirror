@@ -95,8 +95,13 @@ Smart Rollup node
   ``/local/outbox/pending/executable`` and
   ``/local/outbox/pending/unexecutable``. (MR :gl:`!16831`)
 
-- Add a new RPC RPC ``/local/outbox/pending`` to fetch all known outbox messages
+- Add a new RPC ``/local/outbox/pending`` to fetch all known outbox messages
   with their status. (MR :gl:`!16831`)
+
+
+- Use correct constant to determine executable or lost outbox messages for RPCs
+  ``/local/outbox/pending`` and ``/local/outbox/pending/executable``. (MR
+  :gl:`!17279`)
 
 Smart Rollup WASM Debugger
 --------------------------
