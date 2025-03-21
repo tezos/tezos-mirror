@@ -591,7 +591,7 @@ val bake_for :
   t ->
   unit Lwt.t
 
-(** Same as {!bake_for}, but wait until level increases by 1.
+(** Same as {!bake_for}, but wait for your node to reach the expected level.
 
     Waiting ensures that the baked block has been well processed by
     the node. This makes your test more deterministic.
