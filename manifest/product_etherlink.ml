@@ -472,6 +472,7 @@ let _floodgate_bin =
   public_exe
     "floodgate"
     ~path:"etherlink/bin_floodgate"
+    ~with_macos_security_framework:true
     ~internal_name:"main"
     ~release_status:Unreleased
     ~opam:"floodgate"

@@ -7691,6 +7691,7 @@ let _octez_bench_store_lib_tests_exe =
   private_exe
     "bench"
     ~path:"src/lib_store/unix/test/bench"
+    ~with_macos_security_framework:true
     ~synopsis:"Bench store lib tests"
     ~opam:""
     ~deps:
@@ -7711,6 +7712,7 @@ let _octez_slow_store_lib_tests_exe =
   private_exe
     "test_slow"
     ~path:"src/lib_store/unix/test/slow"
+    ~with_macos_security_framework:true
     ~synopsis:"Slow store lib tests"
     ~modules:["test_slow"]
     ~opam:""
@@ -7852,6 +7854,7 @@ let _proto_context_du =
     "proto_context_du"
     ~internal_name:"main"
     ~path:("devtools" // "proto_context_du")
+    ~with_macos_security_framework:true
     ~release_status:Unreleased
     ~synopsis:"A script to print protocol context disk usage"
     ~opam:"internal-devtools_proto-context-du"
@@ -8829,6 +8832,7 @@ let _octez_scoru_wasm_regressions =
   tezt
     ["tezos_scoru_wasm_regressions"]
     ~path:"src/lib_scoru_wasm/regressions"
+    ~with_macos_security_framework:true
     ~opam:"tezos-scoru-wasm-regressions"
     ~synopsis:"WASM PVM regressions"
     ~deps:
