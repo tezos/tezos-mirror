@@ -262,6 +262,8 @@ linkcheck_ignore = [
     r'^https://crates\.io/crates/tezos-smart-rollup',
     r'^https://rpc\.ghostnet\.teztnets\.com/chains/main/blocks/',
     r'^https://gitlab\.com/tezos/tezos/-/merge_requests/2771',
+    r'^https://gitlab\.com/tezos/tezos/-/merge_requests/3163',
+    r'^https://gitlab\.com/tezos/tezos/-/merge_requests/3225',
 ]
 linkcheck_allowed_redirects = dict(
     [

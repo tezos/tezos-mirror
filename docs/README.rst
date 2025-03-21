@@ -106,7 +106,7 @@ Some ad-hoc reference kinds are supported.
   (``package.version``)
 - ``:gl:`[special gitlab reference]``` or ``:gl:`text <[special gitlab
   reference]>``` expands and links `GitLab special references
-  <https://docs.gitlab.com/ee/user/markdown.html#gitlab-specific-references>`_,
+  <https://docs.gitlab.com/user/markdown/#gitlab-specific-references>`_,
   like for
   merge requests :gl:`tezos/tezos!123` (``:gl:`tezos/tezos!123```),
   issues :gl:`tezos/tezos#999` (``:gl:`tezos/tezos#999```)

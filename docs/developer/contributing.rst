@@ -96,7 +96,7 @@ merge request is ready, it is reviewed and approved, then merged with a merge co
 
 Therefore, you can bring useful contributions both by creating your own MRs and by reviewing MRs submitted by others.
 
-We maintain a `semi-linear history <https://docs.gitlab.com/ee/user/project/merge_requests/reviews/index.html#semi-linear-history-merge-requests>`_,
+We maintain a `semi-linear history <https://docs.gitlab.com/user/project/merge_requests/reviews/#semi-linear-history-merge-requests>`_,
 which means that merge requests are only
 merged if they are direct suffixes of the master branch.
 This means that merge requests are rebased on top of ``master`` before they are merged.
@@ -155,7 +155,7 @@ approach will make it easier for the reviewer to keep interacting till
 each discussion is resolved. When the reviewer is satisfied, they
 will mark the discussion resolved.
 
-The `Draft: <https://docs.gitlab.com/ee/user/project/merge_requests/drafts.html>`_
+The `Draft: <https://docs.gitlab.com/user/project/merge_requests/drafts/>`_
 status can be set at any time during the
 authoring/review process to signal that the MR is not yet ready for
 merge (for instance, the ``git`` history might not be clean). But, the
@@ -456,7 +456,7 @@ To find reviewers, either:
 - Ask help to the :ref:`merge coordinator <merge_coordinator>`, either
   by asking them on Slack or mentioning them in a comment (see next paragraph).
 
-Depending on your `GitLab role <https://docs.gitlab.com/ee/user/permissions.html>`_
+Depending on your `GitLab role <https://docs.gitlab.com/user/permissions/>`_
 you may or may not be able to use the *Reviewers* field for specifying
 the reviewers. If you don't have the right, mention the reviewers using
 their GitLab handle (username prefixed with ``@``) in a comment.
@@ -469,7 +469,7 @@ Merge Request "Draft" Mode
 
 A merge request that is not yet ready to be merged should be marked as
 `draft
-<https://docs.gitlab.com/ee/user/project/merge_requests/drafts.html>`_
+<https://docs.gitlab.com/user/project/merge_requests/drafts/>`_
 by prefixing its title with ``Draft:``. Typical reasons for this is
 that the author still has some minor tasks to accomplish, such as
 cleaning up the merge request's ``git`` history (e.g. squashing ``fixup!`` commits), even
