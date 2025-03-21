@@ -638,7 +638,7 @@ let compute_step_many_until ~wasm_entrypoint ?(max_steps = 1L)
       else
         let* pvm_state = compute_step_with_reveal pvm_state in
         let* () =
-          match hooks.pvm_reboot with
+          match hooks.pvm.reboot with
           | None -> Lwt.return_unit
           | Some hook when is_last_eval_state pvm_state.tick_state ->
               hook Z.(to_int64 (pvm_state.current_tick - !last_snapshot_tick))

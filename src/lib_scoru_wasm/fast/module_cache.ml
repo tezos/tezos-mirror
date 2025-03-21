@@ -49,7 +49,7 @@ let load_parse_module ~hooks store key durable =
      Fast Exec. This effectively ensures WASMER will never be used with
      kernels including floats. *)
   let* () =
-    match hooks.Tezos_scoru_wasm.Hooks.fast_exec_invalid_kernel with
+    match hooks.Tezos_scoru_wasm.Hooks.fast_exec.invalid_kernel with
     | `Check_with_hook k ->
         Lwt.catch
           (fun () ->

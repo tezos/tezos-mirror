@@ -86,7 +86,7 @@ let rec compute_step_many accum_ticks ~(hooks : Hooks.t) ?reveal_builtins
   let open Lwt.Syntax in
   assert (max_steps > 0L) ;
   let after_fast_exec =
-    match hooks.fast_exec_completed with
+    match hooks.fast_exec.completed with
     | Some hook -> hook
     | None -> fun () -> Lwt_syntax.return_unit
   in
@@ -179,14 +179,14 @@ let rec compute_step_many accum_ticks ~(hooks : Hooks.t) ?reveal_builtins
       let go_like_the_wind () =
         Lwt.catch go_like_the_wind (fun exn ->
             let* () =
-              match hooks.fast_exec_panicked with
+              match hooks.fast_exec.panicked with
               | Some hook -> hook exn
               | None -> Lwt_syntax.return_unit
             in
             Lwt.reraise exn)
       in
       match pvm_state.tick_state with
-      | Snapshot when hooks.fast_exec_fallback ->
+      | Snapshot when hooks.fast_exec.fallback ->
           Lwt.catch go_like_the_wind (fun _ -> backup pvm_state)
       | Snapshot -> go_like_the_wind ()
       | _ -> goto_snapshot_and_retry ())
