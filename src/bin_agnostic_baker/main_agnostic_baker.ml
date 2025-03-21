@@ -22,13 +22,12 @@ let[@warning "-32"] may_start_profiler baking_dir =
       Agnostic_baker_profiler.init profiler_maker
   | None -> ()
 
-let lwt_run () =
+let lwt_run ~args () =
   let open Lwt_result_syntax in
-  let Run_args.{node_endpoint; base_dir} = Run_args.parse_args Sys.argv in
   let base_dir =
     Option.value
       ~default:Tezos_client_base_unix.Client_config.Cfg_file.default.base_dir
-      base_dir
+      (Run_args.get_base_dir args)
   in
   let*! () =
     Tezos_base_unix.Internal_event_unix.init
@@ -36,15 +35,15 @@ let lwt_run () =
       ()
   in
   () [@profiler.overwrite may_start_profiler base_dir] ;
-  let daemon = Daemon.create ~node_endpoint in
+  let daemon = Daemon.create ~node_endpoint:(Run_args.get_endpoint args) in
   let* (_ : unit) = Daemon.run daemon in
   let*! () = Lwt_utils.never_ending () in
   return_unit
 
-let run () =
+let run ~args () =
   let open Lwt_result_syntax in
   let main_promise =
-    Lwt.catch lwt_run (function
+    Lwt.catch (lwt_run ~args) (function
         | Failure msg -> failwith "%s" msg
         | exn -> failwith "%s" (Printexc.to_string exn))
   in
@@ -70,4 +69,4 @@ let () =
     Client_main_run.run
       (module Daemon_config)
       ~select_commands:(fun _ _ -> Lwt_result_syntax.return_nil)
-  else run ()
+  else run ~args ()

@@ -35,18 +35,8 @@ let get_arg_value ~arg ?(short_arg = "") =
   in
   loop
 
-let get_endpoint = get_arg_value ~arg:endpoint_arg ~short_arg:endpoint_short_arg
+let get_endpoint args =
+  Option.value ~default:Parameters.default_node_endpoint
+  @@ get_arg_value ~arg:endpoint_arg ~short_arg:endpoint_short_arg args
 
 let get_base_dir = get_arg_value ~arg:base_dir_arg ~short_arg:base_dir_short_arg
-
-type args = {node_endpoint : string; base_dir : string option}
-
-let parse_args all_args =
-  let all_args = Array.to_list all_args in
-  {
-    node_endpoint =
-      Option.value
-        ~default:Parameters.default_node_endpoint
-        (get_endpoint all_args);
-    base_dir = get_base_dir all_args;
-  }

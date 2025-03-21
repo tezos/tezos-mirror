@@ -12,10 +12,10 @@ val is_help_cmd : string list -> bool
 (** [is_version_cmd args] returns [true] iff [--version] is amongst [args]. *)
 val is_version_cmd : string list -> bool
 
-(** Simple wrapper to handle the arguments of the agnostic baker. *)
-type args = {node_endpoint : string; base_dir : string option}
+(** [get_endpoint args] returns the value associated to the [--endpoint] argument
+    amongst [args], and in its absence using the default node RPC port. *)
+val get_endpoint : string list -> string
 
-(** [parse_args args] is a raw utility that aims to parse the given
-    arguments from the command line and to return, respectively, the
-    [endpoint] and [base_dir]. *)
-val parse_args : string array -> args
+(** [get_base_dir] returns the value associated to the [--base-dir] argument
+        amonsgst [args]. *)
+val get_base_dir : string list -> string option
