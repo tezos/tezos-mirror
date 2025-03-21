@@ -374,7 +374,7 @@ RUN --mount=type=secret,id=npm_token \
       npm set registry "$NPM_REGISTRY" && \
       npm set //${NPM_REGISTRY_DOMAIN}:_authToken=$(cat /run/secrets/npm_token); \
     fi \
- && npm --verbose install -g "@datadog/datadog-ci@2.44.0" \
+ && npm --verbose install -g "@datadog/datadog-ci@2.45.0" \
  # We need eth since e2e tests. This requires git as well.
  && npm --verbose install -g eth-cli@2.0.2 \
  # We need solc to compile solidity smart-contracts
