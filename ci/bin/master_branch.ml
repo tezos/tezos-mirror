@@ -20,6 +20,21 @@ open Gitlab_ci
 open Gitlab_ci.Util
 open Tezos_ci
 
+let rules_always = [job_rule ~when_:Always ()]
+
+let job_docker_amd64_experimental : tezos_job =
+  job_docker_build ~__POS__ ~rules:rules_always ~arch:Amd64 Experimental
+
+let job_docker_arm64_experimental : tezos_job =
+  job_docker_build ~__POS__ ~rules:rules_always ~arch:Arm64 Experimental
+
+let job_docker_merge_manifests =
+  job_docker_merge_manifests
+    ~__POS__
+    ~ci_docker_hub:true
+    ~job_docker_amd64:job_docker_amd64_experimental
+    ~job_docker_arm64:job_docker_arm64_experimental
+
 let jobs =
   (* Like in the {!Schedule_extended_test} variant of
      {!Code_verification} pipelines, we'd like to run as many jobs as
@@ -35,20 +50,6 @@ let jobs =
      [changes:] in different pipelines, see
      {{:https://docs.gitlab.com/ee/ci/jobs/job_troubleshooting.html#jobs-or-pipelines-run-unexpectedly-when-using-changes}
      GitLab Docs: Jobs or pipelines run unexpectedly when using changes}. *)
-  let rules_always = [job_rule ~when_:Always ()] in
-  let job_docker_amd64_experimental : tezos_job =
-    job_docker_build ~__POS__ ~rules:rules_always ~arch:Amd64 Experimental
-  in
-  let job_docker_arm64_experimental : tezos_job =
-    job_docker_build ~__POS__ ~rules:rules_always ~arch:Arm64 Experimental
-  in
-  let job_docker_merge_manifests =
-    job_docker_merge_manifests
-      ~__POS__
-      ~ci_docker_hub:true
-      ~job_docker_amd64:job_docker_amd64_experimental
-      ~job_docker_arm64:job_docker_arm64_experimental
-  in
   let job_static_arm64 =
     job_build_static_binaries ~__POS__ ~arch:Arm64 ~rules:rules_always ()
   in

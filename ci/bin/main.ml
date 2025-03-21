@@ -373,7 +373,18 @@ let () =
         Common.job_datadog_pipeline_trace;
         Release_tag.job_release_page ~test:false ();
       ]
-    ~description:"Pipeline that updates and publishes the release page."
+    ~description:"Pipeline that updates and publishes the release page." ;
+  register
+    "docker_only"
+    api_docker
+    ~jobs:
+      [
+        Common.job_datadog_pipeline_trace;
+        Master_branch.job_docker_amd64_experimental;
+        Master_branch.job_docker_arm64_experimental;
+        Master_branch.job_docker_merge_manifests;
+      ]
+    ~description:"Pipeline that only generates docker images."
 
 (** {2 Entry point of the generator binary} *)
 

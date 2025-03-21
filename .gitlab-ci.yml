@@ -109,6 +109,10 @@ workflow:
     variables:
       PIPELINE_TYPE: publish_release_page
     when: always
+  - if: $CI_PIPELINE_SOURCE == "api" && $TZ_API_KIND == "DOCKER"
+    variables:
+      PIPELINE_TYPE: docker_only
+    when: always
 
 default:
   interruptible: true
@@ -242,4 +246,8 @@ include:
   rules:
   - if: $CI_PIPELINE_SOURCE == "api" && $TZ_API_KIND == "RELEASE_PAGE" && $CI_PROJECT_NAMESPACE
       == "tezos"
+    when: always
+- local: .gitlab/ci/pipelines/docker_only.yml
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "api" && $TZ_API_KIND == "DOCKER"
     when: always
