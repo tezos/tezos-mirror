@@ -33,6 +33,6 @@ container_scanning:
   - gtcs scan
   variables:
     GIT_STRATEGY: fetch
-    CS_IMAGE: tezos/tezos:octez-evm-node-v0.19
+    CS_IMAGE: tezos/tezos:octez-evm-node-v0.20
     SECURE_LOG_LEVEL: debug
     CS_DOCKERFILE_PATH: build.Dockerfile
