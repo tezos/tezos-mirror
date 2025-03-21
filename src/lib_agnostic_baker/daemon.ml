@@ -157,14 +157,21 @@ let hot_swap_baker ~state ~current_protocol_hash ~next_protocol_hash
   state.current_baker <- Some new_baker ;
   return_unit
 
-(** [maybe_kill_old_baker state head_level] checks whether the [old_baker] process
+(** [parse_level head_info] retrieves the ["level"] field information from the
+    json information of the chain from [head_info]. *)
+let parse_level head_info =
+  let json = Ezjsonm.from_string head_info in
+  Ezjsonm.find json ["level"] |> Ezjsonm.get_int
+
+(** [maybe_kill_old_baker state head_info] checks whether the [old_baker] process
     from the [state] of the agnostic baker has surpassed its lifetime and it stops
     it if that is the case. *)
-let maybe_kill_old_baker state head_level =
+let maybe_kill_old_baker state head_info =
   let open Lwt_syntax in
   match state.old_baker with
   | None -> return_unit
   | Some {baker; level_to_kill} ->
+      let head_level = parse_level head_info in
       if head_level >= level_to_kill then (
         let* () =
           Agnostic_baker_events.(emit stopping_baker) baker.protocol_hash
@@ -182,18 +189,17 @@ let monitor_voting_periods ~state head_stream =
   let open Lwt_result_syntax in
   let node_addr = state.node_endpoint in
   let rec loop () =
-    let*! v = Lwt_stream.get head_stream in
-    match v with
+    let*! head_info_opt = Lwt_stream.get head_stream in
+    match head_info_opt with
     | None -> tzfail Lost_node_connection
-    | Some _tick ->
+    | Some head_info ->
         let* period_kind, remaining =
           Rpc_services.get_current_period ~node_addr
         in
         let*! () =
           Agnostic_baker_events.(emit period_status) (period_kind, remaining)
         in
-        let* head_level = Rpc_services.get_level ~node_addr in
-        let*! () = maybe_kill_old_baker state head_level in
+        let*! () = maybe_kill_old_baker state head_info in
         let* next_protocol_hash =
           Rpc_services.get_next_protocol_hash ~node_addr
         in
@@ -209,7 +215,8 @@ let monitor_voting_periods ~state head_stream =
               ~state
               ~current_protocol_hash
               ~next_protocol_hash
-              ~level_to_kill_old_baker:(head_level + extra_levels_for_old_baker)
+              ~level_to_kill_old_baker:
+                (parse_level head_info + extra_levels_for_old_baker)
           else return_unit
         in
         loop ()
