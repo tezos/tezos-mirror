@@ -14,11 +14,6 @@ let default_node_endpoint =
 let default_daily_logs_path = Some "octez-experimental-agnostic-baker"
 
 let log_config ~base_dir =
-  let base_dir : string =
-    match base_dir with
-    | Some p -> p
-    | None -> Tezos_client_base_unix.Client_config.Cfg_file.default.base_dir
-  in
   let daily_logs_path =
     default_daily_logs_path
     |> Option.map Filename.Infix.(fun logdir -> base_dir // "logs" // logdir)

@@ -171,6 +171,12 @@ let parse_level head_info =
   let json = Ezjsonm.from_string head_info in
   Ezjsonm.find json ["level"] |> Ezjsonm.get_int
 
+(** [parse_block_hash head_info] retrieves the ["hash"] field information from the
+    json information of the chain from [head_info]. *)
+let[@warning "-32"] parse_block_hash head_info =
+  let json = Ezjsonm.from_string head_info in
+  Ezjsonm.find json ["hash"] |> Ezjsonm.get_string |> Block_hash.of_b58check_exn
+
 (** [maybe_kill_old_baker state head_info] checks whether the [old_baker] process
     from the [state] of the agnostic baker has surpassed its lifetime and it stops
     it if that is the case. *)
@@ -201,6 +207,9 @@ let monitor_voting_periods ~state head_stream =
     match head_info_opt with
     | None -> tzfail Lost_node_connection
     | Some head_info ->
+        ()
+        [@profiler.reset_block_section
+          {profiler_module = Profiler} (parse_block_hash head_info)] ;
         let* period_kind, remaining =
           Rpc_services.get_current_period ~node_addr
         in

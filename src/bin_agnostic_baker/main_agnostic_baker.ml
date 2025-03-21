@@ -18,6 +18,11 @@ let run () =
   let Run_args.{node_endpoint; base_dir; baker_args} =
     Run_args.parse_args Sys.argv
   in
+  let base_dir =
+    Option.value
+      ~default:Tezos_client_base_unix.Client_config.Cfg_file.default.base_dir
+      base_dir
+  in
   let*! () =
     Tezos_base_unix.Internal_event_unix.init
       ~config:(Parameters.log_config ~base_dir)
