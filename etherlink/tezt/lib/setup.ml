@@ -321,6 +321,31 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
   let l2_chain_ids = List.map (fun l2 -> l2.Evm_node.l2_chain_id) l2_setups in
   let* l2_configs = Lwt_list.map_s generate_l2_kernel_config l2_setups in
   let rollup_config = Temp.file "rollup-config.yaml" in
+  (* To keep backwards compatibility, we also write to the current durable storage
+     paths the variables that have been moved if we have a single chain. *)
+  let ( minimum_base_fee_per_gas,
+        da_fee_per_byte,
+        sequencer_pool_address,
+        maximum_gas_per_transaction,
+        bootstrap_accounts ) =
+    match l2_setups with
+    | [
+     {
+       minimum_base_fee_per_gas;
+       da_fee_per_byte;
+       sequencer_pool_address;
+       maximum_gas_per_transaction;
+       bootstrap_accounts;
+       _;
+     };
+    ] ->
+        ( minimum_base_fee_per_gas,
+          da_fee_per_byte,
+          sequencer_pool_address,
+          maximum_gas_per_transaction,
+          bootstrap_accounts )
+    | _ -> (None, None, None, None, None)
+  in
   let*! () =
     Evm_node.make_kernel_installer_config
       ~l2_chain_ids
@@ -331,14 +356,19 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
       ~ticketer:l1_contracts.exchanger
       ~administrator:l1_contracts.admin
       ~sequencer_governance:l1_contracts.sequencer_governance
+      ?minimum_base_fee_per_gas
+      ?da_fee_per_byte
       ?delayed_inbox_timeout
       ?delayed_inbox_min_levels
+      ?sequencer_pool_address
       ?maximum_allowed_ticks
+      ?maximum_gas_per_transaction
       ~enable_dal
       ?enable_fast_withdrawal
       ?dal_slots
       ~enable_multichain:true
       ?max_blueprint_lookahead_in_seconds
+      ?bootstrap_accounts
       ~output:rollup_config
       ?enable_fa_bridge
       ?evm_version
