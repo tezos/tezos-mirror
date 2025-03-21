@@ -144,6 +144,7 @@ fn fetch_sequencer_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
         chain_configuration,
     )? {
         StageOneStatus::Done => {
+            log!(host, Debug, "Stage one done, rebooting");
             // Check if there are timed-out transactions in the delayed inbox
             let timed_out = delayed_inbox.first_has_timed_out(host)?;
             if timed_out {

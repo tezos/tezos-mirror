@@ -326,6 +326,8 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
         log!(host, Benchmarking, "Shortcircuiting computation");
         return Ok(());
     }
+
+    log!(host, Debug, "End of kernel run.");
     Ok(())
 }
 

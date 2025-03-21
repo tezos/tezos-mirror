@@ -74,7 +74,7 @@ pub fn read_input<Host: Runtime, Mode: Parsable>(
 /// The InputHandler abstracts how the input is handled once it has been parsed.
 pub trait InputHandler
 where
-    Self: Parsable,
+    Self: Parsable + std::fmt::Debug,
 {
     /// Abstracts the type used to store the inputs once handled
     type Inbox;
@@ -185,6 +185,7 @@ impl InputHandler for SequencerInput {
         input: Self,
         delayed_inbox: &mut Self::Inbox,
     ) -> anyhow::Result<()> {
+        log!(host, Debug, "Handling input in sequencer mode: {:?}", input);
         match input {
             Self::DelayedInput(tx) => {
                 let previous_timestamp = read_last_info_per_level_timestamp(host)?;
@@ -390,6 +391,7 @@ pub fn handle_input<Mode: Parsable + InputHandler>(
             // New inbox level detected, remove all previous events.
             clear_events(host)?;
             if garbage_collect_blocks {
+                log!(host, Debug, "Garbage collection of old blocks");
                 crate::block_storage::garbage_collect_blocks(host, chain_family)?;
             }
             store_last_info_per_level_timestamp(host, info.info.predecessor_timestamp)?;
@@ -442,10 +444,12 @@ fn read_and_dispatch_input<
                 // If `inbox_is_empty` is true, that means we haven't see
                 // any input in the current call of `read_inbox`. Therefore,
                 // the inbox of this level has already been consumed.
+                log!(host, Debug, "Inbox is empty, moving to stage 2.");
                 Ok(ReadStatus::FinishedIgnore)
             } else {
                 // If it's a `NoInput` and `inbox_is_empty` is false, we
                 // have simply reached the end of the inbox.
+                log!(host, Debug, "Reaching end of inbox.");
                 Ok(ReadStatus::FinishedRead)
             }
         }
