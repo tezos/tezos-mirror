@@ -1787,6 +1787,16 @@ module Monitoring_app = struct
               | remaining_delegates ->
                   to_treat_delegates := remaining_delegates ;
                   unit)
+
+    let check_for_recently_missed_a_lot t ~level ~metadata =
+      Lwt.catch
+        (fun () -> check_for_recently_missed_a_lot t ~level ~metadata)
+        (fun exn ->
+          Log.warn
+            "Monitor_app.Alert.check_for_recently_missed_a_lot: unexpected \
+             error: '%s'"
+            (Printexc.to_string exn) ;
+          unit)
   end
 end
 
