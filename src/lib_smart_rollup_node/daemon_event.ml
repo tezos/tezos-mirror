@@ -36,6 +36,7 @@ module Simple = struct
       ~section
       ~name:"smart_rollup_node_daemon_process_head"
       ~msg:"Processing head {hash} at level {level}"
+      ~pp1:Block_hash.pp_short
       ~level:Notice
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
@@ -44,10 +45,9 @@ module Simple = struct
     declare_3
       ~section
       ~name:"smart_rollup_node_daemon_new_head_processed"
-      ~msg:
-        "Finished processing layer 1 head {hash} at level {level} in \
-         {process_time}"
+      ~msg:"Processed head {hash} at level {level} in {process_time}"
       ~level:Notice
+      ~pp1:Block_hash.pp_short
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
       ("process_time", Time.System.Span.encoding)
@@ -57,8 +57,9 @@ module Simple = struct
     declare_2
       ~section
       ~name:"smart_rollup_node_daemon_new_head_degraded"
-      ~msg:"[DEGRADED MODE] Seen layer 1 head {hash} at level {level}"
+      ~msg:"[DEGRADED MODE] Seen head {hash} at level {level}"
       ~level:Error
+      ~pp1:Block_hash.pp_short
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
 
@@ -88,8 +89,7 @@ module Simple = struct
     declare_3
       ~section
       ~name:"smart_rollup_node_daemon_new_heads_processed"
-      ~msg:
-        "Finished processing {number} layer 1 heads for levels {from} to {to}"
+      ~msg:"Processed {number} heads for levels {from} to {to}"
       ~level:Info
       ("number", Data_encoding.int31)
       ("from", Data_encoding.int32)
@@ -99,9 +99,7 @@ module Simple = struct
     declare_3
       ~section
       ~name:"smart_rollup_node_daemon_loop_process_finished"
-      ~msg:
-        "Finished main loop processing {number} layer 1 heads for levels \
-         {from} to {to}"
+      ~msg:"Main loop processed {number} heads up to level {to}"
       ~level:Info
       ("number", Data_encoding.int31)
       ("from", Data_encoding.int32)
