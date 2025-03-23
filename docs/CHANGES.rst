@@ -3,6 +3,13 @@
 Changelog
 '''''''''
 
+Version 22.0~rc3
+================
+
+- Use the correct constant to determine executable or lost outbox messages for the
+  ``/local/outbox/pending`` and ``/local/outbox/pending/executable`` RPC endpoints. (MR
+  :gl:`!17279`)
+
 Version 22.0~rc2
 ================
 

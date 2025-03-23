@@ -112,5 +112,6 @@ Alternatively, you can run them individually. For instance, to start a baker for
 Changelog
 ---------
 
+- `Version 22.0~rc3 <../CHANGES.html#version-22-0-rc3>`_
 - `Version 22.0~rc2 <../CHANGES.html#version-22-0-rc2>`_
 - `Version 22.0~rc1 <../CHANGES.html#version-22-0-rc1>`_
