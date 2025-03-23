@@ -135,6 +135,7 @@ let constants_of_parametric
             challenge_window_in_blocks;
             commitment_period_in_blocks;
             max_number_of_stored_cemented_commitments;
+            max_active_outbox_levels;
             _;
           };
         dal =
@@ -158,6 +159,7 @@ let constants_of_parametric
           commitment_period_in_blocks;
           reveal_activation_level = None;
           max_number_of_stored_cemented_commitments;
+          max_active_outbox_levels = Int32.to_int max_active_outbox_levels;
         };
       dal =
         {feature_enable; attestation_lag; number_of_slots; cryptobox_parameters};
