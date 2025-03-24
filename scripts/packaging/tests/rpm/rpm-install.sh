@@ -1,6 +1,9 @@
 #!/bin/sh
 #
 
+# include apt-get function with retry
+. scripts/packaging/tests/tests-common.inc.sh
+
 set -eu
 
 REPO="https://storage.googleapis.com/$GCP_LINUX_PACKAGES_BUCKET/$CI_COMMIT_REF_NAME"
