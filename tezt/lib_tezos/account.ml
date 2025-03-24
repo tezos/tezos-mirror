@@ -40,14 +40,14 @@ let require_unencrypted_secret_key ~__LOC__ = function
         ~__LOC__
         "[require_unencrypted_secret_key] expected an unencrypted secret key"
 
-let sign_bytes ~watermark ~(signer : key) (message : Bytes.t) =
+let sign_bytes ?watermark ~(signer : key) (message : Bytes.t) =
   let b58_secret_key =
     require_unencrypted_secret_key ~__LOC__ signer.secret_key
   in
   let secret_key =
     Tezos_crypto.Signature.Secret_key.of_b58check_exn b58_secret_key
   in
-  Tezos_crypto.Signature.sign ~watermark secret_key message
+  Tezos_crypto.Signature.sign ?watermark secret_key message
 
 let uri_of_secret_key = function
   | Unencrypted secret_key -> "unencrypted:" ^ secret_key

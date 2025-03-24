@@ -493,6 +493,12 @@ module Manager : sig
     unit ->
     payload
 
+  (** [update_consensus_key ~public_key ~proof ()] builds an
+      update_consenus_key operation. [proof] is required only for tz4
+      public keys. *)
+  val update_consensus_key :
+    public_key:string -> ?proof:string -> unit -> payload
+
   (** [dal_publish_commitment ~level ~index ~header] builds an
      operation for the data-availability layer that publishes a
      slot. *)

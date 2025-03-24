@@ -125,6 +125,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Basic.register ~protocols ;
   Big_map_all.register ~protocols ;
   Big_map_arity.register ~protocols ;
+  Bls_signature.register ~protocols ;
   Bootstrap.register ~protocols ;
   Cache_cache.register ~protocols ;
   Client_commands.register ~protocols ;
