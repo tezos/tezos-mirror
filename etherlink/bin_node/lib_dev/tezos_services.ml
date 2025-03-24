@@ -129,6 +129,8 @@ let import_service s = Tezos_rpc.Service.subst0 s
 let register_with_conversion ~service ~impl ~convert_output dir =
   Tezos_rpc.Directory.register dir service (wrap convert_output impl)
 
+let register ~service ~impl dir = Tezos_rpc.Directory.register dir service impl
+
 (* TODO *)
 type tezlink_rpc_context = {
   block : Tezos_shell_services.Block_services.block;
@@ -166,6 +168,10 @@ module Tezlink_protocols = struct
   module Shell_impl = Tezos_shell_services.Block_services
 
   type protocols = Shell_impl.protocols
+
+  let quebec = Tezos_protocol_021_PsQuebec.Protocol.hash
+
+  let current = Shell_impl.{current_protocol = quebec; next_protocol = quebec}
 end
 
 (* This is where we import service declarations from the protocol. *)
@@ -194,7 +200,7 @@ module Imported_services = struct
       Tezos_rpc.Service.t =
     Tezos_shell_services.Version_services.S.version
 
-  let _protocols :
+  let protocols :
       ( [`GET],
         tezlink_rpc_context,
         tezlink_rpc_context,
@@ -221,6 +227,7 @@ type tezos_services_implementation = {
   current_level :
     chain -> block -> Imported_services.level_query -> level tzresult Lwt.t;
   version : unit -> Tezlink_version.version tzresult Lwt.t;
+  protocols : unit -> Tezlink_protocols.protocols tzresult Lwt.t;
 }
 
 (** Builds the directory registering services under `/chains/<main>/blocks/<head>/...`. *)
@@ -234,6 +241,8 @@ let build_block_dir impl =
        ~impl:(fun {block; chain} query () ->
          impl.current_level chain block query)
        ~convert_output:Protocol_types.Level.convert
+  |> register ~service:Imported_services.protocols ~impl:(fun _ _ () ->
+         impl.protocols ())
 
 (** Builds the root director. *)
 let build_dir impl =
