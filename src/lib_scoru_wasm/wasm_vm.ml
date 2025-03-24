@@ -45,6 +45,13 @@ let eval_has_finished = function
   (* explicit pattern matching to avoid new states introducing silent bugs *)
   | Snapshot | Decode _ | Link _ | Init _ | Eval _ | Collect | Stuck _ -> false
 
+let is_last_eval_state = function
+  | Eval {config = {step_kont = Wasm.Eval.(SK_Result _); _}; _} -> true
+  (* explicit pattern matching to avoid new states introducing silent bugs *)
+  | Padding | Snapshot | Decode _ | Link _ | Init _ | Eval _ | Collect | Stuck _
+    ->
+      false
+
 let ticks_to_snapshot {current_tick; last_top_level_call; max_nb_ticks; _} =
   let open Z in
   max_nb_ticks - one - (current_tick - last_top_level_call)
@@ -576,15 +583,11 @@ let reveal_step payload pvm_state =
               "No reveal expected during collecting"))
   | Stuck _ | Padding -> return pvm_state.tick_state
 
-let compute_step_many_until ~wasm_entrypoint ?(max_steps = 1L) ?hooks
-    ?reveal_builtins ?(write_debug = Builtins.Noop) should_continue pvm_state =
+let compute_step_many_until ~wasm_entrypoint ?(max_steps = 1L)
+    ?(hooks = Hooks.no_hooks) ?reveal_builtins ?(write_debug = Builtins.Noop)
+    should_continue pvm_state =
   let open Lwt.Syntax in
   assert (max_steps > 0L) ;
-  (* Hooks have been initially introduced for the Fast Execution engine; they
-     leak here because the WASM PVM and the Fast Exec share a common functor.
-     There are no hooks of interest for the WASM PVM yet, so we can safely
-     ignore this argument. *)
-  ignore hooks ;
   let* version = get_wasm_version pvm_state in
   let stack_size_limit = stack_size_limit version in
   let host_function_registry = Host_funcs.registry ~version ~write_debug in
@@ -611,7 +614,10 @@ let compute_step_many_until ~wasm_entrypoint ?(max_steps = 1L) ?hooks
           ~stack_size_limit
           host_function_registry
   in
+  let last_snapshot_tick = ref pvm_state.current_tick in
   let rec go steps_left pvm_state =
+    if pvm_state.tick_state = Snapshot then
+      last_snapshot_tick := pvm_state.current_tick ;
     let* continue = should_continue pvm_state in
     if steps_left > 0L && continue then
       if is_top_level_padding pvm_state then
@@ -631,6 +637,13 @@ let compute_step_many_until ~wasm_entrypoint ?(max_steps = 1L) ?hooks
         go (Int64.sub steps_left (Z.to_int64 bulk_ticks)) pvm_state
       else
         let* pvm_state = compute_step_with_reveal pvm_state in
+        let* () =
+          match hooks.pvm.reboot with
+          | None -> Lwt.return_unit
+          | Some hook when is_last_eval_state pvm_state.tick_state ->
+              hook Z.(to_int64 (pvm_state.current_tick - !last_snapshot_tick))
+          | Some _ -> Lwt.return_unit
+        in
         go (Int64.pred steps_left) pvm_state
     else Lwt.return pvm_state
   in
