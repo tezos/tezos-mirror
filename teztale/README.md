@@ -79,5 +79,12 @@ octez-teztale-archiver [--endpoint OCTEZ_NODE_URL:OCTEZ_NODE_RPC_PORT] feed ARCH
 
 ```
 
+For example:
+
+```
+octez-teztale-archiver --endpoint http://127.0.0.1:8732 feed http://alice:secret@127.0.0.1:8443
+
+```
+
 `octez-teztale-archiver` is an octez client, it thus accepts the same global
 options and default values as the client (especially the `--endpoint` option).
