@@ -30,6 +30,17 @@ type time_between_blocks = Nothing | Time_between_blocks of float
 
 type history_mode = Archive | Rolling of int | Full of int
 
+type l2_setup = {
+  l2_chain_id : int;
+  l2_chain_family : string;
+  world_state_path : string option;
+  bootstrap_accounts : string list option;
+  sequencer_pool_address : string option;
+  minimum_base_fee_per_gas : Wei.t option;
+  da_fee_per_byte : Wei.t option;
+  maximum_gas_per_transaction : int64 option;
+}
+
 type mode =
   | Observer of {
       initial_kernel : string;
@@ -1347,7 +1358,7 @@ let patch_config_with_experimental_feature
     ?(blueprints_publisher_order_enabled = false) ?(next_wasm_runtime = true)
     ?rpc_server ?(enable_websocket = false) ?max_websocket_message_length
     ?(enable_tx_queue = false) ?tx_queue_config ?spawn_rpc
-    ?periodic_snapshot_path () =
+    ?periodic_snapshot_path ?l2_chains () =
   JSON.update "experimental_features" @@ fun json ->
   conditional_json_put
     drop_duplicate_when_injection
@@ -1394,6 +1405,12 @@ let patch_config_with_experimental_feature
        ~name:"periodic_snapshot_path"
        periodic_snapshot_path
        (fun path -> `String path)
+  |> optional_json_put ~name:"l2_chains" l2_chains (fun l2_chains ->
+         `A
+           (List.map
+              (fun {l2_chain_id; _} ->
+                `O [("chain_id", `String (string_of_int l2_chain_id))])
+              l2_chains))
 
 let patch_config_gc ?history_mode json =
   json
