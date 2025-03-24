@@ -162,6 +162,12 @@ module Tezlink_version = struct
       }
 end
 
+module Tezlink_protocols = struct
+  module Shell_impl = Tezos_shell_services.Block_services
+
+  type protocols = Shell_impl.protocols
+end
+
 (* This is where we import service declarations from the protocol. *)
 module Imported_services = struct
   module Protocol_plugin_services = Imported_protocol_plugin.RPC.S
@@ -187,6 +193,16 @@ module Imported_services = struct
         Tezlink_version.version )
       Tezos_rpc.Service.t =
     Tezos_shell_services.Version_services.S.version
+
+  let _protocols :
+      ( [`GET],
+        tezlink_rpc_context,
+        tezlink_rpc_context,
+        unit,
+        unit,
+        Tezlink_protocols.protocols )
+      Tezos_rpc.Service.t =
+    import_service Tezos_shell_services.Shell_services.Blocks.S.protocols
 end
 
 type block = Tezos_shell_services.Block_services.block
