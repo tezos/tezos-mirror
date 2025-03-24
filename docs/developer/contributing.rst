@@ -7,8 +7,17 @@ Octez.
 Introduction
 ------------
 
-There are several ways to get involved with the codebase, and you may want to start with some preliminary steps.
+There are several ways to get involved with the codebase and its documentation, and you may want to start with some preliminary steps.
 
+.. _feedback_doc:
+
+Feedback on documentation
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+As you will probably start by reading the documentation, consider giving us feedback using the "Send feedback" button available in any page.
+You can use it to mention aspects you like or don't like.
+Many kinds of feedback are useful!
+For instance, there are more objective aspects of documentation, such as: reliable (accurate, up-to-date), consistent, complete, precise, grammatically correct, or more subjective aspects such as clear, easy to find, useful.
 
 Reporting issues
 ~~~~~~~~~~~~~~~~
