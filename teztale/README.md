@@ -76,14 +76,12 @@ Run an octez node, with a RPC server open on localhost:8732 and do
 
 ```
 octez-teztale-archiver [--endpoint OCTEZ_NODE_URL:OCTEZ_NODE_RPC_PORT] feed ARCHIVER_LOGIN:ARCHIVER_PASSWORD@SERVER_URL:SERVER_PORT
-
 ```
 
 For example:
 
 ```
 octez-teztale-archiver --endpoint http://127.0.0.1:8732 feed http://alice:secret@127.0.0.1:8443
-
 ```
 
 `octez-teztale-archiver` is an octez client, it thus accepts the same global
