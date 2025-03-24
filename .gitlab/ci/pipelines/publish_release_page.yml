@@ -3,6 +3,28 @@
 
 stages:
 - start
+- images
+- publish_release
+
+oc.docker:ci:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 90 minutes
+  before_script: []
+  script:
+  - ./images/ci_create_ci_images.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+    ARCH: amd64
+  artifacts:
+    reports:
+      dotenv: ci_image_tag.env
 
 datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
@@ -18,3 +40,24 @@ datadog_pipeline_trace:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
+
+publish:release-page:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: publish_release
+  tags:
+  - gcp
+  rules:
+  - when: manual
+    allow_failure: true
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  before_script:
+  - export AWS_ACCESS_KEY_ID=${AWS_KEY_RELEASE_PUBLISH:?AWS_KEY_RELEASE_PUBLISH is
+    not set}
+  - export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_RELEASE_PUBLISH:?AWS_SECRET_RELEASE_PUBLISH
+    is not set}
+  script:
+  - ./scripts/releases/publish_release_page.sh
+  variables:
+    S3_BUCKET: release-page-test.nomadic-labs.com

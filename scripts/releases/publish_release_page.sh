@@ -19,6 +19,11 @@ if [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
   exit 1
 fi
 
+#TODO: Add to docker image ?
+sudo apk add aws-cli
+
+aws s3 cp s3://"${S3_BUCKET}"/"$versions_list_filename" "./$versions_list_filename"
+
 # If it's a release, we actually push the assets to the s3 bucket
 if [ -n "${CI_COMMIT_TAG}" ]; then
 
@@ -33,9 +38,7 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
   else
 
     #TODO: Add to docker image ?
-    sudo apk add aws-cli gawk jq
-
-    aws s3 cp s3://"${S3_BUCKET}"/"$versions_list_filename" "./$versions_list_filename"
+    sudo apk add gawk jq
 
     # Add the new version to the $versions_list_filename JSON file.
     # Since jq cannot modify the file in-place, we write to a temporary file first.

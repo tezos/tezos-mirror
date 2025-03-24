@@ -350,7 +350,11 @@ let () =
   register
     "publish_release_page"
     api_release_page
-    ~jobs:[Common.job_datadog_pipeline_trace]
+    ~jobs:
+      [
+        Common.job_datadog_pipeline_trace;
+        Release_tag.job_release_page ~test:true ();
+      ]
     ~description:"Pipeline that updates and publishes the release page."
 
 (** {2 Entry point of the generator binary} *)
