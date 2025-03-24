@@ -33,7 +33,9 @@ let test_conf () =
   let specs =
     Spec.list () |> Seq.map Spec.name |> List.of_seq |> List.sort String.compare
   in
-  let () = Alcotest.(check (list string)) "Spec list" ["a"; "b"; "mem"] specs in
+  let () =
+    Alcotest.(check (list string)) "Spec list" ["a"; "b"; "mem"; "pack"] specs
+  in
   let keys =
     Spec.keys spec_a
     |> Seq.map (fun (K k) -> name k)
