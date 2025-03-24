@@ -422,8 +422,6 @@ module type Layer1 = sig
 
   val stake : int list option
 
-  val agnostic_bakers : int list option
-
   val stresstest : (string * string * int * int) option
 
   val maintenance_delay : int option
@@ -485,19 +483,6 @@ module Layer1 () = struct
          will be distributed amongst pools in order to (approximately) respect \
          the given stake distribution."
       (Clap.list_of_int ~dummy:[] "stake")
-      ()
-
-  let agnostic_bakers =
-    Clap.optional
-      ~section
-      ~long:"agnostic-bakers"
-      ~placeholder:"<integer>,<integer>,<integer>,..."
-      ~description:
-        "By default all the bakers run in the experiment will use protocol \
-         specific octez binaries. This list contains the indices of the bakers \
-         that are going to be agnostic, meaning that they will use the \
-         agnostic-baker binary, instead of the protocol specific one."
-      (Clap.list_of_int ~dummy:[] "agnostic-bakers")
       ()
 
   let stresstest =

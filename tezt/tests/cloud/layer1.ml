@@ -30,8 +30,6 @@ module Network = struct
   let to_octez_network_options (t : t) =
     Network.to_octez_network_options (t :> Network.public)
 
-  let default_protocol (t : t) = Network.default_protocol (t :> Network.t)
-
   let block_time = function `Ghostnet -> 5 | `Mainnet -> 8
 
   (** Next protocol for both Mainnet and Ghostnet - needs to be updated manually. *)
@@ -324,12 +322,6 @@ type stresstest_conf = {pkh : string; pk : string; tps : int; seed : int}
       must match the number of delegates. This scenario will launch one node
       per delegate (i.e. more than 300 nodes if testing on mainnet).
 
-    - [agnostic_bakers] specifies which bakers will use the agnostic baker
-      binary and which will use the protocol-dependent one(s).
-
-      e.g: [0,2] means that the first and last bakers will be agnostic, while
-      the second one will be protocol dependent (if we have 3 bakers in total).
-
     - [maintenance_delay]: number of level which will be multiplied by the
       position in the list of the bakers to define the store merge delay.
       We want it to be the same for two runs with same parameters (not
@@ -343,7 +335,6 @@ type stresstest_conf = {pkh : string; pk : string; tps : int; seed : int}
   *)
 type 'network configuration0 = {
   stake : int list;
-  agnostic_bakers : int list;
   network : 'network;
   snapshot : string;
   stresstest : stresstest_conf option;
@@ -360,12 +351,10 @@ type bootstrap = {
   client : Client.t;
 }
 
-type baker_kind = Classic of Baker.t | Agnostic of Agnostic_baker.t
-
 type baker = {
   agent : Agent.t;
   node : Node.t;
-  kind : baker_kind;
+  baker : Agnostic_baker.t;
   accounts : string list;
 }
 
@@ -384,7 +373,7 @@ type 'network t = {
   stresstesters : stresstester list;
 }
 
-let init_baker_i i (configuration : configuration) cloud ~peers ~use_agnostic
+let init_baker_i i (configuration : configuration) cloud ~peers
     (accounts : baker_account list) (agent, node, name) =
   let delay = i * configuration.maintenance_delay in
   let* client =
@@ -399,70 +388,28 @@ let init_baker_i i (configuration : configuration) cloud ~peers ~use_agnostic
       ~migration_offset:configuration.migration_offset
       (agent, node, name)
   in
-  let* baker_kind =
-    if use_agnostic then (
-      toplog "init_baker: Initialize agnostic baker" ;
-      let name = name ^ "-agnostic-baker" in
-      let* agnostic_baker =
-        Agnostic_baker.Agent.init
-          ~env:yes_crypto_env
-          ~name
-          ~delegates:(List.map (fun ({pkh; _} : baker_account) -> pkh) accounts)
-          ~client
-          node
-          cloud
-          agent
-      in
-      let* () = Agnostic_baker.wait_for_ready agnostic_baker in
-      toplog "init_baker: %s is ready!" name ;
-      Lwt.return @@ Agnostic agnostic_baker)
-    else (
-      toplog "init_baker: Initialize baker" ;
-      let name = name ^ "-baker" in
-      let* baker =
-        let protocol = Network.default_protocol configuration.network in
-        Baker.Agent.init
-          ~env:yes_crypto_env
-          ~name
-          ~delegates:(List.map (fun ({pkh; _} : baker_account) -> pkh) accounts)
-          ~protocol
-          ~client
-          node
-          cloud
-          agent
-      in
-      let* () = Baker.wait_for_ready baker in
-      toplog "init_baker: %s is ready!" name ;
-      (* If case of a migration scenario, we also need to start the next protocol baker binary. *)
-      let* () =
-        if configuration.migration_offset == None then Lwt.return_unit
-        else (
-          toplog "init_baker_next: Initialize next baker" ;
-          let name = name ^ "-next" in
-          let* next_baker =
-            let protocol = Network.migrate_to configuration.network in
-            Baker.Agent.init
-              ~env:yes_crypto_env
-              ~name
-              ~delegates:
-                (List.map (fun ({pkh; _} : baker_account) -> pkh) accounts)
-              ~protocol
-              ~client
-              node
-              cloud
-              agent
-          in
-          let* () = Baker.wait_for_ready next_baker in
-          toplog "init_baker_next: %s is ready!" name ;
-          Lwt.return_unit)
-      in
-      Lwt.return @@ Classic baker)
+  let* baker =
+    toplog "init_baker: Initialize agnostic baker" ;
+    let name = name ^ "-agnostic-baker" in
+    let* agnostic_baker =
+      Agnostic_baker.Agent.init
+        ~env:yes_crypto_env
+        ~name
+        ~delegates:(List.map (fun ({pkh; _} : baker_account) -> pkh) accounts)
+        ~client
+        node
+        cloud
+        agent
+    in
+    let* () = Agnostic_baker.wait_for_ready agnostic_baker in
+    toplog "init_baker: %s is ready!" name ;
+    Lwt.return agnostic_baker
   in
   Lwt.return
     {
       agent;
       node;
-      kind = baker_kind;
+      baker;
       accounts = List.map (fun ({pkh; _} : baker_account) -> pkh) accounts;
     }
 
@@ -740,14 +687,7 @@ let init ~(configuration : configuration) cloud next_agent =
       (fun i accounts ->
         let ((_, node, _) as agent) = List.nth baker_agents i in
         let peers = List.filter (( <> ) (Node.point_str node)) peers in
-        init_baker_i
-          i
-          ~peers
-          ~use_agnostic:(List.mem i configuration.agnostic_bakers)
-          configuration
-          cloud
-          accounts
-          agent)
+        init_baker_i i ~peers configuration cloud accounts agent)
       distribution
   in
   let* stresstesters =
@@ -974,7 +914,6 @@ let parse_conf encoding file =
 let register (module Cli : Scenarios_cli.Layer1) =
   let configuration =
     let stake = Option.value ~default:[] Cli.stake in
-    let agnostic_bakers = Option.value ~default:[] Cli.agnostic_bakers in
     let network : Network.t option =
       match Cli.network with
       | `Mainnet -> Some `Mainnet
@@ -988,15 +927,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
     let maintenance_delay = Option.value ~default:0 Cli.maintenance_delay in
     let snapshot = Option.value ~default:"" Cli.snapshot in
     let migration_offset = Cli.migration_offset in
-    {
-      stake;
-      agnostic_bakers;
-      network;
-      stresstest;
-      maintenance_delay;
-      snapshot;
-      migration_offset;
-    }
+    {stake; network; stresstest; maintenance_delay; snapshot; migration_offset}
   in
   let vms_conf = Option.map (parse_conf vms_conf_encoding) Cli.vms_config in
   toplog "Parsing CLI done" ;

@@ -487,7 +487,7 @@ type bootstrap = {
 type baker = {
   node : Node.t;
   dal_node : Dal_node.t option;
-  baker : Baker.t;
+  baker : Agnostic_baker.t;
   account : Account.key;
   stake : int;
 }
@@ -2378,10 +2378,9 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
       ~alias:account.alias
   in
   let* baker =
-    Baker.Agent.init
+    Agnostic_baker.Agent.init
       ~name:(Format.asprintf "baker-%d" i)
       ~delegates:[account.Account.alias]
-      ~protocol:configuration.protocol
       ~client
       ?dal_node
       node
@@ -3587,7 +3586,7 @@ let register (module Cli : Scenarios_cli.Dal) =
            [
              "octez-dal-node";
              "octez-client";
-             Tezt_wrapper.Uses.path (Protocol.baker configuration.protocol);
+             Tezt_wrapper.Uses.path Constant.octez_experimental_agnostic_baker;
            ]
            @ (if Cli.etherlink then
                 ["evm_kernel.wasm"; "octez-evm-node"; "octez-smart-rollup-node"]
