@@ -73,7 +73,7 @@ let job_release_page ~test ?dependencies () =
       [
         ( "S3_BUCKET",
           if test then "release-page-test.nomadic-labs.com"
-          else "s3://site-prod.octez.tezos.com/releases/" );
+          else "site-prod.octez.tezos.com/releases/" );
       ]
     ~before_script:
       (if test then
