@@ -277,7 +277,7 @@ impl BlockInProgress {
 
     pub fn from_blueprint(
         blueprint: crate::blueprint::Blueprint,
-        current_block_number: U256,
+        number: U256,
         parent_hash: H256,
         tick_counter: u64,
         base_fee_per_gas: U256,
@@ -294,7 +294,7 @@ impl BlockInProgress {
             }
         };
         BlockInProgress::new_with_ticks(
-            current_block_number,
+            number,
             parent_hash,
             ring,
             tick_counter,

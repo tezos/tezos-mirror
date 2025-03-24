@@ -258,8 +258,8 @@ fn next_bip_from_blueprints<Host: Runtime>(
     kernel_upgrade: &Option<KernelUpgrade>,
 ) -> Result<BlueprintParsing, anyhow::Error> {
     let (
-        current_block_number,
-        current_block_parent_hash,
+        next_bip_number,
+        next_bip_parent_hash,
         previous_timestamp,
         receipts_root,
         transactions_root,
@@ -290,8 +290,8 @@ fn next_bip_from_blueprints<Host: Runtime>(
     let (blueprint, size) = read_blueprint(
         host,
         config,
-        current_block_number,
-        current_block_parent_hash,
+        next_bip_number,
+        next_bip_parent_hash,
         previous_timestamp,
     )?;
     log!(host, Benchmarking, "Size of blueprint: {}", size);
@@ -315,8 +315,8 @@ fn next_bip_from_blueprints<Host: Runtime>(
 
                     let bip = block_in_progress::BlockInProgress::from_blueprint(
                         blueprint,
-                        current_block_number,
-                        current_block_parent_hash,
+                        next_bip_number,
+                        next_bip_parent_hash,
                         tick_counter.c,
                         gas_price,
                         receipts_root,
