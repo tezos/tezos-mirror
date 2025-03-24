@@ -154,6 +154,16 @@ struct
         in
         Lwt.return supported)
 
+  let list_known_keys path =
+    let open Lwt_result_syntax in
+    Tezos_base_unix.Socket.with_connection path (fun conn ->
+        let* () =
+          Tezos_base_unix.Socket.send conn Request.encoding Request.Known_keys
+        in
+        let encoding = result_encoding Known_keys.Response.encoding in
+        let* pkhs = Tezos_base_unix.Socket.recv conn encoding in
+        match pkhs with Error _ as e -> Lwt.return e | Ok pkhs -> return pkhs)
+
   let public_key path pkh =
     let open Lwt_result_syntax in
     Tezos_base_unix.Socket.with_connection path (fun conn ->
@@ -178,14 +188,22 @@ struct
 
     include Client_keys.Signature_type
 
-    let parse uri =
+    let parse_aux uri =
       let open Result_syntax in
       assert (Uri.scheme uri = Some scheme) ;
+      return (Tezos_base_unix.Socket.Unix (Uri.path uri))
+
+    let parse uri =
+      let open Result_syntax in
       match Uri.get_query_param uri "pkh" with
       | None -> error_with "Missing the query parameter: 'pkh=tz1...'"
       | Some key ->
-          let+ key = Tezos_crypto.Signature.Public_key_hash.of_b58check key in
-          (Tezos_base_unix.Socket.Unix (Uri.path uri), key)
+          let* key = Tezos_crypto.Signature.Public_key_hash.of_b58check key in
+          let+ path = parse_aux uri in
+          (path, key)
+
+    let parse_aux uri =
+      parse_aux uri |> record_trace (Invalid_uri uri) |> Lwt.return
 
     let parse uri = parse uri |> record_trace (Invalid_uri uri) |> Lwt.return
 
@@ -205,6 +223,11 @@ struct
       return (Tezos_crypto.Signature.Public_key.hash pk, Some pk)
 
     let import_secret_key ~io:_ = public_key_hash
+
+    let list_known_keys uri =
+      let open Lwt_result_syntax in
+      let* path = parse_aux uri in
+      list_known_keys path
 
     let sign ?version ?watermark uri msg =
       let open Lwt_result_syntax in
@@ -238,23 +261,36 @@ struct
 
     include Client_keys.Signature_type
 
-    let parse uri =
+    let parse_aux uri =
       let open Result_syntax in
       assert (Uri.scheme uri = Some scheme) ;
       match (Uri.host uri, Uri.port uri) with
       | None, _ -> error_with "Missing host address"
       | _, None -> error_with "Missing host port"
       | Some path, Some port ->
-          let pkh = Uri.path uri in
-          let pkh = try String.(sub pkh 1 (length pkh - 1)) with _ -> "" in
-          let+ pkh = Tezos_crypto.Signature.Public_key_hash.of_b58check pkh in
           let tcp_socket =
             Tezos_base_unix.Socket.Tcp
               (path, string_of_int port, [Lwt_unix.AI_SOCKTYPE SOCK_STREAM])
           in
-          (tcp_socket, pkh)
+          return tcp_socket
+
+    let parse uri =
+      let open Result_syntax in
+      let* tcp_socket = parse_aux uri in
+      let pkh = Uri.path uri in
+      let pkh = try String.(sub pkh 1 (length pkh - 1)) with _ -> "" in
+      let+ pkh = Tezos_crypto.Signature.Public_key_hash.of_b58check pkh in
+      (tcp_socket, pkh)
+
+    let parse_aux uri =
+      parse_aux uri |> record_trace (Invalid_uri uri) |> Lwt.return
 
     let parse uri = parse uri |> record_trace (Invalid_uri uri) |> Lwt.return
+
+    let list_known_keys uri =
+      let open Lwt_result_syntax in
+      let* path = parse_aux uri in
+      list_known_keys path
 
     let public_key uri =
       let open Lwt_result_syntax in

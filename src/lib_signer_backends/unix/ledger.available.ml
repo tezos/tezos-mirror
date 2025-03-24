@@ -832,6 +832,9 @@ module Signer_implementation : Client_keys.SIGNER = struct
   let import_secret_key ~io pk_uri =
     public_key_hash_maybe_prompt ~first_import:io pk_uri
 
+  let list_known_keys _ =
+    failwith "List known keys request not allowed for Ledger."
+
   let sign ?version:_ ?watermark (sk_uri : sk_uri) msg =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/7812
        handle version *)

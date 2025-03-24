@@ -95,6 +95,28 @@ let () =
     (function Unexisting_scheme uri -> Some uri | _ -> None)
     (fun uri -> Unexisting_scheme uri)
 
+let make_uri (x : Uri.t) : Uri.t tzresult =
+  let open Result_syntax in
+  match Uri.scheme x with
+  | None ->
+      tzfail (Exn (Failure "Error while parsing URI: no scheme were found"))
+  | Some _ -> return x
+
+let uri_parameter () =
+  Tezos_clic.parameter (fun _ s -> Lwt.return @@ make_uri (Uri.of_string s))
+
+let uri_param ?name ?desc params =
+  let name = Option.value ~default:"uri" name in
+  let desc =
+    Option.value
+      ~default:
+        "remote signer\n\
+         Varies from one scheme to the other.\n\
+         Use command `list signing schemes` for more information."
+      desc
+  in
+  Tezos_clic.param ~name ~desc (uri_parameter ()) params
+
 type pk_uri = Uri.t
 
 module Pk_uri_hashtbl = Hashtbl.Make (struct
@@ -323,6 +345,9 @@ module type SIMPLE_SIGNER = sig
   val deterministic_nonce_hash : sk_uri -> Bytes.t -> Bytes.t tzresult Lwt.t
 
   val supports_deterministic_nonces : sk_uri -> bool tzresult Lwt.t
+
+  val list_known_keys :
+    Uri.t -> Tezos_crypto.Signature.Public_key_hash.t list tzresult Lwt.t
 end
 
 module type S = sig
@@ -395,6 +420,9 @@ module type S = sig
   val deterministic_nonce_hash : sk_uri -> Bytes.t -> Bytes.t tzresult Lwt.t
 
   val supports_deterministic_nonces : sk_uri -> bool tzresult Lwt.t
+
+  val list_known_keys :
+    Uri.t -> Tezos_crypto.Signature.Public_key_hash.t list tzresult Lwt.t
 
   val register_key :
     #Client_context.wallet ->
@@ -602,6 +630,8 @@ module Make (Signature : Signature_S) :
       let*? pk = Option.map_e Signature.Adapter.public_key pk in
       return (pkh, pk)
 
+    let list_known_keys uri = S.list_known_keys uri
+
     let sign ?version ?watermark sk msg =
       let open Lwt_result_syntax in
       let* signature = S.sign ?version ?watermark sk msg in
@@ -657,6 +687,10 @@ module Make (Signature : Signature_S) :
   let import_secret_key ~io pk_uri =
     with_scheme_simple_signer pk_uri (fun (module Signer) ->
         Signer.import_secret_key ~io pk_uri)
+
+  let list_known_keys uri =
+    with_scheme_simple_signer uri (fun (module Signer) ->
+        Signer.list_known_keys uri)
 
   let sign cctxt ?watermark sk_uri buf =
     let open Lwt_result_syntax in

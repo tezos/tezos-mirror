@@ -657,6 +657,24 @@ let commands network : Client_context.full Tezos_clic.command list =
             l);
       command
         ~group
+        ~desc:"List the keys known by the remote wallet."
+        no_options
+        (prefix "list"
+        @@ prefixes ["known"; "remote"; "keys"]
+        @@ Client_keys.uri_param @@ stop)
+        (fun () uri (cctxt : Client_context.full) ->
+          let* pkhs = Client_keys.list_known_keys uri in
+          let*! () =
+            cctxt#message
+              "@[<v 2>Tezos remote known keys:@,%a@]"
+              (Format.pp_print_list
+                 ~pp_sep:Format.pp_print_cut
+                 Signature.Public_key_hash.pp)
+              pkhs
+          in
+          return_unit);
+      command
+        ~group
         ~desc:"Show the keys associated with an implicit account."
         (args1 show_private_switch)
         (prefixes ["show"; "address"] @@ Public_key_hash.alias_param @@ stop)
