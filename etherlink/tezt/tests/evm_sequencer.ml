@@ -623,9 +623,13 @@ let test_current_level =
         unit)
   in
   let* res = rpc_current_level "head" ~offset:(-1) in
-  let* () = check_current_level res 4 in
+  Check.(
+    JSON.(
+      res |> as_list |> List.hd |-> "msg" |> as_string
+      = "The specified level offset should be positive.")
+      string
+      ~error_msg:"Should have failed: expected %R but got %L") ;
 
-  (* TODO: #7845 what should be result of offset goes past 0 ? *)
   unit
 
 let test_make_l2_kernel_installer_config chain_family =

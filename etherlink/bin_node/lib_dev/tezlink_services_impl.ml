@@ -12,6 +12,12 @@ let current_level (module Backend : Services_backend_sig.S)
       Imported_protocol.Protocol.Alpha_context.Constants.Parametric.t) chain
     block level_query =
   let open Lwt_result_syntax in
+  let* offset =
+    (* Tezos l1 requires non-negative offset #7845 *)
+    if level_query.offset >= 0l then return level_query.offset
+    else failwith "The specified level offset should be positive."
+  in
+
   (* TODO: #7831
      take chain into account
      For the moment this implementation only supports the main chain, once
@@ -35,7 +41,6 @@ let current_level (module Backend : Services_backend_sig.S)
   in
 
   let current_block_number = Z.to_int32 current_block_number in
-  let offset = level_query.offset in
 
   let level = Int32.add current_block_number offset in
   return
