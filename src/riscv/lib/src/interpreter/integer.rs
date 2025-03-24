@@ -278,23 +278,47 @@ pub fn run_shift(
     icb.xregister_write_nz(rd, result);
 }
 
+/// Shift bits in `rs1` by `shift_amount = imm` in the method specified by `shift`
+/// saving the result in `rd`.
+///
+/// Relevant opcodes:
+/// - `SLLI`
+/// - `SRLI`
+/// - `SRAI`
+/// - `C.SLLI`
+/// - `C.SRLI`
+/// - `C.SRAI`
+#[inline]
+pub fn run_shift_immediate(
+    icb: &mut impl ICB,
+    shift: Shift,
+    imm: i64,
+    rs1: NonZeroXRegister,
+    rd: NonZeroXRegister,
+) {
+    let shift_amount = icb.xvalue_of_imm(imm);
+    let rs1val = icb.xregister_read_nz(rs1);
+    let result = icb.xvalue_shift(rs1val, shift_amount, shift);
+
+    icb.xregister_write_nz(rd, result);
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::backend_test;
     use crate::create_state;
-    use crate::interpreter::integer::run_add;
-    use crate::interpreter::integer::run_addi;
-    use crate::interpreter::integer::run_mv;
-    use crate::interpreter::integer::run_neg;
-    use crate::interpreter::integer::run_sub;
+    use crate::instruction_context::Shift;
     use crate::machine_state::MachineCoreState;
     use crate::machine_state::MachineCoreStateLayout;
     use crate::machine_state::memory::M4K;
+    use crate::machine_state::registers::a0;
     use crate::machine_state::registers::a1;
     use crate::machine_state::registers::a2;
     use crate::machine_state::registers::nz;
     use crate::machine_state::registers::t0;
     use crate::machine_state::registers::t1;
+    use crate::machine_state::registers::t3;
 
     backend_test!(test_negate, F, {
         let rs2val_rd_res = [
@@ -397,5 +421,194 @@ mod tests {
             super::run_set_less_than_immediate_unsigned(&mut core, val2 as i64, a1, nz::t0);
             assert_eq!(core.hart.xregisters.read(t0), expected_unsigned);
         }
+    });
+
+    macro_rules! test_shift_instr {
+        ($state:ident, $shift:expr, $imm:expr,
+            $rs1:ident, $r1_val:expr,
+            $rd:ident, $expected_val:expr
+        ) => {
+            $state.hart.xregisters.write_nz(nz::$rs1, $r1_val);
+            run_shift_immediate(&mut $state, $shift, $imm, nz::$rs1, nz::$rd);
+            let new_val = $state.hart.xregisters.read($rd);
+            assert_eq!(new_val, $expected_val);
+        };
+    }
+
+    macro_rules! test_shift_reg_instr {
+        ($state:ident, $shift:expr,
+            $rs2:ident, $r2_val:expr,
+            $rs1:ident, $r1_val:expr,
+            $rd:ident, $expected_val:expr
+        ) => {
+            $state.hart.xregisters.write($rs2, $r2_val);
+            $state.hart.xregisters.write($rs1, $r1_val);
+            run_shift(&mut $state, $shift, nz::$rs1, nz::$rs2, nz::$rd);
+            let new_val = $state.hart.xregisters.read($rd);
+            assert_eq!(new_val, $expected_val);
+        };
+    }
+
+    macro_rules! test_both_shift_instr {
+        ($state:ident, $shift_reg:expr,
+            $rs2:ident, $r2_val:expr,
+            $rs1:ident, $r1_val:expr,
+            $rd:ident, $expected_val:expr
+        ) => {
+            test_shift_instr!(
+                $state,
+                $shift_reg,
+                $r2_val,
+                $rs1,
+                $r1_val,
+                $rd,
+                $expected_val
+            );
+            test_shift_reg_instr!(
+                $state,
+                $shift_reg,
+                $rs2,
+                $r2_val,
+                $rs1,
+                $r1_val,
+                $rd,
+                $expected_val
+            );
+        };
+    }
+
+    backend_test!(test_shift, F, {
+        let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+
+        // imm = 0
+        test_both_shift_instr!(state, Shift::Left, t0, 0, a0, 0x1234_ABEF, a1, 0x1234_ABEF);
+        test_both_shift_instr!(
+            state,
+            Shift::RightUnsigned,
+            t1,
+            0,
+            a0,
+            0x1234_ABEF,
+            a0,
+            0x1234_ABEF
+        );
+        test_both_shift_instr!(
+            state,
+            Shift::RightSigned,
+            t3,
+            0,
+            a0,
+            0xFFFF_DEAD_1234_ABEF,
+            a1,
+            0xFFFF_DEAD_1234_ABEF
+        );
+
+        // small imm (< 32))
+        test_both_shift_instr!(
+            state,
+            Shift::Left,
+            a2,
+            20,
+            a0,
+            0x1234_ABEF,
+            a1,
+            0x1_234A_BEF0_0000
+        );
+        test_both_shift_instr!(
+            state,
+            Shift::RightUnsigned,
+            a2,
+            10,
+            a0,
+            0x44_1234_ABEF,
+            a1,
+            0x1104_8D2A
+        );
+        test_both_shift_instr!(
+            state,
+            Shift::RightUnsigned,
+            a2,
+            14,
+            t0,
+            -1_i64 as u64,
+            a0,
+            0x0003_FFFF_FFFF_FFFF
+        );
+        test_both_shift_instr!(
+            state,
+            Shift::RightSigned,
+            t0,
+            10,
+            a0,
+            0xFFFF_F0FF_FFF0_FF00,
+            a0,
+            0xFFFF_FFFC_3FFF_FC3F
+        );
+
+        // big imm (>= 32))
+        test_both_shift_instr!(
+            state,
+            Shift::Left,
+            t0,
+            40,
+            a0,
+            0x1234_ABEF,
+            a0,
+            0x34AB_EF00_0000_0000
+        );
+        test_both_shift_instr!(
+            state,
+            Shift::RightUnsigned,
+            a1,
+            40,
+            a0,
+            0x1234_ABEF,
+            a0,
+            0x0
+        );
+        test_both_shift_instr!(
+            state,
+            Shift::RightSigned,
+            a2,
+            40,
+            a0,
+            0x8000_FAFF_1234_ABEF,
+            a1,
+            0xFFFF_FFFF_FF80_00FA
+        );
+
+        // Use same register for shift and source
+        test_shift_reg_instr!(
+            state,
+            Shift::Left,
+            a1,
+            0b1001_0101,
+            a1,
+            0b1001_0101,
+            a2,
+            0x12A0_0000
+        );
+        // Use same register for shift and destination
+        test_shift_reg_instr!(
+            state,
+            Shift::Left,
+            a1,
+            0b1001_0101,
+            a2,
+            0b1101_0101,
+            a1,
+            0x1AA0_0000
+        );
+        // Use same register for shift, source and destination
+        test_shift_reg_instr!(
+            state,
+            Shift::Left,
+            a1,
+            0b1101_0101,
+            a1,
+            0b1101_0101,
+            a1,
+            0x1AA0_0000
+        );
     });
 }

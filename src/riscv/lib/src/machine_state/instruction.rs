@@ -225,9 +225,9 @@ pub enum OpCode {
     Xori,
     Ori,
     Andi,
-    Slli,
-    Srli,
-    Srai,
+    ShiftLeftImmediate,
+    ShiftRightImmediateUnsigned,
+    ShiftRightImmediateSigned,
     Slliw,
     Srliw,
     Sraiw,
@@ -469,9 +469,9 @@ impl OpCode {
             Self::Xori => Args::run_xori,
             Self::Ori => Args::run_ori,
             Self::Andi => Args::run_andi,
-            Self::Slli => Args::run_slli,
-            Self::Srli => Args::run_srli,
-            Self::Srai => Args::run_srai,
+            Self::ShiftLeftImmediate => Args::run_shift_left_immediate,
+            Self::ShiftRightImmediateUnsigned => Args::run_shift_right_immediate_unsigned,
+            Self::ShiftRightImmediateSigned => Args::run_shift_right_immediate_signed,
             Self::Slliw => Args::run_slliw,
             Self::Srliw => Args::run_srliw,
             Self::Sraiw => Args::run_sraiw,
@@ -694,6 +694,9 @@ impl OpCode {
             Self::ShiftLeft => Some(Args::run_shift_left),
             Self::ShiftRightUnsigned => Some(Args::run_shift_right_unsigned),
             Self::ShiftRightSigned => Some(Args::run_shift_right_signed),
+            Self::ShiftLeftImmediate => Some(Args::run_shift_left_immediate),
+            Self::ShiftRightImmediateUnsigned => Some(Args::run_shift_right_immediate_unsigned),
+            Self::ShiftRightImmediateSigned => Some(Args::run_shift_right_immediate_signed),
             _ => None,
         }
     }
@@ -895,6 +898,15 @@ macro_rules! impl_i_type {
         /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
             $impl(icb, self.imm, self.rs1.x, self.rd.nzx);
+            icb.ok(Next(self.width))
+        }
+    };
+
+    ($fn: ident, $shift: path) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+            integer::run_shift_immediate(icb, $shift, self.imm, self.rs1.nzx, self.rd.nzx);
             icb.ok(Next(self.width))
         }
     };
@@ -1299,9 +1311,9 @@ impl Args {
     impl_i_type!(run_xori, non_zero);
     impl_i_type!(run_ori, non_zero);
     impl_i_type!(integer::run_andi, run_andi, non_zero);
-    impl_i_type!(run_slli, non_zero);
-    impl_i_type!(run_srli, non_zero);
-    impl_i_type!(run_srai, non_zero);
+    impl_i_type!(run_shift_left_immediate, Shift::Left);
+    impl_i_type!(run_shift_right_immediate_unsigned, Shift::RightUnsigned);
+    impl_i_type!(run_shift_right_immediate_signed, Shift::RightSigned);
     impl_i_type!(run_slliw, non_zero_rd);
     impl_i_type!(run_srliw, non_zero_rd);
     impl_i_type!(run_sraiw, non_zero_rd);
@@ -2167,9 +2179,12 @@ impl From<&InstrCacheable> for Instruction {
                 InstrWidth::Compressed,
             ),
             InstrCacheable::CAddi4spn(args) => Instruction::from_ic_caddi4spn(args),
-            InstrCacheable::CSlli(args) => {
-                Instruction::new_slli(args.rd_rs1, args.rd_rs1, args.imm, InstrWidth::Compressed)
-            }
+            InstrCacheable::CSlli(args) => Instruction::new_shift_left_immediate(
+                args.rd_rs1,
+                args.rd_rs1,
+                args.imm,
+                InstrWidth::Compressed,
+            ),
             InstrCacheable::CSrli(args) => Instruction::from_ic_csrli(args),
             InstrCacheable::CSrai(args) => Instruction::from_ic_csrai(args),
             InstrCacheable::CAndi(args) => Instruction::from_ic_candi(args),
