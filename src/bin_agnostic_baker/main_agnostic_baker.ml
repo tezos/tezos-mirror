@@ -65,7 +65,7 @@ let run ~args () =
 let () =
   let open Tezos_client_base_unix in
   let args = Array.to_list Sys.argv in
-  if Run_args.(is_help_cmd args || is_version_cmd args) then
+  if Run_args.(is_help_cmd args || is_version_cmd args || is_man_cmd args) then
     Client_main_run.run
       (module Daemon_config)
       ~select_commands:(fun _ _ -> Lwt_result_syntax.return_nil)

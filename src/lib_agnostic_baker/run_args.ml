@@ -12,9 +12,13 @@ let help_arg = "--help"
 
 let version_arg = "--version"
 
+let man_arg = "man"
+
 let is_help_cmd = List.mem ~equal:String.equal help_arg
 
 let is_version_cmd = List.mem ~equal:String.equal version_arg
+
+let is_man_cmd = List.mem ~equal:String.equal man_arg
 
 (* Arguments needed for the start and monitoring of the agnostic baker process. *)
 
