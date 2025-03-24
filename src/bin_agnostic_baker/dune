@@ -12,11 +12,14 @@
   octez-libs.base
   octez-libs.base.unix
   octez-experimental-agnostic-baker-lib
+  octez-libs.octez-profiler
   octez-protocol-021-PsQuebec-libs.agnostic-baker
   octez-protocol-022-PsRiotum-libs.agnostic-baker
   (select void_for_linking-octez-protocol-alpha-libs-agnostic-baker from
    (octez-protocol-alpha-libs.agnostic-baker -> void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty)))
+ (preprocess (pps octez-libs.ppx_profiler))
+ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)
@@ -27,7 +30,8 @@
   -open Tezos_base.TzPervasives
   -open Tezos_base
   -open Tezos_base_unix
-  -open Octez_experimental_agnostic_baker))
+  -open Octez_experimental_agnostic_baker
+  -open Tezos_profiler))
 
 (rule
  (action

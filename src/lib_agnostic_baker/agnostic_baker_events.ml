@@ -22,6 +22,7 @@ let starting_baker =
     ("proto", Protocol_hash.encoding)
     ("args", string)
     ~pp1:Protocol_hash.pp_short
+    ~pp2:Format.pp_print_string
 
 let baker_running =
   declare_1
@@ -92,12 +93,15 @@ let waiting_for_active_protocol =
     ()
 
 let period_status =
-  declare_2
+  declare_3
     ~section
     ~alternative_color
     ~level:Notice
     ~name:"period_status"
-    ~msg:"new block on {period} period (remaining period duration {remaining})"
+    ~msg:
+      "new block ({block}) on {period} period (remaining period duration \
+       {remaining})"
+    ("block", Block_hash.encoding)
     ("period", string)
     ("remaining", int31)
 

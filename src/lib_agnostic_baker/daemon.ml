@@ -6,6 +6,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Profiler = struct
+  include (val Profiler.wrap Agnostic_baker_profiler.agnostic_baker_profiler)
+
+  let[@warning "-32"] reset_block_section =
+    Agnostic_baker_profiler.create_reset_block_section
+      Agnostic_baker_profiler.agnostic_baker_profiler
+end
+
 open Agnostic_baker_errors
 
 (* Number of extra levels to keep the old baker alive before shutting it down.
@@ -77,7 +85,11 @@ let spawn_baker protocol_hash ~baker_args =
   let baker_args = "./mock-binary" :: baker_args in
   let cancel_promise, canceller = Lwt.wait () in
   let* thread =
-    let*? plugin = Protocol_plugins.proto_plugin_for_protocol protocol_hash in
+    let*? plugin =
+      (Protocol_plugins.proto_plugin_for_protocol
+         protocol_hash
+       [@profiler.record_f {verbosity = Notice} "proto_plugin_for_protocol"])
+    in
     let baker_commands = Commands.baker_commands plugin in
     return
     @@ run_thread
@@ -157,26 +169,25 @@ let hot_swap_baker ~state ~current_protocol_hash ~next_protocol_hash
   state.current_baker <- Some new_baker ;
   return_unit
 
-(** [parse_level head_info] retrieves the ["level"] field information from the
-    json information of the chain from [head_info]. *)
-let parse_level head_info =
-  let json = Ezjsonm.from_string head_info in
-  Ezjsonm.find json ["level"] |> Ezjsonm.get_int
-
-(** [maybe_kill_old_baker state head_info] checks whether the [old_baker] process
+(** [maybe_kill_old_baker state node_addr] checks whether the [old_baker] process
     from the [state] of the agnostic baker has surpassed its lifetime and it stops
     it if that is the case. *)
-let maybe_kill_old_baker state head_info =
-  let open Lwt_syntax in
+let maybe_kill_old_baker state node_addr =
+  let open Lwt_result_syntax in
   match state.old_baker with
   | None -> return_unit
   | Some {baker; level_to_kill} ->
-      let head_level = parse_level head_info in
+      let* head_level =
+        (Rpc_services.get_level
+           ~node_addr [@profiler.record_s {verbosity = Notice} "get_level"])
+      in
       if head_level >= level_to_kill then (
-        let* () =
+        let*! () =
           Agnostic_baker_events.(emit stopping_baker) baker.protocol_hash
         in
-        Lwt.wakeup baker.process.canceller 0 ;
+        Lwt.wakeup
+          baker.process.canceller
+          0 [@profiler.record_f {verbosity = Notice} "kill old baker"] ;
         state.old_baker <- None ;
         return_unit)
       else return_unit
@@ -184,24 +195,42 @@ let maybe_kill_old_baker state head_info =
 (** [monitor_voting_periods ~state head_stream] continuously monitors [heads_stream]
     to detect protocol changes. It will:
     - Shut down an old baker it its time has come;
-    - Spawn and "hot-swap" to a new baker if the next protocol hash is different. *)
+    - Spawn and "hot-swap" to a new baker if the next protocol hash is different. 
+    The voting period information is used for logging purposes. *)
 let monitor_voting_periods ~state head_stream =
   let open Lwt_result_syntax in
   let node_addr = state.node_endpoint in
   let rec loop () =
-    let*! head_info_opt = Lwt_stream.get head_stream in
-    match head_info_opt with
+    let*! v = Lwt_stream.get head_stream in
+    match v with
     | None -> tzfail Lost_node_connection
-    | Some head_info ->
+    | Some _tick ->
+        let* block_hash =
+          (Rpc_services.get_block_hash
+             ~node_addr
+           [@profiler.record_s {verbosity = Notice} "get_block_hash"])
+        in
+        ()
+        [@profiler.reset_block_section {profiler_module = Profiler} block_hash] ;
         let* period_kind, remaining =
-          Rpc_services.get_current_period ~node_addr
+          (Rpc_services.get_current_period
+             ~node_addr
+           [@profiler.record_s {verbosity = Notice} "get_current_period"])
         in
         let*! () =
-          Agnostic_baker_events.(emit period_status) (period_kind, remaining)
+          Agnostic_baker_events.(emit period_status)
+            (block_hash, period_kind, remaining)
         in
-        let*! () = maybe_kill_old_baker state head_info in
+        let* () =
+          (maybe_kill_old_baker
+             state
+             node_addr
+           [@profiler.record_s {verbosity = Notice} "maybe_kill_old_baker"])
+        in
         let* next_protocol_hash =
-          Rpc_services.get_next_protocol_hash ~node_addr
+          (Rpc_services.get_next_protocol_hash
+             ~node_addr
+           [@profiler.record_s {verbosity = Notice} "get_next_protocol_hash"])
         in
         let* current_protocol_hash =
           match state.current_baker with
@@ -211,12 +240,17 @@ let monitor_voting_periods ~state head_stream =
         let* () =
           if not (Protocol_hash.equal current_protocol_hash next_protocol_hash)
           then
-            hot_swap_baker
-              ~state
-              ~current_protocol_hash
-              ~next_protocol_hash
-              ~level_to_kill_old_baker:
-                (parse_level head_info + extra_levels_for_old_baker)
+            let* head_level =
+              (Rpc_services.get_level
+                 ~node_addr
+               [@profiler.record_s {verbosity = Notice} "get_level"])
+            in
+            (hot_swap_baker
+               ~state
+               ~current_protocol_hash
+               ~next_protocol_hash
+               ~level_to_kill_old_baker:(head_level + extra_levels_for_old_baker)
+             [@profiler.record_s {verbosity = Notice} "hot_swap_baker"])
           else return_unit
         in
         loop ()

@@ -5343,11 +5343,14 @@ let _octez_scoru_wasm_fast_tests =
     ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
 
 let octez_experimental_agnostic_baker_lib =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   public_lib
     "octez-experimental-agnostic-baker-lib"
     ~path:"src/lib_agnostic_baker"
     ~internal_name:"octez_experimental_agnostic_baker"
     ~synopsis:"Octez: library for Agnostic Baker"
+    ~preprocess
+    ~preprocessor_deps
     ~deps:
       [
         octez_rustzcash_deps;
@@ -5358,6 +5361,7 @@ let octez_experimental_agnostic_baker_lib =
         octez_client_base_unix |> open_;
         octez_node_config;
         octez_client_commands |> open_;
+        octez_profiler |> open_;
       ]
 
 (* PROTOCOL PACKAGES *)
@@ -8280,6 +8284,7 @@ let _octez_node =
         ]
 
 let _octez_experimental_agnostic_baker =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   let protocol_deps =
     let deps_for_protocol protocol =
       let is_optional =
@@ -8297,6 +8302,8 @@ let _octez_experimental_agnostic_baker =
     ~path:"src/bin_agnostic_baker"
     ~internal_name:"main_agnostic_baker"
     ~synopsis:"Tezos: `octez-experimental-agnostic-baker` binary for baking"
+    ~preprocess
+    ~preprocessor_deps
     ~release_status:Released
     ~with_macos_security_framework:true
     ~deps:
@@ -8306,6 +8313,7 @@ let _octez_experimental_agnostic_baker =
          octez_base |> open_ ~m:"TzPervasives" |> open_;
          octez_base_unix |> open_;
          octez_experimental_agnostic_baker_lib |> open_;
+         octez_profiler |> open_;
        ]
       @ protocol_deps)
     ~linkall:true
