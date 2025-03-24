@@ -926,7 +926,12 @@ let block_encoding transaction_object_encoding =
                 (block_transactions_encoding transaction_object_encoding))
              (req "uncles" (list hash_encoding))
              (opt "baseFeePerGas" quantity_encoding)))
-       (obj1 (opt "prevRandao" block_hash_encoding)))
+       (obj1
+          (* [mixHash] has been replaced by [prevRandao] internally in the
+             Paris EVM version, but every public RPC endpoints we have been
+             testing keep using [mixHash] in their JSON encoding (probably for
+             backward compatibility). *)
+          (opt "mixHash" block_hash_encoding)))
 
 type call = {
   from : address option;
