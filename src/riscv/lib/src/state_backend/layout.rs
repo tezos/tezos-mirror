@@ -377,7 +377,7 @@ mod tests {
     use crate::state_backend::ProofPart;
     use crate::state_backend::owned_backend::Owned;
     use crate::state_backend::proof_backend::ProofWrapper;
-    use crate::state_backend::verify_backend::handle_not_found;
+    use crate::state_backend::verify_backend::handle_stepper_panics;
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     struct MyFoo(u64);
@@ -455,7 +455,7 @@ mod tests {
             assert_eq!(hash, proof_hash);
 
             // Verify the proof
-            handle_not_found(|| {
+            handle_stepper_panics(|| {
                 let verify_foo = Foo::from_proof(ProofPart::Present(&proof)).unwrap();
                 assert_eq!(bar, verify_foo.bar.read());
                 assert_eq!(qux, verify_foo.qux.read_all().as_slice());

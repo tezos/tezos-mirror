@@ -9,10 +9,14 @@ use std::ops::Bound;
 use std::time::Instant;
 
 use common::*;
+use octez_riscv::machine_state::CacheLayouts;
 use octez_riscv::machine_state::DefaultCacheLayouts;
 use octez_riscv::machine_state::memory::M64M;
+use octez_riscv::machine_state::memory::MemoryConfig;
 use octez_riscv::state_backend::hash;
+use octez_riscv::state_backend::proof_backend::proof::Proof;
 use octez_riscv::state_backend::proof_backend::proof::serialise_proof;
+use octez_riscv::state_backend::verify_backend::ProofVerificationFailure;
 use octez_riscv::stepper::Stepper;
 use octez_riscv::stepper::StepperStatus;
 use octez_riscv::stepper::pvm::PvmStepper;
@@ -83,12 +87,16 @@ where
             );
 
             eprintln!("> Checking initial proof hash ...");
-            assert_eq!(proof.initial_state_hash(), stepper.hash());
+            let initial_state_hash = proof.initial_state_hash();
+            assert_eq!(initial_state_hash, stepper.hash());
 
             let final_state_hash = proof.final_state_hash();
 
-            eprintln!("> Verifying ...");
-            assert!(stepper.verify_proof(proof));
+            eprintln!("> Attempting to verify basic invalid proofs ...");
+            basic_invalid_proofs_are_rejected(&stepper, &proof, initial_state_hash);
+
+            eprintln!("> Verifying proof ...");
+            assert!(stepper.verify_proof(proof).is_ok());
 
             // Run one final step, which is the step proven by `proof`, and check that its
             // state hash matches the final state hash of `proof`.
@@ -112,5 +120,59 @@ where
 
     if let Some(hash) = expected_hash {
         assert_eq!(stepper.hash(), hash)
+    }
+}
+
+fn basic_invalid_proofs_are_rejected<MC: MemoryConfig, CL: CacheLayouts>(
+    stepper: &PvmStepper<'static, MC, CL>,
+    proof: &Proof,
+    state_hash: hash::Hash,
+) {
+    // A fully blinded proof could only be valid if every single leaf
+    // in the state is written to and proof compression were to optimise
+    // for this case.
+    let fully_blinded_proof = proof_helpers::fully_blinded(state_hash);
+    assert!(
+        stepper
+            .verify_proof(fully_blinded_proof)
+            .is_err_and(|e| matches!(e, ProofVerificationFailure::AbsentDataAccess(_)))
+    );
+
+    let empty_proof = proof_helpers::empty(state_hash);
+    assert!(
+        stepper
+            .verify_proof(empty_proof)
+            .is_err_and(|e| matches!(e, ProofVerificationFailure::UnexpectedProofShape))
+    );
+
+    let invalid_final_hash_proof = proof_helpers::with_final_hash(proof, state_hash);
+    assert!(
+        stepper
+            .verify_proof(invalid_final_hash_proof)
+            .is_err_and(
+                |e| matches!(e, ProofVerificationFailure::FinalHashMismatch {
+                    expected: _,
+                    computed: _
+                })
+            )
+    );
+}
+
+mod proof_helpers {
+    use octez_riscv::state_backend::hash::Hash;
+    use octez_riscv::state_backend::proof_backend::proof::MerkleProofLeaf;
+    use octez_riscv::state_backend::proof_backend::proof::Proof;
+    use octez_riscv::state_backend::proof_backend::tree::Tree;
+
+    pub fn fully_blinded(hash: Hash) -> Proof {
+        Proof::new(Tree::Leaf(MerkleProofLeaf::Blind(hash)), hash)
+    }
+
+    pub(crate) fn empty(hash: Hash) -> Proof {
+        Proof::new(Tree::Node(Vec::new()), hash)
+    }
+
+    pub(crate) fn with_final_hash(proof: &Proof, hash: Hash) -> Proof {
+        Proof::new(proof.tree().clone(), hash)
     }
 }
