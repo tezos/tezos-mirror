@@ -77,6 +77,10 @@ let handle_client_step ?signing_version ?magic_bytes ?timeout
         else return Authorized_keys.Response.No_authentication
       in
       Tezos_base_unix.Socket.send fd encoding res
+  | Known_keys ->
+      let encoding = result_encoding Known_keys.Response.encoding in
+      let*! res = Handler.known_keys cctxt in
+      Tezos_base_unix.Socket.send fd encoding res
 
 let handle_client_loop ?signing_version ?magic_bytes ?timeout
     ~check_high_watermark ~require_auth cctxt fd =

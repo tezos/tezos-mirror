@@ -346,3 +346,9 @@ let public_key (cctxt : #Client_context.wallet) pkh =
   | Some (name, _, Some pk, _) ->
       let*! () = Events.(emit found_public_key) (pkh, name) in
       return pk
+
+let known_keys (cctxt : #Client_context.wallet) =
+  let open Lwt_result_syntax in
+  let*! () = Events.(emit request_for_known_keys ()) in
+  let+ all_keys = Client_keys.list_keys cctxt in
+  List.map (fun (_, pkh, _, _) -> pkh) all_keys

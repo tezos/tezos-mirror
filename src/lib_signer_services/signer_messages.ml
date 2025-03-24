@@ -269,6 +269,20 @@ module Authorized_keys = struct
   end
 end
 
+module Known_keys = struct
+  module Response = struct
+    type t = Tezos_crypto.Signature.Public_key_hash.t list
+
+    let encoding =
+      let open Data_encoding in
+      def "signer_messages.known_keys.response"
+      @@ obj1
+           (req
+              "known_keys"
+              (list Tezos_crypto.Signature.Public_key_hash.encoding))
+  end
+end
+
 module Request = struct
   type t =
     | Sign of Sign.Request.t
@@ -277,6 +291,7 @@ module Request = struct
     | Deterministic_nonce of Deterministic_nonce.Request.t
     | Deterministic_nonce_hash of Deterministic_nonce_hash.Request.t
     | Supports_deterministic_nonces of Supports_deterministic_nonces.Request.t
+    | Known_keys
 
   let encoding =
     let open Data_encoding in
@@ -331,6 +346,12 @@ module Request = struct
              (function
                | Supports_deterministic_nonces req -> Some ((), req) | _ -> None)
              (fun ((), req) -> Supports_deterministic_nonces req);
+           case
+             (Tag 6)
+             ~title:"Known_keys"
+             (obj1 (req "kind" (constant "known_keys")))
+             (function Known_keys -> Some () | _ -> None)
+             (fun () -> Known_keys);
          ]
 end
 
@@ -341,4 +362,5 @@ let () =
   register Deterministic_nonce.Response.encoding ;
   register Deterministic_nonce_hash.Response.encoding ;
   register Supports_deterministic_nonces.Response.encoding ;
-  register Public_key.Response.encoding
+  register Public_key.Response.encoding ;
+  register Known_keys.Response.encoding

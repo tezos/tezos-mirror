@@ -68,6 +68,10 @@ let run (cctxt : #Client_context.wallet) ~hosts ?signing_version ?magic_bytes
           return_some hashes
         else return_none)
   in
+  let dir =
+    Tezos_rpc.Directory.register0 dir Signer_services.known_keys (fun () () ->
+        Handler.known_keys cctxt)
+  in
   let server =
     RPC_server.init_server ~media_types:Media_type.all_media_types dir
   in

@@ -121,3 +121,15 @@ let authorized_keys =
              "authorized_keys"
              (list Tezos_crypto.Signature.Public_key_hash.encoding)))
     Tezos_rpc.Path.(root / "authorized_keys")
+
+let known_keys =
+  Tezos_rpc.Service.get_service
+    ~description:"Retrieve the hashes of the public keys known to the signer."
+    ~query:Tezos_rpc.Query.empty
+    ~output:
+      Data_encoding.(
+        obj1
+          (req
+             "known_keys"
+             (list Tezos_crypto.Signature.Public_key_hash.encoding)))
+    Tezos_rpc.Path.(root / "known_keys")
