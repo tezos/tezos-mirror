@@ -45,7 +45,17 @@ type l2_levels_range = {
   end_l2 : Ethereum_types.quantity;
 }
 
-type outbox_index = {message_index : int; transaction_index : int}
+type outbox_index = {
+  outbox_level : int32;
+  message_index : int;
+  transaction_index : int;
+}
+
+type execution_short_info = {
+  operation_hash : Operation_hash.t;
+  l1_block : int32;
+  timestamp : Time.Protocol.t;
+}
 
 let withdrawal_kind_encoding =
   let open Data_encoding in
@@ -234,6 +244,20 @@ module Types = struct
         |> Result.map_error (fun _e -> "invalid contract in db"))
       string
 
+  let operation_hash =
+    custom
+      ~encode:(fun c -> Ok (Operation_hash.to_b58check c))
+      ~decode:(fun s ->
+        Operation_hash.of_b58check s
+        |> Result.map_error (fun _e -> "invalid operation hash in db"))
+      string
+
+  let proto_timestamp =
+    custom
+      ~encode:(fun t -> Ok (Time.Protocol.to_seconds t))
+      ~decode:(fun s -> Ok (Time.Protocol.of_seconds s))
+      int64
+
   let withdrawal =
     product (fun kind amount sender receiver withdrawal_id ->
         {kind; amount; sender; receiver; withdrawal_id})
@@ -308,10 +332,19 @@ module Types = struct
     @@ proj_end
 
   let outbox_index =
-    product (fun message_index transaction_index ->
-        {message_index; transaction_index})
+    product (fun outbox_level message_index transaction_index ->
+        {outbox_level; message_index; transaction_index})
+    @@ proj int32 (fun o -> o.outbox_level)
     @@ proj int (fun o -> o.message_index)
     @@ proj int (fun o -> o.transaction_index)
+    @@ proj_end
+
+  let execution_short_info =
+    product (fun operation_hash l1_block timestamp ->
+        {operation_hash; l1_block; timestamp})
+    @@ proj operation_hash (fun e -> e.operation_hash)
+    @@ proj int32 (fun e -> e.l1_block)
+    @@ proj proto_timestamp (fun e -> e.timestamp)
     @@ proj_end
 end
 
@@ -461,7 +494,7 @@ module Withdrawals = struct
       |sql}
 
     let set_outbox_index =
-      (t5 int32 outbox_index hash level level ->. unit)
+      (t4 outbox_index hash level level ->. unit)
       @@ {sql|
       UPDATE withdrawals
       SET
@@ -471,6 +504,33 @@ module Withdrawals = struct
       WHERE transactionHash = ?
       AND transactionIndex = ?
       AND logIndex = ?
+      |sql}
+
+    let get_overdue =
+      (int ->* t2 withdrawal_log int32)
+      @@ {sql|
+      SELECT
+        w.transactionHash,
+        w.transactionIndex, w.logIndex, w.blockHash, w.blockNumber,
+        w.removed, w.kind, w.ticket_owner, w.amount, w.sender, w.receiver,
+        CAST(w.withdrawal_id as integer),
+        l.l1
+      FROM withdrawals w
+      JOIN levels l ON
+        w.blockNumber > l.start_l2 AND
+        w.blockNumber <= l.end_l2
+      LEFT OUTER JOIN outbox_messages o ON
+        w.outbox_level = o.outbox_level AND
+        w.outbox_message_index = o.message_index AND
+        w.outbox_transaction_index = o.transaction_index
+      LEFT OUTER JOIN executions e ON
+        e.outbox_level = w.outbox_level AND
+        e.message_index = w.outbox_message_index
+      JOIN pointers lcc ON
+        lcc.name = "lcc"
+      WHERE
+        l.l1 <= lcc.value - ? AND
+        e.outbox_level IS NULL
       |sql}
   end
 
@@ -482,12 +542,16 @@ module Withdrawals = struct
     Sqlite.Db.rev_collect_list conn Q.find_by_blockNumbers (min_level, max_level)
 
   let set_outbox_index ?conn db ~transactionHash ~transactionIndex ~logIndex
-      ~outbox_level outbox_index =
+      outbox_index =
     with_connection db conn @@ fun conn ->
     Sqlite.Db.exec
       conn
       Q.set_outbox_index
-      (outbox_level, outbox_index, transactionHash, transactionIndex, logIndex)
+      (outbox_index, transactionHash, transactionIndex, logIndex)
+
+  let get_overdue ?conn db ~challenge_window =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.collect_list conn Q.get_overdue challenge_window
 end
 
 module Levels = struct
@@ -631,7 +695,7 @@ module Outbox_messages = struct
     open Types
 
     let insert =
-      (t3 int32 outbox_index outbox_transaction ->. unit)
+      (t2 outbox_index outbox_transaction ->. unit)
       @@ {sql|
       INSERT INTO outbox_messages
       (outbox_level, message_index, transaction_index,
@@ -646,7 +710,7 @@ module Outbox_messages = struct
     let indexes_by_outbox_level =
       (int32 ->* outbox_index)
       @@ {sql|
-      SELECT message_index, transaction_index
+      SELECT outbox_level, message_index, transaction_index
       FROM outbox_messages
       WHERE outbox_level = ?
       ORDER BY message_index DESC, transaction_index DESC
@@ -658,9 +722,60 @@ module Outbox_messages = struct
     Sqlite.Db.exec
       conn
       Q.insert
-      (outbox_level, {message_index; transaction_index}, tx)
+      ({outbox_level; message_index; transaction_index}, tx)
 
   let indexes_by_outbox_level ?conn db ~outbox_level =
     with_connection db conn @@ fun conn ->
     Sqlite.Db.rev_collect_list conn Q.indexes_by_outbox_level outbox_level
+end
+
+module Executions = struct
+  module Q = struct
+    open Types
+
+    let insert =
+      (t5 int32 int operation_hash int32 proto_timestamp ->. unit)
+      @@ {sql|
+      REPLACE INTO executions
+      (outbox_level, message_index, operation_hash,
+       l1_block, timestamp)
+      VALUES (?, ?, ?, ?, ?)
+      |sql}
+
+    let withdrawals_of_level =
+      (int32 ->* t3 withdrawal_log outbox_index execution_short_info)
+      @@ {sql|
+      SELECT
+        w.transactionHash,
+        w.transactionIndex, w.logIndex, w.blockHash, w.blockNumber,
+        w.removed, w.kind, w.ticket_owner, w.amount, w.sender, w.receiver,
+        CAST(w.withdrawal_id as integer),
+        o.outbox_level, o.message_index, o.transaction_index,
+        e.operation_hash, e.l1_block, e.timestamp
+      FROM withdrawals w
+      JOIN outbox_messages o ON
+        w.outbox_level = o.outbox_level AND
+        w.outbox_message_index = o.message_index AND
+        w.outbox_transaction_index = o.transaction_index
+      JOIN executions e ON
+        e.outbox_level = w.outbox_level AND
+        e.message_index = w.outbox_message_index
+      WHERE
+        w.outbox_level IS NOT NULL AND
+        w.removed = false AND
+        e.l1_block = ?
+      |sql}
+  end
+
+  let store ?conn db ~outbox_level ~message_index ~operation_hash ~l1_block
+      ~timestamp =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.exec
+      conn
+      Q.insert
+      (outbox_level, message_index, operation_hash, l1_block, timestamp)
+
+  let withdrawals_executed_in_l1_block ?conn db ~l1_block =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.collect_list conn Q.withdrawals_of_level l1_block
 end

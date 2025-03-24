@@ -177,7 +177,6 @@ let match_levels db ~outbox_level Db.{start_l2; end_l2} =
             ~transactionHash
             ~transactionIndex
             ~logIndex
-            ~outbox_level
             outbox_index)
         withdrawals
         outbox_indexes

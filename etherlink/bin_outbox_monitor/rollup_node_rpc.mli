@@ -28,3 +28,6 @@ val get_outbox_messages :
 
 (** Returns last cemented commitment of the rollup from the rollup node. *)
 val get_lcc : #Tezos_rpc.Context.simple -> int32 tzresult Lwt.t
+
+(** Returns the rollup address which the rollup node handles. *)
+val get_rollup_address : #Tezos_rpc.Context.simple -> Address.t tzresult Lwt.t

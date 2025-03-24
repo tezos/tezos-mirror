@@ -36,7 +36,17 @@ type l2_levels_range = {
   end_l2 : Ethereum_types.quantity;
 }
 
-type outbox_index = {message_index : int; transaction_index : int}
+type outbox_index = {
+  outbox_level : int32;
+  message_index : int;
+  transaction_index : int;
+}
+
+type execution_short_info = {
+  operation_hash : Operation_hash.t;
+  l1_block : int32;
+  timestamp : Time.Protocol.t;
+}
 
 (** Human readable encoding for quantities (levels, amounts, etc.) *)
 val quantity_hum_encoding : Ethereum_types.quantity Data_encoding.t
@@ -69,9 +79,14 @@ module Withdrawals : sig
     transactionHash:Ethereum_types.hash ->
     transactionIndex:Ethereum_types.quantity ->
     logIndex:Ethereum_types.quantity ->
-    outbox_level:int32 ->
     outbox_index ->
     unit tzresult Lwt.t
+
+  val get_overdue :
+    ?conn:Sqlite.conn ->
+    t ->
+    challenge_window:int ->
+    (withdrawal_log * int32) list tzresult Lwt.t
 end
 
 module Levels : sig
@@ -137,4 +152,22 @@ module Outbox_messages : sig
     t ->
     outbox_level:int32 ->
     outbox_index list tzresult Lwt.t
+end
+
+module Executions : sig
+  val store :
+    ?conn:Sqlite.conn ->
+    t ->
+    outbox_level:int32 ->
+    message_index:int ->
+    operation_hash:Operation_hash.t ->
+    l1_block:int32 ->
+    timestamp:Time.Protocol.t ->
+    unit tzresult Lwt.t
+
+  val withdrawals_executed_in_l1_block :
+    ?conn:Sqlite.conn ->
+    t ->
+    l1_block:int32 ->
+    (withdrawal_log * outbox_index * execution_short_info) list tzresult Lwt.t
 end
