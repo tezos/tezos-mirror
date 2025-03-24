@@ -5,6 +5,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type config = Octez_smart_rollup_wasm_debugger_lib.Config.config
+
+(** Constructs a configuration for rollup execution. *)
+val config :
+  ?sender:Tezos_protocol_alpha.Protocol.Contract_hash.t ->
+  ?source:Signature.Public_key_hash.t ->
+  ?destination:Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup.Address.t ->
+  ?preimage_directory:string ->
+  ?preimage_endpoint:Uri.t ->
+  ?dal_pages_directory:string ->
+  ?kernel_debug:bool ->
+  ?flamecharts_directory:string ->
+  ?timings_file:string ->
+  unit ->
+  config
+
 (** Describe where the kernel code can be found: either in-memory from a
     buffer, or on-disk using a given path. *)
 type kernel = In_memory of string | On_disk of string
@@ -29,7 +45,7 @@ val profile :
   no_reboot:bool ->
   int32 ->
   string trace Seq.t ->
-  Octez_smart_rollup_wasm_debugger_lib.Config.config ->
+  config ->
   string Octez_smart_rollup_wasm_debugger_lib.Custom_section.FuncMap.t ->
   Irmin_context.tree ->
   (Irmin_context.tree * string trace Seq.t * int32) tzresult Lwt.t
@@ -62,7 +78,7 @@ val eval :
   wasm_entrypoint:string ->
   int32 ->
   string trace Seq.t ->
-  Octez_smart_rollup_wasm_debugger_lib.Config.config ->
+  config ->
   Octez_smart_rollup_wasm_debugger_lib.Commands.eval_step ->
   Irmin_context.tree ->
   (Irmin_context.tree * int64 * string trace Seq.t * int32) tzresult Lwt.t

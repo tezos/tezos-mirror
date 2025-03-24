@@ -26,7 +26,7 @@ val execute :
   data_dir:string ->
   ?log_file:string ->
   ?wasm_entrypoint:string ->
-  config:Octez_smart_rollup_wasm_debugger_lib.Config.config ->
+  config:Wasm_debugger.config ->
   native_execution:bool ->
   t ->
   [< `Input of string] list ->
@@ -66,7 +66,7 @@ val execute_and_inspect :
   ?wasm_pvm_fallback:bool ->
   data_dir:string ->
   ?wasm_entrypoint:string ->
-  config:Octez_smart_rollup_wasm_debugger_lib.Config.config ->
+  config:Wasm_debugger.config ->
   native_execution_policy:Configuration.native_execution_policy ->
   input:Simulation.Encodings.simulate_input ->
   t ->
@@ -99,7 +99,7 @@ val apply_blueprint :
   ?log_file:string ->
   ?profile:bool ->
   data_dir:string ->
-  config:Octez_smart_rollup_wasm_debugger_lib.Config.config ->
+  config:Wasm_debugger.config ->
   native_execution_policy:Configuration.native_execution_policy ->
   t ->
   Blueprint_types.payload ->

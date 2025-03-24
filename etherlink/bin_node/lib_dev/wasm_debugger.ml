@@ -7,6 +7,10 @@
 
 type kernel = In_memory of string | On_disk of string
 
+type config = Octez_smart_rollup_wasm_debugger_lib.Config.config
+
+let config = Octez_smart_rollup_wasm_debugger_lib.Config.config
+
 module Bare_context = struct
   module Tree = Irmin_context.Tree
 
