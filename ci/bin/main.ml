@@ -348,12 +348,17 @@ let () =
   let open Pipeline in
   let open Rules in
   register
+    "publish_test_release_page"
+    If.(api_release_page && not_on_tezos_namespace)
+    ~jobs:[Release_tag.job_release_page ~test:true ()]
+    ~description:"Pipeline that updates and publishes the test release page." ;
+  register
     "publish_release_page"
-    api_release_page
+    If.(api_release_page && on_tezos_namespace)
     ~jobs:
       [
         Common.job_datadog_pipeline_trace;
-        Release_tag.job_release_page ~test:true ();
+        Release_tag.job_release_page ~test:false ();
       ]
     ~description:"Pipeline that updates and publishes the release page."
 
