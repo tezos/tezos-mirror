@@ -8,6 +8,9 @@
 
 ### RPCs changes
 
+- Fixes `mixHash` being renamed into `prevRandao` in the output of our JSON RPC
+  API server. (!17394)
+
 ### Metrics changes
 
 ### Execution changes
