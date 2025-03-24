@@ -207,8 +207,8 @@ type tezos_services_implementation = {
   version : unit -> Tezlink_version.version tzresult Lwt.t;
 }
 
-(** Builds the directory registering services under `.../helpers`. *)
-let build_helper_dir impl =
+(** Builds the directory registering services under `/chains/<main>/blocks/<head>/...`. *)
+let build_block_dir impl =
   let dir : tezlink_rpc_context Tezos_rpc.Directory.t =
     Tezos_rpc.Directory.empty
   in
@@ -221,7 +221,7 @@ let build_helper_dir impl =
 
 (** Builds the root director. *)
 let build_dir impl =
-  let helper_dir = build_helper_dir impl in
+  let helper_dir = build_block_dir impl in
   let root_directory =
     Tezos_rpc.Directory.prefix
       block_directory_path
