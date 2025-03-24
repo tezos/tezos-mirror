@@ -39,7 +39,7 @@ run_package_manager_with_retries() {
   shift
 
   # Maximum retries
-  max_retries=5
+  max_retries=10
   # Initial delay in seconds
   delay=1
 
