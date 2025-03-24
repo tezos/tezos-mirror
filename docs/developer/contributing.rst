@@ -17,7 +17,19 @@ Feedback on documentation
 As you will probably start by reading the documentation, consider giving us feedback using the "Send feedback" button available in any page.
 You can use it to mention aspects you like or don't like.
 Many kinds of feedback are useful!
-For instance, there are more objective aspects of documentation, such as: reliable (accurate, up-to-date), consistent, complete, precise, grammatically correct, or more subjective aspects such as clear, easy to find, useful.
+For instance, there are more objective aspects of documentation, such as:
+
+- reliable: are the explanations accurate? up-to-date?
+- consistent: are there any contradictions between the different parts?
+- complete: are there important topics or aspects not described?
+- precise: are the explanations detailed enough?
+- grammatically correct: is the phrasing correct?
+
+or more subjective aspects such as:
+
+- clear: are the explanations easy to understand?
+- easy to find: did you have troubles locating some information?
+- useful: does the text help in some way?
 
 However, if the feedback is about grammatical aspects, consider fixing the issues yourself as explained next.
 
