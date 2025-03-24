@@ -100,7 +100,7 @@ let test_invalid_argument () =
   ()
 
 let tests =
-  let test name fn = Alcotest.test_case name `Quick fn in
+  let test name fn = Common.Alcotest.test_case_eio name `Quick fn in
   [
     test "add_and_mem" test_add_and_mem;
     test "random" test_random;

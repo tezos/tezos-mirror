@@ -85,4 +85,9 @@ let test_map =
     QCheck.(list arbitrary_action)
     (fun t -> eq (run t) (run' t))
 
-let suite = List.map QCheck_alcotest.to_alcotest [test_map]
+let suite =
+  List.map
+    (fun t ->
+      let name, speed, f = QCheck_alcotest.to_alcotest t in
+      Common.Alcotest.test_case_eio name speed f)
+    [test_map]

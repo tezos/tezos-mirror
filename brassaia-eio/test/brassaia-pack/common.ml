@@ -254,7 +254,7 @@ module Alcotest = struct
 
   let hash = testable_repr Schema.Hash.t
 
-  let quick_tc name f = test_case name `Quick f
+  let quick_tc name f = test_case_eio name `Quick f
 end
 
 module Filename = struct

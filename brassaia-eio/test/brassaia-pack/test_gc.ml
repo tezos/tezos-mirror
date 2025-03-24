@@ -21,13 +21,15 @@ let src = Logs.Src.create "tests.gc" ~doc:"Test gc"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
-let test_dir = "_build"
+let build_dir = "_build"
+
+let root_local_build name = Filename.concat build_dir ("brassia-eio" ^ name)
 
 let fresh_name =
   let c = ref 0 in
   fun () ->
     incr c ;
-    let name = Filename.concat test_dir ("test-gc" ^ string_of_int !c) in
+    let name = Filename.concat build_dir ("test-gc" ^ string_of_int !c) in
     name
 
 let create_v1_test_env () =

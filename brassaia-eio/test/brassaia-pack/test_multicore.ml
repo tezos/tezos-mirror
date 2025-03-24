@@ -469,7 +469,7 @@ let test_commit_v d_mgr =
   Store.Repo.close repo
 
 let tests d_mgr =
-  let tc name fn = Alcotest.test_case name `Quick (fun () -> fn d_mgr) in
+  let tc name fn = Alcotest.test_case_eio name `Quick (fun () -> fn d_mgr) in
   [
     tc "find." test_find;
     tc "length." test_length;

@@ -52,7 +52,8 @@ let test_duplicate_key_names () =
     (fun () -> ignore (key ~spec name Brassaia.Type.bool false))
 
 let suite =
+  let module Alcotest = Common.Alcotest in
   [
-    Alcotest.test_case "conf" `Quick test_conf;
-    Alcotest.test_case "duplicate key names" `Quick test_duplicate_key_names;
+    Alcotest.test_case_eio "conf" `Quick test_conf;
+    Alcotest.test_case_eio "duplicate key names" `Quick test_duplicate_key_names;
   ]
