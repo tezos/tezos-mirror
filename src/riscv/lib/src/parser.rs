@@ -149,6 +149,11 @@ const fn i_imm(instr: u32) -> i64 {
     (((instr & 0b1111_1111_1111_0000_0000_0000_0000_0000) as i32) >> 20) as i64
 }
 
+const fn shift_imm(instr: u32) -> i64 {
+    let imm = i_imm(instr);
+    imm & SHIFT_BITMASK
+}
+
 const fn s_imm(instr: u32) -> i64 {
     // instr[31:25] | instr[11:7]
     let instr_31_25 = (instr & 0b1111_1110_0000_0000_0000_0000_0000_0000) as i32;
@@ -644,7 +649,11 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
                 (F7_0, X0) => Hint { instr },
                 (F7_0, NonZero(rd)) => i_instr!(Srli, instr, rd),
                 (F7_20, X0) => Hint { instr },
-                (F7_20, NonZero(rd)) => i_instr!(Srai, instr, rd),
+                (F7_20, NonZero(rd)) => InstrCacheable::Srai(NonZeroRdITypeArgs {
+                    rd,
+                    rs1: rs1(instr),
+                    imm: shift_imm(instr),
+                }),
                 _ => Unknown { instr },
             },
             (F3_2, X0) => Hint { instr },

@@ -89,12 +89,8 @@ where
     /// - `SRAI`
     /// - `C.SRAI`
     pub fn run_srai(&mut self, imm: i64, rs1: NonZeroXRegister, rd: NonZeroXRegister) {
-        // SRAI encoding has bit imm[10] set, so need to mask the shift amount
-        // TODO: RV-459: Move bit-masking of shamt to the parser
-        let sh_amt = imm & 0b11_1111;
-
         // Right shift on i64 is an arithmetic shift
-        let result = (self.read_nz(rs1) as i64) >> sh_amt;
+        let result = (self.read_nz(rs1) as i64) >> imm;
         // i64 as u64 is a no-op
         self.write_nz(rd, result as u64)
     }
