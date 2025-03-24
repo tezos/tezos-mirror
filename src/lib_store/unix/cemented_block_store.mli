@@ -120,11 +120,11 @@ type cemented_blocks_file = {
   file : [`Cemented_blocks_file] Naming.file;
 }
 
-(** [init ?log_size ~cemented_blocks_dir ~readonly] creates or loads
-    an existing cemented block store at path
-    [cemented_blocks_dir]. [cemented_blocks_dir] will be created if it
-    does not exists. If [readonly] is true, cementing blocks will
-    result in an error. [log_size] determines the index cache size. *)
+(** [init ?log_size chain_dir ~readonly] creates or loads an existing
+    cemented block store at path [chain_dir]. [chain_dir] will be
+    created if it does not exists. If [~readonly] is [true], cementing
+    blocks will result in an error. [?log_size] determines the index
+    cache size. *)
 val init :
   ?log_size:int ->
   [< `Chain_dir] Naming.directory ->
@@ -167,22 +167,22 @@ val cemented_block_hash_index : t -> Cemented_block_hash_index.t
     no effect on RW instances. *)
 val may_synchronize_indexes : t -> unit
 
-(** [load_table ~cemented_blocks_dir] reads the [cemented_blocks_dir]
+(** [load_table cemented_blocks_dir] returns the [cemented_blocks_files] in [cemented_blocks_dir]
     directory and instantiate the cemented blocks chunks files. *)
 val load_table :
   [`Cemented_blocks_dir] Naming.directory ->
   cemented_blocks_file array option tzresult Lwt.t
 
-(** [load_metadata_table ~cemented_blocks_dir] similar to
-    [load_table], but for the cemented metadata files. *)
+(** [load_metadata_table cemented_blocks_dir] similar to [load_table],
+    but for the cemented metadata files. *)
 val load_metadata_table :
   [`Cemented_blocks_dir] Naming.directory ->
   cemented_metadata_file array option tzresult Lwt.t
 
 (** [find_block_file cemented_store block_level] lookups the
-   [cemented_store] to find the cemented block chunk file that
-   contains the block at level [block_level]. Returns [None] if the
-   block cannot be found.*)
+    [cemented_store] to find the cemented block chunk file that
+    contains the block at level [block_level]. Returns [None] if the
+    block cannot be found.*)
 val find_block_file : t -> int32 -> cemented_blocks_file option
 
 (** [is_cemented cemented_store block_hash] checks if the [block_hash]
@@ -232,9 +232,10 @@ val get_highest_cemented_level : t -> int32 option
 val get_cemented_block_by_level :
   t -> read_metadata:bool -> int32 -> Block_repr.block option tzresult Lwt.t
 
-(** [get_cemented_block_by_hash cemented_store hash] reads the cemented
-    block of [hash] in [cemented_store], if it exists. It also
-    retrieves the metadata depending on [read_metadata]. *)
+(** [get_cemented_block_by_hash ~read_metadata cemented_store hash]
+    reads the cemented block of [hash] in [cemented_store], if it
+    exists. It also retrieves the metadata depending on
+    [~read_metadata]. *)
 val get_cemented_block_by_hash :
   read_metadata:bool ->
   t ->
@@ -281,12 +282,11 @@ val cement_blocks :
       the higher the offset is, the longest the GC phase will last. *)
 val trigger_gc : t -> History_mode.t -> unit Lwt.t
 
-(** [iter_cemented_file ~cemented_block_dir f block_file] reads from
-    the cemented [block_file] located in [cemented_block_dir] and
-    applies [f] on every block.
+(** [iter_cemented_file f block_file] reads from the cemented
+    [block_file] and applies [f] on every block.
 
-    {b Warning}: in this version, exceptions are caught. Use [raw_iter_cemented_file]
-    for manual exception management. *)
+    {b Warning}: in this version, exceptions are caught. Use
+    [raw_iter_cemented_file] for manual exception management. *)
 val iter_cemented_file :
   (Block_repr.block -> unit Lwt.t) ->
   cemented_blocks_file ->
@@ -297,11 +297,11 @@ val iter_cemented_file :
 val raw_iter_cemented_file :
   (Block_repr.block -> unit Lwt.t) -> cemented_blocks_file -> unit Lwt.t
 
-(** [check_indexes_consistency ?post_step ?genesis_hash cemented_store
-    history_mode] iterates over a partially initialized
+(** [check_indexes_consistency ?post_step ?genesis_hash
+    cemented_store] iterates over a partially initialized
     [cemented_store] that contains both chunks of blocks and indexes
-    then check the consistency of each block: (hashes, predecessors and
-    levels). The hash is not checked for [genesis_hash] and
+    then check the consistency of each block: (hashes, predecessors
+    and levels). The hash is not checked for [genesis_hash] and
     [post_step] is called after each treated chunk. This is used for
     snapshot imports. *)
 val check_indexes_consistency :

@@ -958,8 +958,9 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
        {verbosity = Debug; metadata = [("prometheus", "")]}
          "copy all lpbl predecessors"])
   in
-  (* 2. Retrieve ALL cycles (potentially more than one) *)
-  (* 2.1. We write back to the new store all the blocks from
+  (* 2. Retrieve ALL cycles (potentially more than one)
+
+     2.1. We write back to the new store all the blocks from
      [lpbl_block] to the end of the file(s).
 
      2.2 At the same time, retrieve the list of cycle bounds: i.e. the
@@ -1226,9 +1227,13 @@ let compute_lowest_bound_to_preserve_in_floating block_store ~new_head
        (Int32.of_int
           (match Block_repr.metadata lpbl_block with
           | None ->
-              (* FIXME: this is not valid but it is a good
-                 approximation of the max_op_ttl of a block where the
-                 metadata is missing. *)
+              (* This is not valid but it is a good approximation of
+                 the max_op_ttl of a block where the metadata is
+                 missing. This is harmless if the max_op_ttl of the
+                 head is bigger: we only store more block data than
+                 expected. If the max_op_ttl has decreased in the
+                 head, this might generate a storage with a broken
+                 invariant, but which is not breaking. *)
               Block_repr.max_operations_ttl new_head_metadata
           | Some metadata -> Block_repr.max_operations_ttl metadata)))
 
@@ -1502,7 +1507,6 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
                   (* Lock the block store to avoid RO instances to open the
                      state while the file descriptors are being updated. *)
                   let*! () = lock block_store.lockfile in
-
                   (instantiate_temporary_floating_store
                      block_store
                    [@profiler.record_s
