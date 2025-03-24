@@ -126,7 +126,7 @@ let wrap conv impl p q i =
     types in the signature of the service [s]. *)
 let import_service s = Tezos_rpc.Service.subst0 s
 
-let register_protocol_service ~dir ~service ~impl ~convert_output =
+let register_with_conversion ~service ~impl ~convert_output dir =
   Tezos_rpc.Directory.register dir service (wrap convert_output impl)
 
 (* TODO *)
@@ -212,11 +212,12 @@ let build_helper_dir impl =
   let dir : tezlink_rpc_context Tezos_rpc.Directory.t =
     Tezos_rpc.Directory.empty
   in
-  register_protocol_service
-    ~dir
-    ~service:Imported_services.current_level
-    ~impl:(fun {block; chain} query () -> impl.current_level chain block query)
-    ~convert_output:Protocol_types.Level.convert
+  dir
+  |> register_with_conversion
+       ~service:Imported_services.current_level
+       ~impl:(fun {block; chain} query () ->
+         impl.current_level chain block query)
+       ~convert_output:Protocol_types.Level.convert
 
 (** Builds the root director. *)
 let build_dir impl =
