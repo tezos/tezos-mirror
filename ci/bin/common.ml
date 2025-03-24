@@ -618,8 +618,8 @@ let changeset_test_evm_compatibility =
     @ make
         [
           "etherlink.mk";
-          "etherlink/kernel_evm/evm_execution/**/*";
-          "etherlink/kernel_evm/evm_evaluation/**/*";
+          "etherlink/kernel_latest/evm_execution/**/*";
+          "etherlink/kernel_latest/evm_evaluation/**/*";
         ])
 
 let changeset_mir =

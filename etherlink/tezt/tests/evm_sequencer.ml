@@ -7240,7 +7240,7 @@ let test_preimages_endpoint =
     ~tags:["evm"; "sequencer"; "preimages_endpoint"]
     ~title:"Sequencer use remote server to get preimages"
     ~kernels:[Latest]
-    ~additional_uses:[Constant.WASM.ghostnet_evm_kernel]
+    ~additional_uses:[Constant.WASM.ghostnet_kernel]
     ~genesis_timestamp
   @@ fun {
            sc_rollup_node;
@@ -7344,7 +7344,7 @@ let test_preimages_endpoint =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:Constant.WASM.ghostnet_evm_kernel
+      ~upgrade_to:Constant.WASM.ghostnet_kernel
       ~activation_timestamp
   in
   let* _ =
@@ -7410,7 +7410,7 @@ let test_preimages_endpoint_retry =
     ~tags:["evm"; "sequencer"; "preimages_endpoint"; "retry"; Tag.slow]
     ~title:"Sequencer use remote server to get preimages with retries"
     ~kernels:[Latest]
-    ~additional_uses:[Constant.WASM.ghostnet_evm_kernel]
+    ~additional_uses:[Constant.WASM.ghostnet_kernel]
     ~genesis_timestamp
   @@ fun {
            sc_rollup_node;
@@ -7473,7 +7473,7 @@ let test_preimages_endpoint_retry =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:Constant.WASM.ghostnet_evm_kernel
+      ~upgrade_to:Constant.WASM.ghostnet_kernel
       ~activation_timestamp
   in
   let* () = finalizeL1 () in
@@ -9533,20 +9533,18 @@ let test_patch_kernel =
     ~kernels:[Mainnet]
     ~tags:["evm"; "patch_kernel"; "experimental"]
     ~title:"Can patch the kernel of an existing node"
-    ~additional_uses:[Constant.WASM.ghostnet_evm_kernel]
+    ~additional_uses:[Constant.WASM.ghostnet_kernel]
     ~da_fee:Wei.zero
   @@ fun {sequencer; _} _protocol ->
   let* _ =
     check_kernel_version
       ~evm_node:sequencer
       ~equal:true
-      Constant.WASM.mainnet_evm_commit
+      Constant.WASM.mainnet_commit
   in
   let* () = Evm_node.terminate sequencer in
   let* () =
-    Evm_node.patch_kernel
-      sequencer
-      Uses.(path Constant.WASM.ghostnet_evm_kernel)
+    Evm_node.patch_kernel sequencer Uses.(path Constant.WASM.ghostnet_kernel)
   in
   let* () = Evm_node.run sequencer in
   (* Produce a block so that the migration code is executed *)
@@ -9555,7 +9553,7 @@ let test_patch_kernel =
     check_kernel_version
       ~evm_node:sequencer
       ~equal:true
-      Constant.WASM.ghostnet_evm_commit
+      Constant.WASM.ghostnet_commit
   in
   unit
 

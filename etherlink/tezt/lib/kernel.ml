@@ -10,14 +10,14 @@ type t = Mainnet | Ghostnet | Latest
 let all = [Mainnet; Ghostnet; Latest]
 
 let to_uses_and_tags = function
-  | Mainnet -> ("mainnet", Constant.WASM.mainnet_evm_kernel)
-  | Ghostnet -> ("ghostnet", Constant.WASM.ghostnet_evm_kernel)
+  | Mainnet -> ("mainnet", Constant.WASM.mainnet_kernel)
+  | Ghostnet -> ("ghostnet", Constant.WASM.ghostnet_kernel)
   | Latest -> ("latest", Constant.WASM.evm_kernel)
 
 let commit_of = function
   | Latest -> None
-  | Ghostnet -> Some Constant.WASM.ghostnet_evm_commit
-  | Mainnet -> Some Constant.WASM.mainnet_evm_commit
+  | Ghostnet -> Some Constant.WASM.ghostnet_commit
+  | Mainnet -> Some Constant.WASM.mainnet_commit
 
 let upgrade_to = function
   | Latest -> Latest
@@ -25,8 +25,8 @@ let upgrade_to = function
   | Mainnet -> Ghostnet
 
 let of_tag_use u =
-  if Uses.(tag u = tag Constant.WASM.mainnet_evm_kernel) then Mainnet
-  else if Uses.(tag u = tag Constant.WASM.ghostnet_evm_kernel) then Ghostnet
+  if Uses.(tag u = tag Constant.WASM.mainnet_kernel) then Mainnet
+  else if Uses.(tag u = tag Constant.WASM.ghostnet_kernel) then Ghostnet
   else if Uses.(tag u = tag Constant.WASM.evm_kernel) then Latest
   else raise (Invalid_argument "Kernel.of_use")
 

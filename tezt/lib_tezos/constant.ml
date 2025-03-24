@@ -101,7 +101,7 @@ module WASM = struct
   let debug_kernel =
     Uses.make
       ~tag:"debug_kernel"
-      ~path:"etherlink/kernel_evm/kernel/tests/resources/debug_kernel.wasm"
+      ~path:"etherlink/kernel_latest/kernel/tests/resources/debug_kernel.wasm"
       ()
 
   (* Note: this should probably depend on the protocol,
@@ -123,26 +123,26 @@ module WASM = struct
   let failed_migration =
     Uses.make
       ~tag:"failed_migration"
-      ~path:"etherlink/kernel_evm/kernel/tests/resources/failed_migration.wasm"
-      ()
-
-  let mainnet_evm_kernel =
-    Uses.make
-      ~tag:"mainnet_evm_kernel"
       ~path:
-        "etherlink/kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm"
+        "etherlink/kernel_latest/kernel/tests/resources/failed_migration.wasm"
       ()
 
-  let mainnet_evm_commit = "7386d0bc63f3589525bdfbd3cc0544076231b813"
-
-  let ghostnet_evm_kernel =
+  let mainnet_kernel =
     Uses.make
-      ~tag:"ghostnet_evm_kernel"
-      ~path:
-        "etherlink/kernel_evm/kernel/tests/resources/ghostnet_evm_kernel.wasm"
+      ~tag:"mainnet_kernel"
+      ~path:"etherlink/kernel_latest/kernel/tests/resources/mainnet_kernel.wasm"
       ()
 
-  let ghostnet_evm_commit = "604663095ad8d9f537a7035821bc78112c3b865b"
+  let mainnet_commit = "7386d0bc63f3589525bdfbd3cc0544076231b813"
+
+  let ghostnet_kernel =
+    Uses.make
+      ~tag:"ghostnet_kernel"
+      ~path:
+        "etherlink/kernel_latest/kernel/tests/resources/ghostnet_kernel.wasm"
+      ()
+
+  let ghostnet_commit = "604663095ad8d9f537a7035821bc78112c3b865b"
 
   let tx_kernel = Uses.make ~tag:"tx_kernel" ~path:"tx_kernel.wasm" ()
 

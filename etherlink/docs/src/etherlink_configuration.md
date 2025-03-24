@@ -149,10 +149,10 @@ The DA fee per byte is defined by the contents of the file
 `/evm/world_state/fees/da_fee_per_byte`. It is only used when Etherlink is
 operated in sequencer mode. If the file does not exist, the DA fee per byte
 defaults to \\( 4.10^12 \\) native tokens, because Etherlink official instance
-uses tez as its native tokens and 4 mutez is is enough to cover the cost for
+uses tez as its native tokens and 4 mutez is enough to cover the cost for
 the sequencer of creating a block containing only this transaction.
 
 The speed limit of Etherlink is currently hard-coded in the file
-`etherlink/kernel_evm/kernel/src/gas_price.rs`.
+`etherlink/kernel_latest/kernel/src/gas_price.rs`.
 
 See [Etherlink fee model](fee_model.md) for more information.

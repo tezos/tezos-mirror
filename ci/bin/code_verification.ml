@@ -1750,7 +1750,8 @@ let jobs pipeline_type =
             "git clone --depth 1 --branch v14.1@etherlink \
              https://github.com/functori/tests ethereum_tests";
             "./evm-evaluation-assessor --eth-tests ./ethereum_tests/ \
-             --resources ./etherlink/kernel_evm/evm_evaluation/resources/ -c";
+             --resources ./etherlink/kernel_latest/evm_evaluation/resources/ \
+             -c";
           ]
       in
       [

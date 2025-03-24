@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: MIT
 
 KERNELS=evm_kernel.wasm
-EVM_DIR=etherlink/kernel_evm
+KERNEL_DIR=etherlink/kernel_latest
 EVM_KERNEL_PREIMAGES=_evm_installer_preimages
 EVM_UNSTRIPPED_KERNEL_PREIMAGES=_evm_unstripped_installer_preimages
 
@@ -18,16 +18,16 @@ all: build-dev-deps check test build
 
 .PHONY: evm-execution
 evm-execution:
-	@$(MAKE) -C ${EVM_DIR} build-evm-execution
+	@$(MAKE) -C ${KERNEL_DIR} build-evm-execution
 
 .PHONY: evm-evaluation-assessor
 evm-evaluation-assessor:
-	@$(MAKE) -C ${EVM_DIR} build-evm-evaluation
-	@cp ${EVM_DIR}/target/release/evm-evaluation $@
+	@$(MAKE) -C ${KERNEL_DIR} build-evm-evaluation
+	@cp ${KERNEL_DIR}/target/release/evm-evaluation $@
 
 evm_kernel_unstripped.wasm::
-	@$(MAKE) -C ${EVM_DIR} build
-	@cp etherlink/kernel_evm/target/wasm32-unknown-unknown/release/evm_kernel.wasm $@
+	@$(MAKE) -C ${KERNEL_DIR} build
+	@cp ${KERNEL_DIR}/target/wasm32-unknown-unknown/release/evm_kernel.wasm $@
 
 evm_kernel.wasm:: evm_kernel_unstripped.wasm
 	@cp evm_kernel_unstripped.wasm $@
@@ -88,19 +88,19 @@ clang-supports-wasm:
 
 .PHONY: build-dev-deps
 build-dev-deps: clang-supports-wasm build-deps
-	@$(MAKE) -C ${EVM_DIR} build-dev-deps
+	@$(MAKE) -C ${KERNEL_DIR} build-dev-deps
 
 .PHONY: build-deps
 build-deps:
-	@$(MAKE) -C ${EVM_DIR} build-deps
+	@$(MAKE) -C ${KERNEL_DIR} build-deps
 
 .PHONY: test
 test:
-	@$(MAKE) -C ${EVM_DIR} test
+	@$(MAKE) -C ${KERNEL_DIR} test
 
 .PHONY: check
 check: build-dev-deps
-	@$(MAKE) -C ${EVM_DIR} check
+	@$(MAKE) -C ${KERNEL_DIR} check
 
 	# Check format of all crates
 	@exec scripts/check-format-rust.sh
@@ -109,7 +109,7 @@ check: build-dev-deps
 clean:
 	@$(MAKE) -f kernels.mk clean
 	@rm -f evm_kernel_unstripped.wasm evm_kernel.wasm evm_installer.wasm evm_unstripped_installer.wasm evm_installer.wasm evm_installer_dev.wasm evm_benchmark_kernel.wasm sequencer.wasm
-	@$(MAKE) -C ${EVM_DIR} clean
+	@$(MAKE) -C ${KERNEL_DIR} clean
 	@rm -rf ${EVM_KERNEL_PREIMAGES} ${EVM_UNSTRIPPED_KERNEL_PREIMAGES}
 
 sequencer.wasm::

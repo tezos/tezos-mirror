@@ -134,7 +134,7 @@ let force_kernel_upgrade ~sc_rollup_address ~sc_rollup_node ~client =
     ^ Tezos_crypto.Hashed.Smart_rollup_address.(
         of_b58check_exn sc_rollup_address |> to_string)
     ^ (* Force kernel upgrade tag.
-         See [FORCE_KERNEL_UPGRADE_TAG] in [etherlink/kernel_evm/kernel/src/parsing.rs] *)
+         See [FORCE_KERNEL_UPGRADE_TAG] in [etherlink/kernel_latest/kernel/src/parsing.rs] *)
     "\255"
     |> Hex.of_string |> Hex.show
   in

@@ -52,7 +52,7 @@
  (deps
   rlptest.json
   invalidRLPTest.json
-  ../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm)
+  ../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm)
  (action (run %{dep:./test_rlp.exe})))
 
 (rule
@@ -61,7 +61,7 @@
  (deps
   rlptest.json
   invalidRLPTest.json
-  ../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm)
+  ../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm)
  (action (run %{dep:./test_ethbloom.exe})))
 
 (rule
@@ -70,7 +70,7 @@
  (deps
   rlptest.json
   invalidRLPTest.json
-  ../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm)
+  ../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm)
  (action (run %{dep:./test_call_tracer_algo.exe})))
 
 (rule
@@ -79,7 +79,7 @@
  (deps
   rlptest.json
   invalidRLPTest.json
-  ../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm)
+  ../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm)
  (action (run %{dep:./test_wasm_runtime.exe})))
 
 (rule
@@ -88,7 +88,7 @@
  (deps
   rlptest.json
   invalidRLPTest.json
-  ../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm)
+  ../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm)
  (action (run %{dep:./test_blueprint_roundtrip.exe})))
 
 (rule
@@ -97,5 +97,5 @@
  (deps
   rlptest.json
   invalidRLPTest.json
-  ../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm)
+  ../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm)
  (action (run %{dep:./test_bitset_nonce.exe})))
