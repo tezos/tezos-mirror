@@ -47,4 +47,8 @@ module type Sigs = sig
     ?prefix:string ->
     (module Clock) ->
     Logs.reporter
+
+  (** [to_string_exn encoding v] returns [v] as a string
+      according to [encoding] *)
+  val to_string_exn : 'a Data_encoding.encoding -> 'a -> string
 end
