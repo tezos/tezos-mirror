@@ -243,7 +243,7 @@ let vdf_cycles : Protocol.t list -> unit =
     ~__FILE__
     ~title:"VDF daemon"
     ~tags:[team; "vdf"]
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   let n_cycles = 2 in
   let* node, client, blocks_per_cycle, nonce_revelation_threshold =
@@ -343,7 +343,7 @@ let vdf_cancel : Protocol.t list -> unit =
     ~__FILE__
     ~title:"Cancelling VDF computation"
     ~tags:[team; "vdf"]
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   (* Override the `vdf_difficulty` constant in order ensure that
    * a VDF computation started in the last block of a cycle will not be finished
