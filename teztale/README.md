@@ -26,7 +26,7 @@ folowing the schema:
                 }
                 <list_of_network_point_to_bind_to>
               ],
-"admins": [ {"login":"admin","password":"zzz"},
+"admins": [ {"login":"admin","password":"zzz"}
            <admins_allowed_to_add_remove_users>
           ],
 "users": [ {"login":"alice","password":"secret"},
