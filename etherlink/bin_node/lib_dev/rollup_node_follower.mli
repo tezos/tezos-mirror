@@ -5,8 +5,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [start ~keep_alive ~proxy ~rollup_node_endpoint ()] starts the
-    rollup node follower. In proxy mode does not try to catchup evm
-    event. *)
+(** [start ~keep_alive ?on_new_head ~rollup_node_endpoint ()] starts
+    the rollup node follower. When [on_new_head] is given then it's
+    call at each received block. *)
 val start :
-  keep_alive:bool -> proxy:bool -> rollup_node_endpoint:Uri.t -> unit -> unit
+  keep_alive:bool ->
+  ?on_new_head:(unit -> unit tzresult Lwt.t) ->
+  rollup_node_endpoint:Uri.t ->
+  unit ->
+  unit

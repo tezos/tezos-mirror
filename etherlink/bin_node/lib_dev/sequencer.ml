@@ -249,7 +249,6 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       let () =
         Rollup_node_follower.start
           ~keep_alive:configuration.keep_alive
-          ~proxy:false
           ~rollup_node_endpoint
           ()
       in

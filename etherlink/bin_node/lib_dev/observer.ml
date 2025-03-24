@@ -286,7 +286,6 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       let () =
         Rollup_node_follower.start
           ~keep_alive:config.keep_alive
-          ~proxy:false
           ~rollup_node_endpoint:config.rollup_node_endpoint
           ()
       in
