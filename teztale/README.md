@@ -38,10 +38,13 @@ folowing the schema:
 }
 ```
 
-Note: allowed archivers are actually stored in the database. The list `users`
-from the config file will automatically be added to the database at launch.
-Admins are not stored in the database, so you need to update your configuration
-and restart your server if you want to modify them.
+Notes:
+  - Allowed archivers are actually stored in the database. The list `users` from
+the config file will automatically be added to the database at launch,
+  - Admins are not stored in the database, so you need to update your
+configuration and restart your server if you want to modify them,
+  - the `db` field must be prefixed by the sqlite3 or postgres hint, such as
+    `sqlite3:path_to_the_database` or `postgres://user:password@addr:port/db`
 
 You can know the list of users allowed (but not the password) with
 
