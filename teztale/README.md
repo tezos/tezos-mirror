@@ -14,7 +14,7 @@ It is splitted in 2 parts:
 ### Server
 
 First, you need to write a configuration file. It is a json file
-folowing the schema:
+following the schema:
 
 ```json
 {
