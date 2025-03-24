@@ -145,6 +145,16 @@ module Event = struct
       ~msg:"Empty L1 level {l1_level}"
       ~level:Info
       ("l1_level", Data_encoding.int32)
+
+  let fallback_earliest =
+    declare_1
+      ~section
+      ~name:"fallback_earliest"
+      ~msg:
+        "LCC level {lcc} is not available in the EVM node, we fallback to \
+         starting from its earliest available level."
+      ~level:Warning
+      ("lcc", Data_encoding.int32)
 end
 
 type error +=
@@ -493,34 +503,27 @@ let rec catch_up db ws_client ~from_block ~end_block =
 *)
 let catch_up_withdrawals db ws_client ~last_l2_head =
   let open Lwt_result_syntax in
-  match last_l2_head with
-  | None ->
-      (* No previous state - first time running the monitor *)
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7778:
-         Fetch 2 weeks of withdrawals *)
-      return_unit
-  | Some last_l2_head ->
-      (* Get current L2 head from the node *)
-      let* current_l2_head =
-        Websocket_client.send_jsonrpc
-          ws_client
-          (Call ((module Rpc_encodings.Get_block_by_number), (Latest, false)))
-      in
-      (* We want to process up to HEAD-1 to avoid partially fetched logs *)
-      let pred_l2_head = Ethereum_types.Qty.pred current_l2_head.number in
-      (* Calculate how many blocks we need to catch up on *)
-      let missing =
-        Z.sub
-          (Ethereum_types.Qty.to_z pred_l2_head)
-          (Ethereum_types.Qty.to_z last_l2_head)
-      in
-      (* Log if we need to catch up *)
-      let*! () =
-        if Z.(Compare.(missing > zero)) then Event.(emit catch_up) missing
-        else Lwt.return_unit
-      in
-      (* Process all missing blocks in chunks *)
-      catch_up db ws_client ~from_block:last_l2_head ~end_block:pred_l2_head
+  (* We know we have seen withdrawals until at least HEAD~1. *)
+  let* current_l2_head =
+    Websocket_client.send_jsonrpc
+      ws_client
+      (Call ((module Rpc_encodings.Get_block_by_number), (Latest, false)))
+  in
+  (* We want to process up to HEAD-1 to avoid partially fetched logs *)
+  let pred_l2_head = Ethereum_types.Qty.pred current_l2_head.number in
+  (* Calculate how many blocks we need to catch up on *)
+  let missing =
+    Z.sub
+      (Ethereum_types.Qty.to_z pred_l2_head)
+      (Ethereum_types.Qty.to_z last_l2_head)
+  in
+  (* Log if we need to catch up *)
+  let*! () =
+    if Z.(Compare.(missing > zero)) then Event.(emit catch_up) missing
+    else Lwt.return_unit
+  in
+  (* Process all missing blocks in chunks *)
+  catch_up db ws_client ~from_block:last_l2_head ~end_block:pred_l2_head
 
 let monitor_heads db ws_client =
   let open Lwt_result_syntax in
@@ -536,13 +539,13 @@ let monitor_heads db ws_client =
 
 let monitor_l2_l1_levels db ws_client rollup_node_rpc ~last_levels =
   let open Lwt_result_syntax in
-  let last_l1_level = Option.map fst last_levels in
-  (* TODO: https://gitlab.com/tezos/tezos/-/merge_requests/16879
-     When last_l1_level = None, fetch 2 weeks history. *)
+  let* start_l1_level =
+    match last_levels with
+    | Some (l, _) -> return (Int32.succ l)
+    | None -> Db.Pointers.LCC.get db
+  in
   let* levels_subscription =
-    Websocket_client.subscribe_l1_l2_levels
-      ws_client
-      ?start_l1_level:(Option.map Int32.succ last_l1_level)
+    Websocket_client.subscribe_l1_l2_levels ws_client ~start_l1_level
   in
   let* () =
     lwt_stream_iter_es
@@ -576,8 +579,52 @@ let monitor_l2_l1_levels db ws_client rollup_node_rpc ~last_levels =
             outbox_messages
         in
         let* () = Db.Levels.store db ~l1_level ~start_l2_level ~end_l2_level in
+        let* () = Matcher.run db in
         return_unit)
       levels_subscription.stream
+  in
+  return_unit
+
+let init_db_pointers db ws_client rollup_node_rpc =
+  let open Lwt_result_syntax in
+  let* lcc = Rollup_node_rpc.get_lcc rollup_node_rpc in
+  let* () = Db.Pointers.LCC.set db lcc in
+  let* last_matched = Db.Pointers.Last_matched_L1_level.find db in
+  let* l2_head = Db.Pointers.L2_head.find db in
+  let* () =
+    match last_matched with
+    | Some _ -> return_unit
+    | None -> Db.Pointers.Last_matched_L1_level.set db (Int32.pred lcc)
+  in
+  let* () =
+    match l2_head with
+    | Some _ -> return_unit
+    | None -> (
+        let*! lcc_l2 =
+          Websocket_client.send_jsonrpc
+            ws_client
+            (Call ((module Rpc_encodings.Get_finalized_blocks_of_l1_level), lcc))
+        in
+        match lcc_l2 with
+        | Ok lcc_l2 -> Db.Pointers.L2_head.set db lcc_l2.start_l2_level
+        | Error
+            (Websocket_client.Request_failed
+               ( _,
+                 Rpc_encodings.JSONRPC.
+                   {code = -32001 (* Resource unavailable *); _} )
+            :: _) ->
+            (* If the LCC L2 block is not available in the EVM node, fallback to
+               using the earliest available one. *)
+            let*! () = Event.(emit fallback_earliest) lcc in
+            let* earliest =
+              Websocket_client.send_jsonrpc
+                ws_client
+                (Call
+                   ( (module Rpc_encodings.Get_block_by_number),
+                     (Earliest, false) ))
+            in
+            Db.Pointers.L2_head.set db earliest.number
+        | Error _ as e -> Lwt.return e)
   in
   return_unit
 
@@ -587,6 +634,7 @@ let start db ~evm_node_endpoint ~rollup_node_endpoint =
     Websocket_client.connect Media_type.json evm_node_endpoint
   in
   let rollup_node_rpc = Rollup_node_rpc.make_ctxt ~rollup_node_endpoint in
+  let* () = init_db_pointers db ws_client rollup_node_rpc in
   let* last_l2_head = Db.Pointers.L2_head.get db in
   let* last_levels = Db.Levels.last db in
   let monitor_withdrawals = monitor_withdrawals db ws_client in

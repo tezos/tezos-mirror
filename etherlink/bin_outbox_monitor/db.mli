@@ -36,6 +36,8 @@ type l2_levels_range = {
   end_l2 : Ethereum_types.quantity;
 }
 
+type outbox_index = {message_index : int; transaction_index : int}
+
 (** Human readable encoding for quantities (levels, amounts, etc.) *)
 val quantity_hum_encoding : Ethereum_types.quantity Data_encoding.t
 
@@ -53,6 +55,23 @@ val init : data_dir:string -> [`Read_only | `Read_write] -> t tzresult Lwt.t
 
 module Withdrawals : sig
   val store : ?conn:Sqlite.conn -> t -> withdrawal_log -> unit tzresult Lwt.t
+
+  val list_by_block_numbers :
+    ?conn:Sqlite.conn ->
+    t ->
+    min_level:Ethereum_types.quantity ->
+    max_level:Ethereum_types.quantity ->
+    withdrawal_log list tzresult Lwt.t
+
+  val set_outbox_index :
+    ?conn:Sqlite.conn ->
+    t ->
+    transactionHash:Ethereum_types.hash ->
+    transactionIndex:Ethereum_types.quantity ->
+    logIndex:Ethereum_types.quantity ->
+    outbox_level:int32 ->
+    outbox_index ->
+    unit tzresult Lwt.t
 end
 
 module Levels : sig
@@ -78,6 +97,9 @@ module Levels : sig
 
   val last :
     ?conn:Sqlite.conn -> t -> (int32 * l2_levels_range) option tzresult Lwt.t
+
+  val levels_to_match :
+    ?conn:Sqlite.conn -> t -> (int32 * l2_levels_range) list tzresult Lwt.t
 end
 
 module Pointers : sig
@@ -86,7 +108,9 @@ module Pointers : sig
 
     val set : ?conn:Sqlite.conn -> t -> value -> unit tzresult Lwt.t
 
-    val get : ?conn:Sqlite.conn -> t -> value option tzresult Lwt.t
+    val find : ?conn:Sqlite.conn -> t -> value option tzresult Lwt.t
+
+    val get : ?conn:Sqlite.conn -> t -> value tzresult Lwt.t
   end
 
   module Finalized_L1_head : S with type value := Ethereum_types.quantity
@@ -94,6 +118,8 @@ module Pointers : sig
   module L2_head : S with type value := Ethereum_types.quantity
 
   module LCC : S with type value := int32
+
+  module Last_matched_L1_level : S with type value := int32
 end
 
 module Outbox_messages : sig
@@ -105,4 +131,10 @@ module Outbox_messages : sig
     transaction_index:int ->
     Octez_smart_rollup.Outbox_message.transaction_summary ->
     unit tzresult Lwt.t
+
+  val indexes_by_outbox_level :
+    ?conn:Sqlite.conn ->
+    t ->
+    outbox_level:int32 ->
+    outbox_index list tzresult Lwt.t
 end

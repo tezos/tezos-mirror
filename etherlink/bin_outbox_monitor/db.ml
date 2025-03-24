@@ -45,6 +45,8 @@ type l2_levels_range = {
   end_l2 : Ethereum_types.quantity;
 }
 
+type outbox_index = {message_index : int; transaction_index : int}
+
 let withdrawal_kind_encoding =
   let open Data_encoding in
   union
@@ -304,6 +306,13 @@ module Types = struct
     @@ proj string (fun o -> o.entrypoint)
     @@ proj micheline (fun o -> o.parameters)
     @@ proj_end
+
+  let outbox_index =
+    product (fun message_index transaction_index ->
+        {message_index; transaction_index})
+    @@ proj int (fun o -> o.message_index)
+    @@ proj int (fun o -> o.transaction_index)
+    @@ proj_end
 end
 
 module Migrations = struct
@@ -437,10 +446,48 @@ module Withdrawals = struct
         receiver = $11,
         withdrawal_id = $12
       |sql}
+
+    let find_by_blockNumbers =
+      (t2 level level ->* withdrawal_log)
+      @@ {sql|
+      SELECT
+       transactionHash,
+       transactionIndex, logIndex, blockHash, blockNumber,
+       removed, kind, ticket_owner, amount, sender, receiver,
+       CAST(withdrawal_id as integer)
+      FROM withdrawals
+      WHERE blockNumber BETWEEN ? AND ?
+      ORDER BY transactionIndex DESC, logIndex DESC
+      |sql}
+
+    let set_outbox_index =
+      (t5 int32 outbox_index hash level level ->. unit)
+      @@ {sql|
+      UPDATE withdrawals
+      SET
+        outbox_level = ?,
+        outbox_message_index = ?,
+        outbox_transaction_index = ?
+      WHERE transactionHash = ?
+      AND transactionIndex = ?
+      AND logIndex = ?
+      |sql}
   end
 
   let store ?conn db log =
     with_connection db conn @@ fun conn -> Sqlite.Db.exec conn Q.insert log
+
+  let list_by_block_numbers ?conn db ~min_level ~max_level =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.rev_collect_list conn Q.find_by_blockNumbers (min_level, max_level)
+
+  let set_outbox_index ?conn db ~transactionHash ~transactionIndex ~logIndex
+      ~outbox_level outbox_index =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.exec
+      conn
+      Q.set_outbox_index
+      (outbox_level, outbox_index, transactionHash, transactionIndex, logIndex)
 end
 
 module Levels = struct
@@ -462,6 +509,17 @@ module Levels = struct
     let last =
       (unit ->? t2 int32 l2_levels_range)
       @@ {sql|SELECT l1, start_l2, end_l2 FROM levels ORDER BY l1 DESC LIMIT 1|sql}
+
+    let levels_to_match =
+      (unit ->* t2 int32 l2_levels_range)
+      @@ {sql|
+      SELECT l1, start_l2, end_l2 FROM levels
+      JOIN pointers px ON l1 > px.value
+      JOIN pointers py ON end_l2 <= py.value
+      WHERE px.name = "last_matched_l1_level"
+      AND py.name = "l2_head"
+      ORDER BY l1 DESC
+      |sql}
   end
 
   let store ?conn db ~l1_level ~start_l2_level ~end_l2_level =
@@ -481,6 +539,10 @@ module Levels = struct
 
   let last ?conn db =
     with_connection db conn @@ fun conn -> Sqlite.Db.find_opt conn Q.last ()
+
+  let levels_to_match ?conn db =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.rev_collect_list conn Q.levels_to_match ()
 end
 
 module Pointers = struct
@@ -489,7 +551,9 @@ module Pointers = struct
 
     val set : ?conn:Sqlite.conn -> t -> value -> unit tzresult Lwt.t
 
-    val get : ?conn:Sqlite.conn -> t -> value option tzresult Lwt.t
+    val find : ?conn:Sqlite.conn -> t -> value option tzresult Lwt.t
+
+    val get : ?conn:Sqlite.conn -> t -> value tzresult Lwt.t
   end
 
   module Make (N : sig
@@ -506,18 +570,27 @@ module Pointers = struct
              {sql|REPLACE INTO pointers (name, value) VALUES (%S, ?)|sql}
              N.name
 
-      let get =
+      let find =
         (unit ->? N.value)
+        @@ Format.sprintf
+             {sql|SELECT value from pointers WHERE name = %S|sql}
+             N.name
+
+      let get =
+        (unit ->! N.value)
         @@ Format.sprintf
              {sql|SELECT value from pointers WHERE name = %S|sql}
              N.name
     end
 
-    let set ?conn db level =
-      with_connection db conn @@ fun conn -> Sqlite.Db.exec conn Q.set level
+    let set ?conn db value =
+      with_connection db conn @@ fun conn -> Sqlite.Db.exec conn Q.set value
+
+    let find ?conn db =
+      with_connection db conn @@ fun conn -> Sqlite.Db.find_opt conn Q.find ()
 
     let get ?conn db =
-      with_connection db conn @@ fun conn -> Sqlite.Db.find_opt conn Q.get ()
+      with_connection db conn @@ fun conn -> Sqlite.Db.find conn Q.get ()
   end
 
   module Finalized_L1_head = Make (struct
@@ -543,6 +616,14 @@ module Pointers = struct
 
     let value = Caqti_type.int32
   end)
+
+  module Last_matched_L1_level = Make (struct
+    let name = "last_matched_l1_level"
+
+    type value = int32
+
+    let value = Caqti_type.int32
+  end)
 end
 
 module Outbox_messages = struct
@@ -550,7 +631,7 @@ module Outbox_messages = struct
     open Types
 
     let insert =
-      (t4 int32 int int outbox_transaction ->. unit)
+      (t3 int32 outbox_index outbox_transaction ->. unit)
       @@ {sql|
       INSERT INTO outbox_messages
       (outbox_level, message_index, transaction_index,
@@ -561,6 +642,15 @@ module Outbox_messages = struct
         entrypoint = $5,
         parameters = $6
       |sql}
+
+    let indexes_by_outbox_level =
+      (int32 ->* outbox_index)
+      @@ {sql|
+      SELECT message_index, transaction_index
+      FROM outbox_messages
+      WHERE outbox_level = ?
+      ORDER BY message_index DESC, transaction_index DESC
+      |sql}
   end
 
   let store ?conn db ~outbox_level ~message_index ~transaction_index tx =
@@ -568,5 +658,9 @@ module Outbox_messages = struct
     Sqlite.Db.exec
       conn
       Q.insert
-      (outbox_level, message_index, transaction_index, tx)
+      (outbox_level, {message_index; transaction_index}, tx)
+
+  let indexes_by_outbox_level ?conn db ~outbox_level =
+    with_connection db conn @@ fun conn ->
+    Sqlite.Db.rev_collect_list conn Q.indexes_by_outbox_level outbox_level
 end
