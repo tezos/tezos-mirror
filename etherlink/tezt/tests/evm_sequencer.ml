@@ -530,6 +530,30 @@ let test_tezlink_current_level =
 
   unit
 
+let test_tezlink_protocols =
+  register_tezlink_test
+    ~title:"Test of the protocols rpc"
+    ~tags:["evm"; "rpc"; "protocols"]
+  @@ fun {sequencer; _} _protocol ->
+  (* call the protocols rpc and parse the result *)
+  let rpc_protocols () =
+    let path = "/tezlink/chains/main/blocks/head/protocols" in
+    let* res =
+      Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
+      |> Runnable.run
+    in
+    return @@ JSON.parse ~origin:"curl_protocols" res
+  in
+
+  let* res = rpc_protocols () in
+  Check.(
+    JSON.(
+      res |-> "protocol" |> as_string
+      = "PsQuebecnLByd3JwTiGadoG4nGWi3HYiLXUjkibeFV8dCFeVMUg")
+      string
+      ~error_msg:"Expected %R but got %L") ;
+  unit
+
 let test_tezlink_version =
   register_tezlink_test
     ~title:"Test of the version rpc"
@@ -12584,4 +12608,5 @@ let () =
   test_fa_deposit_and_withdrawals_events [Alpha] ;
   test_block_producer_validation [Alpha] ;
   test_tezlink_current_level [Alpha] ;
+  test_tezlink_protocols [Alpha] ;
   test_tezlink_version [Alpha]
