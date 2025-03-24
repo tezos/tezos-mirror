@@ -58,7 +58,7 @@ let execute ?(wasm_pvm_fallback = false) ?(profile = false)
           0l
           inbox
           {config with flamecharts_directory = data_dir}
-          Custom_section.FuncMap.empty
+          Octez_smart_rollup_wasm_debugger_lib.Custom_section.FuncMap.empty
           evm_state
       in
       return evm_state

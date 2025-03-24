@@ -53,7 +53,7 @@ type t = {
 let is_sequencer t = Option.is_some t.sequencer_wallet
 
 let pvm_config ctxt =
-  Config.config
+  Octez_smart_rollup_wasm_debugger_lib.Config.config
     ~preimage_directory:ctxt.configuration.kernel_execution.preimages
     ?preimage_endpoint:ctxt.configuration.kernel_execution.preimages_endpoint
     ~kernel_debug:true

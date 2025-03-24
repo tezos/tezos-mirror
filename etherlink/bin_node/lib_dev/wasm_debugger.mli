@@ -29,8 +29,8 @@ val profile :
   no_reboot:bool ->
   int32 ->
   string trace Seq.t ->
-  Config.config ->
-  string Custom_section.FuncMap.t ->
+  Octez_smart_rollup_wasm_debugger_lib.Config.config ->
+  string Octez_smart_rollup_wasm_debugger_lib.Custom_section.FuncMap.t ->
   Irmin_context.tree ->
   (Irmin_context.tree * string trace Seq.t * int32) tzresult Lwt.t
 
@@ -62,8 +62,8 @@ val eval :
   wasm_entrypoint:string ->
   int32 ->
   string trace Seq.t ->
-  Config.config ->
-  Commands.eval_step ->
+  Octez_smart_rollup_wasm_debugger_lib.Config.config ->
+  Octez_smart_rollup_wasm_debugger_lib.Commands.eval_step ->
   Irmin_context.tree ->
   (Irmin_context.tree * int64 * string trace Seq.t * int32) tzresult Lwt.t
 
