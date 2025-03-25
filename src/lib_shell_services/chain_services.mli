@@ -52,6 +52,23 @@ type active_peers_info = {
   block_level : Int32.t;
 }
 
+type delegators_contribution = {
+  own_delegated : int64;
+  delegators_contributions : (string * int64) list;
+  former_delegators_unstake_requests : int64;
+  overstaked : int64;
+  total_delegated_including_overdelegated : int64;
+  total_delegated_after_limits : int64;
+  overdelegated : int64;
+}
+
+module Delegators_contribution_errors : sig
+  type error +=
+    | Cycle_too_far_in_future
+    | Cycle_too_far_in_past
+    | Protocol_not_supported of {protocol_hash : Protocol_hash.t}
+end
+
 val path : (unit, prefix) Tezos_rpc.Path.path
 
 open Tezos_rpc.Context
@@ -137,6 +154,15 @@ module S : sig
       unit,
       unit,
       active_peers_info list )
+    Tezos_rpc.Service.t
+
+  val delegators_contribution :
+    ( [`GET],
+      prefix,
+      (prefix * int32) * Signature.public_key_hash,
+      unit,
+      unit,
+      delegators_contribution )
     Tezos_rpc.Service.t
 
   module Levels : sig
