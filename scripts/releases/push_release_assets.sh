@@ -30,7 +30,7 @@ cat ./versions.json
 
 aws s3 ls "s3://${S3_BUCKET}/"
 
-aws s3 ls "s3://${S3_BUCKET}/binaries/arm64/"
+aws s3 ls "s3://${S3_BUCKET}/octez-v22.0-rc3/binaries/arm64/"
 
 # wget -O "octez-arm.zip" "https://gitlab.com/tezos/tezos/-/jobs/9502586413/artifacts/download"
 # unzip "./octez-arm.zip"
