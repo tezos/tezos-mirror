@@ -357,13 +357,24 @@ RUN mkdir -p /usr/share/dal-trusted-setup && \
 ## - for compatibility reasons, this requires to have [sqlite-dev] from 3.21 as well
 # hadolint ignore=DL3018
 RUN apk del sqlite-dev sqlite-libs \
- && apk add --no-cache sqlite-dev npm --repository=https://dl-cdn.alpinelinux.org/alpine/v3.21/main \
+ && apk add --no-cache sqlite-dev npm --repository=https://dl-cdn.alpinelinux.org/alpine/v3.21/main
  # We need datadog-ci to send JUnit files to Datadog in tezt
  # jobs. Cf. [scripts/ci/tezt.sh].
  # Version number should be kept in sync with the one of the
  # datadog/ci image used for the [datadog_ci] image
  # (cf. ci/bin/common.ml)
- && npm --verbose install -g "@datadog/datadog-ci@2.44.0" \
+
+# Set NPM registry
+# NPM_REGISTRY_DOMAIN and NPM_REGISTRY are set in the GitLab CI/CD
+ARG NPM_REGISTRY_DOMAIN
+ARG NPM_REGISTRY
+
+RUN --mount=type=secret,id=npm_token \
+    if [ -n "$NPM_REGISTRY" ] ; then \
+      npm set registry "$NPM_REGISTRY" && \
+      npm set //${NPM_REGISTRY_DOMAIN}:_authToken=$(cat /run/secrets/npm_token); \
+    fi \
+ && npm --verbose install -g "@datadog/datadog-ci@2.46.0" \
  # We need eth since e2e tests. This requires git as well.
  && npm --verbose install -g eth-cli@2.0.2 \
  # We need solc to compile solidity smart-contracts
