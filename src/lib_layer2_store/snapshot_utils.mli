@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>         *)
+(* SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>         *)
+(* SPDX-FileCopyrightText: 2025 Nomadic Labs, <contact@nomadic-labs.com>     *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -39,6 +40,9 @@ val input_format : reader_input -> [`Compressed | `Uncompressed]
     filename] when the snapshot is read from a local file [filename] or [`Remote
     url] when the snapshot file is downloaded from [url].  *)
 val input_source : reader_input -> [`Local of string | `Remote of string]
+
+(** Add a download snapshot command to the executable (only for internal use). *)
+val add_download_command : unit -> unit
 
 module Make (Header : sig
   type t

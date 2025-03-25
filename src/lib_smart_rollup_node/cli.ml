@@ -500,6 +500,13 @@ let snapshot_file_param next =
     string_parameter
     next
 
+let snapshot_file_or_url_param next =
+  Tezos_clic.param
+    ~name:"snapshot_file_or_url"
+    ~desc:"Snapshot archive file name or URL to download the snapshot"
+    string_parameter
+    next
+
 let no_checks_arg : (bool, Client_context.full) Tezos_clic.arg =
   Tezos_clic.switch
     ~long:"no-check"

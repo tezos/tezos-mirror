@@ -602,7 +602,7 @@ let import_snapshot =
        Cli.no_checks_arg
        Cli.import_force_switch
        Cli.apply_unsafe_patches_switch)
-    (prefixes ["snapshot"; "import"] @@ Cli.snapshot_file_param @@ stop)
+    (prefixes ["snapshot"; "import"] @@ Cli.snapshot_file_or_url_param @@ stop)
     (fun (data_dir, no_checks, force, apply_unsafe_patches) snapshot_file cctxt ->
       let open Lwt_result_syntax in
       let* () =
@@ -623,7 +623,7 @@ let snapshot_info =
     ~group
     ~desc:"Display information about a snapshot file."
     no_options
-    (prefixes ["snapshot"; "info"] @@ Cli.snapshot_file_param @@ stop)
+    (prefixes ["snapshot"; "info"] @@ Cli.snapshot_file_or_url_param @@ stop)
     (fun () snapshot_file cctxt ->
       let open Lwt_result_syntax in
       let* ( Snapshots.Header.
@@ -752,5 +752,7 @@ module Daemon_node_config = struct
 
   let advertise_log_levels = Some true
 end
+
+let () = Tezos_layer2_store.Snapshot_utils.add_download_command ()
 
 let () = Client_main_run.run (module Daemon_node_config) ~select_commands

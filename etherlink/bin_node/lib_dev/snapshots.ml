@@ -411,7 +411,7 @@ let import ~force ~data_dir snapshot_input header =
       ~display_progress:
         (`Periodic_event
           (fun elapsed_time ->
-            Events.extract_snapshot_archive_in_progress
+            Events.import_snapshot_archive_in_progress
               ~archive_name
               ~elapsed_time))
         (* [progress] modifies the signal handlers, which are necessary for
@@ -437,24 +437,9 @@ let info ~snapshot_file =
   let format = input_format snapshot_input in
   Lwt_result_syntax.return (snapshot_header, format)
 
-let import_from ~force ~keep_alive ?history_mode ~data_dir ~download_path
-    ~snapshot_file () =
+let import_from ~force ?history_mode ~data_dir ~snapshot_file () =
   let open Lwt_result_syntax in
-  let with_snapshot k =
-    if
-      String.starts_with ~prefix:"http://" snapshot_file
-      || String.starts_with ~prefix:"https://" snapshot_file
-    then
-      Lwt_utils_unix.with_tempdir ~temp_dir:data_dir download_path
-      @@ fun working_dir ->
-      let* snapshot_file =
-        Misc.download_file ~keep_alive ~working_dir snapshot_file
-      in
-      k snapshot_file
-    else k snapshot_file
-  in
   Data_dir.use ~data_dir @@ fun () ->
-  with_snapshot @@ fun snapshot_file ->
   with_open_snapshot snapshot_file @@ fun header snapshot_input ->
   let* store_history_mode =
     match (history_mode, header) with
@@ -463,7 +448,7 @@ let import_from ~force ~keep_alive ?history_mode ~data_dir ~download_path
         else tzfail (History_mode_mismatch (h1, h2))
     | _ -> return_none
   in
-  let*! () = Events.importing_snapshot () in
+  let*! () = Events.importing_snapshot snapshot_file in
   let* () = import ~force ~data_dir snapshot_input header in
   let*! () = Events.import_finished () in
   return store_history_mode

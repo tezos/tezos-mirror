@@ -147,28 +147,7 @@ val missing_chain_id : unit -> unit Lwt.t
     a kernel for a single chain environment. *)
 val multichain_node_singlechain_kernel : unit -> unit Lwt.t
 
-(** [downloading_file ?size url] advertises that the node is downloading
-    the file at [url], and explicitly mentions its [size] if provided. *)
-val downloading_file : ?size:int -> string -> unit Lwt.t
-
-(** [download_in_progress ~size ~remaining_size ~elapsed_time url] advertises
-    that the node is downloading the file at [url], and explicitly mentions the
-    percentage and remaining bytes to download, as well as the time elapsed
-    since the download started. *)
-val download_in_progress :
-  size:int option ->
-  remaining_size:int option ->
-  elapsed_time:Ptime.span ->
-  string ->
-  unit Lwt.t
-
-type download_error = Http_error of Cohttp.Code.status_code | Exn of exn
-
-(** [download_failed url status] advertises that the download of [url] failed
-    with the given [status] code. *)
-val download_failed : string -> download_error -> unit Lwt.t
-
-val importing_snapshot : unit -> unit Lwt.t
+val importing_snapshot : string -> unit Lwt.t
 
 (** Emit a warning that the imported snapshot uses the legacy block storage. *)
 val importing_legacy_snapshot : unit -> unit Lwt.t
@@ -187,8 +166,8 @@ val still_compressing_snapshot :
 
 val import_finished : unit -> unit Lwt.t
 
-(** [extract_snapshot_archive_in_progress ~archive_name ~elapsed_time] advertises that the node is
-    extracting the snapshot archive named [archive_name], and explicitly mentions the time elapsed
-    since the extraction started. *)
-val extract_snapshot_archive_in_progress :
+(** [import_snapshot_archive_in_progress ~archive_name ~elapsed_time] advertises
+    that the node is importing the snapshot archive named [archive_name], and
+    explicitly mentions the time elapsed since the extraction started. *)
+val import_snapshot_archive_in_progress :
   archive_name:string -> elapsed_time:Time.System.Span.t -> unit Lwt.t

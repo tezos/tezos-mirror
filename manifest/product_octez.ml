@@ -5068,6 +5068,7 @@ let octez_layer2_store =
         octez_context_encoding;
         octez_context_sigs;
         octez_context_helpers;
+        cohttp_lwt_unix;
         camlzip;
         tar;
         tar_unix;

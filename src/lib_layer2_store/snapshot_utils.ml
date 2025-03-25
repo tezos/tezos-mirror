@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>         *)
+(* SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>         *)
+(* SPDX-FileCopyrightText: 2025 Nomadic Labs, <contact@nomadic-labs.com>     *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -111,6 +112,90 @@ let run ~cancellable k =
        our use case for cancellation leads to the program exiting. *)
     Lwt.wrap_in_cancelable (Lwt_preemptive.detach k ())
   else Lwt.return (k ())
+
+let download_file_command url =
+  let open Lwt_syntax in
+  let uri = Uri.of_string url in
+  let pipe_stream stream =
+    let rec write_string offset str =
+      let len = String.length str in
+      let* written =
+        Lwt_unix.write_string Lwt_unix.stdout str offset (len - offset)
+      in
+      let reached = offset + written in
+      if reached = len then return_unit else write_string reached str
+    in
+    Lwt_stream.iter_s (write_string 0) stream
+  in
+  let* resp, body = Cohttp_lwt_unix.Client.get uri in
+  match resp.status with
+  | `OK ->
+      let stream = Cohttp_lwt.Body.to_stream body in
+      let* () = pipe_stream stream in
+      Lwt_result_syntax.return_unit
+  | #Cohttp.Code.status_code as status_code ->
+      failwith
+        "Download of snapshot %s failed with HTTP error %s@."
+        url
+        (Cohttp.Code.string_of_status status_code)
+
+let add_download_command () =
+  if Sys.argv.(0) = "download-snapshot" then
+    let url = Sys.argv.(1) in
+    match Lwt_main.run @@ download_file_command url with
+    | Ok () -> Stdlib.exit 0
+    | Error errs ->
+        Format.eprintf "%a%!" pp_print_trace errs ;
+        Stdlib.exit 1
+
+let download_file url =
+  let in_chan, pin, perr =
+    Unix.open_process_args_full
+      Sys.argv.(0)
+      [|"download-snapshot"; url|]
+      (Unix.environment ())
+  in
+  close_out_noerr pin ;
+  let notify_crash fmt = Format.eprintf (fmt ^^ "@.") in
+  let open Lwt_syntax in
+  let pid = Unix.process_full_pid (in_chan, pin, perr) in
+  Lwt.dont_wait
+    (fun () ->
+      let+ _pid, status = Lwt_unix.waitpid [] pid in
+      match status with
+      | WEXITED 0 -> ()
+      | _ ->
+          let phrase, n =
+            match status with
+            | WEXITED n -> ("failed with code", n)
+            | WSIGNALED n -> ("was killed by signal", n)
+            | Unix.WSTOPPED n -> ("was stopped by signal", n)
+          in
+          notify_crash
+            "Snapshot download process %s %d: %s"
+            phrase
+            n
+            (In_channel.input_all perr))
+    (fun exn ->
+      notify_crash
+        "Snapshot download processed crashed because %s"
+        (Printexc.to_string exn)) ;
+  Lwt_result.return in_chan
+
+let open_or_download_file file_or_url =
+  let open Lwt_result_syntax in
+  if
+    String.starts_with ~prefix:"http://" file_or_url
+    || String.starts_with ~prefix:"https://" file_or_url
+  then
+    let+ chan = download_file file_or_url in
+    (chan, `Remote file_or_url)
+  else
+    try
+      let chan = open_in_bin file_or_url in
+      return (chan, `Local file_or_url)
+    with Sys_error s ->
+      failwith "Cannot open snapshot file %s: %s" file_or_url s
 
 (* Magic bytes for gzip files is 1f8b. *)
 let is_compressed_snapshot ic =
@@ -358,17 +443,16 @@ struct
 
   let with_open_snapshot file f =
     let open Lwt_result_syntax in
-    let in_chan = open_in file in
+    let* in_chan, src = open_or_download_file file in
     let reader =
       if is_compressed_snapshot in_chan then gzip_reader else stdlib_reader
     in
-    let reader_input = create_reader_input reader in_chan ~src:(`Local file) in
-    protect
-      ~on_error:(fun error ->
+    let reader_input = create_reader_input reader in_chan ~src in
+    protect ~on_error:(fun error ->
         let module Reader = (val reader_input) in
-        Reader.close_in Reader.in_chan ;
+        (try Reader.close_in Reader.in_chan with _ -> ()) ;
         fail error)
-      (fun () ->
-        let header = read_snapshot_header reader_input in
-        f header reader_input)
+    @@ fun () ->
+    let header = read_snapshot_header reader_input in
+    f header reader_input
 end
