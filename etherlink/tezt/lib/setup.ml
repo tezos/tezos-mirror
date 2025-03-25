@@ -31,6 +31,7 @@ type multichain_sequencer_setup = {
   boot_sector : string;
   kernel : Uses.t;
   enable_dal : bool;
+  evm_version : Evm_version.t;
   enable_multichain : bool;
 }
 
@@ -46,6 +47,7 @@ type sequencer_setup = {
   boot_sector : string;
   kernel : Uses.t;
   enable_dal : bool;
+  evm_version : Evm_version.t;
   enable_multichain : bool;
 }
 
@@ -80,6 +82,7 @@ let multichain_setup_to_single ~(setup : multichain_sequencer_setup) =
     kernel = setup.kernel;
     enable_dal = setup.enable_dal;
     enable_multichain = setup.enable_multichain;
+    evm_version = setup.evm_version;
   }
 
 let uses _protocol =
@@ -428,7 +431,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
   in
   let client = Client.with_dal_node client ?dal_node in
   let* l1_contracts =
-    setup_l1_contracts ~kernel:(Kernel.of_use kernel) client
+    setup_l1_contracts ~kernel:(Kernel.of_tag_use kernel) client
   in
   let sc_rollup_node =
     Sc_rollup_node.create
@@ -584,6 +587,9 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
           (Sc_rollup_node.endpoint sc_rollup_node))
       l2_chains
   in
+  let evm_version =
+    Kernel.select_evm_version (Kernel.of_tag_use kernel) ?evm_version
+  in
   return
     {
       node;
@@ -597,6 +603,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       boot_sector = output;
       kernel;
       enable_dal;
+      evm_version;
       enable_multichain;
     }
 

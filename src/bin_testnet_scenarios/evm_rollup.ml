@@ -206,7 +206,9 @@ let rps_perf ~configuration_path ~testnet =
   in
 
   let endpoint = Evm_node.endpoint evm_node in
-  let* contract = Solidity_contracts.loop () in
+  let* contract =
+    Solidity_contracts.loop (Kernel.select_evm_version Kernel.Latest)
+  in
   let data = read_file contract.bin in
   let* chain_id_result = Rpc.get_chain_id evm_node in
   let chain_id =

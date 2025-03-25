@@ -24,7 +24,7 @@ let upgrade_to = function
   | Ghostnet -> Latest
   | Mainnet -> Ghostnet
 
-let of_use u =
+let of_tag_use u =
   if Uses.(tag u = tag Constant.WASM.mainnet_evm_kernel) then Mainnet
   else if Uses.(tag u = tag Constant.WASM.ghostnet_evm_kernel) then Ghostnet
   else if Uses.(tag u = tag Constant.WASM.evm_kernel) then Latest
@@ -34,3 +34,15 @@ let supports_dal = function
   | Mainnet -> false
   | Ghostnet -> false
   | Latest -> true
+
+(* Select the appropriate EVM version for the specified kernel.
+
+   NOTE: This function must be updated when Ghostnet or Mainnet kernels start
+   supporting configurable (overridable) EVM versions. *)
+let select_evm_version ?evm_version kernel =
+  match (evm_version, kernel) with
+  | Some Evm_version.Shanghai, _ -> Evm_version.Shanghai
+  | None, (Ghostnet | Mainnet) -> Evm_version.Shanghai
+  | None, Latest -> Cancun
+  | Some v, Latest -> v
+  | _ -> Test.fail "Invalid combination of kernel and evm_version"
