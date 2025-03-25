@@ -95,7 +95,13 @@ workflow:
     variables:
       PIPELINE_TYPE: schedule_container_scanning_evm_node_releases
     when: always
-  - if: $CI_PIPELINE_SOURCE == "api" && $TZ_API_KIND == "RELEASE_PAGE"
+  - if: $CI_PIPELINE_SOURCE == "api" && $TZ_API_KIND == "RELEASE_PAGE" && $CI_PROJECT_NAMESPACE
+      != "tezos"
+    variables:
+      PIPELINE_TYPE: publish_test_release_page
+    when: always
+  - if: $CI_PIPELINE_SOURCE == "api" && $TZ_API_KIND == "RELEASE_PAGE" && $CI_PROJECT_NAMESPACE
+      == "tezos"
     variables:
       PIPELINE_TYPE: publish_release_page
     when: always
@@ -219,7 +225,13 @@ include:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_EVM_NODE_RELEASES"
     when: always
+- local: .gitlab/ci/pipelines/publish_test_release_page.yml
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "api" && $TZ_API_KIND == "RELEASE_PAGE" && $CI_PROJECT_NAMESPACE
+      != "tezos"
+    when: always
 - local: .gitlab/ci/pipelines/publish_release_page.yml
   rules:
-  - if: $CI_PIPELINE_SOURCE == "api" && $TZ_API_KIND == "RELEASE_PAGE"
+  - if: $CI_PIPELINE_SOURCE == "api" && $TZ_API_KIND == "RELEASE_PAGE" && $CI_PROJECT_NAMESPACE
+      == "tezos"
     when: always
