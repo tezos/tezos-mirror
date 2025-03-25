@@ -1734,33 +1734,39 @@ module Monitoring_app = struct
                     unit
                 | Some prev_status ->
                     if prev_status = attest_enough then unit
-                    else (
-                      Hashtbl.add prev_was_enough pkh attest_enough ;
-                      let network = t.configuration.network in
-                      let attested =
-                        JSON.(
-                          dal_participation |-> "delegate_attested_dal_slots"
-                          |> as_float)
-                      in
+                    else
                       let attestable =
                         JSON.(
                           dal_participation |-> "delegate_attestable_dal_slots"
                           |> as_float)
                       in
-                      let attestation_percentage =
-                        100. *. attested /. attestable
-                      in
-                      let transition =
-                        if attest_enough then Restarted_attesting
-                        else Stopped_attesting
-                      in
-                      report_attestation_transition
-                        ~monitor_app_configuration
-                        ~network
-                        ~level
-                        ~pkh
-                        ~transition
-                        ~attestation_percentage)
+                      (* If no slots was attestatble, the value of [attest_enough]
+                         is [true], but it is quite meaningless, since we do not want
+                          to state that the DAL node is working well again simply
+                          because there was nothing to attest. *)
+                      if attestable = 0. then unit
+                      else (
+                        Hashtbl.add prev_was_enough pkh attest_enough ;
+                        let network = t.configuration.network in
+                        let attested =
+                          JSON.(
+                            dal_participation |-> "delegate_attested_dal_slots"
+                            |> as_float)
+                        in
+                        let attestation_percentage =
+                          100. *. attested /. attestable
+                        in
+                        let transition =
+                          if attest_enough then Restarted_attesting
+                          else Stopped_attesting
+                        in
+                        report_attestation_transition
+                          ~monitor_app_configuration
+                          ~network
+                          ~level
+                          ~pkh
+                          ~transition
+                          ~attestation_percentage)
               in
               let refill_delegates_to_treat () =
                 let query_string = [("active", "true")] in
