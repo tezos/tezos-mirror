@@ -64,7 +64,8 @@ let make_is_input_state (get_status : 'a -> Backend.status Lwt.t)
 module PVM :
   Sc_rollup.PVM.S
     with type state = tree
-     and type context = Riscv_context.rw_index = struct
+     and type context = Riscv_context.rw_index
+     and type proof = Backend.proof = struct
   let parse_boot_sector s = Some s
 
   let pp_boot_sector fmt s = Format.fprintf fmt "%s" s
@@ -88,12 +89,9 @@ module PVM :
 
   type proof = Backend.proof
 
-  let proof_encoding =
-    Data_encoding.(
-      conv_with_guard
-        (function (_ : proof) -> ())
-        (fun _ -> Error "proofs not implemented")
-        unit)
+  let proof_encoding : Backend.proof Data_encoding.t =
+    let open Data_encoding in
+    conv_with_guard Backend.serialise_proof Backend.deserialise_proof bytes
 
   let proof_start_state proof = Backend.proof_start_state proof
 
