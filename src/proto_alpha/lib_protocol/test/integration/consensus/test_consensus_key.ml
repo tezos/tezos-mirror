@@ -248,14 +248,15 @@ let test_tz4_consensus_key ~allow_tz4_delegate_enable () =
     let* (_i : Incremental.t) =
       Incremental.validate_operation ~expect_failure inc operation
     in
+    let proof_signer = Account.new_account ~algo:Bls () in
     let* operation_with_incorrect_proof =
       Op.update_consensus_key
-        ~proof_signer:contract
+        ~proof_signer:(Contract.Implicit proof_signer.pkh)
         (B blk')
         (Contract.Implicit delegate)
         consensus_pk
     in
-    let expect_failure = function
+    let expect_apply_failure = function
       | [
           Environment.Ecoproto_error
             (Validate_errors.Manager.Update_consensus_key_with_incorrect_proof
@@ -273,8 +274,8 @@ let test_tz4_consensus_key ~allow_tz4_delegate_enable () =
             err
     in
     let* (_i : Incremental.t) =
-      Incremental.validate_operation
-        ~expect_failure
+      Incremental.add_operation
+        ~expect_apply_failure
         inc
         operation_with_incorrect_proof
     in
@@ -322,9 +323,10 @@ let test_consensus_key_with_unused_proof () =
   let* blk' =
     transfer_tokens genesis account1_pkh consensus_pkh Tez.one_mutez
   in
+  let proof_signer = Account.new_account ~algo:Bls () in
   let* operation =
     Op.update_consensus_key
-      ~proof_signer:(Contract.Implicit consensus_account.pkh)
+      ~proof_signer:(Contract.Implicit proof_signer.pkh)
       (B blk')
       (Contract.Implicit delegate)
       consensus_pk
