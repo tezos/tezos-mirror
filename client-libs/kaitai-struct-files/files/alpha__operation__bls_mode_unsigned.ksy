@@ -975,7 +975,7 @@ types:
       type: private_pis_elt_field1
   proof:
     seq:
-    - id: signature__v1
+    - id: signature__v2
       size-eos: true
   proof_0:
     seq:
