@@ -381,9 +381,26 @@ let check_header ~populated ~force ~data_dir (header : Header.t) :
   in
   return_unit
 
-let import ~force ~data_dir snapshot_input header =
+let info ~snapshot_file =
+  with_open_snapshot snapshot_file @@ fun snapshot_header snapshot_input ->
+  let format = input_format snapshot_input in
+  Lwt_result_syntax.return (snapshot_header, format)
+
+let import_from ~force ?history_mode ~data_dir ~snapshot_file () =
   let open Lwt_result_syntax in
   let open Filename.Infix in
+  Data_dir.use ~data_dir @@ fun () ->
+  Lwt_utils_unix.with_tempdir ~temp_dir:data_dir ".octez_evm_node_import_"
+  @@ fun dest ->
+  with_open_snapshot snapshot_file @@ fun header snapshot_input ->
+  let* store_history_mode =
+    match (history_mode, header) with
+    | Some h1, V1 {history_mode = h2; _} ->
+        if Configuration.history_mode_partial_eq h1 h2 then return_some h1
+        else tzfail (History_mode_mismatch (h1, h2))
+    | _ -> return_none
+  in
+  let*! () = Events.importing_snapshot snapshot_file in
   let*! populated = Data_dir.populated ~data_dir in
   let*? () =
     error_when ((not force) && populated) (Data_dir_populated data_dir)
@@ -399,8 +416,6 @@ let import ~force ~data_dir snapshot_input header =
     return_unit
   in
   let* () = check_header ~force ~populated ~data_dir header in
-  Lwt_utils_unix.with_tempdir ~temp_dir:data_dir ".octez_evm_node_import_"
-  @@ fun dest ->
   let archive_name =
     match input_source snapshot_input with `Local s | `Remote s -> s
   in
@@ -430,26 +445,6 @@ let import ~force ~data_dir snapshot_input header =
   Unix.rename
     (dest // Evm_store.sqlite_file_name)
     (data_dir // Evm_store.sqlite_file_name) ;
-  return_unit
-
-let info ~snapshot_file =
-  with_open_snapshot snapshot_file @@ fun snapshot_header snapshot_input ->
-  let format = input_format snapshot_input in
-  Lwt_result_syntax.return (snapshot_header, format)
-
-let import_from ~force ?history_mode ~data_dir ~snapshot_file () =
-  let open Lwt_result_syntax in
-  Data_dir.use ~data_dir @@ fun () ->
-  with_open_snapshot snapshot_file @@ fun header snapshot_input ->
-  let* store_history_mode =
-    match (history_mode, header) with
-    | Some h1, V1 {history_mode = h2; _} ->
-        if Configuration.history_mode_partial_eq h1 h2 then return_some h1
-        else tzfail (History_mode_mismatch (h1, h2))
-    | _ -> return_none
-  in
-  let*! () = Events.importing_snapshot snapshot_file in
-  let* () = import ~force ~data_dir snapshot_input header in
   let*! () = Events.import_finished () in
   return store_history_mode
 

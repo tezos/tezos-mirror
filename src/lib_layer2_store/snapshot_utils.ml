@@ -42,6 +42,8 @@ module type READER_INPUT = sig
   val in_chan : in_channel
 
   val source : [`Local of string | `Remote of string]
+
+  val crashed : tztrace Lwt.t
 end
 
 module type WRITER_OUTPUT = sig
@@ -148,7 +150,7 @@ let add_download_command () =
         Format.eprintf "%a%!" pp_print_trace errs ;
         Stdlib.exit 1
 
-let download_file url =
+let download_file ~crash_resolver url =
   let in_chan, pin, perr =
     Unix.open_process_args_full
       Sys.argv.(0)
@@ -156,26 +158,35 @@ let download_file url =
       (Unix.environment ())
   in
   close_out_noerr pin ;
-  let notify_crash fmt = Format.eprintf (fmt ^^ "@.") in
+  let notify_crash fmt =
+    Format.ksprintf (fun s -> Lwt.wakeup crash_resolver [Exn (Failure s)]) fmt
+  in
   let open Lwt_syntax in
   let pid = Unix.process_full_pid (in_chan, pin, perr) in
+  let canceler = Lwt_canceler.create () in
+  Lwt_canceler.on_cancel canceler (fun () ->
+      Unix.kill pid Sys.sigterm ;
+      return_unit) ;
   Lwt.dont_wait
     (fun () ->
-      let+ _pid, status = Lwt_unix.waitpid [] pid in
-      match status with
-      | WEXITED 0 -> ()
-      | _ ->
-          let phrase, n =
-            match status with
-            | WEXITED n -> ("failed with code", n)
-            | WSIGNALED n -> ("was killed by signal", n)
-            | Unix.WSTOPPED n -> ("was stopped by signal", n)
-          in
-          notify_crash
-            "Snapshot download process %s %d: %s"
-            phrase
-            n
-            (In_channel.input_all perr))
+      let+ st = protect_result ~canceler @@ fun () -> Lwt_unix.waitpid [] pid in
+      match st with
+      | Error _e -> notify_crash "Error"
+      | Ok (_pid, status) -> (
+          match status with
+          | WEXITED 0 -> ()
+          | _ ->
+              let phrase, n =
+                match status with
+                | WEXITED n -> ("failed with code", n)
+                | WSIGNALED n -> ("was killed by signal", n)
+                | Unix.WSTOPPED n -> ("was stopped by signal", n)
+              in
+              notify_crash
+                "Snapshot download process %s %d: %s"
+                phrase
+                n
+                (In_channel.input_all perr)))
     (fun exn ->
       notify_crash
         "Snapshot download processed crashed because %s"
@@ -184,16 +195,17 @@ let download_file url =
 
 let open_or_download_file file_or_url =
   let open Lwt_result_syntax in
+  let crashed, crash_resolver = Lwt.task () in
   if
     String.starts_with ~prefix:"http://" file_or_url
     || String.starts_with ~prefix:"https://" file_or_url
   then
-    let+ chan = download_file file_or_url in
-    (chan, `Remote file_or_url)
+    let+ chan = download_file ~crash_resolver file_or_url in
+    ((chan, crashed), `Remote file_or_url)
   else
     try
       let chan = open_in_bin file_or_url in
-      return (chan, `Local file_or_url)
+      return ((chan, crashed), `Local file_or_url)
     with Sys_error s ->
       failwith "Cannot open snapshot file %s: %s" file_or_url s
 
@@ -229,7 +241,7 @@ let periodic_report event =
 
 let create_reader_input (type a) ~src
     (module Reader : READER with type in_channel = a)
-    (in_chan : Stdlib.in_channel) :
+    (in_chan : Stdlib.in_channel) crashed :
     (module READER_INPUT with type in_channel = a) =
   (module struct
     include Reader
@@ -237,11 +249,13 @@ let create_reader_input (type a) ~src
     let in_chan = open_in_chan in_chan
 
     let source = src
+
+    let crashed = crashed
   end)
 
-let create_reader_input : src:_ -> reader -> in_channel -> reader_input =
- fun ~src (module R) s ->
-  let r = create_reader_input ~src (module R) s in
+let create_reader_input : src:_ -> reader -> in_channel -> _ -> reader_input =
+ fun ~src (module R) s crash ->
+  let r = create_reader_input ~src (module R) s crash in
   let module R : READER_INPUT = (val r) in
   (module R)
 
@@ -441,18 +455,39 @@ struct
       close_in in_chan ;
       raise e
 
+  let fail_on_crash (module Reader : READER_INPUT) f =
+    let open Lwt_syntax in
+    let crash =
+      let+ err = Reader.crashed in
+      `Crashed err
+    in
+    let normal =
+      let* () = Lwt.pause () in
+      let* res = protect f in
+      let* () = Lwt.pause () in
+      return (`Normal res)
+    in
+    let* res = Lwt.nchoose [crash; normal] in
+    match res with
+    | [] -> assert false
+    | `Crashed err :: _ | [_; `Crashed err] ->
+        Lwt.cancel normal ;
+        return_error err
+    | `Normal res :: _ -> return res
+
   let with_open_snapshot file f =
     let open Lwt_result_syntax in
-    let* in_chan, src = open_or_download_file file in
+    let* (in_chan, crashed), src = open_or_download_file file in
     let reader =
       if is_compressed_snapshot in_chan then gzip_reader else stdlib_reader
     in
-    let reader_input = create_reader_input reader in_chan ~src in
+    let reader_input = create_reader_input reader in_chan ~src crashed in
     protect ~on_error:(fun error ->
         let module Reader = (val reader_input) in
         (try Reader.close_in Reader.in_chan with _ -> ()) ;
         fail error)
     @@ fun () ->
+    fail_on_crash reader_input @@ fun () ->
     let header = read_snapshot_header reader_input in
     f header reader_input
 end
