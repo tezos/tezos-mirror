@@ -73,7 +73,7 @@ let spawn_baker protocol_hash =
          protocol_hash
        [@profiler.record_f {verbosity = Notice} "proto_plugin_for_protocol"])
     in
-    let baker_commands = Commands.baker_commands plugin in
+    let baker_commands = Commands.baker_commands ~plugin () in
     return
     @@ run_thread
          ~protocol_hash
