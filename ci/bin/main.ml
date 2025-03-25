@@ -414,6 +414,15 @@ let () =
         Common.job_datadog_pipeline_trace;
         Release_tag.job_release_page ~test:false ();
       ]
+    ~description:"Pipeline that updates and publishes the release page." ;
+  register
+    "push_release_page_assets"
+    api_push_release_page_assets
+    ~jobs:
+      [
+        Common.job_datadog_pipeline_trace;
+        Release_tag.job_push_release_page_assets ~test:false ();
+      ]
     ~description:"Pipeline that updates and publishes the release page."
 
 (** {2 Entry point of the generator binary} *)

@@ -88,6 +88,28 @@ let job_release_page ~test ?dependencies () =
          ])
     ["./scripts/releases/publish_release_page.sh"]
 
+let job_push_release_page_assets ~test ?dependencies () =
+  job
+    ~__POS__
+    ~image:Images.CI.test
+    ~stage:Stages.publish_release
+    ~description:"WIP."
+    ~name:"publish:push-release-page-assets"
+    ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ()]
+    ?dependencies
+    ~before_script:
+      (if test then
+         [
+           "export \
+            AWS_ACCESS_KEY_ID=${AWS_KEY_RELEASE_PUBLISH:?AWS_KEY_RELEASE_PUBLISH \
+            is not set}";
+           "export \
+            AWS_SECRET_ACCESS_KEY=${AWS_SECRET_RELEASE_PUBLISH:?AWS_SECRET_RELEASE_PUBLISH \
+            is not set}";
+         ]
+       else [])
+    ["./scripts/releases/push_release_assets.sh"]
+
 (** Create an Octez release tag pipeline of type {!release_tag_pipeline_type}.
 
     If [test] is true (default is [false]), then the Docker images are

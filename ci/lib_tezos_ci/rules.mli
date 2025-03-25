@@ -31,6 +31,8 @@ val api : If.t
     [TZ_API_KIND] set to [RELEASE_PAGE]. *)
 val api_release_page : If.t
 
+val api_push_release_page_assets : If.t
+
 (** A rule that is true if [CI_MERGE_REQUEST_EVENT_TYPE] is [detached].
 
     Merge request pipelines are {i detached} when:
