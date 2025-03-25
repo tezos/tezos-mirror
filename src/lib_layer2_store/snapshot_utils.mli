@@ -111,6 +111,7 @@ end) : sig
   (** [with_open_snapshot file f] opens the snapshot file for reading, reads its
       header and executes [f] then finally closes the channels. *)
   val with_open_snapshot :
+    progress:bool ->
     string ->
     (Header.t -> reader_input -> 'a tzresult Lwt.t) ->
     'a tzresult Lwt.t

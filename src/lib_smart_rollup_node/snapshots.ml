@@ -643,7 +643,8 @@ let post_export_checks ~snapshot_file =
   let open Lwt_result_syntax in
   Lwt_utils_unix.with_tempdir "snapshot_checks_" @@ fun dest ->
   let* snapshot_header =
-    with_open_snapshot snapshot_file @@ fun header snapshot_input ->
+    with_open_snapshot ~progress:false snapshot_file
+    @@ fun header snapshot_input ->
     let*! () =
       extract snapshot_input ~display_progress:`Bar ~cancellable:false ~dest
     in
@@ -985,7 +986,8 @@ let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
     ~filename:lockfile
   @@ fun () ->
   let* snapshot_header, original_history_mode =
-    with_open_snapshot snapshot_file @@ fun header snapshot_input ->
+    with_open_snapshot ~progress:true snapshot_file
+    @@ fun header snapshot_input ->
     let* _original_metadata, original_history_mode =
       (pre_import_checks cctxt ~no_checks ~data_dir) header
     in
@@ -1024,6 +1026,7 @@ let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
     ~dest:data_dir
 
 let info ~snapshot_file =
-  with_open_snapshot snapshot_file @@ fun snapshot_header snapshot_input ->
+  with_open_snapshot ~progress:false snapshot_file
+  @@ fun snapshot_header snapshot_input ->
   let format = input_format snapshot_input in
   Lwt_result_syntax.return (snapshot_header, format)
