@@ -889,6 +889,27 @@ let get_chain_block_helper_levels_in_current_cycle ?(chain = "main")
     ["chains"; chain; "blocks"; block; "helpers"; "levels_in_current_cycle"]
     Fun.id
 
+let post_bls_aggregate_signatures sigs =
+  let data = `A (List.map (fun sig_ -> `String sig_) sigs) in
+  make ~data:(Data data) POST ["bls"; "aggregate_signatures"] JSON.as_string
+
+let post_bls_check_proof ~pk ~proof () =
+  let data = `O [("public_key", `String pk); ("proof", `String proof)] in
+  make ~data:(Data data) POST ["bls"; "check_proof"] JSON.as_bool
+
+let post_bls_aggregate_public_keys pks_with_proofs =
+  let data =
+    `A
+      (List.map
+         (fun (pk, proof) ->
+           `O [("public_key", `String pk); ("proof", `String proof)])
+         pks_with_proofs)
+  in
+  make ~data:(Data data) POST ["bls"; "aggregate_public_keys"] @@ fun json ->
+  let group_pk = JSON.(json |-> "public_key" |> as_string) in
+  let group_pkh = JSON.(json |-> "public_key_hash" |> as_string) in
+  (group_pk, group_pkh)
+
 let get_chain_block_context_big_map ?(chain = "main") ?(block = "head") ~id
     ~key_hash () =
   make

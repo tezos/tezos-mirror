@@ -804,6 +804,16 @@ val get_chain_block_helper_validators :
 val get_chain_block_helper_levels_in_current_cycle :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
+(** RPC: [POST /bls/aggregate_signatures] *)
+val post_bls_aggregate_signatures : string list -> string t
+
+(** RPC: [POST /bls/check_proof] *)
+val post_bls_check_proof : pk:string -> proof:string -> unit -> bool t
+
+(** RPC: [POST /bls/aggregate_public_keys] *)
+val post_bls_aggregate_public_keys :
+  (string * string) list -> (string * string) t
+
 (** {2 Big maps RPC module} *)
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/big_maps/<id>/<key_hash>]
