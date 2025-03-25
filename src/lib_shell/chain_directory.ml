@@ -110,12 +110,107 @@ let list_blocks chain_store ?(length = 1) ?min_date blocks =
   in
   return (List.rev blocks)
 
+module Delegators_contribution_implem = struct
+  open Chain_services.Delegators_contribution_errors
+
+  let context_and_plugin chain_store block_id =
+    let open Lwt_result_syntax in
+    let* block =
+      let*! block_opt =
+        Store.Chain.block_of_identifier_opt chain_store block_id
+      in
+      match block_opt with
+      | Some v -> return v
+      | None -> tzfail Cycle_too_far_in_past
+    in
+    let* (context : Context.t) =
+      let*! context_opt = Store.Block.context_opt chain_store block in
+      match context_opt with
+      | Some v -> return v
+      | None -> tzfail Cycle_too_far_in_past
+    in
+    let context_for_plugin = (Store.Block.shell_header block, context) in
+    let*! protocol_hash = Store.Block.protocol_hash_exn chain_store block in
+    let* delegators_contribution_plugin =
+      match Protocol_plugin.find_delegators_contribution protocol_hash with
+      | Some x -> return x
+      | None -> tzfail (Protocol_not_supported {protocol_hash})
+    in
+    return (context_for_plugin, delegators_contribution_plugin)
+
+  let rec delegated_breakdown_at_sampling chain_store ~cycle ~delegate_pkh block
+      =
+    let open Lwt_result_syntax in
+    let* context, (module Delegators_contribution_plugin) =
+      context_and_plugin chain_store block
+    in
+    let* output =
+      Delegators_contribution_plugin.delegated_breakdown_at_sampling
+        context
+        ~cycle
+        ~delegate_pkh
+    in
+    match output with
+    | `Ok v -> return v
+    | `Retry_at_level level ->
+        delegated_breakdown_at_sampling
+          chain_store
+          ~cycle
+          ~delegate_pkh
+          (`Level level)
+    | `Cycle_too_far_in_future -> tzfail Cycle_too_far_in_future
+
+  let delegators_contribution chain_store cycle delegate_pkh () () =
+    let open Lwt_result_syntax in
+    let* {
+           min_delegated_amount;
+           min_delegated_level;
+           overstaked;
+           total_delegated_including_overdelegated;
+           total_delegated_after_limits;
+           overdelegated;
+         } =
+      delegated_breakdown_at_sampling chain_store ~cycle ~delegate_pkh (`Head 0)
+    in
+    let* context, (module Delegators_contribution_plugin) =
+      context_and_plugin chain_store (`Level min_delegated_level)
+    in
+    let* {
+           total_delegated;
+           own_delegated;
+           delegators_contributions;
+           former_delegators_unstake_requests;
+         } =
+      Delegators_contribution_plugin.min_delegated_breakdown
+        context
+        ~delegate_pkh
+    in
+    assert (Int64.equal min_delegated_amount total_delegated) ;
+    return
+      {
+        own_delegated;
+        delegators_contributions;
+        former_delegators_unstake_requests;
+        overstaked;
+        total_delegated_including_overdelegated;
+        total_delegated_after_limits;
+        overdelegated;
+      }
+end
+
 let register0 dir s f =
   dir :=
     Tezos_rpc.Directory.register
       !dir
       (Tezos_rpc.Service.subst0 s)
       (fun chain p q -> f chain p q)
+
+let register2 dir s f =
+  dir :=
+    Tezos_rpc.Directory.register
+      !dir
+      (Tezos_rpc.Service.subst2 s)
+      (fun ((chain, x1), x2) p q -> f chain x1 x2 p q)
 
 (* This RPC directory must be instantiated by the node itself. Indeed,
    only the node has access to some particular resources, such as the
@@ -149,6 +244,10 @@ let rpc_directory_with_validator dir validator =
       | Ok chain_validator ->
           let*! ap = Chain_validator.active_peers_heads chain_validator in
           return ap) ;
+  register2
+    dir
+    S.delegators_contribution
+    Delegators_contribution_implem.delegators_contribution ;
   (* invalid_blocks *)
   register0 dir S.Invalid_blocks.list (fun chain_store () () ->
       let convert (hash, {Store_types.level; errors}) = {hash; level; errors} in
