@@ -21,7 +21,7 @@
     (c_flags
      :standard
      -Wno-discarded-qualifiers
-     -I../rust_deps
+     -I../rust_deps/wasmer-3.3.0/lib/c-api
      -Wno-incompatible-pointer-types)
     (c_library_flags :standard)))
   (headers (include wasmer.h))
@@ -32,4 +32,6 @@
    (functor Api_funcs_desc))
   (generated_types Api_types)
   (generated_entry_point Api)
-  (deps ../rust_deps/wasmer.h ../rust_deps/wasm.h)))
+  (deps
+   ../rust_deps/wasmer-3.3.0/lib/c-api/wasmer.h
+   ../rust_deps/wasmer-3.3.0/lib/c-api/wasm.h)))

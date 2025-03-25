@@ -10,7 +10,7 @@
 (dirs :standard .cargo (not target))
 
 (rule
- (targets liboctez_rust_deps.a dlloctez_rust_deps.so wasmer.h wasm.h)
+ (targets liboctez_rust_deps.a dlloctez_rust_deps.so)
  (deps
   (file build.sh)
   (file Cargo.toml)
