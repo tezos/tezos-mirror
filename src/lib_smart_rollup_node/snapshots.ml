@@ -648,7 +648,6 @@ let post_export_checks ~snapshot_file =
   let* snapshot_header, () =
     extract
       reader
-      stdlib_writer
       (fun _ -> return_unit)
       ~display_progress:`Bar
       ~cancellable:false
@@ -781,7 +780,6 @@ let export_dir (header : Header.t) ~unlock ~compression ~data_dir ~dest
       in
       let*! () =
         create
-          stdlib_reader
           writer
           header
           ~files
@@ -997,7 +995,6 @@ let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
   let* snapshot_header, (_original_metadata, original_history_mode) =
     extract
       reader
-      stdlib_writer
       (pre_import_checks cctxt ~no_checks ~data_dir)
       ~display_progress:`Bar
       ~cancellable:false

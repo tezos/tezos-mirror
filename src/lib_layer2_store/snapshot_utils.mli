@@ -34,19 +34,18 @@ module Make (Header : sig
 
   val encoding : t Data_encoding.t
 end) : sig
-  (** [create reader writer header ~cancellable ~display_progress ~files ~dest]
-      creates a snapshot archive with the header [header] with the contents of
+  (** [create writer header ~cancellable ~display_progress ~files ~dest] creates
+      a snapshot archive with the header [header] with the contents of
       [files]. Each element of [files] is a pair whose first component is the
       path of the file to include and the second component is the "relative"
       path it should be registered to in the snapshot archive The archive is
-      produced in file [dest]. 
+      produced in file [dest].
 
       Setting [cancellable] to [true] ensures the promise returned by [create]
       can be canceled. How progress is advertized is controlled by the
       [display_progress] variable. Note that [`Bar] is not compatible with
       [Lwt_exit]. *)
   val create :
-    reader ->
     writer ->
     Header.t ->
     cancellable:bool ->
@@ -59,11 +58,11 @@ end) : sig
     unit ->
     unit Lwt.t
 
-  (** [extract reader writer check_header ~cancellable ~display_progress
-      ~snapshot_file ~dest] extracts the snapshot archive [snapshot_file] in the
-      directory [dest]. Existing files in [dest] with the same names are
-      overwritten. The header read from the snapshot is checked with
-      [check_header] before beginning extraction, and returned. 
+  (** [extract reader check_header ~cancellable ~display_progress ~snapshot_file
+      ~dest] extracts the snapshot archive [snapshot_file] in the directory
+      [dest]. Existing files in [dest] with the same names are overwritten. The
+      header read from the snapshot is checked with [check_header] before
+      beginning extraction, and returned.
 
       Setting [cancellable] to [true] ensures the promise returned by [extract]
       can be canceled. How progress is advertized is controlled by the
@@ -71,7 +70,6 @@ end) : sig
       [Lwt_exit]. *)
   val extract :
     reader ->
-    writer ->
     (Header.t -> 'a tzresult Lwt.t) ->
     cancellable:bool ->
     display_progress:[`Bar | `Periodic_event of Ptime.span -> unit Lwt.t] ->

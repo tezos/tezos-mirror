@@ -279,7 +279,6 @@ let export ?snapshot_file ~compression ~data_dir () =
       ~cancellable:true
       ~display_progress:
         (`Periodic_event (Events.still_exporting_snapshot dest_file))
-      stdlib_reader
       writer
       header
       ~files
@@ -425,7 +424,6 @@ let import ~force ~data_dir ~snapshot_file =
   let* _snapshot_header, () =
     extract
       reader
-      stdlib_writer
       (check_header ~force ~populated ~data_dir)
       ~cancellable:true
       ~display_progress:
