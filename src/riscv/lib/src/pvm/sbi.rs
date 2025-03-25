@@ -43,7 +43,7 @@ use crate::machine_state::registers::a2;
 use crate::machine_state::registers::a3;
 use crate::machine_state::registers::a6;
 use crate::machine_state::registers::a7;
-use crate::parser::instruction::InstrUncacheable;
+use crate::parser::instruction::InstrCacheable;
 use crate::state_backend::CellRead;
 use crate::state_backend::CellReadWrite;
 use crate::state_backend::CellWrite;
@@ -429,7 +429,7 @@ where
     // No matter the outcome, we need to bump the
     // program counter because ECALL's don't update it
     // to the following instructions.
-    let pc = machine.hart.pc.read() + InstrUncacheable::Ecall.width() as u64;
+    let pc = machine.hart.pc.read() + InstrCacheable::Ecall.width() as u64;
     machine.hart.pc.write(pc);
 
     // SBI extension is contained in a7.

@@ -685,6 +685,8 @@ pub enum InstrCacheable {
     HintCompressed {
         instr: u16,
     },
+
+    Ecall,
 }
 
 impl ConstDefault for InstrCacheable {
@@ -708,7 +710,6 @@ impl ConstDefault for InstrCacheable {
 pub enum InstrUncacheable {
     Fence(FenceArgs),
     FenceTso(FenceArgs),
-    Ecall,
     Ebreak,
 
     // RV32C compressed instructions
@@ -912,6 +913,7 @@ impl InstrCacheable {
             | Csrrsi(_)
             | Csrrci(_)
             | Unknown { instr: _ }
+            | Ecall
             | Hint { instr: _ } => InstrWidth::Uncompressed,
 
             // 2 bytes instructions (compressed instructions)
@@ -966,7 +968,6 @@ impl InstrUncacheable {
             FenceI
             | Fence(_)
             | FenceTso(_)
-            | Ecall
             | Ebreak
             | Mret
             | Sret
@@ -1413,6 +1414,7 @@ impl fmt::Display for InstrCacheable {
 
             Hint { instr } => write!(f, "hint {:x}", instr),
             HintCompressed { instr } => write!(f, "hint.c {:x}", instr),
+            Ecall => write!(f, "ecall"),
         }
     }
 }
@@ -1424,7 +1426,6 @@ impl fmt::Display for InstrUncacheable {
             Fence(args) => fence_instr!(f, "fence", args),
             FenceTso(args) => fence_instr!(f, "fence.tso", args),
 
-            Ecall => write!(f, "ecall"),
             Ebreak => write!(f, "ebreak"),
 
             // Privileged instructions

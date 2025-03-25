@@ -343,8 +343,9 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | Amoaddw | Amoxorw | Amoandw | Amoorw | Amominw | Amomaxw | Amominuw | Amomaxuw | Lrd
         | Scd | Amoswapd | Amoaddd | Amoxord | Amoandd | Amoord | Amomind | Amomaxd | Amominud
         | Amomaxud | Rem | Remu | Remw | Remuw | Div | Divu | Divw | Divuw | Mulh | Mulhsu
-        | Mulhu | Mulw | Csrrw | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci | CAddw | CSubw
-        | Unknown => ArgsShape::XSrcXDest,
+        | Mulhu | Mulw | Csrrw | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci | CAddw | CSubw => {
+            ArgsShape::XSrcXDest
+        }
 
         Fadds | Fsubs | Fmuls | Fdivs | Fsqrts | Fmins | Fmaxs | Fsgnjs | Fsgnjns | Fsgnjxs
         | Fmadds | Fmsubs | Fnmsubs | Fnmadds | Faddd | Fsubd | Fmuld | Fdivd | Fsqrtd | Fmind
@@ -386,7 +387,6 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | Jalr
         | CAddiw
         | Li
-        | Nop
         | BranchEqual
         | BranchEqualZero
         | BranchNotEqual
@@ -407,7 +407,10 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | Lhnz
         | Shnz
         | Lbnz
-        | Sbnz => ArgsShape::NZXSrcNZXDest,
+        | Sbnz
+        | Nop
+        | ECall
+        | Unknown => ArgsShape::NZXSrcNZXDest,
 
         Addiw
         | Addw

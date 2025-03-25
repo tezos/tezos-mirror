@@ -420,7 +420,6 @@ impl<MC: memory::MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: backend::Ma
                 Ok(Next(instr.width()))
             }
             InstrUncacheable::FenceTso(_args) => Err(Exception::IllegalInstruction),
-            InstrUncacheable::Ecall => run_syscall_instr!(core, run_ecall),
             InstrUncacheable::Ebreak => run_syscall_instr!(core, run_ebreak),
 
             // Privileged instructions

@@ -1068,6 +1068,17 @@ impl Instruction {
             },
         }
     }
+
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::ECall`].
+    pub(crate) fn new_ecall() -> Self {
+        Self {
+            opcode: OpCode::ECall,
+            args: Args {
+                width: InstrWidth::Uncompressed,
+                ..Args::DEFAULT
+            },
+        }
+    }
 }
 
 impl Instruction {
