@@ -194,9 +194,6 @@ let install_component_from_cache ~verbose ~dry_run (component : Component.t) =
     @@ fun {directory; source_path; target_path_relative_to_prefix; _} ->
     let target_path = "_opam" // target_path_relative_to_prefix in
     match directory with
-    | Doc ->
-        if verbose then echo "%s: ignored (doc)" target_path ;
-        unit
     | Man ->
         if verbose then echo "%s: ignored (man)" target_path ;
         unit
@@ -204,7 +201,11 @@ let install_component_from_cache ~verbose ~dry_run (component : Component.t) =
         if verbose then echo "%s: ignored (misc)" target_path ;
         unit
     | Lib | Lib_root | Libexec | Libexec_root | Bin | Sbin | Toplevel | Share
-    | Share_root | Etc | Stublibs ->
+    | Share_root | Etc | Doc | Stublibs ->
+        (* Ideally we would ignore [Doc] files.
+           But some .mld files can be installed there.
+           And those .mld files may be needed to build other stuff.
+           This is the case for src/lib_protocol_compiler/dune for instance. *)
         if verbose then echo "-> %s" target_path ;
         if dry_run then unit
         else
