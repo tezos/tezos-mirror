@@ -11,5 +11,6 @@ open Misc
 val run :
   verbose:bool ->
   dry_run:bool ->
+  jobs:int ->
   string list ->
   (unit, [> `failed] error) result

@@ -155,7 +155,11 @@ let main () =
         components
   | `reset -> Cmd_reset.run ~verbose:CLI.verbose ~dry_run:CLI.dry_run
   | `build components ->
-      Cmd_build.run ~verbose:CLI.verbose ~dry_run:CLI.dry_run components
+      Cmd_build.run
+        ~verbose:CLI.verbose
+        ~dry_run:CLI.dry_run
+        ~jobs:(jobs ())
+        components
 
 (* Entrypoint: call [main] and handle errors. *)
 let () =
