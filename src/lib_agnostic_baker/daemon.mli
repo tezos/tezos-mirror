@@ -23,8 +23,8 @@
 
 type 'a t
 
-(** [create ~node_endpoint ~baker_args] returns a non initialized daemon. *)
-val create : node_endpoint:string -> baker_args:string list -> 'a t
+(** [create ~node_endpoint] returns a non initialized daemon. *)
+val create : node_endpoint:string -> 'a t
 
 (** [run t] Runs the daemon responsible for the spawn/stop of the
     baker daemons. *)

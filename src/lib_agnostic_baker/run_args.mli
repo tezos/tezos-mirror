@@ -6,14 +6,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Simple wrapper to handle the arguments of the agnostic baker. *)
-type args = {
-  node_endpoint : string;
-  base_dir : string option;
-  baker_args : string list;
-}
+(** [is_help_cmd args] returns [true] iff [--help] is amongst [args]. *)
+val is_help_cmd : string list -> bool
 
-(** [parse_args args] is a raw utility that aims to parse the given
-    arguments from the command line and to return, respectively, the
-    [endpoint], [base_dir] and [baker_args]. *)
-val parse_args : string array -> args
+(** [is_version_cmd args] returns [true] iff [--version] is amongst [args]. *)
+val is_version_cmd : string list -> bool
+
+(** [is_man_cmd args] returns [true] iff [man] is amongst [args]. *)
+val is_man_cmd : string list -> bool
+
+(** [get_endpoint args] returns the value associated to the [--endpoint] argument
+    amongst [args], and in its absence using the default node RPC port. *)
+val get_endpoint : string list -> string
+
+(** [get_base_dir] returns the value associated to the [--base-dir] argument
+        amonsgst [args]. *)
+val get_base_dir : string list -> string option

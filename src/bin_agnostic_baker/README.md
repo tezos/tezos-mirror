@@ -19,18 +19,12 @@ used for real-life scenarios, for instance, baking on `mainnet`.
 
 ## Usage
 
-To run the agnostic baker, the command line syntax is quite similar to the one
+To run the agnostic baker, the command line syntax is similar to the one
 for the protocol-dependent baking binaries:
 
 ```bash
-./octez-experimental-agnostic-baker [OCTEZ-EXPERIMENTAL-AGNOSTIC-BAKER-COMMANDS] \
--- [OCTEZ-BAKER-COMMANDS]
+./octez-experimental-agnostic-baker [OCTEZ-BAKER-COMMANDS]
 ```
-
-The `[OCTEZ-EXPERIMENTAL-AGNOSTIC-BAKER-COMMANDS]` list consists of arguments specific
-to the agnostic baker binary and they include:
-
--- `--help` : displays help information
 
 The `[OCTEZ-BAKER-COMMANDS]` list consists of all the arguments that can be used
 for the specific protocol baking binary. To be more clear, if a user wants to use
@@ -42,8 +36,6 @@ the agnostic baker to replace a baking command which would be
 
 they can do this by using the same `[OCTEZ-BAKER-COMMANDS]` and let the agnostic
 baker run the baker process for `<protocol>`, information obtained from the node.
-
-Notice that the two types of arguments are separated by a clear `--`.
 
 With the introduction of the agnostic baker, a unification of the CLI has also been
 achieved, therefore there will not be incompatibilities between two consecutive protocol

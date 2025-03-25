@@ -230,7 +230,7 @@ let run ?env ?event_level ?event_sections_levels (agnostic_baker : t) =
     else ["with"; "local"; "node"; node_data_dir]
   in
   let arguments =
-    ["--"; "--endpoint"; node_addr; "--base-dir"; base_dir; "run"]
+    ["--endpoint"; node_addr; "--base-dir"; base_dir; "run"]
     @ run_args @ delegates @ liquidity_baking_toggle_vote @ votefile
     @ force_apply_from_round @ operations_pool @ dal_node_endpoint @ without_dal
     @ dal_node_timeout_percentage @ state_recorder @ node_version_check_bypass

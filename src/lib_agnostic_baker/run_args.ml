@@ -6,48 +6,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Arguments for which we do not need to run a baker process. *)
+
+let help_arg = "--help"
+
+let version_arg = "--version"
+
+let man_arg = "man"
+
+let is_help_cmd = List.mem ~equal:String.equal help_arg
+
+let is_version_cmd = List.mem ~equal:String.equal version_arg
+
+let is_man_cmd = List.mem ~equal:String.equal man_arg
+
+(* Arguments needed for the start and monitoring of the agnostic baker process. *)
+
 let endpoint_arg = "--endpoint"
 
 let endpoint_short_arg = "-E"
 
 let base_dir_arg = "--base-dir"
 
-let base_dir_short_arg = "--b"
+let base_dir_short_arg = "-d"
 
-let help_arg = "--help"
-
-let print_help () =
-  Format.printf
-    "Usage:\n\
-    \  octez-experimental-agnostic-baker \
-     [OCTEZ-EXPERIMENTAL-AGNOSTIC-BAKER-COMMANDS] -- \
-     [OCTEZ-BAKER-COMMANDS]@.@." ;
-  Format.printf
-    "OCTEZ-EXPERIMENTAL-AGNOSTIC-BAKER-COMMANDS:\n  %s: display help@.@."
-    help_arg ;
-  Format.printf
-    "OCTEZ-BAKER-COMMANDS:\n Run ./octez-baker-<PROTOCOL_HASH> --help@."
-
-let help_cmd args =
-  if List.mem ~equal:String.equal help_arg args then (
-    print_help () ;
-    exit 0)
-  else ()
-
-let version_cmd args =
-  if List.mem ~equal:String.equal "--version" args then (
-    Format.printf "%s@." Tezos_version_value.Bin_version.octez_version_string ;
-    exit 0)
-  else ()
-
-let split_args ?(on = "--") =
-  let rec loop acc = function
-    | [] -> (List.rev acc, [])
-    | hd :: tl when hd = on -> (List.rev acc, tl)
-    | hd :: tl -> loop (hd :: acc) tl
-  in
-  loop []
-
+(** Retrieves the value for a given argument key. It checks both the long and short forms. *)
 let get_arg_value ~arg ?(short_arg = "") =
   let rec loop = function
     | [] -> None
@@ -56,38 +39,8 @@ let get_arg_value ~arg ?(short_arg = "") =
   in
   loop
 
-let get_endpoint = get_arg_value ~arg:endpoint_arg ~short_arg:endpoint_short_arg
-
-let fail_on_empty_baker_args baker_args =
-  if List.is_empty baker_args then (
-    Format.eprintf
-      "Cannot run agnostic baker without any baker arguments. Please refer to \
-       the following help:@." ;
-    print_help () ;
-    exit 1)
+let get_endpoint args =
+  Option.value ~default:Parameters.default_node_endpoint
+  @@ get_arg_value ~arg:endpoint_arg ~short_arg:endpoint_short_arg args
 
 let get_base_dir = get_arg_value ~arg:base_dir_arg ~short_arg:base_dir_short_arg
-
-type args = {
-  node_endpoint : string;
-  base_dir : string option;
-  baker_args : string list;
-}
-
-let parse_args all_args =
-  let all_args = Array.to_list all_args in
-  (* Specific vesrion case *)
-  let () = version_cmd all_args in
-  (* Remove the binary path *)
-  let all_args = Option.value ~default:[] (List.tl all_args) in
-  (* Split agnostic baker and baker arguments, that aims to be delimited by -- *)
-  let agnostic_baker_args, baker_args = split_args all_args in
-  let () = fail_on_empty_baker_args baker_args in
-  let () = help_cmd agnostic_baker_args in
-  let node_endpoint =
-    Option.value
-      ~default:Parameters.default_node_endpoint
-      (get_endpoint baker_args)
-  in
-  let base_dir = get_base_dir baker_args in
-  {node_endpoint; base_dir; baker_args}

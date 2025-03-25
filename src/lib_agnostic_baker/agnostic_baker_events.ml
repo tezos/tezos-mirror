@@ -13,16 +13,14 @@ let alternative_color = Internal_event.Green
 
 (* Notice *)
 let starting_baker =
-  declare_2
+  declare_1
     ~section
     ~alternative_color
     ~level:Notice
     ~name:"starting_baker"
-    ~msg:"starting baker for protocol {proto} with arguments: {args}"
+    ~msg:"starting baker for protocol {proto}"
     ("proto", Protocol_hash.encoding)
-    ("args", string)
     ~pp1:Protocol_hash.pp_short
-    ~pp2:Format.pp_print_string
 
 let baker_running =
   declare_1
