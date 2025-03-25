@@ -1604,7 +1604,7 @@ module Manager = struct
       }
     | Update_consensus_key_with_incorrect_proof of {
         public_key : public_key;
-        proof : signature;
+        proof : Bls.t;
       }
     | Update_consensus_key_with_unused_proof of {
         source : public_key_hash;
@@ -1735,12 +1735,12 @@ module Manager = struct
            possession %a."
           Signature.Public_key.pp
           pk
-          Signature.pp
+          Bls.pp
           proof)
       Data_encoding.(
         obj2
           (req "public_key" Signature.Public_key.encoding)
-          (req "proof" Signature.encoding))
+          (req "proof" Bls.encoding))
       (function
         | Update_consensus_key_with_incorrect_proof {public_key; proof} ->
             Some (public_key, proof)

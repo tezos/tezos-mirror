@@ -365,7 +365,7 @@ and _ manager_operation =
       -> Kind.increase_paid_storage manager_operation
   | Update_consensus_key : {
       public_key : Signature.Public_key.t;
-      proof : Signature.signature option;
+      proof : Bls.t option;
     }
       -> Kind.update_consensus_key manager_operation
   | Transfer_ticket : {
@@ -760,7 +760,7 @@ module Encoding = struct
           encoding =
             obj2
               (req "pk" Signature.Public_key.encoding)
-              (opt "proof" (dynamic_size Signature.encoding));
+              (opt "proof" (dynamic_size Bls.encoding));
           select =
             (function
             | Manager (Update_consensus_key _ as op) -> Some op | _ -> None);

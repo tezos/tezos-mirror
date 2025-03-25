@@ -953,8 +953,8 @@ types:
       type: private_pis_elt_field1
   proof:
     seq:
-    - id: signature__v2
-      size-eos: true
+    - id: bls12_381_signature
+      size: 96
   proof_0:
     seq:
     - id: len_proof

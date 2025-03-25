@@ -32,6 +32,24 @@ open Client_proto_contracts
 open Client_keys
 module Alpha_services = Plugin.Alpha_services
 
+type error += Unexpected_proof_of_possession_format of Signature.t
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"client.unexpected_proof_of_possession_format"
+    ~title:"Unexpected proof of possession format"
+    ~description:"Proof of possession should be a BLS signature."
+    ~pp:(fun ppf s ->
+      Format.fprintf
+        ppf
+        "Proof of possession should be a BLS signature (%a)."
+        Signature.pp
+        s)
+    Data_encoding.(obj1 (req "proof_of_possession" Signature.encoding))
+    (function Unexpected_proof_of_possession_format s -> Some s | _ -> None)
+    (fun s -> Unexpected_proof_of_possession_format s)
+
 let get_balance (rpc : #rpc_context) ~chain ~block contract =
   Alpha_services.Contract.balance rpc (chain, block) contract
 
@@ -341,14 +359,16 @@ let build_update_consensus_key cctxt ?fee ?gas_limit ?storage_limit
   let open Lwt_result_syntax in
   let* proof =
     match ((public_key : Signature.public_key), secret_key_uri) with
-    | Bls _, Some secret_key_uri ->
+    | Bls _, Some secret_key_uri -> (
         let bytes =
           Data_encoding.Binary.to_bytes_exn
             Signature.Public_key.encoding
             public_key
         in
         let* proof = Client_keys.sign cctxt secret_key_uri bytes in
-        return_some proof
+        match proof with
+        | Bls proof -> return_some proof
+        | _ -> tzfail (Unexpected_proof_of_possession_format proof))
     | _ -> return_none
   in
   let operation = Update_consensus_key {public_key; proof} in

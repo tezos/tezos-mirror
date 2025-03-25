@@ -2517,14 +2517,7 @@ module Manager = struct
           result_error
             (Validate_errors.Manager.Update_consensus_key_with_tz4_without_proof
                {source; public_key})
-      | ( Bls _bls_public_key,
-          Some
-            ((Signature.Ed25519 _ | Signature.Secp256k1 _ | Signature.P256 _) as
-             proof) ) ->
-          result_error
-            (Validate_errors.Manager.Update_consensus_key_with_incorrect_proof
-               {public_key; proof})
-      | Bls bls_public_key, Some (Signature.Bls _ | Signature.Unknown _) ->
+      | Bls bls_public_key, Some _ ->
           (* Compute the gas cost to encode the consensus public key and
              check the proof. *)
           let gas_cost_for_sig_check =

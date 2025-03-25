@@ -244,7 +244,11 @@ let pp_manager_operation_content (type kind) source ppf
           match proof with
           | None -> ()
           | Some proof ->
-              Format.fprintf ppf "@,Proof of possession: %a" Signature.pp proof)
+              Format.fprintf
+                ppf
+                "@,Proof of possession: %a"
+                Signature.Bls.pp
+                proof)
         proof
   | Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint} ->
       Format.fprintf
