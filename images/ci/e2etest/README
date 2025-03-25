@@ -1,0 +1,55 @@
+# e2eTest Setup and Configuration
+
+## Installing `nvm`
+
+If you don't have `nvm` installed yet, you can download and install it by following the instructions from the official repository:
+
+- [Install NVM](https://github.com/nvm-sh/nvm#installing-and-updating)
+
+## Updating NPM Dependencies
+
+To update the npm dependencies locally on your machine, follow these steps:
+
+1. Install Node.js version `22.0.0` using `nvm`:
+    ```bash
+    nvm install 22.0.0
+    ```
+
+2. Use the installed Node.js version:
+    ```bash
+    nvm use 22.0.0
+    ```
+
+3. Update the `package-lock.json`:
+    ```bash
+    npm install --package-lock-only
+    ```
+
+4. Commit the changes made to `package-lock.json`.
+
+Ensure that `nvm` is installed and properly configured on your machine to set
+up a fully functional Node.js/npm environment.
+
+## Notes on NPM and Alpine
+
+- To use a newer version of Node.js (v22), add `npm` from the `3.21` repository
+  instead of `3.20`. This will resolve related hanging issues. For more
+  details, see:
+  - [GitHub Issue](https://github.com/npm/cli/issues/4028)
+  - [Alpine GitLab Merge
+    Request](https://gitlab.alpinelinux.org/alpine/aports/-/merge_requests/75639)
+
+## Datadog Integration
+
+We use the `datadog-ci` tool to send relevant job info (e.g. pipeline type) as well as JUnit test results to Datadog during CI
+jobs. Refer to the script at `[scripts/ci/tezt.sh]` for details.
+
+### Important Notes:
+- The `datadog-ci` version should be kept in sync with the version used by the
+  `datadog/ci` image in the `[datadog_ci]` image (see `ci/bin/common.ml` for
+  version sync details).
+
+## Additional Dependencies
+
+- **Ethereum (eth)**: Required for running end-to-end (e2e) tests.
+- **Solidity Compiler (solc)**: Required for compiling Solidity smart contracts.

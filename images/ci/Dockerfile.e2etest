@@ -11,6 +11,7 @@
 # This image is intended for
 # - Running end-to-end tests (mostly Tezt) in the tezos/tezos CI.
 
+# this is needed because we COPY --from=build below
 # hadolint ignore=DL3006
 FROM build as build
 
@@ -70,17 +71,18 @@ RUN mkdir -p /usr/share/dal-trusted-setup && \
 ARG NPM_REGISTRY_DOMAIN
 ARG NPM_REGISTRY
 
+COPY e2etest/package.json e2etest/package-lock.json /usr/local/lib/
+# Etherlink tests have hardcoded /usr/local/lib as path,
+# and `npm ci` installs the node_modules directory locally
+# hadolint ignore=DL3003
 RUN --mount=type=secret,id=npm_token \
     if [ -n "$NPM_REGISTRY" ] ; then \
       npm set registry "$NPM_REGISTRY" && \
-      npm set //${NPM_REGISTRY_DOMAIN}:_authToken="$(cat /run/secrets/npm_token)"; \
+      npm set //"${NPM_REGISTRY_DOMAIN}":_authToken="$(cat /run/secrets/npm_token)"; \
     fi \
- && npm install -g "@datadog/datadog-ci@2.46.0" \
- # We need eth since e2e tests. This requires git as well.
- && npm install -g eth-cli@2.0.2 \
- # We need solc to compile solidity smart-contracts
- && npm install -g solc@0.8.28 \
- && PATH="/root/.cargo/bin:${PATH}" \
+    && cd /usr/local/lib/ && npm ci
+
+RUN PATH="/root/.cargo/bin:${PATH}" \
  && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | ash -s -- -y \
  && RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=lld" cargo install \
  --git https://github.com/foundry-rs/foundry/ foundry-cast --profile release --force --locked \
