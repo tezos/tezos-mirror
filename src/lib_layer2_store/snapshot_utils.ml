@@ -140,19 +140,6 @@ let create_reader_input : reader -> string -> reader_input =
     let in_chan = open_in file
   end)
 
-let with_open_snapshot file f =
-  let open Lwt_result_syntax in
-  let reader =
-    if is_compressed_snapshot file then gzip_reader else stdlib_reader
-  in
-  let reader_input = create_reader_input reader file in
-  let module Reader = (val reader_input) in
-  protect
-    ~on_error:(fun error ->
-      Reader.close_in Reader.in_chan ;
-      fail error)
-    (fun () -> f reader_input)
-
 module Make (Header : sig
   type t
 
@@ -270,9 +257,9 @@ struct
       Writer.close_out out_chan ;
       raise e
 
-  let extract (reader_input : (module READER_INPUT)) header_check ~cancellable
+  let extract (reader_input : (module READER_INPUT)) ~cancellable
       ~display_progress ~dest =
-    let open Lwt_result_syntax in
+    let open Lwt_syntax in
     let module Writer = struct
       type out_channel = Stdlib.out_channel
 
@@ -302,20 +289,15 @@ struct
     in
     Lwt.finalize
       (fun () ->
-        let header = read_snapshot_header reader_input in
-        let* check_result = header_check header in
         run_progress ~display_progress @@ fun count_progress ->
         Writer.count_progress := count_progress ;
-        let*! () =
-          run ~cancellable (fun () ->
-              Archive_reader.Archive.extract_gen
-                out_channel_of_header
-                Reader.in_chan)
-        in
-        return (header, check_result))
+        run ~cancellable (fun () ->
+            Archive_reader.Archive.extract_gen
+              out_channel_of_header
+              Reader.in_chan))
       (fun () ->
         Reader.close_in Reader.in_chan ;
-        Lwt.return_unit)
+        return_unit)
 
   let compress ~cancellable ~display_progress ~snapshot_file () =
     let Unix.{st_size = total; _} = Unix.stat snapshot_file in
@@ -353,4 +335,19 @@ struct
       Gzip.close_out out_chan ;
       close_in in_chan ;
       raise e
+
+  let with_open_snapshot file f =
+    let open Lwt_result_syntax in
+    let reader =
+      if is_compressed_snapshot file then gzip_reader else stdlib_reader
+    in
+    let reader_input = create_reader_input reader file in
+    protect
+      ~on_error:(fun error ->
+        let module Reader = (val reader_input) in
+        Reader.close_in Reader.in_chan ;
+        fail error)
+      (fun () ->
+        let header = read_snapshot_header reader_input in
+        f header reader_input)
 end

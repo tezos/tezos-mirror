@@ -381,7 +381,7 @@ let check_header ~populated ~force ~data_dir (header : Header.t) :
   in
   return_unit
 
-let import ~force ~data_dir ~snapshot_file snapshot_input =
+let import ~force ~data_dir ~snapshot_file snapshot_input header =
   let open Lwt_result_syntax in
   let open Filename.Infix in
   let*! populated = Data_dir.populated ~data_dir in
@@ -398,12 +398,12 @@ let import ~force ~data_dir ~snapshot_file snapshot_input =
     let*! () = Lwt_utils_unix.remove_dir (Data_dir.store_path ~data_dir) in
     return_unit
   in
+  let* () = check_header ~force ~populated ~data_dir header in
   Lwt_utils_unix.with_tempdir ~temp_dir:data_dir ".octez_evm_node_import_"
   @@ fun dest ->
-  let* _snapshot_header, () =
+  let*! () =
     extract
       snapshot_input
-      (check_header ~force ~populated ~data_dir)
       ~cancellable:true
       ~display_progress:
         (`Periodic_event
@@ -430,8 +430,7 @@ let import ~force ~data_dir ~snapshot_file snapshot_input =
   return_unit
 
 let info ~snapshot_file =
-  with_open_snapshot snapshot_file @@ fun snapshot_input ->
-  let snapshot_header = read_snapshot_header snapshot_input in
+  with_open_snapshot snapshot_file @@ fun snapshot_header snapshot_input ->
   let format = input_format snapshot_input in
   Lwt_result_syntax.return (snapshot_header, format)
 
@@ -453,8 +452,7 @@ let import_from ~force ~keep_alive ?history_mode ~data_dir ~download_path
   in
   Data_dir.use ~data_dir @@ fun () ->
   with_snapshot @@ fun snapshot_file ->
-  with_open_snapshot snapshot_file @@ fun snapshot_input ->
-  let header = read_snapshot_header snapshot_input in
+  with_open_snapshot snapshot_file @@ fun header snapshot_input ->
   let* store_history_mode =
     match (history_mode, header) with
     | Some h1, V1 {history_mode = h2; _} ->
@@ -463,7 +461,7 @@ let import_from ~force ~keep_alive ?history_mode ~data_dir ~download_path
     | _ -> return_none
   in
   let*! () = Events.importing_snapshot () in
-  let* () = import ~force ~data_dir ~snapshot_file snapshot_input in
+  let* () = import ~force ~data_dir ~snapshot_file snapshot_input header in
   let*! () = Events.import_finished () in
   return store_history_mode
 

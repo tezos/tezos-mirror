@@ -35,11 +35,6 @@ val reader_format : reader -> [`Compressed | `Uncompressed]
     uncompressed files. *)
 val input_format : reader_input -> [`Compressed | `Uncompressed]
 
-(** [with_open_snapshot file f] opens the snapshot file for reading, executes
-    [f] and closes the channels. *)
-val with_open_snapshot :
-  string -> (reader_input -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
-
 module Make (Header : sig
   type t
 
@@ -69,11 +64,9 @@ end) : sig
     unit ->
     unit Lwt.t
 
-  (** [extract reader_input check_header ~cancellable ~display_progress ~dest]
+  (** [extract reader_input ~cancellable ~display_progress ~dest]
       extracts the snapshot archive opened in [reader_input] in the directory
-      [dest]. Existing files in [dest] with the same names are overwritten. The
-      header read from the snapshot is checked with [check_header] before
-      beginning extraction, and returned.
+      [dest]. Existing files in [dest] with the same names are overwritten.
 
       Setting [cancellable] to [true] ensures the promise returned by [extract]
       can be canceled. How progress is advertized is controlled by the
@@ -81,11 +74,10 @@ end) : sig
       [Lwt_exit]. *)
   val extract :
     reader_input ->
-    (Header.t -> 'a tzresult Lwt.t) ->
     cancellable:bool ->
     display_progress:[`Bar | `Periodic_event of Ptime.span -> unit Lwt.t] ->
     dest:string ->
-    (Header.t * 'a) tzresult Lwt.t
+    unit Lwt.t
 
   (** [compress ~cancellable ~display_progress ~snapshot_file] compresses the
       snapshot archive [snapshot_file] of the form
@@ -107,7 +99,10 @@ end) : sig
     unit ->
     string Lwt.t
 
-  (** [read_header reader_input] reads the header from an opened snapshot
-      without extracting it. *)
-  val read_snapshot_header : reader_input -> Header.t
+  (** [with_open_snapshot file f] opens the snapshot file for reading, reads its
+      header and executes [f] then finally closes the channels. *)
+  val with_open_snapshot :
+    string ->
+    (Header.t -> reader_input -> 'a tzresult Lwt.t) ->
+    'a tzresult Lwt.t
 end

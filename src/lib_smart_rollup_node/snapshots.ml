@@ -642,14 +642,12 @@ let post_checks ?(apply_unsafe_patches = false) ~action ~message snapshot_header
 let post_export_checks ~snapshot_file =
   let open Lwt_result_syntax in
   Lwt_utils_unix.with_tempdir "snapshot_checks_" @@ fun dest ->
-  let* snapshot_header, () =
-    with_open_snapshot snapshot_file @@ fun snapshot_input ->
-    extract
-      snapshot_input
-      (fun _ -> return_unit)
-      ~display_progress:`Bar
-      ~cancellable:false
-      ~dest
+  let* snapshot_header =
+    with_open_snapshot snapshot_file @@ fun header snapshot_input ->
+    let*! () =
+      extract snapshot_input ~display_progress:`Bar ~cancellable:false ~dest
+    in
+    return header
   in
   post_checks
     ~action:`Export
@@ -986,14 +984,19 @@ let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
     ~when_locked:(`Fail (Rollup_node_errors.Could_not_acquire_lock lockfile))
     ~filename:lockfile
   @@ fun () ->
-  let* snapshot_header, (_original_metadata, original_history_mode) =
-    with_open_snapshot snapshot_file @@ fun snapshot_input ->
-    extract
-      snapshot_input
-      (pre_import_checks cctxt ~no_checks ~data_dir)
-      ~display_progress:`Bar
-      ~cancellable:false
-      ~dest:data_dir
+  let* snapshot_header, original_history_mode =
+    with_open_snapshot snapshot_file @@ fun header snapshot_input ->
+    let* _original_metadata, original_history_mode =
+      (pre_import_checks cctxt ~no_checks ~data_dir) header
+    in
+    let*! () =
+      extract
+        snapshot_input
+        ~display_progress:`Bar
+        ~cancellable:false
+        ~dest:data_dir
+    in
+    return (header, original_history_mode)
   in
   let rm f =
     try Unix.unlink f with Unix.Unix_error (Unix.ENOENT, _, _) -> ()
@@ -1021,7 +1024,6 @@ let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
     ~dest:data_dir
 
 let info ~snapshot_file =
-  with_open_snapshot snapshot_file @@ fun snapshot_input ->
-  let snapshot_header = read_snapshot_header snapshot_input in
+  with_open_snapshot snapshot_file @@ fun snapshot_header snapshot_input ->
   let format = input_format snapshot_input in
   Lwt_result_syntax.return (snapshot_header, format)
