@@ -21,6 +21,11 @@
 
 ### Storage changes
 
+- Snapshots are downloaded and extracted simultaneously which uses a smaller
+  disk footprint and is slightly more efficient. (!17407)
+- Command `snapshot info` now supports remote snapshot URLs and can print the
+  snapshot header without downloading the whole snapshot. (!17407)
+
 ### Documentation changes
 
 ### Experimental features changes
