@@ -340,7 +340,20 @@ let () =
       ]
     ~description:
       "Scheduled pipeline for scanning vulnerabilities in latest \
-       tezos/tezos:octez-evm-node-vX.Y Docker image"
+       tezos/tezos:octez-evm-node-vX.Y Docker image" ;
+  register
+    "schedule_container_scanning_octez_rc"
+    schedule_container_scanning_octez_rc
+    ~jobs:
+      [
+        Common.job_datadog_pipeline_trace;
+        Common.job_container_scanning
+          ~docker_image:"tezos/tezos:octez-v22.0-rc3"
+          ~dockerfile_path:"build.Dockerfile";
+      ]
+    ~description:
+      "Scheduled pipeline for scanning vulnerabilities in the Docker image for \
+       the latest release candidate of Octez"
 
 (** {Manual pipelines} *)
 
