@@ -57,14 +57,13 @@ module CLI = struct
       false
 
   let jobs =
-    (* TODO: default value should be the number of CPU cores. *)
-    Clap.default_int
+    Clap.optional_int
       ~long:"jobs"
       ~short:'j'
       ~description:
         "Maximum number of processes to spawn when stuff can be done in \
          parallel."
-      20
+      ()
 
   (* Subcommands. *)
   module Command = struct
@@ -138,6 +137,11 @@ let main () =
   let* project_root = find_project_root () in
   Sys.chdir project_root ;
 
+  (* Only read [/proc/cpuinfo] if needed, as it can emit a warning. *)
+  let jobs () =
+    match CLI.jobs with Some jobs -> jobs | None -> Cpuinfo.get_cpu_count ()
+  in
+
   (* Dispatch commands. *)
   match CLI.command with
   | `list (version, `installed installed) ->
@@ -146,7 +150,7 @@ let main () =
       Cmd_install.run
         ~verbose:CLI.verbose
         ~dry_run:CLI.dry_run
-        ~jobs:CLI.jobs
+        ~jobs:(jobs ())
         ~keep_temp
         components
   | `reset -> Cmd_reset.run ~verbose:CLI.verbose ~dry_run:CLI.dry_run
