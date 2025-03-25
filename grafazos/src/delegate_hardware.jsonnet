@@ -46,8 +46,8 @@ local graph = base.graph;
     local writesBaker = 'writes baker';
     local readsAccuserQuery = self.query('netdata_app_disk_logical_io_KiB_persec_average{dimension="reads", app_group="octez-accuser",' + base.node_instance + '="$node_instance"}', readsAccuser);
     local writesAccuserQuery = self.query('netdata_app_disk_logical_io_KiB_persec_average{dimension="writes", app_group="octez-accuser",' + base.node_instance + '="$node_instance"}', writesAccuser);
-    local readsBakerQuery = self.query('netdata_app_disk_logical_io_KiB_persec_average{dimension="reads", app_group"octez-baker",' + base.node_instance + '="$node_instance"}', readsBaker);
-    local writesBakerQuery = self.query('netdata_app_disk_logical_io_KiB_persec_average{dimension="writes", app_groupoctez-baker",' + base.node_instance + '="$node_instance"}', writesBaker);
+    local readsBakerQuery = self.query('netdata_app_disk_logical_io_KiB_persec_average{dimension="reads", app_group="octez-baker",' + base.node_instance + '="$node_instance"}', readsBaker);
+    local writesBakerQuery = self.query('netdata_app_disk_logical_io_KiB_persec_average{dimension="writes", app_group="octez-baker",' + base.node_instance + '="$node_instance"}', writesBaker);
     graph.new('IOs', [readsAccuserQuery, writesAccuserQuery, readsBakerQuery, writesBakerQuery], h, w, x, y)
     + timeSeries.standardOptions.withUnit('kbytes')
     + graph.withLegendBottom(calcs=['current', 'mean', 'max'])
@@ -76,4 +76,3 @@ local graph = base.graph;
     + graph.withLegendBottom(calcs=['current', 'mean', 'max'])
     + graph.withQueryColor([[ramAccuser, 'dark-yellow'], [swapAccuser, 'light-yellow'], [ramBaker, 'dark-red'], [swapBaker, 'light-red']]),
 }
-
