@@ -1841,6 +1841,17 @@ let set_account_code =
              Lwt.return_ok (address, code)
          | _ -> failwith "Parsing error for set-code")
 
+let evm_version_arg =
+  let long = "evm-version" in
+  let doc = Format.sprintf "value for evm_version in the installer config" in
+  Tezos_clic.arg ~long ~doc ~placeholder:"cancun|shanghai"
+  @@ Tezos_clic.parameter (fun _ evm_version ->
+         let open Lwt_result_syntax in
+         match evm_version with
+         | "shanghai" -> return Evm_node_lib_dev.Kernel_config.Shanghai
+         | "cancun" -> return Evm_node_lib_dev.Kernel_config.Cancun
+         | _ -> failwith "Parsing error for evm-version")
+
 let make_l2_kernel_config_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
@@ -1977,13 +1988,14 @@ let make_kernel_config_command =
           (config_key_flag ~name:"enable_fa_bridge")
           (config_key_flag ~name:"enable_dal")
           (config_key_arg ~name:"dal_slots" ~placeholder:"0,1,4,6,..."))
-       (args4
+       (args5
           (config_key_flag ~name:"enable_multichain")
           l2_chain_ids_arg
           (config_key_arg
              ~name:"max_delayed_inbox_blueprint_length"
              ~placeholder:"1000")
-          (config_key_flag ~name:"enable_fast_withdrawal")))
+          (config_key_flag ~name:"enable_fast_withdrawal")
+          evm_version_arg))
     (prefixes ["make"; "kernel"; "installer"; "config"]
     @@ param
          ~name:"kernel config file"
@@ -2018,7 +2030,8 @@ let make_kernel_config_command =
            ( enable_multichain,
              l2_chain_ids,
              max_delayed_inbox_blueprint_length,
-             enable_fast_withdrawal ) )
+             enable_fast_withdrawal,
+             evm_version ) )
          output
          () ->
       Evm_node_lib_dev.Kernel_config.make
@@ -2033,6 +2046,7 @@ let make_kernel_config_command =
         ?sequencer_governance
         ?kernel_governance
         ?kernel_security_governance
+        ?evm_version
         ?minimum_base_fee_per_gas
         ?da_fee_per_byte
         ?delayed_inbox_timeout

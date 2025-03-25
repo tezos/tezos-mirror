@@ -1728,7 +1728,7 @@ let make_kernel_installer_config ?(l2_chain_ids = [])
     ?(max_blueprint_lookahead_in_seconds = ten_years_in_seconds)
     ?(set_account_code = []) ?(enable_fa_bridge = false) ?(enable_dal = false)
     ?dal_slots ?(enable_fast_withdrawal = false) ?(enable_multichain = false)
-    ~output () =
+    ?evm_version ~output () =
   let set_account_code =
     List.flatten
     @@ List.map
@@ -1802,6 +1802,7 @@ let make_kernel_installer_config ?(l2_chain_ids = [])
         (fun l -> String.concat "," (List.map string_of_int l))
         dal_slots
     @ Cli_arg.optional_arg "bootstrap-balance" Wei.to_string bootstrap_balance
+    @ Cli_arg.optional_arg "evm-version" Evm_version.to_string evm_version
     @
     match bootstrap_accounts with
     | None -> []

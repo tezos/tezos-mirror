@@ -6,6 +6,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type evm_version = Shanghai | Cancun
+
 let make_path = function [] -> "" | l -> "/" ^ String.concat "/" l ^ "/"
 
 let make_instr ?(path_prefix = ["evm"]) ?(convert = Fun.id) arg_opt =
@@ -157,7 +159,7 @@ let make ~mainnet_compat ~boostrap_balance ?l2_chain_ids ?bootstrap_accounts
     ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
     ?remove_whitelist ?enable_fa_bridge ?enable_dal ?dal_slots
     ?enable_fast_withdrawal ?enable_multichain ?set_account_code
-    ?max_delayed_inbox_blueprint_length ~output () =
+    ?max_delayed_inbox_blueprint_length ?evm_version ~output () =
   let bootstrap_accounts =
     let open Ethereum_types in
     match bootstrap_accounts with
@@ -210,6 +212,14 @@ let make ~mainnet_compat ~boostrap_balance ?l2_chain_ids ?bootstrap_accounts
         in
         make_instr (Some ("chain_ids", encoded_chain_ids))
   in
+  let evm_version =
+    Option.map
+      (fun evm_version ->
+        ( "evm_version",
+          padded_32_le_int_bytes
+          @@ match evm_version with Shanghai -> Z.zero | Cancun -> Z.one ))
+      evm_version
+  in
   let instrs =
     (if mainnet_compat then make_instr ticketer
      else
@@ -223,6 +233,7 @@ let make ~mainnet_compat ~boostrap_balance ?l2_chain_ids ?bootstrap_accounts
     @ make_instr sequencer_governance
     @ make_instr kernel_governance
     @ make_instr kernel_security_governance
+    @ make_instr evm_version
     @ make_instr
         ~path_prefix:["evm"; "world_state"; "fees"]
         ~convert:parse_z_to_padded_32_le_int_bytes

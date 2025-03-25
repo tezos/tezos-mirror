@@ -680,6 +680,7 @@ val make_kernel_installer_config :
   ?dal_slots:int list ->
   ?enable_fast_withdrawal:bool ->
   ?enable_multichain:bool ->
+  ?evm_version:Evm_version.t ->
   output:string ->
   unit ->
   (Process.t, unit) Runnable.t
