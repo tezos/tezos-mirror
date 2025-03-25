@@ -40,18 +40,19 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
     #TODO: Add to docker image ?
     sudo apk add gawk jq
 
+    announcement="https://octez.tezos.com/docs/releases/version-${gitlab_release_major_version}.html"
+
     # Add the new version to the $versions_list_filename JSON file.
     # Since jq cannot modify the file in-place, we write to a temporary file first.
     # [gitlab_release_rc_version], [gitlab_release_major_version] and [gitlab_release_minor_version] defined in [./scripts/ci/octez-release.sh]
     if [ -n "${gitlab_release_rc_version}" ]; then
       rc="${gitlab_release_rc_version}"
-      announcement="https://octez.tezos.com/docs/releases/version-${gitlab_release_major_version}.html"
-      jq ". += [{\"major\":${gitlab_release_major_version}, \"minor\":${gitlab_release_minor_version},\"rc\":${rc},\"announcement\":${announcement}}]" "./${versions_list_filename}" > "./tmp.json" && mv "./tmp.json" "./${versions_list_filename}"
+      jq ". += [{\"major\":${gitlab_release_major_version}, \"minor\":${gitlab_release_minor_version},\"rc\":${rc},\"announcement\":\"${announcement}\"}]" "./${versions_list_filename}" > "./tmp.json" && mv "./tmp.json" "./${versions_list_filename}"
     else
       # This is a release, we assume it's the latest.
       # All the others are marked [latest = false].
       jq 'map(.latest = false)' "./${versions_list_filename}" > "./tmp.json" && mv "./tmp.json" "./${versions_list_filename}"
-      jq ". += [{\"major\":${gitlab_release_major_version}, \"minor\":${gitlab_release_minor_version}, \"latest\":true}]" "./${versions_list_filename}" > "./tmp.json" && mv "./tmp.json" "./${versions_list_filename}"
+      jq ". += [{\"major\":${gitlab_release_major_version}, \"minor\":${gitlab_release_minor_version}, \"latest\":true, \"announcement\":\"${announcement}\"}]" "./${versions_list_filename}" > "./tmp.json" && mv "./tmp.json" "./${versions_list_filename}"
     fi
 
     # Upload binaries to S3 bucket
