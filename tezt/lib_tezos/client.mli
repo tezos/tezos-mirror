@@ -3279,3 +3279,17 @@ module RPC : sig
     'result RPC_core.t ->
     JSON.t Runnable.process
 end
+
+(** Run [octez-client aggregate bls signatures <signatures>]. *)
+val aggregate_bls_signatures : t -> string list -> string Lwt.t
+
+(** Run [octez-client create bls proof for <signer>]. *)
+val create_bls_proof : signer:string -> t -> string Lwt.t
+
+(** Run [octez-client check bls proof <proof> for <pk>]. *)
+val check_bls_proof : pk:string -> proof:string -> t -> unit Lwt.t
+
+(** Run [octez-client aggregate public keys <pks_with_proofs>].
+    Returns [(aggregated_public_key, aggregated_public_key_hash)]. *)
+val aggregate_bls_public_keys :
+  t -> (string * string) list -> (string * string) Lwt.t
