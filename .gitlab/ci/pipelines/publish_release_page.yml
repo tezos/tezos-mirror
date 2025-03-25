@@ -56,4 +56,4 @@ publish:release-page:
   script:
   - ./scripts/releases/publish_release_page.sh
   variables:
-    S3_BUCKET: site-prod.octez.tezos.com/releases/
+    S3_BUCKET: site-prod.octez.tezos.com/releases
