@@ -1295,7 +1295,7 @@ function misc_updates() {
   fi
 
   find . -name '*.old' -exec rm {} \;
-  scripts/lint.sh --update-ocamlformat
+  scripts/lint.sh --update-ocamlformat || echo "updating ocamlformat files"
   scripts/lint.sh --check-ocamlformat || echo "linting updated ocamlformat files"
   commit_if_changes "scripts: lint"
 
