@@ -30,8 +30,7 @@ local base = import './base.jsonnet';
 local graph = base.graph;
 
 local filecheck = std.extVar('storage_mode') == 'filecheck';
-
-local mountpoints = std.extVar('mountpoints') == 'opt';
+local mountpoint = std.extVar('mountpoint');
 
 //##
 // Node Hardware related stats
@@ -79,10 +78,10 @@ local mountpoints = std.extVar('mountpoints') == 'opt';
     + timeSeries.standardOptions.withUnit('bytes'),
 
   diskFreeSpace(h, w, x, y):
-    local qall = self.query('node_filesystem_free_bytes{' + base.node_instance + '="$node_instance"}', 'Available bytes on disk {{mountpoint}}');
-    local qroot = self.query('node_filesystem_free_bytes{mountpoint="/",' + base.node_instance + '="$node_instance"}', 'Available bytes on disk {{mountpoint}}');
-    local qopt = self.query('node_filesystem_free_bytes{mountpoint="/opt",' + base.node_instance + '="$node_instance"}', 'Available bytes on disk {{mountpoint}}');
-    local mountq = if mountpoints then [qroot, qopt] else [qall];
+    local qall = self.query('node_filesystem_free_bytes{' + base.node_instance + '="$node_instance"}', 'Available bytes on disk');
+    local qroot = self.query('node_filesystem_free_bytes{mountpoint="/",' + base.node_instance + '="$node_instance"}', 'Available bytes on disk /');
+    local qother = self.query('node_filesystem_free_bytes{mountpoint="' + mountpoint + '",' + base.node_instance + '="$node_instance"}', 'Available bytes on disk {{mountpoint}}');
+    local mountq = if mountpoint != null then [qroot, qother] else [qall];
     graph.new('Disk free space', mountq, h, w, x, y)
     + stat.standardOptions.withUnit('decbytes')
     + stat.options.withReduceOptions(stat.options.reduceOptions.withCalcs(['lastNotNull'])),
