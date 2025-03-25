@@ -262,6 +262,6 @@ let () =
        "errors"
        []
        ~description:
-         "The full list of RPC errors would be too long to include.It is\n\
+         "The full list of RPC errors would be too long to include. It is\n\
           available through the RPC `/errors` (GET)."
        error_encoding
