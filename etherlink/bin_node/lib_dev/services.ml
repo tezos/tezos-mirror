@@ -713,10 +713,19 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
                     transactions"
                    None
             else
+              let max_number_of_chunks =
+                Option.map
+                  (fun seq -> seq.Configuration.max_number_of_chunks)
+                  config.sequencer
+              in
               let f tx_raw =
                 let txn = Ethereum_types.hex_to_bytes tx_raw in
                 let* is_valid =
-                  Validate.is_tx_valid (module Backend_rpc) ~mode:validation txn
+                  Validate.is_tx_valid
+                    ?max_number_of_chunks
+                    (module Backend_rpc)
+                    ~mode:validation
+                    txn
                 in
                 match is_valid with
                 | Error err ->

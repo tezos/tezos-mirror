@@ -92,11 +92,33 @@ let validate_balance_is_enough (transaction : Transaction.transaction) ~balance
   else if total_cost > balance then return (Error "Not enough funds")
   else return (Ok total_cost)
 
-let validate_stateless ~next_nonce backend_rpc transaction ~caller =
+let tx_data_size_limit_reached ~max_number_of_chunks ~tx_data =
+  let max_number_of_chunks =
+    Option.value
+      max_number_of_chunks
+      ~default:Sequencer_blueprint.maximum_chunks_per_l1_level
+  in
+  Bytes.length tx_data
+  > Sequencer_blueprint.maximum_usable_space_in_blueprint
+      (* Minus one so that the "rest" of the raw transaction can
+         be contained within one of the chunks. *)
+      (max_number_of_chunks - 1)
+
+let validate_tx_data_size ~max_number_of_chunks
+    (transaction : Transaction.transaction) =
+  let open Lwt_result_syntax in
+  let tx_data = transaction.data in
+  if tx_data_size_limit_reached ~max_number_of_chunks ~tx_data then
+    return @@ Error "Transaction data exceeded the allowed size."
+  else return (Ok ())
+
+let validate_stateless ~next_nonce ~max_number_of_chunks backend_rpc transaction
+    ~caller =
   let open Lwt_result_syntax in
   let** () = validate_chain_id backend_rpc transaction in
   let** () = validate_nonce ~next_nonce transaction in
   let** () = validate_sender_not_a_contract backend_rpc caller in
+  let** () = validate_tx_data_size ~max_number_of_chunks transaction in
   return (Ok ())
 
 let validate_balance_and_gas ~base_fee_per_gas ~maximum_gas_limit
@@ -141,7 +163,7 @@ let validate_with_state_from_backend
 
 type validation_mode = Stateless | With_state | Full
 
-let valid_transaction_object ~backend_rpc ~hash ~mode tx =
+let valid_transaction_object ?max_number_of_chunks ~backend_rpc ~hash ~mode tx =
   let open Lwt_result_syntax in
   let**? tx_object = Transaction.to_transaction_object ~hash tx in
   let caller = tx_object.from in
@@ -154,21 +176,35 @@ let valid_transaction_object ~backend_rpc ~hash ~mode tx =
   in
   let** () =
     match mode with
-    | Stateless -> validate_stateless backend_rpc ~next_nonce tx ~caller
+    | Stateless ->
+        validate_stateless
+          ~max_number_of_chunks
+          backend_rpc
+          ~next_nonce
+          tx
+          ~caller
     | With_state -> validate_with_state_from_backend backend_rpc tx ~caller
     | Full ->
-        let** () = validate_stateless ~next_nonce backend_rpc tx ~caller in
+        let** () =
+          validate_stateless
+            ~max_number_of_chunks
+            ~next_nonce
+            backend_rpc
+            tx
+            ~caller
+        in
         let** () = validate_with_state_from_backend backend_rpc tx ~caller in
         return (Ok ())
   in
 
   return (Ok (next_nonce, tx_object))
 
-let is_tx_valid ((module Backend_rpc : Services_backend_sig.S) as backend_rpc)
-    ~mode tx_raw =
+let is_tx_valid ?max_number_of_chunks
+    ((module Backend_rpc : Services_backend_sig.S) as backend_rpc) ~mode tx_raw
+    =
   let hash = Ethereum_types.hash_raw_tx tx_raw in
   let**? tx = Transaction.decode tx_raw in
-  valid_transaction_object ~backend_rpc ~hash ~mode tx
+  valid_transaction_object ?max_number_of_chunks ~backend_rpc ~hash ~mode tx
 
 type validation_config = {
   base_fee_per_gas : Ethereum_types.quantity;
