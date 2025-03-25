@@ -17,26 +17,20 @@ fi
 
 aws s3 ls "s3://${S3_BUCKET}/"
 
-#aws s3 cp s3://"${S3_BUCKET}"/"$versions_list_filename" "./versions.json"
+aws s3 cp s3://"${S3_BUCKET}"/"$versions_list_filename" "./versions.json"
 
-touch ./versions.json
+# major="22"
+# minor="0"
+# rc="3"
+# announcement="https://octez.tezos.com/docs/releases/version-22.html"
 
-echo "[]" > ./versions.json
-
-cat ./versions.json
-
-major="22"
-minor="0"
-rc="3"
-announcement="https://octez.tezos.com/docs/releases/version-22.html"
-
-jq "[{\"major\":${major}, \"minor\":${minor}, \"rc\":${rc}, \"announcement\":\"${announcement}\"}]" "./${versions_list_filename}"
-
-jq "[{\"major\":${major}, \"minor\":${minor}, \"rc\":${rc}, \"announcement\":\"${announcement}\"}]" "./${versions_list_filename}" > "./tmp.json" && mv "./tmp.json" "./${versions_list_filename}"
+# jq "[{\"major\":${major}, \"minor\":${minor}, \"rc\":${rc}, \"announcement\":\"${announcement}\"}]" "./${versions_list_filename}" > "./tmp.json" && mv "./tmp.json" "./${versions_list_filename}"
 
 cat ./versions.json
 
-aws s3 cp "./$versions_list_filename" "s3://${S3_BUCKET}/"
+aws s3 ls "s3://${S3_BUCKET}/"
+
+aws s3 ls "s3://${S3_BUCKET}/binaries/arm64/"
 
 # wget -O "octez-arm.zip" "https://gitlab.com/tezos/tezos/-/jobs/9502586413/artifacts/download"
 # unzip "./octez-arm.zip"
