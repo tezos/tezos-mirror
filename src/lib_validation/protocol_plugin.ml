@@ -297,3 +297,49 @@ let proto_with_validation_plugin ~block_hash protocol_hash =
             return (module No_plugin (Proto) : T))
   in
   return (module Patch_T (Proto_with_plugin) : T)
+
+type delegated_breakdown_at_sampling = {
+  min_delegated_amount : int64;
+  min_delegated_level : int32;
+  overstaked : int64;
+  total_delegated_including_overdelegated : int64;
+  total_delegated_after_limits : int64;
+  overdelegated : int64;
+}
+
+type min_delegated_breakdown = {
+  total_delegated : int64;
+  own_delegated : int64;
+  delegators_contributions : (string * int64) list;
+  former_delegators_unstake_requests : int64;
+}
+
+module type DELEGATORS_CONTRIBUTION = sig
+  val hash : Protocol_hash.t
+
+  val delegated_breakdown_at_sampling :
+    Tezos_base.Block_header.shell_header * Tezos_protocol_environment.Context.t ->
+    cycle:int32 ->
+    delegate_pkh:Signature.public_key_hash ->
+    [ `Ok of delegated_breakdown_at_sampling
+    | `Retry_at_level of int32
+    | `Cycle_too_far_in_future ]
+    Error_monad.tzresult
+    Lwt.t
+
+  val min_delegated_breakdown :
+    Block_header.shell_header * Tezos_protocol_environment.Context.t ->
+    delegate_pkh:Signature.public_key_hash ->
+    min_delegated_breakdown Error_monad.tzresult Lwt.t
+end
+
+let delegators_contribution_table :
+    (module DELEGATORS_CONTRIBUTION) Protocol_hash.Table.t =
+  Protocol_hash.Table.create 5
+
+let register_delegators_contribution (module M : DELEGATORS_CONTRIBUTION) =
+  assert (not (Protocol_hash.Table.mem delegators_contribution_table M.hash)) ;
+  Protocol_hash.Table.add delegators_contribution_table M.hash (module M)
+
+let find_delegators_contribution =
+  Protocol_hash.Table.find delegators_contribution_table
