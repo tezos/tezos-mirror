@@ -2542,7 +2542,7 @@ let snapshot_info_command =
     (fun () snapshot_file () ->
       let open Lwt_result_syntax in
       let open Evm_node_lib_dev in
-      let header, compressed = Snapshots.info ~snapshot_file in
+      let* header, compressed = Snapshots.info ~snapshot_file in
       let rollup_address, current_level, legacy_block_storage, history_info =
         match header with
         | V0_legacy {rollup_address; current_level} ->

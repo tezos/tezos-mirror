@@ -642,16 +642,13 @@ let post_checks ?(apply_unsafe_patches = false) ~action ~message snapshot_header
 let post_export_checks ~snapshot_file =
   let open Lwt_result_syntax in
   Lwt_utils_unix.with_tempdir "snapshot_checks_" @@ fun dest ->
-  let reader =
-    if is_compressed_snapshot snapshot_file then gzip_reader else stdlib_reader
-  in
   let* snapshot_header, () =
+    with_open_snapshot snapshot_file @@ fun snapshot_input ->
     extract
-      reader
+      snapshot_input
       (fun _ -> return_unit)
       ~display_progress:`Bar
       ~cancellable:false
-      ~snapshot_file
       ~dest
   in
   post_checks
@@ -989,16 +986,13 @@ let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
     ~when_locked:(`Fail (Rollup_node_errors.Could_not_acquire_lock lockfile))
     ~filename:lockfile
   @@ fun () ->
-  let reader =
-    if is_compressed_snapshot snapshot_file then gzip_reader else stdlib_reader
-  in
   let* snapshot_header, (_original_metadata, original_history_mode) =
+    with_open_snapshot snapshot_file @@ fun snapshot_input ->
     extract
-      reader
+      snapshot_input
       (pre_import_checks cctxt ~no_checks ~data_dir)
       ~display_progress:`Bar
       ~cancellable:false
-      ~snapshot_file
       ~dest:data_dir
   in
   let rm f =
@@ -1027,7 +1021,7 @@ let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
     ~dest:data_dir
 
 let info ~snapshot_file =
-  let compressed = is_compressed_snapshot snapshot_file in
-  let reader = if compressed then gzip_reader else stdlib_reader in
-  let snapshot_header = read_header reader ~snapshot_file in
-  (snapshot_header, if compressed then `Compressed else `Uncompressed)
+  with_open_snapshot snapshot_file @@ fun snapshot_input ->
+  let snapshot_header = read_snapshot_header snapshot_input in
+  let format = input_format snapshot_input in
+  Lwt_result_syntax.return (snapshot_header, format)

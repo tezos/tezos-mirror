@@ -9,7 +9,6 @@ open Snapshot_utils
 
 type error +=
   | Data_dir_populated of string
-  | File_not_found of string
   | Incorrect_rollup of Address.t * Address.t
   | Outdated_snapshot of Z.t * Z.t
   | Invalid_snapshot_file of string
@@ -31,15 +30,6 @@ let () =
     Data_encoding.(obj1 (req "data_dir_already_populated" string))
     (function Data_dir_populated path -> Some path | _ -> None)
     (fun path -> Data_dir_populated path) ;
-  register_error_kind
-    `Permanent
-    ~id:"file_not_found"
-    ~title:"File not found"
-    ~description:"Raise an error when a file is not found"
-    ~pp:(fun ppf file -> Format.fprintf ppf "File %s is not found" file)
-    Data_encoding.(obj1 (req "file_not_found" string))
-    (function File_not_found file -> Some file | _ -> None)
-    (fun file -> File_not_found file) ;
   register_error_kind
     `Permanent
     ~id:"evm_incorrect_rollup"
@@ -303,11 +293,6 @@ let export ?snapshot_file ~compression ~data_dir () =
   let*! () = Events.finished_exporting_snapshot dest_file in
   return dest_file
 
-let check_snapshot_exists snapshot_file =
-  let open Lwt_result_syntax in
-  let*! snapshot_file_exists = Lwt_unix.file_exists snapshot_file in
-  fail_when (not snapshot_file_exists) (File_not_found snapshot_file)
-
 let check_header ~populated ~force ~data_dir (header : Header.t) :
     unit tzresult Lwt.t =
   let open Lwt_result_syntax in
@@ -396,14 +381,13 @@ let check_header ~populated ~force ~data_dir (header : Header.t) :
   in
   return_unit
 
-let import ~force ~data_dir ~snapshot_file =
+let import ~force ~data_dir ~snapshot_file snapshot_input =
   let open Lwt_result_syntax in
   let open Filename.Infix in
   let*! populated = Data_dir.populated ~data_dir in
   let*? () =
     error_when ((not force) && populated) (Data_dir_populated data_dir)
   in
-  let* () = check_snapshot_exists snapshot_file in
   let*! () = Lwt_utils_unix.create_dir data_dir in
   let* () = Data_dir.lock ~data_dir in
   let* () =
@@ -414,16 +398,11 @@ let import ~force ~data_dir ~snapshot_file =
     let*! () = Lwt_utils_unix.remove_dir (Data_dir.store_path ~data_dir) in
     return_unit
   in
-  let reader =
-    if Snapshot_utils.is_compressed_snapshot snapshot_file then gzip_reader
-    else stdlib_reader
-  in
-
   Lwt_utils_unix.with_tempdir ~temp_dir:data_dir ".octez_evm_node_import_"
   @@ fun dest ->
   let* _snapshot_header, () =
     extract
-      reader
+      snapshot_input
       (check_header ~force ~populated ~data_dir)
       ~cancellable:true
       ~display_progress:
@@ -435,7 +414,6 @@ let import ~force ~data_dir ~snapshot_file =
         (* [progress] modifies the signal handlers, which are necessary for
            [Lwt_exit] to work. As a consequence, if we want to be
            cancellable, we cannot have display bar. *)
-      ~snapshot_file
       ~dest
   in
   Unix.rename
@@ -452,10 +430,10 @@ let import ~force ~data_dir ~snapshot_file =
   return_unit
 
 let info ~snapshot_file =
-  let compressed = is_compressed_snapshot snapshot_file in
-  let reader = if compressed then gzip_reader else stdlib_reader in
-  let snapshot_header = read_header reader ~snapshot_file in
-  (snapshot_header, if compressed then `Compressed else `Uncompressed)
+  with_open_snapshot snapshot_file @@ fun snapshot_input ->
+  let snapshot_header = read_snapshot_header snapshot_input in
+  let format = input_format snapshot_input in
+  Lwt_result_syntax.return (snapshot_header, format)
 
 let import_from ~force ~keep_alive ?history_mode ~data_dir ~download_path
     ~snapshot_file () =
@@ -475,7 +453,8 @@ let import_from ~force ~keep_alive ?history_mode ~data_dir ~download_path
   in
   Data_dir.use ~data_dir @@ fun () ->
   with_snapshot @@ fun snapshot_file ->
-  let header, _ = info ~snapshot_file in
+  with_open_snapshot snapshot_file @@ fun snapshot_input ->
+  let header = read_snapshot_header snapshot_input in
   let* store_history_mode =
     match (history_mode, header) with
     | Some h1, V1 {history_mode = h2; _} ->
@@ -484,7 +463,7 @@ let import_from ~force ~keep_alive ?history_mode ~data_dir ~download_path
     | _ -> return_none
   in
   let*! () = Events.importing_snapshot () in
-  let* () = import ~force ~data_dir ~snapshot_file in
+  let* () = import ~force ~data_dir ~snapshot_file snapshot_input in
   let*! () = Events.import_finished () in
   return store_history_mode
 

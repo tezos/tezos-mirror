@@ -626,9 +626,9 @@ let snapshot_info =
     (prefixes ["snapshot"; "info"] @@ Cli.snapshot_file_param @@ stop)
     (fun () snapshot_file cctxt ->
       let open Lwt_result_syntax in
-      let ( Snapshots.Header.
-              {version = _; history_mode; address; head_level; last_commitment},
-            compressed ) =
+      let* ( Snapshots.Header.
+               {version = _; history_mode; address; head_level; last_commitment},
+             compressed ) =
         Snapshots.info ~snapshot_file
       in
       let*! () =

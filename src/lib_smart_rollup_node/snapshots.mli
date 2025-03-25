@@ -88,7 +88,9 @@ val import :
 
 (** [info ~snapshot_file] returns information that can be used to inspect the
     snapshot file. *)
-val info : snapshot_file:string -> Header.t * [`Compressed | `Uncompressed]
+val info :
+  snapshot_file:string ->
+  (Header.t * [`Compressed | `Uncompressed]) tzresult Lwt.t
 
 (** [with_modify_data_dir cctxt ~data_dir ~apply_unsafe_patches ?skip_condition
     f] applies [f] in a read-write context that is created from [data-dir] (and

@@ -10,6 +10,9 @@
 (** The type of snapshot archive readers. *)
 type reader
 
+(** The type of snapshot archive readers with an input channel. *)
+type reader_input
+
 (** The type of snapshot archive writers. *)
 type writer
 
@@ -25,9 +28,17 @@ val gzip_reader : reader
 (** A writer for compressed files or snapshot archives. *)
 val gzip_writer : writer
 
-(** [is_compressed_snapshot f] returns [true] if [f] is the path of a compressed
-    snapshot file, i.e. a gzip file. *)
-val is_compressed_snapshot : string -> bool
+(** Returns whether the reader is for compressed or uncompressed files. *)
+val reader_format : reader -> [`Compressed | `Uncompressed]
+
+(** Returns whether the reader and input channel is for compressed or
+    uncompressed files. *)
+val input_format : reader_input -> [`Compressed | `Uncompressed]
+
+(** [with_open_snapshot file f] opens the snapshot file for reading, executes
+    [f] and closes the channels. *)
+val with_open_snapshot :
+  string -> (reader_input -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
 
 module Make (Header : sig
   type t
@@ -58,8 +69,8 @@ end) : sig
     unit ->
     unit Lwt.t
 
-  (** [extract reader check_header ~cancellable ~display_progress ~snapshot_file
-      ~dest] extracts the snapshot archive [snapshot_file] in the directory
+  (** [extract reader_input check_header ~cancellable ~display_progress ~dest]
+      extracts the snapshot archive opened in [reader_input] in the directory
       [dest]. Existing files in [dest] with the same names are overwritten. The
       header read from the snapshot is checked with [check_header] before
       beginning extraction, and returned.
@@ -69,11 +80,10 @@ end) : sig
       [display_progress] variable. Note that [`Bar] is not compatible with
       [Lwt_exit]. *)
   val extract :
-    reader ->
+    reader_input ->
     (Header.t -> 'a tzresult Lwt.t) ->
     cancellable:bool ->
     display_progress:[`Bar | `Periodic_event of Ptime.span -> unit Lwt.t] ->
-    snapshot_file:string ->
     dest:string ->
     (Header.t * 'a) tzresult Lwt.t
 
@@ -97,7 +107,7 @@ end) : sig
     unit ->
     string Lwt.t
 
-  (** [read_header reader ~snapshot_file] reads the header from the snapshot
-      file without extracting it. *)
-  val read_header : reader -> snapshot_file:string -> Header.t
+  (** [read_header reader_input] reads the header from an opened snapshot
+      without extracting it. *)
+  val read_snapshot_header : reader_input -> Header.t
 end
