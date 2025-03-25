@@ -19,6 +19,7 @@ The main operations related to the RPC lifetime, explained below, are:
 - registering RPCs: associating a handler to each service
 - serving an RPC directory: launching a server listening and serving RPC requests
 - calling an RPC: using externals tools to invoke Tezos RPCs
+
 How to declare a service
 ========================
 Declaring a service is the same as declaring a module signature. This includes a textual description and the types and de/serialization of its inputs/outputs.
@@ -67,31 +68,31 @@ handler: this is registered separately (see below). Think of these
 values as the items in a ``.mli`` file: a description of inputs and
 outputs without code.
 
-``'prefix`` vs ``'path``
-------------------------
+``'prefix`` vs ``'params``
+--------------------------
 
-Both the ``'prefix`` and ``'path`` type parameters describe arguments
+Both the ``'prefix`` and ``'params`` type parameters describe arguments
 passed to the service handler. They differ in that ``'prefix`` is
 provided by the directory that multiple services are bundled under
-whereas ``'path`` is provided by the service itself.
+whereas ``'params`` is provided by the service itself.
 
 Thus the prefix can be used for common arguments that a set of services
 use. Just a way to avoid repeating some common argument. E.g., if we
 wanted to have a version number in all the RPC entry-points
 (``/<version>/chain/<chain-id>/heads``) that would be the way to do it.
 
-It can also be used when an argument cannot be described at the point
+The prefix can also be used when an argument cannot be described at the point
 where the service is declared but it is available when the service is
 registered (see below) as described in the documentation of ``subst`` in
 :src:`resto/src/resto.mli`.
 
-The ``'prefix`` is always a subset of the ``'path``. Meaning that if
+The ``'prefix`` is always a subset of the ``'params``. Meaning that if
 ``'prefix`` parameters exist, they also appear (in duplicate) in the
-``'path``. This is enforced by construction of paths (see the module
+``'params``. This is enforced by construction of paths (see the module
 ``Path`` in :src:`resto/src/resto.ml`). The ``'prefix`` is used to enforce
 that the directory does define the necessary parameters (thus you cannot
 register a service in a directory without providing the descriptions for
-the prefix parameters, see below); the ``'path`` is used to enforce that
+the prefix parameters, see below); the ``'params`` is used to enforce that
 the service handler has the matching number of parameters.
 
 .. _declare_rpc_examples:
@@ -128,7 +129,7 @@ And the matching ``.mli`` excerpt:
    val list :
      ( [`GET]  (* method: get *)
      , unit  (* prefix: none *)
-     , unit  (* path: none *)
+     , unit  (* params: none *)
      , unit  (* query: none *)
      , unit  (* input: none *)
      , connection_info list  (* output *)
@@ -137,16 +138,16 @@ And the matching ``.mli`` excerpt:
    val kick :
     ( [`DELETE]  (* method: delete *)
     , unit  (* prefix: none *)
-    , unit * P2p_peer.Id.t  (* path: one parameter *)
+    , unit * P2p_peer.Id.t  (* params: one parameter *)
     , < wait : bool >  (* query: one parameter *)
     , unit  (* input: none *)
     , unit  (* output: none *)
     ) Tezos_rpc.Service.t
 
-Note that path (and prefix) parameters are represented as nested tuples
+Note that params (and prefix) parameters are represented as nested tuples
 of parameters. Zero parameters is represented as ``unit``, a single
 ``x`` parameter is represented as ``unit * x``, two parameters ``x`` and
-``y`` is represented as ``(unit * x) * y``, etc.
+``y`` are represented as ``(unit * x) * y``, etc.
 
 Note that query parameters are represented as objects.
 This helps naming the different components of the query (it could also have been a record).
@@ -187,7 +188,7 @@ And the matching ``.mli`` excerpt:
      val checkpoint :
        ( [`GET]  (* method: get *)
        , prefix  (* prefix: one parameter (defined above) *)
-       , prefix  (* path: same as the prefix, no additional service-specific parameters *)
+       , prefix  (* params: same as the prefix, no additional service-specific parameters *)
        , unit  (* query: none *)
        , unit  (* input: none *)
        , Block_hash.t * int32  (* output *)
@@ -199,7 +200,7 @@ And the matching ``.mli`` excerpt:
    end
 
 How to register services by declaring a directory
-==============================================
+=================================================
 
 Directories are sets of services, each with a handler.
 Therefore, declaring the directory and registering its services is done at the same time.
@@ -277,7 +278,7 @@ uses ``register0`` because it can fail (general case, no prefix) and it
 takes zero (0) path parameters.
 
 Also note that the helper functions for registration convert between the
-nested-tuples representation of the ``'path`` parameters and the curried
+nested-tuples representation of the ``'params`` parameters and the curried
 representation of parameters for the handler function. E.g., the handler
 for ``kick`` takes a ``peer_id`` parameter instead of ``((), peer_id)``.
 
@@ -306,7 +307,7 @@ First, get a ``server`` value by calling
 ``Tezos_rpc_http.RPC_server.init_server``. This function takes a
 directory (see above).
 
-Then, call ``Tezos_rpc_http.RPC_server.launch``. The function takes the
+Then, call ``Tezos_rpc_http.RPC_server.launch``. This function takes the
 ``server`` value initialised above as well as some server-configuration
 parameters (think port number and such). The executable which calls this
 function now serves the RPC services registered in the directory.
