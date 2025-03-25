@@ -381,7 +381,7 @@ let check_header ~populated ~force ~data_dir (header : Header.t) :
   in
   return_unit
 
-let import ~force ~data_dir ~snapshot_file snapshot_input header =
+let import ~force ~data_dir snapshot_input header =
   let open Lwt_result_syntax in
   let open Filename.Infix in
   let*! populated = Data_dir.populated ~data_dir in
@@ -401,6 +401,9 @@ let import ~force ~data_dir ~snapshot_file snapshot_input header =
   let* () = check_header ~force ~populated ~data_dir header in
   Lwt_utils_unix.with_tempdir ~temp_dir:data_dir ".octez_evm_node_import_"
   @@ fun dest ->
+  let archive_name =
+    match input_source snapshot_input with `Local s | `Remote s -> s
+  in
   let*! () =
     extract
       snapshot_input
@@ -409,7 +412,7 @@ let import ~force ~data_dir ~snapshot_file snapshot_input header =
         (`Periodic_event
           (fun elapsed_time ->
             Events.extract_snapshot_archive_in_progress
-              ~archive_name:snapshot_file
+              ~archive_name
               ~elapsed_time))
         (* [progress] modifies the signal handlers, which are necessary for
            [Lwt_exit] to work. As a consequence, if we want to be
@@ -461,7 +464,7 @@ let import_from ~force ~keep_alive ?history_mode ~data_dir ~download_path
     | _ -> return_none
   in
   let*! () = Events.importing_snapshot () in
-  let* () = import ~force ~data_dir ~snapshot_file snapshot_input header in
+  let* () = import ~force ~data_dir snapshot_input header in
   let*! () = Events.import_finished () in
   return store_history_mode
 

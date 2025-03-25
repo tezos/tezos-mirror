@@ -10,7 +10,7 @@ module type READER = sig
 
   val format : [`Compressed | `Uncompressed]
 
-  val open_in : string -> in_channel
+  val open_in_chan : Stdlib.in_channel -> in_channel
 
   val really_input : in_channel -> bytes -> int -> int -> unit
 
@@ -39,6 +39,8 @@ module type READER_INPUT = sig
   include READER
 
   val in_chan : in_channel
+
+  val source : [`Local of string | `Remote of string]
 end
 
 module type WRITER_OUTPUT = sig
@@ -51,6 +53,8 @@ module Stdlib_reader : READER with type in_channel = Stdlib.in_channel = struct
   include Stdlib
 
   let format = `Uncompressed
+
+  let open_in_chan ic = ic
 end
 
 module Stdlib_writer : WRITER with type out_channel = Stdlib.out_channel =
@@ -94,6 +98,8 @@ let reader_format (module Reader : READER) = Reader.format
 
 let input_format (module Reader : READER_INPUT) = Reader.format
 
+let input_source (module Reader : READER_INPUT) = Reader.source
+
 let run ~cancellable k =
   if cancellable then
     (* [Lwt_preemptive] does not yet provide a way to cancel a detached
@@ -107,19 +113,23 @@ let run ~cancellable k =
   else Lwt.return (k ())
 
 (* Magic bytes for gzip files is 1f8b. *)
-let is_compressed_snapshot snapshot_file =
-  let ic = open_in snapshot_file in
+let is_compressed_snapshot ic =
+  let pos = pos_in ic in
   try
-    let ok = input_byte ic = 0x1f && input_byte ic = 0x8b in
-    close_in ic ;
+    let c1 = input_byte ic in
+    let c2 = input_byte ic in
+    let ok = c1 = 0x1f && c2 = 0x8b in
+    (* [seek_in] does not work in general for non regular file channels. However
+       we abuse it a little to rely on the IO buffer because we're only reading
+       the first two bytes so we're guaranteed to only move in this buffer (see
+       https://github.com/ocaml/ocaml/blob/trunk/runtime/caml/misc.h#L806) and
+       not actually call lseek (see
+       https://github.com/ocaml/ocaml/blob/trunk/runtime/io.c#L464.) *)
+    seek_in ic pos ;
     ok
-  with
-  | End_of_file ->
-      close_in ic ;
-      false
-  | e ->
-      close_in ic ;
-      raise e
+  with End_of_file ->
+    seek_in ic pos ;
+    false
 
 let periodic_report event =
   let open Lwt_syntax in
@@ -132,13 +142,23 @@ let periodic_report event =
   in
   aux ()
 
-let create_reader_input : reader -> string -> reader_input =
- fun (module Reader) file ->
+let create_reader_input (type a) ~src
+    (module Reader : READER with type in_channel = a)
+    (in_chan : Stdlib.in_channel) :
+    (module READER_INPUT with type in_channel = a) =
   (module struct
     include Reader
 
-    let in_chan = open_in file
+    let in_chan = open_in_chan in_chan
+
+    let source = src
   end)
+
+let create_reader_input : src:_ -> reader -> in_channel -> reader_input =
+ fun ~src (module R) s ->
+  let r = create_reader_input ~src (module R) s in
+  let module R : READER_INPUT = (val r) in
+  (module R)
 
 module Make (Header : sig
   type t
@@ -338,10 +358,11 @@ struct
 
   let with_open_snapshot file f =
     let open Lwt_result_syntax in
+    let in_chan = open_in file in
     let reader =
-      if is_compressed_snapshot file then gzip_reader else stdlib_reader
+      if is_compressed_snapshot in_chan then gzip_reader else stdlib_reader
     in
-    let reader_input = create_reader_input reader file in
+    let reader_input = create_reader_input reader in_chan ~src:(`Local file) in
     protect
       ~on_error:(fun error ->
         let module Reader = (val reader_input) in

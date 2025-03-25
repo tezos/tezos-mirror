@@ -35,6 +35,11 @@ val reader_format : reader -> [`Compressed | `Uncompressed]
     uncompressed files. *)
 val input_format : reader_input -> [`Compressed | `Uncompressed]
 
+(** Returns from where the snapshot input was constructed. Either [`Local
+    filename] when the snapshot is read from a local file [filename] or [`Remote
+    url] when the snapshot file is downloaded from [url].  *)
+val input_source : reader_input -> [`Local of string | `Remote of string]
+
 module Make (Header : sig
   type t
 
