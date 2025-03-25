@@ -312,7 +312,7 @@ struct
     let simulate_and_read ?state_override simulate_state ~input =
       let open Lwt_result_syntax in
       let config =
-        Config.config
+        Wasm_debugger.config
           ~preimage_directory:Ctxt.ctxt.preimages
           ?preimage_endpoint:Ctxt.ctxt.preimages_endpoint
           ~kernel_debug:false
@@ -413,7 +413,7 @@ end) =
   Services_backend_sig.Make (MakeBackend (Base)) (Base.Executor)
 
 let pvm_config ctxt =
-  Config.config
+  Wasm_debugger.config
     ~preimage_directory:ctxt.preimages
     ?preimage_endpoint:ctxt.preimages_endpoint
     ~kernel_debug:true

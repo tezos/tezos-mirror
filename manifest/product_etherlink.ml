@@ -282,7 +282,7 @@ let evm_node_lib_dev =
         octez_context_encoding;
         octez_scoru_wasm;
         octez_scoru_wasm_helpers_functor |> open_;
-        octez_scoru_wasm_debugger_lib |> open_;
+        octez_scoru_wasm_debugger_lib;
         octez_layer2_store |> open_;
         octez_layer2_irmin_context |> open_;
         octez_smart_rollup_lib |> open_;
