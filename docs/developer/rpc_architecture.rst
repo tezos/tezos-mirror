@@ -295,14 +295,14 @@ etc. See above.
 
 The services are declared in multiple files peppered around the source
 tree. E.g., the p2p-related services are declared in
-:src:`src/lib_p2p_services/`. These declarations are split from the
+:src:`src/lib_p2p_services/`, module :package-api:`P2p_services <octez-libs/Tezos_p2p_services/P2p_services/index.html>`. These declarations are split from the
 registration so that both the serving and the querying stacks can depend
 on it without introducing unneeded dependencies.
 
 The files declare services by calling into
-:src:`src/lib_rpc/RPC_service.ml` which:
+:src:`src/lib_rpc/RPC_service.ml` the module :package-api:`Service <octez-libs/Tezos_rpc/Service/index.html>` which:
 
-- instantiates the functor ``MakeServices`` from :src:`resto/src/resto.ml` with a de/serialisation
+- instantiates the functor :package-api:`MakeService <octez-libs/Resto/MakeService/index.html>` from :src:`resto/src/resto.ml` with a de/serialisation
   process, and
 - specialises the service type and constructors with the error-management type ``tzresult``
 

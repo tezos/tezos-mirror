@@ -12,10 +12,16 @@ the following facts:
   technical debt
 
 For background knowledge about the RPC architecture, see :doc:`./rpc_architecture`.
-
+ 
+The main operations related to the RPC lifetime, explained below, are:
+- declaring an RPC (service): describing the service, including a textual description and the types and de/serialization of arguments and return value
+- declaring an RPC directory that bundles multiple services 
+- registering RPCs: associating a handler to each service
+- serving an RPC directory: launching a server listening and serving RPC requests
+- calling an RPC: using externals tools to invoke Tezos RPCs
 How to declare a service
 ========================
-
+Declaring a service is the same as declaring a module signature. This includes a textual description and the types and de/serialization of its inputs/outputs.
 The short answer is: call ``{get,post,put,…}_service`` in 
 :package-api:`Tezos_rpc.Service <octez-libs/Tezos_rpc/Service/index.html>`.
 Usage examples :ref:`below <declare_rpc_examples>`.
@@ -65,7 +71,7 @@ outputs without code.
 ------------------------
 
 Both the ``'prefix`` and ``'path`` type parameters describe arguments
-passed to the service handler. The differ in that ``'prefix`` is
+passed to the service handler. They differ in that ``'prefix`` is
 provided by the directory that multiple services are bundled under
 whereas ``'path`` is provided by the service itself.
 
@@ -74,7 +80,7 @@ use. Just a way to avoid repeating some common argument. E.g., if we
 wanted to have a version number in all the RPC entry-points
 (``/<version>/chain/<chain-id>/heads``) that would be the way to do it.
 
-It can also be used when a argument cannot be described at the point
+It can also be used when an argument cannot be described at the point
 where the service is declared but it is available when the service is
 registered (see below) as described in the documentation of ``subst`` in
 :src:`resto/src/resto.mli`.
@@ -192,7 +198,7 @@ And the matching ``.mli`` excerpt:
      val caboose : …
    end
 
-How to register services / declare a directory
+How to register services by declaring a directory
 ==============================================
 
 Directories are sets of services, each with a handler.
@@ -205,10 +211,10 @@ More specifically, you:
 2. populate the directory by calling the registration functions in
    :package-api:`Tezos_rpc.Directory <octez-libs/Tezos_rpc/Directory/index.html>`
 
-   There is a variety of registration functions in
+   There are a variety of registration functions in
    ``Tezos_rpc.Directory`` depending on the number of path parameter the
    service has, whether the service can fail with an error or not, etc.
-   E.g., ``register2`` register a 2-parameter service which may fail.
+   E.g., ``register2`` registers a 2-parameter service which may fail.
    E.g., ``lwt_register1`` registers a 1-parameter service which cannot
    fail (its handler uses lwt as its monad, hence the prefix).
 
