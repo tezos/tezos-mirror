@@ -64,7 +64,7 @@ parameters have the following meaning:
 These ``service`` values are *description* of services: they list the
 number and type of arguments, their de/serialisation format, the type of
 the return value, and some documentation. They do not have an associated
-handler: this is registered separately (see below). Think of these
+handler: this is registered separately (see :ref:`howto_register`). Think of these
 values as the items in a ``.mli`` file: a description of inputs and
 outputs without code.
 
@@ -83,7 +83,7 @@ wanted to have a version number in all the RPC entry-points
 
 The prefix can also be used when an argument cannot be described at the point
 where the service is declared but it is available when the service is
-registered (see below) as described in the documentation of ``subst`` in
+registered (see :ref:`howto_register`) as described in the documentation of ``subst`` in
 :src:`resto/src/resto.mli`.
 
 The ``'prefix`` is always a subset of the ``'params``. Meaning that if
@@ -92,7 +92,7 @@ The ``'prefix`` is always a subset of the ``'params``. Meaning that if
 ``Path`` in :src:`resto/src/resto.ml`). The ``'prefix`` is used to enforce
 that the directory does define the necessary parameters (thus you cannot
 register a service in a directory without providing the descriptions for
-the prefix parameters, see below); the ``'params`` is used to enforce that
+the prefix parameters, see :ref:`howto_register`); the ``'params`` is used to enforce that
 the service handler has the matching number of parameters.
 
 .. _declare_rpc_examples:
@@ -198,6 +198,8 @@ And the matching ``.mli`` excerpt:
 
      val caboose : …
    end
+
+.. _howto_register:
 
 How to register services by declaring a directory
 =================================================
@@ -305,7 +307,7 @@ Serving a directory involves configuring and launching a server that listens to 
 
 First, get a ``server`` value by calling
 ``Tezos_rpc_http.RPC_server.init_server``. This function takes a
-directory (see above).
+directory (see :ref:`howto_register`).
 
 Then, call ``Tezos_rpc_http.RPC_server.launch``. This function takes the
 ``server`` value initialised above as well as some server-configuration
@@ -390,10 +392,10 @@ The stack is:
 
 - ``src/bin_client/*`` defines the actual UI of the ``octez-client``
   binary: the commands, the parameters, etc. These commands use a
-  client-context (variable name: ``cctxt``) (see below) to actually make
+  client-context (variable name: ``cctxt``) (see :ref:`details <rpc_cctx>`) to actually make
   the call.
 - :src:`src/lib_rpc_http/RPC_client_unix.ml` instantiates an ``RPC_client``
-  (see below) with the actual underlying calling method. The actual
+  (see next item) with the actual underlying calling method. The actual
   underlying calling method is a thin wrapper around the one provided by
   cohttp-client.
 - :src:`src/lib_rpc_http/RPC_client.ml` provides a thin wrapper (error

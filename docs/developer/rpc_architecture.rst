@@ -291,7 +291,7 @@ Declaring
 
 In the "declaring" part of the stack, the services are merely described:
 how many parameters and of what type, what type of value is returned,
-etc. See above.
+etc.
 
 The services are declared in multiple files peppered around the source
 tree. E.g., the p2p-related services are declared in
@@ -415,6 +415,8 @@ some services from the ``src/lib_*_services`` files. This is one of the
 reason service declaration and registration are separate steps: the
 former can be used by clients were the handler wouldn’t necessarily make
 sense.
+
+.. _rpc_cctx:
 
 The ``octez-client`` instantiates a *client context* object from
 :src:`src/lib_client_base_unix/client_context_unix.ml`. This object is
