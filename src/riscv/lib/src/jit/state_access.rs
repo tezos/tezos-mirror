@@ -20,24 +20,22 @@
 //! [function builder]: cranelift::frontend::FunctionBuilderContext
 //! [direct function call]: cranelift::codegen::ir::InstBuilder::call
 
+mod abi;
 mod stack;
 
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 
-use cranelift::codegen::ir::AbiParam;
+use abi::AbiCall;
 use cranelift::codegen::ir::FuncRef;
 use cranelift::codegen::ir::InstBuilder;
-use cranelift::codegen::ir::Signature;
 use cranelift::codegen::ir::Type;
 use cranelift::codegen::ir::Value;
 use cranelift::codegen::ir::types::I8;
-use cranelift::codegen::ir::types::I64;
 use cranelift::frontend::FunctionBuilder;
 use cranelift_jit::JITBuilder;
 use cranelift_jit::JITModule;
 use cranelift_module::FuncId;
-use cranelift_module::Linkage;
 use cranelift_module::Module;
 use cranelift_module::ModuleResult;
 
@@ -249,78 +247,37 @@ pub(super) struct JsaImports<MC: MemoryConfig, JSA: JitStateAccess> {
 impl<MC: MemoryConfig, JSA: JitStateAccess> JsaImports<MC, JSA> {
     /// Register external functions within the JIT Module.
     pub(super) fn declare_in_module(module: &mut JITModule) -> ModuleResult<Self> {
+        let ptr_type = module.target_config().pointer_type();
         let call_conv = module.target_config().default_call_conv;
 
-        let ptr = module.target_config().pointer_type();
-        let ptr = AbiParam::new(ptr);
+        let pc_write = AbiCall::<2>::args(JSA::pc_write::<MC>);
+        let pc_write = pc_write.declare_function(module, PC_WRITE_SYMBOL, ptr_type, call_conv)?;
 
-        let address = AbiParam::new(I64);
-
-        let xreg = AbiParam::new(I8);
-        let xvalue = AbiParam::new(I64);
-
-        // PC
-        let pc_write_sig = Signature {
-            params: vec![ptr, address],
-            returns: vec![],
-            call_conv,
-        };
-        let pc_write = module.declare_function(PC_WRITE_SYMBOL, Linkage::Import, &pc_write_sig)?;
-
-        // NonZeroXRegisters
-        let xregister_read_sig = Signature {
-            params: vec![ptr, xreg],
-            returns: vec![xvalue],
-            call_conv,
-        };
+        let xreg_read = AbiCall::<2>::args(JSA::xregister_read::<MC>);
         let xreg_read =
-            module.declare_function(XREG_READ_SYMBOL, Linkage::Import, &xregister_read_sig)?;
+            xreg_read.declare_function(module, XREG_READ_SYMBOL, ptr_type, call_conv)?;
 
-        let xregister_write_sig = Signature {
-            params: vec![ptr, xreg, xvalue],
-            returns: vec![],
-            call_conv,
-        };
+        let xreg_write = AbiCall::<3>::args(JSA::xregister_write::<MC>);
         let xreg_write =
-            module.declare_function(XREG_WRITE_SYMBOL, Linkage::Import, &xregister_write_sig)?;
-
-        // Error Handling
-        let handle_exception_sig = Signature {
-            params: vec![ptr, ptr, ptr, ptr],
-            returns: vec![AbiParam::new(I8)],
-            call_conv,
-        };
+            xreg_write.declare_function(module, XREG_WRITE_SYMBOL, ptr_type, call_conv)?;
+        let handle_exception = AbiCall::<4>::args(JSA::handle_exception::<MC>);
         let handle_exception =
-            module.declare_function(HANDLE_EXCEPTION, Linkage::Import, &handle_exception_sig)?;
-
-        let raise_illegal_exception_sig = Signature {
-            params: vec![ptr],
-            returns: vec![],
-            call_conv,
-        };
-        let raise_illegal_instruction_exception = module.declare_function(
-            RAISE_ILLEGAL_INSTRUCTION_EXCEPTION,
-            Linkage::Import,
-            &raise_illegal_exception_sig,
-        )?;
-
-        let ecall_from_mode_sig = Signature {
-            params: vec![ptr, ptr],
-            returns: vec![],
-            call_conv,
-        };
+            handle_exception.declare_function(module, HANDLE_EXCEPTION, ptr_type, call_conv)?;
+        let raise_illegal_instruction_exception =
+            AbiCall::<1>::args(JSA::raise_illegal_instruction_exception);
+        let raise_illegal_instruction_exception = raise_illegal_instruction_exception
+            .declare_function(
+                module,
+                RAISE_ILLEGAL_INSTRUCTION_EXCEPTION,
+                ptr_type,
+                call_conv,
+            )?;
+        let ecall_from_mode = AbiCall::<2>::args(JSA::ecall::<MC>);
         let ecall_from_mode =
-            module.declare_function(ECALL_FROM_MODE, Linkage::Import, &ecall_from_mode_sig)?;
-
-        // Memory
-        let memory_store_sig = Signature {
-            params: vec![ptr, address, xvalue, AbiParam::new(I8), ptr],
-            returns: vec![AbiParam::new(I8)],
-            call_conv,
-        };
+            ecall_from_mode.declare_function(module, ECALL_FROM_MODE, ptr_type, call_conv)?;
+        let memory_store = AbiCall::<5>::args(JSA::memory_store::<MC>);
         let memory_store =
-            module.declare_function(MEMORY_STORE, Linkage::Import, &memory_store_sig)?;
-
+            memory_store.declare_function(module, MEMORY_STORE, ptr_type, call_conv)?;
         Ok(Self {
             pc_write,
             xreg_read,
