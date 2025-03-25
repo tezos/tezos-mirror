@@ -554,13 +554,7 @@ let octez_rust_deps =
           ];
           [
             S "rule";
-            [
-              S "targets";
-              S "liboctez_rust_deps.a";
-              S "dlloctez_rust_deps.so";
-              S "wasmer.h";
-              S "wasm.h";
-            ];
+            [S "targets"; S "liboctez_rust_deps.a"; S "dlloctez_rust_deps.so"];
             [
               S "deps";
               [S "file"; S "build.sh"];
