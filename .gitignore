@@ -133,6 +133,7 @@ _evm_unstripped_installer_preimages/
 etherlink-governance-observer
 floodgate
 etherlink-outbox-monitor
+/etherlink/docs/book/*
 
 # Terraform
 
