@@ -254,8 +254,8 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
         (Array.to_list Eth_account.bootstrap_accounts)) ?sequencer_pool_address
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ?enable_fast_withdrawal ~enable_dal ?dal_slots ~sequencer
-    ~preimages_dir ~kernel () =
+    ?enable_fa_bridge ?enable_fast_withdrawal ~enable_dal ?dal_slots
+    ?evm_version ~sequencer ~preimages_dir ~kernel () =
   let output_config = Temp.file "config.yaml" in
   let*! () =
     Evm_node.make_kernel_installer_config
@@ -280,6 +280,7 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
       ?max_blueprint_lookahead_in_seconds
       ~bootstrap_accounts
       ~output:output_config
+      ?evm_version
       ?enable_fa_bridge
       ()
   in
@@ -312,7 +313,7 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
     ?delayed_inbox_min_levels ?maximum_allowed_ticks
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?enable_fast_withdrawal ~enable_dal ?dal_slots ~sequencer ~preimages_dir
-    ~kernel () =
+    ?evm_version ~kernel () =
   let l2_chain_ids = List.map (fun l2 -> l2.Evm_node.l2_chain_id) l2_setups in
   let* l2_configs = Lwt_list.map_s generate_l2_kernel_config l2_setups in
   let rollup_config = Temp.file "rollup-config.yaml" in
@@ -336,6 +337,7 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
       ?max_blueprint_lookahead_in_seconds
       ~output:rollup_config
       ?enable_fa_bridge
+      ?evm_version
       ()
   in
   let* {output; _} =
@@ -351,7 +353,7 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?maximum_allowed_ticks
     ~enable_dal ?enable_fast_withdrawal ?dal_slots
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ~preimages_dir ~kernel
-    () =
+    ?evm_version () =
   if not enable_multichain then (
     assert (List.length l2_chains = 1) ;
     let chain_config = List.hd l2_chains in
@@ -373,6 +375,7 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
       ?max_blueprint_lookahead_in_seconds
       ?bootstrap_accounts:chain_config.Evm_node.bootstrap_accounts
       ?enable_fa_bridge
+      ?evm_version
       ~preimages_dir
       ~kernel
       ())
@@ -390,6 +393,7 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
       ?enable_fast_withdrawal
       ?dal_slots
       ?max_blueprint_lookahead_in_seconds
+      ?evm_version
       ~preimages_dir
       ~kernel
       ()
@@ -400,8 +404,8 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
     ?commitment_period ?challenge_window ?(sequencer = Constant.bootstrap1)
-    ?(kernel = Constant.WASM.evm_kernel) ?preimages_dir ?maximum_allowed_ticks
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
+    ?(kernel = Constant.WASM.evm_kernel) ?evm_version ?preimages_dir
+    ?maximum_allowed_ticks ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?enable_fast_withdrawal ?(threshold_encryption = false)
     ?(drop_duplicate_when_injection = true)
     ?(blueprints_publisher_order_enabled = true) ?rollup_history_mode
@@ -454,6 +458,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ?dal_slots
       ~enable_multichain
       ~l2_chains
+      ?evm_version
       ?max_blueprint_lookahead_in_seconds
       ?enable_fa_bridge
       ~preimages_dir

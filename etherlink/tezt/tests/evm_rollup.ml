@@ -305,7 +305,7 @@ type setup_mode =
   | Setup_proxy
 
 let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
-    ?(kernel = Kernel.Latest)
+    ?(kernel = Kernel.Latest) ?evm_version
     ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash) ?chain_id
     ?(bootstrap_accounts =
@@ -395,6 +395,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         ~enable_multichain
         ~enable_fast_withdrawal
         ?dal_slots
+        ?evm_version
         ()
     in
     match additional_config with
@@ -532,7 +533,8 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
     ?bootstrap_accounts ?whitelist ?da_fee_per_byte ?minimum_base_fee_per_gas
     ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs ~setup_mode
     ~enable_dal ?(dal_slots = if enable_dal then Some [4] else None)
-    ~enable_multichain ?websockets ?enable_fast_withdrawal f protocols =
+    ~enable_multichain ?websockets ?enable_fast_withdrawal ?evm_version f
+    protocols =
   let extra_tag =
     match setup_mode with
     | Setup_proxy -> "proxy"
@@ -588,6 +590,7 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
               ~enable_multichain
               ?websockets
               ?enable_fast_withdrawal
+              ?evm_version
               protocol
           in
           f ~protocol ~evm_setup)
@@ -598,7 +601,7 @@ let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?whitelist ?rollup_operator_key
     ?maximum_allowed_ticks ?restricted_rpcs ?websockets ?enable_fast_withdrawal
-    f protocols =
+    ?evm_version f protocols =
   let register ~enable_dal ~enable_multichain : unit =
     register_test
       ~title
@@ -618,6 +621,7 @@ let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
       ?restricted_rpcs
       ?websockets
       ?enable_fast_withdrawal
+      ?evm_version
       f
       protocols
       ~enable_dal
@@ -634,7 +638,7 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
     ?challenge_window ?bootstrap_accounts ?da_fee_per_byte
     ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
     ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs
-    ?max_blueprints_ahead ?websockets f protocols =
+    ?max_blueprints_ahead ?websockets ?evm_version f protocols =
   let register ~enable_dal ~enable_multichain : unit =
     register_test
       ~title
@@ -653,6 +657,7 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
       ?maximum_allowed_ticks
       ?restricted_rpcs
       ?websockets
+      ?evm_version
       f
       protocols
       ~enable_dal
@@ -675,7 +680,7 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?bootstrap_accounts
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
     ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs
-    ?max_blueprints_ahead ?websockets f protocols : unit =
+    ?max_blueprints_ahead ?websockets ?evm_version f protocols : unit =
   register_proxy
     ~title
     ~tags
@@ -693,6 +698,7 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?maximum_allowed_ticks
     ?restricted_rpcs
     ?websockets
+    ?evm_version
     f
     protocols ;
   register_sequencer
@@ -714,6 +720,7 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?restricted_rpcs
     ?max_blueprints_ahead
     ?websockets
+    ?evm_version
     f
     protocols
 

@@ -6,6 +6,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type evm_version = Shanghai | Cancun
+
 (** [make ~boostrap_balance ?bootstrap_accounts ... ~output ()]
     generates a configuration file located at [output], where
     [bootstrap_accounts] are provisioned with [bootstrap_balance]. *)
@@ -39,6 +41,7 @@ val make :
   ?enable_multichain:string * string ->
   ?set_account_code:(string * string) list ->
   ?max_delayed_inbox_blueprint_length:string * string ->
+  ?evm_version:evm_version ->
   output:string ->
   unit ->
   unit tzresult Lwt.t

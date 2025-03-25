@@ -424,7 +424,7 @@ let find_and_execute_withdrawal ?(outbox_lookup_depth = 10) ~withdrawal_level
 let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
     ?tx_pool_tx_per_addr_limit ?set_account_code ?da_fee_per_byte
     ?minimum_base_fee_per_gas ?history_mode ?patch_config
-    ?(kernel = Constant.WASM.evm_kernel)
+    ?(kernel = Constant.WASM.evm_kernel) ?evm_version
     ?(bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
@@ -441,6 +441,7 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
       ?minimum_base_fee_per_gas
       ~output:output_config
       ~bootstrap_accounts
+      ?evm_version
       ()
   in
   let* {output; _} =
