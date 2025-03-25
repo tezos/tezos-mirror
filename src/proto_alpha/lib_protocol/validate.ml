@@ -956,6 +956,30 @@ module Consensus = struct
     let operation_state = add_attestation operation_state oph operation in
     return {info; operation_state; block_state}
 
+  let check_attestations_aggregate_conflict vs oph =
+    match vs.consensus_state.attestations_aggregate_seen with
+    | None -> ok_unit
+    | Some existing ->
+        Error (Operation_conflict {existing; new_operation = oph})
+
+  let wrap_attestations_aggregate_conflict = function
+    | Ok () -> ok_unit
+    | Error conflict ->
+        result_error
+          Validate_errors.Consensus.(
+            Conflicting_consensus_operation
+              {kind = Attestations_aggregate; conflict})
+
+  let add_attestations_aggregate operation_state oph =
+    {
+      operation_state with
+      consensus_state =
+        {
+          operation_state.consensus_state with
+          attestations_aggregate_seen = Some oph;
+        };
+    }
+
   let check_attestation_aggregate_signature info public_keys
       ({shell; protocol_data = {contents = Single content; signature}} :
         Kind.attestations_aggregate Operation.t) =
