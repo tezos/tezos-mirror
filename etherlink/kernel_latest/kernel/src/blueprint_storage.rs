@@ -13,7 +13,9 @@ use crate::sequencer_blueprint::{
     BlueprintWithDelayedHashes, UnsignedSequencerBlueprint,
 };
 use crate::storage::read_last_info_per_level_timestamp;
-use crate::transaction::{Transaction, TransactionContent, Transactions::EthTxs};
+use crate::transaction::{
+    Transaction, TransactionContent, Transactions, Transactions::EthTxs,
+};
 use crate::{delayed_inbox, DelayedInbox};
 use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
@@ -48,15 +50,15 @@ const EVM_CURRENT_BLOCK_HEADER: RefPath =
 /// inbox messages. Note that the latter are only to be
 /// used when the kernel isn't running with a sequencer.
 #[derive(PartialEq, Debug, Clone)]
-enum StoreBlueprint {
+enum StoreBlueprint<Txs> {
     SequencerChunk(Vec<u8>),
-    InboxBlueprint(Blueprint),
+    InboxBlueprint(Blueprint<Txs>),
 }
 
 const SEQUENCER_CHUNK_TAG: u8 = 0;
 const INBOX_BLUEPRINT_TAG: u8 = 1;
 
-impl Encodable for StoreBlueprint {
+impl<Txs: Encodable> Encodable for StoreBlueprint<Txs> {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         stream.begin_list(2);
         match &self {
@@ -72,7 +74,7 @@ impl Encodable for StoreBlueprint {
     }
 }
 
-impl Decodable for StoreBlueprint {
+impl<Txs: Decodable> Decodable for StoreBlueprint<Txs> {
     fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
@@ -251,13 +253,16 @@ pub fn store_sequencer_blueprint<Host: Runtime>(
     store_blueprint_nb_chunks(host, &blueprint_path, blueprint.nb_chunks)?;
     let blueprint_chunk_path =
         blueprint_chunk_path(&blueprint_path, blueprint.chunk_index)?;
-    let store_blueprint = StoreBlueprint::SequencerChunk(blueprint.chunk);
+    // The `Transactions` type parameter of `StoreBlueprint` is not
+    // used in the `SequencerChunk` case so it is irrelevant here, we could pass
+    // any type implementing the `Encodable` trait.
+    let store_blueprint = StoreBlueprint::<Vec<u8>>::SequencerChunk(blueprint.chunk);
     store_rlp(&store_blueprint, host, &blueprint_chunk_path).map_err(Error::from)
 }
 
-pub fn store_inbox_blueprint_by_number<Host: Runtime>(
+pub fn store_inbox_blueprint_by_number<Host: Runtime, Txs: Encodable>(
     host: &mut Host,
-    blueprint: Blueprint,
+    blueprint: Blueprint<Txs>,
     number: U256,
 ) -> Result<(), Error> {
     let blueprint_path = blueprint_path(number)?;
@@ -267,9 +272,9 @@ pub fn store_inbox_blueprint_by_number<Host: Runtime>(
     store_rlp(&store_blueprint, host, &chunk_path).map_err(Error::from)
 }
 
-pub fn store_inbox_blueprint<Host: Runtime>(
+pub fn store_inbox_blueprint<Host: Runtime, Txs: Encodable>(
     host: &mut Host,
-    blueprint: Blueprint,
+    blueprint: Blueprint<Txs>,
 ) -> anyhow::Result<()> {
     let number = read_next_blueprint_number(host)?;
     Ok(store_inbox_blueprint_by_number(host, blueprint, number)?)
@@ -287,9 +292,9 @@ pub fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Er
 }
 
 // Used to store a blueprint made out of forced delayed transactions.
-pub fn store_forced_blueprint<Host: Runtime>(
+pub fn store_forced_blueprint<Host: Runtime, Txs: Encodable>(
     host: &mut Host,
-    blueprint: Blueprint,
+    blueprint: Blueprint<Txs>,
     number: U256,
 ) -> Result<(), Error> {
     let blueprint_path = blueprint_path(number)?;
@@ -454,8 +459,8 @@ const MAXIMUM_SIZE_OF_DELAYED_TRANSACTION: usize = MAX_INPUT_MESSAGE_SIZE;
 /// Only used for test, as all errors are handled in the same way
 #[cfg_attr(feature = "benchmark", allow(dead_code))]
 #[derive(Debug, PartialEq)]
-pub enum BlueprintValidity {
-    Valid(Blueprint),
+pub enum BlueprintValidity<Txs> {
+    Valid(Blueprint<Txs>),
     InvalidParentHash,
     TimestampFromPast,
     TimestampFromFuture,
@@ -464,8 +469,8 @@ pub enum BlueprintValidity {
     BlueprintTooLarge,
 }
 
-pub enum DelayedTransactionFetchingResult<Transactions> {
-    Ok(Transactions),
+pub enum DelayedTransactionFetchingResult<Txs> {
+    Ok(Txs),
     BlueprintTooLarge,
     DelayedHashMissing(delayed_inbox::Hash),
 }
@@ -528,7 +533,7 @@ fn fetch_delayed_txs<Host: Runtime>(
     blueprint_with_hashes: BlueprintWithDelayedHashes,
     delayed_inbox: &mut DelayedInbox,
     current_blueprint_size: usize,
-) -> anyhow::Result<(BlueprintValidity, usize)> {
+) -> anyhow::Result<(BlueprintValidity<Transactions>, usize)> {
     let (mut delayed_txs, total_size) = match fetch_hashes_from_delayed_inbox(
         host,
         blueprint_with_hashes.delayed_hashes,
@@ -576,7 +581,7 @@ fn parse_and_validate_blueprint<Host: Runtime>(
     max_blueprint_lookahead_in_seconds: i64,
     parent_chain_header: &ChainHeader,
     head_timestamp: Timestamp,
-) -> anyhow::Result<(BlueprintValidity, usize)> {
+) -> anyhow::Result<(BlueprintValidity<Transactions>, usize)> {
     // Decode
     match rlp::decode::<BlueprintWithDelayedHashes>(bytes) {
         Err(e) => Ok((BlueprintValidity::DecoderError(e), bytes.len())),
@@ -638,10 +643,10 @@ fn parse_and_validate_blueprint<Host: Runtime>(
     }
 }
 
-fn invalidate_blueprint<Host: Runtime>(
+fn invalidate_blueprint<Host: Runtime, Txs: Debug>(
     host: &mut Host,
     blueprint_path: &OwnedPath,
-    error: &BlueprintValidity,
+    error: &BlueprintValidity<Txs>,
 ) -> Result<(), RuntimeError> {
     log!(
         host,
@@ -661,20 +666,20 @@ fn read_all_chunks_and_validate<Host: Runtime>(
     config: &mut Configuration,
     previous_chain_header: &ChainHeader,
     previous_timestamp: Timestamp,
-) -> anyhow::Result<(Option<Blueprint>, usize)> {
+) -> anyhow::Result<(Option<Blueprint<Transactions>>, usize)> {
     let mut chunks = vec![];
     let mut size = 0;
     if nb_chunks > MAXIMUM_NUMBER_OF_CHUNKS {
         invalidate_blueprint(
             host,
             blueprint_path,
-            &BlueprintValidity::BlueprintTooLarge,
+            &BlueprintValidity::<Transactions>::BlueprintTooLarge,
         )?;
         return Ok((None, 0));
     };
     for i in 0..nb_chunks {
         let path = blueprint_chunk_path(blueprint_path, i)?;
-        let stored_chunk = read_rlp(host, &path)?;
+        let stored_chunk = read_rlp::<StoreBlueprint<Transactions>>(host, &path)?;
         // The tick model is based on the size of the chunk, we overapproximate it.
         size += MAX_INPUT_MESSAGE_SIZE;
         match stored_chunk {
@@ -728,7 +733,7 @@ pub fn read_blueprint<Host: Runtime>(
     number: U256,
     previous_timestamp: Timestamp,
     previous_chain_header: &ChainHeader,
-) -> anyhow::Result<(Option<Blueprint>, usize)> {
+) -> anyhow::Result<(Option<Blueprint<Transactions>>, usize)> {
     let blueprint_path = blueprint_path(number)?;
     let exists = host.store_has(&blueprint_path)?.is_some();
     if exists {
@@ -779,7 +784,7 @@ pub fn read_blueprint<Host: Runtime>(
 pub fn read_next_blueprint<Host: Runtime>(
     host: &mut Host,
     config: &mut Configuration,
-) -> anyhow::Result<(Option<Blueprint>, usize)> {
+) -> anyhow::Result<(Option<Blueprint<Transactions>>, usize)> {
     let chain_family = ChainFamily::Evm;
     let (number, previous_timestamp, block_header) =
         match read_current_block_header_for_family(host, &chain_family) {

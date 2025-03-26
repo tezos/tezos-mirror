@@ -394,7 +394,7 @@ mod tests {
     };
     use crate::{
         blueprint::Blueprint,
-        transaction::{Transaction, TransactionContent},
+        transaction::{Transaction, TransactionContent, Transactions},
         upgrade::KernelUpgrade,
     };
     use evm::Config;
@@ -492,7 +492,7 @@ mod tests {
         }
     }
 
-    fn blueprint(transactions: Vec<Transaction>) -> Blueprint {
+    fn blueprint(transactions: Vec<Transaction>) -> Blueprint<Transactions> {
         Blueprint {
             transactions: EthTxs(transactions),
             timestamp: Timestamp::from(0i64),

@@ -19,7 +19,7 @@ use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
 use crate::event::Event;
 use crate::l2block::L2Block;
-use crate::transaction::Transaction;
+use crate::transaction::{Transaction, Transactions};
 use crate::upgrade;
 use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
@@ -277,7 +277,7 @@ pub fn eth_bip_from_blueprint<Host: Runtime>(
     tick_counter: &TickCounter,
     next_bip_number: U256,
     header: EVMBlockHeader,
-    blueprint: Blueprint,
+    blueprint: Blueprint<Transactions>,
 ) -> EthBlockInProgress {
     let gas_price = crate::gas_price::base_fee_per_gas(
         host,
@@ -729,14 +729,14 @@ mod tests {
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
     use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime;
 
-    fn blueprint(transactions: Vec<Transaction>) -> Blueprint {
+    fn blueprint(transactions: Vec<Transaction>) -> Blueprint<Transactions> {
         Blueprint {
             transactions: Transactions::EthTxs(transactions),
             timestamp: Timestamp::from(0i64),
         }
     }
 
-    fn tezlink_blueprint() -> Blueprint {
+    fn tezlink_blueprint() -> Blueprint<Transactions> {
         Blueprint {
             transactions: Transactions::TezTxs,
             timestamp: Timestamp::from(0i64),
@@ -916,7 +916,10 @@ mod tests {
         )
     }
 
-    fn store_blueprints<Host: Runtime>(host: &mut Host, blueprints: Vec<Blueprint>) {
+    fn store_blueprints<Host: Runtime>(
+        host: &mut Host,
+        blueprints: Vec<Blueprint<Transactions>>,
+    ) {
         for (i, blueprint) in blueprints.into_iter().enumerate() {
             store_inbox_blueprint_by_number(host, blueprint, U256::from(i))
                 .expect("Should have stored blueprint");
@@ -1576,7 +1579,7 @@ mod tests {
     }
 
     /// A blueprint that should produce 1 block with an invalid transaction
-    fn almost_empty_blueprint() -> Blueprint {
+    fn almost_empty_blueprint() -> Blueprint<Transactions> {
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
 
         // transaction should be invalid

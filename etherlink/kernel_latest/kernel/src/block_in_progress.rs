@@ -13,7 +13,9 @@ use crate::gas_price::base_fee_per_gas;
 use crate::l2block::L2Block;
 use crate::storage::{self, object_path, receipt_path};
 use crate::tick_model;
-use crate::transaction::{Transaction, Transactions::EthTxs, Transactions::TezTxs};
+use crate::transaction::{
+    Transaction, Transactions, Transactions::EthTxs, Transactions::TezTxs,
+};
 use anyhow::Context;
 use evm_execution::account_storage::EVM_ACCOUNTS_PATH;
 use primitive_types::{H160, H256, U256};
@@ -277,7 +279,7 @@ impl EthBlockInProgress {
     }
 
     pub fn from_blueprint(
-        blueprint: crate::blueprint::Blueprint,
+        blueprint: crate::blueprint::Blueprint<Transactions>,
         number: U256,
         parent_hash: H256,
         tick_counter: u64,
