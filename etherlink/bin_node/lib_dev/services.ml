@@ -478,6 +478,7 @@ let process_trace_result trace =
 let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
     (rpc : Configuration.rpc) (validation : Validate.validation_mode)
     (config : Configuration.t)
+    (module Tx_container : Services_backend_sig.Tx_container)
     ((module Backend_rpc : Services_backend_sig.S), _)
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_result_syntax in
@@ -588,15 +589,9 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
             let f (address, block_param) =
               match block_param with
               | Ethereum_types.Block_parameter.(Block_parameter Pending) ->
-                  let* nonce =
-                    if Configuration.is_tx_queue_enabled config then
-                      let* next_nonce = Backend_rpc.nonce address block_param in
-                      let next_nonce =
-                        Option.value ~default:Qty.zero next_nonce
-                      in
-                      Tx_queue.nonce ~next_nonce address
-                    else Tx_pool.nonce address
-                  in
+                  let* next_nonce = Backend_rpc.nonce address block_param in
+                  let next_nonce = Option.value ~default:Qty.zero next_nonce in
+                  let* nonce = Tx_container.nonce ~next_nonce address in
                   rpc_ok nonce
               | _ ->
                   let* nonce = Backend_rpc.nonce address block_param in
@@ -641,20 +636,10 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
             build_with_input ~f module_ parameters
         | Get_transaction_by_hash.Method ->
             let f tx_hash =
-              let* transaction_object =
-                if Configuration.is_tx_queue_enabled config then
-                  Tx_queue.find tx_hash
-                else Tx_pool.find tx_hash
-              in
+              let* transaction_object = Tx_container.find tx_hash in
               let* transaction_object =
                 match transaction_object with
-                | Some transaction_object ->
-                    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7747
-                       We should instrument the TX pool to return the real
-                       transaction objects. *)
-                    return_some
-                      (Transaction_object.from_store_transaction_object
-                         transaction_object)
+                | Some transaction_object -> return_some transaction_object
                 | None -> Backend_rpc.Block_storage.transaction_object tx_hash
               in
               rpc_ok transaction_object
@@ -718,8 +703,8 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
                   (fun seq -> seq.Configuration.max_number_of_chunks)
                   config.sequencer
               in
-              let f tx_raw =
-                let txn = Ethereum_types.hex_to_bytes tx_raw in
+              let f raw_tx =
+                let txn = Ethereum_types.hex_to_bytes raw_tx in
                 let* is_valid =
                   Validate.is_tx_valid
                     ?max_number_of_chunks
@@ -730,19 +715,12 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
                 match is_valid with
                 | Error err ->
                     let*! () =
-                      Tx_pool_events.invalid_transaction ~transaction:tx_raw
+                      Tx_pool_events.invalid_transaction ~transaction:raw_tx
                     in
                     rpc_error (Rpc_errors.transaction_rejected err None)
                 | Ok (next_nonce, transaction_object) -> (
                     let* tx_hash =
-                      if Configuration.is_tx_queue_enabled config then
-                        let* res =
-                          Tx_queue.inject ~next_nonce transaction_object tx_raw
-                        in
-                        match res with
-                        | Ok () -> return (Ok transaction_object.hash)
-                        | Error errs -> return (Error errs)
-                      else Tx_pool.add transaction_object txn
+                      Tx_container.add ~next_nonce transaction_object ~raw_tx
                     in
                     match tx_hash with
                     | Ok tx_hash -> rpc_ok tx_hash
@@ -795,11 +773,7 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
             build_with_input ~f module_ parameters
         | Txpool_content.Method ->
             let f (_ : unit option) =
-              let* txpool_content =
-                if Configuration.is_tx_queue_enabled config then
-                  Tx_queue.content ()
-                else Tx_pool.get_tx_pool_content ()
-              in
+              let* txpool_content = Tx_container.content () in
               rpc_ok txpool_content
             in
             build ~f module_ parameters
@@ -912,6 +886,7 @@ let dispatch_request (rpc_server_family : Rpc_types.rpc_server_family)
 
 let dispatch_private_request (rpc_server_family : Rpc_types.rpc_server_family)
     (rpc : Configuration.rpc) (config : Configuration.t)
+    (module Tx_container : Services_backend_sig.Tx_container)
     ((module Backend_rpc : Services_backend_sig.S), _) ~block_production
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_syntax in
@@ -1001,22 +976,17 @@ let dispatch_private_request (rpc_server_family : Rpc_types.rpc_server_family)
                     raw_txn
               | _ -> get_nonce ()
           in
+          let transaction = Ethereum_types.hex_encode_string raw_txn in
           match is_valid with
           | Error err ->
-              let transaction = Ethereum_types.hex_encode_string raw_txn in
               let*! () = Tx_pool_events.invalid_transaction ~transaction in
               rpc_error (Rpc_errors.transaction_rejected err None)
           | Ok (next_nonce, transaction_object) -> (
               let* tx_hash =
-                if Configuration.is_tx_queue_enabled config then
-                  let transaction = Ethereum_types.hex_encode_string raw_txn in
-                  let* res =
-                    Tx_queue.inject ~next_nonce transaction_object transaction
-                  in
-                  match res with
-                  | Ok () -> return (Ok transaction_object.hash)
-                  | Error errs -> return (Error errs)
-                else Tx_pool.add transaction_object raw_txn
+                Tx_container.add
+                  ~next_nonce
+                  transaction_object
+                  ~raw_tx:transaction
               in
               match tx_hash with
               | Ok tx_hash -> rpc_ok tx_hash
@@ -1060,17 +1030,17 @@ let can_process_batch size = function
   | Configuration.Limit l -> size <= l
   | Unlimited -> true
 
-let dispatch_handler (rpc : Configuration.rpc) config ctx dispatch_request
-    (input : JSONRPC.request batched_request) =
+let dispatch_handler (rpc : Configuration.rpc) config tx_container ctx
+    dispatch_request (input : JSONRPC.request batched_request) =
   let open Lwt_syntax in
   match input with
   | Singleton request ->
-      let* response = dispatch_request config ctx request in
+      let* response = dispatch_request config tx_container ctx request in
       return (Singleton response)
   | Batch requests ->
       let process =
         if can_process_batch (List.length requests) rpc.batch_limit then
-          dispatch_request config ctx
+          dispatch_request config tx_container ctx
         else fun req ->
           let value =
             Error Rpc_errors.(invalid_request "too many requests in batch")
@@ -1098,7 +1068,8 @@ let empty_stream =
 let empty_sid = Ethereum_types.(Subscription.Id (Hex ""))
 
 let dispatch_websocket (rpc_server_family : Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) validation config ctx (input : JSONRPC.request) =
+    (rpc : Configuration.rpc) validation config tx_container ctx
+    (input : JSONRPC.request) =
   let open Lwt_syntax in
   match
     map_method_name
@@ -1145,12 +1116,19 @@ let dispatch_websocket (rpc_server_family : Rpc_types.rpc_server_family)
       websocket_response_of_response JSONRPC.{value; id = input.id}
   | _ ->
       let+ response =
-        dispatch_request rpc_server_family rpc validation config ctx input
+        dispatch_request
+          rpc_server_family
+          rpc
+          validation
+          config
+          tx_container
+          ctx
+          input
       in
       websocket_response_of_response response
 
 let dispatch_private_websocket (rpc_server_family : Rpc_types.rpc_server_family)
-    ~block_production (rpc : Configuration.rpc) config ctx
+    ~block_production (rpc : Configuration.rpc) config tx_container ctx
     (input : JSONRPC.request) =
   let open Lwt_syntax in
   let+ response =
@@ -1159,38 +1137,42 @@ let dispatch_private_websocket (rpc_server_family : Rpc_types.rpc_server_family)
       ~block_production
       rpc
       config
+      tx_container
       ctx
       input
   in
   websocket_response_of_response response
 
-let generic_dispatch (rpc : Configuration.rpc) config ctx dir path
+let generic_dispatch (rpc : Configuration.rpc) config tx_container ctx dir path
     dispatch_request =
   Evm_directory.register0 dir (dispatch_batch_service ~path) (fun () input ->
-      dispatch_handler rpc config ctx dispatch_request input |> Lwt_result.ok)
+      dispatch_handler rpc config tx_container ctx dispatch_request input
+      |> Lwt_result.ok)
 
 let dispatch_public (rpc_server_family : Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) validation config ctx dir =
+    (rpc : Configuration.rpc) validation config tx_container ctx dir =
   generic_dispatch
     rpc
     config
+    tx_container
     ctx
     dir
     Path.root
     (dispatch_request rpc_server_family rpc validation)
 
 let dispatch_private (rpc_server_family : Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) ~block_production config ctx dir =
+    (rpc : Configuration.rpc) ~block_production config tx_container ctx dir =
   generic_dispatch
     rpc
     config
+    tx_container
     ctx
     dir
     Path.(add_suffix root "private")
     (dispatch_private_request rpc_server_family rpc ~block_production)
 
-let generic_websocket_dispatch (config : Configuration.t) ctx dir path
-    dispatch_websocket =
+let generic_websocket_dispatch (config : Configuration.t) tx_container ctx dir
+    path dispatch_websocket =
   if config.experimental_features.enable_websocket then
     Evm_directory.jsonrpc_websocket_register
       ?monitor:config.experimental_features.monitor_websocket_heartbeat
@@ -1198,30 +1180,31 @@ let generic_websocket_dispatch (config : Configuration.t) ctx dir path
         config.experimental_features.max_websocket_message_length
       dir
       path
-      (dispatch_websocket config ctx)
+      (dispatch_websocket config tx_container ctx)
   else dir
 
 let dispatch_websocket_public (rpc_server_family : Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) validation config ctx dir =
+    (rpc : Configuration.rpc) validation config tx_container ctx dir =
   generic_websocket_dispatch
     config
+    tx_container
     ctx
     dir
     "/ws"
     (dispatch_websocket rpc_server_family rpc validation)
 
 let dispatch_websocket_private (rpc_server_family : Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) ~block_production config ctx dir =
+    (rpc : Configuration.rpc) ~block_production config tx_container ctx dir =
   generic_websocket_dispatch
     config
+    tx_container
     ctx
     dir
     "/private/ws"
     (dispatch_private_websocket rpc_server_family ~block_production rpc)
 
 let directory ~rpc_server_family ?delegate_health_check_to rpc validation config
-    ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
-    dir =
+    tx_container backend dir =
   dir |> version |> configuration config
   |> health_check ?delegate_to:delegate_health_check_to
   |> dispatch_public
@@ -1229,16 +1212,17 @@ let directory ~rpc_server_family ?delegate_health_check_to rpc validation config
        rpc
        validation
        config
-       ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
+       tx_container
+       backend
   |> dispatch_websocket_public
        rpc_server_family
        rpc
        validation
        config
-       ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
+       tx_container
+       backend
 
-let private_directory ~rpc_server_family rpc config
-    ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
+let private_directory ~rpc_server_family rpc config tx_container backend
     ~block_production =
   Evm_directory.empty config.experimental_features.rpc_server
   |> version
@@ -1246,11 +1230,13 @@ let private_directory ~rpc_server_family rpc config
        rpc_server_family
        rpc
        config
-       ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
+       tx_container
+       backend
        ~block_production
   |> dispatch_websocket_private
        rpc_server_family
        rpc
        config
-       ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
+       tx_container
+       backend
        ~block_production

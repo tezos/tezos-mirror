@@ -126,7 +126,7 @@ let monitor_performances ~data_dir =
 
 let start_public_server ~(rpc_server_family : Rpc_types.rpc_server_family)
     ?delegate_health_check_to ?evm_services ?tezlink_services ?data_dir
-    validation (config : Configuration.t) ctxt =
+    validation (config : Configuration.t) tx_container ctxt =
   let open Lwt_result_syntax in
   let*! can_start_performance_metrics =
     Octez_performance_metrics.supports_performance_metrics ()
@@ -168,6 +168,7 @@ let start_public_server ~(rpc_server_family : Rpc_types.rpc_server_family)
          rpc
          validation
          config
+         tx_container
          ctxt
     |> register_evm_services
     |> Evm_directory.register_metrics "/metrics"
@@ -184,7 +185,7 @@ let start_public_server ~(rpc_server_family : Rpc_types.rpc_server_family)
   return finalizer
 
 let start_private_server ~(rpc_server_family : Rpc_types.rpc_server_family)
-    ?(block_production = `Disabled) config ctxt =
+    ?(block_production = `Disabled) config tx_container ctxt =
   let open Lwt_result_syntax in
   match config.Configuration.private_rpc with
   | Some private_rpc ->
@@ -194,6 +195,7 @@ let start_private_server ~(rpc_server_family : Rpc_types.rpc_server_family)
           private_rpc
           ~block_production
           config
+          tx_container
           ctxt
         |> Evm_directory.register_metrics "/metrics"
         |> Evm_directory.register_describe

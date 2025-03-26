@@ -153,10 +153,18 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     Evm_ro_context.ro_backend ro_ctxt config ~evm_node_endpoint
   in
 
-  let* () =
+  let* tx_container, ping_tx_pool =
     match config.experimental_features.enable_tx_queue with
     | Some tx_queue_config ->
-        Tx_queue.start ~config:tx_queue_config ~keep_alive:config.keep_alive ()
+        let* () =
+          Tx_queue.start
+            ~config:tx_queue_config
+            ~keep_alive:config.keep_alive
+            ()
+        in
+        return
+          ( (module Tx_queue.Tx_container : Services_backend_sig.Tx_container),
+            false )
     | None ->
         let mode =
           if config.finalized_view then
@@ -171,19 +179,25 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
               }
           else Tx_pool.Relay
         in
-        Tx_pool.start
-          {
-            backend = observer_backend;
-            smart_rollup_address =
-              Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
-                smart_rollup_address;
-            mode;
-            tx_timeout_limit = config.tx_pool_timeout_limit;
-            tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
-            tx_pool_tx_per_addr_limit =
-              Int64.to_int config.tx_pool_tx_per_addr_limit;
-          }
+        let* () =
+          Tx_pool.start
+            {
+              backend = observer_backend;
+              smart_rollup_address =
+                Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
+                  smart_rollup_address;
+              mode;
+              tx_timeout_limit = config.tx_pool_timeout_limit;
+              tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
+              tx_pool_tx_per_addr_limit =
+                Int64.to_int config.tx_pool_tx_per_addr_limit;
+            }
+        in
+        return
+          ( (module Tx_pool.Tx_container : Services_backend_sig.Tx_container),
+            true )
   in
+
   Metrics.init
     ~mode:"observer"
     ~tx_pool_size_info:Tx_pool.size_info
@@ -230,12 +244,14 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
          else None)
       Stateless
       config
+      tx_container
       (observer_backend, smart_rollup_address)
   in
   let* finalizer_private_server =
     Rpc_server.start_private_server
       ~rpc_server_family:(Rpc_types.Single_chain_node_rpc_server chain_family)
       config
+      tx_container
       (observer_backend, smart_rollup_address)
   in
 
@@ -301,7 +317,6 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     let*! () = task in
     return_unit
   else
-    let ping_tx_pool = not @@ Configuration.is_tx_queue_enabled config in
     let* () =
       Blueprints_follower.start
         ~ping_tx_pool

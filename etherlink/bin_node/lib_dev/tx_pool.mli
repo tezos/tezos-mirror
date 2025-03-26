@@ -95,3 +95,7 @@ val clear_popped_transactions : unit -> unit tzresult Lwt.t
 
 (** [mode] retrieves the current pool mode *)
 val mode : unit -> mode tzresult Lwt.t
+
+(** wrapper of the Tx_pool to be compatible with the Tx_container
+    signature for the services. *)
+module Tx_container : Services_backend_sig.Tx_container

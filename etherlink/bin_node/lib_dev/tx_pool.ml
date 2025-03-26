@@ -957,3 +957,24 @@ let mode () =
   let*? worker = Lazy.force worker in
   let state = Worker.state worker in
   return state.mode
+
+module Tx_container = struct
+  let nonce ~next_nonce:_ address = nonce address
+
+  let add ~next_nonce:_ tx_object ~raw_tx =
+    let raw_tx_str = Ethereum_types.hex_to_bytes raw_tx in
+    add tx_object raw_tx_str
+
+  let find hash =
+    let open Lwt_result_syntax in
+    let* legacy_tx_object = find hash in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7747
+       We should instrument the TX pool to return the real
+       transaction objects. *)
+    return
+      (Option.map
+         Transaction_object.from_store_transaction_object
+         legacy_tx_object)
+
+  let content = get_tx_pool_content
+end

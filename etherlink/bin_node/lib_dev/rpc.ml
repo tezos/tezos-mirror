@@ -76,32 +76,35 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
     Block_storage_setup.enable ~keep_alive:config.keep_alive ctxt.store ;
 
   let rpc_backend = Evm_ro_context.ro_backend ctxt config ~evm_node_endpoint in
-  let* () =
-    Tx_pool.start
-      {
-        backend = rpc_backend;
-        smart_rollup_address =
-          Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
-            ctxt.smart_rollup_address;
-        mode =
-          (match evm_node_private_endpoint with
-          | Some base ->
-              Forward
-                {
-                  injector =
-                    (fun tx_object raw_tx ->
-                      Injector.inject_transaction
-                        ~keep_alive:config.keep_alive
-                        ~base
-                        ~tx_object
-                        ~raw_tx);
-                }
-          | None -> Relay);
-        tx_timeout_limit = config.tx_pool_timeout_limit;
-        tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
-        tx_pool_tx_per_addr_limit =
-          Int64.to_int config.tx_pool_tx_per_addr_limit;
-      }
+  let* tx_container =
+    let* () =
+      Tx_pool.start
+        {
+          backend = rpc_backend;
+          smart_rollup_address =
+            Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
+              ctxt.smart_rollup_address;
+          mode =
+            (match evm_node_private_endpoint with
+            | Some base ->
+                Forward
+                  {
+                    injector =
+                      (fun tx_object raw_tx ->
+                        Injector.inject_transaction
+                          ~keep_alive:config.keep_alive
+                          ~base
+                          ~tx_object
+                          ~raw_tx);
+                  }
+            | None -> Relay);
+          tx_timeout_limit = config.tx_pool_timeout_limit;
+          tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
+          tx_pool_tx_per_addr_limit =
+            Int64.to_int config.tx_pool_tx_per_addr_limit;
+        }
+    in
+    return @@ (module Tx_pool.Tx_container : Services_backend_sig.Tx_container)
   in
 
   let* () = set_metrics_level ctxt in
@@ -162,6 +165,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
          else None)
       Stateless
       rpc_config
+      tx_container
       (rpc_backend, ctxt.smart_rollup_address)
   in
 

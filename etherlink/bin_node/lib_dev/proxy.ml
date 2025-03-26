@@ -17,6 +17,30 @@ let install_finalizer server_finalizer =
   let* () = Tx_pool.shutdown () in
   Evm_context.shutdown ()
 
+let container_forward_tx ~evm_node_endpoint ~keep_alive :
+    (module Services_backend_sig.Tx_container) =
+  (module struct
+    let nonce ~next_nonce _address = Lwt_result.return next_nonce
+
+    let add ~next_nonce:_ _tx_object ~raw_tx =
+      match evm_node_endpoint with
+      | Some evm_node_endpoint ->
+          Injector.send_raw_transaction
+            ~keep_alive
+            ~base:evm_node_endpoint
+            ~raw_tx:(Ethereum_types.hex_to_bytes raw_tx)
+      | None ->
+          Lwt.return_ok
+          @@ Error
+               "the node is in read-only mode, it doesn't accept transactions"
+
+    let find _hash = Lwt_result.return None
+
+    let content () =
+      Lwt_result.return
+        Ethereum_types.{pending = AddressMap.empty; queued = AddressMap.empty}
+  end)
+
 let main
     ({
        keep_alive;
@@ -58,36 +82,37 @@ let main
 
     let ignore_block_param = config.proxy.ignore_block_param
   end) in
-  let pool_mode, validation_mode =
+  let validation_mode =
     match config.proxy.evm_node_endpoint with
-    | None -> (Tx_pool.Proxy, Validate.Full)
-    | Some evm_node_endpoint ->
-        ( Tx_pool.Forward
+    | Some _base -> Validate.Stateless
+    | None -> Validate.Full
+  in
+  let* tx_container =
+    match
+      ( config.experimental_features.enable_send_raw_transaction,
+        config.proxy.evm_node_endpoint )
+    with
+    | true, None ->
+        let* () =
+          Tx_pool.start
             {
-              injector =
-                (fun _ raw_tx ->
-                  Injector.send_raw_transaction
-                    ~keep_alive:config.keep_alive
-                    ~base:evm_node_endpoint
-                    ~raw_tx);
-            },
-          Validate.Stateless )
+              backend = (module Rollup_node_rpc);
+              smart_rollup_address;
+              mode = Proxy;
+              tx_timeout_limit = config.tx_pool_timeout_limit;
+              tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
+              tx_pool_tx_per_addr_limit =
+                Int64.to_int config.tx_pool_tx_per_addr_limit;
+            }
+        in
+        return (module Tx_pool.Tx_container : Services_backend_sig.Tx_container)
+    | enable_send_raw_transaction, evm_node_endpoint ->
+        let evm_node_endpoint =
+          if enable_send_raw_transaction then evm_node_endpoint else None
+        in
+        return @@ container_forward_tx ~evm_node_endpoint ~keep_alive
   in
-  let* () =
-    if not config.experimental_features.enable_send_raw_transaction then
-      return_unit
-    else
-      Tx_pool.start
-        {
-          backend = (module Rollup_node_rpc);
-          smart_rollup_address;
-          mode = pool_mode;
-          tx_timeout_limit = config.tx_pool_timeout_limit;
-          tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
-          tx_pool_tx_per_addr_limit =
-            Int64.to_int config.tx_pool_tx_per_addr_limit;
-        }
-  in
+
   let () =
     Rollup_node_follower.start
       ~keep_alive:config.keep_alive
@@ -141,6 +166,7 @@ let main
          else None)
       validation_mode
       config
+      tx_container
       ((module Rollup_node_rpc), smart_rollup_address)
   in
   let (_ : Lwt_exit.clean_up_callback_id) =
