@@ -82,6 +82,9 @@ endif
 	@make -C dummy_kernel build-deps
 	@make -C supervised_dummy_kernel build-deps
 
+	# Coverage deps
+	@./scripts/isa-suite-coverage.sh -d
+
 .PHONY: test
 test: build
 	@cargo test --workspace
@@ -95,6 +98,10 @@ test-long:
 .PHONY: test-miri
 test-miri:
 	@cargo +$(NIGHTLY_VERSION) miri test -- miri
+
+.PHONY: coverage
+coverage:
+	@./scripts/isa-suite-coverage.sh
 
 .PHONY: check
 check:
