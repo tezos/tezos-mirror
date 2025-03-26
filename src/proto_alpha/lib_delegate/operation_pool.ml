@@ -198,16 +198,18 @@ type consensus_filter = {
   level : int32;
   round : Round.t;
   payload_hash : Block_payload_hash.t;
+  branch : Block_hash.t;
 }
 
 (** From a pool of operations [operation_pool], the function filters
     out the attestations that are different from the [current_level],
     the [current_round] or the optional [current_block_payload_hash],
     as well as preattestations. *)
-let filter_with_relevant_consensus_ops ~(attestation_filter : consensus_filter)
+let filter_with_relevant_consensus_ops ~aggregate_attestation_feature_flag
+    ~(attestation_filter : consensus_filter)
     ~(preattestation_filter : consensus_filter option) operation_set =
   Operation_set.filter
-    (fun {protocol_data; _} ->
+    (fun {shell = {branch}; protocol_data} ->
       match (protocol_data, preattestation_filter) with
       (* 1a. Remove preattestations. *)
       | Operation_data {contents = Single (Preattestation _); _}, None -> false
@@ -219,11 +221,17 @@ let filter_with_relevant_consensus_ops ~(attestation_filter : consensus_filter)
               _;
             },
           Some
-            {level = level'; round = round'; payload_hash = block_payload_hash'}
-        ) ->
+            {
+              level = level';
+              round = round';
+              payload_hash = block_payload_hash';
+              branch = branch';
+            } ) ->
           Compare.Int32.(Raw_level.to_int32 level = level')
           && Round.(round = round')
           && Block_payload_hash.(block_payload_hash = block_payload_hash')
+          && ((not aggregate_attestation_feature_flag)
+             || Block_hash.(branch = branch'))
       (* 2. Filter attestations. *)
       | ( Operation_data
             {
@@ -240,7 +248,9 @@ let filter_with_relevant_consensus_ops ~(attestation_filter : consensus_filter)
           Compare.Int32.(Raw_level.to_int32 level = attestation_filter.level)
           && Round.(round = attestation_filter.round)
           && Block_payload_hash.(
-               block_payload_hash = attestation_filter.payload_hash)
+               block_payload_hash = attestation_filter.payload_hash
+               && ((not aggregate_attestation_feature_flag)
+                  || Block_hash.(branch = attestation_filter.branch)))
       (* 3. Preserve all non-consensus operations. *)
       | _ -> true)
     operation_set

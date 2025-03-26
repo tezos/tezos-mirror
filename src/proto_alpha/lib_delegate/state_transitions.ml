@@ -554,9 +554,14 @@ let prepare_block_to_bake ~attestations ?last_proposal
           Operation_pool.level = predecessor.shell.level;
           round = predecessor.round;
           payload_hash = predecessor.payload_hash;
+          branch = get_branch_from_proposal state.level_state.latest_proposal;
         }
       in
+      let aggregate_attestation_feature_flag =
+        state.global_state.constants.parametric.aggregate_attestation
+      in
       (Operation_pool.filter_with_relevant_consensus_ops
+         ~aggregate_attestation_feature_flag
          ~attestation_filter
          ~preattestation_filter:None
          current_mempool.consensus
@@ -655,6 +660,7 @@ let propose_block_action state delegate round ~last_proposal =
             Operation_pool.level = proposal.predecessor.shell.level;
             round = proposal.predecessor.round;
             payload_hash = proposal.predecessor.payload_hash;
+            branch = get_branch_from_proposal state.level_state.latest_proposal;
           }
         in
         let preattestation_filter =
@@ -663,10 +669,16 @@ let propose_block_action state delegate round ~last_proposal =
               Operation_pool.level = prequorum.level;
               round = prequorum.round;
               payload_hash = prequorum.block_payload_hash;
+              branch =
+                get_branch_from_proposal state.level_state.latest_proposal;
             }
+        in
+        let aggregate_attestation_feature_flag =
+          state.global_state.constants.parametric.aggregate_attestation
         in
         Operation_pool.(
           filter_with_relevant_consensus_ops
+            ~aggregate_attestation_feature_flag
             ~attestation_filter
             ~preattestation_filter
             all_consensus_operations
