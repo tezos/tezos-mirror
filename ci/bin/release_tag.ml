@@ -70,22 +70,20 @@ let job_release_page ~test ?dependencies () =
     ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ()]
     ?dependencies
     ~variables:
-      [
-        ( "S3_BUCKET",
-          if test then "release-page-test.nomadic-labs.com"
-          else "site-prod.octez.tezos.com/releases" );
-      ]
-    ~before_script:
       (if test then
+         (* The S3_BUCKET, AWS keys and DISTRIBUTION_ID
+            depends on the release type (tests or not). *)
          [
-           "export \
-            AWS_ACCESS_KEY_ID=${AWS_KEY_RELEASE_PUBLISH:?AWS_KEY_RELEASE_PUBLISH \
-            is not set}";
-           "export \
-            AWS_SECRET_ACCESS_KEY=${AWS_SECRET_RELEASE_PUBLISH:?AWS_SECRET_RELEASE_PUBLISH \
-            is not set}";
+           ("S3_BUCKET", "release-page-test.nomadic-labs.com");
+           ("DISTRIBUTION_ID", "E19JF46UG3Z747");
+           ("AWS_ACCESS_KEY_ID", "${AWS_KEY_RELEASE_PUBLISH}");
+           ("AWS_SECRET_ACCESS_KEY", "${AWS_SECRET_RELEASE_PUBLISH}");
          ]
-       else [])
+       else
+         [
+           ("S3_BUCKET", "site-prod.octez.tezos.com/releases");
+           ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
+         ])
     ["./scripts/releases/publish_release_page.sh"]
 
 (** Create an Octez release tag pipeline of type {!release_tag_pipeline_type}.

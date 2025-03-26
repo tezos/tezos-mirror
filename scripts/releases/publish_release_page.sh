@@ -11,6 +11,11 @@ if [ -z "${S3_BUCKET:-}" ]; then
   exit 1
 fi
 
+if [ -z "${DISTRIBUTION_ID:-}" ]; then
+  echo "DISTRIBUTION_ID variable is not set, impossible to create an invalidation."
+  exit 1
+fi
+
 # We use a file to list versions so that we can control what is actually displayed.
 versions_list_filename="versions.json"
 
@@ -100,7 +105,5 @@ else
 fi
 
 # Create an invalidation so that the web page actually updates.
-# TODO: Allow to find the Distribution_id
-#DISTRIBUTION_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?Aliases.Items[?contains(@, 'release-page-test.nomadic-labs.com')]].Id" --output text)
-DISTRIBUTION_ID="E19JF46UG3Z747"
+
 aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths "/*"
