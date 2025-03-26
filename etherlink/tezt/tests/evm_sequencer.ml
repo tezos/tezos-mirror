@@ -436,7 +436,7 @@ let register_upgrade_all ~title ~tags ~genesis_timestamp
         protocols)
     kernels
 
-let test_current_level =
+let test_tezlink_current_level =
   let chain_family = "Michelson" in
   Protocol.register_test
     ~__FILE__
@@ -12738,6 +12738,6 @@ let () =
   test_deposit_event [Alpha] ;
   test_withdrawal_events [Alpha] ;
   test_fa_deposit_and_withdrawals_events [Alpha] ;
-  test_current_level protocols ;
   test_block_producer_validation [Alpha] ;
-  test_tezlink_version protocols
+  test_tezlink_current_level [Alpha] ;
+  test_tezlink_version [Alpha]
