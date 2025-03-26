@@ -68,7 +68,7 @@ while read -r version rc latest announcement; do
 
   {
     echo -e "### Debian Packages\n"
-    echo -e "For installation instructions, refer to the [Octez Debian Packages Guide](https://tezos.gitlab.io/introduction/howtoget.html#new-set-of-debian-packages)\n"
+    echo -e "For installation instructions, refer to the [Octez Debian Packages Guide](https://octez.tezos.com/docs/introduction/howtoget.html#ubuntu-and-debian-octez-packages)\n"
   } >> index.md
 
   {
