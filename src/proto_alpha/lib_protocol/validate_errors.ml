@@ -997,10 +997,6 @@ module Anonymous = struct
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
       }
-    | Denunciations_not_allowed_just_after_migration of {
-        level : Raw_level.t;
-        first_allowed_level : Raw_level.t;
-      }
     | Invalid_accusation_no_dal_content of {
         tb_slot : Slot.t;
         level : Raw_level.t;
@@ -1124,33 +1120,6 @@ module Anonymous = struct
         | Dal_already_denounced {delegate; level} -> Some (delegate, level)
         | _ -> None)
       (fun (delegate, level) -> Dal_already_denounced {delegate; level}) ;
-    let open Data_encoding in
-    register_error_kind
-      `Permanent
-      ~id:
-        "validate.operation.block.dal_denunciation_not_allowed_just_after_migration"
-      ~title:"DAL denunciations are not allowed just after migration"
-      ~description:"DAL denunciations are not allows just after the migration."
-      ~pp:(fun ppf (level, first_allowed_level) ->
-        Format.fprintf
-          ppf
-          "A DAL entrapment denunciation is for a level too close to migration \
-           (level: %a, first allowed level: %a)"
-          Raw_level.pp
-          level
-          Raw_level.pp
-          first_allowed_level)
-      (obj2
-         (req "level" Raw_level.encoding)
-         (req "first_allowed_level" Raw_level.encoding))
-      (function
-        | Denunciations_not_allowed_just_after_migration
-            {level; first_allowed_level} ->
-            Some (level, first_allowed_level)
-        | _ -> None)
-      (fun (level, first_allowed_level) ->
-        Denunciations_not_allowed_just_after_migration
-          {level; first_allowed_level}) ;
 
     register_error_kind
       `Permanent

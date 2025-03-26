@@ -224,10 +224,6 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
         in
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7686
-           When the predecessor will be R, then delete the code in validate.ml
-           dealing with the accusations around migration (the same todo can be
-           found there). *)
         return (ctxt, [])
         (* End of Alpha stitching. Comment used for automatic snapshot *)
         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
@@ -239,10 +235,6 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
         in
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7686
-           When the predecessor will be R, then delete the code in validate.ml
-           dealing with the accusations around migration (the same todo can be
-           found there). *)
         return (ctxt, [])
     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
   in
