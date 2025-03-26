@@ -30,9 +30,11 @@
 - Replaced the custom ABI encoder/decoder with `alloy`'s encoder/decoder
   for improved maintainability. (!16670)
 
-## Next proposal
+## Calypso (6046630)
 
-This is a release candidate for a kernel upgrade proposal.
+This kernel has been activated on Etherlink Testnet on block
+[17,443,389][6046-activation-testnet], and on Etherlink Mainnet on block
+[7,056,139][6046-activation-mainnet].
 
 Its storage version is 26.
 
