@@ -158,6 +158,9 @@ module type T = sig
       Cannot be called from within the handlers.  *)
   val shutdown : _ t -> unit Lwt.t
 
+  (** Waits for completion, but doesn't trigger the shutdown. *)
+  val wait_for_completion : _ t -> unit Lwt.t
+
   (** The following interface are common elements of multiple modules below.
       They are used to minimize repetition. *)
   module type BOX = sig
@@ -222,6 +225,9 @@ module type T = sig
 
   (** Access the internal state, once initialized. *)
   val state : _ t -> Types.state
+
+  (** Access the internal state if available. *)
+  val state_opt : _ t -> Types.state option
 
   (** [with_state w f] calls [f] on the current state of worker [w] if
       it was intialized and not closed or crashed, otherwise

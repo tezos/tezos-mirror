@@ -476,15 +476,50 @@ let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
   return (info, {scheduled_conn; info; cryptobox_data})
 
 module Reader = struct
-  type ('msg, 'meta) t = {
+  type ('msg, 'meta) inner_state = {
     canceler : Lwt_canceler.t;
     conn : 'meta authenticated_connection;
     encoding : 'msg Data_encoding.t;
     messages : (int * 'msg) tzresult Lwt_pipe.Maybe_bounded.t;
-    mutable worker : unit Lwt.t;
+    mutable stream : Data_encoding.Binary_stream.t option;
   }
 
-  let read_message st init =
+  type ('msg, 'meta) inner_parameters = {
+    canceler : Lwt_canceler.t;
+    conn : 'meta authenticated_connection;
+    encoding : 'msg Data_encoding.t;
+    messages : (int * 'msg) tzresult Lwt_pipe.Maybe_bounded.t;
+  }
+
+  module Name = struct
+    let base = ["p2p"; "socket"; "reader"]
+
+    type t = P2p_peer.Id.t
+
+    let encoding = P2p_peer.Id.encoding
+
+    let pp = P2p_peer.Id.pp
+
+    let equal = P2p_peer.Id.equal
+  end
+
+  module Types = struct
+    type state = S : _ inner_state -> state
+
+    type parameters = P : _ inner_parameters -> parameters
+  end
+
+  module Worker =
+    Tezos_workers.Worker.MakeSingle (Name) (P2p_workers.Loop_request) (Types)
+
+  type worker = Worker.callback Worker.t
+
+  type ('msg, _) t = {
+    worker : worker;
+    messages : (int * 'msg) tzresult Lwt_pipe.Maybe_bounded.t;
+  }
+
+  let read_message (st : _ inner_state) =
     let rec loop status =
       let open Lwt_result_syntax in
       let*! () = Lwt.pause () in
@@ -509,60 +544,105 @@ module Reader = struct
           in
           loop (decode_next_buf buf)
     in
-    loop (Data_encoding.Binary.read_stream ?init st.encoding)
+    loop (Data_encoding.Binary.read_stream ?init:st.stream st.encoding)
 
-  let rec worker_loop st stream =
-    let open Lwt_syntax in
-    let* r =
+  module Handlers = struct
+    type self = worker
+
+    type launch_error = tztrace
+
+    type error += No_stream
+
+    let on_request :
+        type r request_error.
+        self ->
+        (r, request_error) P2p_workers.loop ->
+        (r, request_error) result Lwt.t =
+     fun w Loop ->
+      let (S st) = Worker.state w in
       let open Lwt_result_syntax in
-      let* msg, size, stream = read_message st stream in
-      protect ~canceler:st.canceler (fun () ->
-          let*! () = Lwt_pipe.Maybe_bounded.push st.messages (Ok (size, msg)) in
-          return_some stream)
-    in
-    match r with
-    | Ok (Some stream) -> worker_loop st (Some stream)
-    | Ok None -> Error_monad.cancel_with_exceptions st.canceler
-    | Error (Canceled :: _) | Error (Exn Lwt_pipe.Closed :: _) ->
-        Events.(emit connection_closed) st.conn.info.peer_id
-    | Error _ as err ->
-        if Lwt_pipe.Maybe_bounded.is_closed st.messages then ()
-        else
-          (* best-effort push to the messages, we ignore failures *)
-          (ignore : bool -> unit)
-          @@ Lwt_pipe.Maybe_bounded.push_now st.messages err ;
-        Error_monad.cancel_with_exceptions st.canceler
+      let* msg, size, stream = read_message st in
+      let* r =
+        protect ~canceler:st.canceler (fun () ->
+            let*! () =
+              Lwt_pipe.Maybe_bounded.push st.messages (Ok (size, msg))
+            in
+            return_some stream)
+      in
+      match r with
+      | Some stream ->
+          st.stream <- Some stream ;
+          return_unit
+      | None ->
+          Lwt_pipe.Maybe_bounded.close st.messages ;
+          tzfail No_stream
 
-  let run ?size conn encoding canceler =
+    let on_launch _w _peer_id (Types.P {canceler; conn; encoding; messages}) =
+      Lwt_result_syntax.return
+        (Types.S {canceler; conn; encoding; messages; stream = None})
+
+    let on_error (type a b) w _st (req : (a, b) P2p_workers.loop) (errs : b) :
+        [`Shutdown | `Continue] tzresult Lwt.t =
+      let open Lwt_result_syntax in
+      let (S st) = Worker.state w in
+      match (req, errs) with
+      | P2p_workers.Loop, (Canceled :: _ | Exn Lwt_pipe.Closed :: _) ->
+          let*! () = Events.(emit connection_closed) st.conn.info.peer_id in
+          return `Shutdown
+      | P2p_workers.Loop, No_stream :: _ -> return `Shutdown
+      | P2p_workers.Loop, err ->
+          if Lwt_pipe.Maybe_bounded.is_closed st.messages then ()
+          else
+            (* best-effort push to the messages, we ignore failures *)
+            (ignore : bool -> unit)
+            @@ Lwt_pipe.Maybe_bounded.push_now st.messages (Error err) ;
+          return `Shutdown
+
+    let on_completion _ _ _ _ = Lwt.return_unit
+
+    let on_no_request _ = Lwt.return_unit
+
+    let on_close _w = Lwt.return_unit
+  end
+
+  (* [?messages] can be specified for testing purposes, it is safe as long
+     as this function is not exposed. *)
+  let run ?messages ?size conn encoding canceler =
+    let open Lwt_result_syntax in
     let compute_size = function
       | Ok (size, _) ->
           (Sys.word_size / 8 * 11) + size + Lwt_pipe.Maybe_bounded.push_overhead
       | Error _ -> 0
-      (* we push Error only when we close the socket,
-                        we don't fear memory leaks in that case... *)
+      (* we push Error only when we close the socket, we don't fear memory leaks
+         in that case... *)
     in
     let bound = Option.map (fun max -> (max, compute_size)) size in
-    let st =
-      {
-        canceler;
-        conn;
-        encoding;
-        messages = Lwt_pipe.Maybe_bounded.create ?bound ();
-        worker = Lwt.return_unit;
-      }
+    let messages =
+      Option.value messages ~default:(Lwt_pipe.Maybe_bounded.create ?bound ())
     in
-    Lwt_canceler.on_cancel st.canceler (fun () ->
-        Lwt_pipe.Maybe_bounded.close st.messages ;
+    Lwt_canceler.on_cancel canceler (fun () ->
+        Lwt_pipe.Maybe_bounded.close messages ;
         Lwt.return_unit) ;
-    st.worker <-
-      Lwt_utils.worker
-        "reader"
-        ~on_event:Internal_event.Lwt_worker_logger.on_event
-        ~run:(fun () -> worker_loop st None)
-        ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler) ;
-    st
+    let table =
+      Worker.create_table
+        (Callback
+           (fun () ->
+             Lwt_syntax.return @@ Worker.Any_request (Loop, {scope = None})))
+    in
+    let* worker =
+      Worker.launch
+        table
+        conn.info.peer_id
+        (P {canceler; conn; encoding; messages})
+        (module Handlers)
+    in
+    return {worker; messages}
 
-  let shutdown st = Error_monad.cancel_with_exceptions st.canceler
+  let shutdown st =
+    let st = Worker.state_opt st.worker in
+    Option.iter_s
+      (fun Types.(S st) -> Error_monad.cancel_with_exceptions st.canceler)
+      st
 end
 
 type 'msg encoded_message = bytes list
@@ -570,17 +650,52 @@ type 'msg encoded_message = bytes list
 let copy_encoded_message = List.map Bytes.copy
 
 module Writer = struct
-  type ('msg, 'meta) t = {
+  type ('msg, 'meta) inner_state = {
     canceler : Lwt_canceler.t;
     conn : 'meta authenticated_connection;
-    encoding : 'msg Data_encoding.t;
     messages :
       (Bytes.t list * unit tzresult Lwt.u option) Lwt_pipe.Maybe_bounded.t;
-    mutable worker : unit Lwt.t;
+  }
+
+  type ('msg, 'meta) inner_parameters = {
+    canceler : Lwt_canceler.t;
+    conn : 'meta authenticated_connection;
+    messages :
+      (Bytes.t list * unit tzresult Lwt.u option) Lwt_pipe.Maybe_bounded.t;
+  }
+
+  module Name = struct
+    let base = ["p2p"; "socket"; "writer"]
+
+    type t = P2p_peer.Id.t
+
+    let encoding = P2p_peer.Id.encoding
+
+    let pp = P2p_peer.Id.pp
+
+    let equal = P2p_peer.Id.equal
+  end
+
+  module Types = struct
+    type state = S : _ inner_state -> state
+
+    type parameters = P : _ inner_parameters -> parameters
+  end
+
+  module Worker =
+    Tezos_workers.Worker.MakeSingle (Name) (P2p_workers.Loop_request) (Types)
+
+  type worker = Worker.callback Worker.t
+
+  type ('msg, _) t = {
+    worker : worker;
+    messages :
+      (bytes trace * unit tzresult Lwt.u option) Lwt_pipe.Maybe_bounded.t;
+    encoding : 'msg Data_encoding.t;
     binary_chunks_size : int; (* in bytes *)
   }
 
-  let send_message st buf =
+  let send_message (st : _ inner_state) buf =
     let open Lwt_result_syntax in
     let rec loop = function
       | [] -> return_unit
@@ -599,54 +714,74 @@ module Writer = struct
     in
     loop buf
 
-  let encode_message (st : ('msg, _) t) msg =
-    match Data_encoding.Binary.to_bytes st.encoding msg with
+  let encode_message (t : ('msg, _) t) msg =
+    match Data_encoding.Binary.to_bytes t.encoding msg with
     | Error we ->
         Result_syntax.tzfail
           (Tezos_base.Data_encoding_wrapper.Encoding_error we)
-    | Ok bytes -> Ok (Utils.cut st.binary_chunks_size bytes)
+    | Ok bytes -> Ok (Utils.cut t.binary_chunks_size bytes)
 
-  let rec worker_loop st =
-    let open Lwt_syntax in
-    let* () = Lwt.pause () in
-    let* r =
-      protect ~canceler:st.canceler (fun () ->
-          Lwt_result.ok @@ Lwt_pipe.Maybe_bounded.pop st.messages)
-    in
-    match r with
-    | Error (Canceled :: _) | Error (Exn Lwt_pipe.Closed :: _) ->
-        Events.(emit connection_closed) st.conn.info.peer_id
-    | Error err ->
-        let* () = Events.(emit write_error) (err, st.conn.info.peer_id) in
-        Error_monad.cancel_with_exceptions st.canceler
-    | Ok (buf, wakener) -> (
-        let* res = send_message st buf in
-        match res with
-        | Ok () ->
-            Option.iter (fun u -> Lwt.wakeup_later u res) wakener ;
-            worker_loop st
-        | Error err -> (
-            Option.iter
-              (fun u ->
-                Lwt.wakeup_later
-                  u
-                  (Result_syntax.tzfail P2p_errors.Connection_closed))
-              wakener ;
-            match err with
-            | (Canceled | Exn Lwt_pipe.Closed) :: _ ->
-                Events.(emit connection_closed) st.conn.info.peer_id
-            | P2p_errors.Connection_closed :: _ ->
-                let* () =
-                  Events.(emit connection_closed) st.conn.info.peer_id
-                in
-                Error_monad.cancel_with_exceptions st.canceler
-            | err ->
-                let* () =
-                  Events.(emit write_error) (err, st.conn.info.peer_id)
-                in
-                Error_monad.cancel_with_exceptions st.canceler))
+  module Handlers = struct
+    type self = worker
 
-  let run ?size ?binary_chunks_size conn encoding canceler =
+    type launch_error = tztrace
+
+    let on_request :
+        type r request_error.
+        self ->
+        (r, request_error) P2p_workers.loop ->
+        (r, request_error) result Lwt.t =
+     fun w Loop ->
+      let (S st) = Worker.state w in
+      let open Lwt_result_syntax in
+      let*! () = Lwt.pause () in
+      let* buf, wakener =
+        protect ~canceler:st.canceler (fun () ->
+            Lwt_result.ok @@ Lwt_pipe.Maybe_bounded.pop st.messages)
+      in
+      let*! res = send_message st buf in
+      match res with
+      | Ok () ->
+          Option.iter (fun u -> Lwt.wakeup_later u res) wakener ;
+          return_unit
+      | Error err ->
+          Option.iter
+            (fun u ->
+              Lwt.wakeup_later
+                u
+                (Result_syntax.tzfail P2p_errors.Connection_closed))
+            wakener ;
+          fail err
+
+    let on_launch _w _peer_id (Types.P {canceler; conn; messages}) =
+      Lwt_result_syntax.return (Types.S {canceler; conn; messages})
+
+    let on_error (type a b) w _st (req : (a, b) P2p_workers.loop) (errs : b) :
+        [`Shutdown | `Continue] tzresult Lwt.t =
+      let open Lwt_result_syntax in
+      let (S st) = Worker.state w in
+      match (req, errs) with
+      | P2p_workers.Loop, (Canceled :: _ | Exn Lwt_pipe.Closed :: _) ->
+          let*! () = Events.(emit connection_closed) st.conn.info.peer_id in
+          return `Shutdown
+      | P2p_workers.Loop, P2p_errors.Connection_closed :: _ ->
+          let*! () = Events.(emit connection_closed) st.conn.info.peer_id in
+          return `Shutdown
+      | P2p_workers.Loop, err ->
+          let*! () = Events.(emit write_error) (err, st.conn.info.peer_id) in
+          return `Shutdown
+
+    let on_completion _ _ _ _ = Lwt.return_unit
+
+    let on_no_request _ = Lwt.return_unit
+
+    let on_close _w = Lwt.return_unit
+  end
+
+  (* [?messages] can be specified for testing purposes, it is safe as long
+     as this function is not exposed. *)
+  let run ?messages ?size ?binary_chunks_size conn encoding canceler =
+    let open Lwt_result_syntax in
     let binary_chunks_size =
       match binary_chunks_size with
       | None -> Crypto.max_content_length
@@ -671,20 +806,13 @@ module Writer = struct
           + Lwt_pipe.Maybe_bounded.push_overhead
     in
     let bound = Option.map (fun max -> (max, compute_size)) size in
-    let st =
-      {
-        canceler;
-        conn;
-        encoding;
-        messages = Lwt_pipe.Maybe_bounded.create ?bound ();
-        worker = Lwt.return_unit;
-        binary_chunks_size;
-      }
+    let messages =
+      Option.value messages ~default:(Lwt_pipe.Maybe_bounded.create ?bound ())
     in
-    Lwt_canceler.on_cancel st.canceler (fun () ->
-        Lwt_pipe.Maybe_bounded.close st.messages ;
+    Lwt_canceler.on_cancel canceler (fun () ->
+        Lwt_pipe.Maybe_bounded.close messages ;
         let rec loop () =
-          match Lwt_pipe.Maybe_bounded.pop_now st.messages with
+          match Lwt_pipe.Maybe_bounded.pop_now messages with
           | exception Lwt_pipe.Closed -> ()
           | None -> ()
           | Some (_, None) -> loop ()
@@ -694,24 +822,35 @@ module Writer = struct
         in
         loop () ;
         Lwt.return_unit) ;
-    st.worker <-
-      Lwt_utils.worker
-        "writer"
-        ~on_event:Internal_event.Lwt_worker_logger.on_event
-        ~run:(fun () -> worker_loop st)
-        ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler) ;
-    st
+    let table =
+      Worker.create_table
+        (Callback
+           (fun () ->
+             Lwt_syntax.return @@ Worker.Any_request (Loop, {scope = None})))
+    in
+    let* worker =
+      Worker.launch
+        table
+        conn.info.peer_id
+        (P {canceler; conn; messages})
+        (module Handlers)
+    in
+    return {worker; messages; encoding; binary_chunks_size}
 
   let shutdown st =
-    let open Lwt_syntax in
-    let* () = Error_monad.cancel_with_exceptions st.canceler in
-    st.worker
+    let st = Worker.state_opt st.worker in
+    Option.iter_s
+      (fun Types.(S st) -> Error_monad.cancel_with_exceptions st.canceler)
+      st
+
+  let wait_for_completion st = Worker.wait_for_completion st.worker
 end
 
 type ('msg, 'meta) t = {
   conn : 'meta authenticated_connection;
   reader : ('msg, 'meta) Reader.t;
   writer : ('msg, 'meta) Writer.t;
+  canceler : Lwt_canceler.t;
 }
 
 let equal {conn = {scheduled_conn = conn2; _}; _}
@@ -765,9 +904,9 @@ let accept ?incoming_message_queue_size ?outgoing_message_queue_size
   match ack with
   | Ack ->
       let canceler = Lwt_canceler.create () in
-      let reader =
+      let* reader =
         Reader.run ?size:incoming_message_queue_size conn encoding canceler
-      and writer =
+      and* writer =
         Writer.run
           ?size:outgoing_message_queue_size
           ?binary_chunks_size
@@ -775,7 +914,7 @@ let accept ?incoming_message_queue_size ?outgoing_message_queue_size
           encoding
           canceler
       in
-      let conn = {conn; reader; writer} in
+      let conn = {conn; reader; writer; canceler} in
       Lwt_canceler.on_cancel canceler (fun () ->
           let open Lwt_syntax in
           let* (_ : unit tzresult) =
@@ -869,11 +1008,12 @@ let close ?(wait = false) ~reason st =
     else (
       Lwt_pipe.Maybe_bounded.close st.reader.messages ;
       Lwt_pipe.Maybe_bounded.close st.writer.messages ;
-      st.writer.worker)
+      Writer.wait_for_completion st.writer)
   in
   (* [st.conn.scheduled_conn] is closed by [Reader.shutdown] and
      [Writer.shutdown], the reason must be added before. *)
   P2p_io_scheduler.add_closing_reason ~reason st.conn.scheduled_conn ;
+  let* () = Error_monad.cancel_with_exceptions st.canceler in
   let* () = Reader.shutdown st.reader in
   let* () = Writer.shutdown st.writer in
   Lwt.return_unit
@@ -934,26 +1074,12 @@ module Internal_for_tests = struct
 
   let mock ?(reader = Lwt_pipe.Maybe_bounded.create ())
       ?(writer = Lwt_pipe.Maybe_bounded.create ()) conn =
-    let reader =
-      Reader.
-        {
-          canceler = Lwt_canceler.create ();
-          conn;
-          encoding = make_crashing_encoding ();
-          messages = reader;
-          worker = Lwt.return_unit;
-        }
+    let open Lwt_result_syntax in
+    let canceler = Lwt_canceler.create () in
+    let* reader =
+      Reader.run ~messages:reader conn (make_crashing_encoding ()) canceler
+    and* writer =
+      Writer.run ~messages:writer conn (make_crashing_encoding ()) canceler
     in
-    let writer =
-      Writer.
-        {
-          canceler = Lwt_canceler.create ();
-          conn;
-          encoding = make_crashing_encoding ();
-          messages = writer;
-          worker = Lwt.return_unit;
-          binary_chunks_size = 0;
-        }
-    in
-    {conn; reader; writer}
+    return {conn; reader; writer; canceler}
 end
