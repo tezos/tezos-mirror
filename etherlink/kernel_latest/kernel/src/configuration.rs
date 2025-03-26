@@ -70,7 +70,6 @@ pub struct Configuration {
     pub mode: ConfigurationMode,
     pub maximum_allowed_ticks: u64,
     pub enable_fa_bridge: bool,
-    pub chain_config: ChainConfig,
     pub garbage_collect_blocks: bool,
 }
 
@@ -81,7 +80,6 @@ impl Default for Configuration {
             mode: ConfigurationMode::Proxy,
             maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
-            chain_config: ChainConfig::default(),
             garbage_collect_blocks: false,
         }
     }
@@ -91,8 +89,8 @@ impl std::fmt::Display for Configuration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Tezos Contracts: {}, Mode: {}, Enable FA Bridge: {}, Chain Config: {}, Garbage collect blocks: {}",
-            &self.tezos_contracts, &self.mode, &self.enable_fa_bridge, &self.chain_config, &self.garbage_collect_blocks
+            "Tezos Contracts: {}, Mode: {}, Enable FA Bridge: {}, Garbage collect blocks: {}",
+            &self.tezos_contracts, &self.mode, &self.enable_fa_bridge, &self.garbage_collect_blocks
         )
     }
 }
@@ -209,10 +207,7 @@ pub fn fetch_chain_configuration<Host: Runtime>(
     }
 }
 
-pub fn fetch_configuration<Host: Runtime>(
-    host: &mut Host,
-    chain_id: U256,
-) -> Configuration {
+pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
     let tezos_contracts = fetch_tezos_contracts(host);
     let maximum_allowed_ticks =
         read_maximum_allowed_ticks(host).unwrap_or(MAX_ALLOWED_TICKS);
@@ -220,7 +215,6 @@ pub fn fetch_configuration<Host: Runtime>(
     let enable_fa_bridge = is_enable_fa_bridge(host).unwrap_or_default();
     let dal: Option<DalConfiguration> = fetch_dal_configuration(host);
     let evm_node_flag = evm_node_flag(host).unwrap_or(false);
-    let chain_config = fetch_chain_configuration(host, chain_id);
     match sequencer {
         Some(sequencer) => {
             let delayed_bridge = read_delayed_transaction_bridge(host)
@@ -249,13 +243,11 @@ pub fn fetch_configuration<Host: Runtime>(
                     },
                     maximum_allowed_ticks,
                     enable_fa_bridge,
-                    chain_config,
                     garbage_collect_blocks: !evm_node_flag,
                 },
                 Err(err) => {
                     log!(host, Fatal, "The kernel failed to created the delayed inbox, reverting configuration to proxy ({:?})", err);
                     Configuration {
-                        chain_config,
                         ..Configuration::default()
                     }
                 }
@@ -266,7 +258,6 @@ pub fn fetch_configuration<Host: Runtime>(
             mode: ConfigurationMode::Proxy,
             maximum_allowed_ticks,
             enable_fa_bridge,
-            chain_config,
             garbage_collect_blocks: false,
         },
     }

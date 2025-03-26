@@ -274,10 +274,11 @@ enum BlueprintParsing {
 fn next_bip_from_blueprints<Host: Runtime>(
     host: &mut Host,
     tick_counter: &TickCounter,
+    chain_config: &ChainConfig,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
 ) -> Result<BlueprintParsing, anyhow::Error> {
-    let chain_family = config.chain_config.get_chain_family();
+    let chain_family = chain_config.get_chain_family();
     let (next_bip_number, timestamp, chain_header) =
         match read_current_block_header_for_family(host, &chain_family) {
             Err(_) => (
@@ -307,7 +308,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
                     return Ok(BlueprintParsing::None);
                 }
             }
-            match (&config.chain_config, chain_header) {
+            match (&chain_config, chain_header) {
                 (ChainConfig::Evm(chain_config), ChainHeader::Eth(header)) => {
                     let gas_price = crate::gas_price::base_fee_per_gas(
                         host,
@@ -498,11 +499,12 @@ fn promote_block<Host: Runtime>(
 
 pub fn produce<Host: Runtime>(
     host: &mut Host,
+    chain_config: &ChainConfig,
     config: &mut Configuration,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
 ) -> Result<ComputationResult, anyhow::Error> {
-    let chain_id = config.chain_config.get_chain_id();
+    let chain_id = chain_config.get_chain_id();
     let da_fee_per_byte = crate::retrieve_da_fee(host)?;
 
     let kernel_upgrade = upgrade::read_kernel_upgrade(host)?;
@@ -537,6 +539,7 @@ pub fn produce<Host: Runtime>(
                 let block_in_progress = match next_bip_from_blueprints(
                     safe_host.host,
                     &tick_counter,
+                    chain_config,
                     config,
                     &kernel_upgrade,
                 )? {
@@ -559,7 +562,7 @@ pub fn produce<Host: Runtime>(
         };
 
     let processed_blueprint = block_in_progress.number();
-    let computation_result = match (&config.chain_config, block_in_progress) {
+    let computation_result = match (&chain_config, block_in_progress) {
         (
             ChainConfig::Evm(chain_config),
             BlockInProgress::Etherlink(block_in_progress),
@@ -765,24 +768,16 @@ mod tests {
     const DUMMY_BASE_FEE_PER_GAS: u64 = MINIMUM_BASE_FEE_PER_GAS;
     const DUMMY_DA_FEE: u64 = DA_FEE_PER_BYTE;
 
-    fn dummy_configuration(evm_configuration: Config) -> Configuration {
-        Configuration {
-            chain_config: ChainConfig::new_evm_config(
-                DUMMY_CHAIN_ID,
-                EvmLimits::default(),
-                evm_configuration,
-            ),
-            ..Configuration::default()
-        }
+    fn dummy_configuration(evm_configuration: Config) -> ChainConfig {
+        ChainConfig::new_evm_config(
+            DUMMY_CHAIN_ID,
+            EvmLimits::default(),
+            evm_configuration,
+        )
     }
 
-    fn dummy_tez_configuration() -> Configuration {
-        Configuration {
-            chain_config: ChainConfig::Michelson(MichelsonChainConfig::create_config(
-                DUMMY_CHAIN_ID,
-            )),
-            ..Configuration::default()
-        }
+    fn dummy_tez_configuration() -> ChainConfig {
+        ChainConfig::Michelson(MichelsonChainConfig::create_config(DUMMY_CHAIN_ID))
     }
 
     fn dummy_block_fees() -> BlockFees {
@@ -955,7 +950,8 @@ mod tests {
 
         produce(
             host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_configuration(EVMVersion::current_test_config()),
+            &mut Configuration::default(),
             None,
             None,
         )
@@ -976,7 +972,8 @@ mod tests {
     fn test_produce_tezlink_block() {
         let mut host = MockKernelHost::default();
 
-        let mut config = dummy_tez_configuration();
+        let chain_config = dummy_tez_configuration();
+        let mut config = Configuration::default();
 
         store_blueprints(
             &mut host,
@@ -987,13 +984,13 @@ mod tests {
             ],
         );
 
-        produce(&mut host, &mut config, None, None)
+        produce(&mut host, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
-        produce(&mut host, &mut config, None, None)
+        produce(&mut host, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
-        produce(&mut host, &mut config, None, None)
+        produce(&mut host, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
-        let computation = produce(&mut host, &mut config, None, None)
+        let computation = produce(&mut host, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
         assert_eq!(ComputationResult::Finished, computation);
         assert_eq!(U256::from(2), read_current_number(&host).unwrap());
@@ -1008,6 +1005,7 @@ mod tests {
             DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
+        let mut config = Configuration::default();
 
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
 
@@ -1030,7 +1028,8 @@ mod tests {
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_configuration(EVMVersion::current_test_config()),
+            &mut config,
             None,
             None,
         )
@@ -1051,6 +1050,7 @@ mod tests {
             DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
+        let mut config = Configuration::default();
 
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
 
@@ -1074,7 +1074,8 @@ mod tests {
 
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_configuration(EVMVersion::current_test_config()),
+            &mut config,
             None,
             None,
         )
@@ -1089,6 +1090,7 @@ mod tests {
     // Test if a valid transaction is producing a receipt with a contract address
     fn test_valid_transactions_receipt_contract_address() {
         let mut host = MockKernelHost::default();
+        let mut config = Configuration::default();
 
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
         let tx = dummy_eth_transaction_deploy();
@@ -1116,7 +1118,8 @@ mod tests {
 
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_configuration(EVMVersion::current_test_config()),
+            &mut config,
             None,
             None,
         )
@@ -1165,6 +1168,7 @@ mod tests {
             DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
+        let mut config = Configuration::default();
 
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
         let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
@@ -1197,7 +1201,8 @@ mod tests {
         // Produce block for blueprint containing transaction_0
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_configuration(EVMVersion::current_test_config()),
+            &mut config,
             None,
             None,
         )
@@ -1205,7 +1210,8 @@ mod tests {
         // Produce block for blueprint containing transaction_1
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_configuration(EVMVersion::current_test_config()),
+            &mut config,
             None,
             None,
         )
@@ -1223,6 +1229,7 @@ mod tests {
     // Test transfers gas consumption consistency
     fn test_cumulative_transfers_gas_consumption() {
         let mut host = MockKernelHost::default();
+        let mut config = Configuration::default();
 
         let base_gas = U256::from(21000);
         let dummy_block_fees = dummy_block_fees();
@@ -1262,7 +1269,8 @@ mod tests {
 
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_configuration(EVMVersion::current_test_config()),
+            &mut config,
             None,
             None,
         )
@@ -1296,6 +1304,7 @@ mod tests {
     // Test that the same transaction can not be replayed twice
     fn test_replay_attack() {
         let mut host = MockKernelHost::default();
+        let mut config = Configuration::default();
 
         let tx = Transaction {
             tx_hash: [0; TRANSACTION_HASH_SIZE],
@@ -1321,7 +1330,8 @@ mod tests {
 
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_configuration(EVMVersion::current_test_config()),
+            &mut config,
             None,
             None,
         )
@@ -1352,6 +1362,7 @@ mod tests {
             DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
+        let mut config = Configuration::default();
 
         let blocks_index =
             block_storage::internal_for_tests::init_blocks_index().unwrap();
@@ -1370,7 +1381,8 @@ mod tests {
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_configuration(EVMVersion::current_test_config()),
+            &mut config,
             None,
             None,
         )
@@ -1498,6 +1510,7 @@ mod tests {
     #[test]
     fn invalid_transaction_should_bump_nonce() {
         let mut host = MockKernelHost::default();
+        let mut config = Configuration::default();
 
         let mut evm_account_storage = init_account_storage().unwrap();
 
@@ -1530,7 +1543,8 @@ mod tests {
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_configuration(EVMVersion::current_test_config()),
+            &mut config,
             None,
             None,
         )
@@ -1569,6 +1583,7 @@ mod tests {
     #[test]
     fn test_first_blocks() {
         let mut host = MockKernelHost::default();
+        let mut config = Configuration::default();
 
         // first block should be 0
         let blueprint = almost_empty_blueprint();
@@ -1576,7 +1591,8 @@ mod tests {
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_configuration(EVMVersion::current_test_config()),
+            &mut config,
             None,
             None,
         )
@@ -1588,7 +1604,8 @@ mod tests {
         store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_configuration(EVMVersion::current_test_config()),
+            &mut config,
             None,
             None,
         )
@@ -1600,7 +1617,8 @@ mod tests {
         store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_configuration(EVMVersion::current_test_config()),
+            &mut config,
             None,
             None,
         )
@@ -1731,12 +1749,18 @@ mod tests {
         // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
         let mut configuration = Configuration {
             maximum_allowed_ticks: 9_000_000_000,
-            ..dummy_configuration(EVMVersion::current_test_config())
+            ..Configuration::default()
         };
 
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
-        let computation_result = produce(&mut host, &mut configuration, None, None)
-            .expect("Should have produced");
+        let computation_result = produce(
+            &mut host,
+            &dummy_configuration(EVMVersion::current_test_config()),
+            &mut configuration,
+            None,
+            None,
+        )
+        .expect("Should have produced");
 
         // test no new block
         assert!(
@@ -1752,6 +1776,7 @@ mod tests {
     fn test_reboot_many_tx_many_proposal() {
         // init host
         let mut host = MockKernelHost::default();
+        let mut config = Configuration::default();
 
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
@@ -1804,18 +1829,21 @@ mod tests {
         store_blueprints(&mut host, proposals);
 
         // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
+        let chain_config = dummy_configuration(EVMVersion::current_test_config());
         let mut configuration = Configuration {
             maximum_allowed_ticks: 9_000_000_000,
-            ..dummy_configuration(EVMVersion::current_test_config())
+            ..Configuration::default()
         };
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
-        let computation_result = produce(&mut host, &mut configuration, None, None)
-            .expect("Should have produced");
+        let computation_result =
+            produce(&mut host, &chain_config, &mut configuration, None, None)
+                .expect("Should have produced");
         // test reboot is set
         matches!(computation_result, ComputationResult::RebootNeeded);
 
-        let computation_result = produce(&mut host, &mut configuration, None, None)
-            .expect("Should have produced");
+        let computation_result =
+            produce(&mut host, &chain_config, &mut configuration, None, None)
+                .expect("Should have produced");
 
         // test no new block
         assert_eq!(
@@ -1839,9 +1867,8 @@ mod tests {
             "There should be some transactions left"
         );
 
-        let _next_blueprint =
-            read_next_blueprint(&mut host, &mut Configuration::default())
-                .expect("The next blueprint should be available");
+        let _next_blueprint = read_next_blueprint(&mut host, &mut config)
+            .expect("The next blueprint should be available");
     }
 
     #[test]
@@ -1858,6 +1885,7 @@ mod tests {
 
         // init host
         let mut host = MockKernelHost::default();
+        let mut config = Configuration::default();
 
         // see
         // https://basescan.org/tx/0x07471adfe8f4ec553c1199f495be97fc8be8e0626ae307281c22534460184ed1
@@ -1898,7 +1926,8 @@ mod tests {
 
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_configuration(EVMVersion::current_test_config()),
+            &mut config,
             None,
             None,
         )
@@ -1956,9 +1985,10 @@ mod tests {
         store_inbox_blueprint(&mut host, blueprint(proposals_first_reboot)).unwrap();
 
         // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
+        let chain_config = dummy_configuration(EVMVersion::current_test_config());
         let mut configuration = Configuration {
             maximum_allowed_ticks: 9_000_000_000,
-            ..dummy_configuration(EVMVersion::current_test_config())
+            ..Configuration::default()
         };
         // sanity check: no current block
         assert!(
@@ -1966,7 +1996,8 @@ mod tests {
             "Should not have found current block number"
         );
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
-        produce(&mut host, &mut configuration, None, None).expect("Should have produced");
+        produce(&mut host, &chain_config, &mut configuration, None, None)
+            .expect("Should have produced");
 
         assert!(
             block_storage::read_current_number(&host).is_ok(),
@@ -1980,7 +2011,8 @@ mod tests {
         store_inbox_blueprint(&mut host, blueprint(proposals_second_reboot)).unwrap();
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
-        produce(&mut host, &mut configuration, None, None).expect("Should have produced");
+        produce(&mut host, &chain_config, &mut configuration, None, None)
+            .expect("Should have produced");
 
         let block = block_storage::read_current(&mut host, &ChainFamily::Evm)
             .expect("Should have found a block");
@@ -2025,6 +2057,7 @@ mod tests {
             DUMMY_BASE_FEE_PER_GAS.into(),
         )
         .unwrap();
+        let mut config = Configuration::default();
 
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
         let tx_hash_eip1559 = [1; TRANSACTION_HASH_SIZE];
@@ -2061,7 +2094,8 @@ mod tests {
 
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_configuration(EVMVersion::current_test_config()),
+            &mut config,
             None,
             None,
         )

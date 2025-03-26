@@ -164,6 +164,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
 pub fn fetch_blueprints<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
+    chain_config: &ChainConfig,
     config: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error> {
     match &mut config.mode {
@@ -185,7 +186,7 @@ pub fn fetch_blueprints<Host: Runtime>(
             config.maximum_allowed_ticks,
             config.enable_fa_bridge,
             config.garbage_collect_blocks,
-            &config.chain_config,
+            chain_config,
         ),
         ConfigurationMode::Proxy => fetch_proxy_blueprints(
             host,
@@ -193,7 +194,7 @@ pub fn fetch_blueprints<Host: Runtime>(
             &config.tezos_contracts,
             config.enable_fa_bridge,
             config.garbage_collect_blocks,
-            &config.chain_config,
+            chain_config,
         ),
     }
 }
@@ -281,7 +282,6 @@ mod tests {
             },
             maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
-            chain_config: test_chain_config(),
             garbage_collect_blocks: false,
         }
     }
@@ -296,7 +296,6 @@ mod tests {
             mode: ConfigurationMode::Proxy,
             maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
-            chain_config: test_chain_config(),
             garbage_collect_blocks: false,
         }
     }
@@ -406,8 +405,10 @@ mod tests {
         let mut host = MockKernelHost::default();
         host.host
             .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
+        let chain_config = test_chain_config();
         let mut conf = dummy_proxy_configuration();
-        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &chain_config, &mut conf)
+            .expect("fetch failed");
 
         match read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -429,8 +430,10 @@ mod tests {
             .add_external(Bytes::from(hex::decode(DUMMY_CHUNK1).unwrap()));
         host.host
             .add_external(Bytes::from(hex::decode(DUMMY_CHUNK2).unwrap()));
+        let chain_config = test_chain_config();
         let mut conf = dummy_proxy_configuration();
-        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &chain_config, &mut conf)
+            .expect("fetch failed");
 
         match read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -447,8 +450,10 @@ mod tests {
         let mut host = MockKernelHost::default();
         host.host
             .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
+        let chain_config = test_chain_config();
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &chain_config, &mut conf)
+            .expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -477,8 +482,10 @@ mod tests {
             .add_external(Bytes::from(hex::decode(DUMMY_CHUNK1).unwrap()));
         host.host
             .add_external(Bytes::from(hex::decode(DUMMY_CHUNK2).unwrap()));
+        let chain_config = test_chain_config();
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &chain_config, &mut conf)
+            .expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -504,8 +511,10 @@ mod tests {
         host.host.add_external(Bytes::from(
             hex::decode(DUMMY_BLUEPRINT_CHUNK_NUMBER_10).unwrap(),
         ));
+        let chain_config = test_chain_config();
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &chain_config, &mut conf)
+            .expect("fetch failed");
 
         // The dummy chunk in the inbox is registered at block 10
         if read_blueprint(
@@ -538,8 +547,10 @@ mod tests {
         host.host.add_external(Bytes::from(
             hex::decode(DUMMY_BLUEPRINT_CHUNK_UNPARSABLE).unwrap(),
         ));
+        let chain_config = test_chain_config();
         let mut conf = dummy_sequencer_config(enable_dal, None);
-        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &chain_config, &mut conf)
+            .expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -565,6 +576,7 @@ mod tests {
         host.host.add_external(Bytes::from(
             hex::decode(DUMMY_BLUEPRINT_CHUNK_NUMBER_10).unwrap(),
         ));
+        let chain_config = test_chain_config();
         let mut conf = dummy_sequencer_config(enable_dal, None);
 
         match read_proxy_inbox(
@@ -573,7 +585,7 @@ mod tests {
             &conf.tezos_contracts,
             false,
             false,
-            &conf.chain_config,
+            &chain_config,
         )
         .unwrap()
         {
@@ -608,6 +620,7 @@ mod tests {
 
     fn test_parsing_delayed_inbox(enable_dal: bool) {
         let mut host = MockKernelHost::default();
+        let chain_config = test_chain_config();
         let mut conf = dummy_sequencer_config(enable_dal, None);
         let metadata = TransferMetadata::new(
             delayed_bridge(&conf),
@@ -616,7 +629,8 @@ mod tests {
         for message in dummy_delayed_transaction() {
             host.host.add_transfer(message, &metadata);
         }
-        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &chain_config, &mut conf)
+            .expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -643,6 +657,7 @@ mod tests {
 
     fn test_parsing_l1_contract_inbox(enable_dal: bool) {
         let mut host = MockKernelHost::default();
+        let chain_config = test_chain_config();
         let mut conf = dummy_sequencer_config(enable_dal, None);
         let metadata = TransferMetadata::new(
             ContractKt1Hash::from_b58check(DUMMY_INVALID_TICKETER).unwrap(),
@@ -651,7 +666,8 @@ mod tests {
         for message in dummy_delayed_transaction() {
             host.host.add_transfer(message, &metadata);
         }
-        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &chain_config, &mut conf)
+            .expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -679,6 +695,7 @@ mod tests {
     #[test]
     fn test_parsing_delayed_inbox_rejected_in_proxy() {
         let mut host = MockKernelHost::default();
+        let chain_config = test_chain_config();
         let mut conf = dummy_proxy_configuration();
         let metadata = TransferMetadata::new(
             ContractKt1Hash::from_b58check(DUMMY_INVALID_TICKETER).unwrap(),
@@ -687,7 +704,8 @@ mod tests {
         for message in dummy_delayed_transaction() {
             host.host.add_transfer(message, &metadata)
         }
-        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &chain_config, &mut conf)
+            .expect("fetch failed");
 
         match read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail").0
@@ -702,6 +720,7 @@ mod tests {
     #[test]
     fn test_deposit_in_proxy_mode() {
         let mut host = MockKernelHost::default();
+        let chain_config = test_chain_config();
         let mut conf = dummy_proxy_configuration();
         let metadata = TransferMetadata::new(
             conf.tezos_contracts.ticketer.clone().unwrap(),
@@ -711,7 +730,8 @@ mod tests {
             dummy_deposit(conf.tezos_contracts.ticketer.clone().unwrap()),
             &metadata,
         );
-        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &chain_config, &mut conf)
+            .expect("fetch failed");
 
         match read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -729,6 +749,7 @@ mod tests {
     #[test]
     fn test_deposit_with_invalid_ticketer() {
         let mut host = MockKernelHost::default();
+        let chain_config = test_chain_config();
         let mut conf = dummy_proxy_configuration();
         let metadata = TransferMetadata::new(
             ContractKt1Hash::from_b58check(DUMMY_INVALID_TICKETER).unwrap(),
@@ -740,7 +761,8 @@ mod tests {
             ),
             &metadata,
         );
-        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &chain_config, &mut conf)
+            .expect("fetch failed");
 
         match read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -757,6 +779,7 @@ mod tests {
 
     fn test_deposit_in_sequencer_mode(enable_dal: bool) {
         let mut host = MockKernelHost::default();
+        let chain_config = test_chain_config();
         let mut conf = dummy_sequencer_config(enable_dal, None);
         let metadata = TransferMetadata::new(
             conf.tezos_contracts.ticketer.clone().unwrap(),
@@ -766,7 +789,8 @@ mod tests {
             dummy_deposit(conf.tezos_contracts.ticketer.clone().unwrap()),
             &metadata,
         );
-        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &chain_config, &mut conf)
+            .expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -824,6 +848,7 @@ mod tests {
 
     fn setup_dal_signal(
         host: &mut MockKernelHost,
+        chain_config: &ChainConfig,
         conf: &mut Configuration,
         signal_slots: Option<Vec<u8>>,
         filled_slots: Option<Vec<u8>>,
@@ -842,15 +867,17 @@ mod tests {
         let filled_slots = filled_slots.unwrap_or(dal_slots);
         fill_slots(host, filled_slots);
 
-        fetch_blueprints(host, DEFAULT_SR_ADDRESS, conf).expect("fetch failed");
+        fetch_blueprints(host, DEFAULT_SR_ADDRESS, chain_config, conf)
+            .expect("fetch failed");
     }
 
     #[test]
     fn test_dal_signal() {
         let mut host = MockKernelHost::default();
+        let chain_config = test_chain_config();
         let mut conf = dummy_sequencer_config(true, None);
 
-        setup_dal_signal(&mut host, &mut conf, None, None);
+        setup_dal_signal(&mut host, &chain_config, &mut conf, None, None);
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -864,9 +891,16 @@ mod tests {
     #[test]
     fn test_dal_signal_empty_slot() {
         let mut host = MockKernelHost::default();
+        let chain_config = test_chain_config();
         let mut conf = dummy_sequencer_config(false, Some(vec![8]));
 
-        setup_dal_signal(&mut host, &mut conf, Some(vec![21]), Some(vec![]));
+        setup_dal_signal(
+            &mut host,
+            &chain_config,
+            &mut conf,
+            Some(vec![21]),
+            Some(vec![]),
+        );
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -880,9 +914,10 @@ mod tests {
     #[test]
     fn test_dal_signal_with_multiple_slots_filled() {
         let mut host = MockKernelHost::default();
+        let chain_config = test_chain_config();
         let mut conf = dummy_sequencer_config(true, Some(vec![6, 8]));
 
-        setup_dal_signal(&mut host, &mut conf, None, None);
+        setup_dal_signal(&mut host, &chain_config, &mut conf, None, None);
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -896,9 +931,10 @@ mod tests {
     #[test]
     fn test_parsable_dal_signal_without_dal() {
         let mut host = MockKernelHost::default();
+        let chain_config = test_chain_config();
         let mut conf = dummy_sequencer_config(false, None);
 
-        setup_dal_signal(&mut host, &mut conf, Some(vec![6]), None);
+        setup_dal_signal(&mut host, &chain_config, &mut conf, Some(vec![6]), None);
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -912,9 +948,10 @@ mod tests {
     #[test]
     fn test_invalid_dal_signal() {
         let mut host = MockKernelHost::default();
+        let chain_config = test_chain_config();
         let mut conf = dummy_sequencer_config(true, Some(vec![8]));
 
-        setup_dal_signal(&mut host, &mut conf, Some(vec![21]), None);
+        setup_dal_signal(&mut host, &chain_config, &mut conf, Some(vec![21]), None);
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")

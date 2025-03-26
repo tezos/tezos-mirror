@@ -734,7 +734,7 @@ pub fn read_next_blueprint<Host: Runtime>(
     host: &mut Host,
     config: &mut Configuration,
 ) -> anyhow::Result<(Option<Blueprint>, usize)> {
-    let chain_family = config.chain_config.get_chain_family();
+    let chain_family = ChainFamily::Evm;
     let (number, previous_timestamp, block_header) =
         match read_current_block_header_for_family(host, &chain_family) {
             Ok(BlockHeader {
@@ -772,7 +772,6 @@ mod tests {
 
     use super::*;
     use crate::block::GENESIS_PARENT_HASH;
-    use crate::chains::ChainConfig;
     use crate::configuration::{DalConfiguration, TezosContracts};
     use crate::delayed_inbox::Hash;
     use crate::sequencer_blueprint::{rlp_roundtrip, rlp_roundtrip_f};
@@ -815,7 +814,6 @@ mod tests {
             },
             maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
-            chain_config: ChainConfig::default(),
             garbage_collect_blocks: false,
         };
 

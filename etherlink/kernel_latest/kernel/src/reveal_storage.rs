@@ -6,7 +6,7 @@
 //! chain into a new deployment. It is not tick-safe, and should obviously not be used in a
 //! production setup.
 
-use crate::configuration::{fetch_configuration, CHAIN_ID};
+use crate::configuration::{fetch_chain_configuration, fetch_configuration, CHAIN_ID};
 use crate::storage::{read_chain_id, ADMIN, SEQUENCER};
 use primitive_types::U256;
 use rlp::{Decodable, DecoderError, Rlp};
@@ -107,6 +107,8 @@ pub fn reveal_storage(
     log!(host, Info, "Done revealing");
 
     let chain_id = read_chain_id(host).unwrap_or(U256::from(CHAIN_ID));
-    let configuration = fetch_configuration(host, chain_id);
+    let chain_config = fetch_chain_configuration(host, chain_id);
+    let configuration = fetch_configuration(host);
+    log!(host, Info, "Chain Configuration {}", chain_config);
     log!(host, Info, "Configuration {}", configuration);
 }
