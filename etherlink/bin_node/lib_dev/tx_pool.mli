@@ -11,14 +11,6 @@ type mode =
   | Sequencer
   | Relay
       (** Relays the transactions when they are valid w.r.t. the local state. *)
-  | Forward of {
-      injector :
-        Ethereum_types.legacy_transaction_object ->
-        string ->
-        (Ethereum_types.hash, string) result tzresult Lwt.t;
-    }
-      (** Forwards the transactions without checking the
-          transaction validity. *)
 
 type parameters = {
   backend : (module Services_backend_sig.S);  (** The backend RPC module. *)

@@ -95,6 +95,23 @@ let install_finalizer_observer ~rollup_node_tracking finalizer_public_server
   let* () = Evm_context.shutdown () in
   when_ rollup_node_tracking @@ fun () -> Evm_events_follower.shutdown ()
 
+let container_forward_tx ~keep_alive ~evm_node_endpoint :
+    (module Services_backend_sig.Tx_container) =
+  (module struct
+    let nonce ~next_nonce _address = Lwt_result.return next_nonce
+
+    let add ~next_nonce:_ _tx_object ~raw_tx =
+      Injector.send_raw_transaction
+        ~keep_alive
+        ~base:evm_node_endpoint
+        ~raw_tx:(Ethereum_types.hex_to_bytes raw_tx)
+
+    let find _hash = Lwt_result.return None
+
+    let content () =
+      Lwt_result.return {pending = AddressMap.empty; queued = AddressMap.empty}
+  end)
+
 let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     ~init_from_snapshot () =
   let open Lwt_result_syntax in
@@ -166,36 +183,31 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
           ( (module Tx_queue.Tx_container : Services_backend_sig.Tx_container),
             false )
     | None ->
-        let mode =
-          if config.finalized_view then
-            Tx_pool.Forward
+        if config.finalized_view then
+          let tx_container =
+            container_forward_tx
+              ~keep_alive:config.keep_alive
+              ~evm_node_endpoint
+          in
+          return (tx_container, false)
+        else
+          let* () =
+            Tx_pool.start
               {
-                injector =
-                  (fun _ raw_tx ->
-                    Injector.send_raw_transaction
-                      ~keep_alive:config.keep_alive
-                      ~base:evm_node_endpoint
-                      ~raw_tx);
+                backend = observer_backend;
+                smart_rollup_address =
+                  Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
+                    smart_rollup_address;
+                mode = Relay;
+                tx_timeout_limit = config.tx_pool_timeout_limit;
+                tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
+                tx_pool_tx_per_addr_limit =
+                  Int64.to_int config.tx_pool_tx_per_addr_limit;
               }
-          else Tx_pool.Relay
-        in
-        let* () =
-          Tx_pool.start
-            {
-              backend = observer_backend;
-              smart_rollup_address =
-                Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
-                  smart_rollup_address;
-              mode;
-              tx_timeout_limit = config.tx_pool_timeout_limit;
-              tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
-              tx_pool_tx_per_addr_limit =
-                Int64.to_int config.tx_pool_tx_per_addr_limit;
-            }
-        in
-        return
-          ( (module Tx_pool.Tx_container : Services_backend_sig.Tx_container),
-            true )
+          in
+          return
+            ( (module Tx_pool.Tx_container : Services_backend_sig.Tx_container),
+              true )
   in
 
   Metrics.init
