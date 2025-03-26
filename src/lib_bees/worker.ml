@@ -708,8 +708,7 @@ struct
                   | Error errs ->
                       (* On unrecoverable error, launch the shutdown process *)
                       let emit () = Worker_events.(emit crashed) errs in
-                      Lwt_eio.run_lwt_in_main (fun () ->
-                          shutdown ~birth worker ~emit) ;
+                      shutdown_eio ~birth worker ~emit ;
                       loop ())
               | exception e ->
                   resolve resolver (Error (Any e)) ;
