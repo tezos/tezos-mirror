@@ -314,7 +314,7 @@ let wrap_qcheck test () =
     will fail if using [Unix.fork].
 *)
 let tztest label fn =
-  Tztest.tztest label `Quick @@ fun () ->
+  Alcotest.test_case label `Quick @@ fun () ->
   match Lwt_unix.fork () with
   | 0 -> (
       (* FIXME: do we want to use [Tezos_base_unix.Event_loop.main_run_eio]?
@@ -326,11 +326,12 @@ let tztest label fn =
       | Ok () -> exit 0
       | Error _ -> exit 1)
   | pid -> (
-      let open Lwt_result_syntax in
-      let*! _, status = Lwt_unix.waitpid [] pid in
+      let _, status = Unix.waitpid [] pid in
       match status with
-      | Unix.WEXITED 0 -> return_unit
-      | _ -> Lwt.return_error [])
+      | Unix.WEXITED 0 -> ()
+      | _ ->
+          let msg = Format.sprintf "Error in %s." label in
+          raise (Alcotest.fail msg))
 
 let tests_history =
   ( "Queue history",
@@ -354,8 +355,7 @@ let tests_buffer =
   ("Buffer handling", [tztest "Dropbox/Async (eio handlers)" test_async_dropbox])
 
 let () =
-  Alcotest_lwt.run
+  Alcotest.run
     ~__FILE__
     "Bees_workers (eio handlers)"
     [tests_history; tests_status; tests_buffer]
-  |> Lwt_main.run
