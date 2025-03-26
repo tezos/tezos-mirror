@@ -10,7 +10,31 @@
     Component:  Lib_crypto_dal Test_dal_cryptobox
     Invocation: dune exec src/lib_crypto_dal/test/main.exe -- --file test_trap.ml
     Subject:    Tests the Trap module
+
 *)
+
+(* The [test_share_is_trap_stats] test checks that the fraction f=10% of "traps"
+   among N=10,000 randomly generated samples is within p=±10% of the expected
+   value (i.e., between 900 and 1,100 traps, assuming a true trap fraction f).
+
+   Even if the trap detection function is "perfect" — meaning it correctly
+   classifies each data sample as a "trap" or "non-trap" according to the
+   intended probability f — there is still some natural variation due to
+   randomness in the sampling process.
+
+   The probability of observing exactly `k` traps in the N samples follows the
+   binomial distribution:
+
+       P(k traps) = C(N, k) * f^k * (1 - f)^(N - k)
+
+   Therefore, the probability that the number of traps falls in the acceptable
+   range — i.e. with low = (1 - p) * N = 900 and high = (1 + p) * N = 1100 is:
+
+       P(pass) = sum_{k=low}^{high} [P(k traps)]
+
+   This probability is approximately 99.92%. So even if the trap function is
+   "perfect", the test has a 0.08% chance of failing due to the variation in the
+   randomly generated samples. *)
 
 let get_commitment_and_shards_with_proofs cryptobox ~slot =
   let res =
@@ -36,7 +60,11 @@ let parameters =
     number_of_shards;
   }
 
-let traps_fraction = Q.(1 // 2_000)
+(* This value is much bigger than the one used in production. However, to check
+   for smaller values, we would need more samples, and that would make the test
+   slower. Testing for this values should already provide some assurance that
+   the trap checking function behaves correctly. *)
+let traps_fraction = Q.(1 // 10)
 
 let setup () =
   let open Lwt_result_syntax in
@@ -74,8 +102,8 @@ let test_share_is_trap_stats () =
   in
 
   (* The number of shards to be generated and used is such that there should be
-     100 traps in total. *)
-  let num_samples = Q.(of_int 100 * (one / traps_fraction) |> to_int) in
+     1000 traps in total. *)
+  let num_samples = Q.(of_int 1000 * (one / traps_fraction) |> to_int) in
   let number_of_slots = 1 + (num_samples / number_of_shards) in
   let total_shards = number_of_slots * number_of_shards in
 
