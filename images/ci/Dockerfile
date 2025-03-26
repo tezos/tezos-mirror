@@ -374,11 +374,11 @@ RUN --mount=type=secret,id=npm_token \
       npm set registry "$NPM_REGISTRY" && \
       npm set //${NPM_REGISTRY_DOMAIN}:_authToken=$(cat /run/secrets/npm_token); \
     fi \
- && npm --verbose install -g "@datadog/datadog-ci@2.46.0" \
+ && npm install -g "@datadog/datadog-ci@2.46.0" \
  # We need eth since e2e tests. This requires git as well.
- && npm --verbose install -g eth-cli@2.0.2 \
+ && npm install -g eth-cli@2.0.2 \
  # We need solc to compile solidity smart-contracts
- && npm --verbose install -g solc@0.8.28 \
+ && npm install -g solc@0.8.28 \
  && PATH="/root/.cargo/bin:${PATH}" \
  && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | ash -s -- -y \
  && RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=lld" cargo install \
