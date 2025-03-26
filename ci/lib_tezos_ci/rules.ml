@@ -69,6 +69,9 @@ let schedule_container_scanning_master =
 let schedule_container_scanning_octez_releases =
   scheduled && var "TZ_SCHEDULE_KIND" == str "CONTAINER_SCANNING_OCTEZ_RELEASES"
 
+let schedule_container_scanning_octez_rc =
+  scheduled && var "TZ_SCHEDULE_KIND" == str "CONTAINER_SCANNING_OCTEZ_RC"
+
 let schedule_container_scanning_evm_node_releases =
   scheduled
   && var "TZ_SCHEDULE_KIND" == str "CONTAINER_SCANNING_EVM_NODE_RELEASES"

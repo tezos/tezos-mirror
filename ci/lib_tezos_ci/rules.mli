@@ -87,11 +87,18 @@ val schedule_test_release : If.t
 val schedule_container_scanning_master : If.t
 
 (** A rule that is true for scheduled pipelines that scan
-    `tezos/tezos:octez-evm-node-vX.Y` Docker image.
+    `tezos/tezos:latest` Docker image.
 
     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
     [TZ_SCHEDULE_KIND] set to [CONTAINER_SCANNING_OCTEZ_RELEASES]. *)
 val schedule_container_scanning_octez_releases : If.t
+
+(** A rule that is true for scheduled pipelines that scan
+    `tezos/tezos:octez-vX.Y-rcN` Docker image.
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [CONTAINER_SCANNING_OCTEZ_RC]. *)
+val schedule_container_scanning_octez_rc : If.t
 
 (** A rule that is true for scheduled pipelines that scan
     `tezos/tezos:octez-evm-node-vX.Y` Docker image.
