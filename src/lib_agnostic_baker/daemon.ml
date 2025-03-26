@@ -33,12 +33,10 @@ type t = state
 
 (* ---- Baker Process Management ---- *)
 
-(** [run_thread ~protocol_hash ~baker_commands ~cancel_promise ~logs_path]
+(** [run_thread ~protocol_hash ~baker_commands ~cancel_promise]
     returns the main running thread for the baker given its protocol [~protocol_hash],
-    corresponding commands [~baker_commands] and Lwt cancellation promise [~cancel_promise].
-
-    The event logs are stored according to [~logs_path]. *)
-let run_thread ~protocol_hash ~baker_commands ~cancel_promise ~logs_path =
+    corresponding commands [~baker_commands] and cancellation [~cancel_promise]. *)
+let run_thread ~protocol_hash ~baker_commands ~cancel_promise =
   let () =
     Client_commands.register protocol_hash @@ fun _network -> baker_commands
   in
@@ -52,15 +50,10 @@ let run_thread ~protocol_hash ~baker_commands ~cancel_promise ~logs_path =
      validation will not be more expensive. *)
   let () = Tezos_sapling.Core.Validator.init_params () in
 
-  let module Config = struct
-    include Daemon_config
-
-    let default_daily_logs_path = logs_path
-  end in
   Lwt.pick
     [
       Client_main_run.lwt_run
-        (module Config)
+        (module Agnostic_baker_config)
         ~select_commands:(fun _ _ -> Lwt_result_syntax.return baker_commands)
           (* The underlying logging from the baker must not be initialised, otherwise we double log. *)
         ~disable_logging:true
@@ -80,12 +73,7 @@ let spawn_baker protocol_hash =
        [@profiler.record_f {verbosity = Notice} "proto_plugin_for_protocol"])
     in
     let baker_commands = Commands.baker_commands ~plugin () in
-    return
-    @@ run_thread
-         ~protocol_hash
-         ~baker_commands
-         ~cancel_promise
-         ~logs_path:Parameters.default_daily_logs_path
+    return @@ run_thread ~protocol_hash ~baker_commands ~cancel_promise
   in
   let*! () = Events.(emit baker_running) protocol_hash in
   return {protocol_hash; process = {thread; canceller}}

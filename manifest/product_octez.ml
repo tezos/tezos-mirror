@@ -8616,6 +8616,7 @@ let _octez_experimental_agnostic_baker =
          bls12_381_archive;
          octez_base |> open_ ~m:"TzPervasives" |> open_;
          octez_base_unix |> open_;
+         octez_client_base_unix |> open_;
          octez_experimental_agnostic_baker_lib |> open_;
          octez_profiler |> open_;
        ]

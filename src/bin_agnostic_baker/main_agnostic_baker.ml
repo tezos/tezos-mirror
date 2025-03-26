@@ -26,7 +26,7 @@ let lwt_run ~args () =
   let open Lwt_result_syntax in
   let base_dir =
     Option.value
-      ~default:Tezos_client_base_unix.Client_config.Cfg_file.default.base_dir
+      ~default:Client_config.Cfg_file.default.base_dir
       (Run_args.get_base_dir args)
   in
   let*! () =
@@ -41,7 +41,7 @@ let lwt_run ~args () =
   return_unit
 
 let run ~args () =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   let main_promise =
     Lwt.catch (lwt_run ~args) (function
         | Failure msg -> failwith "%s" msg
@@ -49,8 +49,8 @@ let run ~args () =
   in
   Stdlib.exit
     (Tezos_base_unix.Event_loop.main_run (fun () ->
-         let*! retcode =
-           let*! r = Lwt_exit.wrap_and_exit main_promise in
+         let* retcode =
+           let* r = Lwt_exit.wrap_and_exit main_promise in
            match r with
            | Ok () -> Lwt.return 0
            | Error errs ->
@@ -59,15 +59,16 @@ let run ~args () =
          in
          Format.pp_print_flush Format.err_formatter () ;
          Format.pp_print_flush Format.std_formatter () ;
-         let*! () = Tezos_base_unix.Internal_event_unix.close () in
-         Lwt.return retcode))
+         let* () = Tezos_base_unix.Internal_event_unix.close () in
+         return retcode))
 
 let () =
-  let open Tezos_client_base_unix in
   let args = Array.to_list Sys.argv in
   if Run_args.(is_help_cmd args || is_version_cmd args || is_man_cmd args) then
+    (* No need to run the baker commands, we just need to get their description,
+       therefore we do not obtain the protocol plugin. *)
     Client_main_run.run
-      (module Daemon_config)
+      (module Agnostic_baker_config)
       ~select_commands:(fun _ _ ->
         Lwt_result_syntax.return @@ Commands.baker_commands ())
   else run ~args ()
