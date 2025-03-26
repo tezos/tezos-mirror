@@ -35,11 +35,13 @@ type checkout_result = {
     They are available, like [path], in [tmp_worktree].
 
     The last argument is a function to call once the files have been checked out.
-    After it returns, the temporary worktree is recursively deleted. *)
+    After it returns, the temporary worktree is recursively deleted
+    unless [keep_temp] is set to [true]. *)
 val with_checkout_into_tmp :
   git_reference:string ->
   path:string ->
   ?other_paths:string list ->
+  ?keep_temp:bool ->
   (checkout_result -> ('a, ([> `failed] as 'b) error) result) ->
   ('a, 'b error) result
 

@@ -72,7 +72,7 @@ let copy_file ~source_path ~target_path ~new_permissions =
 
 (* Checkout a component into a temporary directory, call [continue],
    then clean up temporary files. *)
-let checkout_component_into_tmp (component : Component.t)
+let checkout_component_into_tmp ~keep_temp (component : Component.t)
     (continue : Git.checkout_result -> (_, [> `failed]) r) =
   match component.version with
   | Dev ->
@@ -87,6 +87,7 @@ let checkout_component_into_tmp (component : Component.t)
         ~git_reference
         ~path
         ~other_paths:(Config.pervasive_paths config @ other_paths)
+        ~keep_temp
       @@ fun checkout ->
       (* Make a symbolic link to _opam so that external libraries are available. *)
       let* () =
@@ -140,12 +141,12 @@ let run_build_instructions ~verbose ~jobs (component : Component.t)
       if verbose then echo "%s" (quote_command command arguments) ;
       Run.command command arguments ~working_directory
 
-let build_component_into_cache ~verbose ~dry_run ~jobs (component : Component.t)
-    =
+let build_component_into_cache ~verbose ~dry_run ~jobs ~keep_temp
+    (component : Component.t) =
   if dry_run then unit
   else
     (* Checkout the component into a temporary directory. *)
-    checkout_component_into_tmp component @@ fun checkout ->
+    checkout_component_into_tmp ~keep_temp component @@ fun checkout ->
     (* Build the component in this temporary directory. *)
     let* () =
       run_build_instructions
@@ -223,7 +224,8 @@ let install_component_from_cache ~verbose ~dry_run (component : Component.t) =
           unit
 
 (* TODO: uninstall component if already installed *)
-let install_component ~verbose ~dry_run ~jobs {Solver.component; reasons} =
+let install_component ~verbose ~dry_run ~jobs ~keep_temp
+    {Solver.component; reasons} =
   if verbose then
     echo
       "Installing: %s.%s (%s)"
@@ -236,14 +238,14 @@ let install_component ~verbose ~dry_run ~jobs {Solver.component; reasons} =
     if available_in_cache then (
       echo "Found in cache." ;
       unit)
-    else build_component_into_cache ~verbose ~dry_run ~jobs component
+    else build_component_into_cache ~verbose ~dry_run ~jobs ~keep_temp component
   in
   install_component_from_cache ~verbose ~dry_run component
 
-let run ~verbose ~dry_run ~jobs components =
+let run ~verbose ~dry_run ~jobs ~keep_temp components =
   if components = [] then (
     echo "Nothing to do (no component was specified on the command-line)." ;
     unit)
   else
     let* plan = Solver.solve components in
-    list_iter_r plan (install_component ~verbose ~dry_run ~jobs)
+    list_iter_r plan (install_component ~verbose ~dry_run ~jobs ~keep_temp)

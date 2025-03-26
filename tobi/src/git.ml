@@ -87,11 +87,14 @@ let checkout_into_tmp ~git_reference ~path ?(other_paths = []) () =
       cleanup () ;
       x
 
-let with_checkout_into_tmp ~git_reference ~path ?other_paths f =
+let with_checkout_into_tmp ~git_reference ~path ?other_paths
+    ?(keep_temp = false) f =
   let* checkout_result =
     checkout_into_tmp ~git_reference ~path ?other_paths ()
   in
-  Fun.protect ~finally:checkout_result.cleanup @@ fun () -> f checkout_result
+  Fun.protect ~finally:(fun () ->
+      if not keep_temp then checkout_result.cleanup ())
+  @@ fun () -> f checkout_result
 
 let is_a_commit_hash str =
   String.length str = 40

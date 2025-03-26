@@ -92,6 +92,12 @@ module CLI = struct
              parallel."
           20
       in
+      let keep_temp =
+        Clap.flag
+          ~set_long:"keep-temp"
+          ~description:"Do not remove temporary directories."
+          false
+      in
       let components =
         Clap.list
           Type.component_and_version
@@ -103,7 +109,7 @@ module CLI = struct
              HEAD."
           ()
       in
-      `install (components, `jobs jobs)
+      `install (components, `jobs jobs, `keep_temp keep_temp)
 
     let reset =
       Clap.case "reset" ~description:"Uninstall all installed components."
@@ -136,8 +142,13 @@ let main () =
   match CLI.command with
   | `list (version, `installed installed) ->
       Cmd_list.run ~verbose:CLI.verbose ~installed version
-  | `install (components, `jobs jobs) ->
-      Cmd_install.run ~verbose:CLI.verbose ~dry_run:CLI.dry_run ~jobs components
+  | `install (components, `jobs jobs, `keep_temp keep_temp) ->
+      Cmd_install.run
+        ~verbose:CLI.verbose
+        ~dry_run:CLI.dry_run
+        ~jobs
+        ~keep_temp
+        components
   | `reset -> Cmd_reset.run ~verbose:CLI.verbose ~dry_run:CLI.dry_run
   | `build components ->
       Cmd_build.run ~verbose:CLI.verbose ~dry_run:CLI.dry_run components
