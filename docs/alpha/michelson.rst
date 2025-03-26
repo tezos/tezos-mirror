@@ -109,7 +109,8 @@ The subset of blockchain operations that can be emitted by Michelson programs as
 
 Internal operations are not included in any block, and are not signed.
 
-Internal operations are run in an atomic sequence with the external operation who generated them, right after it, in depth-first order.
+Internal operations are run in an atomic sequence with the external operation who triggered the contract call, *after* the contract execution, in depth-first order.
+This implies in particular that any contract calls emitted by a contract C are executed after contract C successfully finishes execution returning its result (the list of internal operations and the new storage).
 
 Note that :ref:`manager operations batches <manager_operations_batches_alpha>` contain a sequence of external operations signed as a whole by a source user account, which are executed atomically.
 For example, in case of a batch of two external operations, execution proceeds as follows:
