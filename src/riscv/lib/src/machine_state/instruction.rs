@@ -39,6 +39,7 @@ use crate::instruction_context::ICB;
 use crate::instruction_context::IcbFnResult;
 use crate::instruction_context::IcbLoweringFn;
 use crate::instruction_context::Predicate;
+use crate::instruction_context::Shift;
 use crate::interpreter::branching;
 use crate::interpreter::integer;
 use crate::interpreter::load_store;
@@ -207,9 +208,9 @@ pub enum OpCode {
     Xor,
     Or,
     And,
-    Sll,
-    Srl,
-    Sra,
+    ShiftLeft,
+    ShiftRightUnsigned,
+    ShiftRightSigned,
     SetLessThanSigned,
     SetLessThanUnsigned,
     Addw,
@@ -224,9 +225,9 @@ pub enum OpCode {
     Xori,
     Ori,
     Andi,
-    Slli,
-    Srli,
-    Srai,
+    ShiftLeftImmediate,
+    ShiftRightImmediateUnsigned,
+    ShiftRightImmediateSigned,
     Slliw,
     Srliw,
     Sraiw,
@@ -453,9 +454,9 @@ impl OpCode {
             Self::Xor => Args::run_xor,
             Self::Or => Args::run_or,
             Self::And => Args::run_and,
-            Self::Sll => Args::run_sll,
-            Self::Srl => Args::run_srl,
-            Self::Sra => Args::run_sra,
+            Self::ShiftLeft => Args::run_shift_left,
+            Self::ShiftRightUnsigned => Args::run_shift_right_unsigned,
+            Self::ShiftRightSigned => Args::run_shift_right_signed,
             Self::SetLessThanSigned => Args::run_set_less_than_signed,
             Self::SetLessThanUnsigned => Args::run_set_less_than_unsigned,
             Self::Addw => Args::run_addw,
@@ -468,9 +469,9 @@ impl OpCode {
             Self::Xori => Args::run_xori,
             Self::Ori => Args::run_ori,
             Self::Andi => Args::run_andi,
-            Self::Slli => Args::run_slli,
-            Self::Srli => Args::run_srli,
-            Self::Srai => Args::run_srai,
+            Self::ShiftLeftImmediate => Args::run_shift_left_immediate,
+            Self::ShiftRightImmediateUnsigned => Args::run_shift_right_immediate_unsigned,
+            Self::ShiftRightImmediateSigned => Args::run_shift_right_immediate_signed,
             Self::Slliw => Args::run_slliw,
             Self::Srliw => Args::run_srliw,
             Self::Sraiw => Args::run_sraiw,
@@ -690,6 +691,12 @@ impl OpCode {
             Self::BranchGreaterThanOrEqualZero => Some(Args::run_branch_greater_than_or_equal_zero),
             Self::BranchGreaterThanZero => Some(Args::run_branch_greater_than_zero),
 
+            Self::ShiftLeft => Some(Args::run_shift_left),
+            Self::ShiftRightUnsigned => Some(Args::run_shift_right_unsigned),
+            Self::ShiftRightSigned => Some(Args::run_shift_right_signed),
+            Self::ShiftLeftImmediate => Some(Args::run_shift_left_immediate),
+            Self::ShiftRightImmediateUnsigned => Some(Args::run_shift_right_immediate_unsigned),
+            Self::ShiftRightImmediateSigned => Some(Args::run_shift_right_immediate_signed),
             _ => None,
         }
     }
@@ -839,6 +846,15 @@ macro_rules! impl_r_type {
             icb.ok(Next(self.width))
         }
     };
+
+    ($fn: ident, $shift: ident) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+            integer::run_shift(icb, Shift::$shift, self.rs1.nzx, self.rs2.nzx, self.rd.nzx);
+            icb.ok(Next(self.width))
+        }
+    };
 }
 
 macro_rules! impl_i_type {
@@ -882,6 +898,15 @@ macro_rules! impl_i_type {
         /// to the same OpCode as the OpCode used to derive this function.
         unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
             $impl(icb, self.imm, self.rs1.x, self.rd.nzx);
+            icb.ok(Next(self.width))
+        }
+    };
+
+    ($fn: ident, $shift: path) => {
+        /// SAFETY: This function must only be called on an `Args` belonging
+        /// to the same OpCode as the OpCode used to derive this function.
+        unsafe fn $fn<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+            integer::run_shift_immediate(icb, $shift, self.imm, self.rs1.nzx, self.rd.nzx);
             icb.ok(Next(self.width))
         }
     };
@@ -1261,9 +1286,9 @@ impl Args {
     impl_r_type!(run_xor, non_zero);
     impl_r_type!(integer::run_and, run_and, non_zero);
     impl_r_type!(integer::run_or, run_or, non_zero);
-    impl_r_type!(run_sll, non_zero);
-    impl_r_type!(run_srl, non_zero);
-    impl_r_type!(run_sra, non_zero);
+    impl_r_type!(run_shift_left, Left);
+    impl_r_type!(run_shift_right_unsigned, RightUnsigned);
+    impl_r_type!(run_shift_right_signed, RightSigned);
     impl_r_type!(
         integer::run_set_less_than_signed,
         run_set_less_than_signed,
@@ -1286,9 +1311,9 @@ impl Args {
     impl_i_type!(run_xori, non_zero);
     impl_i_type!(run_ori, non_zero);
     impl_i_type!(integer::run_andi, run_andi, non_zero);
-    impl_i_type!(run_slli, non_zero);
-    impl_i_type!(run_srli, non_zero);
-    impl_i_type!(run_srai, non_zero);
+    impl_i_type!(run_shift_left_immediate, Shift::Left);
+    impl_i_type!(run_shift_right_immediate_unsigned, Shift::RightUnsigned);
+    impl_i_type!(run_shift_right_immediate_signed, Shift::RightSigned);
     impl_i_type!(run_slliw, non_zero_rd);
     impl_i_type!(run_srliw, non_zero_rd);
     impl_i_type!(run_sraiw, non_zero_rd);
@@ -2154,9 +2179,12 @@ impl From<&InstrCacheable> for Instruction {
                 InstrWidth::Compressed,
             ),
             InstrCacheable::CAddi4spn(args) => Instruction::from_ic_caddi4spn(args),
-            InstrCacheable::CSlli(args) => {
-                Instruction::new_slli(args.rd_rs1, args.rd_rs1, args.imm, InstrWidth::Compressed)
-            }
+            InstrCacheable::CSlli(args) => Instruction::new_shift_left_immediate(
+                args.rd_rs1,
+                args.rd_rs1,
+                args.imm,
+                InstrWidth::Compressed,
+            ),
             InstrCacheable::CSrli(args) => Instruction::from_ic_csrli(args),
             InstrCacheable::CSrai(args) => Instruction::from_ic_csrai(args),
             InstrCacheable::CAndi(args) => Instruction::from_ic_candi(args),

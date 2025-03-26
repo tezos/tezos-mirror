@@ -79,11 +79,8 @@ mod tests {
     use crate::interpreter::branching::run_jr;
     use crate::machine_state::MachineCoreState;
     use crate::machine_state::MachineCoreStateLayout;
-    use crate::machine_state::hart_state::HartState;
-    use crate::machine_state::hart_state::HartStateLayout;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::registers::nz;
-    use crate::machine_state::registers::nz::a0;
     use crate::parser::instruction::InstrWidth;
 
     backend_test!(test_run_j, F, {
@@ -144,28 +141,5 @@ mod tests {
             assert_eq!(state.hart.pc.read(), init_pc);
             assert_eq!(new_pc, res_pc);
         }
-    });
-
-    macro_rules! test_shift_instr {
-        ($state:ident, $shift_fn:tt, $imm:expr,
-            $rd_rs1:ident, $r1_val:expr, $expected_val:expr
-        ) => {
-            $state.xregisters.write_nz($rd_rs1, $r1_val);
-            $state.xregisters.$shift_fn($imm, $rd_rs1, $rd_rs1);
-            let new_val = $state.xregisters.read_nz($rd_rs1);
-            assert_eq!(new_val, $expected_val);
-        };
-    }
-
-    backend_test!(test_shift, F, {
-        let mut state = create_state!(HartState, F);
-
-        // imm = 0
-        test_shift_instr!(state, run_slli, 0, a0, 0x1234_ABEF, 0x1234_ABEF);
-
-        // small imm (< 32))
-        test_shift_instr!(state, run_slli, 20, a0, 0x1234_ABEF, 0x1_234A_BEF0_0000);
-        // big imm (>= 32))
-        test_shift_instr!(state, run_slli, 40, a0, 0x1234_ABEF, 0x34AB_EF00_0000_0000);
     });
 }

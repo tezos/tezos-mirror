@@ -190,15 +190,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Slli`].
-    pub(crate) fn new_slli(
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::ShiftLeftImmediate`].
+    pub(crate) fn new_shift_left_immediate(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
         imm: i64,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Slli,
+            opcode: OpCode::ShiftLeftImmediate,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -209,15 +209,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Srli`].
-    pub(crate) fn new_srli(
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::ShiftRightImmediateUnsigned`].
+    pub(crate) fn new_shift_right_immediate_unsigned(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
         imm: i64,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Srli,
+            opcode: OpCode::ShiftRightImmediateUnsigned,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -228,15 +228,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Srai`].
-    pub(crate) fn new_srai(
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::ShiftRightImmediateSigned`].
+    pub(crate) fn new_shift_right_immediate_signed(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
         imm: i64,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Srai,
+            opcode: OpCode::ShiftRightImmediateSigned,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -377,15 +377,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sll`].
-    pub(crate) fn new_sll(
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::ShiftLeft`].
+    pub(crate) fn new_shift_left(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
         rs2: NonZeroXRegister,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Sll,
+            opcode: OpCode::ShiftLeft,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -396,15 +396,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Srl`].
-    pub(crate) fn new_srl(
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::ShiftRightUnsigned`].
+    pub(crate) fn new_shift_right_unsigned(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
         rs2: NonZeroXRegister,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Srl,
+            opcode: OpCode::ShiftRightUnsigned,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -415,15 +415,15 @@ impl Instruction {
         }
     }
 
-    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::Sra`].
-    pub(crate) fn new_sra(
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::ShiftRightSigned`].
+    pub(crate) fn new_shift_right_signed(
         rd: NonZeroXRegister,
         rs1: NonZeroXRegister,
         rs2: NonZeroXRegister,
         width: InstrWidth,
     ) -> Self {
         Self {
-            opcode: OpCode::Sra,
+            opcode: OpCode::ShiftRightSigned,
             args: Args {
                 rd: rd.into(),
                 rs1: rs1.into(),
@@ -1221,9 +1221,12 @@ impl Instruction {
         match split_x0(args.rs1) {
             // Shifting 0 by any amount is 0.
             X::X0 => Instruction::new_li(args.rd, 0, InstrWidth::Uncompressed),
-            X::NonZero(rs1) => {
-                Instruction::new_slli(args.rd, rs1, args.imm, InstrWidth::Uncompressed)
-            }
+            X::NonZero(rs1) => Instruction::new_shift_left_immediate(
+                args.rd,
+                rs1,
+                args.imm,
+                InstrWidth::Uncompressed,
+            ),
         }
     }
 
@@ -1235,9 +1238,12 @@ impl Instruction {
         match split_x0(args.rs1) {
             // shifting 0 by any amount is 0.
             X::X0 => Instruction::new_li(args.rd, 0, InstrWidth::Uncompressed),
-            X::NonZero(rs1) => {
-                Instruction::new_srli(args.rd, rs1, args.imm, InstrWidth::Uncompressed)
-            }
+            X::NonZero(rs1) => Instruction::new_shift_right_immediate_unsigned(
+                args.rd,
+                rs1,
+                args.imm,
+                InstrWidth::Uncompressed,
+            ),
         }
     }
 
@@ -1248,9 +1254,12 @@ impl Instruction {
         use XRegisterParsed as X;
         match split_x0(args.rd_rs1) {
             X::X0 => Instruction::new_nop(InstrWidth::Compressed),
-            X::NonZero(rd_rs1) => {
-                Instruction::new_srli(rd_rs1, rd_rs1, args.imm, InstrWidth::Compressed)
-            }
+            X::NonZero(rd_rs1) => Instruction::new_shift_right_immediate_unsigned(
+                rd_rs1,
+                rd_rs1,
+                args.imm,
+                InstrWidth::Compressed,
+            ),
         }
     }
 
@@ -1262,9 +1271,12 @@ impl Instruction {
         match split_x0(args.rs1) {
             // shifting 0 by any amount is 0.
             X::X0 => Instruction::new_li(args.rd, 0, InstrWidth::Uncompressed),
-            X::NonZero(rs1) => {
-                Instruction::new_srai(args.rd, rs1, args.imm, InstrWidth::Uncompressed)
-            }
+            X::NonZero(rs1) => Instruction::new_shift_right_immediate_signed(
+                args.rd,
+                rs1,
+                args.imm,
+                InstrWidth::Uncompressed,
+            ),
         }
     }
 
@@ -1275,9 +1287,12 @@ impl Instruction {
         use XRegisterParsed as X;
         match split_x0(args.rd_rs1) {
             X::X0 => Instruction::new_nop(InstrWidth::Compressed),
-            X::NonZero(rd_rs1) => {
-                Instruction::new_srai(rd_rs1, rd_rs1, args.imm, InstrWidth::Compressed)
-            }
+            X::NonZero(rd_rs1) => Instruction::new_shift_right_immediate_signed(
+                rd_rs1,
+                rd_rs1,
+                args.imm,
+                InstrWidth::Compressed,
+            ),
         }
     }
 
@@ -1383,7 +1398,7 @@ impl Instruction {
             // Shifting by 0 and storing in rd is equivalent to moving the value to rd.
             (X::NonZero(rs1), X::X0) => Instruction::new_mv(args.rd, rs1, InstrWidth::Uncompressed),
             (X::NonZero(rs1), X::NonZero(rs2)) => {
-                Instruction::new_sll(args.rd, rs1, rs2, InstrWidth::Uncompressed)
+                Instruction::new_shift_left(args.rd, rs1, rs2, InstrWidth::Uncompressed)
             }
         }
     }
@@ -1399,7 +1414,7 @@ impl Instruction {
             // Shifting by 0 and storing in rd is equivalent to moving the value to rd.
             (X::NonZero(rs1), X::X0) => Instruction::new_mv(args.rd, rs1, InstrWidth::Uncompressed),
             (X::NonZero(rs1), X::NonZero(rs2)) => {
-                Instruction::new_srl(args.rd, rs1, rs2, InstrWidth::Uncompressed)
+                Instruction::new_shift_right_unsigned(args.rd, rs1, rs2, InstrWidth::Uncompressed)
             }
         }
     }
@@ -1415,7 +1430,7 @@ impl Instruction {
             // Shifting by 0 and storing in rd is equivalent to moving the value to rd.
             (X::NonZero(rs1), X::X0) => Instruction::new_mv(args.rd, rs1, InstrWidth::Uncompressed),
             (X::NonZero(rs1), X::NonZero(rs2)) => {
-                Instruction::new_sra(args.rd, rs1, rs2, InstrWidth::Uncompressed)
+                Instruction::new_shift_right_signed(args.rd, rs1, rs2, InstrWidth::Uncompressed)
             }
         }
     }

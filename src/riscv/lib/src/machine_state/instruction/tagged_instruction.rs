@@ -364,9 +364,9 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | Andi
         | Ori
         | Xori
-        | Slli
-        | Srli
-        | Srai
+        | ShiftLeftImmediate
+        | ShiftRightImmediateUnsigned
+        | ShiftRightImmediateSigned
         | Add
         | Sub
         | Mul
@@ -375,9 +375,9 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | And
         | Or
         | Xor
-        | Sll
-        | Srl
-        | Sra
+        | ShiftLeft
+        | ShiftRightUnsigned
+        | ShiftRightSigned
         | Jal
         | J
         | JrImm

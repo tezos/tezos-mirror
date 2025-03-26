@@ -20,6 +20,7 @@ use super::state_access::JitStateAccess;
 use super::state_access::JsaCalls;
 use crate::instruction_context::ICB;
 use crate::instruction_context::Predicate;
+use crate::instruction_context::Shift;
 use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::registers::NonZeroXRegister;
@@ -226,6 +227,19 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
 
     fn xvalue_bitwise_or(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
         self.builder.ins().bor(lhs, rhs)
+    }
+
+    fn xvalue_shift(
+        &mut self,
+        value: Self::XValue,
+        amount: Self::XValue,
+        shift: Shift,
+    ) -> Self::XValue {
+        match shift {
+            Shift::Left => self.builder.ins().ishl(value, amount),
+            Shift::RightUnsigned => self.builder.ins().ushr(value, amount),
+            Shift::RightSigned => self.builder.ins().sshr(value, amount),
+        }
     }
 
     /// Read the effective current program counter by adding `self.pc_offset` (due to instructions

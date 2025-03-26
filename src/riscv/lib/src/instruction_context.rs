@@ -70,6 +70,14 @@ pub trait ICB {
     /// Perform a bitwise or of two **XValues**, returning the new value.
     fn xvalue_bitwise_or(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue;
 
+    /// Perform a shift of the **XValue** as determined by the given **Shift**.
+    fn xvalue_shift(
+        &mut self,
+        value: Self::XValue,
+        amount: Self::XValue,
+        shift: Shift,
+    ) -> Self::XValue;
+
     /// Perform a read of the program counter.
     fn pc_read(&mut self) -> Self::XValue;
 
@@ -207,6 +215,20 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
     }
 
     #[inline(always)]
+    fn xvalue_shift(
+        &mut self,
+        value: Self::XValue,
+        amount: Self::XValue,
+        shift: Shift,
+    ) -> Self::XValue {
+        match shift {
+            Shift::Left => value << amount,
+            Shift::RightUnsigned => value >> amount,
+            Shift::RightSigned => (value as i64 >> amount) as XValue,
+        }
+    }
+
+    #[inline(always)]
     fn pc_read(&mut self) -> Self::XValue {
         self.hart.pc.read()
     }
@@ -295,4 +317,14 @@ impl Predicate {
             Self::GreaterThanOrEqualUnsigned => lhs >= rhs,
         }
     }
+}
+
+/// The type of shift operation to perform.
+pub enum Shift {
+    /// Logical left shift. Zeroes are shifted into the least significant bits.
+    Left,
+    /// Logical right shift. Zeroes are shifted into the most significant bits.
+    RightUnsigned,
+    /// Arithmetic right shift. Sign-bits (ones) are shifted into the most significant bits.
+    RightSigned,
 }

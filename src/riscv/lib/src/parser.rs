@@ -149,6 +149,11 @@ const fn i_imm(instr: u32) -> i64 {
     (((instr & 0b1111_1111_1111_0000_0000_0000_0000_0000) as i32) >> 20) as i64
 }
 
+const fn shift_imm(instr: u32) -> i64 {
+    let imm = i_imm(instr);
+    imm & SHIFT_BITMASK
+}
+
 const fn s_imm(instr: u32) -> i64 {
     // instr[31:25] | instr[11:7]
     let instr_31_25 = (instr & 0b1111_1110_0000_0000_0000_0000_0000_0000) as i32;
@@ -507,6 +512,8 @@ const RS2_3_U5: u5 = u5::new(0b11);
 const FM_0: u32 = 0b0;
 const FM_8: u32 = 0b1000;
 
+pub(crate) const SHIFT_BITMASK: i64 = 0b11_1111;
+
 /// Parse an uncompressed instruction from a u32.
 #[inline]
 pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
@@ -642,7 +649,11 @@ pub const fn parse_uncompressed_instruction(instr: u32) -> Instr {
                 (F7_0, X0) => Hint { instr },
                 (F7_0, NonZero(rd)) => i_instr!(Srli, instr, rd),
                 (F7_20, X0) => Hint { instr },
-                (F7_20, NonZero(rd)) => i_instr!(Srai, instr, rd),
+                (F7_20, NonZero(rd)) => InstrCacheable::Srai(NonZeroRdITypeArgs {
+                    rd,
+                    rs1: rs1(instr),
+                    imm: shift_imm(instr),
+                }),
                 _ => Unknown { instr },
             },
             (F3_2, X0) => Hint { instr },

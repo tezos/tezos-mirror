@@ -1386,4 +1386,146 @@ mod tests {
             scenario.run(&mut jit, &mut interpreted_bb);
         }
     });
+
+    backend_test!(test_shift_reg, F, {
+        use crate::machine_state::registers::NonZeroXRegister::*;
+
+        let shift_reg = |constructor: fn(
+            NonZeroXRegister,
+            NonZeroXRegister,
+            NonZeroXRegister,
+            InstrWidth,
+        ) -> I,
+                         lhs: (NonZeroXRegister, i64),
+                         rhs: (NonZeroXRegister, i64),
+                         expected: u64|
+         -> Scenario<F> {
+            ScenarioBuilder::default()
+                .set_setup_hook(setup_hook!(core, F, {
+                    core.hart.xregisters.write_nz(lhs.0, lhs.1 as u64);
+                    core.hart.xregisters.write_nz(rhs.0, rhs.1 as u64);
+                }))
+                .set_instructions(&[constructor(x2, lhs.0, rhs.0, Compressed)])
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(
+                        expected,
+                        core.hart.xregisters.read_nz(x2),
+                        "Expected {expected} for Shift* lhs: {lhs:?}, rhs: {rhs:?}"
+                    )
+                }))
+                .build()
+        };
+
+        let scenarios: &[Scenario<F>] = &[
+            shift_reg(I::new_shift_left, (x1, 1), (x3, 1), 2),
+            shift_reg(I::new_shift_left, (x1, 1), (x3, 63), 0x8000_0000_0000_0000),
+            shift_reg(I::new_shift_left, (x1, 2), (x3, 63), 0),
+            shift_reg(I::new_shift_left, (x1, 1), (x3, 126), 0x4000_0000_0000_0000),
+            shift_reg(I::new_shift_left, (x1, -16), (x3, 2), -64_i64 as u64),
+            shift_reg(I::new_shift_right_unsigned, (x1, 2), (x3, 1), 1),
+            shift_reg(I::new_shift_right_unsigned, (x1, !0), (x3, 63), 1),
+            shift_reg(
+                I::new_shift_right_unsigned,
+                (x1, 0x7FFF_FFFF_FFFF_FFFF),
+                (x3, 63),
+                0,
+            ),
+            shift_reg(I::new_shift_right_unsigned, (x1, !0), (x3, 126), 3),
+            shift_reg(
+                I::new_shift_right_unsigned,
+                (x1, -8),
+                (x3, 2),
+                0x3FFF_FFFF_FFFF_FFFE,
+            ),
+            shift_reg(I::new_shift_right_signed, (x1, 2), (x3, 1), 1),
+            shift_reg(I::new_shift_right_signed, (x1, !0), (x3, 63), !0),
+            shift_reg(
+                I::new_shift_right_signed,
+                (x1, 0x7FFF_FFFF_FFFF_FFFF),
+                (x3, 62),
+                1,
+            ),
+            shift_reg(I::new_shift_right_signed, (x1, !0), (x3, 126), !0),
+            shift_reg(I::new_shift_right_signed, (x1, -8), (x3, 2), -2_i64 as u64),
+        ];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
+
+    backend_test!(test_shift_imm, F, {
+        use crate::machine_state::registers::NonZeroXRegister::*;
+
+        let shift_imm =
+            |constructor: fn(NonZeroXRegister, NonZeroXRegister, i64, InstrWidth) -> I,
+             lhs: (NonZeroXRegister, i64),
+             imm: i64,
+             expected: u64|
+             -> Scenario<F> {
+                ScenarioBuilder::default()
+                    .set_setup_hook(setup_hook!(core, F, {
+                        core.hart.xregisters.write_nz(lhs.0, lhs.1 as u64);
+                    }))
+                    .set_instructions(&[constructor(x2, lhs.0, imm, Compressed)])
+                    .set_assert_hook(assert_hook!(core, F, {
+                        assert_eq!(
+                            expected,
+                            core.hart.xregisters.read_nz(x2),
+                            "Expected {expected} for Shift* lhs: {lhs:?}, imm: {imm}"
+                        )
+                    }))
+                    .build()
+            };
+
+        let scenarios: &[Scenario<F>] = &[
+            shift_imm(I::new_shift_left_immediate, (x1, 1), 1, 2),
+            shift_imm(
+                I::new_shift_left_immediate,
+                (x1, 1),
+                63,
+                0x8000_0000_0000_0000,
+            ),
+            shift_imm(I::new_shift_left_immediate, (x1, 2), 63, 0),
+            shift_imm(I::new_shift_left_immediate, (x1, -16), 2, -64_i64 as u64),
+            shift_imm(I::new_shift_right_immediate_unsigned, (x1, 2), 1, 1),
+            shift_imm(I::new_shift_right_immediate_unsigned, (x1, !0), 63, 1),
+            shift_imm(
+                I::new_shift_right_immediate_unsigned,
+                (x1, 0x7FFF_FFFF_FFFF_FFFF),
+                63,
+                0,
+            ),
+            shift_imm(
+                I::new_shift_right_immediate_unsigned,
+                (x1, -8),
+                2,
+                0x3FFF_FFFF_FFFF_FFFE,
+            ),
+            shift_imm(I::new_shift_right_immediate_signed, (x1, 2), 1, 1),
+            shift_imm(I::new_shift_right_immediate_signed, (x1, !0), 63, !0),
+            shift_imm(
+                I::new_shift_right_immediate_signed,
+                (x1, 0x7FFF_FFFF_FFFF_FFFF),
+                62,
+                1,
+            ),
+            shift_imm(
+                I::new_shift_right_immediate_signed,
+                (x1, -8),
+                2,
+                -2_i64 as u64,
+            ),
+        ];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
 }
