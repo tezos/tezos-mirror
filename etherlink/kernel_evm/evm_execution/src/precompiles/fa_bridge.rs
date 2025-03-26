@@ -10,16 +10,17 @@
 //! This is a stateful precompile:
 //!     * Alters ticket table (changes balance)
 //!     * Increments outbox counter
-
+use crate::fa_bridge::withdrawal::FaFastWithdrawal;
+use crate::fa_bridge::FaWithdrawalKind::{Fast, Standard};
+use crate::fast_fa_withdrawals_enabled;
+use crate::{fail_if_too_much, EthereumError};
 use evm::{Context, Handler, Transfer};
 use primitive_types::{H160, U256};
 use tezos_evm_runtime::runtime::Runtime;
 
 use crate::{
     fa_bridge::{execute_fa_withdrawal, withdrawal::FaWithdrawal},
-    fail_if_too_much,
     handler::EvmHandler,
-    EthereumError,
 };
 
 use super::{PrecompileOutcome, FA_BRIDGE_PRECOMPILE_ADDRESS};
@@ -140,11 +141,37 @@ pub fn fa_bridge_precompile<Host: Runtime>(
                     // Using Zero account here so that the inner proxy call
                     // has the same sender as during the FA deposit
                     // (so that the proxy contract has a single admin).
-                    execute_fa_withdrawal(handler, H160::zero(), withdrawal)
+                    execute_fa_withdrawal(handler, H160::zero(), Standard(withdrawal))
                 }
                 Err(err) => Ok(precompile_outcome_error!(
                     "FA withdrawal: parsing failed w/ `{err}`"
                 )),
+            }
+        }
+
+        // "fast withdrawal"'s selector | 4 first bytes of keccak256("fa_fast_withdraw(address,bytes,uint256,bytes22,bytes,string,bytes)")
+        [0xff, 0xf7, 0xca, 0x5f, input_data @ ..] => {
+            if !fast_fa_withdrawals_enabled(handler.host) {
+                return Ok(precompile_outcome_error!(
+                    "Fast FA withdrawal: parsing failed w/ `The fast FA withdrawal
+                     feature flag is not enabled, cannot call this entrypoint.`"
+                ));
+            };
+            // Withdrawal initiator is the precompile caller.
+            // NOTE that since we deny delegate calls, it can either be EOA or
+            // a smart contract that calls the precompile directly (e.g. AA wallet).
+            let timestamp_u256 = handler.block_timestamp();
+            match FaFastWithdrawal::try_parse(input_data, timestamp_u256, context.caller)
+            {
+                Err(err) => Ok(precompile_outcome_error!(
+                    "Fast FA withdrawal: parsing failed w/ `{err}`"
+                )),
+                Ok(withdrawal) => {
+                    // Using Zero account here so that the inner proxy call
+                    // has the same sender as during the FA deposit
+                    // (so that the proxy contract has a single admin).
+                    execute_fa_withdrawal(handler, H160::zero(), Fast(withdrawal))
+                }
             }
         }
         _ => Ok(precompile_outcome_error!(

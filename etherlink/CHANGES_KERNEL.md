@@ -4,6 +4,14 @@
 
 ### Features
 
+- The EVM's configuration has been bumped to Cancun. (!16141)
+  The following EIPs are now supported by Etherlink:
+  * [EIP-1153](https://eips.ethereum.org/EIPS/eip-1153)
+  * [EIP-5656](https://eips.ethereum.org/EIPS/eip-5656)
+  * [EIP-6780](https://eips.ethereum.org/EIPS/eip-6780)
+- A fast withdrawal entrypoint was added to the FA bridge precompiled contract
+  under a feature flag. (!17114)
+
 ### Bug fixes
 
 - Improves call trace of `DELEGATECALL` and `CALLCODE`. (!16588)
@@ -13,14 +21,6 @@
   opcodes, now fully complying with [EIP-3860](https://eips.ethereum.org/EIPS/eip-3860). (!16890)
 - The EVM is now refunding accounts as expected during inter (layer)
   transactions. (!16973)
- 
-### Features
-
-- The EVM's configuration has been bumped to Cancun. (!16141)\
-  The following EIPs are now supported by Etherlink:
-  * [EIP-1153](https://eips.ethereum.org/EIPS/eip-1153)
-  * [EIP-5656](https://eips.ethereum.org/EIPS/eip-5656)
-  * [EIP-6780](https://eips.ethereum.org/EIPS/eip-6780)
 
 ### Internal
 

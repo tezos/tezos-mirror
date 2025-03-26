@@ -42,6 +42,7 @@ use super::{
     ticket_table::{ticket_balance_path, TicketTable},
     withdrawal::FaWithdrawal,
 };
+use crate::fa_bridge::FaWithdrawalKind;
 
 sol!(
     token_wrapper,
@@ -418,7 +419,11 @@ pub fn fa_bridge_precompile_call_withdraw(
         )
         .unwrap();
 
-    let res = execute_fa_withdrawal(&mut handler, caller, withdrawal);
+    let res = execute_fa_withdrawal(
+        &mut handler,
+        caller,
+        FaWithdrawalKind::Standard(withdrawal),
+    );
 
     let execution_result = match res {
         Ok(mut outcome) => {

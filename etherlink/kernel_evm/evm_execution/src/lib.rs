@@ -464,6 +464,15 @@ pub fn read_evm_version(host: &mut impl Runtime) -> EVMVersion {
     }
 }
 
+// Path to the fast withdrawals of FA tokens feature flag. If there is nothing at this
+// path, fast withdrawals are not used.
+pub const ENABLE_FAST_FA_WITHDRAWAL: RefPath =
+    RefPath::assert_from(b"/evm/world_state/feature_flags/enable_fast_fa_withdrawal");
+
+pub fn fast_fa_withdrawals_enabled<Host: Runtime>(host: &Host) -> bool {
+    host.store_read_all(&ENABLE_FAST_FA_WITHDRAWAL).is_ok()
+}
+
 #[cfg(test)]
 mod test {
     use crate::account_storage::EthereumAccount;
