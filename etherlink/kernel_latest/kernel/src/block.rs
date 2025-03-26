@@ -8,11 +8,12 @@
 use crate::apply::{
     apply_transaction, ExecutionInfo, ExecutionResult, Validity, WITHDRAWAL_OUTBOX_QUEUE,
 };
+use crate::blueprint::Blueprint;
 use crate::blueprint_storage::{
     drop_blueprint, read_blueprint, read_current_block_header_for_family,
-    store_current_block_header, BlockHeader, ChainHeader,
+    store_current_block_header, BlockHeader, ChainHeader, EVMBlockHeader,
 };
-use crate::chains::{ChainConfig, EvmLimits};
+use crate::chains::{ChainConfig, EvmChainConfig, EvmLimits};
 use crate::configuration::ConfigurationMode;
 use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
@@ -49,7 +50,7 @@ pub const GAS_LIMIT: u64 = 1 << 50;
 
 /// Struct used to allow the compiler to check that the tick counter value is
 /// correctly moved and updated. Copy and Clone should NOT be derived.
-struct TickCounter {
+pub struct TickCounter {
     c: u64,
 }
 
@@ -270,6 +271,34 @@ enum BlueprintParsing {
     None,
 }
 
+pub fn eth_bip_from_blueprint<Host: Runtime>(
+    host: &Host,
+    chain_config: &EvmChainConfig,
+    tick_counter: &TickCounter,
+    next_bip_number: U256,
+    header: EVMBlockHeader,
+    blueprint: Blueprint,
+) -> EthBlockInProgress {
+    let gas_price = crate::gas_price::base_fee_per_gas(
+        host,
+        blueprint.timestamp,
+        chain_config.limits.minimum_base_fee_per_gas,
+    );
+
+    let bip = EthBlockInProgress::from_blueprint(
+        blueprint,
+        next_bip_number,
+        header.hash,
+        tick_counter.c,
+        gas_price,
+        header.receipts_root,
+        header.transactions_root,
+    );
+
+    tezos_evm_logging::log!(host, tezos_evm_logging::Level::Debug, "bip: {bip:?}");
+    bip
+}
+
 #[cfg_attr(feature = "benchmark", inline(never))]
 fn next_bip_from_blueprints<Host: Runtime>(
     host: &mut Host,
@@ -310,26 +339,13 @@ fn next_bip_from_blueprints<Host: Runtime>(
             }
             match (&chain_config, chain_header) {
                 (ChainConfig::Evm(chain_config), ChainHeader::Eth(header)) => {
-                    let gas_price = crate::gas_price::base_fee_per_gas(
+                    let bip = eth_bip_from_blueprint(
                         host,
-                        blueprint.timestamp,
-                        chain_config.limits.minimum_base_fee_per_gas,
-                    );
-
-                    let bip = block_in_progress::EthBlockInProgress::from_blueprint(
-                        blueprint,
+                        chain_config,
+                        tick_counter,
                         next_bip_number,
-                        header.hash,
-                        tick_counter.c,
-                        gas_price,
-                        header.receipts_root,
-                        header.transactions_root,
-                    );
-
-                    tezos_evm_logging::log!(
-                        host,
-                        tezos_evm_logging::Level::Debug,
-                        "bip: {bip:?}"
+                        header,
+                        blueprint,
                     );
                     Ok(BlueprintParsing::Next(Box::new(
                         BlockInProgress::Etherlink(bip),
