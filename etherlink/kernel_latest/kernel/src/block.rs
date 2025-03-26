@@ -266,8 +266,8 @@ impl BlockInProgress {
     }
 }
 
-enum BlueprintParsing {
-    Next(Box<BlockInProgress>),
+enum BlueprintParsing<BIP> {
+    Next(Box<BIP>),
     None,
 }
 
@@ -306,7 +306,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
     chain_config: &ChainConfig,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
-) -> Result<BlueprintParsing, anyhow::Error> {
+) -> Result<BlueprintParsing<BlockInProgress>, anyhow::Error> {
     let chain_family = chain_config.get_chain_family();
     let (next_bip_number, timestamp, chain_header) =
         match read_current_block_header_for_family(host, &chain_family) {
