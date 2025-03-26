@@ -464,33 +464,52 @@ pub enum BlueprintValidity {
     BlueprintTooLarge,
 }
 
-fn fetch_delayed_txs<Host: Runtime>(
+pub enum DelayedTransactionFetchingResult<Transactions> {
+    Ok(Transactions),
+    BlueprintTooLarge,
+    DelayedHashMissing(delayed_inbox::Hash),
+}
+
+fn fetch_hashes_from_delayed_inbox<Host: Runtime>(
     host: &mut Host,
-    blueprint_with_hashes: BlueprintWithDelayedHashes,
+    delayed_hashes: Vec<delayed_inbox::Hash>,
     delayed_inbox: &mut DelayedInbox,
     current_blueprint_size: usize,
-) -> anyhow::Result<(BlueprintValidity, usize)> {
+) -> anyhow::Result<(DelayedTransactionFetchingResult<Vec<Transaction>>, usize)> {
     let mut delayed_txs = vec![];
     let mut total_size = current_blueprint_size;
-    for tx_hash in blueprint_with_hashes.delayed_hashes {
+    for tx_hash in delayed_hashes {
         let tx = delayed_inbox.find_transaction(host, tx_hash)?;
         // This is overestimated, as the transactions cannot be chunked in the
         // delayed bridge.
         total_size += MAXIMUM_SIZE_OF_DELAYED_TRANSACTION;
         // If the size would overflow the 512KB, reject the blueprint
         if MAXIMUM_SIZE_OF_BLUEPRINT < total_size {
-            return Ok((BlueprintValidity::BlueprintTooLarge, total_size));
+            return Ok((
+                DelayedTransactionFetchingResult::BlueprintTooLarge,
+                total_size,
+            ));
         }
         match tx {
             Some(tx) => delayed_txs.push(tx.0),
             None => {
-                return Ok((BlueprintValidity::DelayedHashMissing(tx_hash), total_size))
+                return Ok((
+                    DelayedTransactionFetchingResult::DelayedHashMissing(tx_hash),
+                    total_size,
+                ))
             }
         }
     }
+    Ok((
+        DelayedTransactionFetchingResult::Ok(delayed_txs),
+        total_size,
+    ))
+}
 
-    let transactions_with_hashes = blueprint_with_hashes
-        .transactions
+fn transactions_from_bytes(
+    transactions: Vec<Vec<u8>>,
+) -> anyhow::Result<Vec<Transaction>> {
+    transactions
         .into_iter()
         .map(|tx_common| {
             let tx_hash = Keccak256::digest(&tx_common).into();
@@ -501,7 +520,34 @@ fn fetch_delayed_txs<Host: Runtime>(
                 content: TransactionContent::Ethereum(tx_common),
             })
         })
-        .collect::<anyhow::Result<Vec<Transaction>>>()?;
+        .collect::<anyhow::Result<Vec<Transaction>>>()
+}
+
+fn fetch_delayed_txs<Host: Runtime>(
+    host: &mut Host,
+    blueprint_with_hashes: BlueprintWithDelayedHashes,
+    delayed_inbox: &mut DelayedInbox,
+    current_blueprint_size: usize,
+) -> anyhow::Result<(BlueprintValidity, usize)> {
+    let (mut delayed_txs, total_size) = match fetch_hashes_from_delayed_inbox(
+        host,
+        blueprint_with_hashes.delayed_hashes,
+        delayed_inbox,
+        current_blueprint_size,
+    )? {
+        (DelayedTransactionFetchingResult::Ok(delayed_txs), total_size) => {
+            (delayed_txs, total_size)
+        }
+        (DelayedTransactionFetchingResult::BlueprintTooLarge, total_size) => {
+            return Ok((BlueprintValidity::BlueprintTooLarge, total_size));
+        }
+        (DelayedTransactionFetchingResult::DelayedHashMissing(hash), total_size) => {
+            return Ok((BlueprintValidity::DelayedHashMissing(hash), total_size));
+        }
+    };
+
+    let transactions_with_hashes =
+        transactions_from_bytes(blueprint_with_hashes.transactions)?;
 
     delayed_txs.extend(transactions_with_hashes);
     Ok((
