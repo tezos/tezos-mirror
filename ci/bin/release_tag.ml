@@ -70,11 +70,16 @@ let job_release_page ~test ?dependencies () =
     ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ()]
     ?dependencies
     ~variables:
-      [
-        ( "S3_BUCKET",
-          if test then "release-page-test.nomadic-labs.com"
-          else "site-prod.octez.tezos.com/releases" );
-      ]
+      (if test then
+         [
+           ("S3_BUCKET", "release-page-test.nomadic-labs.com");
+           ("DISTRIBUTION_ID", "E19JF46UG3Z747");
+         ]
+       else
+         [
+           ("S3_BUCKET", "site-prod.octez.tezos.com/releases");
+           ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
+         ])
     ~before_script:
       (if test then
          [

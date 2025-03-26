@@ -1182,3 +1182,4 @@ publish:release-page:
   - ./scripts/releases/publish_release_page.sh
   variables:
     S3_BUCKET: release-page-test.nomadic-labs.com
+    DISTRIBUTION_ID: E19JF46UG3Z747
