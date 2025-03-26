@@ -127,7 +127,7 @@ DAL node
   existing configuration. It takes the same arguments as for the other
   commands. (MR :gl:`!15759`)
 
-- **Breaking_change** The configuration value ``metrics-addr`` is now an option.
+- **Breaking change** The configuration value ``metrics-addr`` is now an option.
   It should not break unless the value differs from the default value
   (``0.0.0.0:11733``). The new default value is ``None``, so no metrics are
   exported by default.
