@@ -36,13 +36,10 @@ publish:release-page:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
-  before_script:
-  - export AWS_ACCESS_KEY_ID=${AWS_KEY_RELEASE_PUBLISH:?AWS_KEY_RELEASE_PUBLISH is
-    not set}
-  - export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_RELEASE_PUBLISH:?AWS_SECRET_RELEASE_PUBLISH
-    is not set}
   script:
   - ./scripts/releases/publish_release_page.sh
   variables:
     S3_BUCKET: release-page-test.nomadic-labs.com
     DISTRIBUTION_ID: E19JF46UG3Z747
+    AWS_ACCESS_KEY_ID: ${AWS_KEY_RELEASE_PUBLISH}
+    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_RELEASE_PUBLISH}

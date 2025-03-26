@@ -1154,7 +1154,6 @@ publish:release-page:
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
   timeout: 60 minutes
-  before_script: []
   script:
   - ./scripts/releases/publish_release_page.sh
   variables:
