@@ -358,9 +358,8 @@ module Term = struct
        the default one. *)
     let open Cmdliner in
     let doc =
-      "Experimental feature, please dont use it unless you know what you are \
-       doing. Configure the DAL node store to use SQLite3 as a storage \
-       backend. "
+      "DEPRECATED as SQLite is now the default storage backend for storing \
+       skip list cells for DAL slots."
     in
     Arg.(value & flag & info ~docs ~doc ["sqlite3-backend"])
 
