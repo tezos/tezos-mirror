@@ -71,26 +71,19 @@ let job_release_page ~test ?dependencies () =
     ?dependencies
     ~variables:
       (if test then
+         (* The S3_BUCKET, AWS keys and DISTRIBUTION_ID
+            depends on the release type (tests or not). *)
          [
            ("S3_BUCKET", "release-page-test.nomadic-labs.com");
            ("DISTRIBUTION_ID", "E19JF46UG3Z747");
+           ("AWS_ACCESS_KEY_ID", "${AWS_KEY_RELEASE_PUBLISH}");
+           ("AWS_SECRET_ACCESS_KEY", "${AWS_SECRET_RELEASE_PUBLISH}");
          ]
        else
          [
            ("S3_BUCKET", "site-prod.octez.tezos.com/releases");
            ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
          ])
-    ~before_script:
-      (if test then
-         [
-           "export \
-            AWS_ACCESS_KEY_ID=${AWS_KEY_RELEASE_PUBLISH:?AWS_KEY_RELEASE_PUBLISH \
-            is not set}";
-           "export \
-            AWS_SECRET_ACCESS_KEY=${AWS_SECRET_RELEASE_PUBLISH:?AWS_SECRET_RELEASE_PUBLISH \
-            is not set}";
-         ]
-       else [])
     ["./scripts/releases/publish_release_page.sh"]
 
 (** Create an Octez release tag pipeline of type {!release_tag_pipeline_type}.
