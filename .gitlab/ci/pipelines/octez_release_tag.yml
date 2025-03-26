@@ -1154,7 +1154,9 @@ publish:release-page:
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
   timeout: 60 minutes
-  before_script: []
+  before_script:
+  - export DISTRIBUTION_ID=${CLOUDFROND_DISTRIBUTION_ID:?CLOUDFROND_DISTRIBUTION_ID
+    is not set}
   script:
   - ./scripts/releases/publish_release_page.sh
   variables:
