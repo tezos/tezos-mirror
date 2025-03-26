@@ -139,9 +139,11 @@ let assert_status w expected_status =
     | Closing _ -> "Closing"
     | Closed _ -> "Closed"
   in
-  Assert.assert_true
-    (Format.asprintf "Worker should be of status %s" expected_status)
-    (status_str = expected_status)
+  Alcotest.check
+    Alcotest.string
+    "Worker should be of status"
+    expected_status
+    status_str
 
 open Qcheck2_helpers
 
