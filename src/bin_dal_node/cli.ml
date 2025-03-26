@@ -354,8 +354,7 @@ module Term = struct
 
   let sqlite3_backend =
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7527
-       Remove this command line argument once the SQLite3 backend is
-       the default one. *)
+       Remove this command line argument in the next release. *)
     let open Cmdliner in
     let doc =
       "DEPRECATED as SQLite is now the default storage backend for storing \
