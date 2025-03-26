@@ -643,13 +643,11 @@ struct
       =
     let (module Handlers : EIO_HANDLERS with type self = kind t) = handlers in
     let rec loop () : [`Stop_daemon] =
-      let yield_and_loop () =
-        Eio.Fiber.yield () ;
-        loop ()
-      in
+      (* Make sure that recursive calls do yield *)
+      Eio.Fiber.yield () ;
       match worker.status with
       | Launching _ -> assert false
-      | Closing _ -> yield_and_loop ()
+      | Closing _ -> loop ()
       | Closed _ ->
           (* The loop that triggered the Closed state should already
              have handled this, but it cost nothing to add it here as a safety
@@ -670,7 +668,7 @@ struct
           match take worker with
           | None ->
               Handlers.on_no_request worker ;
-              yield_and_loop ()
+              loop ()
           | Some (Message {request; metadata = _; resolver; timestamp = pushed})
             -> (
               worker.stream_explorer <-
@@ -721,7 +719,7 @@ struct
                  Propagate the info and loop, so that we will fall into the
                  [Closing _ | Closed _] case and handle the termination there. *)
               add worker Shutdown ;
-              yield_and_loop ())
+              loop ())
     in
     loop ()
 
