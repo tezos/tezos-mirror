@@ -352,26 +352,14 @@ module Term = struct
 
   (* Experimental features. *)
 
-  let sqlite3_backend =
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7527
-       Remove this command line argument once the SQLite3 backend is
-       the default one. *)
-    let open Cmdliner in
-    let doc =
-      "Experimental feature, please dont use it unless you know what you are \
-       doing. Configure the DAL node store to use SQLite3 as a storage \
-       backend. "
-    in
-    Arg.(value & flag & info ~docs ~doc ["sqlite3-backend"])
-
   let term process =
     Cmdliner.Term.(
       ret
         (const process $ data_dir $ rpc_addr $ expected_pow $ net_addr
        $ public_addr $ endpoint $ metrics_addr $ attester_profile
        $ producer_profile $ observer_profile $ bootstrap_profile $ peers
-       $ history_mode $ service_name $ service_namespace $ sqlite3_backend
-       $ fetch_trusted_setup $ verbose))
+       $ history_mode $ service_name $ service_namespace $ fetch_trusted_setup
+       $ verbose))
 end
 
 type t = Run | Config_init | Config_update | Debug_print_store_schemas
@@ -512,7 +500,7 @@ module Debug = struct
     Cmdliner.Cmd.group ~default info [Print.cmd (run Debug_print_store_schemas)]
 end
 
-type experimental_features = {sqlite3_backend : bool}
+type experimental_features = unit
 
 type options = {
   data_dir : string option;
@@ -535,8 +523,7 @@ type options = {
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
       endpoint metrics_addr attesters producers observers bootstrap_flag peers
-      history_mode service_name service_namespace sqlite3_backend
-      fetch_trusted_setup verbose =
+      history_mode service_name service_namespace fetch_trusted_setup verbose =
     let run profile =
       run
         subcommand
@@ -553,7 +540,7 @@ let make ~run =
           history_mode;
           service_name;
           service_namespace;
-          experimental_features = {sqlite3_backend};
+          experimental_features = ();
           fetch_trusted_setup;
           verbose;
         }

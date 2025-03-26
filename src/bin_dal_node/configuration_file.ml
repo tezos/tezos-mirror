@@ -33,7 +33,7 @@ type neighbor = {addr : string; port : int}
 
 type history_mode = Rolling of {blocks : [`Auto | `Some of int]} | Full
 
-type experimental_features = {sqlite3_backend : bool}
+type experimental_features = unit
 
 let history_mode_encoding =
   let open Data_encoding in
@@ -118,9 +118,7 @@ let default_metrics_addr =
 
 let default_history_mode = Rolling {blocks = `Auto}
 
-let default_experimental_features =
-  let default_sqlite3_backend = false in
-  {sqlite3_backend = default_sqlite3_backend}
+let default_experimental_features = ()
 
 let default_fetch_trusted_setup = true
 
@@ -166,15 +164,7 @@ let endpoint_encoding : Uri.t Data_encoding.t =
     string
 
 let experimental_features_encoding : experimental_features Data_encoding.t =
-  let open Data_encoding in
-  conv
-    (fun {sqlite3_backend} -> sqlite3_backend)
-    (fun sqlite3_backend -> {sqlite3_backend})
-    (obj1
-       (dft
-          "sqlite3-backend"
-          bool
-          default_experimental_features.sqlite3_backend))
+  Data_encoding.unit
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
