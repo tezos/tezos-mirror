@@ -32,7 +32,7 @@ module Types = Tezos_dal_node_services.Types
     can be used to register a function when the user invokes the
     command. *)
 
-type experimental_features = {sqlite3_backend : bool}
+type experimental_features = unit
 
 type options = {
   data_dir : string option;

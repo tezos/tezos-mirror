@@ -23,9 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let merge_experimental_features Cli.{sqlite3_backend} configuration =
-  Configuration_file.
-    {sqlite3_backend = sqlite3_backend || configuration.sqlite3_backend}
+let merge_experimental_features _ _configuration = ()
 
 let merge
     Cli.

@@ -110,6 +110,11 @@ Data Availability Layer (DAL)
 DAL node
 ~~~~~~~~
 
+- **Breaking change** The CLI experimental flag ``--sqlite3-backend``
+  and its corresponding configuration file field have been removed
+  since SQLite is now the default storage backend for storing skip
+  list cells of DAL slots. (MR :gl:`!17424`)
+
 - **Feature** The DAL node stores now a peers.json file in its
   directory when it is shutdown with SIGINT. This file is read if it
   exists when starting the DAL node to restore previous known
@@ -122,7 +127,7 @@ DAL node
   existing configuration. It takes the same arguments as for the other
   commands. (MR :gl:`!15759`)
 
-- **Breaking_change** The configuration value ``metrics-addr`` is now an option.
+- **Breaking change** The configuration value ``metrics-addr`` is now an option.
   It should not break unless the value differs from the default value
   (``0.0.0.0:11733``). The new default value is ``None``, so no metrics are
   exported by default.
