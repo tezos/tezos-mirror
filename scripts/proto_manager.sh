@@ -779,9 +779,8 @@ function copy_source() {
   ## update agnostic_baker
   ## add protocol as active before alpha in parameters.ml
   if ! grep -q "${long_hash}" src/lib_agnostic_baker/parameters.ml; then
-    ## look for | "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" -> ("alpha", Active)
-    ## and add   | "${longhash}" ) as full_hash -> (String.sub full_hash 0 8, Active)
-    sed -i.old -e "/| \"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK\" ->/a \  | \"${long_hash}\" as full_hash -> (String.sub full_hash 0 8, Active)" src/lib_agnostic_baker/parameters.ml
+    ## look for "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" and add "${longhash};"
+    sed -i.old -e "/ \"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK\" /a \"${long_hash}\"; " src/lib_agnostic_baker/parameters.ml
     ocamlformat -i src/lib_agnostic_baker/parameters.ml
     commit "src: add protocol to agnostic_baker"
   fi

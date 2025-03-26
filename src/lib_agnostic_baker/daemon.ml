@@ -16,11 +16,6 @@ end
 
 open Agnostic_baker_errors
 
-(* Number of extra levels to keep the old baker alive before shutting it down.
-   This extra time is used to avoid halting the chain in cases such as
-   reorganization or high round migration blocks. *)
-let extra_levels_for_old_baker = 3
-
 type process = {thread : int Lwt.t; canceller : int Lwt.u}
 
 type baker = {protocol_hash : Protocol_hash.t; process : process}
@@ -228,7 +223,8 @@ let monitor_voting_periods ~state head_stream =
                ~state
                ~current_protocol_hash
                ~next_protocol_hash
-               ~level_to_kill_old_baker:(head_level + extra_levels_for_old_baker)
+               ~level_to_kill_old_baker:
+                 (head_level + Parameters.extra_levels_for_old_baker)
              [@profiler.record_s {verbosity = Notice} "hot_swap_baker"])
           else return_unit
         in

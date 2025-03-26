@@ -15,10 +15,14 @@ val default_daily_logs_path : string option
 
 val log_config : base_dir:string -> Tezos_base.Internal_event_config.t
 
-(** Status of a protocol, based on Manifest/Product_octez/Protocol. A
-    protocol is considered as [Active] while it is running on a network,
-    and thus, have dedicated binaries. Otherwise, the protocol is
-    [Frozen] as not running anymore and no associated binaries.
+(** Number of extra levels to keep the old baker alive before shutting it down.
+    This extra time is used to avoid halting the chain in cases such as
+    reorganization or high round migration blocks. *)
+val extra_levels_for_old_baker : int
+
+(** Status of a protocol, based on [Manifest/Product_octez/Protocol]. A
+    protocol is considered as [Active] while it is running on a network.
+    Otherwise, the protocol is [Frozen].
 
     Warning, it is needed to update status for each new protocol added.
 *)
@@ -28,6 +32,6 @@ val pp_status : Format.formatter -> status -> unit
 
 val status_encoding : status t
 
-val protocol_short_hash : Protocol_hash.t -> string
-
+(** [protocol_status proto_hash] returns whether the given [proto_hash] is
+    [Active] or [Frozen]. *)
 val protocol_status : Protocol_hash.t -> status
