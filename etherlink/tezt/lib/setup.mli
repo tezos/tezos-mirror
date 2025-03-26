@@ -28,6 +28,7 @@ type multichain_sequencer_setup = {
   boot_sector : string;
   kernel : Uses.t;
   enable_dal : bool;
+  evm_version : Evm_version.t;
   enable_multichain : bool;
 }
 
@@ -43,6 +44,7 @@ type sequencer_setup = {
   boot_sector : string;
   kernel : Uses.t;
   enable_dal : bool;
+  evm_version : Evm_version.t;
   enable_multichain : bool;
 }
 

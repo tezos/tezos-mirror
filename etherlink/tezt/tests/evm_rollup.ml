@@ -70,6 +70,7 @@ type full_evm_setup = {
   endpoint : string;
   l1_contracts : l1_contracts option;
   kernel : string;
+  evm_version : Evm_version.t;
   kernel_root_hash : string;
 }
 
@@ -512,6 +513,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
           return (produce_block, evm_node)
   in
   let endpoint = Evm_node.endpoint evm_node in
+  let evm_version = Kernel.select_evm_version kernel ?evm_version in
   return
     {
       node;
@@ -525,6 +527,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
       endpoint;
       l1_contracts;
       kernel = output;
+      evm_version;
       kernel_root_hash = root_hash;
     }
 
@@ -1209,7 +1212,7 @@ let test_l2_deploy_simple_storage =
     ~tags:["evm"; "l2_deploy"; "simple_storage"]
     ~title:"Check L2 contract deployment"
   @@ fun ~protocol:_ ~evm_setup ->
-  let* simple_storage_resolved = simple_storage () in
+  let* simple_storage_resolved = simple_storage evm_setup.evm_version in
   deploy_with_base_checks
     {
       contract = simple_storage_resolved;
@@ -1229,8 +1232,8 @@ let send_call_set_storage_simple simple_storage_resolved contract_address sender
   in
   wait_for_application ~produce_block (call_set sender n)
 
-let send_call_get_storage_simple contract_address {endpoint; _} =
-  let* simple_storage_resolved = simple_storage () in
+let send_call_get_storage_simple contract_address {endpoint; evm_version; _} =
+  let* simple_storage_resolved = simple_storage evm_version in
   let* nb =
     Eth_cli.contract_call
       ~endpoint
@@ -1269,7 +1272,7 @@ let test_l2_call_simple_storage =
   let {evm_node; sc_rollup_node; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* simple_storage_resolved = simple_storage () in
+  let* simple_storage_resolved = simple_storage evm_setup.evm_version in
 
   (* deploy contract *)
   let* address, _tx =
@@ -1336,11 +1339,11 @@ let test_l2_deploy_erc20 =
     ~title:"Check L2 erc20 contract deployment"
   @@ fun ~protocol:_ ~evm_setup ->
   (* setup *)
-  let {evm_node; sc_rollup_node; _} = evm_setup in
+  let {evm_node; sc_rollup_node; evm_version; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let player = Eth_account.bootstrap_accounts.(1) in
-  let* erc20_resolved = erc20 () in
+  let* erc20_resolved = erc20 evm_version in
 
   (* deploy the contract *)
   let* address, tx = deploy ~contract:erc20_resolved ~sender evm_setup in
@@ -1460,7 +1463,7 @@ let test_deploy_contract_for_shanghai =
     ~title:
       "Check that a contract containing PUSH0 can successfully be deployed."
   @@ fun ~protocol:_ ~evm_setup ->
-  let* shanghai_storage_resolved = shanghai_storage () in
+  let* shanghai_storage_resolved = shanghai_storage evm_setup.evm_version in
   deploy_with_base_checks
     {
       contract = shanghai_storage_resolved;
@@ -1500,7 +1503,7 @@ let test_log_index =
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let _player = Eth_account.bootstrap_accounts.(1) in
-  let* events_resolved = events () in
+  let* events_resolved = events evm_setup.evm_version in
   (* deploy the events contract *)
   let* _address, _tx = deploy ~contract:events_resolved ~sender evm_setup in
   (* Emits two events: EventA and EventB *)
@@ -2316,7 +2319,7 @@ let test_eth_call_input =
 let test_estimate_gas =
   let test_f ~protocol:_ ~evm_setup =
     (* large request *)
-    let* simple_storage_resolved = simple_storage () in
+    let* simple_storage_resolved = simple_storage evm_setup.evm_version in
     let data = read_file simple_storage_resolved.bin in
     let eth_call = [("data", Ezjsonm.encode_string @@ "0x" ^ data)] in
 
@@ -2330,7 +2333,7 @@ let test_estimate_gas =
 let test_estimate_gas_additionnal_field =
   let test_f ~protocol:_ ~evm_setup =
     (* large request *)
-    let* simple_storage_resolved = simple_storage () in
+    let* simple_storage_resolved = simple_storage evm_setup.evm_version in
     let data = read_file simple_storage_resolved.bin in
     let eth_call =
       [
@@ -2353,9 +2356,10 @@ let test_estimate_gas_additionnal_field =
   register_both ~title ~tags test_f
 
 let test_eth_call_storage_contract =
-  let test_f ~protocol:_ ~evm_setup:({evm_node; endpoint; _} as evm_setup) =
+  let test_f ~protocol:_
+      ~evm_setup:({evm_node; endpoint; evm_version; _} as evm_setup) =
     let sender = Eth_account.bootstrap_accounts.(0) in
-    let* simple_storage_resolved = simple_storage () in
+    let* simple_storage_resolved = simple_storage evm_version in
 
     (* deploy contract *)
     let* address, tx =
@@ -2429,7 +2433,8 @@ let test_eth_call_storage_contract =
 
 let test_eth_call_storage_contract_eth_cli =
   let test_f ~protocol:_
-      ~evm_setup:({evm_node; endpoint; produce_block; _} as evm_setup) =
+      ~evm_setup:
+        ({evm_node; endpoint; produce_block; evm_version; _} as evm_setup) =
     (* sanity *)
     let* call_result =
       Evm_node.(
@@ -2445,7 +2450,7 @@ let test_eth_call_storage_contract_eth_cli =
 
     let sender = Eth_account.bootstrap_accounts.(0) in
 
-    let* simple_storage_resolved = simple_storage () in
+    let* simple_storage_resolved = simple_storage evm_version in
 
     (* deploy contract send send 42 *)
     let* address, _tx =
@@ -2722,9 +2727,11 @@ let test_withdraw_via_calls =
     ~tags:["evm"; "withdraw"; "call"; "staticcall"; "delegatecall"; "callcode"]
     ~title:"Withdrawal via different kind of calls"
     ~admin
-  @@ fun ~protocol:_ ~evm_setup:({endpoint; produce_block; _} as evm_setup) ->
+  @@ fun ~protocol:_
+             ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
+    ->
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* call_withdrawal = call_withdrawal () in
+  let* call_withdrawal = call_withdrawal evm_version in
   let* contract, _tx = deploy ~contract:call_withdrawal ~sender evm_setup in
 
   (* Call works, it transfers funds to the precompiled contract and produce
@@ -3193,7 +3200,7 @@ let test_rpc_getCode =
     ~title:"RPC method eth_getCode"
   @@ fun ~protocol:_ ~evm_setup ->
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* simple_storage_resolved = simple_storage () in
+  let* simple_storage_resolved = simple_storage evm_setup.evm_version in
   let* address, _ =
     deploy ~contract:simple_storage_resolved ~sender evm_setup
   in
@@ -3342,7 +3349,9 @@ let test_mainnet_ghostnet_kernel_migration =
       Eth_account.bootstrap_accounts.(1),
       Eth_account.bootstrap_accounts.(2) )
   in
-  let* simple_storage = simple_storage () in
+  let* simple_storage =
+    simple_storage @@ Kernel.select_evm_version @@ Kernel.Mainnet
+  in
   let scenario_prior ~evm_setup =
     let* transfer_result =
       make_transfer
@@ -3437,7 +3446,7 @@ let test_latest_kernel_migration protocols =
         Eth_account.bootstrap_accounts.(1),
         Eth_account.bootstrap_accounts.(2) )
     in
-    let* simple_storage = simple_storage () in
+    let* simple_storage = simple_storage (Kernel.select_evm_version from) in
     let scenario_prior ~evm_setup =
       let* transfer_result =
         make_transfer
@@ -4027,9 +4036,9 @@ let test_simulation_eip2200 =
     ~tags:["evm"; "loop"; "simulation"; "eip2200"]
     ~title:"Simulation is EIP2200 resilient"
   @@ fun ~protocol:_ ~evm_setup ->
-  let {produce_block; endpoint; _} = evm_setup in
+  let {produce_block; endpoint; evm_version; _} = evm_setup in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* loop_resolved = loop () in
+  let* loop_resolved = loop evm_version in
   let* loop_address, _tx = deploy ~contract:loop_resolved ~sender evm_setup in
   (* If we support EIP-2200, the simulation gives an amount of gas
      insufficient for the execution. As we do the simulation with an
@@ -4138,8 +4147,8 @@ let test_rpc_gasPrice =
   unit
 
 let send_foo_mapping_storage contract_address sender
-    {produce_block; endpoint; _} =
-  let* mapping_storage_resolved = mapping_storage () in
+    {produce_block; endpoint; evm_version; _} =
+  let* mapping_storage_resolved = mapping_storage evm_version in
   let call_foo (sender : Eth_account.t) =
     Eth_cli.contract_send
       ~source_private_key:sender.private_key
@@ -4157,7 +4166,7 @@ let test_rpc_getStorageAt =
   @@ fun ~protocol:_ ~evm_setup ->
   let {endpoint; evm_node; _} = evm_setup in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* mapping_storage_resolved = mapping_storage () in
+  let* mapping_storage_resolved = mapping_storage evm_setup.evm_version in
   (* deploy contract *)
   let* address, _tx =
     deploy ~contract:mapping_storage_resolved ~sender evm_setup
@@ -4239,13 +4248,14 @@ let test_l2_call_inter_contract =
     ~title:"Check L2 inter contract call"
   @@ fun protocol ->
   (* setup *)
-  let* ({produce_block; evm_node; sc_rollup_node; _} as evm_setup) =
+  let* ({produce_block; evm_node; sc_rollup_node; evm_version; _} as evm_setup)
+      =
     setup_evm_kernel ~admin:None protocol
   in
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* callee_resolved = callee () in
-  let* caller_resolved = caller () in
+  let* callee_resolved = callee evm_version in
+  let* caller_resolved = caller evm_version in
 
   (* deploy Callee contract *)
   let* callee_address, _tx =
@@ -4301,11 +4311,11 @@ let test_rpc_getLogs =
     ~tags:["evm"; "rpc"; "get_logs"; "erc20"]
     ~title:"Check getLogs RPC"
   @@ fun ~protocol:_ ~evm_setup ->
-  let {evm_node; produce_block; _} = evm_setup in
+  let {evm_node; produce_block; evm_version; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let player = Eth_account.bootstrap_accounts.(1) in
-  let* erc20_resolved = erc20 () in
+  let* erc20_resolved = erc20 evm_version in
   (* deploy the contract *)
   let* address, _tx = deploy ~contract:erc20_resolved ~sender evm_setup in
   let address = String.lowercase_ascii address in
@@ -4455,7 +4465,7 @@ let test_l2_nested_create =
   let {evm_node; produce_block; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* nested_create_resolved = nested_create () in
+  let* nested_create_resolved = nested_create evm_setup.evm_version in
   let* nested_create_address, _tx =
     deploy ~contract:nested_create_resolved ~sender evm_setup
   in
@@ -4532,7 +4542,7 @@ let test_l2_revert_returns_unused_gas =
   let {evm_node; produce_block; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* revert_resolved = revert () in
+  let* revert_resolved = revert evm_setup.evm_version in
   let* _revert_address, _tx =
     deploy ~contract:revert_resolved ~sender evm_setup
   in
@@ -4572,10 +4582,10 @@ let test_l2_create_collision =
     ~tags:["evm"; "l2_create"; "collision"]
     ~title:"Check L2 create collision"
   @@ fun ~protocol:_ ~evm_setup ->
-  let {evm_node; produce_block; _} = evm_setup in
+  let {evm_node; produce_block; evm_version; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* create2_resolved = create2 () in
+  let* create2_resolved = create2 evm_version in
   let* create2_address, _tx =
     deploy ~contract:create2_resolved ~sender evm_setup
   in
@@ -4612,11 +4622,11 @@ let test_l2_intermediate_OOG_call =
       "Check that an L2 call to a smart contract with an intermediate call \
        that runs out of gas still succeeds."
   @@ fun ~protocol:_ ~evm_setup ->
-  let {evm_node; produce_block; _} = evm_setup in
-  let* oog_call_resolved = oog_call () in
+  let {evm_node; produce_block; evm_version; _} = evm_setup in
+  let* oog_call_resolved = oog_call evm_version in
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* simple_storage_resolved = simple_storage () in
+  let* simple_storage_resolved = simple_storage evm_version in
   let* random_contract_address, _tx =
     deploy ~contract:simple_storage_resolved ~sender evm_setup
   in
@@ -4643,10 +4653,10 @@ let test_l2_ether_wallet =
     ~tags:["evm"; "l2_call"; "wallet"]
     ~title:"Check ether wallet functions correctly"
   @@ fun ~protocol:_ ~evm_setup ->
-  let {evm_node; produce_block; _} = evm_setup in
+  let {evm_node; produce_block; evm_version; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* ether_wallet_resolved = ether_wallet () in
+  let* ether_wallet_resolved = ether_wallet evm_version in
   let* ether_wallet_address, _tx =
     deploy ~contract:ether_wallet_resolved ~sender evm_setup
   in
@@ -4812,10 +4822,10 @@ let test_reboot_out_of_ticks =
 
 let test_l2_timestamp_opcode =
   let test ~protocol:_ ~evm_setup =
-    let {evm_node; produce_block; _} = evm_setup in
+    let {evm_node; produce_block; evm_version; _} = evm_setup in
     let endpoint = Evm_node.endpoint evm_node in
     let sender = Eth_account.bootstrap_accounts.(0) in
-    let* timestamp_resolved = timestamp () in
+    let* timestamp_resolved = timestamp evm_version in
     let* timestamp_address, _tx =
       deploy ~contract:timestamp_resolved ~sender evm_setup
     in
@@ -5222,9 +5232,9 @@ let test_estimate_gas_out_of_ticks =
   register_both
     ~tags:["evm"; "estimate_gas"; "out_of_ticks"; "simulate"; "loop"]
     ~title:"estimateGas works with out of ticks"
-  @@ fun ~protocol:_ ~evm_setup:({evm_node; _} as evm_setup) ->
+  @@ fun ~protocol:_ ~evm_setup:({evm_node; evm_version; _} as evm_setup) ->
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* loop_resolved = loop () in
+  let* loop_resolved = loop evm_version in
   let* loop_address, _tx = deploy ~contract:loop_resolved ~sender evm_setup in
   (* Call estimateGas with an out of ticks transaction. *)
   let estimateGas =
@@ -5261,7 +5271,7 @@ let test_l2_call_selfdetruct_contract_in_same_transaction =
   @@ fun protocol ->
   let* evm_setup = setup_evm_kernel ~admin:None protocol in
   let*@ _ = evm_setup.produce_block () in
-  let* call_selfdestruct_resolved = call_selfdestruct () in
+  let* call_selfdestruct_resolved = call_selfdestruct evm_setup.evm_version in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* _address, _tx =
     deploy ~contract:call_selfdestruct_resolved ~sender evm_setup
@@ -5274,9 +5284,13 @@ let test_l2_call_selfdetruct_contract_in_same_transaction_and_separate_transacti
     ~kernels:[Kernel.Latest]
     ~tags:["evm"; "l2_call"; "selfdestruct"; "cancun"]
     ~title:"Check SELFDESTRUCT's behavior as stated by Cancun's EIP-6780"
-  @@ fun ~protocol:_ ~evm_setup:({endpoint; produce_block; _} as evm_setup) ->
+  @@ fun ~protocol:_
+             ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
+    ->
   let*@ _ = produce_block () in
-  let* call_selfdestruct_behavior_resolved = call_selfdestruct_behavior () in
+  let* call_selfdestruct_behavior_resolved =
+    call_selfdestruct_behavior evm_version
+  in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* address, _tx =
     deploy ~contract:call_selfdestruct_behavior_resolved ~sender evm_setup
@@ -5333,9 +5347,11 @@ let test_mcopy_opcode =
     ~kernels:[Kernel.Latest]
     ~tags:["evm"; "mcopy"; "cancun"]
     ~title:"Check MCOPY's behavior as stated by Cancun's EIP-5656"
-  @@ fun ~protocol:_ ~evm_setup:({endpoint; produce_block; _} as evm_setup) ->
+  @@ fun ~protocol:_
+             ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
+    ->
   let*@ _ = evm_setup.produce_block () in
-  let* mcopy_resolved = mcopy () in
+  let* mcopy_resolved = mcopy evm_version in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* address, _tx = deploy ~contract:mcopy_resolved ~sender evm_setup in
   let* source =
@@ -5400,10 +5416,12 @@ let test_transient_storage =
     ~kernels:[Kernel.Latest]
     ~tags:["evm"; "transient_storage"; "cancun"]
     ~title:"Check TSTORE/TLOAD behavior as stated by Cancun's EIP-1153"
-  @@ fun ~protocol:_ ~evm_setup:({endpoint; produce_block; _} as evm_setup) ->
+  @@ fun ~protocol:_
+             ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
+    ->
   let*@ _ = evm_setup.produce_block () in
   let* transient_storage_multiplier_resolved =
-    transient_storage_multiplier ()
+    transient_storage_multiplier evm_version
   in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* address, _tx =
@@ -5455,11 +5473,11 @@ let test_call_recursive_contract_estimate_gas =
       ])
     ~title:"Check recursive contract gasLimit is high enough"
   @@ fun protocol ->
-  let* ({endpoint; produce_block; _} as evm_setup) =
+  let* ({endpoint; produce_block; evm_version; _} as evm_setup) =
     setup_evm_kernel ~admin:None protocol
   in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* recursive_resolved = recursive () in
+  let* recursive_resolved = recursive evm_version in
   let* recursive_address, _tx =
     deploy ~contract:recursive_resolved ~sender evm_setup
   in
@@ -5482,9 +5500,11 @@ let test_limited_stack_depth =
     ~tags:["evm"; "recursive"; "stack_depth"]
     ~title:"Check recursive contract gasLimit is high enough"
     ~maximum_allowed_ticks:1_000_000_000_000L
-  @@ fun ~protocol:_ ~evm_setup:({endpoint; produce_block; _} as evm_setup) ->
+  @@ fun ~protocol:_
+             ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
+    ->
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* recursive_resolved = recursive () in
+  let* recursive_resolved = recursive evm_version in
   let* recursive_address, _tx =
     deploy ~contract:recursive_resolved ~sender evm_setup
   in
@@ -5524,9 +5544,9 @@ let test_check_estimateGas_enforces_limits =
     ~kernels:[Latest]
     ~tags:["evm"; "estimate_gas"; "gas_limit"]
     ~title:"Check that the eth_estimateGas enforces the kernel gas limit."
-  @@ fun ~protocol:_ ~evm_setup:({evm_node; _} as evm_setup) ->
+  @@ fun ~protocol:_ ~evm_setup:({evm_node; evm_version; _} as evm_setup) ->
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* gas_left_contract = Solidity_contracts.gas_left () in
+  let* gas_left_contract = Solidity_contracts.gas_left evm_version in
   let* gas_left_address, _tx =
     deploy ~contract:gas_left_contract ~sender evm_setup
   in
@@ -5671,8 +5691,10 @@ let test_blockhash_opcode =
     ~tags:["evm"; "blockhash"; "opcode"]
     ~title:"Check if blockhash opcode returns the actual hash of the block"
   @@ fun ~protocol:_
-             ~evm_setup:({produce_block; endpoint; evm_node; _} as evm_setup) ->
-  let* blockhash_resolved = blockhash () in
+             ~evm_setup:
+               ({produce_block; endpoint; evm_node; evm_version; _} as evm_setup)
+    ->
+  let* blockhash_resolved = blockhash evm_version in
   let* address, _tx =
     deploy
       ~contract:blockhash_resolved
@@ -5725,10 +5747,12 @@ let test_block_constants_opcode =
     ~tags:["evm"; "block"; "opcode"; "constants"]
     ~title:"Check block constants in opcode"
   @@ fun ~protocol:_
-             ~evm_setup:({evm_node; produce_block; endpoint; _} as evm_setup) ->
+             ~evm_setup:
+               ({evm_node; produce_block; endpoint; evm_version; _} as evm_setup)
+    ->
   let sender = Eth_account.bootstrap_accounts.(0) in
   (* Deploy the contracts with the block constants. *)
-  let* contract = block_constants () in
+  let* contract = block_constants evm_version in
   let* address, tx = deploy ~contract ~sender evm_setup in
   let* () = check_tx_succeeded ~endpoint ~tx in
   (* Set the block number in the contract's storage. *)
@@ -5809,9 +5833,9 @@ let test_revert_is_correctly_propagated =
   register_both
     ~tags:["evm"; "revert"]
     ~title:"Check that the node propagates reverts reason correctly."
-  @@ fun ~protocol:_ ~evm_setup:({evm_node; _} as evm_setup) ->
+  @@ fun ~protocol:_ ~evm_setup:({evm_node; evm_version; _} as evm_setup) ->
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* error_resolved = error () in
+  let* error_resolved = error evm_version in
   let* error_address, _tx = deploy ~contract:error_resolved ~sender evm_setup in
   let* data =
     Eth_cli.encode_method
@@ -5833,8 +5857,9 @@ let test_block_gas_limit =
   register_both
     ~tags:["evm"; "gas_limit"; "block"]
     ~title:"Block gas limit returns 2^50."
-  @@ fun ~protocol:_ ~evm_setup:({evm_node; endpoint; _} as evm_setup) ->
-  let* gas_limit_contract_resolved = gas_limit_contract () in
+  @@ fun ~protocol:_
+             ~evm_setup:({evm_node; endpoint; evm_version; _} as evm_setup) ->
+  let* gas_limit_contract_resolved = gas_limit_contract evm_version in
   let* contract, _tx =
     deploy
       ~contract:gas_limit_contract_resolved

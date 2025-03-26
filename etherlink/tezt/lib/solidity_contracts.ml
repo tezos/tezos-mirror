@@ -55,8 +55,9 @@ let generate_json_string ~label ~contract ~path ~evm_version =
     evm_version
     contract
 
-let compile_contract ~source ~label ~contract ~evm_version =
+let compile_contract ~source ~label ~contract evm_version =
   (* Construct the JSON input for solc *)
+  let evm_version = Evm_version.to_string evm_version in
   let input_json =
     generate_json_string ~label ~contract ~path:source ~evm_version
   in
@@ -111,238 +112,209 @@ let compile_contract ~source ~label ~contract ~evm_version =
   return {label; abi = abi_file; bin = bin_file; deployed_bin = deployed_file}
 
 (** The info for the "storage.sol" contract. *)
-let simple_storage () =
+let simple_storage =
   compile_contract
     ~source:(solidity_contracts_path ^ "/storage.sol")
     ~label:"simpleStorage"
     ~contract:"SimpleStorage"
-    ~evm_version:"london"
 
 (* The info for the "even_block_gas_consumer.sol" contract. *)
-let even_block_gas_consumer () =
+let even_block_gas_consumer =
   compile_contract
     ~source:(solidity_contracts_path ^ "/even_block_gas_consumer.sol")
     ~label:"even_block_gas_consumer"
     ~contract:"EvenBlockGasConsumer"
-    ~evm_version:"london"
 
 (** The info for the "erc20tok.sol" contract. *)
-let erc20 () =
+let erc20 =
   compile_contract
     ~source:(solidity_contracts_path ^ "/erc20tok.sol")
     ~label:"erc20tok"
     ~contract:"ERC20"
-    ~evm_version:"london"
 
 (** The info for the "loop.sol" contract. *)
-let loop () =
+let loop =
   compile_contract
     ~source:(solidity_contracts_path ^ "/loop.sol")
     ~label:"loop"
     ~contract:"Loop"
-    ~evm_version:"london"
 
 (** The info for the "mapping_storage.sol" contract. *)
-let mapping_storage () =
+let mapping_storage =
   compile_contract
     ~source:(solidity_contracts_path ^ "/mapping_storage.sol")
     ~label:"mapping_storage"
     ~contract:"MappingStorage"
-    ~evm_version:"london"
 
 (** The info for the "storage.sol" contract, compiled for Shanghai. *)
-let shanghai_storage () =
+let shanghai_storage =
   compile_contract
     ~source:(solidity_contracts_path ^ "/storage.sol")
     ~label:"shanghai_storage"
     ~contract:"SimpleStorage"
-    ~evm_version:"shanghai"
 
 (** The info for the Callee contract. *)
-let callee () =
+let callee =
   compile_contract
     ~source:(solidity_contracts_path ^ "/caller_callee.sol")
     ~label:"callee"
     ~contract:"Callee"
-    ~evm_version:"london"
 
 (** The info for the Caller contract. *)
-let caller () =
+let caller =
   compile_contract
     ~source:(solidity_contracts_path ^ "/caller_callee.sol")
     ~label:"caller"
     ~contract:"Caller"
-    ~evm_version:"london"
 
 (** The info for the "events.sol" contract. *)
-let events () =
+let events =
   compile_contract
     ~source:(solidity_contracts_path ^ "/events.sol")
     ~label:"events"
     ~contract:"Events"
-    ~evm_version:"london"
 
 (** The info for the "nested_create.sol" contract. *)
-let nested_create () =
+let nested_create =
   compile_contract
     ~source:(solidity_contracts_path ^ "/nested_create.sol")
     ~label:"nested_create"
     ~contract:"Creator"
-    ~evm_version:"london"
 
 (** The info for the "revert.sol" contract. *)
-let revert () =
+let revert =
   compile_contract
     ~source:(solidity_contracts_path ^ "/revert.sol")
     ~label:"revert"
     ~contract:"Revert"
-    ~evm_version:"london"
 
 (** The info for the "create2.sol" contract. *)
-let create2 () =
+let create2 =
   compile_contract
     ~source:(solidity_contracts_path ^ "/create2.sol")
     ~label:"create2"
     ~contract:"Create2"
-    ~evm_version:"london"
 
 (** The info for the "oog_call.sol" contract. *)
-let oog_call () =
+let oog_call =
   compile_contract
     ~source:(solidity_contracts_path ^ "/oog_call.sol")
     ~label:"oog_call"
     ~contract:"OOGCall"
-    ~evm_version:"london"
 
 (** The info for the "ether_wallet.sol" contract. *)
-let ether_wallet () =
+let ether_wallet =
   compile_contract
     ~source:(solidity_contracts_path ^ "/ether_wallet.sol")
     ~label:"ether_wallet"
     ~contract:"SharedEtherWallet"
-    ~evm_version:"london"
 
 (** The info for the "block_hash_gen.sol" contract. *)
-let block_hash_gen () =
+let block_hash_gen =
   compile_contract
     ~source:(solidity_contracts_path ^ "/block_hash_gen.sol")
     ~label:"block_hash_gen"
     ~contract:"BlockHashGen"
-    ~evm_version:"london"
 
 (** The info for the "block_hash_gen.sol" contract. *)
-let blockhash () =
+let blockhash =
   compile_contract
     ~source:(solidity_contracts_path ^ "/blockhash.sol")
     ~label:"blockhash"
     ~contract:"Blockhash"
-    ~evm_version:"london"
 
 (** The info for the "timestamp.sol" contract. *)
-let timestamp () =
+let timestamp =
   compile_contract
     ~source:(solidity_contracts_path ^ "/timestamp.sol")
     ~label:"timestamp"
     ~contract:"Timestamp"
-    ~evm_version:"london"
 
 (** The info for the "call_selfdestruct.sol" contract. *)
-let call_selfdestruct () =
+let call_selfdestruct =
   compile_contract
     ~source:(solidity_contracts_path ^ "/call_selfdestruct.sol")
     ~label:"call_selfdestruct"
     ~contract:"C1"
-    ~evm_version:"london"
 
 (** The info for the "call_selfdestruct_behavior.sol" contract. *)
-let call_selfdestruct_behavior () =
+let call_selfdestruct_behavior =
   compile_contract
     ~source:(solidity_contracts_path ^ "/call_selfdestruct_behavior.sol")
     ~label:"call_selfdestruct"
     ~contract:"Parent"
-    ~evm_version:"cancun"
 
 (** The info for the "mcopy.sol" contract. *)
-let mcopy () =
+let mcopy =
   compile_contract
     ~source:(solidity_contracts_path ^ "/mcopy.sol")
     ~label:"mcopy"
     ~contract:"MCOPY"
-    ~evm_version:"cancun"
 
 (** The info for the "transient_storage_multiplier.sol" contract. *)
-let transient_storage_multiplier () =
+let transient_storage_multiplier =
   compile_contract
     ~source:(solidity_contracts_path ^ "/transient_storage_multiplier.sol")
     ~label:"transient_storage_multiplier"
     ~contract:"TransientStorageMultiplier"
-    ~evm_version:"cancun"
 
 (** The info for the "recursive.sol" contract. *)
-let recursive () =
+let recursive =
   compile_contract
     ~source:(solidity_contracts_path ^ "/recursive.sol")
     ~label:"recursive"
     ~contract:"Recursive"
-    ~evm_version:"london"
 
 (** The info for the "error.sol" contract. *)
-let error () =
+let error =
   compile_contract
     ~source:(solidity_contracts_path ^ "/error.sol")
     ~label:"error"
     ~contract:"Error"
-    ~evm_version:"london"
 
 (** The info for the "spam_withdrawal.sol" contract. *)
-let spam_withdrawal () =
+let spam_withdrawal =
   compile_contract
     ~source:(solidity_contracts_path ^ "/spam_withdrawal.sol")
     ~label:"spam_withdrawal"
     ~contract:"SpamWithdrawals"
-    ~evm_version:"london"
 
 (** The info for the "gas_limit.sol" contract. *)
-let gas_limit_contract () =
+let gas_limit_contract =
   compile_contract
     ~source:(solidity_contracts_path ^ "/gas_limit.sol")
     ~label:"gas_limit"
     ~contract:"Gas_limit"
-    ~evm_version:"london"
 
 (** The info for the "gas_limit.sol" contract. *)
-let counter () =
+let counter =
   compile_contract
     ~source:(solidity_contracts_path ^ "/counter.sol")
     ~label:"counter"
     ~contract:"TestCounter"
-    ~evm_version:"london"
 
 (** The info for the "coinbase.sol" contract. *)
-let coinbase () =
+let coinbase =
   compile_contract
     ~source:(solidity_contracts_path ^ "/coinbase.sol")
     ~label:"coinbase"
     ~contract:"Coinbase"
-    ~evm_version:"london"
 
 (** The info for the "block_constants.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/block_constants.sol] *)
-let block_constants () =
+let block_constants =
   compile_contract
     ~source:(solidity_contracts_path ^ "/block_constants.sol")
     ~label:"block_constants"
     ~contract:"BlockConstants"
-    ~evm_version:"cancun"
 
 (** The info for the "call_withdrawal.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/call_withdrawal.sol] *)
-let call_withdrawal () =
+let call_withdrawal =
   compile_contract
     ~source:(solidity_contracts_path ^ "/call_withdrawal.sol")
     ~label:"call_withdrawal"
     ~contract:"CallPrecompile"
-    ~evm_version:"cancun"
 
 (** The info for the "callcode_withdrawal.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/callcode_withdrawal.sol]
@@ -357,111 +329,96 @@ let callcode_withdrawal =
     deployed_bin = "";
   }
 
-let gas_left () =
+let gas_left =
   compile_contract
     ~source:(solidity_contracts_path ^ "/gas_left.sol")
     ~label:"gas_left"
     ~contract:"GasLeft"
-    ~evm_version:"shanghai"
 
-let call_types () =
+let call_types =
   compile_contract
     ~source:(solidity_contracts_path ^ "/call_types.sol")
     ~label:"call_types"
     ~contract:"TestCallTypes"
-    ~evm_version:"shanghai"
 
-let simple_logger () =
+let simple_logger =
   compile_contract
     ~source:(solidity_contracts_path ^ "/simple_logger.sol")
     ~label:"simple_logger"
     ~contract:"SimpleLogger"
-    ~evm_version:"shanghai"
 
-let call_tracer_depth () =
+let call_tracer_depth =
   compile_contract
     ~source:(solidity_contracts_path ^ "/call_tracer_depth.sol")
     ~label:"call_tracer_depth"
     ~contract:"TestDepthCall"
-    ~evm_version:"shanghai"
 
-let call_tracer_revert () =
+let call_tracer_revert =
   compile_contract
     ~source:(solidity_contracts_path ^ "/call_tracer_revert.sol")
     ~label:"call_tracer_revert"
     ~contract:"ErrorContract"
-    ~evm_version:"shanghai"
 
-let call_revert () =
+let call_revert =
   compile_contract
     ~source:(solidity_contracts_path ^ "/call_revert.sol")
     ~label:"call_revert"
     ~contract:"CallRevert"
-    ~evm_version:"shanghai"
 
-let precompiles () =
+let precompiles =
   compile_contract
     ~source:(solidity_contracts_path ^ "/precompiles.sol")
     ~label:"precompiles"
     ~contract:"PrecompileCaller"
-    ~evm_version:"shanghai"
 
-let state_override_tester () =
+let state_override_tester =
   compile_contract
     ~source:(solidity_contracts_path ^ "/state_override_tester.sol")
     ~label:"state_override_tester"
     ~contract:"StateOverrideTester"
-    ~evm_version:"shanghai"
 
-let state_override_tester_readable () =
+let state_override_tester_readable =
   compile_contract
     ~source:(solidity_contracts_path ^ "/state_override_tester_readable.sol")
     ~label:"state_override_tester_readable"
     ~contract:"StateOverrideTester"
-    ~evm_version:"shanghai"
 
-let batcher () =
+let batcher =
   compile_contract
     ~source:(solidity_contracts_path ^ "/batcher.sol")
     ~label:"batcher"
     ~contract:"Batcher"
-    ~evm_version:"shanghai"
 
-let reentrancy_test () =
+let reentrancy_test =
   compile_contract
     ~source:
       "etherlink/kernel_evm/evm_execution/tests/contracts/src/ReentrancyTester.sol"
     ~label:"reentrancy_tester"
     ~contract:"ReentrancyTester"
-    ~evm_version:"shanghai"
 
-let slot_filler () =
+let slot_filler =
   compile_contract
     ~source:(solidity_contracts_path ^ "/slot_filler.sol")
     ~label:"slot_filler"
     ~contract:"SlotFiller"
-    ~evm_version:"shanghai"
 
-let call_fast_withdrawal () =
+let call_fast_withdrawal =
   compile_contract
     ~source:(solidity_contracts_path ^ "/call_fast_withdrawal.sol")
     ~label:"call_fast_withdrawal"
     ~contract:"CallPrecompile"
-    ~evm_version:"shanghai"
 
-let delegatecall_delegator () =
+let delegatecall_delegator =
   compile_contract
     ~source:(solidity_contracts_path ^ "/delegatecall.sol")
     ~label:"delegatecall_delegator"
     ~contract:"Delegator"
-    ~evm_version:"shanghai"
 
-let delegatecall_delegated () =
+let delegatecall_delegated =
   compile_contract
     ~source:(solidity_contracts_path ^ "/delegatecall.sol")
     ~label:"delegatecall_delegated"
     ~contract:"Delegated"
-    ~evm_version:"shanghai"
 
 module Precompile = struct
   let withdrawal = "0xff00000000000000000000000000000000000001"

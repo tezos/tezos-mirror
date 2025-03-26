@@ -2554,10 +2554,11 @@ let test_fa_reentrant_deposit_reverts =
            sc_rollup_node;
            sequencer;
            proxy;
+           evm_version;
            _;
          }
              _protocol ->
-  let* reentrancy = Solidity_contracts.reentrancy_test () in
+  let* reentrancy = Solidity_contracts.reentrancy_test evm_version in
   let* () = Eth_cli.add_abi ~label:reentrancy.label ~abi:reentrancy.abi () in
 
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -3177,7 +3178,7 @@ let test_extended_block_param =
     ~tags:["evm"; "sequencer"; "rpc"; "block_param"; "counter"]
     ~title:"Supports extended block parameter"
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocols ->
+  @@ fun {sequencer; evm_version; _} _protocols ->
   (*
      In this test we will deploy a counter contract, increments its counter
      at multiple consecutives blocks, and check the counter using block
@@ -3186,7 +3187,7 @@ let test_extended_block_param =
      both for read only RPCs such as [eth_getStorageAt] and simulation
      such as [eth_call].
   *)
-  let* counter_resolved = Solidity_contracts.counter () in
+  let* counter_resolved = Solidity_contracts.counter evm_version in
   let* () =
     Eth_cli.add_abi ~label:counter_resolved.label ~abi:counter_resolved.abi ()
   in
@@ -6426,6 +6427,7 @@ let test_outbox_size_limit_resilience ~slow =
            sc_rollup_node;
            sequencer;
            proxy;
+           evm_version;
            _;
          }
              _protocol ->
@@ -6470,7 +6472,7 @@ let test_outbox_size_limit_resilience ~slow =
     ~error_msg:"Expected a bigger balance" ;
 
   (* Deploy and top up batch withdrawal contract *)
-  let* spammer_resolved = Solidity_contracts.spam_withdrawal () in
+  let* spammer_resolved = Solidity_contracts.spam_withdrawal evm_version in
   let* () =
     Eth_cli.add_abi ~label:spammer_resolved.label ~abi:spammer_resolved.abi ()
   in
@@ -7323,7 +7325,7 @@ let test_overwrite_simulation_tick_limit =
       (* We set a smaller tick limit to make it easier to trigger the
          OutOfTick error *)
       500_000_000L
-  @@ fun {sequencer; sc_rollup_node; _} _protocol ->
+  @@ fun {sequencer; sc_rollup_node; evm_version; _} _protocol ->
   let* observer =
     run_new_observer_node
       ~sc_rollup_node
@@ -7337,7 +7339,7 @@ let test_overwrite_simulation_tick_limit =
       sequencer
   in
 
-  let* recursive = Solidity_contracts.recursive () in
+  let* recursive = Solidity_contracts.recursive evm_version in
   let* () = Eth_cli.add_abi ~label:recursive.label ~abi:recursive.abi () in
   (* Deploy the contract. *)
   let* recursive_address, _tx_hash =
@@ -7491,11 +7493,13 @@ let test_trace_transaction_call =
     ~title:"Sequencer can run debug_traceTransaction and return a valid log"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   (* Transfer funds to a random address. *)
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* simple_storage_resolved = Solidity_contracts.simple_storage () in
+  let* simple_storage_resolved =
+    Solidity_contracts.simple_storage evm_version
+  in
 
   (* deploy contract *)
   let* () =
@@ -7585,11 +7589,13 @@ let test_trace_transaction_call_trace =
     ~title:"Sequencer can run debug_traceTransaction with calltracer"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   (* Transfer funds to a random address. *)
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* simple_storage_resolved = Solidity_contracts.simple_storage () in
+  let* simple_storage_resolved =
+    Solidity_contracts.simple_storage evm_version
+  in
   (* deploy contract *)
   let* () =
     Eth_cli.add_abi
@@ -7690,10 +7696,10 @@ let test_trace_transaction_calltracer_failed_create =
        creation reverts but is included"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* call_types = Solidity_contracts.call_types () in
+  let* call_types = Solidity_contracts.call_types evm_version in
   let* () = Eth_cli.add_abi ~label:call_types.label ~abi:call_types.abi () in
   let* _contract_address, create_tx =
     send_transaction_to_sequencer
@@ -7744,11 +7750,11 @@ let test_trace_delegate_call =
     ~title:"calltracer correctly display delegate call infos"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* delegated = Solidity_contracts.delegatecall_delegated () in
-  let* delegator = Solidity_contracts.delegatecall_delegator () in
+  let* delegated = Solidity_contracts.delegatecall_delegated evm_version in
+  let* delegator = Solidity_contracts.delegatecall_delegator evm_version in
   let* () = Eth_cli.add_abi ~label:delegated.label ~abi:delegated.abi () in
   let* () = Eth_cli.add_abi ~label:delegator.label ~abi:delegator.abi () in
   let* delegated_address, _ =
@@ -7823,10 +7829,10 @@ let test_trace_transaction_calltracer_all_types =
       "debug_traceTransaction with calltracer can produce all the call types"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* call_types = Solidity_contracts.call_types () in
+  let* call_types = Solidity_contracts.call_types evm_version in
   let* () = Eth_cli.add_abi ~label:call_types.label ~abi:call_types.abi () in
   let* contract_address, _ =
     send_transaction_to_sequencer
@@ -7912,10 +7918,10 @@ let test_trace_transaction_call_tracer_with_logs =
     ~title:"debug_traceTransaction with calltracer can produce a call with logs"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* simple_logger = Solidity_contracts.simple_logger () in
+  let* simple_logger = Solidity_contracts.simple_logger evm_version in
   let* () =
     Eth_cli.add_abi ~label:simple_logger.label ~abi:simple_logger.abi ()
   in
@@ -7971,10 +7977,10 @@ let test_trace_transaction_call_trace_certain_depth =
     ~title:"debug_traceTransaction with calltracer to see diffuclt depth"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* call_tracer_depth = Solidity_contracts.call_tracer_depth () in
+  let* call_tracer_depth = Solidity_contracts.call_tracer_depth evm_version in
   let* () =
     Eth_cli.add_abi ~label:call_tracer_depth.label ~abi:call_tracer_depth.abi ()
   in
@@ -8049,10 +8055,10 @@ let test_trace_transaction_call_revert =
        handled"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* call_revert = Solidity_contracts.call_revert () in
+  let* call_revert = Solidity_contracts.call_revert evm_version in
   let* () = Eth_cli.add_abi ~label:call_revert.label ~abi:call_revert.abi () in
   let* contract_address, _ =
     send_transaction_to_sequencer
@@ -8103,10 +8109,10 @@ let test_trace_transaction_call_trace_revert =
     ~title:"debug_traceTransaction with calltracer to see how revert is handled"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* call_tracer_revert = Solidity_contracts.call_tracer_revert () in
+  let* call_tracer_revert = Solidity_contracts.call_tracer_revert evm_version in
   let* () =
     Eth_cli.add_abi
       ~label:call_tracer_revert.label
@@ -8199,11 +8205,11 @@ let test_trace_transaction_calltracer_multiple_txs =
       "debug_traceTransaction handles blocks containing several transactions"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender_0 = Eth_account.bootstrap_accounts.(0) in
   let sender_1 = Eth_account.bootstrap_accounts.(1) in
-  let* call_types = Solidity_contracts.call_types () in
+  let* call_types = Solidity_contracts.call_types evm_version in
   let* () = Eth_cli.add_abi ~label:call_types.label ~abi:call_types.abi () in
   let* address, _ =
     send_transaction_to_sequencer
@@ -8303,10 +8309,10 @@ let test_trace_transaction_calltracer_precompiles =
     ~da_fee:Wei.zero
     ~maximum_allowed_ticks:100_000_000_000_000L
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* precompiles = Solidity_contracts.precompiles () in
+  let* precompiles = Solidity_contracts.precompiles evm_version in
   let* () = Eth_cli.add_abi ~label:precompiles.label ~abi:precompiles.abi () in
   let* contract_address, _ =
     send_transaction_to_sequencer
@@ -8485,14 +8491,14 @@ let test_miner =
     ~tags:["evm"; "miner"; "coinbase"]
     ~title:"Sequencer pool address is the block's miner"
     ~sequencer_pool_address
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
   Check.((String.lowercase_ascii block.miner = sequencer_pool_address) string)
     ~error_msg:
       "Block miner should be the sequencer pool address, expected %R got %L" ;
   (* We deploy a contract that stores the block coinbase in its storage, and
      also has a view to get the block coinbase. *)
-  let* coinbase_resolved = Solidity_contracts.coinbase () in
+  let* coinbase_resolved = Solidity_contracts.coinbase evm_version in
   let* () =
     Eth_cli.add_abi ~label:coinbase_resolved.label ~abi:coinbase_resolved.abi ()
   in
@@ -8816,14 +8822,14 @@ let test_fast_withdrawal_l2_caller =
     ~enable_fast_withdrawal:true
     ~time_between_blocks:Nothing
     ~kernels:[Kernel.Ghostnet; Kernel.Latest]
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let fast_withdrawal_contract_address =
     "KT1TczPwz5KjAuuJKvkTmttS7bBioT5gjQ4Y"
   in
   let produce_block () = Rpc.produce_block sequencer in
   let endpoint = Evm_node.endpoint sequencer in
   let* withdrawal_forwarder_contract =
-    Solidity_contracts.call_fast_withdrawal ()
+    Solidity_contracts.call_fast_withdrawal evm_version
   in
   let sender = Eth_account.bootstrap_accounts.(0) in
   (* deploy the contract *)
@@ -9061,14 +9067,17 @@ let test_trace_call =
     ~tags:["evm"; "rpc"; "trace"; "call"]
     ~title:"Sequencer can run debug_traceCall and return a valid log"
     ~da_fee:Wei.zero
-  @@ fun {sc_rollup_node; sequencer; client; proxy = _; _} _protocol ->
+  @@ fun {sc_rollup_node; sequencer; client; proxy = _; evm_version; _}
+             _protocol ->
   (* Start a RPC node as well, since we will want to check it returns the
      same result as the sequencer *)
   let* rpc_node = run_new_rpc_endpoint sequencer in
   (* Transfer funds to a random address. *)
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* simple_storage_resolved = Solidity_contracts.simple_storage () in
+  let* simple_storage_resolved =
+    Solidity_contracts.simple_storage evm_version
+  in
 
   (* deploy contract *)
   let* () =
@@ -9505,13 +9514,13 @@ let test_regression_block_hash_gen =
     ~tags:["evm"; "l2_call"; "block_hash"; "timestamp"]
     ~title:"Random generation based on block hash and timestamp"
     ~genesis_timestamp:Client.(At (Time.of_notation_exn timestamp))
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let* () =
     repeat 3 (fun _ ->
         let*@ _ = produce_block sequencer ~timestamp in
         unit)
   in
-  let* {abi; bin; _} = Solidity_contracts.block_hash_gen () in
+  let* {abi; bin; _} = Solidity_contracts.block_hash_gen evm_version in
   let* _contract, _tx_hash =
     send_transaction_to_sequencer
       (Eth_cli.deploy
@@ -10397,12 +10406,12 @@ let test_websocket_logs_event =
       @ Eth_account.lots_of_address)
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~websockets:true
-  @@ fun {sequencer; observer; _} _protocol ->
+  @@ fun {sequencer; observer; evm_version; _} _protocol ->
   let scenario evm_node =
     let* websocket = Evm_node.open_websocket evm_node in
     let endpoint = Evm_node.endpoint evm_node in
     let sender = Eth_account.bootstrap_accounts.(0) in
-    let* erc20 = Solidity_contracts.erc20 () in
+    let* erc20 = Solidity_contracts.erc20 evm_version in
     let* () = Eth_cli.add_abi ~label:erc20.label ~abi:erc20.abi () in
     let* address, _tx =
       send_transaction_to_sequencer
@@ -10709,12 +10718,12 @@ let test_trace_block =
     ~tags:["evm"; "sequencer"; "trace"; "block"]
     ~title:"debug_traceBlockByNumber succeeds on non empty block"
     ~kernels:Kernel.all
-  @@ fun {client; sc_rollup_node; sequencer; proxy; _} _protocol ->
+  @@ fun {client; sc_rollup_node; sequencer; proxy; evm_version; _} _protocol ->
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
   let endpoint = Evm_node.endpoint sequencer in
   let sender_0 = Eth_account.bootstrap_accounts.(0) in
   let sender_1 = Eth_account.bootstrap_accounts.(1) in
-  let* call_types = Solidity_contracts.call_types () in
+  let* call_types = Solidity_contracts.call_types evm_version in
   let* () = Eth_cli.add_abi ~label:call_types.label ~abi:call_types.abi () in
   let* address, _ =
     send_transaction_to_sequencer
@@ -10815,10 +10824,10 @@ let test_filling_max_slots_cant_lead_to_out_of_memory =
        OutOfGas not an out of memory error"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* slot_filler = Solidity_contracts.slot_filler () in
+  let* slot_filler = Solidity_contracts.slot_filler evm_version in
   let* () = Eth_cli.add_abi ~label:slot_filler.label ~abi:slot_filler.abi () in
   let* contract_address, _ =
     send_transaction_to_sequencer
@@ -10856,10 +10865,10 @@ let test_rpc_getLogs_with_earliest_fail =
     ~tags:["evm"; "rpc"; "get_logs"; "earliest"]
     ~title:"RPC method getLogs with earliest block"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* erc20_resolved = Solidity_contracts.erc20 () in
+  let* erc20_resolved = Solidity_contracts.erc20 evm_version in
   let* () =
     Eth_cli.add_abi ~label:erc20_resolved.label ~abi:erc20_resolved.abi ()
   in
@@ -10912,9 +10921,9 @@ let test_estimate_gas_with_block_param =
     ~tags:["evm"; "eth_estimategas"; "simulate"; "estimate_gas"; "earliest"]
     ~title:"eth_estimateGas with block parameter"
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* gas_consumer = Solidity_contracts.even_block_gas_consumer () in
+  let* gas_consumer = Solidity_contracts.even_block_gas_consumer evm_version in
   let* () =
     Eth_cli.add_abi ~label:gas_consumer.label ~abi:gas_consumer.abi ()
   in
