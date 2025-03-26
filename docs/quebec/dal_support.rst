@@ -54,6 +54,9 @@ In the block’s metadata, there is a specific field for the DAL, called ``"dal_
 
 Therefore, for data committed (published) at level ``L``, the slot's availability is determined by the metadata of the block at level ``L + attestation_lag``. Consequently, a smart rollup can only utilize this data from level ``L + attestation_lag + 1`` onward.
 
+.. _dal_rollups_integration:
+.. _dal_rollups_integration_quebec:
+
 Smart rollups integration
 =========================
 

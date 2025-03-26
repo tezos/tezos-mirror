@@ -778,11 +778,11 @@ function copy_source() {
 
   ## update agnostic_baker
   ## add protocol as active before alpha in parameters.ml
-  if ! grep -q "${long_hash}" src/bin_agnostic_baker/parameters.ml; then
+  if ! grep -q "${long_hash}" src/lib_agnostic_baker/parameters.ml; then
     ## look for | "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" -> ("alpha", Active)
     ## and add   | "${longhash}" ) as full_hash -> (String.sub full_hash 0 8, Active)
-    sed -i.old -e "/| \"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK\" ->/a \  | \"${long_hash}\" as full_hash -> (String.sub full_hash 0 8, Active)" src/bin_agnostic_baker/parameters.ml
-    ocamlformat -i src/bin_agnostic_baker/parameters.ml
+    sed -i.old -e "/| \"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK\" ->/a \  | \"${long_hash}\" as full_hash -> (String.sub full_hash 0 8, Active)" src/lib_agnostic_baker/parameters.ml
+    ocamlformat -i src/lib_agnostic_baker/parameters.ml
     commit "src: add protocol to agnostic_baker"
   fi
 
@@ -1295,7 +1295,7 @@ function misc_updates() {
   fi
 
   find . -name '*.old' -exec rm {} \;
-  scripts/lint.sh --update-ocamlformat
+  scripts/lint.sh --update-ocamlformat || echo "updating ocamlformat files"
   scripts/lint.sh --check-ocamlformat || echo "linting updated ocamlformat files"
   commit_if_changes "scripts: lint"
 

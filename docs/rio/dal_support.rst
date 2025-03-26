@@ -110,6 +110,7 @@ Penalties
 
 A baker that is correctly accused, through an accusation operation included in a block, loses their DAL rewards for the cycle containing the block.
 
+.. _dal_rollups_integration_rio:
 
 Smart Rollups integration
 =========================
