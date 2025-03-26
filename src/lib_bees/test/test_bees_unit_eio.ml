@@ -232,6 +232,9 @@ let test_push_crashing_request () =
   let* w = create_queue "crashing_worker" in
   assert_status w "Running" ;
   push_and_assert_history w [Box RqB; Box RqB; Box (RqErr Crash); Box RqB] ;
+  (* The worker loop run in another fiber, let the scheduler run the shutdown
+     process before continuing. *)
+  let () = sleep 0.1 in
   assert_status w "Closed" ;
   return_unit
 
