@@ -292,6 +292,11 @@ DAL node
   the connection attempt failed. However, this MR fixes the timing
   when those attempts were made. (MR :gl:`!16466`)
 
+- **Deprecation** The CLI experimental flag ``--sqlite3-backend`` and its
+  corresponding configuration file field have been deprecated since
+  SQLite is now the default storage backend for storing skip list
+  cells for DAL slots.
+
 - **Feature** The DAL node stores now a peers.json file in its
   directory when it is shutdown with SIGINT. This file is read if it
   exists when starting the DAL node to restore previous known
