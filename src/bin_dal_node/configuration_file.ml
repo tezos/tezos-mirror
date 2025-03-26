@@ -176,6 +176,9 @@ let experimental_features_encoding : experimental_features Data_encoding.t =
     (obj1
        (dft
           "sqlite3-backend"
+          ~description:
+            "DEPRECATED as SQLite is now the default storage backend for \
+             storing skip list cells for DAL slots."
           bool
           default_experimental_features.sqlite3_backend))
 

@@ -354,13 +354,11 @@ module Term = struct
 
   let sqlite3_backend =
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7527
-       Remove this command line argument once the SQLite3 backend is
-       the default one. *)
+       Remove this command line argument in the next release. *)
     let open Cmdliner in
     let doc =
-      "Experimental feature, please dont use it unless you know what you are \
-       doing. Configure the DAL node store to use SQLite3 as a storage \
-       backend. "
+      "DEPRECATED as SQLite is now the default storage backend for storing \
+       skip list cells for DAL slots."
     in
     Arg.(value & flag & info ~docs ~doc ["sqlite3-backend"])
 
