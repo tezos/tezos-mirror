@@ -78,8 +78,8 @@ local mountpoint = std.extVar('mountpoint');
     + timeSeries.standardOptions.withUnit('bytes'),
 
   diskFreeSpace(h, w, x, y):
-    local qall = self.query('node_filesystem_free_bytes{' + base.node_instance + '="$node_instance"}', 'Available bytes on disk');
-    local qroot = self.query('node_filesystem_free_bytes{mountpoint="/",' + base.node_instance + '="$node_instance"}', 'Available bytes on disk /');
+    local qall = self.query('node_filesystem_free_bytes{' + base.node_instance + '="$node_instance"}', 'Available bytes on disk {{mountpoint}}');
+    local qroot = self.query('node_filesystem_free_bytes{mountpoint="/",' + base.node_instance + '="$node_instance"}', 'Available bytes on disk {{mountpoint}}');
     local qother = self.query('node_filesystem_free_bytes{mountpoint="' + mountpoint + '",' + base.node_instance + '="$node_instance"}', 'Available bytes on disk {{mountpoint}}');
     local mountq = if mountpoint != null then [qroot, qother] else [qall];
     graph.new('Disk free space', mountq, h, w, x, y)

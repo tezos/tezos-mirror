@@ -84,9 +84,7 @@ Optionnally you can enable storage monitoring with ``filecheck``:
     STORAGE_MODE=filecheck
 
 
-If you want to selectively change mountpoints to ``/`` and ``/opt``, you can enable it with
-
+By default, all mountpoints are monitored. If you want to selectively change mountpoints to ``/`` and another specific mountpoint, you can enable and add it with the `MOUNTPOINT` variable :
 .. code-block:: shell
 
-    MOUNTPOINTS=opt
-
+    MOUNTPOINT="/opt"
