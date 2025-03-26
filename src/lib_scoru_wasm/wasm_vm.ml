@@ -52,6 +52,13 @@ let is_last_eval_state = function
     ->
       false
 
+let eval_will_start = function
+  | Init {init_kont = IK_Stop; _} -> true
+  (* explicit pattern matching to avoid new states introducing silent bugs *)
+  | Padding | Snapshot | Decode _ | Link _ | Init _ | Eval _ | Collect | Stuck _
+    ->
+      false
+
 let ticks_to_snapshot {current_tick; last_top_level_call; max_nb_ticks; _} =
   let open Z in
   max_nb_ticks - one - (current_tick - last_top_level_call)
@@ -616,7 +623,7 @@ let compute_step_many_until ~wasm_entrypoint ?(max_steps = 1L)
   in
   let last_snapshot_tick = ref pvm_state.current_tick in
   let rec go steps_left pvm_state =
-    if pvm_state.tick_state = Snapshot then
+    if eval_will_start pvm_state.tick_state then
       last_snapshot_tick := pvm_state.current_tick ;
     let* continue = should_continue pvm_state in
     if steps_left > 0L && continue then

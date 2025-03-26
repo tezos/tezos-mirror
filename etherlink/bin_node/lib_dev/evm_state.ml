@@ -52,20 +52,17 @@ let execute ?(wasm_pvm_fallback = false) ?(profile = false)
       let filename =
         Filename.concat
           (kernel_logs_directory ~data_dir)
-          (log_file ^ "_ticks_per_reboot.csv")
+          (log_file ^ "_profile.csv")
       in
-      Lwt_io.with_file ~mode:Lwt_io.Output filename @@ fun oc ->
-      let*! () = Lwt_io.fprintf oc "ticks,reboot limit %%\n" in
+      let flags = Unix.[O_WRONLY; O_CREAT; O_TRUNC] in
+      Lwt_io.with_file ~mode:Lwt_io.Output ~flags filename @@ fun oc ->
       let*! () = Events.replay_csv_available filename in
-      let reboot_limit = 30_000_000_000L in
+      let*! () = Lwt_io.fprintf oc "ticks_used\n" in
       let hooks =
         Tezos_scoru_wasm.Hooks.(
           no_hooks
           |> on_pvm_reboot (fun ticks ->
-                 let percentage =
-                   Int64.to_float ticks /. Int64.to_float reboot_limit *. 100.0
-                 in
-                 let*! () = Lwt_io.fprintf oc "%Ld,%.6f%%\n" ticks percentage in
+                 let*! () = Lwt_io.fprintf oc "%Ld\n" ticks in
                  Lwt_io.flush oc))
       in
       let* evm_state, _ticks, _inboxes, _level =
@@ -336,9 +333,26 @@ let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir ~config
     in
     return (Option.map (L2_types.block_from_bytes ~chain_family:EVM) bytes)
   in
+  let export_gas_used (Qty gas) =
+    match (profile, log_file) with
+    | Some true, Some log_file ->
+        let filename =
+          Filename.concat
+            (kernel_logs_directory ~data_dir)
+            (log_file ^ "_profile.csv")
+        in
+        let flags = Unix.[O_WRONLY; O_CREAT; O_APPEND] in
+        Lwt_io.with_file ~mode:Lwt_io.Output ~flags filename @@ fun oc ->
+        Lwt_io.fprintf oc "gas_used\n%Ld\n" (Z.to_int64 gas)
+    | _ -> Lwt.return_unit
+  in
   match block with
   | Some block ->
       let (Qty after_height) = L2_types.block_number block in
+      let gas =
+        match block with Eth {gasUsed; _} -> gasUsed | _ -> Qty.zero
+      in
+      let*! () = export_gas_used gas in
       if Z.(equal (succ before_height) after_height) then
         return (Apply_success {evm_state; block})
       else return Apply_failure

@@ -15,6 +15,10 @@
 
 ### Execution changes
 
+- `replay blueprint` can export tick and gas consumption with `--profile`. (!17441)
+- `replay blueprint` can disable data availability fees with `--disable-da-fees`. (!17441)
+- `replay blueprint` can replay a range of blocks with `--up-to`. (!17441)
+
 ### Storage changes
 
 ### Documentation changes

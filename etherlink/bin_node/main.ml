@@ -162,6 +162,11 @@ module Params = struct
         in
         return (Evm_node_lib_dev_encoding.Ethereum_types.Address (Hex hex)))
 
+  let l2_level =
+    Tezos_clic.parameter (fun () s ->
+        Lwt.return_ok
+        @@ Evm_node_lib_dev_encoding.Ethereum_types.Qty (Z.of_string s))
+
   let snapshot_file next =
     Tezos_clic.param
       ~name:"snapshot_file"
@@ -318,6 +323,19 @@ let profile_arg =
   Tezos_clic.switch
     ~long:"profile"
     ~doc:"Profile the execution of the WASM PVM."
+    ()
+
+let upto_arg =
+  Tezos_clic.arg
+    ~long:"up-to"
+    ~doc:"Replay the successors until 'UPTO_LEVEL' is reached."
+    ~placeholder:"UPTO_LEVEL"
+    Params.l2_level
+
+let disable_da_fees_arg =
+  Tezos_clic.switch
+    ~long:"disable-da-fees"
+    ~doc:"Disable DA fees for this replay."
     ()
 
 let omit_delayed_tx_events_arg =
@@ -1532,7 +1550,7 @@ let replay_command =
   command
     ~group:Groups.debug
     ~desc:"Replay a specific block level."
-    (args8
+    (args10
        data_dir_arg
        config_path_arg
        preimages_arg
@@ -1540,14 +1558,11 @@ let replay_command =
        native_execution_policy_arg
        (kernel_arg ())
        kernel_verbosity_arg
-       profile_arg)
+       profile_arg
+       upto_arg
+       disable_da_fees_arg)
     (prefixes ["replay"; "blueprint"]
-    @@ Tezos_clic.param
-         ~name:"level"
-         ~desc:"Level to replay."
-         (Tezos_clic.parameter (fun () s ->
-              Lwt.return_ok
-              @@ Evm_node_lib_dev_encoding.Ethereum_types.Qty (Z.of_string s)))
+    @@ Tezos_clic.param ~name:"level" ~desc:"Level to replay." Params.l2_level
     @@ stop)
     (fun ( data_dir,
            config_file,
@@ -1556,7 +1571,9 @@ let replay_command =
            native_execution_policy,
            kernel,
            kernel_verbosity,
-           profile )
+           profile,
+           upto,
+           disable_da_fees )
          l2_level
          () ->
       let open Lwt_result_syntax in
@@ -1572,11 +1589,13 @@ let replay_command =
       let*! () = init_logs ~daily_logs:false ~data_dir configuration in
       Evm_node_lib_dev.Replay.main
         ~profile
+        ~disable_da_fees
         ?kernel
         ?kernel_verbosity
         ~data_dir
-        configuration
-        l2_level)
+        ~number:l2_level
+        ?upto
+        configuration)
 
 let patch_kernel_command =
   let open Tezos_clic in

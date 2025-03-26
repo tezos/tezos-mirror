@@ -5,6 +5,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let patch_da_fees evm_state =
+  Evm_state.modify
+    ~key:"/evm/world_state/fees/da_fee_per_byte"
+    ~value:(Int.to_string 0)
+    evm_state
+
 let patch_kernel ~kernel evm_state =
   let open Lwt_result_syntax in
   let* content, binary = Wasm_debugger.read_kernel kernel in
@@ -34,8 +40,11 @@ let patch_verbosity ~kernel_verbosity evm_state =
   in
   return evm_state
 
-let alter_evm_state ~kernel ~kernel_verbosity evm_state =
+let alter_evm_state ~disable_da_fees ~kernel ~kernel_verbosity evm_state =
   let open Lwt_result_syntax in
+  let*! evm_state =
+    if disable_da_fees then patch_da_fees evm_state else Lwt.return evm_state
+  in
   let* evm_state =
     match kernel with
     | None -> return evm_state
@@ -45,26 +54,46 @@ let alter_evm_state ~kernel ~kernel_verbosity evm_state =
   | None -> return evm_state
   | Some kernel_verbosity -> patch_verbosity ~kernel_verbosity evm_state
 
-let main ?profile ?kernel ?kernel_verbosity ~data_dir config number =
+let main ~profile ~disable_da_fees ?kernel ?kernel_verbosity ~data_dir ~number
+    ?upto config =
   let open Lwt_result_syntax in
+  let* up_to_level =
+    match upto with
+    | None -> return number
+    | Some v ->
+        if v < number then
+          failwith
+            "'upto' must be a level succeeding the initial replayed level"
+        else return v
+  in
   let* ro_ctxt = Evm_ro_context.load ~data_dir config in
   let* legacy_block_storage =
     Evm_store.(use ro_ctxt.store Block_storage_mode.legacy)
   in
   if not legacy_block_storage then
     Block_storage_setup.enable ~keep_alive:config.keep_alive ro_ctxt.store ;
-  let alter_evm_state = alter_evm_state ~kernel ~kernel_verbosity in
-  let* apply_result =
-    Evm_ro_context.replay ro_ctxt ?profile ~alter_evm_state number
+  let alter_evm_state =
+    alter_evm_state ~disable_da_fees ~kernel ~kernel_verbosity
   in
-  match apply_result with
-  | Apply_success {block; _} ->
-      Format.printf
-        "Replaying blueprint %a led to block %a\n%!"
-        Ethereum_types.pp_quantity
-        number
-        Ethereum_types.pp_block_hash
-        (L2_types.block_hash block) ;
-      return_unit
-  | Apply_failure ->
-      failwith "Could not replay blueprint %a" Ethereum_types.pp_quantity number
+  let rec replay_upto current =
+    if current > up_to_level then return_unit
+    else
+      let* apply_result =
+        Evm_ro_context.replay ro_ctxt ~profile ~alter_evm_state current
+      in
+      match apply_result with
+      | Apply_success {block; _} ->
+          Format.printf
+            "Replaying blueprint %a led to block %a\n%!"
+            Ethereum_types.pp_quantity
+            current
+            Ethereum_types.pp_block_hash
+            (L2_types.block_hash block) ;
+          replay_upto Ethereum_types.Qty.(next current)
+      | Apply_failure ->
+          failwith
+            "Could not replay blueprint %a"
+            Ethereum_types.pp_quantity
+            current
+  in
+  replay_upto up_to_level
