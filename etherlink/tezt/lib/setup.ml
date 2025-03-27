@@ -247,6 +247,7 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
       ?history_mode
       (Evm_node.endpoint evm_node)
   in
+  let* () = Evm_node.wait_for_blueprint_applied observer 0 in
   return observer
 
 let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
