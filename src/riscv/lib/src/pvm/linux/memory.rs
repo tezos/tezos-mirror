@@ -77,20 +77,17 @@ impl<M: ManagerBase> SupervisorState<M> {
     pub(super) fn handle_brk<MC>(
         &mut self,
         core: &mut MachineCoreState<MC, M>,
-    ) -> Result<bool, Error>
+        new_brk: VirtAddr,
+    ) -> Result<u64, Error>
     where
         MC: MemoryConfig,
         M: ManagerReadWrite,
     {
-        let new_brk = VirtAddr::new(core.hart.xregisters.read(registers::a0));
         let brk = self.program_break.read();
 
         // When the new break address is NULL, we need to return the current program break
         if new_brk == 0 {
-            core.hart
-                .xregisters
-                .write(registers::a0, brk.to_machine_address());
-            return Ok(true);
+            return Ok(brk.to_machine_address());
         }
 
         // Ensure the program break is in the break area. This means at or above the end of the
@@ -126,11 +123,7 @@ impl<M: ManagerBase> SupervisorState<M> {
         // Only update the program break after the mappings have been changed
         self.program_break.write(new_brk);
 
-        core.hart
-            .xregisters
-            .write(registers::a0, new_brk.to_machine_address());
-
-        Ok(true)
+        Ok(new_brk.to_machine_address())
     }
 
     /// Handle `madvise` system call.
@@ -156,21 +149,20 @@ impl<M: ManagerBase> SupervisorState<M> {
     pub(super) fn handle_mprotect<MC>(
         &mut self,
         core: &mut MachineCoreState<MC, M>,
-    ) -> Result<bool, Error>
+        addr: PageAligned<VirtAddr>,
+        length: u64,
+        perms: Permissions,
+    ) -> Result<u64, Error>
     where
         MC: MemoryConfig,
         M: ManagerReadWrite,
     {
-        let addr: PageAligned<VirtAddr> = core.hart.xregisters.try_read(registers::a0)?;
-        let length = core.hart.xregisters.read(registers::a1);
-        let perms: Permissions = core.hart.xregisters.try_read(registers::a2)?;
-
         core.main_memory
             .protect_pages(addr.to_machine_address(), length as usize, perms)
             .map_err(|_| Error::NoMemory)?;
 
-        core.hart.xregisters.write(registers::a0, 0);
-        Ok(true)
+        // Return 0 to indicate success.
+        Ok(0)
     }
 
     /// Allocate a number of bytes on the heap.
@@ -224,16 +216,15 @@ impl<M: ManagerBase> SupervisorState<M> {
     pub(super) fn handle_mmap<MC>(
         &mut self,
         core: &mut MachineCoreState<MC, M>,
-    ) -> Result<bool, Error>
+        addr: VirtAddr,
+        length: NonZeroU64,
+        perms: Permissions,
+        flags: Flags,
+    ) -> Result<u64, Error>
     where
         MC: MemoryConfig,
         M: ManagerReadWrite,
     {
-        let addr: VirtAddr = core.hart.xregisters.read(registers::a0).into();
-        let length: NonZeroU64 = core.hart.xregisters.try_read(registers::a1)?;
-        let perms: Permissions = core.hart.xregisters.try_read(registers::a2)?;
-        let flags: Flags = core.hart.xregisters.try_read(registers::a3)?;
-
         // We don't support file descriptors yet
         let NoFileDescriptor = core.hart.xregisters.try_read(registers::a4)?;
 
@@ -269,11 +260,7 @@ impl<M: ManagerBase> SupervisorState<M> {
         // Without updating the underlying memory mappings, the mapped memory would not be accessible
         update_mappings(core, addr, length, perms)?;
 
-        core.hart
-            .xregisters
-            .write(registers::a0, addr.to_machine_address());
-
-        Ok(true)
+        Ok(addr.to_machine_address())
     }
 
     /// Handle `munmap` system call.
@@ -282,21 +269,19 @@ impl<M: ManagerBase> SupervisorState<M> {
     pub(super) fn handle_munmap<MC>(
         &mut self,
         core: &mut MachineCoreState<MC, M>,
-    ) -> Result<bool, Error>
+        addr: u64,
+        length: u64,
+    ) -> Result<u64, Error>
     where
         MC: MemoryConfig,
         M: ManagerReadWrite,
     {
-        let addr = core.hart.xregisters.read(registers::a0);
-        let length = core.hart.xregisters.read(registers::a1);
-
         core.main_memory
             .protect_pages(addr, length as usize, Permissions::None)
             .map_err(|_| Error::InvalidArgument)?;
 
         // TODO: RV-534: Mapped memory is never freed up to be re-allocated
 
-        core.hart.xregisters.write(registers::a0, 0);
-        Ok(true)
+        Ok(0)
     }
 }

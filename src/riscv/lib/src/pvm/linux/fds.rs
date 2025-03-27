@@ -168,16 +168,12 @@ impl<M: ManagerBase> SupervisorState<M> {
     pub(super) fn handle_ppoll(
         &mut self,
         core: &mut MachineCoreState<impl MemoryConfig, M>,
-    ) -> Result<bool, Error>
+        fd_ptrs: u64,
+        num_fds: parameters::FileDescriptorCount,
+    ) -> Result<u64, Error>
     where
         M: ManagerReadWrite,
     {
-        let fd_ptrs = core.hart.xregisters.read(registers::a0);
-        let num_fds = core
-            .hart
-            .xregisters
-            .try_read::<parameters::FileDescriptorCount>(registers::a1)?;
-
         // The file descriptors are passed as `struct pollfd[]`.
         //
         // ```
@@ -226,8 +222,6 @@ impl<M: ManagerBase> SupervisorState<M> {
         }
 
         // Indicate success by returning 0
-        core.hart.xregisters.write(registers::a0, 0);
-
-        Ok(true)
+        Ok(0)
     }
 }

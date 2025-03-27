@@ -9,7 +9,6 @@ use super::error::Error;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::memory::Memory;
 use crate::machine_state::memory::MemoryConfig;
-use crate::machine_state::registers;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerReadWrite;
 
@@ -41,14 +40,13 @@ impl<M: ManagerBase> SupervisorState<M> {
     pub(super) fn handle_getcwd(
         &mut self,
         core: &mut MachineCoreState<impl MemoryConfig, M>,
-    ) -> Result<bool, Error>
+        buffer: u64,
+        length: u64,
+    ) -> Result<u64, Error>
     where
         M: ManagerReadWrite,
     {
         const CWD: &[u8] = c"/".to_bytes_with_nul();
-
-        let buffer = core.hart.xregisters.read(registers::a0);
-        let length = core.hart.xregisters.read(registers::a1);
 
         if length == 0 && buffer != 0 {
             return Err(Error::InvalidArgument);
@@ -63,8 +61,6 @@ impl<M: ManagerBase> SupervisorState<M> {
         core.main_memory.write_all(buffer, CWD)?;
 
         // Return the buffer address as an indicator of success
-        core.hart.xregisters.write(registers::a0, buffer);
-
-        Ok(true)
+        Ok(buffer)
     }
 }

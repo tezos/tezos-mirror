@@ -472,7 +472,121 @@ impl<M: ManagerBase> SupervisorState<M> {
                 try_blocks::try_block! {
                     paste::paste! {
                         let arg1 = core.hart.xregisters.try_read(registers::a0)?;
-                        let result = self.[<handle_$system_call>](arg1)?;
+                        let result = self.[<handle_$system_call>](core, arg1)?;
+                        core.hart.xregisters.write(registers::a0, result.into());
+                        true
+                    }
+                }
+            }};
+        }
+
+        // `dispatch2!(system_call_no)`
+        // Converts the system call name to the handler
+        macro_rules! dispatch2 {
+            ($system_call:ty) => {{
+                try_blocks::try_block! {
+                    paste::paste! {
+                        let arg1 = core.hart.xregisters.try_read(registers::a0)?;
+                        let arg2 = core.hart.xregisters.try_read(registers::a1)?;
+                        let result = self.[<handle_$system_call>](core, arg1, arg2)?;
+                        core.hart.xregisters.write(registers::a0, result.into());
+                        true
+                    }
+                }
+            }};
+        }
+
+        // `dispatch3!(system_call_no)`
+        // Converts the system call name to the handler
+        macro_rules! dispatch3 {
+            ($system_call:ty) => {{
+                try_blocks::try_block! {
+                    paste::paste! {
+                        let arg1 = core.hart.xregisters.try_read(registers::a0)?;
+                        let arg2 = core.hart.xregisters.try_read(registers::a1)?;
+                        let arg3 = core.hart.xregisters.try_read(registers::a2)?;
+                        let result = self.[<handle_$system_call>](core, arg1, arg2, arg3)?;
+                        core.hart.xregisters.write(registers::a0, result.into());
+                        true
+                    }
+                }
+            }};
+        }
+
+        // `dispatch4!(system_call_no)`
+        // Converts the system call name to the handler
+        macro_rules! dispatch4 {
+            ($system_call:ty) => {{
+                try_blocks::try_block! {
+                    paste::paste! {
+                        let arg1 = core.hart.xregisters.try_read(registers::a0)?;
+                        let arg2 = core.hart.xregisters.try_read(registers::a1)?;
+                        let arg3 = core.hart.xregisters.try_read(registers::a2)?;
+                        let arg4 = core.hart.xregisters.try_read(registers::a3)?;
+                        let result = self.[<handle_$system_call>](core, arg1, arg2, arg3, arg4)?;
+                        core.hart.xregisters.write(registers::a0, result.into());
+                        true
+                    }
+                }
+            }};
+        }
+
+        // `dispatch5!(system_call_no)`
+        // Converts the system call name to the handler
+        #[allow(unused_macros)]
+        macro_rules! dispatch5 {
+            ($system_call:ty) => {{
+                try_blocks::try_block! {
+                    paste::paste! {
+                        let arg1 = core.hart.xregisters.try_read(registers::a0)?;
+                        let arg2 = core.hart.xregisters.try_read(registers::a1)?;
+                        let arg3 = core.hart.xregisters.try_read(registers::a2)?;
+                        let arg4 = core.hart.xregisters.try_read(registers::a3)?;
+                        let arg5 = core.hart.xregisters.try_read(registers::a4)?;
+                        let result = self.[<handle_$system_call>](core, arg1, arg2, arg3, arg4, arg5)?;
+                        core.hart.xregisters.write(registers::a0, result.into());
+                        true
+                    }
+                }
+            }};
+        }
+
+        // `dispatch6!(system_call_no)`
+        // Converts the system call name to the handler
+        #[allow(unused_macros)]
+        macro_rules! dispatch6 {
+            ($system_call:ty) => {{
+                try_blocks::try_block! {
+                    paste::paste! {
+                        let arg1 = core.hart.xregisters.try_read(registers::a0)?;
+                        let arg2 = core.hart.xregisters.try_read(registers::a1)?;
+                        let arg3 = core.hart.xregisters.try_read(registers::a2)?;
+                        let arg4 = core.hart.xregisters.try_read(registers::a3)?;
+                        let arg5 = core.hart.xregisters.try_read(registers::a4)?;
+                        let arg6 = core.hart.xregisters.try_read(registers::a5)?;
+                        let result = self.[<handle_$system_call>](core, arg1, arg2, arg3, arg4, arg5, arg6)?;
+                        core.hart.xregisters.write(registers::a0, result.into());
+                        true
+                    }
+                }
+            }};
+        }
+
+        // `dispatch7!(system_call_no)`
+        // Converts the system call name to the handler
+        #[allow(unused_macros)]
+        macro_rules! dispatch7 {
+            ($system_call:ty) => {{
+                try_blocks::try_block! {
+                    paste::paste! {
+                        let arg1 = core.hart.xregisters.try_read(registers::a0)?;
+                        let arg2 = core.hart.xregisters.try_read(registers::a1)?;
+                        let arg3 = core.hart.xregisters.try_read(registers::a2)?;
+                        let arg4 = core.hart.xregisters.try_read(registers::a3)?;
+                        let arg5 = core.hart.xregisters.try_read(registers::a4)?;
+                        let arg6 = core.hart.xregisters.try_read(registers::a5)?;
+                        let arg7 = core.hart.xregisters.try_read(registers::a6)?;
+                        let result = self.[<handle_$system_call>](core, arg1, arg2, arg3, arg4, arg5, arg6, arg7)?;
                         core.hart.xregisters.write(registers::a0, result.into());
                         true
                     }
@@ -489,24 +603,24 @@ impl<M: ManagerBase> SupervisorState<M> {
         let system_call_no = core.hart.xregisters.read(registers::a7);
 
         let result = match system_call_no {
-            GETCWD => self.handle_getcwd(core),
+            GETCWD => dispatch2!(getcwd),
             OPENAT => self.handle_openat(),
             WRITE => self.handle_write(core, hooks),
             WRITEV => self.handle_writev(core, hooks),
-            PPOLL => self.handle_ppoll(core),
+            PPOLL => dispatch2!(ppoll),
             READLINKAT => self.handle_readlinkat(),
             EXIT | EXITGROUP => self.handle_exit(core),
             SET_TID_ADDRESS => dispatch1!(set_tid_address),
             TKILL => self.handle_tkill(core),
-            SIGALTSTACK => self.handle_sigaltstack(core),
-            RT_SIGACTION => self.handle_rt_sigaction(core),
-            RT_SIGPROCMASK => self.handle_rt_sigprocmask(core),
-            BRK => self.handle_brk(core),
-            MMAP => self.handle_mmap(core),
-            MPROTECT => self.handle_mprotect(core),
-            MUNMAP => self.handle_munmap(core),
+            SIGALTSTACK => dispatch2!(sigaltstack),
+            RT_SIGACTION => dispatch4!(rt_sigaction),
+            RT_SIGPROCMASK => dispatch4!(rt_sigprocmask),
+            BRK => dispatch1!(brk),
+            MMAP => dispatch4!(mmap),
+            MPROTECT => dispatch3!(mprotect),
+            MUNMAP => dispatch2!(munmap),
             MADVISE => self.handle_madvise(core),
-            GETRANDOM => self.handle_getrandom(core),
+            GETRANDOM => dispatch2!(getrandom),
             SBI_FIRMWARE_TEZOS => return on_tezos(core),
             _ => Err(Error::NoSystemCall),
         };
@@ -542,7 +656,11 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// Handle `set_tid_address` system call.
     ///
     /// See: <https://www.man7.org/linux/man-pages/man2/set_tid_address.2.html>
-    fn handle_set_tid_address(&mut self, tid_address: VirtAddr) -> Result<u64, Error>
+    fn handle_set_tid_address(
+        &mut self,
+        _: &mut MachineCoreState<impl MemoryConfig, M>,
+        tid_address: VirtAddr,
+    ) -> Result<u64, Error>
     where
         M: ManagerRead + ManagerWrite,
     {
@@ -578,15 +696,12 @@ impl<M: ManagerBase> SupervisorState<M> {
     fn handle_sigaltstack(
         &mut self,
         core: &mut MachineCoreState<impl MemoryConfig, M>,
-    ) -> Result<bool, Error>
+        _: u64,
+        old: parameters::SignalAction,
+    ) -> Result<u64, Error>
     where
         M: ManagerReadWrite,
     {
-        let old = core
-            .hart
-            .xregisters
-            .try_read::<parameters::SignalAction>(registers::a1)?;
-
         /// `sizeof(struct sigaltstack)` on the Kernel side
         const SIZE_SIGALTSTACK: usize = 24;
 
@@ -594,9 +709,7 @@ impl<M: ManagerBase> SupervisorState<M> {
             .write(old.address(), [0u8; SIZE_SIGALTSTACK])?;
 
         // Return 0 as an indicator of success
-        core.hart.xregisters.write(registers::a0, 0);
-
-        Ok(true)
+        Ok(0)
     }
 
     /// Handle `rt_sigaction` system call. This does nothing effectively. It does not support
@@ -606,19 +719,14 @@ impl<M: ManagerBase> SupervisorState<M> {
     fn handle_rt_sigaction(
         &mut self,
         core: &mut MachineCoreState<impl MemoryConfig, M>,
-    ) -> Result<bool, Error>
+        _: u64,
+        _: u64,
+        old: parameters::SignalAction,
+        _: parameters::SigsetTSizeEightBytes,
+    ) -> Result<u64, Error>
     where
         M: ManagerReadWrite,
     {
-        let old = core
-            .hart
-            .xregisters
-            .try_read::<parameters::SignalAction>(registers::a2)?;
-
-        core.hart
-            .xregisters
-            .try_read::<parameters::SigsetTSizeEightBytes>(registers::a3)?;
-
         /// `sizeof(struct sigaction)` on the Kernel side
         const SIZE_SIGACTION: usize = 32;
 
@@ -627,9 +735,7 @@ impl<M: ManagerBase> SupervisorState<M> {
             .write(old.address(), [0u8; SIZE_SIGACTION])?;
 
         // Return 0 as an indicator of success
-        core.hart.xregisters.write(registers::a0, 0);
-
-        Ok(true)
+        Ok(0)
     }
 
     /// Handle `rt_sigprocmask` system call. This does nothing effectively. If the previous mask is
@@ -637,27 +743,20 @@ impl<M: ManagerBase> SupervisorState<M> {
     fn handle_rt_sigprocmask(
         &mut self,
         core: &mut MachineCoreState<impl MemoryConfig, M>,
-    ) -> Result<bool, Error>
+        _: u64,
+        _: u64,
+        old: parameters::SignalAction,
+        _: parameters::SigsetTSizeEightBytes,
+    ) -> Result<u64, Error>
     where
         M: ManagerReadWrite,
     {
-        let old = core
-            .hart
-            .xregisters
-            .try_read::<parameters::SignalAction>(registers::a2)?;
-
-        core.hart
-            .xregisters
-            .try_read::<parameters::SigsetTSizeEightBytes>(registers::a3)?;
-
         // As we don't store the previous mask, we just zero out the memory
         core.main_memory
             .write(old.address(), [0u8; parameters::SIGSET_SIZE as usize])?;
 
         // Return 0 as an indicator of success
-        core.hart.xregisters.write(registers::a0, 0);
-
-        Ok(true)
+        Ok(0)
     }
 
     /// Handle `tkill` system call. As there is only one thread at the moment, this system call
