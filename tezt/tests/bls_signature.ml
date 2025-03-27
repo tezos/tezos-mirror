@@ -685,8 +685,103 @@ let test_single_staker_sign_staking_operation_consensus_key_op_core =
   in
   unit
 
+(* N = group size and M = threshold *)
+
+(** Simple case: N = M = 3 *)
+let test_all_stakers_sign_staking_operation_external_delegate ~kind =
+  Protocol.register_test
+    ~__FILE__
+    ~title:
+      (sf
+         "all stakers sign a staking operation with an external delegate (%s)"
+         (kind_to_string kind))
+    ~tags:(threshold_bls_tags @ ["multiple"; "external_delegate"])
+    ~supports:(Protocol.From_protocol 023)
+  @@ fun protocol ->
+  let* _parameters, client, default_baker, funder, delegate =
+    Local_helpers.init_node_and_client_with_external_delegate ~protocol
+  in
+  (* gen keys staker_i -s bls *)
+  let stakers = List.init 3 (fun i -> "staker_" ^ Int.to_string (i + 1)) in
+  let* accounts =
+    Lwt_list.map_s
+      (fun alias ->
+        Local_helpers.gen_and_show_keys ~alias ~sig_alg:"bls" client)
+      stakers
+  in
+  (* Create bls proofs *)
+  let* pks_with_proofs =
+    Local_helpers.create_bls_proofs ~signers:accounts client
+  in
+  (* aggregate bls public keys *)
+  let* group_pk_bls, group_pkh_bls =
+    Local_helpers.aggregate_bls_public_keys ~kind client pks_with_proofs
+  in
+  let group_staker =
+    Local_helpers.mk_fake_account_from_bls_pk
+      ~bls_pk:group_pk_bls
+      ~bls_pkh:group_pkh_bls
+      ~alias:"group_staker"
+  in
+  (* transfer 150000 from bootstrap2 to group_staker *)
+  let* () =
+    Local_helpers.transfer
+      ~baker:default_baker
+      ~amount:(Tez.of_int 150_000)
+      ~giver:funder
+      ~receiver:group_staker.public_key_hash
+      client
+  in
+  (* reveal key for group_staker *)
+  let* op_reveal = Local_helpers.mk_op_reveal group_staker client in
+  let* _op_hash =
+    Local_helpers.inject_aggregate_bls_sign_op
+      ~kind
+      ~baker:default_baker
+      ~signers:accounts
+      op_reveal
+      client
+  in
+  (* set delegate for group_staker to delegate *)
+  let* op_set_delegate =
+    Local_helpers.mk_op_set_delegate ~src:group_staker ~delegate client
+  in
+  let* _op_hash =
+    Local_helpers.inject_aggregate_bls_sign_op
+      ~kind
+      ~baker:default_baker
+      ~signers:accounts
+      op_set_delegate
+      client
+  in
+  (* stake 140000 for group_staker *)
+  let* op_stake =
+    Local_helpers.mk_op_stake
+      ~staker:group_staker
+      ~amount:(Tez.of_int 140_000)
+      client
+  in
+  let* _op_hash =
+    Local_helpers.inject_aggregate_bls_sign_op
+      ~kind
+      ~baker:default_baker
+      ~signers:accounts
+      op_stake
+      client
+  in
+  let* () =
+    Local_helpers.check_staked_balance_increase_when_baking
+      ~baker:delegate
+      ~staker:group_staker
+      client
+  in
+  unit
 let register ~protocols =
   test_single_staker_sign_staking_operation_self_delegate protocols ;
   test_single_staker_sign_staking_operation_external_delegate protocols ;
   test_single_staker_sign_staking_operation_consensus_key protocols ;
-  test_single_staker_sign_staking_operation_consensus_key_op_core protocols
+  test_single_staker_sign_staking_operation_consensus_key_op_core protocols ;
+  test_all_stakers_sign_staking_operation_external_delegate
+    ~kind:Client
+    protocols ;
+  test_all_stakers_sign_staking_operation_external_delegate ~kind:RPC protocols
