@@ -732,7 +732,7 @@ let blacklisted_rpcs_arg =
   Tezos_clic.arg
     ~doc:
       "Disable the RPC methods which are part of the provided list. Cannot be \
-       used with --restricted-rpcs or --blacklisted-rpcs."
+       used with --restricted-rpcs or --whitelisted-rpcs."
     ~long:"blacklisted-rpcs"
     ~placeholder:"blacklist"
     (Tezos_clic.parameter (fun _ctxt raw ->
