@@ -295,6 +295,8 @@ let evm_node_lib_dev =
         performance_metrics;
         plugin;
         parameters;
+        octez_version;
+        octez_shell_services;
       ]
 
 let evm_node_lib_dev_client =

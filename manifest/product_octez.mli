@@ -83,6 +83,8 @@ val octez_stdlib_unix : Manifest.target
 
 val octez_test_helpers : Manifest.target
 
+val octez_version : Manifest.target
+
 val octez_version_value : Manifest.target
 
 val octez_workers : Manifest.target
