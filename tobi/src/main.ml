@@ -56,6 +56,15 @@ module CLI = struct
       ~description:"Do not write any file; only print what would be done."
       false
 
+  let jobs =
+    Clap.optional_int
+      ~long:"jobs"
+      ~short:'j'
+      ~description:
+        "Maximum number of processes to spawn when stuff can be done in \
+         parallel."
+      ()
+
   (* Subcommands. *)
   module Command = struct
     let list =
@@ -82,16 +91,6 @@ module CLI = struct
 
     let install =
       Clap.case "install" ~description:"Install some component(s)." @@ fun () ->
-      let jobs =
-        (* TODO: default value should be the number of CPU cores *)
-        Clap.default_int
-          ~long:"jobs"
-          ~short:'j'
-          ~description:
-            "Maximum number of processes to spawn when stuff can be done in \
-             parallel."
-          20
-      in
       let keep_temp =
         Clap.flag
           ~set_long:"keep-temp"
@@ -109,7 +108,7 @@ module CLI = struct
              HEAD."
           ()
       in
-      `install (components, `jobs jobs, `keep_temp keep_temp)
+      `install (components, `keep_temp keep_temp)
 
     let reset =
       Clap.case "reset" ~description:"Uninstall all installed components."
@@ -138,20 +137,29 @@ let main () =
   let* project_root = find_project_root () in
   Sys.chdir project_root ;
 
+  (* Only read [/proc/cpuinfo] if needed, as it can emit a warning. *)
+  let jobs () =
+    match CLI.jobs with Some jobs -> jobs | None -> Cpuinfo.get_cpu_count ()
+  in
+
   (* Dispatch commands. *)
   match CLI.command with
   | `list (version, `installed installed) ->
       Cmd_list.run ~verbose:CLI.verbose ~installed version
-  | `install (components, `jobs jobs, `keep_temp keep_temp) ->
+  | `install (components, `keep_temp keep_temp) ->
       Cmd_install.run
         ~verbose:CLI.verbose
         ~dry_run:CLI.dry_run
-        ~jobs
+        ~jobs:(jobs ())
         ~keep_temp
         components
   | `reset -> Cmd_reset.run ~verbose:CLI.verbose ~dry_run:CLI.dry_run
   | `build components ->
-      Cmd_build.run ~verbose:CLI.verbose ~dry_run:CLI.dry_run components
+      Cmd_build.run
+        ~verbose:CLI.verbose
+        ~dry_run:CLI.dry_run
+        ~jobs:(jobs ())
+        components
 
 (* Entrypoint: call [main] and handle errors. *)
 let () =

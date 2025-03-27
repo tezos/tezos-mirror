@@ -7,7 +7,7 @@
 
 open Misc
 
-let run ~verbose ~dry_run components =
+let run ~verbose ~dry_run ~jobs components =
   if components = [] then (
     echo "Nothing to do (no component was specified on the command-line)." ;
     unit)
@@ -79,11 +79,14 @@ let run ~verbose ~dry_run components =
          Force the progress bar with [--display=progress],
          and use [Unix.execvp] instead of [Run.command],
          otherwise Dune thinks the output is not a terminal. *)
+      (* Note about -j: it seems like when executed by Tobi,
+         dune's default number of jobs is 1 and not the number of CPU cores.
+         So it is important to specify -j. *)
       let command = "dune" in
       let arguments =
         "build" :: "--only-packages"
         :: String.concat "," only_packages
-        :: "--display=progress" :: paths
+        :: "--display=progress" :: "-j" :: string_of_int jobs :: paths
       in
       if verbose then echo "%s" (quote_command command arguments) ;
       if dry_run then unit

@@ -5,12 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Misc
+(** CPU information. *)
 
-(** Run the [build] CLI command. *)
-val run :
-  verbose:bool ->
-  dry_run:bool ->
-  jobs:int ->
-  string list ->
-  (unit, [> `failed] error) result
+(** Get the number of CPU cores from [/proc/cpuinfo].
+
+    Always returns at least 1.
+    Prints a warning if [/proc/cpuinfo] cannot be read. *)
+val get_cpu_count : unit -> int
