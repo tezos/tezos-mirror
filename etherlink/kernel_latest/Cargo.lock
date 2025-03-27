@@ -2487,9 +2487,12 @@ name = "tezos_tezlink_latest"
 version = "0.1.0"
 dependencies = [
  "hex",
+ "nom",
+ "num-bigint",
  "primitive-types",
  "tezos-smart-rollup",
  "tezos_crypto_rs",
+ "tezos_data_encoding",
 ]
 
 [[package]]
