@@ -11,10 +11,13 @@ pub(super) mod arithmetic;
 
 use arithmetic::Arithmetic;
 
+use crate::machine_state::AccessType;
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::instruction::Args;
+use crate::machine_state::memory::Memory;
 use crate::machine_state::memory::MemoryConfig;
+use crate::machine_state::memory::OutOfBounds;
 use crate::machine_state::mode::Mode;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::registers::XRegister;
@@ -122,6 +125,16 @@ pub trait ICB {
 
     /// Exception to perform an ECall at the current mode
     fn ecall(&mut self) -> Self::IResult<ProgramCounterUpdate<Self::XValue>>;
+
+    /// Write value to main memory, at the given address.
+    ///
+    /// The value is truncated to the width given by [`LoadStoreWidth`].
+    fn main_memory_store(
+        &mut self,
+        phys_address: Self::XValue,
+        value: Self::XValue,
+        width: LoadStoreWidth,
+    ) -> Self::IResult<()>;
 
     // ----------------
     // Provided Methods
@@ -265,6 +278,24 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
             Mode::Machine => Exception::EnvCallFromMMode,
         })
     }
+
+    fn main_memory_store(
+        &mut self,
+        address: Self::XValue,
+        value: Self::XValue,
+        width: LoadStoreWidth,
+    ) -> Self::IResult<()> {
+        let phys_address = self.translate(address, AccessType::Store)?;
+
+        let res = match width {
+            LoadStoreWidth::Byte => self.main_memory.write(phys_address, value as u8),
+            LoadStoreWidth::Half => self.main_memory.write(phys_address, value as u16),
+            LoadStoreWidth::Word => self.main_memory.write(phys_address, value as u32),
+            LoadStoreWidth::Double => self.main_memory.write(phys_address, value),
+        };
+
+        res.map_err(|_: OutOfBounds| Exception::StoreAMOAccessFault(phys_address))
+    }
 }
 
 /// Operators for producing a boolean from two values.
@@ -304,4 +335,13 @@ pub enum Shift {
     RightUnsigned,
     /// Arithmetic right shift. Sign-bits (ones) are shifted into the most significant bits.
     RightSigned,
+}
+
+/// The value width being loaded/stored to/from the xregisters to main memory.
+#[repr(u8)]
+pub enum LoadStoreWidth {
+    Double = 0,
+    Word = 1,
+    Half = 2,
+    Byte = 3,
 }

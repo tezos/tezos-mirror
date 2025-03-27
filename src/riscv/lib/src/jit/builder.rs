@@ -374,6 +374,15 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
 
         None
     }
+
+    fn main_memory_store(
+        &mut self,
+        phys_address: Self::XValue,
+        value: Self::XValue,
+        width: crate::instruction_context::LoadStoreWidth,
+    ) -> Self::IResult<()> {
+        todo!()
+    }
 }
 
 impl From<Predicate> for IntCC {
