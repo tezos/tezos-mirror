@@ -196,7 +196,7 @@ module type Internal = sig
       (** The type of entries. *)
       type entry = {name : step; key : kinded_key} [@@deriving brassaia]
 
-      (** The type for internal pointers between concrete {!tree}s. *)
+      (** The type for internal pointers between concrete {!type-tree}s. *)
       type 'a pointer = {index : int; pointer : hash; tree : 'a}
       [@@deriving brassaia]
 

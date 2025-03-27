@@ -84,7 +84,7 @@ module type S = sig
       some file contents. It is [None] if [k] is not present in [t]. *)
   val kind : t -> path -> [`Contents | `Node] option
 
-  (** [is_empty t] is true iff [t] is {!empty} (i.e. a tree node with no
+  (** [is_empty t] is true iff [t] is {!val-empty} (i.e. a tree node with no
       children). Trees with {!kind} = [`Contents] are never considered empty. *)
   val is_empty : t -> bool
 

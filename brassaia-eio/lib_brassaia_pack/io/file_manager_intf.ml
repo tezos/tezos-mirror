@@ -238,9 +238,9 @@ module type S = sig
   (** [fsync] executes an fsync for all files of the file manager.
 
       Note: This function exists primarily for operations like snapshot imports.
-      If fsync is enabled for the store (see {!Brassaia_pack.Config.use_fsync}),
-      calls to {!flush} will also call fsync and therefore there is little need
-      to call this function directly. *)
+      If fsync is enabled for the store (see {!Brassia_eio.Brassaia_pack.Config.
+      use_fsync}), calls to {!flush} will also call fsync and therefore there is
+      little need to call this function directly. *)
   val fsync : t -> (unit, [> fsync_error]) result
 
   type reload_stages := [`After_index | `After_control | `After_suffix]

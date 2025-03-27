@@ -267,7 +267,7 @@ module type Sigs = sig
 
   (** [report_pack_store ~field] increments the [field] value in the
       [pack_store] stats. It also increments the [total] field in
-      {!Pack_store.t} when the field is related to [finds]. *)
+      {!Pack_store.type-t} when the field is related to [finds]. *)
   val report_pack_store : field:Pack_store.field -> unit
 
   (** [report_index ()] fills the [stats] with value from the {!Index.Stats}

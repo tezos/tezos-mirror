@@ -45,7 +45,7 @@ module type S = sig
   (** Clear all register listeners in the given watch state. *)
   val clear : t -> unit
 
-  (** Watch a given key for changes. More efficient than {!watch}. *)
+  (** Watch a given key for changes. More efficient than {!val-watch}. *)
   val watch_key : t -> key -> ?init:value -> (value Diff.t -> unit) -> watch
 
   (** Add a watch handler. To watch a specific key, use {!watch_key} which is

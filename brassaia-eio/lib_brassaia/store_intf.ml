@@ -774,7 +774,7 @@ module type S_generic_key = sig
     set:contents option ->
     commit option
 
-  (** [test_set_and_get_tree] is like {!test_set_and_get} but for a {!tree} *)
+  (** [test_set_and_get_tree] is like {!test_set_and_get} but for a {!type-tree} *)
   val test_set_and_get_tree :
     ?clear:bool ->
     ?retries:int ->
@@ -917,7 +917,7 @@ module type S_generic_key = sig
   (** {1 Clones} *)
 
   (** [clone ~src ~dst] makes [dst] points to [Head.get src]. [dst] is created
-      if needed. Remove the current contents en [dst] if [src] is {!empty}. *)
+      if needed. Remove the current contents en [dst] if [src] is {!val-empty}. *)
   val clone : src:t -> dst:branch -> t
 
   (** {1 Watches} *)
@@ -1099,7 +1099,7 @@ module type S_generic_key = sig
     tree ->
     kinded_key
 
-  (** {Deprecated} *)
+  (** {2 Deprecated} *)
 
   (** @deprecated Use {!main} instead *)
   val master : repo -> t

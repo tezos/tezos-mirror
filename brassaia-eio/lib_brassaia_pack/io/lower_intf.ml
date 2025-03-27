@@ -105,7 +105,7 @@ module type S = sig
       If [t] is read-only, [Error `Ro_not_allowed] is returned. *)
   val add_volume : t -> (Volume.t, [> add_error]) result
 
-  (** [find_volume ~off t] returns the {!Volume} that contains [off]. *)
+  (** [find_volume ~off t] returns the {!module-type-Volume} that contains [off]. *)
   val find_volume : off:int63 -> t -> Volume.t option
 
   (** [read_exn ~off ~len ~volume t b] will read [len] bytes from a global [off]

@@ -196,12 +196,12 @@ module type History = sig
     commit_key ->
     (commit_key, Merge.conflict) result
 
-  (** Same as {{!Node.Graph.closure} Node.Graph.closure} but for the history
+  (** Same as {!Node.module-type-Graph.closure} but for the history
       graph. *)
   val closure :
     [> read] t -> min:commit_key list -> max:commit_key list -> commit_key list
 
-  (** Same as {{!Node.Graph.iter} Node.Graph.iter} but for traversing the
+  (** Same as {!Node.module-type-Graph.iter} but for traversing the
       history graph. *)
   val iter :
     [> read] t ->

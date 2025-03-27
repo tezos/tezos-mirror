@@ -23,7 +23,7 @@ module type Subcommand = sig
 
   val run : run
 
-  (** A pre-packaged [Cmdliner] term for executing {!run}. *)
+  (** A pre-packaged [Cmdliner] term for executing {!val-run}. *)
   val term_internal : (unit -> unit) Cmdliner.Term.t
 
   (** [term] is {!term_internal} plus documentation and logs initialisation *)

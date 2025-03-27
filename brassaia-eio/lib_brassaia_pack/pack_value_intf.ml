@@ -56,7 +56,7 @@ module type S = sig
 
   val decode_bin_length : string -> int -> int
 
-  (** [to_kinded t] returns a {!kinded} version of [t]. *)
+  (** [to_kinded t] returns a {!type-kinded} version of [t]. *)
   val to_kinded : t -> kinded
 
   (** [of_kinded k] is the inverse of [to_kinded t].
