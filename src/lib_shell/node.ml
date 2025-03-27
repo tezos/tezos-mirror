@@ -399,4 +399,5 @@ let build_rpc_directory ~node_version node =
   merge (Tezos_profiler_unix.Profiler_directory.build_rpc_directory ()) ;
   register0 Tezos_rpc.Service.error_service (fun () () ->
       Lwt.return_ok (Data_encoding.Json.schema Error_monad.error_encoding)) ;
+  merge (Bls_directory.build_rpc_directory ()) ;
   !dir

@@ -37,3 +37,4 @@ module Injection = Injection_services
 module P2p = P2p_services
 module Worker = Worker_services
 module Config = Config_services
+module Bls = Bls_services
