@@ -1457,9 +1457,9 @@ let test_l2_deploy_erc20 =
   let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:100 in
   unit
 
-let test_deploy_contract_for_shanghai =
+let test_deploy_contract_with_push0 =
   register_proxy
-    ~tags:["evm"; "deploy"; "shanghai"]
+    ~tags:["evm"; "deploy"; "push0"]
     ~title:
       "Check that a contract containing PUSH0 can successfully be deployed."
   @@ fun ~protocol:_ ~evm_setup ->
@@ -5281,7 +5281,6 @@ let test_l2_call_selfdetruct_contract_in_same_transaction =
 let test_l2_call_selfdetruct_contract_in_same_transaction_and_separate_transaction
     =
   register_both
-    ~kernels:[Kernel.Latest]
     ~tags:["evm"; "l2_call"; "selfdestruct"; "cancun"]
     ~title:"Check SELFDESTRUCT's behavior as stated by Cancun's EIP-6780"
   @@ fun ~protocol:_
@@ -5317,7 +5316,7 @@ let test_l2_call_selfdetruct_contract_in_same_transaction_and_separate_transacti
     in
     return @@ Int64.of_string @@ String.trim res
   in
-  let* selfdestrct_post_create_codesize =
+  let* selfdestruct_post_create_codesize =
     let* res =
       Eth_cli.contract_call
         ()
@@ -5334,50 +5333,60 @@ let test_l2_call_selfdetruct_contract_in_same_transaction_and_separate_transacti
       ~error_msg:
         "The contract should have a code size of 0 when SELFDESTRUCT is called \
          in the same transaction as the contract creation") ;
-  Check.(
-    (selfdestrct_post_create_codesize > 0L)
-      int64
-      ~error_msg:
-        "The contract should have a code size greater than 0 when SELFDESTRUCT \
-         is called in a separate transaction from the contract creation") ;
+  (if Evm_version.is_pre_cancun evm_version then
+     Check.(
+       (selfdestruct_post_create_codesize = 0L)
+         int64
+         ~error_msg:
+           "The contract should have a code size of 0 when SELFDESTRUCT is \
+            called in a separate transaction from the contract creation before \
+            Cancun")
+   else
+     Check.(
+       (selfdestruct_post_create_codesize > 0L)
+         int64
+         ~error_msg:
+           "The contract should have a code size greater than 0 when \
+            SELFDESTRUCT is called in a separate transaction from the contract \
+            creation after Cancun")) ;
   unit
 
 let test_mcopy_opcode =
   register_both
-    ~kernels:[Kernel.Latest]
     ~tags:["evm"; "mcopy"; "cancun"]
     ~title:"Check MCOPY's behavior as stated by Cancun's EIP-5656"
   @@ fun ~protocol:_
              ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
     ->
+  let is_pre_cancun = Evm_version.is_pre_cancun evm_version in
+  (* MCOPY requires an evm version >=Cancun, to ensure that the test gracefully
+     fails with evm version's <Cancun, we need to be able to compile the contract
+     regardless of the kernel's version *)
+  let* mcopy_resolved = mcopy (Evm_version.max evm_version Cancun) in
   let*@ _ = evm_setup.produce_block () in
-  let* mcopy_resolved = mcopy evm_version in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* address, _tx = deploy ~contract:mcopy_resolved ~sender evm_setup in
-  let* source =
+  let call_method ~method_call =
     Eth_cli.contract_call
       ()
+      ~expect_failure:is_pre_cancun
       ~endpoint
       ~abi_label:mcopy_resolved.label
       ~address
-      ~method_call:"getSource()"
+      ~method_call
   in
-  let* dst =
-    Eth_cli.contract_call
-      ()
-      ~endpoint
-      ~abi_label:mcopy_resolved.label
-      ~address
-      ~method_call:"getDestination()"
-  in
-  Check.(
-    (source <> dst)
-      string
-      ~error_msg:
-        "The source and destination should not be the same before the MCOPY \
-         operation") ;
+  let* source = call_method ~method_call:"getSource()" in
+  let* dst = call_method ~method_call:"getDestination()" in
+  (if not is_pre_cancun then
+     Check.(
+       (source <> dst)
+         string
+         ~error_msg:
+           "The source and destination should not be the same before the MCOPY \
+            operation")) ;
   let mcopy () =
     Eth_cli.contract_send
+      ~expect_failure:is_pre_cancun
       ~endpoint
       ~abi_label:mcopy_resolved.label
       ~address
@@ -5386,42 +5395,35 @@ let test_mcopy_opcode =
       ()
   in
   let* tx = wait_for_application ~produce_block mcopy in
-  let* () = check_tx_succeeded ~endpoint ~tx in
-  let* source =
-    Eth_cli.contract_call
-      ()
-      ~endpoint
-      ~abi_label:mcopy_resolved.label
-      ~address
-      ~method_call:"getSource()"
+  let* () =
+    if is_pre_cancun then check_tx_failed ~endpoint ~tx
+    else check_tx_succeeded ~endpoint ~tx
   in
-  let* dst =
-    Eth_cli.contract_call
-      ()
-      ~endpoint
-      ~abi_label:mcopy_resolved.label
-      ~address
-      ~method_call:"getDestination()"
-  in
-  Check.(
-    (source = dst)
-      string
-      ~error_msg:
-        "The source and destination should be the same after the MCOPY \
-         operation") ;
+  let* source = call_method ~method_call:"getSource()" in
+  let* dst = call_method ~method_call:"getDestination()" in
+  (if not is_pre_cancun then
+     Check.(
+       (source = dst)
+         string
+         ~error_msg:
+           "The source and destination should be the same after the MCOPY \
+            operation")) ;
   unit
 
 let test_transient_storage =
   register_both
-    ~kernels:[Kernel.Latest]
     ~tags:["evm"; "transient_storage"; "cancun"]
     ~title:"Check TSTORE/TLOAD behavior as stated by Cancun's EIP-1153"
   @@ fun ~protocol:_
              ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
     ->
+  let is_pre_cancun = Evm_version.is_pre_cancun evm_version in
   let*@ _ = evm_setup.produce_block () in
+  (* TSTORE and TLOAD require an evm version >=Cancun, to ensure that the test gracefully
+     fails with evm version's <Cancun, we need to be able to compile the contract
+     regardless of the kernel's version *)
   let* transient_storage_multiplier_resolved =
-    transient_storage_multiplier evm_version
+    transient_storage_multiplier (Evm_version.max evm_version Cancun)
   in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* address, _tx =
@@ -5431,6 +5433,7 @@ let test_transient_storage =
   let res = Int64.mul input mul in
   let send_values () =
     Eth_cli.contract_send
+      ~expect_failure:is_pre_cancun
       ~endpoint
       ~abi_label:transient_storage_multiplier_resolved.label
       ~address
@@ -5439,26 +5442,28 @@ let test_transient_storage =
       ()
   in
   let* tx = wait_for_application ~produce_block send_values in
-  let* () = check_tx_succeeded ~endpoint ~tx in
-  let* output =
-    let* response =
-      Eth_cli.contract_call
-        ()
-        ~endpoint
-        ~abi_label:transient_storage_multiplier_resolved.label
-        ~address
-        ~method_call:"get_output()"
+  if is_pre_cancun then check_tx_failed ~endpoint ~tx
+  else
+    let* () = check_tx_succeeded ~endpoint ~tx in
+    let* output =
+      let* response =
+        Eth_cli.contract_call
+          ()
+          ~endpoint
+          ~abi_label:transient_storage_multiplier_resolved.label
+          ~address
+          ~method_call:"get_output()"
+      in
+      return @@ Int64.of_string @@ String.trim response
     in
-    return @@ Int64.of_string @@ String.trim response
-  in
-  Check.(
-    (output = res)
-      int64
-      ~error_msg:
-        "The output should be equal to the multiplication of the input and the \
-         multiplier") ;
+    Check.(
+      (output = res)
+        int64
+        ~error_msg:
+          "The output should be equal to the multiplication of the input and \
+           the multiplier") ;
 
-  unit
+    unit
 
 let test_call_recursive_contract_estimate_gas =
   Protocol.register_test
@@ -6573,7 +6578,7 @@ let register_evm_node ~protocols =
   test_l2_deploy_simple_storage protocols ;
   test_l2_call_simple_storage protocols ;
   test_l2_deploy_erc20 protocols ;
-  test_deploy_contract_for_shanghai protocols ;
+  test_deploy_contract_with_push0 protocols ;
   test_inject_100_transactions protocols ;
   test_eth_call_storage_contract protocols ;
   test_eth_call_storage_contract_eth_cli protocols ;
