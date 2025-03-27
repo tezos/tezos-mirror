@@ -698,6 +698,12 @@ impl OpCode {
             Self::ShiftRightImmediateUnsigned => Some(Args::run_shift_right_immediate_unsigned),
             Self::ShiftRightImmediateSigned => Some(Args::run_shift_right_immediate_signed),
 
+            // Stores
+            Self::Sdnz => Some(Args::run_sdnz),
+            Self::Swnz => Some(Args::run_swnz),
+            Self::Shnz => Some(Args::run_shnz),
+            Self::Sbnz => Some(Args::run_sbnz),
+
             // Errors
             Self::Unknown => Some(Args::run_illegal),
             Self::ECall => Some(Args::run_ecall),

@@ -283,6 +283,7 @@ mod tests {
     use super::*;
     use crate::backend_test;
     use crate::create_state;
+    use crate::instruction_context::LoadStoreWidth;
     use crate::machine_state::MachineCoreState;
     use crate::machine_state::MachineCoreStateLayout;
     use crate::machine_state::block_cache::bcall::BCall;
@@ -291,6 +292,7 @@ mod tests {
     use crate::machine_state::block_cache::bcall::Interpreted;
     use crate::machine_state::block_cache::bcall::InterpretedBlockBuilder;
     use crate::machine_state::memory::M4K;
+    use crate::machine_state::memory::Memory;
     use crate::machine_state::memory::MemoryConfig;
     use crate::machine_state::mode::Mode;
     use crate::machine_state::registers::NonZeroXRegister;
@@ -1670,6 +1672,81 @@ mod tests {
                 2,
                 -2_i64 as u64,
             ),
+        ];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
+
+    backend_test!(test_store, F, {
+        use crate::machine_state::registers::NonZeroXRegister::*;
+
+        type ConstructorFn =
+            fn(rd: NonZeroXRegister, rs1: NonZeroXRegister, imm: i64, width: InstrWidth) -> I;
+
+        const MEMORY_SIZE: u64 = M4K::TOTAL_BYTES as u64;
+        const XREG_VALUE: u64 = 0xFFEEDDCCBBAA9988;
+
+        let valid_store = |constructor: ConstructorFn, imm: u64, expected: u64| {
+            const LOAD_ADDRESS_BASE: u64 = MEMORY_SIZE / 2;
+
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(x1, LOAD_ADDRESS_BASE as i64, InstrWidth::Compressed),
+                    I::new_li(x2, XREG_VALUE as i64, InstrWidth::Compressed),
+                    constructor(x1, x2, imm as i64, InstrWidth::Uncompressed),
+                    I::new_nop(InstrWidth::Compressed),
+                ])
+                .set_assert_hook(assert_hook!(core, F, {
+                    let value: u64 = core.main_memory.read(LOAD_ADDRESS_BASE + imm).unwrap();
+
+                    assert_eq!(value, expected, "Found {value:x}, expected {expected:x}");
+                }))
+                .build()
+        };
+
+        let invalid_store = |constructor: ConstructorFn, width: LoadStoreWidth| {
+            // an address that, with the immediate of 16, will be out of bounds by one byte
+            let load_address_base = MEMORY_SIZE - 15 - width as u64;
+            let load_address_offset = 16;
+
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(x1, load_address_base as i64, InstrWidth::Compressed),
+                    I::new_li(x2, XREG_VALUE as i64, InstrWidth::Compressed),
+                    constructor(x1, x2, load_address_offset as i64, InstrWidth::Uncompressed),
+                    I::new_nop(InstrWidth::Compressed),
+                ])
+                // the load will fail due to being out of bounds
+                .set_expected_steps(3)
+                .set_assert_hook(assert_hook!(core, F, {
+                    let value: u64 = core.main_memory.read(MEMORY_SIZE - 8).unwrap();
+
+                    assert_eq!(value, 0, "Found {value:x}, but expected store to fail");
+                }))
+                .build()
+        };
+
+        let scenarios: &[Scenario<F>] = &[
+            // check stores - differing imm value to ensure both
+            // aligned & unaligned stores are supported
+            valid_store(I::new_sdnz, 8, XREG_VALUE),
+            valid_store(I::new_sdnz, 5, XREG_VALUE),
+            valid_store(I::new_swnz, 4, XREG_VALUE as u32 as u64),
+            valid_store(I::new_swnz, 3, XREG_VALUE as u32 as u64),
+            valid_store(I::new_shnz, 2, XREG_VALUE as u16 as u64),
+            valid_store(I::new_shnz, 1, XREG_VALUE as u16 as u64),
+            // byte load always aligned
+            valid_store(I::new_sbnz, 0, XREG_VALUE as u8 as u64),
+            // invalid stores: out of bounds
+            invalid_store(I::new_sdnz, LoadStoreWidth::Double),
+            invalid_store(I::new_swnz, LoadStoreWidth::Word),
+            invalid_store(I::new_shnz, LoadStoreWidth::Half),
+            invalid_store(I::new_sbnz, LoadStoreWidth::Byte),
         ];
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
