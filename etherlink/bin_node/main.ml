@@ -116,7 +116,7 @@ module Params = struct
   let sequencer_key =
     Tezos_clic.param
       ~name:"sequencer-key"
-      ~desc:"key to sign the blueprints."
+      ~desc:"Key to sign the blueprints."
       string
 
   let string_list =
@@ -165,14 +165,14 @@ module Params = struct
   let snapshot_file next =
     Tezos_clic.param
       ~name:"snapshot_file"
-      ~desc:"Snapshot archive file"
+      ~desc:"Snapshot archive file."
       string
       next
 
   let snapshot_file_or_url next =
     Tezos_clic.param
       ~name:"snapshot"
-      ~desc:"Snapshot archive file or URL"
+      ~desc:"Snapshot archive file or URL."
       string
       next
 
@@ -204,7 +204,7 @@ let wallet_dir_arg =
     ~env:Client_config.base_dir_env_name
     ~default:Client_config.default_base_dir
     ~pp_default:(fun fmt -> Format.pp_print_string fmt "$HOME/.tezos-client")
-    ~doc:"The directory where the Tezos client stores all its wallet data"
+    ~doc:"The directory where the Tezos client stores all its wallet data."
     Params.string
 
 let rpc_addr_arg =
@@ -273,7 +273,7 @@ let maximum_blueprints_ahead_arg =
   Tezos_clic.arg
     ~long:"maximum-blueprints-ahead"
     ~placeholder:"AHEAD"
-    ~doc:"The maximum advance (in blueprints) the Sequencer accepts"
+    ~doc:"The maximum advance (in blueprints) the Sequencer accepts."
     Params.int
 
 let maximum_blueprints_catchup_arg =
@@ -311,13 +311,13 @@ let mainnet_compat_arg =
     ~long:"mainnet-compat"
     ~doc:
       "Generate a configuration compatible with the first Etherlink Mainnet \
-       kernel"
+       kernel."
     ()
 
 let profile_arg =
   Tezos_clic.switch
     ~long:"profile"
-    ~doc:"Profile the execution of the WASM PVM"
+    ~doc:"Profile the execution of the WASM PVM."
     ()
 
 let omit_delayed_tx_events_arg =
@@ -334,7 +334,7 @@ let keep_everything_arg =
   Tezos_clic.switch
     ~short:'k'
     ~long:"keep-everything"
-    ~doc:"Do not filter out files outside of the `/evm` directory"
+    ~doc:"Do not filter out files outside of the `/evm` directory."
     ()
 
 let verbose_arg =
@@ -349,7 +349,7 @@ let kernel_verbosity_arg =
     ~long:"kernel-verbosity"
     ~doc:
       "Sets kernel's logging verbosity, either `fatal`, `error`, `info`, \
-       `debug`"
+       `debug`."
     ~placeholder:"info"
     ( Tezos_clic.parameter @@ fun _ctxt value ->
       let open Lwt_result_syntax in
@@ -371,7 +371,7 @@ let data_dir_arg =
     ~env:(config_env "DATA_DIR")
     ~long:"data-dir"
     ~placeholder:"data-dir"
-    ~doc:"The path to the EVM node data directory"
+    ~doc:"The path to the EVM node data directory."
     ~pp_default:(fun fmt -> Format.fprintf fmt "$HOME/.octez-evm-node")
     ~default
     Params.string
@@ -388,7 +388,7 @@ let config_path_arg =
 
 let print_config_arg =
   Tezos_clic.switch
-    ~doc:"Print the full configuration to the standard output"
+    ~doc:"Print the full configuration to the standard output."
     ~short:'p'
     ~long:"print"
     ()
@@ -397,7 +397,7 @@ let level_arg =
   Tezos_clic.default_arg
     ~doc:
       "Set list_events filter level to either `fatal`, `error`, `warning`, \
-       `notice` `info`, `debug`"
+       `notice` `info`, `debug`."
     ~short:'l'
     ~long:"level"
     ~placeholder:"info"
@@ -408,7 +408,7 @@ let json_arg =
   Tezos_clic.switch
     ~short:'j'
     ~long:"json"
-    ~doc:"Enables the display of json schemas"
+    ~doc:"Enables the display of json schemas."
     ()
 
 let rollup_address_arg =
@@ -429,7 +429,7 @@ let rollup_address_arg =
        ~long:"rollup-address"
        ~doc:
          "The smart rollup address in Base58 encoding used to produce the \
-          chunked messages"
+          chunked messages."
        ~default:Tezos_crypto.Hashed.Smart_rollup_address.(to_b58check zero)
        ~placeholder:"sr1..."
 
@@ -439,7 +439,7 @@ let kernel_arg ?(long = "kernel") ?(placeholder = "evm_kernel.wasm") () =
     ~placeholder
     ~doc:
       "Path to the EVM kernel used to launch the PVM, it will be loaded from \
-       storage afterward"
+       storage afterward."
     Params.kernel_path
 
 let initial_kernel_arg =
@@ -450,7 +450,7 @@ let force_arg ~doc = Tezos_clic.switch ~long:"force" ~short:'f' ~doc ()
 let preimages_arg =
   Tezos_clic.arg
     ~long:"preimages-dir"
-    ~doc:"Path to the preimages directory"
+    ~doc:"Path to the preimages directory."
     ~placeholder:"_evm_installer_preimages"
     Params.string
 
@@ -507,7 +507,7 @@ let dont_track_rollup_node_arg =
 let no_sync_arg =
   Tezos_clic.switch
     ~long:"no-sync"
-    ~doc:"Disable tracking the head of the EVM node endpoint"
+    ~doc:"Disable tracking the head of the EVM node endpoint."
     ()
 
 let init_from_snapshot_arg =
@@ -586,7 +586,7 @@ let keep_alive_arg =
 let blueprint_mode_arg =
   Tezos_clic.switch
     ~long:"as-blueprint"
-    ~doc:"Chunk the data into a blueprint usable in sequencer mode"
+    ~doc:"Chunk the data into a blueprint usable in sequencer mode."
     ()
 
 let timestamp_arg =
@@ -603,7 +603,7 @@ let genesis_timestamp_arg =
        ~long:"genesis-timestamp"
        ~doc:
          "Timestamp used for the genesis block, uses machine's clock if not \
-          provided"
+          provided."
        ~placeholder:"1970-01-01T00:00:00Z"
 
 let blueprint_number_arg =
@@ -614,7 +614,7 @@ let blueprint_number_arg =
       with _ -> failwith "Blueprint number must be an integer")
   |> default_arg
        ~long:"number"
-       ~doc:"Level of the blueprint"
+       ~doc:"Level of the blueprint."
        ~placeholder:"0"
        ~default:"0"
 
@@ -624,7 +624,7 @@ let parent_hash_arg =
   parameter (fun _ hash -> return hash)
   |> default_arg
        ~long:"parent-hash"
-       ~doc:"Blueprint's parent hash"
+       ~doc:"Blueprint's parent hash."
        ~placeholder:
          "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
        ~default:
@@ -656,21 +656,21 @@ let tx_pool_tx_per_addr_limit_arg =
 let sequencer_key_arg =
   Tezos_clic.arg
     ~long:"sequencer-key"
-    ~doc:"key to sign the blueprints."
+    ~doc:"Key to sign the blueprints."
     ~placeholder:"edsk..."
     Params.string
 
 let log_filter_max_nb_blocks_arg =
   Tezos_clic.arg
     ~long:"max-number-blocks"
-    ~doc:"maximum number of blocks kept in the log."
+    ~doc:"Maximum number of blocks kept in the log."
     ~placeholder:"100"
     Params.int
 
 let log_filter_max_nb_logs_arg =
   Tezos_clic.arg
     ~long:"max-number-logs"
-    ~doc:"maximum number of logs kept."
+    ~doc:"Maximum number of logs kept."
     ~placeholder:"1000"
     Params.int
 
@@ -685,7 +685,7 @@ let log_filter_chunk_size_arg =
 
 let read_only_arg =
   Tezos_clic.switch
-    ~doc:"If the flag is set, the node refuses transactions"
+    ~doc:"If the flag is set, the node refuses transactions."
     ~long:"read-only"
     ()
 
@@ -1070,7 +1070,7 @@ let rpc_command =
   let open Tezos_clic in
   command
     ~group:Groups.run
-    ~desc:"Start the EVM node in rpc mode"
+    ~desc:"Start the EVM node in rpc mode."
     (merge_options common_config_args rpc_run_args)
     (prefixes ["experimental"; "run"; "rpc"] stop)
     (fun ( ( data_dir,
@@ -1300,7 +1300,7 @@ let chunker_command =
     ~group:Groups.kernel
     ~desc:
       "Chunk hexadecimal data according to the message representation of the \
-       EVM rollup"
+       EVM rollup."
     (args8
        rollup_address_arg
        blueprint_mode_arg
@@ -1365,18 +1365,18 @@ let make_upgrade_command =
   let open Lwt_result_syntax in
   command
     ~group:Groups.kernel
-    ~desc:"Create bytes payload for the upgrade entrypoint"
+    ~desc:"Create bytes payload for the upgrade entrypoint."
     no_options
     (prefixes ["make"; "upgrade"; "payload"; "with"; "root"; "hash"]
     @@ param
          ~name:"preimage_hash"
-         ~desc:"Root hash of the kernel to upgrade to"
+         ~desc:"Root hash of the kernel to upgrade to."
          Params.string
     @@ prefixes ["at"; "activation"; "timestamp"]
     @@ param
          ~name:"activation_timestamp"
          ~desc:
-           "After activation timestamp, the kernel will upgrade to this value"
+           "After activation timestamp, the kernel will upgrade to this value."
          Params.timestamp
     @@ stop)
     (fun () root_hash timestamp () ->
@@ -1392,19 +1392,19 @@ let make_sequencer_upgrade_command =
   let open Lwt_result_syntax in
   command
     ~group:Groups.kernel
-    ~desc:"Create bytes payload for the sequencer upgrade entrypoint"
+    ~desc:"Create bytes payload for the sequencer upgrade entrypoint."
     (args1 wallet_dir_arg)
     (prefixes ["make"; "sequencer"; "upgrade"; "payload"]
     @@ prefixes ["with"; "pool"; "address"]
     @@ Tezos_clic.param
          ~name:"pool_address"
-         ~desc:"pool address of the sequencer"
+         ~desc:"Pool address of the sequencer"
          Params.l2_address
     @@ prefixes ["at"; "activation"; "timestamp"]
     @@ param
          ~name:"activation_timestamp"
          ~desc:
-           "After activation timestamp, the kernel will upgrade to this value"
+           "After activation timestamp, the kernel will upgrade to this value."
          Params.timestamp
     @@ prefix "for" @@ Params.sequencer_key @@ stop)
     (fun wallet_dir pool_address activation_timestamp sequencer_str () ->
@@ -1438,7 +1438,7 @@ let init_from_rollup_node_command =
   command
     ~group:Groups.run
     ~desc:
-      "initialises the EVM node data-dir using the data-dir of a rollup node."
+      "Initialises the EVM node data-dir using the data-dir of a rollup node."
     (args3 data_dir_arg config_path_arg omit_delayed_tx_events_arg)
     (prefixes ["init"; "from"; "rollup"; "node"]
     @@ rollup_node_data_dir_param @@ stop)
@@ -1459,12 +1459,12 @@ let dump_to_rlp_command =
   let open Lwt_result_syntax in
   command
     ~group:Groups.debug
-    ~desc:"Transforms the JSON list of instructions to a RLP list"
+    ~desc:"Transforms the JSON list of instructions to a RLP list."
     (args1 keep_everything_arg)
     (prefixes ["transform"; "dump"]
-    @@ param ~name:"dump.json" ~desc:"Description" Params.string
+    @@ param ~name:"dump.json" ~desc:"Description." Params.string
     @@ prefixes ["to"; "rlp"]
-    @@ param ~name:"dump.rlp" ~desc:"Description" Params.string
+    @@ param ~name:"dump.rlp" ~desc:"Description." Params.string
     @@ stop)
     (fun keep_everything dump_json dump_rlp () ->
       let* dump_json = Lwt_utils_unix.Json.read_file dump_json in
@@ -1510,12 +1510,12 @@ let reset_command =
        data_dir_arg
        (force_arg
           ~doc:
-            "force suppression of data to reset state of sequencer to a \
+            "Force suppression of data to reset state of sequencer to a \
              specified l2 level."))
     (prefixes ["reset"; "at"]
     @@ Tezos_clic.param
          ~name:"level"
-         ~desc:"level to reset to state to."
+         ~desc:"Level to reset to state to."
          (Tezos_clic.parameter (fun () s ->
               Lwt.return_ok
               @@ Evm_node_lib_dev_encoding.Ethereum_types.Qty (Z.of_string s)))
@@ -1544,7 +1544,7 @@ let replay_command =
     (prefixes ["replay"; "blueprint"]
     @@ Tezos_clic.param
          ~name:"level"
-         ~desc:"level to replay"
+         ~desc:"Level to replay."
          (Tezos_clic.parameter (fun () s ->
               Lwt.return_ok
               @@ Evm_node_lib_dev_encoding.Ethereum_types.Qty (Z.of_string s)))
@@ -1596,9 +1596,9 @@ let patch_kernel_command =
              requested block will be used instead of the latest state. In that \
              case, the patch will only impact replays of the successor block \
              only.")
-       (force_arg ~doc:"Force patching the kernel"))
+       (force_arg ~doc:"Force patching the kernel."))
     (prefixes ["patch"; "kernel"; "with"]
-    @@ Tezos_clic.string ~name:"kernel_path" ~desc:"Path to the kernel"
+    @@ Tezos_clic.string ~name:"kernel_path" ~desc:"Path to the kernel."
     @@ stop)
     (fun (data_dir, config_file, block_number, force) kernel_path () ->
       let open Lwt_result_syntax in
@@ -1811,26 +1811,26 @@ let check_config_command =
 let config_key_arg ~name ~placeholder =
   let open Lwt_result_syntax in
   let long = String.mapi (fun _ c -> if c = '_' then '-' else c) name in
-  let doc = Format.sprintf "value for %s in the installer config" name in
+  let doc = Format.sprintf "Value for %s in the installer config." name in
   Tezos_clic.arg ~long ~doc ~placeholder
   @@ Tezos_clic.parameter (fun _ s -> return (name, s))
 
 let config_key_flag ~name =
   let open Lwt_result_syntax in
   let long = String.mapi (fun _ c -> if c = '_' then '-' else c) name in
-  let doc = Format.sprintf "enable flag %s in the installer config" name in
+  let doc = Format.sprintf "Enable flag %s in the installer config." name in
   Tezos_clic.map_arg ~f:(fun _ enable ->
       if enable then return_some (name, "") else return_none)
   @@ Tezos_clic.switch ~long ~doc ()
 
 let bootstrap_account_arg =
   let long = "bootstrap-account" in
-  let doc = Format.sprintf "add a bootstrap account in the installer config." in
+  let doc = Format.sprintf "Add a bootstrap account in the installer config." in
   Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x..." Params.l2_address
 
 let set_account_code =
   let long = "set-code" in
-  let doc = Format.sprintf "add code to an account in the installer config." in
+  let doc = Format.sprintf "Add code to an account in the installer config." in
   Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x...,0x...."
   @@ Tezos_clic.parameter (fun _ address_code ->
          match String.split ',' address_code with
@@ -1843,7 +1843,7 @@ let set_account_code =
 
 let evm_version_arg =
   let long = "evm-version" in
-  let doc = Format.sprintf "value for evm_version in the installer config" in
+  let doc = Format.sprintf "Value for evm_version in the installer config." in
   Tezos_clic.arg ~long ~doc ~placeholder:"cancun|shanghai"
   @@ Tezos_clic.parameter (fun _ evm_version ->
          let open Lwt_result_syntax in
@@ -1870,7 +1870,7 @@ let make_l2_kernel_config_command =
           ~placeholder:"30000...")
        (Tezos_clic.default_arg
           ~long:"bootstrap-balance"
-          ~doc:"balance of the bootstrap accounts"
+          ~doc:"Balance of the bootstrap accounts."
           ~default:"9999000000000000000000"
           ~placeholder:"9999000000000000000000"
        @@ Tezos_clic.parameter (fun _ s -> return @@ Z.of_string s))
@@ -1881,7 +1881,7 @@ let make_l2_kernel_config_command =
           ~placeholder:"/evm/world_state/<chain_id>")
        (Tezos_clic.arg
           ~long:"l2-chain-id"
-          ~doc:"L2 chain id"
+          ~doc:"L2 chain id."
           ~placeholder:"1"
           (Tezos_clic.parameter (fun _ s -> return @@ Chain_id.of_string_exn s)))
        (Tezos_clic.default_arg
@@ -1894,7 +1894,7 @@ let make_l2_kernel_config_command =
     (prefixes ["make"; "l2"; "kernel"; "installer"; "config"]
     @@ param
          ~name:"kernel config file"
-         ~desc:"file path where the config will be written to"
+         ~desc:"File path where the config will be written to."
          Params.string
     @@ stop)
     (fun ( minimum_base_fee_per_gas,
@@ -1935,7 +1935,7 @@ let l2_chain_ids_arg =
   let open Evm_node_lib_dev_encoding in
   Tezos_clic.multiple_arg
     ~long:"l2-chain-id"
-    ~doc:"specify one of the chain ids in the kernel, can be used several times"
+    ~doc:"Specify one of the chain ids in the kernel, can be used several times"
     ~placeholder:"1"
   @@ Tezos_clic.parameter (fun _ chain_id ->
          Lwt.return_ok @@ Ethereum_types.Chain_id.of_string_exn chain_id)
@@ -1945,7 +1945,7 @@ let make_kernel_config_command =
   let open Lwt_result_syntax in
   command
     ~group:Groups.kernel
-    ~desc:"Create a configuration for the kernel installer"
+    ~desc:"Create a configuration for the kernel installer."
     (merge_options
        (args25
           mainnet_compat_arg
@@ -1979,7 +1979,7 @@ let make_kernel_config_command =
           (config_key_flag ~name:"remove_whitelist")
           (Tezos_clic.default_arg
              ~long:"bootstrap-balance"
-             ~doc:"balance of the bootstrap accounts"
+             ~doc:"Balance of the bootstrap accounts"
              ~default:"9999000000000000000000"
              ~placeholder:"9999000000000000000000"
           @@ Tezos_clic.parameter (fun _ s -> return @@ Z.of_string s))
@@ -1999,7 +1999,7 @@ let make_kernel_config_command =
     (prefixes ["make"; "kernel"; "installer"; "config"]
     @@ param
          ~name:"kernel config file"
-         ~desc:"file path where the config will be written to"
+         ~desc:"File path where the config will be written to."
          Params.string
     @@ stop)
     (fun ( ( mainnet_compat,
@@ -2149,7 +2149,7 @@ let fund_arg =
   let long = "fund" in
   let doc =
     "The address of an account to provide with funds in the sandbox (can be \
-     repeated to fund multiple accounts)"
+     repeated to fund multiple accounts)."
   in
   Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x..." Params.l2_address
 
@@ -2173,7 +2173,7 @@ let sequencer_command =
   let open Tezos_clic in
   command
     ~group:Groups.run
-    ~desc:"Start the EVM node in sequencer mode"
+    ~desc:"Start the EVM node in sequencer mode."
     (merge_options common_config_args sequencer_config_args)
     (prefixes ["run"; "sequencer"] stop)
     (fun ( ( data_dir,
@@ -2374,7 +2374,7 @@ let observer_command =
   let open Tezos_clic in
   command
     ~group:Groups.run
-    ~desc:"Start the EVM node in observer mode"
+    ~desc:"Start the EVM node in observer mode."
     (merge_options common_config_args observer_run_args)
     (prefixes ["run"; "observer"] stop)
     (fun ( ( data_dir,
@@ -2591,7 +2591,7 @@ let switch_history_mode_command =
   let open Tezos_clic in
   command
     ~group:Groups.storage
-    ~desc:"Switch history mode of the node"
+    ~desc:"Switch history mode of the node."
     (args2 data_dir_arg config_path_arg)
     (prefixes ["switch"; "history"; "to"] @@ Params.history @@ stop)
     (fun (data_dir, config_file) history_mode () ->
@@ -2647,11 +2647,11 @@ let patch_state_command =
           ~doc:
             "If provided, the state resulting in the application of the \
              requested block will be used instead of the latest state.")
-       (force_arg ~doc:"Force patching the state"))
+       (force_arg ~doc:"Force patching the state."))
     (prefixes ["patch"; "state"; "at"]
-    @@ param ~name:"path" ~desc:"Durable storage path" Params.string
+    @@ param ~name:"path" ~desc:"Durable storage path." Params.string
     @@ prefixes ["with"]
-    @@ param ~name:"value" ~desc:"Patched value" Params.hex_string
+    @@ param ~name:"value" ~desc:"Patched value." Params.hex_string
     @@ stop)
     (fun (data_dir, config_file, block_number, force) key value () ->
       let open Evm_node_lib_dev in
@@ -2676,7 +2676,7 @@ let preemptive_kernel_download_command =
   let open Tezos_clic in
   command
     ~group:Groups.kernel
-    ~desc:"Preemptively download a kernel before running the EVM node"
+    ~desc:"Preemptively download a kernel before running the EVM node."
     (args5
        data_dir_arg
        config_path_arg
@@ -2686,7 +2686,7 @@ let preemptive_kernel_download_command =
     (prefixes ["download"; "kernel"; "with"; "root"; "hash"]
     @@ param
          ~name:"root hash"
-         ~desc:"root hash of the kernel to download"
+         ~desc:"Root hash of the kernel to download."
          (Tezos_clic.parameter (fun _ str ->
               Lwt_result_syntax.return @@ `Hex str))
     @@ stop)
@@ -2729,7 +2729,7 @@ let debug_print_store_schemas_command =
   let open Tezos_clic in
   command
     ~group:Groups.debug
-    ~desc:"Print SQL statements describing the tables created in the store"
+    ~desc:"Print SQL statements describing the tables created in the store."
     no_options
     (prefixes ["debug"; "print"; "store"; "schemas"] @@ stop)
     (fun () () ->
