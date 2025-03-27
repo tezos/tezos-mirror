@@ -305,23 +305,6 @@ where
         self.write_to_bus(imm, rs1, value)
     }
 
-    /// Stores a double-word (8 bytes from rs2) to the address starting at: `val(rs1) + imm`
-    /// where `rs1` and `rs2` are NonZeroXRegisters.
-    ///
-    /// Relevant opcodes:
-    /// - `SD`
-    /// - `C.SD`
-    /// - `C.SDSP`
-    pub fn run_sdnz(
-        &mut self,
-        imm: i64,
-        rs1: NonZeroXRegister,
-        rs2: NonZeroXRegister,
-    ) -> Result<(), Exception> {
-        let value: u64 = self.hart.xregisters.read_nz(rs2);
-        self.write_to_bus_nz(imm, rs1, value)
-    }
-
     /// Stores a word (lowest 4 bytes from rs2) to the address starting at: `val(rs1) + imm`
     ///
     /// Relevant opcodes:
@@ -331,24 +314,6 @@ where
         let value: u64 = self.hart.xregisters.read(rs2);
         // u64 as u32 is truncated, getting the lowest 32 bits
         self.write_to_bus(imm, rs1, value as u32)
-    }
-
-    /// Stores a word (lowest 4 bytes from rs2) to the address starting at: `val(rs1) + imm`
-    /// where `rs1` and `rs2` are NonZeroXRegisters.
-    ///
-    /// Relevant opcodes:
-    /// - `SW`
-    /// - `C.SW`
-    /// - `C.SWSP`
-    pub fn run_swnz(
-        &mut self,
-        imm: i64,
-        rs1: NonZeroXRegister,
-        rs2: NonZeroXRegister,
-    ) -> Result<(), Exception> {
-        let value: u64 = self.hart.xregisters.read_nz(rs2);
-        // u64 as u32 is truncated, getting the lowest 32 bits
-        self.write_to_bus_nz(imm, rs1, value as u32)
     }
 
     /// Stores a half-word (lowest 2 bytes from rs2) to the address starting at: `val(rs1) + imm`
@@ -361,22 +326,6 @@ where
         self.write_to_bus(imm, rs1, value as u16)
     }
 
-    /// Stores a half-word (lowest 2 bytes from rs2) to the address starting at: `val(rs1) + imm`
-    /// where `rs1` and `rs2` are NonZeroXRegisters.
-    ///
-    /// Relevant opcodes:
-    /// - `SH`
-    pub fn run_shnz(
-        &mut self,
-        imm: i64,
-        rs1: NonZeroXRegister,
-        rs2: NonZeroXRegister,
-    ) -> Result<(), Exception> {
-        let value: u64 = self.hart.xregisters.read_nz(rs2);
-        // u64 as u16 is truncated, getting the lowest 16 bits
-        self.write_to_bus_nz(imm, rs1, value as u16)
-    }
-
     /// Stores a byte (lowest 1 byte from rs2) to the address starting at: `val(rs1) + imm`
     ///
     /// Relevant opcodes:
@@ -385,22 +334,6 @@ where
         let value: u64 = self.hart.xregisters.read(rs2);
         // u64 as u8 is truncated, getting the lowest 8 bits
         self.write_to_bus(imm, rs1, value as u8)
-    }
-
-    /// Stores a byte (lowest 1 byte from rs2) to the address starting at: `val(rs1) + imm`
-    /// where `rs1` and `rs2` are NonZeroXRegisters.
-    ///
-    /// Relevant opcodes:
-    /// - `SB`
-    pub fn run_sbnz(
-        &mut self,
-        imm: i64,
-        rs1: NonZeroXRegister,
-        rs2: NonZeroXRegister,
-    ) -> Result<(), Exception> {
-        let value: u64 = self.hart.xregisters.read_nz(rs2);
-        // u64 as u8 is truncated, getting the lowest 8 bits
-        self.write_to_bus_nz(imm, rs1, value as u8)
     }
 }
 

@@ -74,16 +74,4 @@ where
         let address = self.hart.xregisters.read(rs1).wrapping_add(imm as u64);
         self.write_to_address(address, value)
     }
-
-    /// Generic store operation for writing `mem::size_of<T>` bytes starting at address val(rs1) + imm
-    /// where `rs1` is known not be x0.
-    pub(super) fn write_to_bus_nz<T: backend::Elem>(
-        &mut self,
-        imm: i64,
-        rs1: NonZeroXRegister,
-        value: T,
-    ) -> Result<(), Exception> {
-        let address = self.hart.xregisters.read_nz(rs1).wrapping_add(imm as u64);
-        self.write_to_address(address, value)
-    }
 }

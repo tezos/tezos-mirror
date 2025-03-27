@@ -279,6 +279,7 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
         })
     }
 
+    #[inline(always)]
     fn main_memory_store(
         &mut self,
         address: Self::XValue,
@@ -288,10 +289,10 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
         let phys_address = self.translate(address, AccessType::Store)?;
 
         let res = match width {
-            LoadStoreWidth::Byte => self.main_memory.write(phys_address, value as u8),
-            LoadStoreWidth::Half => self.main_memory.write(phys_address, value as u16),
-            LoadStoreWidth::Word => self.main_memory.write(phys_address, value as u32),
-            LoadStoreWidth::Double => self.main_memory.write(phys_address, value),
+            LoadStoreWidth::Byte => self.main_memory.write::<u8>(phys_address, value as u8),
+            LoadStoreWidth::Half => self.main_memory.write::<u16>(phys_address, value as u16),
+            LoadStoreWidth::Word => self.main_memory.write::<u32>(phys_address, value as u32),
+            LoadStoreWidth::Double => self.main_memory.write::<u64>(phys_address, value),
         };
 
         res.map_err(|_: OutOfBounds| Exception::StoreAMOAccessFault(phys_address))
@@ -337,11 +338,41 @@ pub enum Shift {
     RightSigned,
 }
 
-/// The value width being loaded/stored to/from the xregisters to main memory.
+/// Supported value widths for loading from/storing to main memory for XRegisters.
+///
+/// **NB** This type may be passed over C-FFI. See [state_access] for more
+/// information.
+///
+/// For now, the approach taken chooses to pass enums as integers, and parse
+/// them back into the Enum variant on the rust side - to avoid potential UB
+/// should an incorrect discriminant be parsed. We therefore choose explicit
+/// constants for each - so that we know very precisely what values are expected.
+///
+/// [state_access]: crate::jit::state_access
+#[derive(Debug)]
 #[repr(u8)]
 pub enum LoadStoreWidth {
-    Double = 0,
-    Word = 1,
-    Half = 2,
-    Byte = 3,
+    Byte = Self::BYTE_WIDTH,
+    Half = Self::HALF_WIDTH,
+    Word = Self::WORD_WIDTH,
+    Double = Self::DOUBLE_WIDTH,
+}
+
+impl LoadStoreWidth {
+    const BYTE_WIDTH: u8 = std::mem::size_of::<u8>() as u8;
+    const HALF_WIDTH: u8 = std::mem::size_of::<u16>() as u8;
+    const WORD_WIDTH: u8 = std::mem::size_of::<u32>() as u8;
+    const DOUBLE_WIDTH: u8 = std::mem::size_of::<u64>() as u8;
+
+    /// Convert a value-width in bytes to the appropriate
+    /// `LoadStoreWidth`, if supported.
+    pub fn new(val: u8) -> Option<Self> {
+        match val {
+            Self::BYTE_WIDTH => Some(Self::Byte),
+            Self::HALF_WIDTH => Some(Self::Half),
+            Self::WORD_WIDTH => Some(Self::Word),
+            Self::DOUBLE_WIDTH => Some(Self::Double),
+            _ => None,
+        }
+    }
 }
