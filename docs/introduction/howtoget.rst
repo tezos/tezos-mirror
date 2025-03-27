@@ -52,6 +52,11 @@ However, if you encounter problems when performing one of the installation scena
 
 .. _installing_packages:
 
+Installing binary packages
+--------------------------
+
+.. _installing_deb:
+
 Ubuntu and Debian Octez packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

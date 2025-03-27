@@ -54,7 +54,7 @@ Using the official deb or rpm packages offers several advantages:
 Installing Octez
 ----------------
 
-First of all, you must :ref:`install Octez from binary packages <installing_binaries>`, as explained in the installation tutorial.
+First of all, you must :ref:`install Octez from binary packages <installing_packages>`, as explained in the installation tutorial.
 
 To make things concrete, we are assuming here that you installed Octez Debian packages, but most commands should apply to other distributions.
 
@@ -102,7 +102,7 @@ Once the node is configured, we can use ``systemd`` to start the daemon:
    sudo systemctl start octez-node
 
 If configured to do so during package installation, this will automatically download a snapshot
-and import it before starting the ``octez-node`` service.
+and import it before starting the ``octez-node`` service (starting with v22 packages).
 
 We can check the status of the daemon in the logs of the node that
 are stored by default in ``/var/log/tezos/node.log``. Logs are
