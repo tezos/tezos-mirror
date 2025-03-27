@@ -27,7 +27,12 @@ WORKDIR /home/tezos
 ENV BLST_PORTABLE=yes
 
 # hadolint ignore=SC2046,DL4006
-RUN opam install --yes $(opam list --all --short | grep -v ocaml-option-) \
+RUN opam install --yes \
+        # We must tell Opam to assume external dependencies are installed because it is not able to
+        # correctly detect and/or install Cargo and Rust compiler packages using the system package
+        # manager.
+        --assume-depexts \ 
+        $(opam list --all --short | grep -v ocaml-option-) \
     && opam clean
 
 # ENTRYPOINT and CMD already set in prebuild
