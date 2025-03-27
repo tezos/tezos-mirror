@@ -95,9 +95,11 @@ val prepare_installer_kernel :
   Uses.t ->
   installer_result Lwt.t
 
+val read_riscv_kernel : Uses.t -> Uses.t -> string
+
 (** [merge_setup_files ?output configs]
     feeds the [smart-rollup-installer] with multiple setup files
-    ([configs]), and write in [output] the setup file that is the 
+    ([configs]), and write in [output] the setup file that is the
     concatenation of all the configs files.
 
     The returned setup file may be passed to [prepare_installer_kernel]
@@ -252,6 +254,7 @@ val setup_bootstrap_smart_rollup :
 type refutation_scenario_parameters = {
   loser_modes : string list;
   inputs : string list list;
+  input_format : [`Raw | `Hex];
   final_level : int;
   empty_levels : int list;
   stop_loser_at : int list;
@@ -270,6 +273,7 @@ val refutation_scenario_parameters :
   ?bad_reveal_at:int list ->
   ?priority:[`No_priority | `Priority_honest | `Priority_loser] ->
   ?allow_degraded:bool ->
+  ?input_format:[`Raw | `Hex] ->
   string list list ->
   refutation_scenario_parameters
 
@@ -382,7 +386,7 @@ val timeout :
   unit Lwt.t
 
 val send_text_messages :
-  ?format:[< `Hex | `Raw > `Raw] ->
+  ?input_format:[`Hex | `Raw] ->
   ?hooks:Process_hooks.t ->
   ?src:string ->
   Client.t ->

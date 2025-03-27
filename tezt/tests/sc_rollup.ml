@@ -180,8 +180,8 @@ let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
 
 let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?commitment_period ?(parameters_ty = "string") ?challenge_window ?timeout
-    ?rollup_node_name ?whitelist_enable ?whitelist ?operator ?operators
-    ?(uses = fun _protocol -> []) ?rpc_external ?allow_degraded
+    ?timestamp ?rollup_node_name ?whitelist_enable ?whitelist ?operator
+    ?operators ?(uses = fun _protocol -> []) ?rpc_external ?allow_degraded
     ?kernel_debug_log ?preimages_dir {variant; tags; description} scenario =
   let uses protocol =
     (Constant.octez_smart_rollup_node :: Option.to_list preimages_dir)
@@ -204,6 +204,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
       ?commitment_period
       ?challenge_window
       ?timeout
+      ?timestamp
       ?whitelist_enable
       ~riscv_pvm_enable
       protocol
@@ -829,7 +830,7 @@ let bake_until_execute_outbox_message ?at_least ?timeout client rollup_node =
     executes an output message (whitelist_update) *)
 let send_messages_then_bake_until_rollup_node_execute_output_message
     ~commitment_period ~challenge_window client rollup_node msg_list =
-  let* () = send_text_messages ~hooks ~format:`Hex client msg_list in
+  let* () = send_text_messages ~hooks ~input_format:`Hex client msg_list in
   let* () =
     bake_until_execute_outbox_message
       ~timeout:5.0
@@ -1547,15 +1548,16 @@ let test_advances_state_with_kernel ~title ~boot_sector ~kind ~messages =
 
 (* `inbox_file` is expected to be in the format produced by the `inbox_bench` tool
  * in `src/riscv/jstz` *)
-let test_advances_state_with_inbox ~title ~boot_sector ~kind ~inbox_file =
+let read_jstz_inbox inbox_file =
   let inbox =
     JSON.(
       Uses.path inbox_file |> parse_file |> as_list |> List.map as_list
       |> List.concat)
   in
-  let messages =
-    List.map (fun m -> JSON.(m |-> "external" |> as_string)) inbox
-  in
+  List.map (fun m -> JSON.(m |-> "external" |> as_string)) inbox
+
+let test_advances_state_with_inbox ~title ~boot_sector ~kind ~inbox_file =
+  let messages = read_jstz_inbox inbox_file in
   test_advances_state_with_kernel ~title ~boot_sector ~kind ~messages
 
 let test_rollup_node_advances_pvm_state ?regression ?kernel_debug_log ~title
@@ -3145,7 +3147,8 @@ let test_can_stake ~kind =
   unit
 
 let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
-    ~kind ({allow_degraded; _} as scenario) =
+    ~kind ?(ci_disabled = false) ?uses ?(timeout = 60) ?timestamp ?boot_sector
+    ({allow_degraded; _} as scenario) =
   let regression =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5313
        Disabled dissection regressions for parallel games, as it introduces
@@ -3155,14 +3158,18 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
   let tags =
     ["refutation"] @ if mode = Sc_rollup_node.Accuser then ["accuser"] else []
   in
+  let tags = if ci_disabled then Tag.ci_disabled :: tags else tags in
   let variant = variant ^ if mode = Accuser then "+accuser" else "" in
   test_full_scenario
     ~regression
     ?hooks:None (* We only want to capture dissections manually *)
     ?commitment_period
     ~kind
+    ?uses
     ~mode
-    ~timeout:60
+    ~timeout
+    ?timestamp
+    ?boot_sector
     ?challenge_window
     ~rollup_node_name:"honest"
     ~allow_degraded
@@ -4455,7 +4462,11 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
         match payload with
         | `External payload ->
             let extra = List.init extra_empty_messages (fun _ -> "") in
-            send_text_messages ~hooks ~format:`Hex client (extra @ [payload])
+            send_text_messages
+              ~hooks
+              ~input_format:`Hex
+              client
+              (extra @ [payload])
         | `Internal payload ->
             let payload = "0x" ^ payload in
             let* () =
@@ -7024,14 +7035,6 @@ let test_patch_durable_storage_on_commitment =
   in
   unit
 
-(* TODO: https://linear.app/tezos/issue/RV-109/port-kernel-installer-to-risc-v
- * Originate RISC-V kernels using installer kernel instead *)
-let read_riscv_kernel (kernel_path : Uses.t) (checksum_path : Uses.t) : string =
-  let checksum =
-    String.split_on_char ' ' (read_file (Uses.path checksum_path))
-  in
-  "kernel:" ^ Uses.path kernel_path ^ ":" ^ List.hd checksum
-
 let register_riscv ~protocols =
   let kind = "riscv" in
   let boot_sector =
@@ -7069,7 +7072,33 @@ let register_riscv_jstz ~protocols =
     ~title:"node advances PVM state with jstz kernel"
     ~boot_sector
     ~inbox_file:
-      (Uses.make ~tag:"riscv" ~path:"tezt/tests/riscv-tests/jstz-inbox.json" ())
+      (Uses.make ~tag:"riscv" ~path:"tezt/tests/riscv-tests/jstz-inbox.json" ()) ;
+  test_refutation_scenario
+    ~kind
+    ~ci_disabled:true
+    ~mode:Operator
+    ~challenge_window:400
+    ~timeout:400
+    ~timestamp:(Ago (Client.Time.Span.of_seconds_exn 200.))
+      (* Setting the timestamp results in blocks being produced more slowly *)
+    ~commitment_period:10
+    ~variant:"pvm_proof_0"
+    ~uses:(fun _protocol ->
+      [Uses.make ~tag:"riscv" ~path:"tezt/tests/riscv-tests/jstz-inbox.json" ()])
+    ~boot_sector
+    (refutation_scenario_parameters
+       ~loser_modes:["5 0 1000"]
+       (List.map
+          (fun x -> [x])
+          (read_jstz_inbox
+             (Uses.make
+                ~tag:"riscv"
+                ~path:"tezt/tests/riscv-tests/jstz-inbox.json"
+                ())))
+       ~input_format:`Hex
+       ~final_level:500
+       ~priority:`No_priority)
+    protocols
 
 let register ~kind ~protocols =
   test_origination ~kind protocols ;

@@ -277,6 +277,14 @@ let riscv_dummy_kernel =
 let riscv_dummy_kernel_checksum =
   Uses.make ~tag:"riscv" ~path:"src/riscv/assets/riscv-dummy.elf.checksum" ()
 
+(* TODO: https://linear.app/tezos/issue/RV-109/port-kernel-installer-to-risc-v
+ * Originate RISC-V kernels using installer kernel instead *)
+let read_riscv_kernel (kernel_path : Uses.t) (checksum_path : Uses.t) : string =
+  let checksum =
+    String.split_on_char ' ' (read_file (Uses.path checksum_path))
+  in
+  "kernel:" ^ Uses.path kernel_path ^ ":" ^ List.hd checksum
+
 let default_boot_sector_of ~kind =
   match kind with
   | "arith" -> ""
@@ -524,6 +532,7 @@ let setup_bootstrap_smart_rollup ?(name = "smart-rollup") ~address
 type refutation_scenario_parameters = {
   loser_modes : string list;
   inputs : string list list;
+  input_format : [`Raw | `Hex];
   final_level : int;
   empty_levels : int list;
   stop_loser_at : int list;
@@ -536,10 +545,11 @@ type refutation_scenario_parameters = {
 let refutation_scenario_parameters ?(loser_modes = []) ~final_level
     ?(empty_levels = []) ?(stop_loser_at = []) ?(reset_honest_on = [])
     ?(bad_reveal_at = []) ?(priority = `No_priority) ?(allow_degraded = false)
-    inputs =
+    ?(input_format = `Raw) inputs =
   {
     loser_modes;
     inputs;
+    input_format;
     final_level;
     empty_levels;
     stop_loser_at;
@@ -920,8 +930,8 @@ let prioritize_refute_operations sc_rollup_node =
          ))
     config
 
-let send_text_messages ?(format = `Raw) ?hooks ?src client msgs =
-  match format with
+let send_text_messages ?(input_format = `Raw) ?hooks ?src client msgs =
+  match input_format with
   | `Raw -> send_message ?hooks ?src client (to_text_messages_arg msgs)
   | `Hex -> send_message ?hooks ?src client (to_hex_messages_arg msgs)
 
@@ -958,12 +968,12 @@ let bake_until ?hook cond n client =
 (*
 
    To check the refutation game logic, we evaluate a scenario with one
-   honest rollup node and one dishonest rollup node configured as with
-   a given [loser_mode].
+   honest rollup node and one dishonest rollup node configured with
+   the given [loser_mode].
 
    For a given sequence of [inputs], distributed amongst several
    levels, with some possible [empty_levels]. We check that at some
-   [final_level], the crime does not pay: the dishonest node has losen
+   [final_level] crime does not pay: the dishonest node has lost
    its deposit while the honest one has not.
 
 *)
@@ -971,6 +981,7 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
     {
       loser_modes;
       inputs;
+      input_format;
       final_level;
       empty_levels;
       stop_loser_at;
@@ -1142,7 +1153,11 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
         else
           let* () =
             retry @@ fun () ->
-            send_text_messages ~src:Constant.bootstrap3.alias client inputs
+            send_text_messages
+              ~input_format
+              ~src:Constant.bootstrap3.alias
+              client
+              inputs
           in
           consume_inputs next_batches
   in
@@ -1155,7 +1170,11 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
       if List.mem level bad_reveal_at then
         let hash = reveal_hash ~protocol ~kind "Missing data" in
         retry @@ fun () ->
-        send_text_messages ~src:Constant.bootstrap3.alias client [hash.message]
+        send_text_messages
+          ~input_format
+          ~src:Constant.bootstrap3.alias
+          client
+          [hash.message]
       else unit
     in
     stop_losers level
