@@ -5,7 +5,7 @@ This page lists the changes brought by protocol Alpha with respect
 to Rio (see :ref:`naming_convention`).
 For the list of changes brought by Rio with respect to Quebec, see :doc:`../protocols/022_rio`.
 
-For a higher-level overview of the most salient new features see the 
+For a higher-level overview of the most salient new features see the
 `announcement blog <https://research-development.nomadic-labs.com/blog.html>`__.
 
 The code can be found in directory :src:`src/proto_alpha` of the ``master``
@@ -21,6 +21,12 @@ This protocol requires an updated protocol environment version (V15) from R vers
   signatures were expected to be produced with the ``Augmented`` cryptographic
   scheme. Starting from V15, they are expected to be produced with the ``Proof
   of possession`` cryptographic scheme. (MR :gl:`!17036`)
+
+Client
+------
+
+- Added ``octez-client set companion key for <delegate> to <bls_key>``, setting a
+  companion key for the given delegate. (MR :gl:`!17320`)
 
 Smart Rollups
 -------------
@@ -53,6 +59,10 @@ RPC Changes
 
 Operation receipts
 ------------------
+
+- Adds receipt for ``companion_key`` update. The receipt is similar to a consensus
+  key update, with the ``kind`` field used to differientiate between both.
+  (MR :gl:`!17320`)
 
 
 Errors
