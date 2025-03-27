@@ -81,7 +81,7 @@ Run commands:
       --blacklisted-rpcs.
     --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of
       the provided list. Cannot be used with --restricted-rpcs or
-      --blacklisted-rpcs.
+      --whitelisted-rpcs.
     --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not
       part of the provided list. Cannot be used with --restricted-rpcs or
       --blacklisted-rpcs.
@@ -169,7 +169,7 @@ Run commands:
       --blacklisted-rpcs.
     --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of
       the provided list. Cannot be used with --restricted-rpcs or
-      --blacklisted-rpcs.
+      --whitelisted-rpcs.
     --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not
       part of the provided list. Cannot be used with --restricted-rpcs or
       --blacklisted-rpcs.
@@ -233,7 +233,7 @@ Run commands:
       --blacklisted-rpcs.
     --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of
       the provided list. Cannot be used with --restricted-rpcs or
-      --blacklisted-rpcs.
+      --whitelisted-rpcs.
     --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not
       part of the provided list. Cannot be used with --restricted-rpcs or
       --blacklisted-rpcs.
@@ -319,7 +319,7 @@ Run commands:
       --blacklisted-rpcs.
     --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of
       the provided list. Cannot be used with --restricted-rpcs or
-      --blacklisted-rpcs.
+      --whitelisted-rpcs.
     --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not
       part of the provided list. Cannot be used with --restricted-rpcs or
       --blacklisted-rpcs.
@@ -405,7 +405,7 @@ Run commands:
       --blacklisted-rpcs.
     --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of
       the provided list. Cannot be used with --restricted-rpcs or
-      --blacklisted-rpcs.
+      --whitelisted-rpcs.
     --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not
       part of the provided list. Cannot be used with --restricted-rpcs or
       --blacklisted-rpcs.
@@ -498,7 +498,7 @@ Configuration commands:
       --blacklisted-rpcs.
     --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of
       the provided list. Cannot be used with --restricted-rpcs or
-      --blacklisted-rpcs.
+      --whitelisted-rpcs.
     --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not
       part of the provided list. Cannot be used with --restricted-rpcs or
       --blacklisted-rpcs.
