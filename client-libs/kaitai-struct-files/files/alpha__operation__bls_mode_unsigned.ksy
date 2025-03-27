@@ -128,9 +128,9 @@ types:
     - id: bls_mode_attestation
       type: bls_mode_attestation
       if: (alpha__operation__alpha__bls_mode_contents_tag == alpha__operation__alpha__bls_mode_contents_tag::bls_mode_attestation)
-    - id: preattestation
-      type: preattestation
-      if: (alpha__operation__alpha__bls_mode_contents_tag == alpha__operation__alpha__bls_mode_contents_tag::preattestation)
+    - id: bls_mode_preattestation
+      type: bls_mode_preattestation
+      if: (alpha__operation__alpha__bls_mode_contents_tag == alpha__operation__alpha__bls_mode_contents_tag::bls_mode_preattestation)
     - id: attestations_aggregate
       type: attestations_aggregate
       if: (alpha__operation__alpha__bls_mode_contents_tag == alpha__operation__alpha__bls_mode_contents_tag::attestations_aggregate)
@@ -358,6 +358,14 @@ types:
     - id: dal
       type: z
       if: (dal_tag == bool::true)
+  bls_mode_preattestation:
+    seq:
+    - id: level
+      type: s4be
+    - id: round
+      type: s4be
+    - id: block_payload_hash
+      size: 32
   bytes_dyn_uint30:
     seq:
     - id: len_bytes_dyn_uint30
@@ -2000,9 +2008,9 @@ enums:
     8: vdf_revelation
     9: drain_delegate
     17: failing_noop
-    20: preattestation
     24: dal_entrapment_evidence
     31: attestations_aggregate
+    40: bls_mode_preattestation
     41: bls_mode_attestation
     107: reveal
     108: transaction
