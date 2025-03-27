@@ -9843,6 +9843,8 @@ let test_batch_limit_size_rpc =
     ~title:"Test batch size limit"
     ~tags:["rpc"; "batch_limit"]
     ~time_between_blocks:Nothing
+    ~use_multichain:Register_without_feature
+  (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; _} _protocol ->
   (* We restart the sequencer to impose a batch limit on the sequencer. *)
   let* () = Evm_node.terminate sequencer in
@@ -9962,6 +9964,8 @@ let test_relay_restricted_rpcs =
     ~tags:["evm"; "rpc"; "relay"]
     ~title:"Relay restricted RPC only accept eth_sendRawTransaction"
     ~da_fee:Wei.zero
+    ~use_multichain:Register_without_feature
+  (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; _} _protocol ->
   let* () = Evm_node.terminate sequencer in
   let* () =
@@ -9981,6 +9985,8 @@ let test_tx_pool_replacing_transactions =
     ~kernels:[Latest] (* Not a kernel specific test. *)
     ~tags:["evm"; "tx_pool"]
     ~title:"Transactions can be replaced"
+    ~use_multichain:Register_without_feature
+  (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; _} _protocol ->
   let* gas_price = Rpc.get_gas_price sequencer in
   let gas_price = Int32.to_int gas_price in
@@ -11293,6 +11299,8 @@ let test_tx_queue =
     ~websockets:false
     ~enable_tx_queue:true
     ~title:"Submits a transaction to an observer with a tx queue."
+    ~use_multichain:Register_without_feature
+  (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; observer; _} _protocol ->
   let* () = Evm_node.terminate observer in
 
@@ -11418,6 +11426,8 @@ let test_tx_queue_clear =
     ~use_dal:Register_without_feature
     ~use_threshold_encryption:Register_without_feature
     ~websockets:false
+    ~use_multichain:Register_without_feature
+  (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {
            client;
            l1_contracts;
@@ -11525,6 +11535,8 @@ let test_tx_queue_nonce =
     ~title:
       "Submits transactions to an observer with a tx queue and make sure it \
        can respond to getTransactionCount."
+    ~use_multichain:Register_without_feature
+  (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; observer; _} _protocol ->
   let* () = Evm_node.terminate observer in
 
@@ -11829,6 +11841,8 @@ let test_tx_queue_limit =
     ~title:
       "Submits transactions to an observer with a tx queue and make sure its \
        limit are respected."
+    ~use_multichain:Register_without_feature
+  (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; observer; _} _protocol ->
   let* () =
     let*@ _ = produce_block sequencer in
@@ -12283,6 +12297,8 @@ let test_block_producer_validation =
     ~websockets:false
     ~enable_tx_queue:true (* enables it in the sequencer *)
     ~title:"Test part of the validation is done when producing blocks."
+    ~use_multichain:Register_without_feature
+  (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; observer; _} _protocol ->
   let* () =
     let*@ _ = produce_block sequencer in
