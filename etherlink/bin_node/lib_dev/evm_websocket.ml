@@ -18,19 +18,11 @@ type parameters = {
   monitor : Configuration.monitor_websocket_heartbeat option;
 }
 
-type close_status = Normal_closure | Going_away | Message_too_big
-
-(* https://datatracker.ietf.org/doc/html/rfc6455#section-7.4.1 *)
-let code_of_close_status = function
-  | Normal_closure -> 1000
-  | Going_away -> 1001
-  | Message_too_big -> 1009
-
 module Types = struct
   type subscriptions_table =
     (Ethereum_types.Subscription.id, unit -> unit) Stdlib.Hashtbl.t
 
-  type close_info = {reason : string; status : close_status}
+  type close_info = {reason : string; status : Websocket_encodings.close_status}
 
   type monitor_state = {
     params : Configuration.monitor_websocket_heartbeat;
@@ -480,7 +472,10 @@ module Handlers = struct
     let* () = Event.(emit shutdown) (conn_descr, reason, nb_sub) in
     let () =
       try
-        push_frame (Some (Websocket.Frame.close (code_of_close_status status))) ;
+        push_frame
+          (Some
+             (Websocket.Frame.close
+                (Websocket_encodings.code_of_close_status status))) ;
         push_frame None
       with _ -> (* Websocket already closed *) ()
     in

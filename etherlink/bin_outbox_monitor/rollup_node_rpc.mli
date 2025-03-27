@@ -8,10 +8,9 @@
 
 open Octez_smart_rollup
 
-(** Create a RPC context for calling the rollup node. *)
-val make_ctxt :
-  rollup_node_endpoint:Uri.t ->
-  Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
+(** Create a RPC context for calling the rollup node and retrying on connection
+    errors. *)
+val make_ctxt : rollup_node_endpoint:Uri.t -> Retrier_context.t
 
 type outbox_message = {
   outbox_level : int32;

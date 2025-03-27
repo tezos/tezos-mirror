@@ -9,10 +9,7 @@
 open Octez_smart_rollup
 
 let make_ctxt ~rollup_node_endpoint =
-  let open Tezos_rpc_http_client_unix.RPC_client_unix in
-  new http_ctxt
-    {default_config with endpoint = rollup_node_endpoint}
-    [Media_type.json]
+  new Retrier_context.ctxt ~timeout:30. rollup_node_endpoint [Media_type.json]
 
 type outbox_message = {
   outbox_level : int32;

@@ -67,7 +67,7 @@ module Arg = struct
     @@ Tezos_clic.parameter (fun _ x -> Lwt_result.return x)
 end
 
-let log_config ~verbosity () =
+let log_config ~verbosity ~data_dir =
   let open Tezos_base_unix.Internal_event_unix in
   let config =
     make_with_defaults
@@ -78,6 +78,18 @@ let log_config ~verbosity () =
            ())
       ()
   in
+  let uri =
+    Tezos_base.Internal_event_config.make_config_uri
+      ~create_dirs:true
+      ~daily_logs:15
+      ~level:Info
+      ~format:"pp-rfc5424"
+      ~chmod:0o640
+      ~section_prefixes:[]
+      ~advertise_levels:true
+      (`Path Filename.Infix.(data_dir // "daily_logs" // "daily.log"))
+  in
+  let config = Tezos_base.Internal_event_config.add_uri_to_config uri config in
   init ~config ()
 
 let global_options_args =
@@ -114,7 +126,7 @@ let run_command =
          (evm_node_endpoint, rollup_node_endpoint, l1_node_endpoint)
          _ ->
       let open Lwt_result_syntax in
-      let*! () = log_config ~verbosity () in
+      let*! () = log_config ~verbosity ~data_dir in
       let* db = Db.init ~data_dir `Read_write in
       Etherlink_monitor.start
         db
