@@ -213,6 +213,9 @@ shipped with the package.
 
 The logs of the baker are available in ``/var/log/tezos/baker-<protocol name>.log``.
 
+
+.. _services_upgrade:
+
 Upgrading Octez
 ---------------
 
@@ -232,3 +235,7 @@ changes in governance.
 
 Mind reloading the new services using ``sudo systemctl daemon-reload`` and then
 restarting the running services using ``sudo systemctl restart <service>``.
+When doing so:
+
+- Always make sure that all binaries or packages are on the same version of Octez.
+- The restart order should follow the dependency order: (i) Octez node, (ii) DAL node, (iii) baker, (iv) accuser (if running one).

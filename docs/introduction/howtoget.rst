@@ -108,6 +108,9 @@ To remove the Octez packages you can simply run the following command.
 If migrating from Serokell packages you can check out migration documentation
 :doc:`./serokell`.
 
+To upgrade packages, use ``apt-get update`` and ``apt-get upgrade``.
+If runnning Octez as services, see also how to :ref:`restart them <services_upgrade>`.
+
 .. _installing_rpm:
 
 Fedora Octez packages
@@ -165,6 +168,10 @@ To remove the Octez packages you can simply run the following command.
 .. literalinclude:: install-bin-rpm.sh
    :language: shell
    :start-after: [test autopurge]
+
+To upgrade packages, use ``dnf update``.
+If runnning Octez as services, see also how to :ref:`restart them <services_upgrade>`.
+
 
 .. _getting_static_binaries:
 
