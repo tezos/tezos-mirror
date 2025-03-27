@@ -1290,9 +1290,10 @@ let make_args_dict_filter ?command spec args =
         | Some (arity, long) -> (
             let* () = check_help_flag ?command tl in
             match (arity, tl) with
-            | [0; 1], value :: _ when String.length value > 0 && value.[0] = '-'
+            | [0; 1], value :: _ when String.length value > 1 && value.[0] = '-'
               ->
-                (* Using arity 0 of the argument *)
+                (* Using arity 0 of the argument. When value = "-", the argument
+                   is arity 1. *)
                 make_args_dict
                   arities
                   (add_occurrence long Occ_empty dict, other_args)
