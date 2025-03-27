@@ -503,7 +503,9 @@ let snapshot_file_param next =
 let snapshot_file_or_url_param next =
   Tezos_clic.param
     ~name:"snapshot_file_or_url"
-    ~desc:"Snapshot archive file name or URL to download the snapshot"
+    ~desc:
+      "Snapshot archive file name, URL to download the snapshot or stdin (when \
+       given `-`)"
     string_parameter
     next
 
