@@ -1424,7 +1424,8 @@ let apply_manager_operation :
             }
         in
         (ctxt, result, [])
-    | Update_consensus_key {public_key; proof} ->
+    | Update_consensus_key {public_key; proof; kind = _} ->
+        (* TODO: handle companion *)
         let*! is_registered = Delegate.registered ctxt source in
         let*? () =
           error_unless

@@ -371,7 +371,11 @@ let build_update_consensus_key cctxt ?fee ?gas_limit ?storage_limit
         | _ -> tzfail (Unexpected_proof_of_possession_format proof))
     | _ -> return_none
   in
-  let operation = Update_consensus_key {public_key; proof} in
+  let operation =
+    Update_consensus_key
+      {public_key; proof; kind = Delegate_consensus_key.Consensus}
+  in
+  (* TODO: handle companion *)
   return
   @@ Injection.prepare_manager_operation
        ~fee:(Limit.of_option fee)

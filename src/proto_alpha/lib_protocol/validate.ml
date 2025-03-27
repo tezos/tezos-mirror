@@ -2622,7 +2622,8 @@ module Manager = struct
     | Delegation (Some pkh) ->
         if Constants.allow_tz4_delegate_enable vi.ctxt then return_unit
         else Delegate.check_not_tz4 pkh
-    | Update_consensus_key {public_key; proof} ->
+    | Update_consensus_key {public_key; proof; kind = _} ->
+        (* TODO: handle companion *)
         check_update_consensus_key vi remaining_gas source public_key proof
     | Delegation None | Set_deposits_limit _ | Increase_paid_storage _ ->
         return_unit

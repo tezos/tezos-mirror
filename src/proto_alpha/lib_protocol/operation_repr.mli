@@ -434,6 +434,7 @@ and _ manager_operation =
   | Update_consensus_key : {
       public_key : Signature.Public_key.t;
       proof : Bls.t option;
+      kind : consensus_key_kind;
     }
       -> Kind.update_consensus_key manager_operation
       (** [Transfer_ticket] allows an implicit account (the "claimer") to receive

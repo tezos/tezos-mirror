@@ -1144,6 +1144,8 @@ let update_consensus_key ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
               "Can't forge an Update_consensus_key with a non-BLS proof of \
                possession.")
   in
+  (* TODO: handle companion *)
+  let kind = Delegate_consensus_key.Consensus in
   let* to_sign_op =
     manager_operation
       ?force_reveal
@@ -1153,7 +1155,7 @@ let update_consensus_key ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
       ?storage_limit
       ~source:src
       ctxt
-      (Update_consensus_key {public_key; proof})
+      (Update_consensus_key {public_key; proof; kind})
   in
   let* account = Context.Contract.manager ctxt src in
   sign ctxt account.sk (Context.branch ctxt) to_sign_op

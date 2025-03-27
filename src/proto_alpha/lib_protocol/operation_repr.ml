@@ -382,6 +382,7 @@ and _ manager_operation =
   | Update_consensus_key : {
       public_key : Signature.Public_key.t;
       proof : Bls.t option;
+      kind : consensus_key_kind;
     }
       -> Kind.update_consensus_key manager_operation
   | Transfer_ticket : {
@@ -774,18 +775,19 @@ module Encoding = struct
           tag = update_consensus_key_tag;
           name = "update_consensus_key";
           encoding =
-            obj2
+            obj3
               (req "pk" Signature.Public_key.encoding)
+              (req "kind" Delegate_consensus_key.kind_encoding)
               (opt "proof" (dynamic_size Bls.encoding));
           select =
             (function
             | Manager (Update_consensus_key _ as op) -> Some op | _ -> None);
           proj =
-            (fun (Update_consensus_key {public_key; proof}) ->
-              (public_key, proof));
+            (fun (Update_consensus_key {public_key; proof; kind}) ->
+              (public_key, kind, proof));
           inj =
-            (fun (public_key, proof) ->
-              Update_consensus_key {public_key; proof});
+            (fun (public_key, kind, proof) ->
+              Update_consensus_key {public_key; proof; kind});
         }
 
     let transfer_ticket_case =
@@ -2255,7 +2257,7 @@ let attestation_infos_from_content (c : consensus_content)
         d;
   }
 
-(** Compute an {!aggregate_info} value from {!consensus_aggregate_content} 
+(** Compute an {!aggregate_info} value from {!consensus_aggregate_content}
     and {!Slot_repr.t list} values. It is used to compute the weight of an
     {!Aggregate_attestation}.
 
