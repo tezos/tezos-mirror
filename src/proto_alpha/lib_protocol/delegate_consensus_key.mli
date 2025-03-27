@@ -26,11 +26,14 @@
 (** Management of a delegate's consensus key, the one used to sign
     blocks and consensus operations.  It is responsible for maintaining
     the tables {!Storage.Consensus_keys},
-    {!Storage.Contract.Consensus_key}, and
-    {!Storage.Contract.Pending_consensus_keys}. *)
+    {!Storage.Contract.Consensus_key},
+    {!Storage.Contract.Pending_consensus_keys},
+    {!Storage.Contract.Companion_key}, and
+    {!Storage.Contract.Pending_companion_keys}. *)
 
 type error +=
-  | Invalid_consensus_key_update_noop of Cycle_repr.t
+  | Invalid_consensus_key_update_noop of
+      (Cycle_repr.t * Operation_repr.consensus_key_kind)
   | Invalid_consensus_key_update_active
   | Invalid_consensus_key_update_tz4 of Bls.Public_key.t
 

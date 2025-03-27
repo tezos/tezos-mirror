@@ -24,7 +24,8 @@
 (*****************************************************************************)
 
 type error +=
-  | Invalid_consensus_key_update_noop of Cycle_repr.t
+  | Invalid_consensus_key_update_noop of
+      (Cycle_repr.t * Operation_repr.consensus_key_kind)
   | Invalid_consensus_key_update_active
   | Invalid_consensus_key_update_tz4 of Bls.Public_key.t
 
@@ -34,13 +35,18 @@ let () =
     ~id:"delegate.consensus_key.invalid_noop"
     ~title:"Invalid key for consensus key update"
     ~description:"Tried to update the consensus key with the active key"
-    ~pp:(fun ppf cycle ->
+    ~pp:(fun ppf (cycle, kind) ->
       Format.fprintf
         ppf
-        "Invalid key while updating a consensus key (already active since %a)."
+        "Invalid key while updating a %a key (already active since %a)."
+        Operation_repr.pp_consensus_key_kind
+        kind
         Cycle_repr.pp
         cycle)
-    Data_encoding.(obj1 (req "cycle" Cycle_repr.encoding))
+    Data_encoding.(
+      obj2
+        (req "cycle" Cycle_repr.encoding)
+        (req "kind" Operation_repr.consensus_key_kind_encoding))
     (function Invalid_consensus_key_update_noop c -> Some c | _ -> None)
     (fun c -> Invalid_consensus_key_update_noop c) ;
   register_error_kind
@@ -71,9 +77,9 @@ let () =
     (function Invalid_consensus_key_update_tz4 pk -> Some pk | _ -> None)
     (fun pk -> Invalid_consensus_key_update_tz4 pk)
 
-type 'a kind =
-  | Consensus : Signature.public_key kind
-  | Companion : Bls.Public_key.t option kind
+type 'a typed_kind =
+  | Consensus : Signature.public_key typed_kind
+  | Companion : Bls.Public_key.t option typed_kind
 
 type pk = Raw_context.consensus_pk = {
   delegate : Signature.Public_key_hash.t;
@@ -155,7 +161,7 @@ let init ctxt delegate pk =
   let*! ctxt = set_used ctxt pkh in
   Storage.Contract.Consensus_key.init ctxt (Contract_repr.Implicit delegate) pk
 
-let active_pubkey_kind (type a) ctxt ~(kind : a kind) delegate :
+let active_pubkey_kind (type a) ctxt ~(kind : a typed_kind) delegate :
     a tzresult Lwt.t =
   match kind with
   | Consensus ->
@@ -176,8 +182,8 @@ let active_key ctxt delegate =
   let* pk = active_pubkey ctxt delegate in
   return (pkh pk)
 
-let raw_pending_updates (type a) ctxt ?up_to_cycle ~(kind : a kind) delegate :
-    (Cycle_repr.t * a) list tzresult Lwt.t =
+let raw_pending_updates (type a) ctxt ?up_to_cycle ~(kind : a typed_kind)
+    delegate : (Cycle_repr.t * a) list tzresult Lwt.t =
   let open Lwt_result_syntax in
   let relevant_cycles =
     let level = Raw_context.current_level ctxt in
@@ -194,7 +200,7 @@ let raw_pending_updates (type a) ctxt ?up_to_cycle ~(kind : a kind) delegate :
     Cycle_repr.(first_cycle ---> last_cycle)
   in
   let delegate = Contract_repr.Implicit delegate in
-  let find (type a) (ctxt, cycle) delegate (kind : a kind) :
+  let find (type a) (ctxt, cycle) delegate (kind : a typed_kind) :
       a option tzresult Lwt.t =
     match kind with
     | Consensus -> Storage.Pending_consensus_keys.find (ctxt, cycle) delegate
@@ -262,7 +268,7 @@ let register_update ctxt delegate pk =
     in
     fail_when
       Signature.Public_key.(pk = active_pubkey)
-      (Invalid_consensus_key_update_noop first_active_cycle)
+      (Invalid_consensus_key_update_noop (first_active_cycle, Consensus))
   in
   let pkh = Signature.Public_key.hash pk in
   let* () = check_unused ctxt pkh in
@@ -295,7 +301,7 @@ let register_update_companion ctxt delegate pk =
     | Some active_pubkey ->
         fail_when
           Bls.Public_key.(pk = active_pubkey)
-          (Invalid_consensus_key_update_noop first_active_cycle)
+          (Invalid_consensus_key_update_noop (first_active_cycle, Companion))
   in
   let pkh : Signature.public_key_hash =
     Signature.Bls (Bls.Public_key.hash pk)

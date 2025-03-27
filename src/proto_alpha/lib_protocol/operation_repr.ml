@@ -236,6 +236,22 @@ let of_watermark = function
       else None
   | _ -> None
 
+type consensus_key_kind = Consensus | Companion
+
+let consensus_key_kind_encoding =
+  let open Data_encoding in
+  conv
+    (function Consensus -> true | Companion -> false)
+    (fun x -> if x then Consensus else Companion)
+    bool
+
+let consensus_key_kind_to_string = function
+  | Consensus -> "consensus"
+  | Companion -> "companion"
+
+let pp_consensus_key_kind ppf kind =
+  Format.fprintf ppf "%s" (consensus_key_kind_to_string kind)
+
 type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
 
 let raw_encoding = Operation.encoding
