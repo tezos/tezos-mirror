@@ -194,6 +194,35 @@ let test_preattestation_for_next_round () =
     ~kind:`Preattestation
     ~next:`Round
 
+(* The BLS mode encoding differs from the regular preattestation encoding
+   in that slots are omitted. This test verifies that a preattestation's
+   swapping slots produces the same bytes. *)
+let slot_substitution_does_not_affect_bytes () =
+  let open Lwt_result_syntax in
+  let* genesis, _contracts = Context.init_n 5 ~aggregate_attestation:true () in
+  let* b = Block.bake genesis in
+  let* delegate, _slots = Context.get_attester (B b) in
+  let* {shell = {branch}; protocol_data = {contents; _}} =
+    Op.raw_preattestation ~delegate ~slot:Slot.zero b
+  in
+  match contents with
+  | Single (Preattestation consensus_content) ->
+      let bytes_with_slot_0 =
+        Data_encoding.Binary.to_bytes_exn
+          Operation.bls_mode_unsigned_encoding
+          ({branch}, Contents_list contents)
+      in
+      (* Swap slots 0 with 1 *)
+      let slot = Slot.Internal_for_tests.of_int_unsafe_only_use_for_tests 1 in
+      let contents = Single (Preattestation {consensus_content with slot}) in
+      let bytes_with_slot_1 =
+        Data_encoding.Binary.to_bytes_exn
+          Operation.bls_mode_unsigned_encoding
+          ({branch}, Contents_list contents)
+      in
+      if Bytes.equal bytes_with_slot_0 bytes_with_slot_1 then return_unit
+      else Test.fail "Bytes are expected to be equals"
+
 let tests =
   let module AppMode = Test_preattestation_functor.BakeWithMode (struct
     let name = "AppMode"
@@ -248,6 +277,11 @@ let tests =
         "Preattestation for next round"
         `Quick
         test_preattestation_for_next_round;
+      (* slots are not part of the signed payload *)
+      Tztest.tztest
+        "Slot substitution does not affect bytes"
+        `Quick
+        slot_substitution_does_not_affect_bytes;
     ]
 
 let () =
