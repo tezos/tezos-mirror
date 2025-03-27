@@ -465,6 +465,20 @@ impl<M: ManagerBase> SupervisorState<M> {
         MC: MemoryConfig,
         M: ManagerReadWrite,
     {
+        // `dispatch0!(system_call_no [, optional_arguments_passed_to_handler])`
+        // Converts the system call name to the handler
+        macro_rules! dispatch0 {
+            ($system_call:ty$(, $arg:ident)*) => {{
+                try_blocks::try_block! {
+                    paste::paste! {
+                        let result = self.[<handle_$system_call>]($($arg)*)?;
+                        core.hart.xregisters.write(registers::a0, result.into());
+                        true
+                    }
+                }
+            }};
+        }
+
         // `dispatch1!(system_call_no [, optional_arguments_passed_to_handler])`
         // Converts the system call name to the handler
         macro_rules! dispatch1 {
@@ -604,11 +618,11 @@ impl<M: ManagerBase> SupervisorState<M> {
 
         let result = match system_call_no {
             GETCWD => dispatch2!(getcwd, core),
-            OPENAT => self.handle_openat(),
+            OPENAT => dispatch0!(openat),
             WRITE => dispatch3!(write, core, hooks),
             WRITEV => dispatch3!(writev, core, hooks),
             PPOLL => dispatch2!(ppoll, core),
-            READLINKAT => self.handle_readlinkat(),
+            READLINKAT => dispatch0!(readlinkat),
             EXIT | EXITGROUP => self.handle_exit(core),
             SET_TID_ADDRESS => dispatch1!(set_tid_address, core),
             TKILL => self.handle_tkill(core),
@@ -619,7 +633,7 @@ impl<M: ManagerBase> SupervisorState<M> {
             MMAP => dispatch4!(mmap, core),
             MPROTECT => dispatch3!(mprotect, core),
             MUNMAP => dispatch2!(munmap, core),
-            MADVISE => self.handle_madvise(core),
+            MADVISE => dispatch0!(madvise),
             GETRANDOM => dispatch2!(getrandom, core),
             SBI_FIRMWARE_TEZOS => return on_tezos(core),
             _ => Err(Error::NoSystemCall),
