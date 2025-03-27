@@ -130,7 +130,9 @@ let default_storage_dir data_dir = Filename.concat data_dir storage_dir
 
 let default_context_dir data_dir = Filename.concat data_dir context_dir
 
-let config_filename ~data_dir = Filename.concat data_dir "config.json"
+let config_filename ~data_dir = function
+  | Some path -> path
+  | None -> Filename.concat data_dir "config.json"
 
 let default_rpc_addr = "127.0.0.1"
 
@@ -807,23 +809,22 @@ let override_acl ~rpc_addr ~rpc_port acl = function
       in
       Tezos_rpc_http_server.RPC_server.Acl.put_policy (addr, new_acl) acl
 
-let save ~force ~data_dir config =
+let save ~force ~config_file config =
   loser_warning_message config ;
   let open Lwt_result_syntax in
   let json = Data_encoding.Json.construct encoding config in
-  let config_file = config_filename ~data_dir in
   let*! exists = Lwt_unix.file_exists config_file in
   if exists && not force then
     failwith
       "Configuration file %S already exists. Use --force to overwrite."
       config_file
   else
-    let*! () = Lwt_utils_unix.create_dir data_dir in
+    let*! () = Lwt_utils_unix.create_dir (Filename.dirname config_file) in
     Lwt_utils_unix.Json.write_file config_file json
 
-let load ~data_dir =
+let load ~config_file =
   let open Lwt_result_syntax in
-  let+ json = Lwt_utils_unix.Json.read_file (config_filename ~data_dir) in
+  let+ json = Lwt_utils_unix.Json.read_file config_file in
   let config = Data_encoding.Json.destruct encoding json in
   loser_warning_message config ;
   config
@@ -1020,7 +1021,7 @@ module Cli = struct
         bail_on_disagree = bail_on_disagree || configuration.bail_on_disagree;
       }
 
-  let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~acl_override
+  let create_or_read_config ~config_file ~rpc_addr ~rpc_port ~acl_override
       ~metrics_addr ~disable_performance_metrics ~loser_mode ~reconnection_delay
       ~dal_node_endpoint ~pre_images_endpoint ~injector_retention_period
       ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
@@ -1029,24 +1030,11 @@ module Cli = struct
       ~allowed_origins ~allowed_headers ~apply_unsafe_patches
       ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree =
     let open Lwt_result_syntax in
-    let open Filename.Infix in
-    (* Check if the data directory of the smart rollup node is not the one of Octez node *)
-    let* () =
-      let*! identity_file_in_data_dir_exists =
-        Lwt_unix.file_exists (data_dir // "identity.json")
-      in
-      if identity_file_in_data_dir_exists then
-        failwith
-          "Invalid data directory. This is a data directory for an Octez node, \
-           please choose a different directory for the smart rollup node data."
-      else return_unit
-    in
-    let config_file = config_filename ~data_dir in
     let*! exists_config = Lwt_unix.file_exists config_file in
     if exists_config then
       (* Read configuration from file and patch if user wanted to override
          some fields with values provided by arguments. *)
-      let* configuration = load ~data_dir in
+      let* configuration = load ~config_file in
       let* configuration =
         patch_configuration_from_args
           configuration

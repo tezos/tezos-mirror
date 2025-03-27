@@ -208,51 +208,44 @@ module For_snapshots = struct
         ~needed_purposes:(Configuration.purposes_of_mode mode)
         []
     in
-    let* config =
-      let config_file = Configuration.config_filename ~data_dir in
-      let*! exists_config = Lwt_unix.file_exists config_file in
-      if exists_config then
-        let* config = Configuration.load ~data_dir in
-        return {config with apply_unsafe_patches}
-      else
-        return
-        @@ Configuration.
-             {
-               sc_rollup_address = metadata.rollup_address;
-               boot_sector_file = None;
-               operators;
-               rpc_addr = Configuration.default_rpc_addr;
-               rpc_port = Configuration.default_rpc_port;
-               acl = Configuration.default_acl;
-               metrics_addr = None;
-               performance_metrics = false;
-               reconnection_delay = 1.;
-               fee_parameters = Configuration.default_fee_parameters;
-               mode;
-               loser_mode;
-               apply_unsafe_patches;
-               unsafe_pvm_patches = [];
-               unsafe_disable_wasm_kernel_checks = false;
-               execute_outbox_messages_filter =
-                 Configuration.default_execute_outbox_filter;
-               dal_node_endpoint = None;
-               batcher = Configuration.default_batcher;
-               injector = Configuration.default_injector;
-               l1_blocks_cache_size;
-               l2_blocks_cache_size;
-               index_buffer_size = Some index_buffer_size;
-               irmin_cache_size = Some irmin_cache_size;
-               prefetch_blocks = None;
-               log_kernel_debug = false;
-               no_degraded = false;
-               gc_parameters = Configuration.default_gc_parameters;
-               history_mode = None;
-               cors = Resto_cohttp.Cors.default;
-               l1_rpc_timeout;
-               loop_retry_delay = 10.;
-               pre_images_endpoint = None;
-               bail_on_disagree = false;
-             }
+    let config =
+      Configuration.
+        {
+          sc_rollup_address = metadata.rollup_address;
+          boot_sector_file = None;
+          operators;
+          rpc_addr = Configuration.default_rpc_addr;
+          rpc_port = Configuration.default_rpc_port;
+          acl = Configuration.default_acl;
+          metrics_addr = None;
+          performance_metrics = false;
+          reconnection_delay = 1.;
+          fee_parameters = Configuration.default_fee_parameters;
+          mode;
+          loser_mode;
+          apply_unsafe_patches;
+          unsafe_pvm_patches = [];
+          unsafe_disable_wasm_kernel_checks = false;
+          execute_outbox_messages_filter =
+            Configuration.default_execute_outbox_filter;
+          dal_node_endpoint = None;
+          batcher = Configuration.default_batcher;
+          injector = Configuration.default_injector;
+          l1_blocks_cache_size;
+          l2_blocks_cache_size;
+          index_buffer_size = Some index_buffer_size;
+          irmin_cache_size = Some irmin_cache_size;
+          prefetch_blocks = None;
+          log_kernel_debug = false;
+          no_degraded = false;
+          gc_parameters = Configuration.default_gc_parameters;
+          history_mode = None;
+          cors = Resto_cohttp.Cors.default;
+          l1_rpc_timeout;
+          loop_retry_delay = 10.;
+          pre_images_endpoint = None;
+          bail_on_disagree = false;
+        }
     in
     let*? l1_ctxt =
       Layer1.create

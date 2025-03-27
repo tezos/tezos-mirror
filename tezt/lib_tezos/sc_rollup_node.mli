@@ -62,6 +62,7 @@ type history_mode = Archive | Full
 (** Octez smart rollup node command-line arguments. *)
 type argument =
   | Data_dir of string
+  | Config_file of string
   | Rpc_addr of string
   | Rpc_port of int
   | Log_kernel_debug
@@ -100,6 +101,9 @@ val string_of_history_mode : history_mode -> string
     Default [data_dir] is a temporary directory
     which is always the same for each [name].
 
+    [config_file] can be used to specify the configuration file instead of the
+    default location in the data dir.
+
     [dal_node] is a node node from the data availability layer the rollup should
     be connected to.
 
@@ -129,6 +133,7 @@ val create :
   ?name:string ->
   ?color:Log.Color.t ->
   ?data_dir:string ->
+  ?config_file:string ->
   base_dir:string ->
   ?remote_signer:Uri.t ->
   ?event_pipe:string ->
@@ -155,6 +160,7 @@ val create_with_endpoint :
   ?name:string ->
   ?color:Log.Color.t ->
   ?data_dir:string ->
+  ?config_file:string ->
   base_dir:string ->
   ?remote_signer:Uri.t ->
   ?event_pipe:string ->

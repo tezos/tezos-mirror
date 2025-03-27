@@ -43,9 +43,10 @@ let config_init_command =
     ~group
     ~desc:"Configure the smart rollup node."
     (merge_options
-       (args22
+       (args23
           force_switch
           data_dir_arg
+          config_file_arg
           rpc_addr_arg
           rpc_port_arg
           acl_override_arg
@@ -78,6 +79,7 @@ let config_init_command =
     @@ seq_of_param @@ operator_param)
     (fun ( ( force,
              data_dir,
+             config_file,
              rpc_addr,
              rpc_port,
              acl_override,
@@ -143,11 +145,12 @@ let config_init_command =
           ~apply_unsafe_patches:false
           ~bail_on_disagree
       in
-      let* () = Configuration.save ~force ~data_dir config in
+      let config_file = Configuration.config_filename ~data_dir config_file in
+      let* () = Configuration.save ~force ~config_file config in
       let*! () =
         cctxt#message
           "Smart rollup node configuration written in %s"
-          (Configuration.config_filename ~data_dir)
+          config_file
       in
       return_unit)
 
@@ -159,8 +162,9 @@ let legacy_run_command =
     ~group
     ~desc:"Run the rollup node daemon (deprecated)."
     (merge_options
-       (args9
+       (args10
           data_dir_arg
+          config_file_arg
           mode_arg
           sc_rollup_address_arg
           rpc_addr_arg
@@ -192,6 +196,7 @@ let legacy_run_command =
           unsafe_disable_wasm_kernel_checks_switch))
     (prefixes ["run"] @@ stop)
     (fun ( ( data_dir,
+             config_file,
              mode,
              sc_rollup_address,
              rpc_addr,
@@ -228,9 +233,10 @@ let legacy_run_command =
           "Cannot use both --enable-performance-metrics and \
            --disable-performance-metrics"
       in
+      let config_file = Configuration.config_filename ~data_dir config_file in
       let* configuration =
         Configuration.Cli.create_or_read_config
-          ~data_dir
+          ~config_file
           ~rpc_addr
           ~rpc_port
           ~acl_override
@@ -276,8 +282,9 @@ let run_command =
       "Run the rollup node daemon. Arguments overwrite values provided in the \
        configuration file."
     (merge_options
-       (args11
+       (args12
           data_dir_arg
+          config_file_arg
           rpc_addr_arg
           rpc_port_arg
           acl_override_arg
@@ -310,6 +317,7 @@ let run_command =
     @@ prefixes ["with"; "operators"]
     @@ seq_of_param @@ operator_param)
     (fun ( ( data_dir,
+             config_file,
              rpc_addr,
              rpc_port,
              acl_override,
@@ -347,9 +355,10 @@ let run_command =
           "Cannot use both --enable-performance-metrics and \
            --disable-performance-metrics"
       in
+      let config_file = Configuration.config_filename ~data_dir config_file in
       let* configuration =
         Configuration.Cli.create_or_read_config
-          ~data_dir
+          ~config_file
           ~rpc_addr
           ~rpc_port
           ~acl_override

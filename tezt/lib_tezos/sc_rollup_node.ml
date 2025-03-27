@@ -94,6 +94,7 @@ let string_of_history_mode = function Archive -> "archive" | Full -> "full"
 
 type argument =
   | Data_dir of string
+  | Config_file of string
   | Rpc_addr of string
   | Rpc_port of int
   | Log_kernel_debug
@@ -115,6 +116,7 @@ type argument =
 
 let make_argument = function
   | Data_dir dir -> ["--data-dir"; dir]
+  | Config_file f -> ["--config-file"; f]
   | Rpc_addr host -> ["--rpc-addr"; host]
   | Rpc_port port -> ["--rpc-port"; string_of_int port]
   | Log_kernel_debug -> ["--log-kernel-debug"]
@@ -137,6 +139,7 @@ let make_argument = function
 
 let is_redundant = function
   | Data_dir _, Data_dir _
+  | Config_file _, Config_file _
   | Rpc_addr _, Rpc_addr _
   | Rpc_port _, Rpc_port _
   | Log_kernel_debug, Log_kernel_debug
@@ -158,6 +161,7 @@ let is_redundant = function
   | Metrics_addr addr1, Metrics_addr addr2 -> addr1 = addr2
   | Metrics_addr _, _
   | Data_dir _, _
+  | Config_file _, _
   | Rpc_addr _, _
   | Rpc_port _, _
   | Log_kernel_debug, _
@@ -198,6 +202,7 @@ let optional_arg const = function None -> [] | Some x -> [const x]
 module Parameters = struct
   type persistent_state = {
     data_dir : string;
+    config_file : string option;
     base_dir : string;
     remote_signer : Uri.t option;
     mutable operators : (purpose * string) list;
@@ -366,6 +371,9 @@ let runlike_argument rollup_node =
     History_mode rollup_node_state.history_mode;
     Gc_frequency rollup_node_state.gc_frequency;
   ]
+  @ optional_arg
+      (fun s -> Config_file s)
+      rollup_node.persistent_state.config_file
   @ optional_arg (fun s -> Loser_mode s) rollup_node_state.loser_mode
   @ optional_switch No_degraded (not rollup_node_state.allow_degraded)
   @ optional_arg (fun n -> Dal_node n) rollup_node_state.dal_node
@@ -396,7 +404,10 @@ let config_init ?force sc_node rollup_address =
   | Some filename -> return filename
 
 module Config_file = struct
-  let filename sc_node = sf "%s/config.json" @@ data_dir sc_node
+  let filename sc_node =
+    match sc_node.persistent_state.config_file with
+    | Some f -> f
+    | None -> sf "%s/config.json" @@ data_dir sc_node
 
   let read sc_node = JSON.parse_file (filename sc_node)
 
@@ -563,8 +574,8 @@ let handle_event sc_node {name; value; timestamp = _} =
       update_level sc_node level
   | _ -> ()
 
-let create_with_endpoint ?runner ?path ?name ?color ?data_dir ~base_dir
-    ?remote_signer ?event_pipe ?metrics_addr ?metrics_port
+let create_with_endpoint ?runner ?path ?name ?color ?data_dir ?config_file
+    ~base_dir ?remote_signer ?event_pipe ?metrics_addr ?metrics_port
     ?(rpc_host = Constant.default_host) ?rpc_port ?(operators = [])
     ?default_operator ?(dal_node : Dal_node.t option) ?loser_mode
     ?(allow_degraded = false) ?(gc_frequency = 1) ?(history_mode = Full)
@@ -591,6 +602,7 @@ let create_with_endpoint ?runner ?path ?name ?color ?data_dir ~base_dir
       ?event_pipe
       {
         data_dir;
+        config_file;
         base_dir;
         remote_signer;
         metrics_addr;
@@ -615,16 +627,17 @@ let create_with_endpoint ?runner ?path ?name ?color ?data_dir ~base_dir
   on_event sc_node (handle_event sc_node) ;
   sc_node
 
-let create ?runner ?path ?name ?color ?data_dir ~base_dir ?remote_signer
-    ?event_pipe ?metrics_addr ?metrics_port ?rpc_host ?rpc_port ?operators
-    ?default_operator ?dal_node ?loser_mode ?allow_degraded ?gc_frequency
-    ?history_mode ?password_file mode (node : Node.t) =
+let create ?runner ?path ?name ?color ?data_dir ?config_file ~base_dir
+    ?remote_signer ?event_pipe ?metrics_addr ?metrics_port ?rpc_host ?rpc_port
+    ?operators ?default_operator ?dal_node ?loser_mode ?allow_degraded
+    ?gc_frequency ?history_mode ?password_file mode (node : Node.t) =
   create_with_endpoint
     ?runner
     ?path
     ?name
     ?color
     ?data_dir
+    ?config_file
     ~base_dir
     ?remote_signer
     ?event_pipe

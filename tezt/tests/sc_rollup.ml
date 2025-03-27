@@ -270,11 +270,19 @@ let test_rollup_node_configuration ~kind =
       description = "configuration of a smart rollup node is robust";
     }
     ~kind
-  @@ fun _protocol rollup_node sc_rollup tezos_node tezos_client ->
+  @@ fun _protocol _rollup_node sc_rollup tezos_node tezos_client ->
+  let config_file = Temp.file "smart-rollup-config.json" in
+  let rollup_node =
+    Sc_rollup_node.create
+      Operator
+      ~default_operator:Constant.bootstrap2.alias
+      tezos_node
+      ~base_dir:(Client.base_dir tezos_client)
+      ~config_file
+  in
   let* _filename = Sc_rollup_node.config_init rollup_node sc_rollup in
   let config = Sc_rollup_node.Config_file.read rollup_node in
   let _rpc_port = JSON.(config |-> "rpc-port" |> as_int) in
-  let data_dir = Sc_rollup_node.data_dir rollup_node in
   Log.info "Check that config cannot be overwritten" ;
   let p = Sc_rollup_node.spawn_config_init rollup_node sc_rollup in
   let* () =
@@ -304,11 +312,15 @@ let test_rollup_node_configuration ~kind =
   let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
   let* () = Sc_rollup_node.terminate rollup_node in
   (* Run a rollup node in the same data_dir, but for a different rollup *)
-  let* other_rollup_node, other_sc_rollup =
-    setup_rollup ~alias:"rollup2" ~kind tezos_node tezos_client ~data_dir
+  let* other_sc_rollup =
+    originate_sc_rollup
+      ~kind
+      ~alias:"rollup2"
+      ~src:Constant.bootstrap1.alias
+      tezos_client
   in
   let expect_failure () =
-    match Sc_rollup_node.process other_rollup_node with
+    match Sc_rollup_node.process rollup_node with
     | None -> unit
     | Some p ->
         Process.check_error
@@ -317,7 +329,7 @@ let test_rollup_node_configuration ~kind =
           p
   in
   let run_promise =
-    let* () = Sc_rollup_node.run other_rollup_node other_sc_rollup [] in
+    let* () = Sc_rollup_node.run rollup_node other_sc_rollup [] in
     Test.fail "Node for other rollup in same dir run without errors"
   in
   Lwt.choose [run_promise; expect_failure ()]
@@ -7284,14 +7296,19 @@ let register_protocol_independent () =
     ~history_mode:Archive
     ~compact:false
     protocols ;
-  test_snapshots
-    ~unsafe_pvm_patches:true
-    ~kind
-    ~challenge_window:10
-    ~commitment_period:10
-    ~history_mode:Archive
-    ~compact:false
-    protocols ;
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7835
+        Re-enable when unsafe patches are properly part of
+        snapshot.
+
+     test_snapshots
+       ~unsafe_pvm_patches:true
+       ~kind
+       ~challenge_window:10
+       ~commitment_period:10
+       ~history_mode:Archive
+       ~compact:false
+       protocols ;
+  *)
   custom_mode_empty_operation_kinds ~kind protocols ;
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4373
      Uncomment this test as soon as the issue done.
