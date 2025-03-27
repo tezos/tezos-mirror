@@ -1085,6 +1085,22 @@ let list_known_addresses client =
   in
   return addresses
 
+let spawn_list_known_remote_keys client uri =
+  spawn_command client ["list"; "known"; "remote"; "keys"; Uri.to_string uri]
+
+let list_known_remote_keys client uri =
+  let* client_output =
+    spawn_list_known_remote_keys client uri |> Process.check_and_read_stdout
+  in
+  let addresses =
+    client_output |> String.trim |> String.split_on_char '\n'
+    |> List.filter_map @@ fun line ->
+       match line =~** rex "(.*):(.*)" with
+       | Some _ -> None
+       | None -> Some (String.trim line)
+  in
+  return addresses
+
 let gen_and_show_keys ?alias ?sig_alg client =
   let* alias = gen_keys ?alias ?sig_alg client in
   show_address ~alias client
