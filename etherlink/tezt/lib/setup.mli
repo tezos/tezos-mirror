@@ -118,6 +118,7 @@ val register_test :
   ?enable_tx_queue:bool ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
+  ?l2_setups:Evm_node.l2_setup list ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
   title:string ->
   tags:string list ->
@@ -159,7 +160,7 @@ val register_multichain_test :
   enable_dal:bool ->
   ?dal_slots:int list option ->
   enable_multichain:bool ->
-  number_of_chains:int ->
+  l2_setups:Evm_node.l2_setup list option ->
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?history_mode:Evm_node.history_mode ->
@@ -215,6 +216,7 @@ val register_test_for_kernels :
   ?enable_tx_queue:bool ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
+  ?l2_setups:Evm_node.l2_setup list ->
   title:string ->
   tags:string list ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->

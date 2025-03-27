@@ -713,7 +713,7 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?(threshold_encryption = false) ?(uses = uses) ?(additional_uses = [])
     ?rollup_history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None)
-    ~enable_multichain ~number_of_chains ?rpc_server ?websockets ?history_mode
+    ~enable_multichain ~l2_setups ?rpc_server ?websockets ?history_mode
     ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path body ~title ~tags
     protocols =
   let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
@@ -731,15 +731,19 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     | _, Latest -> Some Evm_node.Dream (* test with Dream for latest kernel *)
   in
   let l2_chains =
-    List.init number_of_chains (fun l2_chain_id ->
-        {
-          (default_l2_setup ~l2_chain_id) with
-          sequencer_pool_address;
-          da_fee_per_byte = da_fee;
-          minimum_base_fee_per_gas;
-          maximum_gas_per_transaction;
-          bootstrap_accounts = Some bootstrap_accounts;
-        })
+    match l2_setups with
+    | None ->
+        [
+          {
+            (Evm_node.default_l2_setup ~l2_chain_id:0) with
+            da_fee_per_byte = da_fee;
+            sequencer_pool_address;
+            minimum_base_fee_per_gas;
+            maximum_gas_per_transaction;
+            bootstrap_accounts = Some bootstrap_accounts;
+          };
+        ]
+    | Some l2_chains -> l2_chains
   in
   let body protocol =
     let* sequencer_setup =
@@ -824,8 +828,8 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?enable_fast_withdrawal ?commitment_period ?challenge_window
     ?threshold_encryption ?uses ?additional_uses ?rollup_history_mode
     ~enable_dal ?dal_slots ~enable_multichain ?rpc_server ?websockets
-    ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path body
-    ~title ~tags protocols =
+    ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?l2_setups
+    body ~title ~tags protocols =
   let body sequencer_setup =
     body (multichain_setup_to_single ~setup:sequencer_setup)
   in
@@ -864,13 +868,13 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ~enable_dal
     ?dal_slots
     ~enable_multichain
-    ~number_of_chains:1
     ?rpc_server
     ?websockets
     ?history_mode
     ?enable_tx_queue
     ?spawn_rpc
     ?periodic_snapshot_path
+    ~l2_setups
     body
     ~title
     ~tags
@@ -888,8 +892,8 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
     ?additional_uses ~threshold_encryption ~enable_dal ?dal_slots
     ~enable_multichain ?rpc_server ?websockets ?enable_fast_withdrawal
-    ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ~title
-    ~tags body protocols =
+    ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?l2_setups
+    ~title ~tags body protocols =
   List.iter
     (fun kernel ->
       register_test
@@ -932,6 +936,7 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?enable_tx_queue
         ?spawn_rpc
         ?periodic_snapshot_path
+        ?l2_setups
         ~title
         ~tags
         body

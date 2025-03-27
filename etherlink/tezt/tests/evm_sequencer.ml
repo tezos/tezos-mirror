@@ -253,7 +253,7 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
     ?(use_threshold_encryption = default_threshold_encryption_registration)
     ?(use_dal = default_dal_registration)
     ?(use_multichain = default_multichain_registration) ?enable_tx_queue
-    ?spawn_rpc ?periodic_snapshot_path ~title ~tags body protocols =
+    ?spawn_rpc ?periodic_snapshot_path ?l2_setups ~title ~tags body protocols =
   let dal_cases =
     match use_dal with
     | Register_both {extra_tags_with; extra_tags_without} ->
@@ -329,6 +329,7 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
                 ?enable_tx_queue
                 ?spawn_rpc
                 ?periodic_snapshot_path
+                ?l2_setups
                 ~title
                 ~tags:(te_tags @ dal_tags @ multichain_tags @ tags)
                 body
@@ -347,9 +348,10 @@ let register_multichain_all ?max_delayed_inbox_blueprint_length
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?rollup_history_mode
     ?commitment_period ?challenge_window ?additional_uses ?rpc_server
-    ?websockets ?enable_fast_withdrawal ?history_mode ~number_of_chains
+    ?websockets ?enable_fast_withdrawal ?history_mode
     ?(use_threshold_encryption = default_threshold_encryption_registration)
-    ?(use_dal = default_dal_registration) ~title ~tags body protocols =
+    ?(use_dal = default_dal_registration) ~l2_setups ~title ~tags body protocols
+    =
   let dal_cases =
     match use_dal with
     | Register_both {extra_tags_with; extra_tags_without} ->
@@ -405,10 +407,10 @@ let register_multichain_all ?max_delayed_inbox_blueprint_length
             ?rollup_history_mode
             ~enable_dal
             ~enable_multichain:true
+            ~l2_setups
             ~title
             ~tags:(te_tags @ dal_tags @ tags)
             ~kernel:Kernel.Latest
-            ~number_of_chains
             body
             protocols)
         dal_cases)
@@ -12654,7 +12656,14 @@ let () =
   test_multichain_feature_flag protocols ;
   test_make_l2_kernel_installer_config "EVM" protocols ;
   test_make_l2_kernel_installer_config "Michelson" protocols ;
-  test_multichain_produceBlock ~number_of_chains:2 protocols ;
+  test_multichain_produceBlock
+    ~l2_setups:
+      (Some
+         [
+           Evm_node.default_l2_setup ~l2_chain_id:0;
+           Evm_node.default_l2_setup ~l2_chain_id:1;
+         ])
+    protocols ;
   test_fast_withdrawal_feature_flag protocols ;
   test_deposit_and_fast_withdraw protocols ;
   test_fast_withdraw_feature_flag_deactivated protocols ;
