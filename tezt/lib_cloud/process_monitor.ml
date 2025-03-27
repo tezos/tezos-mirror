@@ -38,7 +38,7 @@ let reload t run_cmd =
     (* Check if in path only the first time *)
     if not t.checked_in_path then
       let* r =
-        run_cmd ~detach:false "sh" ["-c command -v " ^ executable]
+        run_cmd ~detach:false "sh" ["-c"; "command -v " ^ executable]
         |> Process.wait
       in
       let () =
