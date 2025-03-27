@@ -1278,16 +1278,31 @@ let test_snapshots_import_empty =
     ~title:"Import sequencer snapshot in empty data dir"
     ~time_between_blocks:Nothing
     ~history_mode:(Rolling 1)
-  @@ fun ({sequencer; sc_rollup_node; _} as setup) _protocol ->
+  @@ fun ({sequencer; sc_rollup_node; l2_chains; enable_multichain; _} as setup)
+             _protocol ->
   let* _snapshot_file_before, snapshot_file, block_number =
     snapshots_setup setup
   in
   Log.info "Create new sequencer from snapshot." ;
+  (* patch sequencer config if multichain *)
+  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let new_sequencer =
     let mode = Evm_node.mode sequencer |> Evm_node.mode_with_new_private_rpc in
-    Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.create ~mode ?spawn_rpc (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature
+            ~l2_chains
+            ?spawn_rpc
+            ()
+        in
+        Evm_node.Config_file.update new_sequencer patch_config
+    | false -> unit
+  in
   let*! () = Evm_node.import_snapshot new_sequencer ~snapshot_file in
   Log.info "Start new sequencer." ;
   let* () = Evm_node.run new_sequencer in
@@ -2643,6 +2658,8 @@ let test_delayed_deposit_from_init_rollup_node =
            sc_rollup_node;
            sequencer;
            proxy;
+           l2_chains;
+           enable_multichain;
            _;
          }
              _protocol ->
@@ -2673,11 +2690,24 @@ let test_delayed_deposit_from_init_rollup_node =
 
   (* Run a new sequencer that is initialized from a rollup node that has the
      delayed deposit in its state. *)
+  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let new_sequencer =
     let mode = Evm_node.mode sequencer |> Evm_node.mode_with_new_private_rpc in
-    Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.create ?spawn_rpc ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature
+            ~l2_chains
+            ?spawn_rpc
+            ()
+        in
+        Evm_node.Config_file.update new_sequencer patch_config
+    | false -> unit
+  in
   let* () =
     Evm_node.init_from_rollup_node_data_dir new_sequencer sc_rollup_node
   in
@@ -2720,7 +2750,17 @@ let test_init_from_rollup_node_data_dir =
          fixed. Enable DAL once it is done. *)
     ~use_dal:Register_without_feature
     ~rollup_history_mode:Archive
-  @@ fun {sc_rollup_node; sequencer; observer; proxy; client; _} _protocol ->
+  @@ fun {
+           sc_rollup_node;
+           sequencer;
+           observer;
+           proxy;
+           client;
+           l2_chains;
+           enable_multichain;
+           _;
+         }
+             _protocol ->
   (* a sequencer is needed to produce an initial block *)
   let* () =
     repeat 5 (fun () ->
@@ -2730,12 +2770,26 @@ let test_init_from_rollup_node_data_dir =
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
   let* () = Evm_node.terminate sequencer
   and* () = Evm_node.terminate observer in
+  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let evm_node' =
     Evm_node.create
+      ?spawn_rpc
       ~mode:(Evm_node.mode sequencer)
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config evm_node' in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature
+            ~l2_chains
+            ?spawn_rpc
+            ()
+        in
+        Evm_node.Config_file.update evm_node' patch_config
+    | false -> unit
+  in
   let* () =
     (* bake 2 blocks so rollup context is for the finalized l1 level
        and can't be reorged. *)
@@ -2773,6 +2827,8 @@ let test_init_from_rollup_node_with_delayed_inbox =
            client;
            l1_contracts;
            sc_rollup_address;
+           l2_chains;
+           enable_multichain;
            _;
          }
              _protocol ->
@@ -2797,12 +2853,26 @@ let test_init_from_rollup_node_with_delayed_inbox =
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
 
   (* Start a new sequencer, the previous sequencer is doomed. *)
+  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let sequencer =
     Evm_node.create
+      ?spawn_rpc
       ~mode:(Evm_node.mode sequencer)
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config sequencer in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature
+            ~l2_chains
+            ?spawn_rpc
+            ()
+        in
+        Evm_node.Config_file.update sequencer patch_config
+    | false -> unit
+  in
   let* () = Evm_node.init_from_rollup_node_data_dir sequencer sc_rollup_node in
   let* () = Evm_node.run sequencer in
   (* The sequencer should have items in its delayed inbox. *)
@@ -2814,6 +2884,15 @@ let test_init_from_rollup_node_with_delayed_inbox =
     Evm_node.create ~mode:(Evm_node.mode observer) (Evm_node.endpoint sequencer)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config observer in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature ~l2_chains ()
+        in
+        Evm_node.Config_file.update observer patch_config
+    | false -> unit
+  in
   let* () =
     Evm_node.init_from_rollup_node_data_dir
       ~omit_delayed_tx_events:true
@@ -3021,7 +3100,16 @@ let test_get_balance_block_param =
     ~tags:["evm"; "sequencer"; "rpc"; "get_balance"; "block_param"]
     ~title:"RPC method getBalance uses block parameter"
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; sc_rollup_node; proxy; client; _} _protocol ->
+  @@ fun {
+           sequencer;
+           sc_rollup_node;
+           proxy;
+           client;
+           enable_multichain;
+           l2_chains;
+           _;
+         }
+             _protocol ->
   (* Transfer funds to a random address. *)
   let address = "0xB7A97043983f24991398E5a82f63F4C58a417185" in
   let* _tx_hash =
@@ -3070,6 +3158,15 @@ let test_get_balance_block_param =
     Process.check @@ Evm_node.spawn_init_config observer_partial_history
   in
   let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature ~l2_chains ()
+        in
+        Evm_node.Config_file.update observer_partial_history patch_config
+    | false -> unit
+  in
+  let* () =
     Evm_node.init_from_rollup_node_data_dir
       observer_partial_history
       sc_rollup_node
@@ -3112,7 +3209,17 @@ let test_get_block_by_number_block_param =
     ~tags:["evm"; "sequencer"; "rpc"; "get_block_by_number"; "block_param"]
     ~title:"RPC method getBlockByNumber uses block parameter"
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; observer; sc_rollup_node; proxy; client; _} _protocols ->
+  @@ fun {
+           sequencer;
+           observer;
+           sc_rollup_node;
+           proxy;
+           client;
+           enable_multichain;
+           l2_chains;
+           _;
+         }
+             _protocols ->
   let observer_offset = 3l in
   let* () =
     repeat Int32.(to_int observer_offset) @@ fun () ->
@@ -3141,6 +3248,15 @@ let test_get_block_by_number_block_param =
   in
   let* () =
     Process.check @@ Evm_node.spawn_init_config observer_partial_history
+  in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature ~l2_chains ()
+        in
+        Evm_node.Config_file.update observer_partial_history patch_config
+    | false -> unit
   in
   let* () =
     Evm_node.init_from_rollup_node_data_dir
@@ -5590,13 +5706,23 @@ let test_force_kernel_upgrade_too_early =
                client;
                sequencer;
                proxy;
+               l2_chains;
+               enable_multichain;
                _;
              }
              _protocol ->
   (* Wait for the sequencer to publish its genesis block. *)
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let patch_config =
+    Evm_node.patch_config_with_experimental_feature
+      ?l2_chains:(if enable_multichain then Some l2_chains else None)
+      ()
+  in
   let* proxy =
-    Evm_node.init ~mode:Proxy (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.init
+      ~patch_config
+      ~mode:Proxy
+      (Sc_rollup_node.endpoint sc_rollup_node)
   in
 
   (* Assert the kernel version is the same at start up. *)
@@ -5651,13 +5777,23 @@ let test_force_kernel_upgrade =
            client;
            sequencer;
            proxy;
+           l2_chains;
+           enable_multichain;
            _;
          }
              _protocol ->
   (* Wait for the sequencer to publish its genesis block. *)
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let patch_config =
+    Evm_node.patch_config_with_experimental_feature
+      ?l2_chains:(if enable_multichain then Some l2_chains else None)
+      ()
+  in
   let* proxy =
-    Evm_node.init ~mode:Proxy (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.init
+      ~patch_config
+      ~mode:Proxy
+      (Sc_rollup_node.endpoint sc_rollup_node)
   in
 
   (* Assert the kernel version is the same at start up. *)
@@ -6200,7 +6336,17 @@ let test_sequencer_diverge =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "diverge"]
     ~title:"Runs two sequencers, one diverge and stop"
-  @@ fun {sc_rollup_node; client; sequencer; observer; proxy; enable_dal; _}
+  @@ fun {
+           sc_rollup_node;
+           client;
+           sequencer;
+           observer;
+           proxy;
+           enable_dal;
+           enable_multichain;
+           l2_chains;
+           _;
+         }
              _protocol ->
   let* () =
     repeat 4 (fun () ->
@@ -6219,6 +6365,7 @@ let test_sequencer_diverge =
   (* We duplicate the sequencer by creating a snapshot and importing it *)
   let* _ = Evm_node.terminate sequencer in
   let* snapshot_file = Runnable.run @@ Evm_node.export_snapshot sequencer in
+  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let* sequencer_bis =
     let* mode =
       match Evm_node.mode sequencer with
@@ -6239,9 +6386,22 @@ let test_sequencer_diverge =
                }
       | _ -> Test.fail "impossible case, it's a sequencer"
     in
-    return @@ Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+    return
+    @@ Evm_node.create ?spawn_rpc ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config sequencer_bis in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature
+            ~l2_chains
+            ?spawn_rpc
+            ()
+        in
+        Evm_node.Config_file.update sequencer_bis patch_config
+    | false -> unit
+  in
   let* () =
     Runnable.run @@ Evm_node.import_snapshot sequencer_bis ~snapshot_file
   in
@@ -6944,6 +7104,8 @@ let test_preimages_endpoint =
            sequencer;
            observer;
            proxy;
+           l2_chains;
+           enable_multichain;
            _;
          }
              _protocol ->
@@ -6959,12 +7121,26 @@ let test_preimages_endpoint =
         Evm_node.Threshold_encryption_sequencer {mode with preimage_dir = None}
     | _ -> assert false
   in
+  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let new_sequencer =
     Evm_node.create
       ~mode:sequencer_mode_without_preimages_dir
+      ?spawn_rpc
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature
+            ~l2_chains
+            ?spawn_rpc
+            ()
+        in
+        Evm_node.Config_file.update new_sequencer patch_config
+    | false -> unit
+  in
   (* Prepares the observer without [preimages-dir], to force the use of
      preimages endpoint. *)
   let observer_mode_without_preimages_dir () =
@@ -6991,6 +7167,18 @@ let test_preimages_endpoint =
 
   let* () = Process.check @@ Evm_node.spawn_init_config new_observer in
   let* () = Process.check @@ Evm_node.spawn_init_config new_observer2 in
+
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature ~l2_chains ()
+        in
+        let* () = Evm_node.Config_file.update new_observer patch_config in
+        let* () = Evm_node.Config_file.update new_observer2 patch_config in
+        Lwt.return_unit
+    | false -> Lwt.return_unit
+  in
 
   let* () =
     repeat 2 (fun () ->
@@ -7085,6 +7273,8 @@ let test_preimages_endpoint_retry =
            client;
            sequencer;
            proxy;
+           l2_chains;
+           enable_multichain;
            _;
          }
              _protocol ->
@@ -7105,12 +7295,26 @@ let test_preimages_endpoint_retry =
         Evm_node.Threshold_encryption_sequencer {mode with preimage_dir = None}
     | _ -> assert false
   in
+  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let new_sequencer =
     Evm_node.create
       ~mode:sequencer_mode_without_preimages_dir
+      ?spawn_rpc
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature
+            ~l2_chains
+            ?spawn_rpc
+            ()
+        in
+        Evm_node.Config_file.update new_sequencer patch_config
+    | false -> unit
+  in
   let* () = finalizeL1 () in
   let* () =
     Evm_node.init_from_rollup_node_data_dir new_sequencer sc_rollup_node
@@ -11558,7 +11762,8 @@ let test_observer_init_from_snapshot =
   register_all
     ~tags:["observer"; "init"; "from"; "snapshot"]
     ~title:"Observer successfully inits from a rolling snapshot"
-  @@ fun {sequencer; sc_rollup_node; _} _protocol ->
+  @@ fun {sequencer; sc_rollup_node; l2_chains; enable_multichain; _} _protocol
+    ->
   (* Restart the sequencer in rolling:3 *)
   let* () = Evm_node.terminate sequencer in
   let*! () = Evm_node.switch_history_mode sequencer (Rolling 2) in
@@ -11591,6 +11796,15 @@ let test_observer_init_from_snapshot =
       (Evm_node.endpoint sequencer)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config observer in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature ~l2_chains ()
+        in
+        Evm_node.Config_file.update observer patch_config
+    | false -> unit
+  in
   let extra_arguments =
     ["--init-from-snapshot"; snapshot_file; "--history"; "rolling:5"]
   in
