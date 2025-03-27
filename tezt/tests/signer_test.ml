@@ -161,7 +161,30 @@ let signer_bls_test =
     ~error_msg:"Tz4 sender %s has decreased balance after transfer" ;
   unit
 
+let signer_known_remote_keys_test =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Known remote keys signer test"
+    ~tags:[team; "signer"; "remote"; "keys"]
+    ~uses:(fun _ -> [Constant.octez_signer])
+  @@ fun protocol ->
+  let* _node, client = Client.init_with_protocol `Client ~protocol () in
+  let keys = [Constant.tz4_account; Constant.bootstrap1; Constant.bootstrap2] in
+  let* signer = Signer.init ~keys () in
+  let* pkhs = Client.list_known_remote_keys client (Signer.uri signer) in
+  let expected =
+    keys
+    |> List.map (fun Account.{public_key_hash; _} -> public_key_hash)
+    |> List.sort String.compare
+  in
+  let found = List.sort String.compare pkhs in
+  if List.equal String.equal expected found then unit
+  else
+    let pp = Format.(pp_print_list pp_print_string) in
+    Test.fail "@[<v 2>expected:@,%a@]@,@[<v 2>found:@,%a@]" pp expected pp found
+
 let register ~protocols =
   signer_simple_test protocols ;
   signer_magic_bytes_test protocols ;
-  signer_bls_test protocols
+  signer_bls_test protocols ;
+  signer_known_remote_keys_test protocols
