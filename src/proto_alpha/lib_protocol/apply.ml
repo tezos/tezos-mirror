@@ -35,7 +35,8 @@ type error +=
   | Set_deposits_limit_on_unregistered_delegate of Signature.Public_key_hash.t
   | Set_deposits_limit_when_automated_staking_off
   | Error_while_taking_fees
-  | Update_consensus_key_on_unregistered_delegate of Signature.Public_key_hash.t
+  | Update_consensus_key_on_unregistered_delegate of
+      (Signature.Public_key_hash.t * Operation_repr.consensus_key_kind)
   | Empty_transaction of Contract.t
   | Non_empty_transaction_from of Destination.t
   | Internal_operation_replay of
@@ -115,14 +116,19 @@ let () =
     `Temporary
     ~id:"operation.update_consensus_key_on_unregistered_delegate"
     ~title:"Update consensus key on an unregistered delegate"
-    ~description:"Cannot update consensus key an unregistered delegate."
-    ~pp:(fun ppf c ->
+    ~description:"Cannot update consensus key for an unregistered delegate."
+    ~pp:(fun ppf (delegate, kind) ->
       Format.fprintf
         ppf
-        "Cannot update the consensus key on the unregistered delegate %a."
+        "Cannot update the %a key on the unregistered delegate %a."
+        Operation_repr.pp_consensus_key_kind
+        kind
         Signature.Public_key_hash.pp
-        c)
-    Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+        delegate)
+    Data_encoding.(
+      obj2
+        (req "delegate" Signature.Public_key_hash.encoding)
+        (req "kind" Operation_repr.consensus_key_kind_encoding))
     (function
       | Update_consensus_key_on_unregistered_delegate c -> Some c | _ -> None)
     (fun c -> Update_consensus_key_on_unregistered_delegate c) ;
@@ -1424,13 +1430,13 @@ let apply_manager_operation :
             }
         in
         (ctxt, result, [])
-    | Update_consensus_key {public_key; proof; kind = _} ->
+    | Update_consensus_key {public_key; proof; kind} ->
         (* TODO: handle companion *)
         let*! is_registered = Delegate.registered ctxt source in
         let*? () =
           error_unless
             is_registered
-            (Update_consensus_key_on_unregistered_delegate source)
+            (Update_consensus_key_on_unregistered_delegate (source, kind))
         in
         let* ctxt =
           match (public_key, proof) with
