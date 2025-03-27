@@ -686,6 +686,7 @@ module Handlers = struct
     let state = Worker.state self in
     match request with
     | Inject {next_nonce; payload; tx_object; callback} ->
+        protect @@ fun () ->
         let (Address (Hex addr)) = tx_object.from in
         let (Qty tx_nonce) = tx_object.nonce in
         let pending_callback (reason : pending_variant) =
@@ -783,13 +784,16 @@ module Handlers = struct
           return
             (Error "Transaction limit was reached. Transaction is rejected.")
     | Confirm {txn_hash} -> (
+        protect @@ fun () ->
         match Pending_transactions.pop state.pending txn_hash with
         | Some {pending_callback; _} ->
             Lwt.async (fun () -> pending_callback `Confirmed) ;
             return_unit
         | None -> return_unit)
-    | Find {txn_hash} -> return @@ Tx_object.find state.tx_object txn_hash
+    | Find {txn_hash} ->
+        protect @@ fun () -> return @@ Tx_object.find state.tx_object txn_hash
     | Tick {evm_node_endpoint} ->
+        protect @@ fun () ->
         let all_transactions = Queue.to_seq state.queue in
         let* transactions_to_inject, remaining_transactions =
           match state.config.max_transaction_batch_length with
@@ -832,19 +836,23 @@ module Handlers = struct
             Lwt.async (fun () -> pending_callback `Dropped))
           txns
     | Clear ->
+        protect @@ fun () ->
         clear state ;
         let*! () = Tx_queue_events.cleared () in
         return_unit
     | Nonce {next_nonce; address = Address (Hex addr)} ->
+        protect @@ fun () ->
         let Ethereum_types.(Qty next_nonce) = next_nonce in
         let*? next_gap =
           Address_nonce.next_gap state.address_nonce ~addr ~next_nonce
         in
         return @@ Ethereum_types.Qty next_gap
-    | Lock_transactions -> return (lock_transactions state)
-    | Unlock_transactions -> return (unlock_transactions state)
-    | Is_locked -> return (is_locked state)
+    | Lock_transactions -> protect @@ fun () -> return (lock_transactions state)
+    | Unlock_transactions ->
+        protect @@ fun () -> return (unlock_transactions state)
+    | Is_locked -> protect @@ fun () -> return (is_locked state)
     | Content ->
+        protect @@ fun () ->
         let open Ethereum_types in
         let process_transactions tx_map lookup_fn acc =
           String.Hashtbl.fold
@@ -883,10 +891,11 @@ module Handlers = struct
 
         return {pending; queued}
     | Pop_transactions {validation_state; validate_tx} ->
-        let open Lwt_result_syntax in
+        protect @@ fun () ->
         if is_locked state then return []
         else pop_queue_until state ~validate_tx ~validation_state
     | Confirm_transactions {confirmed_txs; clear_pending_queue_after} ->
+        protect @@ fun () ->
         let*! () =
           Seq.S.iter
             (fun hash ->
