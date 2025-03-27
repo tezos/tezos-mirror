@@ -1460,7 +1460,7 @@ let apply_manager_operation :
                   (Signature.check public_key (Bls proof) bytes)
                   (Validate_errors.Manager
                    .Update_consensus_key_with_incorrect_proof
-                     {public_key; proof})
+                     {kind = Consensus; public_key; proof})
               in
               return ctxt
           | _, _ -> return ctxt

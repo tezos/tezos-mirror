@@ -2556,7 +2556,7 @@ module Manager = struct
       | Bls _bls_public_key, None ->
           result_error
             (Validate_errors.Manager.Update_consensus_key_with_tz4_without_proof
-               {source; public_key})
+               {kind = Consensus; source; public_key})
       | Bls bls_public_key, Some _ ->
           (* Compute the gas cost to encode the consensus public key and
              check the proof. *)
@@ -2579,14 +2579,14 @@ module Manager = struct
       | (Ed25519 _ | Secp256k1 _ | P256 _), Some _proof ->
           result_error
             (Validate_errors.Manager.Update_consensus_key_with_unused_proof
-               {source; public_key})
+               {kind = Consensus; source; public_key})
       | (Ed25519 _ | Secp256k1 _ | P256 _), None -> return_unit
     else
       let* () = Delegate.Consensus_key.check_not_tz4 public_key in
       if Option.is_some proof then
         result_error
           (Validate_errors.Manager.Update_consensus_key_with_unused_proof
-             {source; public_key})
+             {kind = Consensus; source; public_key})
       else return_unit
 
   let check_kind_specific_content (type kind)
