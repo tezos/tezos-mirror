@@ -179,7 +179,7 @@ let run_nodes ~addr ?port client server =
   let* main_socket, p = listen ?port:p addr in
   let* server_node =
     Process.detach ~prefix:"server: " (fun channel ->
-        let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
+        let* sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
         Lwt.finalize
           (fun () ->
             let* () = server channel sched main_socket in
@@ -203,7 +203,7 @@ let run_nodes ~addr ?port client server =
               Lwt.return_unit
           | Ok () -> Lwt.return_unit
         in
-        let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
+        let* sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
         let* () = client channel sched addr p in
         let*! () = P2p_io_scheduler.shutdown sched in
         return_unit)

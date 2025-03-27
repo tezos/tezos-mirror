@@ -1036,6 +1036,7 @@ module Internal_for_tests = struct
   let raw_write_sync = raw_write_sync
 
   let mock_authenticated_connection default_metadata =
+    let open Lwt_result_syntax in
     let secret_key, public_key, _pkh =
       Tezos_crypto.Crypto_box.random_keypair ()
     in
@@ -1047,18 +1048,17 @@ module Internal_for_tests = struct
           remote_nonce = Tezos_crypto.Crypto_box.zero_nonce;
         }
     in
-    let scheduled_conn =
+    let* scheduled_conn =
       let socket = Tezos_base_unix.Event_loop.main_run P2p_fd.socket in
       let f2d_t =
         match socket with Ok socket -> socket | Error _ -> assert false
         (* [P2p_fd.socket] cannot fail when not given a fd_pool. *)
       in
-      P2p_io_scheduler.register
-        (P2p_io_scheduler.create ~read_buffer_size:0 ())
-        f2d_t
+      let* sched = P2p_io_scheduler.create ~read_buffer_size:0 () in
+      return (P2p_io_scheduler.register sched f2d_t)
     in
     let info = P2p_connection.Internal_for_tests.Info.mock default_metadata in
-    {scheduled_conn; info; cryptobox_data}
+    return {scheduled_conn; info; cryptobox_data}
 
   module Crypto = struct
     type data = Crypto.data

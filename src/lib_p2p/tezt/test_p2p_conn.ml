@@ -34,7 +34,7 @@ let mock_conn ?(reader = Lwt_pipe.Maybe_bounded.create ())
     ?(writer = Lwt_pipe.Maybe_bounded.create ()) () =
   let open Lwt_result_syntax in
   let+ socket =
-    let auth_connection =
+    let* auth_connection =
       P2p_socket.Internal_for_tests.mock_authenticated_connection ()
     in
     P2p_socket.Internal_for_tests.mock ~reader ~writer auth_connection

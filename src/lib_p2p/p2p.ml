@@ -194,7 +194,7 @@ module Real = struct
   let create ?fd_pool ~config ~limits ?received_msg_hook ?sent_msg_hook
       ?broadcasted_msg_hook meta_cfg msg_cfg conn_meta_cfg =
     let open Lwt_result_syntax in
-    let io_sched = create_scheduler limits in
+    let* io_sched = create_scheduler limits in
     let watcher = Lwt_watcher.create_input () in
     let log event = Lwt_watcher.notify watcher event in
     let triggers = P2p_trigger.create () in

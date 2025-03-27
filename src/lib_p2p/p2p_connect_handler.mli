@@ -229,5 +229,5 @@ module Internal_for_tests : sig
     [< `Pool of ('msg, 'peer, 'conn) P2p_pool.t | `Make_default_pool of 'peer] ->
     [< `Dependencies of ('msg, 'peer, 'conn) dependencies
     | `Make_default_dependencies of 'conn ] ->
-    ('msg, 'peer, 'conn) t
+    ('msg, 'peer, 'conn) t tzresult Lwt.t
 end
