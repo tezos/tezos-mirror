@@ -436,6 +436,203 @@ let force_apply_from_round =
       round ;
   unit
 
+(* [check_aggregate ~expected_committee aggregate_json] fails if the set of
+   committee members in [aggregate_json] differs from [expected_committee]. *)
+let check_aggregate ~expected_committee aggregate_json =
+  let expected_committee = List.sort String.compare expected_committee in
+  let contents = JSON.(aggregate_json |-> "contents" |> as_list |> List.hd) in
+  let committee =
+    JSON.(contents |-> "metadata" |-> "committee" |> as_list)
+    |> List.map JSON.(fun json -> json |-> "delegate" |> as_string)
+    |> List.sort String.compare
+  in
+  if not (List.equal String.equal committee expected_committee) then
+    let pp = Format.(pp_print_list ~pp_sep:pp_print_cut pp_print_string) in
+    Test.fail
+      "@[<v 0>Wrong commitee@,@[<v 2>expected:@,%a@]@,@[<v 2>found:@,%a@]@]"
+      pp
+      expected_committee
+      pp
+      committee
+
+(* [find_aggregate_receipt operations] returns the sole attestations aggregate
+   found in [operations]. Fails the test if no such operation exists or if
+   more than one if found. *)
+let find_aggregate_receipt consensus_operations =
+  let aggregates =
+    List.filter
+      (fun json ->
+        let kind =
+          JSON.(
+            json |-> "contents" |> as_list |> List.hd |-> "kind" |> as_string)
+        in
+        kind = "attestations_aggregate")
+      consensus_operations
+  in
+  match aggregates with
+  | [] -> Test.fail "The block doesn't contain any attestations aggregate"
+  | _ :: _ :: _ ->
+      Test.fail
+        "Multiple attestation aggregates found, but only one is expected"
+  | [json] -> json
+
+(* [check_for_non_aggregated_eligible_attestations operations] fails the test if
+   [operations] contains a non-aggregated attestation that is eligible for
+   aggregation. *)
+let check_for_non_aggregated_eligible_attestations consensus_operations =
+  let is_tz4 = String.starts_with ~prefix:"tz4" in
+  let has_non_aggregated_eligible_attestations =
+    List.exists
+      (fun json ->
+        let kind =
+          JSON.(
+            json |-> "contents" |> as_list |> List.hd |-> "kind" |> as_string)
+        in
+        if kind = "attestation" then
+          let consensus_key =
+            JSON.(
+              json |-> "contents" |> as_list |> List.hd |-> "metadata"
+              |-> "consensus_key" |> as_string)
+          in
+          is_tz4 consensus_key
+        else false)
+      consensus_operations
+  in
+  if has_non_aggregated_eligible_attestations then
+    Test.fail "The block contains a non-aggregated eligible attestation"
+
+(* Test that the baker aggregates eligible attestations.*)
+let simple_attestations_aggregation =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Simple attestations aggregation"
+    ~tags:[team; "baker"; "attestation"; "aggregation"]
+    ~supports:Protocol.(From_protocol 023)
+    ~uses:(fun protocol -> [Protocol.baker protocol])
+  @@ fun protocol ->
+  log_step 1 "Initialize a node and a client with protocol" ;
+  let consensus_rights_delay = 1 in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Right (protocol, None))
+      [
+        (["allow_tz4_delegate_enable"], `Bool true);
+        (["aggregate_attestation"], `Bool true);
+        (* Diminish some constants to activate consensus keys faster *)
+        (["blocks_per_cycle"], `Int 2);
+        (["nonce_revelation_threshold"], `Int 1);
+        (["consensus_rights_delay"], `Int consensus_rights_delay);
+        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
+        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
+      ]
+  in
+  let* node, client =
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~parameter_file
+      ()
+      ~timestamp:Now
+  in
+  log_step 2 "Wait for level 1" ;
+  let* _ = Node.wait_for_level node 1 in
+  log_step 3 "Generate bls keys" ;
+  let* b1 = Client.gen_keys ~sig_alg:"bls" client in
+  let* b2 = Client.gen_keys ~sig_alg:"bls" client in
+  let* b3 = Client.gen_keys ~sig_alg:"bls" client in
+  log_step 4 "Use them as consensus keys for some delegates" ;
+  let bootstrap1, bootstrap2, bootstrap3 =
+    Constant.(bootstrap1, bootstrap2, bootstrap3)
+  in
+  let* () = Client.update_consensus_key ~src:bootstrap1.alias ~pk:b1 client in
+  let* () = Client.update_consensus_key ~src:bootstrap2.alias ~pk:b2 client in
+  let* () = Client.update_consensus_key ~src:bootstrap3.alias ~pk:b3 client in
+  let delegates =
+    Account.Bootstrap.keys |> Array.to_list
+    |> List.map (fun (account : Account.key) -> account.Account.alias)
+    |> List.append [b1; b2; b3]
+  in
+  (* Expected committee that should be found in attestations aggregate *)
+  let expected_committee =
+    [
+      bootstrap1.public_key_hash;
+      bootstrap2.public_key_hash;
+      bootstrap3.public_key_hash;
+    ]
+  in
+  (* Testing the "bake for" command *)
+  log_step 4 "Bake for until level 8" ;
+  (* Waiting for level 8 ensures that the bls consensus keys are activated *)
+  let* () = Client.bake_for_and_wait ~count:7 ~keys:delegates client in
+  log_step 5 "Fetch latest block consensus operations" ;
+  let* consensus_operations =
+    let* json =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_operations_validation_pass ~validation_pass:0 ()
+    in
+    return JSON.(as_list json)
+  in
+  log_step
+    6
+    "Check that it doesn't contain any non-aggregated eligible attestation" ;
+  let () =
+    check_for_non_aggregated_eligible_attestations consensus_operations
+  in
+  log_step 7 "Check that it contains an aggregate" ;
+  let aggregate_json = find_aggregate_receipt consensus_operations in
+  log_step 8 "Check that the aggregate contains the expected attestations" ;
+  let () = check_aggregate ~expected_committee aggregate_json in
+  (* Testing the "bake for" command with minimal timestamp *)
+  log_step 9 "Bake for with minimal timestamp until level 10" ;
+  let* () =
+    Client.bake_for_and_wait
+      ~minimal_timestamp:true
+      ~count:2
+      ~keys:delegates
+      client
+  in
+  log_step 10 "Fetch latest block consensus operations" ;
+  let* consensus_operations =
+    let* json =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_operations_validation_pass ~validation_pass:0 ()
+    in
+    return JSON.(as_list json)
+  in
+  log_step
+    11
+    "Check that it doesn't contain any non-aggregated eligible attestation" ;
+  let () =
+    check_for_non_aggregated_eligible_attestations consensus_operations
+  in
+  log_step 12 "Check that it contains an aggregate" ;
+  let aggregate_json = find_aggregate_receipt consensus_operations in
+  log_step 13 "Check that the aggregate contains the expected attestations" ;
+  let () = check_aggregate ~expected_committee aggregate_json in
+  log_step 14 "Start a baker and bake until level 12" ;
+  (* Testing the baker automaton *)
+  let* _baker = Baker.init ~protocol ~delegates node client in
+  let* _ = Node.wait_for_level node 12 in
+  log_step 15 "Fetch latest block consensus operations" ;
+  let* consensus_operations =
+    let* json =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_operations_validation_pass ~validation_pass:0 ()
+    in
+    return JSON.(as_list json)
+  in
+  log_step
+    16
+    "Check that it doesn't contain any non-aggregated eligible attestation" ;
+  let () =
+    check_for_non_aggregated_eligible_attestations consensus_operations
+  in
+  log_step 17 "Check that it contains an aggregate" ;
+  let _ = find_aggregate_receipt consensus_operations in
+  log_step 18 "Check that the aggregate contains the expected attestations" ;
+  let () = check_aggregate ~expected_committee aggregate_json in
+  unit
+
 let register ~protocols =
   check_node_version_check_bypass_test protocols ;
   check_node_version_allowed_test protocols ;
@@ -448,4 +645,5 @@ let register ~protocols =
   no_bls_baker_test protocols ;
   baker_remote_test protocols ;
   baker_check_consensus_branch protocols ;
-  force_apply_from_round protocols
+  force_apply_from_round protocols ;
+  simple_attestations_aggregation protocols
