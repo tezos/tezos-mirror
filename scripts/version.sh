@@ -75,9 +75,12 @@ export COVERAGE_OUTPUT=_coverage_output
 #  - Locally, it will point to the protected registry.
 #  - In the CI, on protected (resp. unprotected) refs, it will point
 #    to the protected (resp. unprotected) registry.
+#  - The variable GCP_PROTECTED_REGISTRY is used in the CI for the docker cache
+#    and it's statically set here.
 #
 # See also the description of this variable in 'ci/bin/main.ml'.
 export GCP_REGISTRY="${GCP_REGISTRY:-us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry}"
+export GCP_PROTECTED_REGISTRY="us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry"
 
 # Unprotected GCP Artifact Registry
 export GCP_PUBLIC_REGISTRY='us-central1-docker.pkg.dev/nl-gitlab-runner/registry'
@@ -92,6 +95,7 @@ export GCP_PUBLIC_REGISTRY='us-central1-docker.pkg.dev/nl-gitlab-runner/registry
 # (resp. unprotected) images on protected (resp. unprotected) refs.
 
 export ci_image_name="${GCP_REGISTRY}/tezos/tezos/ci"
+export ci_image_name_protected="${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci"
 
 export rust_toolchain_image_name="${GCP_REGISTRY}/tezos/tezos/rust-toolchain"
 

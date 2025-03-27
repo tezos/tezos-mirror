@@ -51,6 +51,8 @@ cd "$repo_dir"
 # ci_image_name is set in the variables of '.gitlab-ci.yml'
 # shellcheck disable=SC2154
 image_base="${ci_image_name}"
+# shellcheck disable=SC2154
+image_name_protected="${ci_image_name_protected}"
 
 arch=${ARCH:-amd64}
 
@@ -100,6 +102,7 @@ echo "Build CI images with image_tag_suffix $image_tag_suffix"
 
 ./images/create_ci_images.sh \
   --image-base "${image_base}" \
+  --image-base-protected "${image_name_protected}" \
   --tag-suffix "${image_tag_suffix}" \
   --tag-cache-suffix "${CI_DEFAULT_BRANCH}" \
   --tag-extra "${CI_COMMIT_REF_SLUG}" \
