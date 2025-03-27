@@ -787,7 +787,7 @@ module Consensus = struct
     in
     let* consensus_key, voting_power =
       match vi.mode with
-      | Application _ | Partial_validation _ | Construction _ ->
+      | Application _ | Partial_validation _ | Construction _ -> (
           let* () =
             check_block_attestation vi consensus_info consensus_content
           in
@@ -797,7 +797,14 @@ module Consensus = struct
               Attestation
               consensus_content.slot
           in
-          return (consensus_key, voting_power)
+          match (consensus_key.consensus_pk, dal_content) with
+          | Bls _, None when Constants.aggregate_attestation vi.ctxt ->
+              (* An attestation signed by a tz4 without DAL content must be
+                 included in an Attestations_aggregate, even when it is the only
+                 one in the quorum. *)
+              let hash = Operation.hash operation in
+              tzfail (Unaggregated_eligible_attestation hash)
+          | _ -> return (consensus_key, voting_power))
       | Mempool ->
           check_mempool_consensus
             vi

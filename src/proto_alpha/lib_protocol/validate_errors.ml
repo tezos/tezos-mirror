@@ -134,6 +134,7 @@ module Consensus = struct
     | Aggregate_not_implemented
     | Non_bls_key_in_aggregate
     | Public_key_aggregation_failure
+    | Unaggregated_eligible_attestation of Operation_hash.t
 
   let () =
     register_error_kind
@@ -413,7 +414,22 @@ module Consensus = struct
       ~pp:(fun ppf () -> Format.fprintf ppf "Public key aggregation failed")
       Data_encoding.empty
       (function Public_key_aggregation_failure -> Some () | _ -> None)
-      (fun () -> Public_key_aggregation_failure)
+      (fun () -> Public_key_aggregation_failure) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.unaggregated_eligible_attestation"
+      ~title:"Unaggregated eligible attestation"
+      ~description:"An eligible attestation was found unaggregated"
+      ~pp:(fun ppf hash ->
+        Format.fprintf
+          ppf
+          "Attestation %a should have been aggregated."
+          Operation_hash.pp
+          hash)
+      Data_encoding.(obj1 (req "hash" Operation_hash.encoding))
+      (function
+        | Unaggregated_eligible_attestation hash -> Some hash | _ -> None)
+      (fun hash -> Unaggregated_eligible_attestation hash)
 end
 
 module Voting = struct
