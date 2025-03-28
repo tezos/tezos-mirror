@@ -141,6 +141,8 @@ Smart Rollup node
 
 - Display logging levels in logs by default. (MR :gl:`!17479`)
 
+- Allow to import snapshots from standard input with ``-``. (MR :gl:`!17463`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
