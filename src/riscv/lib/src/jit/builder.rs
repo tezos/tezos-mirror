@@ -216,30 +216,47 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
         );
 
         // if handled -> jump to end with updated pc_ptr. Add steps += 1
+        self.exit_on_branch(outcome.handled, |builder| {
+            builder.complete_step(PCUpdate::Absolute(outcome.new_pc));
+        });
+
         // if !handled -> exit directly; environ needs to be consulted.
         //                pc has been committed
-        let handled_block = self.builder.create_block();
-        let environ_block = self.builder.create_block();
+        self.jump_to_end();
+    }
+
+    /// Branch and exit if the given condition holds.
+    ///
+    /// When needing to exit the 'block-cache' block - on either a `run_branch` or due to
+    /// an exception occuring, we jump to the end of the compiled function.
+    ///
+    /// There is a little cleanup to do, before doing so, however: potentially needing to
+    /// complete the current step.
+    ///
+    /// Semantically, this function returns the caller into the context of the 'fallthrough'
+    /// block - ie, the where the branch condition fails.
+    fn exit_on_branch(&mut self, cond: Value, on_branching: impl FnOnce(&mut Self)) {
+        let on_branch = self.builder.create_block();
+        let fallthrough = self.builder.create_block();
 
         self.builder
             .ins()
-            .brif(outcome.handled, handled_block, &[], environ_block, &[]);
+            .brif(cond, on_branch, &[], fallthrough, &[]);
 
+        // both IR blocks need access to the dynamic values at this point in time.
+        // These are modified by the jump to the end block below, and possibly by the
+        // `on_branching` function.
         let snapshot = self.dynamic;
 
-        // Exception succesfully handled, we have a new PC and need to complete
-        // the current step.
-        self.builder.switch_to_block(handled_block);
-        self.complete_step(PCUpdate::Absolute(outcome.new_pc));
+        self.builder.switch_to_block(on_branch);
+
+        on_branching(self);
         self.jump_to_end();
+        self.builder.seal_block(on_branch);
 
-        self.builder.seal_block(handled_block);
-
-        // The exception has to be handled by the environment. Do not complete
-        // the current step; this will be done by the ECall handling mechanism
-        self.builder.switch_to_block(environ_block);
+        // Restore the dynamic values to the branching point, for the fallthrough block.
         self.dynamic = snapshot;
-        self.jump_to_end();
+        self.builder.switch_to_block(fallthrough);
     }
 }
 
@@ -299,26 +316,9 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
         offset: i64,
         instr_width: InstrWidth,
     ) -> ProgramCounterUpdate<Self::XValue> {
-        let branch_block = self.builder.create_block();
-        let fallthrough_block = self.builder.create_block();
-
-        self.builder
-            .ins()
-            .brif(condition, branch_block, &[], fallthrough_block, &[]);
-
-        let snapshot = self.dynamic;
-
-        // Handle branching block
-        self.builder.switch_to_block(branch_block);
-
-        self.complete_step(block_state::PCUpdate::Offset(offset));
-        self.jump_to_end();
-
-        self.builder.seal_block(branch_block);
-
-        // Continue on the fallthrough block
-        self.dynamic = snapshot;
-        self.builder.switch_to_block(fallthrough_block);
+        self.exit_on_branch(condition, |builder| {
+            builder.complete_step(block_state::PCUpdate::Offset(offset));
+        });
 
         ProgramCounterUpdate::Next(instr_width)
     }
