@@ -7,6 +7,10 @@
 //! By providing these building blocks for various execution formats, the same implementation can
 //! be used for both interpretation and compilation of instructions.
 
+pub(super) mod arithmetic;
+
+use arithmetic::Arithmetic;
+
 use crate::machine_state::MachineCoreState;
 use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::instruction::Args;
@@ -34,7 +38,7 @@ pub trait ICB {
     /// A 64-bit value stored in [`XRegisters`].
     ///
     /// [`XRegisters`]: crate::machine_state::registers::XRegisters
-    type XValue;
+    type XValue: Arithmetic<Self>;
 
     /// Perform a read to a [`NonZeroXRegister`], with the given value.
     /// This is a specialized version of `xregister_read` that is only used for
@@ -48,35 +52,6 @@ pub trait ICB {
 
     /// Construct an [`ICB::XValue`] from an `imm: i64`.
     fn xvalue_of_imm(&mut self, imm: i64) -> Self::XValue;
-
-    /// Perform a wrapping add of two **XValues**, returning the new value.
-    ///
-    /// This behaves identically for both signed & unsigned values.
-    fn xvalue_wrapping_add(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue;
-
-    /// Perform a wrapping sub of two **XValues**, returning the new value.
-    ///
-    /// This behaves identically for both signed & unsigned values.
-    fn xvalue_wrapping_sub(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue;
-
-    /// Perform a wrapping mul of two **XValues**, returning the new value.
-    ///
-    /// This behaves identically for both signed & unsigned values.
-    fn xvalue_wrapping_mul(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue;
-
-    /// Perform a bitwise and of two **XValues**, returning the new value.
-    fn xvalue_bitwise_and(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue;
-
-    /// Perform a bitwise or of two **XValues**, returning the new value.
-    fn xvalue_bitwise_or(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue;
-
-    /// Perform a shift of the **XValue** as determined by the given **Shift**.
-    fn xvalue_shift(
-        &mut self,
-        value: Self::XValue,
-        amount: Self::XValue,
-        shift: Shift,
-    ) -> Self::XValue;
 
     /// Perform a read of the program counter.
     fn pc_read(&mut self) -> Self::XValue;
@@ -150,12 +125,6 @@ pub trait ICB {
             self.xregister_write_nz(reg, value)
         }
     }
-
-    /// Integer negation of the given `XValue`.
-    fn xvalue_negate(&mut self, value: Self::XValue) -> Self::XValue {
-        let zero = self.xvalue_of_imm(0);
-        self.xvalue_wrapping_sub(zero, value)
-    }
 }
 
 impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
@@ -184,48 +153,6 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
     #[inline(always)]
     fn xvalue_of_imm(&mut self, imm: i64) -> Self::XValue {
         imm as u64
-    }
-
-    #[inline(always)]
-    fn xvalue_wrapping_add(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
-        // Wrapped addition in two's complement behaves the same for signed and unsigned
-        lhs.wrapping_add(rhs)
-    }
-
-    #[inline(always)]
-    fn xvalue_wrapping_sub(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
-        // Wrapped subtraction in two's complement behaves the same for signed and unsigned
-        lhs.wrapping_sub(rhs)
-    }
-
-    #[inline(always)]
-    fn xvalue_wrapping_mul(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
-        // Wrapped multiplication in two's complement behaves the same for signed and unsigned
-        lhs.wrapping_mul(rhs)
-    }
-
-    #[inline(always)]
-    fn xvalue_bitwise_and(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
-        lhs & rhs
-    }
-
-    #[inline(always)]
-    fn xvalue_bitwise_or(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
-        lhs | rhs
-    }
-
-    #[inline(always)]
-    fn xvalue_shift(
-        &mut self,
-        value: Self::XValue,
-        amount: Self::XValue,
-        shift: Shift,
-    ) -> Self::XValue {
-        match shift {
-            Shift::Left => value << amount,
-            Shift::RightUnsigned => value >> amount,
-            Shift::RightSigned => (value as i64 >> amount) as XValue,
-        }
     }
 
     #[inline(always)]

@@ -6,6 +6,9 @@
 //!
 //! [instructions]: crate::machine_state::instruction::Instruction
 
+pub(super) mod arithmetic;
+pub(super) mod block_state;
+
 use cranelift::codegen::ir;
 use cranelift::codegen::ir::InstBuilder;
 use cranelift::codegen::ir::MemFlags;
@@ -20,13 +23,13 @@ use super::state_access::JitStateAccess;
 use super::state_access::JsaCalls;
 use crate::instruction_context::ICB;
 use crate::instruction_context::Predicate;
-use crate::instruction_context::Shift;
 use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::parser::instruction::InstrWidth;
 
-pub(super) mod block_state;
+#[derive(Copy, Clone, Debug)]
+pub struct X64(pub Value);
 
 /// Builder context used when lowering individual instructions within a block.
 pub(super) struct Builder<'a, MC: MemoryConfig, JSA: JitStateAccess> {
@@ -74,7 +77,7 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
         builder.seal_block(entry_block);
 
         let core_ptr_val = builder.block_params(entry_block)[0];
-        let pc_val = builder.block_params(entry_block)[1];
+        let pc_val = X64(builder.block_params(entry_block)[1]);
         let steps_ptr_val = builder.block_params(entry_block)[2];
 
         Self {
@@ -110,7 +113,7 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
 
         // write the final pc to the state.
         self.jsa_call
-            .pc_write(&mut self.builder, self.core_ptr_val, pc_val);
+            .pc_write(&mut self.builder, self.core_ptr_val, X64(pc_val));
 
         self.builder.ins().return_(&[]);
 
@@ -171,13 +174,13 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
             .end_block
             .unwrap_or_else(|| self.builder.create_block());
 
-        self.builder.ins().jump(end_block, &[pc_val, steps_val]);
+        self.builder.ins().jump(end_block, &[pc_val.0, steps_val]);
         self.finalise_end_block(end_block)
     }
 }
 
 impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
-    type XValue = Value;
+    type XValue = X64;
     type IResult<Value> = Value;
 
     /// An `I8` width value.
@@ -194,52 +197,12 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
     }
 
     fn xvalue_of_imm(&mut self, imm: i64) -> Self::XValue {
-        self.builder.ins().iconst(I64, imm)
+        X64(self.builder.ins().iconst(I64, imm))
     }
 
     fn xvalue_from_bool(&mut self, value: Self::Bool) -> Self::XValue {
         // unsigned extension works as boolean can never be negative (only 0 or 1)
-        self.builder.ins().uextend(I64, value)
-    }
-
-    fn xvalue_negate(&mut self, value: Self::XValue) -> Self::XValue {
-        self.builder.ins().ineg(value)
-    }
-
-    fn xvalue_wrapping_add(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
-        // wrapping add; does not depend on whether operands are signed
-        self.builder.ins().iadd(lhs, rhs)
-    }
-
-    fn xvalue_wrapping_sub(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
-        // wrapping sub; does not depend on whether operands are signed
-        self.builder.ins().isub(lhs, rhs)
-    }
-
-    fn xvalue_wrapping_mul(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
-        // wrapping mul; does not depend on whether operands are signed
-        self.builder.ins().imul(lhs, rhs)
-    }
-
-    fn xvalue_bitwise_and(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
-        self.builder.ins().band(lhs, rhs)
-    }
-
-    fn xvalue_bitwise_or(&mut self, lhs: Self::XValue, rhs: Self::XValue) -> Self::XValue {
-        self.builder.ins().bor(lhs, rhs)
-    }
-
-    fn xvalue_shift(
-        &mut self,
-        value: Self::XValue,
-        amount: Self::XValue,
-        shift: Shift,
-    ) -> Self::XValue {
-        match shift {
-            Shift::Left => self.builder.ins().ishl(value, amount),
-            Shift::RightUnsigned => self.builder.ins().ushr(value, amount),
-            Shift::RightSigned => self.builder.ins().sshr(value, amount),
-        }
+        X64(self.builder.ins().uextend(I64, value))
     }
 
     /// Read the effective current program counter by adding `self.pc_offset` (due to instructions
@@ -263,7 +226,7 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
         //
         // See
         // <https://docs.rs/cranelift-codegen/0.117.2/cranelift_codegen/ir/trait.InstBuilder.html#method.icmp>
-        self.builder.ins().icmp(comparison, lhs, rhs)
+        self.builder.ins().icmp(comparison, lhs.0, rhs.0)
     }
 
     fn branch(

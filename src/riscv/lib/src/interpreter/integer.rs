@@ -7,6 +7,7 @@
 use crate::instruction_context::ICB;
 use crate::instruction_context::Predicate;
 use crate::instruction_context::Shift;
+use crate::instruction_context::arithmetic::Arithmetic;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::registers::XRegister;
 use crate::parser::SHIFT_BITMASK;
@@ -17,7 +18,7 @@ use crate::parser::SHIFT_BITMASK;
 /// - SUB
 pub fn run_neg(icb: &mut impl ICB, rd_rs1: NonZeroXRegister, rs2: NonZeroXRegister) {
     let rs2_val = icb.xregister_read_nz(rs2);
-    let result = icb.xvalue_negate(rs2_val);
+    let result = rs2_val.negate(icb);
     icb.xregister_write_nz(rd_rs1, result)
 }
 
@@ -68,7 +69,7 @@ pub fn run_add(
     let lhs = icb.xregister_read_nz(rs1);
     let rhs = icb.xregister_read_nz(rs2);
     // Wrapped addition in two's complement behaves the same for signed and unsigned
-    let result = icb.xvalue_wrapping_add(lhs, rhs);
+    let result = lhs.add(rhs, icb);
     icb.xregister_write_nz(rd, result)
 }
 
@@ -86,7 +87,7 @@ pub fn run_sub(
     let lhs = icb.xregister_read_nz(rs1);
     let rhs = icb.xregister_read_nz(rs2);
     // Wrapped subtraction in two's complement behaves the same for signed and unsigned
-    let result = icb.xvalue_wrapping_sub(lhs, rhs);
+    let result = lhs.sub(rhs, icb);
     icb.xregister_write_nz(rd, result)
 }
 
@@ -104,7 +105,7 @@ pub fn run_and(
     let lhs = icb.xregister_read_nz(rs1);
     let rhs = icb.xregister_read_nz(rs2);
 
-    let res = icb.xvalue_bitwise_and(lhs, rhs);
+    let res = lhs.and(rhs, icb);
     icb.xregister_write_nz(rd, res);
 }
 
@@ -122,7 +123,7 @@ pub fn run_or(
     let lhs = icb.xregister_read_nz(rs1);
     let rhs = icb.xregister_read_nz(rs2);
 
-    let res = icb.xvalue_bitwise_or(lhs, rhs);
+    let res = lhs.or(rhs, icb);
     icb.xregister_write_nz(rd, res);
 }
 
@@ -138,7 +139,7 @@ pub fn run_addi(icb: &mut impl ICB, imm: i64, rs1: NonZeroXRegister, rd: NonZero
     // Irrespective of sign, the result is the same, casting to u64 for addition;
     let lhs = icb.xregister_read_nz(rs1);
     let rhs = icb.xvalue_of_imm(imm);
-    let result = icb.xvalue_wrapping_add(lhs, rhs);
+    let result = lhs.add(rhs, icb);
     icb.xregister_write_nz(rd, result)
 }
 
@@ -150,7 +151,7 @@ pub fn run_addi(icb: &mut impl ICB, imm: i64, rs1: NonZeroXRegister, rd: NonZero
 pub fn run_andi(icb: &mut impl ICB, imm: i64, rs1: NonZeroXRegister, rd: NonZeroXRegister) {
     let lhs = icb.xregister_read_nz(rs1);
     let rhs = icb.xvalue_of_imm(imm);
-    let res = icb.xvalue_bitwise_and(lhs, rhs);
+    let res = lhs.and(rhs, icb);
     icb.xregister_write_nz(rd, res);
 }
 
@@ -249,7 +250,7 @@ pub fn run_mul(
 ) {
     let lhs = icb.xregister_read_nz(rs1);
     let rhs = icb.xregister_read_nz(rs2);
-    let result = icb.xvalue_wrapping_mul(lhs, rhs);
+    let result = lhs.mul(rhs, icb);
     icb.xregister_write_nz(rd, result)
 }
 
@@ -269,11 +270,11 @@ pub fn run_shift(
     rd: NonZeroXRegister,
 ) {
     let bitmask = icb.xvalue_of_imm(SHIFT_BITMASK);
-    let rs2val = icb.xregister_read_nz(rs2);
-    let shift_amount = icb.xvalue_bitwise_and(rs2val, bitmask);
+    let lhs = icb.xregister_read_nz(rs2);
+    let shift_amount = lhs.and(bitmask, icb);
 
-    let rs1val = icb.xregister_read_nz(rs1);
-    let result = icb.xvalue_shift(rs1val, shift_amount, shift);
+    let lhs = icb.xregister_read_nz(rs1);
+    let result = lhs.shift(shift, shift_amount, icb);
 
     icb.xregister_write_nz(rd, result);
 }
@@ -297,8 +298,8 @@ pub fn run_shift_immediate(
     rd: NonZeroXRegister,
 ) {
     let shift_amount = icb.xvalue_of_imm(imm);
-    let rs1val = icb.xregister_read_nz(rs1);
-    let result = icb.xvalue_shift(rs1val, shift_amount, shift);
+    let lhs = icb.xregister_read_nz(rs1);
+    let result = lhs.shift(shift, shift_amount, icb);
 
     icb.xregister_write_nz(rd, result);
 }
