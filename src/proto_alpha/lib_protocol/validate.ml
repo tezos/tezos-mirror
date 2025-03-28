@@ -1927,22 +1927,6 @@ module Anonymous = struct
             (Invalid_accusation_slot_not_attested
                {tb_slot = consensus_content.slot; level; slot_index})
         in
-        let* protocol_first_level = First_level_of_protocol.get vi.ctxt in
-        let*? () =
-          (* Due to the DAL node possibly not checking for traps before the R
-             migration level, and the baker asking for trap information before
-             the migration level (for a level in the current protocol), we fix a
-             time period (the attestation lag plus 2) just after the migration
-             during which accusations are not allowed. *)
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/7686
-             This code (and the error) should be deleted in protocol S *)
-          let delay = 10 in
-          let first_allowed_level = Raw_level.add protocol_first_level delay in
-          error_unless
-            Raw_level.(level >= first_allowed_level)
-            (Denunciations_not_allowed_just_after_migration
-               {level; first_allowed_level})
-        in
         let*? () = check_denunciation_age vi `Dal_denounciation level in
         let level = Level.from_raw vi.ctxt level in
         let* ctxt, consensus_key =

@@ -171,10 +171,6 @@ module Anonymous : sig
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
       }
-    | Denunciations_not_allowed_just_after_migration of {
-        level : Raw_level.t;
-        first_allowed_level : Raw_level.t;
-      }
     | Invalid_accusation_no_dal_content of {
         tb_slot : Slot.t;
         level : Raw_level.t;
