@@ -103,6 +103,7 @@ val register_test :
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
   ?enable_fast_withdrawal:bool ->
+  ?enable_fast_fa_withdrawal:bool ->
   ?commitment_period:int ->
   ?challenge_window:int ->
   ?threshold_encryption:bool ->
@@ -151,6 +152,7 @@ val register_multichain_test :
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
   ?enable_fast_withdrawal:bool ->
+  ?enable_fast_fa_withdrawal:bool ->
   ?commitment_period:int ->
   ?challenge_window:int ->
   ?threshold_encryption:bool ->
@@ -212,6 +214,7 @@ val register_test_for_kernels :
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?enable_fast_withdrawal:bool ->
+  ?enable_fast_fa_withdrawal:bool ->
   ?history_mode:Evm_node.history_mode ->
   ?enable_tx_queue:bool ->
   ?spawn_rpc:int ->
@@ -252,6 +255,7 @@ val setup_sequencer :
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
   ?enable_fast_withdrawal:bool ->
+  ?enable_fast_fa_withdrawal:bool ->
   ?threshold_encryption:bool ->
   ?drop_duplicate_when_injection:bool ->
   ?blueprints_publisher_order_enabled:bool ->

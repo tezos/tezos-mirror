@@ -707,7 +707,8 @@ Kernel commands:
       [--enable-fa-bridge] [--enable-dal] [--dal-slots <0,1,4,6,...>]
       [--enable-multichain] [--l2-chain-id <1>]
       [--max-delayed-inbox-blueprint-length <1000>]
-      [--enable-fast-withdrawal] [--evm-version <cancun|shanghai>]
+      [--enable-fast-withdrawal] [--enable-fast-fa-withdrawal]
+      [--evm-version <cancun|shanghai>]
     Create a configuration for the kernel installer.
     <kernel config file>: File path where the config will be written to.
     --mainnet-compat: Generate a configuration compatible with the first
@@ -760,6 +761,8 @@ Kernel commands:
     --max-delayed-inbox-blueprint-length <1000>: Value for
       max_delayed_inbox_blueprint_length in the installer config.
     --enable-fast-withdrawal: Enable flag enable_fast_withdrawal in the
+      installer config.
+    --enable-fast-fa-withdrawal: Enable flag enable_fast_fa_withdrawal in the
       installer config.
     --evm-version <cancun|shanghai>: Value for evm_version in the installer
       config.

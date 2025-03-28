@@ -246,8 +246,8 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
     ?sequencer_pool_address ?da_fee_per_byte ?minimum_base_fee_per_gas
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
-    ?enable_fast_withdrawal ~enable_dal ?dal_slots ?evm_version ~sequencer
-    ~preimages_dir ~kernel () =
+    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ~enable_dal ?dal_slots
+    ?evm_version ~sequencer ~preimages_dir ~kernel () =
   let output_config = Temp.file "config.yaml" in
   let*! () =
     Evm_node.make_kernel_installer_config
@@ -267,6 +267,7 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
       ?maximum_gas_per_transaction
       ~enable_dal
       ?enable_fast_withdrawal
+      ?enable_fast_fa_withdrawal
       ?dal_slots
       ~enable_multichain:false
       ?max_blueprint_lookahead_in_seconds
@@ -304,8 +305,8 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
     ?max_delayed_inbox_blueprint_length ~mainnet_compat ?delayed_inbox_timeout
     ?delayed_inbox_min_levels ?maximum_allowed_ticks
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
-    ?enable_fast_withdrawal ~enable_dal ?dal_slots ~sequencer ~preimages_dir
-    ?evm_version ~kernel () =
+    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ~enable_dal ?dal_slots
+    ~sequencer ~preimages_dir ?evm_version ~kernel () =
   let l2_chain_ids = List.map (fun l2 -> l2.Evm_node.l2_chain_id) l2_setups in
   let* l2_configs = Lwt_list.map_s generate_l2_kernel_config l2_setups in
   let rollup_config = Temp.file "rollup-config.yaml" in
@@ -355,6 +356,7 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
       ?maximum_gas_per_transaction
       ~enable_dal
       ?enable_fast_withdrawal
+      ?enable_fast_fa_withdrawal
       ?dal_slots
       ~enable_multichain:true
       ?max_blueprint_lookahead_in_seconds
@@ -375,7 +377,7 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
 let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
     ?max_delayed_inbox_blueprint_length ~mainnet_compat ~sequencer
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?maximum_allowed_ticks
-    ~enable_dal ?enable_fast_withdrawal ?dal_slots
+    ~enable_dal ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?dal_slots
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ~preimages_dir ~kernel
     ?evm_version () =
   if not enable_multichain then (
@@ -395,6 +397,7 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
       ?maximum_gas_per_transaction:chain_config.maximum_gas_per_transaction
       ~enable_dal
       ?enable_fast_withdrawal
+      ?enable_fast_fa_withdrawal
       ?dal_slots
       ?max_blueprint_lookahead_in_seconds
       ?bootstrap_accounts:chain_config.Evm_node.bootstrap_accounts
@@ -416,6 +419,7 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
       ~enable_dal
       ?enable_fa_bridge
       ?enable_fast_withdrawal
+      ?enable_fast_fa_withdrawal
       ?dal_slots
       ?max_blueprint_lookahead_in_seconds
       ?evm_version
@@ -431,8 +435,8 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
     ?commitment_period ?challenge_window ?(sequencer = Constant.bootstrap1)
     ?(kernel = Constant.WASM.evm_kernel) ?evm_version ?preimages_dir
     ?maximum_allowed_ticks ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
-    ?enable_fast_withdrawal ?(threshold_encryption = false)
-    ?(drop_duplicate_when_injection = true)
+    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
+    ?(threshold_encryption = false) ?(drop_duplicate_when_injection = true)
     ?(blueprints_publisher_order_enabled = true) ?rollup_history_mode
     ~enable_dal ?dal_slots ~enable_multichain ~l2_chains ?rpc_server ?websockets
     ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path protocol =
@@ -480,6 +484,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ?maximum_allowed_ticks
       ~enable_dal
       ?enable_fast_withdrawal
+      ?enable_fast_fa_withdrawal
       ?dal_slots
       ~enable_multichain
       ~l2_chains
@@ -640,10 +645,11 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     ?sequencer_pool_address ?kernel ?da_fee ?minimum_base_fee_per_gas
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
-    ?enable_fast_withdrawal ?threshold_encryption ?drop_duplicate_when_injection
-    ?blueprints_publisher_order_enabled ?rollup_history_mode ~enable_dal
-    ?dal_slots ~enable_multichain ?rpc_server ?websockets ?history_mode
-    ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path protocol =
+    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?threshold_encryption
+    ?drop_duplicate_when_injection ?blueprints_publisher_order_enabled
+    ?rollup_history_mode ~enable_dal ?dal_slots ~enable_multichain ?rpc_server
+    ?websockets ?history_mode ?enable_tx_queue ?spawn_rpc
+    ?periodic_snapshot_path protocol =
   (* Note that the chain_id is not important (it will become important later) *)
   let l2_chains =
     [
@@ -682,6 +688,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ?max_blueprint_lookahead_in_seconds
       ?enable_fa_bridge
       ?enable_fast_withdrawal
+      ?enable_fast_fa_withdrawal
       ?blueprints_publisher_order_enabled
       ?drop_duplicate_when_injection
       ?threshold_encryption
@@ -709,9 +716,9 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?sequencer_pool_address ~kernel ?da_fee ?minimum_base_fee_per_gas
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
-    ?enable_fast_withdrawal ?commitment_period ?challenge_window
-    ?(threshold_encryption = false) ?(uses = uses) ?(additional_uses = [])
-    ?rollup_history_mode ~enable_dal
+    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?commitment_period
+    ?challenge_window ?(threshold_encryption = false) ?(uses = uses)
+    ?(additional_uses = []) ?rollup_history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None)
     ~enable_multichain ~l2_setups ?rpc_server ?websockets ?history_mode
     ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path body ~title ~tags
@@ -770,6 +777,7 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?max_blueprint_lookahead_in_seconds
         ?enable_fa_bridge
         ?enable_fast_withdrawal
+        ?enable_fast_fa_withdrawal
         ~threshold_encryption
         ?rollup_history_mode
         ?websockets
@@ -825,11 +833,11 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?sequencer_pool_address ~kernel ?da_fee ?minimum_base_fee_per_gas
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
-    ?enable_fast_withdrawal ?commitment_period ?challenge_window
-    ?threshold_encryption ?uses ?additional_uses ?rollup_history_mode
-    ~enable_dal ?dal_slots ~enable_multichain ?rpc_server ?websockets
-    ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?l2_setups
-    body ~title ~tags protocols =
+    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?commitment_period
+    ?challenge_window ?threshold_encryption ?uses ?additional_uses
+    ?rollup_history_mode ~enable_dal ?dal_slots ~enable_multichain ?rpc_server
+    ?websockets ?history_mode ?enable_tx_queue ?spawn_rpc
+    ?periodic_snapshot_path ?l2_setups body ~title ~tags protocols =
   let body sequencer_setup =
     body (multichain_setup_to_single ~setup:sequencer_setup)
   in
@@ -859,6 +867,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?max_blueprint_lookahead_in_seconds
     ?enable_fa_bridge
     ?enable_fast_withdrawal
+    ?enable_fast_fa_withdrawal
     ?commitment_period
     ?challenge_window
     ?threshold_encryption
@@ -892,8 +901,8 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
     ?additional_uses ~threshold_encryption ~enable_dal ?dal_slots
     ~enable_multichain ?rpc_server ?websockets ?enable_fast_withdrawal
-    ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?l2_setups
-    ~title ~tags body protocols =
+    ?enable_fast_fa_withdrawal ?history_mode ?enable_tx_queue ?spawn_rpc
+    ?periodic_snapshot_path ?l2_setups ~title ~tags body protocols =
   List.iter
     (fun kernel ->
       register_test
@@ -924,6 +933,7 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?max_blueprint_lookahead_in_seconds
         ?enable_fa_bridge
         ?enable_fast_withdrawal
+        ?enable_fast_fa_withdrawal
         ?additional_uses
         ?rpc_server
         ?websockets

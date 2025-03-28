@@ -1988,13 +1988,14 @@ let make_kernel_config_command =
           (config_key_flag ~name:"enable_fa_bridge")
           (config_key_flag ~name:"enable_dal")
           (config_key_arg ~name:"dal_slots" ~placeholder:"0,1,4,6,..."))
-       (args5
+       (args6
           (config_key_flag ~name:"enable_multichain")
           l2_chain_ids_arg
           (config_key_arg
              ~name:"max_delayed_inbox_blueprint_length"
              ~placeholder:"1000")
           (config_key_flag ~name:"enable_fast_withdrawal")
+          (config_key_flag ~name:"enable_fast_fa_withdrawal")
           evm_version_arg))
     (prefixes ["make"; "kernel"; "installer"; "config"]
     @@ param
@@ -2031,6 +2032,7 @@ let make_kernel_config_command =
              l2_chain_ids,
              max_delayed_inbox_blueprint_length,
              enable_fast_withdrawal,
+             enable_fast_fa_withdrawal,
              evm_version ) )
          output
          () ->
@@ -2065,6 +2067,7 @@ let make_kernel_config_command =
         ?set_account_code
         ?max_delayed_inbox_blueprint_length
         ?enable_fast_withdrawal
+        ?enable_fast_fa_withdrawal
         ~output
         ())
 
