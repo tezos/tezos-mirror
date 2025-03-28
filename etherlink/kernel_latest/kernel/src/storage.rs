@@ -61,6 +61,7 @@ pub enum StorageVersion {
     V26,
     V27,
     V28,
+    V29,
 }
 
 impl From<StorageVersion> for u64 {
@@ -75,7 +76,7 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V28;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V29;
 
 pub const PRIVATE_FLAG_PATH: RefPath = RefPath::assert_from(b"/evm/remove_whitelist");
 
@@ -140,12 +141,6 @@ const EVM_BURNED_FEES: RefPath = RefPath::assert_from(b"/evm/world_state/fees/bu
 /// Path to the last info per level timestamp seen.
 const EVM_INFO_PER_LEVEL_TIMESTAMP: RefPath =
     RefPath::assert_from(b"/evm/info_per_level/timestamp");
-/// Path to the number of timestamps read, use to compute the average block time.
-const EVM_INFO_PER_LEVEL_STATS_NUMBERS: RefPath =
-    RefPath::assert_from(b"/evm/info_per_level/stats/numbers");
-/// Path to the sum of distance between blocks, used to compute the average block time.
-const EVM_INFO_PER_LEVEL_STATS_TOTAL: RefPath =
-    RefPath::assert_from(b"/evm/info_per_level/stats/total");
 
 pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/evm/simulation_result");
 
@@ -555,44 +550,11 @@ pub fn store_l1_level<Host: Runtime>(host: &mut Host, level: u32) -> Result<(), 
     Ok(())
 }
 
-pub fn read_last_info_per_level_timestamp_stats<Host: Runtime>(
-    host: &mut Host,
-) -> Result<(i64, i64), Error> {
-    let mut buffer = [0u8; 8];
-    store_read_slice(host, &EVM_INFO_PER_LEVEL_STATS_NUMBERS, &mut buffer, 8)?;
-    let numbers = i64::from_le_bytes(buffer);
-
-    let mut buffer = [0u8; 8];
-    store_read_slice(host, &EVM_INFO_PER_LEVEL_STATS_TOTAL, &mut buffer, 8)?;
-    let total = i64::from_le_bytes(buffer);
-
-    Ok((numbers, total))
-}
-
-fn store_info_per_level_stats<Host: Runtime>(
-    host: &mut Host,
-    new_timestamp: Timestamp,
-) -> Result<(), Error> {
-    let old_timestamp =
-        read_last_info_per_level_timestamp(host).unwrap_or_else(|_| Timestamp::from(0));
-    let diff = new_timestamp.i64() - old_timestamp.i64();
-    let (numbers, total) =
-        read_last_info_per_level_timestamp_stats(host).unwrap_or((0i64, 0i64));
-    let total = total + diff;
-    let numbers = numbers + 1;
-
-    host.store_write(&EVM_INFO_PER_LEVEL_STATS_TOTAL, &total.to_le_bytes(), 0)?;
-    host.store_write(&EVM_INFO_PER_LEVEL_STATS_NUMBERS, &numbers.to_le_bytes(), 0)?;
-
-    Ok(())
-}
-
 pub fn store_last_info_per_level_timestamp<Host: Runtime>(
     host: &mut Host,
     timestamp: Timestamp,
 ) -> Result<(), Error> {
-    store_timestamp_path(host, &EVM_INFO_PER_LEVEL_TIMESTAMP.into(), &timestamp)?;
-    store_info_per_level_stats(host, timestamp)
+    store_timestamp_path(host, &EVM_INFO_PER_LEVEL_TIMESTAMP.into(), &timestamp)
 }
 
 pub fn read_timestamp_path<Host: Runtime>(
