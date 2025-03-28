@@ -3972,8 +3972,19 @@ let test_clean_bps =
     ~use_dal:Register_without_feature
     ~use_threshold_encryption:Register_without_feature
     ~kernels:[Latest]
-  @@ fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; _} _protocols
-    ->
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           proxy;
+           sequencer;
+           _;
+         }
+             _protocols ->
+  let* () =
+    bake_until_sync ~__LOC__ ~sc_rollup_node ~proxy ~sequencer ~client ()
+  in
   (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
      Eth_account.bootstrap_accounts.(1). *)
   let* raw_transfer =
