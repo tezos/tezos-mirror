@@ -17,7 +17,7 @@
 open! Import
 open Common
 
-let root = Filename.concat "_build" "test-readonly"
+let root = Filename.concat "_build" "brassaia-eio-test-readonly"
 
 let src = Logs.Src.create "tests.readonly" ~doc:"Tests read-only stores"
 

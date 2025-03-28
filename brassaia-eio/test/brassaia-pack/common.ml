@@ -396,7 +396,7 @@ let create_lower_root =
   let counter = ref 0 in
   let ( let$ ) res f = f @@ Result.get_ok res in
   fun ?(mkdir = true) () ->
-    let lower_root = "test_lower_" ^ string_of_int !counter in
+    let lower_root = "brassia_eio_test_lower_" ^ string_of_int !counter in
     incr counter ;
     let lower_path = Filename.concat "_build" lower_root in
     unlink_path lower_path ;

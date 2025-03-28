@@ -34,7 +34,7 @@ let archive_v3_always =
 let archive_v3_minimal_gced =
   "brassaia-eio" / "test" / "brassaia-pack" / "data" / "version_3_minimal_gced"
 
-let root_local_build = "_build" / "test-upgrade"
+let root_local_build = "_build" / "brassaia-eio-test-upgrade"
 
 (** [pack_entry]: hash / offset / length / kind *)
 type pack_entry = {h : Schema.Hash.t; o : Int63.t; l : int; k : [`b | `n | `c]}

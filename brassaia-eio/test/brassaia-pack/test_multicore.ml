@@ -17,7 +17,7 @@
 open! Import
 open Common
 
-let root = Filename.concat "_build" "test-multicore"
+let root = Filename.concat "_build" "brassaia-eio-test-multicore"
 
 let src = Logs.Src.create "tests.multicore" ~doc:"Tests"
 

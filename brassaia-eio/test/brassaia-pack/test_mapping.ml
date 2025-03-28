@@ -20,7 +20,7 @@ module Io = Brassaia_pack_unix.Io.Unix
 module Errs = Brassaia_pack_unix.Io_errors.Make (Io)
 module Sparse_file = Brassaia_pack_unix.Sparse_file.Make (Io)
 
-let test_dir = Filename.concat "_build" "test-pack-mapping"
+let test_dir = Filename.concat "_build" "brassaia-eio-test-pack-mapping"
 
 let rec make_string_seq len () =
   if len <= 0 then Seq.Nil

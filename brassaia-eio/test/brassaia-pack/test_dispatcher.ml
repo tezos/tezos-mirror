@@ -19,7 +19,7 @@ open Common
 module S = Test_gc.Store
 module Dispatcher = Brassaia_pack_unix.Dispatcher.Make (File_manager)
 
-let root = Filename.concat "_build" "test-dispatcher"
+let root = Filename.concat "_build" "brassaia-eio-test-dispatcher"
 
 let src = Logs.Src.create "tests.dispatcher" ~doc:"Test dispatcher"
 

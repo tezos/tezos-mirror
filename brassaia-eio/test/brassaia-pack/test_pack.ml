@@ -19,7 +19,7 @@ open Common
 module Brassaia_test = Brassaia_eio_test_helpers.Brassaia_test
 (* module Brassaia_pack_mem = Brassaia_eio_pack.Brassaia_pack_mem *)
 
-let test_dir = Filename.concat "_build" "test-db-pack"
+let test_dir = Filename.concat "_build" "brassia-eio-test-db-pack"
 
 module Brassaia_pack_store (Config : Brassaia_pack.Conf.S) :
   Brassaia_test.Generic_key = struct

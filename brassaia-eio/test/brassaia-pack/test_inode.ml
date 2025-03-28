@@ -17,7 +17,7 @@
 open! Import
 open Common
 
-let root = Filename.concat "_build" "test-inode"
+let root = Filename.concat "_build" "brassaia-test-inode"
 
 let src = Logs.Src.create "tests.instances" ~doc:"Tests"
 

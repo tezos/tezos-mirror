@@ -17,7 +17,7 @@
 open! Import
 open Common
 
-let root = Filename.concat "_build" "test-corrupted"
+let root = Filename.concat "_build" "brassia-eio-test-corrupted"
 
 module Conf = Brassaia_tezos.Conf
 

@@ -39,8 +39,8 @@ let root_v1_archive, root_v1, tmp =
   let open Fpath in
   ( v "brassaia-eio" / "test" / "brassaia-pack" / "data" / "version_1"
     |> to_string,
-    v "_build" / "test_pack_version_1" |> to_string,
-    v "_build" / "test_index_reconstruct" |> to_string )
+    v "_build" / "brassaia-eio-test_pack_version_1" |> to_string,
+    v "_build" / "brassaia-eio-test_index_reconstruct" |> to_string )
 
 module Test (S : Brassaia.Generic_key.KV with type Schema.Contents.t = string) =
 struct
@@ -193,7 +193,7 @@ module Test_corrupted_stores = struct
     let open Fpath in
     ( v "brassaia-eio" / "test" / "brassaia-pack" / "data" / "corrupted"
       |> to_string,
-      v "_build" / "test_integrity" |> to_string )
+      v "_build" / "brassaia-eio-test_integrity" |> to_string )
 
   let setup_env () = setup_test_env ~root_archive ~root_local_build:root
 
@@ -224,7 +224,7 @@ module Test_corrupted_stores = struct
     let open Fpath in
     ( v "brassaia-eio" / "test" / "brassaia-pack" / "data" / "version_3_minimal"
       |> to_string,
-      v "_build" / "test_corrupt_minimal" |> to_string )
+      v "_build" / "brassaia-eio-test_corrupt_minimal" |> to_string )
 
   let setup_env () = setup_test_env ~root_archive ~root_local_build
 
@@ -290,7 +290,7 @@ module Test_corrupted_inode = struct
     let open Fpath in
     ( v "brassaia-eio" / "test" / "brassaia-pack" / "data" / "corrupted_inode"
       |> to_string,
-      v "_build" / "test_integrity_inode" |> to_string )
+      v "_build" / "brassaia-eio-test_integrity_inode" |> to_string )
 
   let setup_test_env () = setup_test_env ~root_archive ~root_local_build:root
 
@@ -325,7 +325,7 @@ module Test_traverse_gced = struct
     let open Fpath in
     ( v "brassaia-eio" / "test" / "brassaia-pack" / "data" / "version_3_minimal"
       |> to_string,
-      v "_build" / "test_reconstruct" |> to_string )
+      v "_build" / "brassaia-eio-test_reconstruct" |> to_string )
 
   let setup_test_env () = setup_test_env ~root_archive ~root_local_build
 

@@ -17,7 +17,7 @@
 open! Import
 open Common
 
-let root = Filename.concat "_build" "test-tree"
+let root = Filename.concat "_build" "brassaia-eio-test-tree"
 
 let src = Logs.Src.create "tests.tree" ~doc:"Tests"
 

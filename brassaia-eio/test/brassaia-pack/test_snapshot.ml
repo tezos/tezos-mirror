@@ -17,9 +17,9 @@
 open! Import
 open Common
 
-let root_export = Filename.concat "_build" "test-snapshot-export"
+let root_export = Filename.concat "_build" "brassia-eio-test-snapshot-export"
 
-let root_import = Filename.concat "_build" "test-snapshot-import"
+let root_import = Filename.concat "_build" "brassia-eio-test-snapshot-import"
 
 let src = Logs.Src.create "tests.snapshot" ~doc:"Tests"
 

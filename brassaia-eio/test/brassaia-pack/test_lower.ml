@@ -19,6 +19,8 @@ open Common
 
 let src = Logs.Src.create "tests.lower" ~doc:"Test lower"
 
+let mkroot path = Filename.concat "_build" ("brassia-eio-" ^ path)
+
 module Log = (val Logs.src_log src : Logs.LOG)
 
 module Io = Brassaia_pack_unix.Io.Unix
@@ -352,7 +354,7 @@ module Store_tc = struct
       "brassaia-eio" / "test" / "brassaia-pack" / "data"
       / "version_2_to_3_always"
     in
-    let root = "_build" / "test_lower_migrate_v2" in
+    let root = mkroot "test_lower_migrate_v2" in
     setup_test_env ~root_archive ~root_local_build:root ;
     let lower_root = root / "lower" in
     (* Open store and trigger migration. This should succeed. *)
@@ -366,7 +368,7 @@ module Store_tc = struct
     let root_archive =
       "brassaia-eio" / "test" / "brassaia-pack" / "data" / "version_3_minimal"
     in
-    let root = "_build" / "test_lower_migrate_v3_minimal" in
+    let root = mkroot "test_lower_migrate_v3_minimal" in
     setup_test_env ~root_archive ~root_local_build:root ;
     let lower_root = root / "lower" in
     (* Open store and trigger migration. This should succeed. *)
@@ -379,7 +381,7 @@ module Store_tc = struct
     let root_archive =
       "brassaia-eio" / "test" / "brassaia-pack" / "data" / "version_3_always"
     in
-    let root = "_build" / "test_lower_migrate_v3_always" in
+    let root = mkroot "test_lower_migrate_v3_always" in
     setup_test_env ~root_archive ~root_local_build:root ;
     let lower_root = root / "lower" in
     (* Open store and trigger migration. This should succeed. *)

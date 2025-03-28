@@ -29,15 +29,14 @@ let fresh_name =
   let c = ref 0 in
   fun () ->
     incr c ;
-    let name = Filename.concat build_dir ("test-gc" ^ string_of_int !c) in
-    name
+    Filename.concat build_dir ("test-gc" ^ string_of_int !c)
 
 let create_v1_test_env () =
   let ( / ) = Filename.concat in
   let root_archive =
     "brassaia-eio" / "test" / "brassaia-pack" / "data" / "version_1_large"
   in
-  let root_local_build = "_build" / "test-v1-gc" in
+  let root_local_build = root_local_build "test-v1-gc" in
   setup_test_env ~root_archive ~root_local_build ;
   root_local_build
 
@@ -46,7 +45,7 @@ let create_from_v2_always_test_env () =
   let root_archive =
     "brassaia-eio" / "test" / "brassaia-pack" / "data" / "version_2_to_3_always"
   in
-  let root_local_build = "_build" / "test-from-v2-always-gc" in
+  let root_local_build = root_local_build "test-from-v2-always-gc" in
   setup_test_env ~root_archive ~root_local_build ;
   root_local_build
 
@@ -55,7 +54,7 @@ let create_test_env () =
   let root_archive =
     "brassaia-eio" / "test" / "brassaia-pack" / "data" / "version_3_minimal"
   in
-  let root_local_build = "_build" / "test-gc" in
+  let root_local_build = root_local_build "test-gc" in
   setup_test_env ~root_archive ~root_local_build ;
   root_local_build
 

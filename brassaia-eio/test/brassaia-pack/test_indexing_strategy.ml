@@ -28,7 +28,7 @@ module Store = struct
 end
 
 let config ~indexing_strategy ?(readonly = false) ?(fresh = false) () =
-  let root = Filename.concat "_build" "test_indexing_strategy" in
+  let root = Filename.concat "_build" "brassia-eio-test_indexing_strategy" in
   Brassaia_pack.config ~readonly ~indexing_strategy ~fresh root
 
 let test_unique_when_switched () =
