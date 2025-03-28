@@ -1026,9 +1026,11 @@ let contract_stake ctxt ~delegator_contract ~delegate =
     return @@ Some (delegator_pkh, staked_balance)
   else return_none
 
+let delegators ctxt pkh = Delegate.delegated_contracts ctxt pkh
+
 let stakers ctxt pkh =
   let open Lwt_result_syntax in
-  let*! delegators = Delegate.delegated_contracts ctxt pkh in
+  let*! delegators = delegators ctxt pkh in
   List.filter_map_es
     (fun delegator_contract ->
       contract_stake ctxt ~delegator_contract ~delegate:pkh)
@@ -1070,26 +1072,12 @@ let own_staked ctxt pkh =
   in
   return (Option.value own_staked_opt ~default:Tez.zero)
 
-let unstake_requests ctxt pkh =
-  let open Lwt_result_syntax in
-  let open Unstake_requests.For_RPC in
-  let* result =
-    (* This function applies slashing to finalizable requests. *)
-    prepare_finalize_unstake ctxt pkh
-  in
-  match result with
-  | None -> return_none
-  | Some {finalizable; unfinalizable} ->
-      let* unfinalizable =
-        (* Apply slashing to unfinalizable requests too. *)
-        apply_slash_to_unstaked_unfinalizable_stored_requests ctxt unfinalizable
-      in
-      return_some {finalizable; unfinalizable}
-
 let own_staked_and_delegated ctxt pkh =
   let open Lwt_result_syntax in
   let* own_full_balance = Delegate.For_RPC.full_balance ctxt pkh in
-  let* own_unstake_requests = unstake_requests ctxt (Implicit pkh) in
+  let* own_unstake_requests =
+    Contract_services.Implem.unstake_requests ctxt (Implicit pkh)
+  in
   let* own_unstaked_from_other_delegates =
     match own_unstake_requests with
     | None -> return Tez.zero
@@ -1178,7 +1166,7 @@ let f_baking_power ctxt pkh () () =
 let f_delegators ctxt pkh () () =
   let open Lwt_result_syntax in
   let* () = check_delegate_registered ctxt pkh in
-  let*! contracts = Delegate.delegated_contracts ctxt pkh in
+  let*! contracts = delegators ctxt pkh in
   return contracts
 
 let f_total_currently_staked ctxt =
@@ -1272,7 +1260,7 @@ let info ctxt pkh =
   let* consensus_key = consensus_key ctxt pkh in
   (* Chunked RPCs *)
   let* stakers = stakers ctxt pkh in
-  let*! delegators = Delegate.delegated_contracts ctxt pkh in
+  let*! delegators = delegators ctxt pkh in
   return
     {
       (* General baking information *)
@@ -1313,6 +1301,16 @@ let wrap_check_registered ~chunked s f =
       let open Lwt_result_syntax in
       let* () = check_delegate_registered ctxt pkh in
       f ctxt pkh)
+
+module Implem = struct
+  let check_delegate_registered = check_delegate_registered
+
+  let total_delegated = total_delegated
+
+  let own_delegated = own_delegated
+
+  let delegators = delegators
+end
 
 let register () =
   let open Lwt_result_syntax in
