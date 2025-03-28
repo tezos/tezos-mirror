@@ -222,9 +222,25 @@ val info :
 
 val register : unit -> unit
 
-(** For RPC.ml *)
+(** Functions used in the implementation of this file's RPCs, but also
+    useful elsewhere (as opposed to the functions above, which call
+    the RPCs). These functions are gathered in a separate module to
+    avoid naming conflicts. *)
+module Implem : sig
+  val check_delegate_registered :
+    Alpha_context.t ->
+    public_key_hash ->
+    unit Environment.Error_monad.tzresult Lwt.t
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/7369 *)
+  val total_delegated :
+    Alpha_context.t ->
+    public_key_hash ->
+    Tez.t Environment.Error_monad.tzresult Lwt.t
 
-val external_staked_and_delegated :
-  t -> public_key_hash -> Tez.t Environment.Error_monad.tzresult Lwt.t
+  val own_delegated :
+    Alpha_context.t ->
+    public_key_hash ->
+    Tez.t Environment.Error_monad.tzresult Lwt.t
+
+  val delegators : Alpha_context.t -> public_key_hash -> Contract.t list Lwt.t
+end
