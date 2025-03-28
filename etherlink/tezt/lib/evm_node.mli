@@ -40,6 +40,10 @@ type l2_setup = {
   maximum_gas_per_transaction : int64 option;
 }
 
+val default_bootstrap_accounts : string list
+
+val default_l2_setup : l2_chain_id:int -> l2_setup
+
 type time_between_blocks =
   | Nothing  (** Does not produce any block if not forced by the private RPC *)
   | Time_between_blocks of float

@@ -253,7 +253,7 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
     ?(use_threshold_encryption = default_threshold_encryption_registration)
     ?(use_dal = default_dal_registration)
     ?(use_multichain = default_multichain_registration) ?enable_tx_queue
-    ?spawn_rpc ?periodic_snapshot_path ~title ~tags body protocols =
+    ?spawn_rpc ?periodic_snapshot_path ?l2_setups ~title ~tags body protocols =
   let dal_cases =
     match use_dal with
     | Register_both {extra_tags_with; extra_tags_without} ->
@@ -329,6 +329,7 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
                 ?enable_tx_queue
                 ?spawn_rpc
                 ?periodic_snapshot_path
+                ?l2_setups
                 ~title
                 ~tags:(te_tags @ dal_tags @ multichain_tags @ tags)
                 body
@@ -347,9 +348,10 @@ let register_multichain_all ?max_delayed_inbox_blueprint_length
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?rollup_history_mode
     ?commitment_period ?challenge_window ?additional_uses ?rpc_server
-    ?websockets ?enable_fast_withdrawal ?history_mode ~number_of_chains
+    ?websockets ?enable_fast_withdrawal ?history_mode
     ?(use_threshold_encryption = default_threshold_encryption_registration)
-    ?(use_dal = default_dal_registration) ~title ~tags body protocols =
+    ?(use_dal = default_dal_registration) ~l2_setups ~title ~tags body protocols
+    =
   let dal_cases =
     match use_dal with
     | Register_both {extra_tags_with; extra_tags_without} ->
@@ -405,10 +407,10 @@ let register_multichain_all ?max_delayed_inbox_blueprint_length
             ?rollup_history_mode
             ~enable_dal
             ~enable_multichain:true
+            ~l2_setups
             ~title
             ~tags:(te_tags @ dal_tags @ tags)
             ~kernel:Kernel.Latest
-            ~number_of_chains
             body
             protocols)
         dal_cases)
@@ -434,134 +436,27 @@ let register_upgrade_all ~title ~tags ~genesis_timestamp
         protocols)
     kernels
 
-let test_current_level =
-  let chain_family = "Michelson" in
-  Protocol.register_test
-    ~__FILE__
-    ~title:"Test of the current_level rpc"
-    ~tags:["evm"; "tezlink"; "rpc"; "current_level"]
-    ~uses:(fun _protocol ->
+let register_tezlink_test ~title ~tags scenario protocols =
+  register_all
+    ~title
+    ~tags:("tezlink" :: tags)
+    ~l2_setups:
       [
-        Constant.octez_evm_node;
-        Constant.octez_smart_rollup_node;
-        Constant.WASM.evm_kernel;
-        Constant.smart_rollup_installer;
-      ])
-  @@ fun protocol ->
-  (* Setup: TODO: refactor once generic setup !17201 is merged *)
-  let* node, client = setup_l1 protocol in
+        {
+          (Evm_node.default_l2_setup ~l2_chain_id:12) with
+          l2_chain_family = "Michelson";
+        };
+      ]
+    ~use_multichain:Register_with_feature
+    ~rpc_server:Evm_node.Resto
+    scenario
+    protocols
 
-  (* Random chain id, let's not take one that could have been set by default (1, 42, 1337) *)
-  let chain_id_1 = 2988 in
-
-  (* Configuration files for the two l2 chains and for the rollup *)
-  let l2_config_1 = Temp.file "l2-chain-1-config.yaml" in
-  let rollup_config = Temp.file "rollup-chain-config.yaml" in
-
-  (* Argument for the l2 chain, a bootstrap account and a new world_state_path *)
-  let world_state_path = "/test/chain/" in
-  let address = Eth_account.bootstrap_accounts.(0).address in
-  let*! () =
-    Evm_node.make_l2_kernel_installer_config
-      ~chain_id:chain_id_1
-      ~chain_family
-      ~world_state_path
-      ~bootstrap_accounts:[address]
-      ~output:l2_config_1
-      ()
-  in
-  let*! () =
-    Evm_node.make_kernel_installer_config
-    (* No need for a real sequencer governance *)
-      ~sequencer_governance:"KT1"
-      ~l2_chain_ids:[chain_id_1]
-      ~output:rollup_config
-        (* we enable the multichain feature flag in the kernel *)
-      ~enable_multichain:true
-      ()
-  in
-
-  (* Setup the rollup (Origination and Start a rollup node) *)
-  let sc_rollup_node =
-    Sc_rollup_node.create
-      ~default_operator:Constant.bootstrap1.public_key_hash
-      Batcher
-      node
-      ~base_dir:(Client.base_dir client)
-  in
-
-  let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
-  let kernel = Constant.WASM.evm_kernel in
-  let* {output = kernel; _} =
-    prepare_installer_kernel_with_multiple_setup_file
-      ~output:(Temp.file "kernel.hex")
-      ~preimages_dir
-      ~configs:[rollup_config; l2_config_1]
-      (Uses.path kernel)
-  in
-  let* sc_rollup_address =
-    originate_sc_rollup
-      ~keys:[]
-      ~kind:"wasm_2_0_0"
-      ~boot_sector:("file:" ^ kernel)
-      ~parameters_ty:Test_helpers.evm_type
-      client
-  in
-  let* () =
-    Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
-  in
-
-  (* Setup a sequencer with a private rpc port to verify the durable storage. *)
-  let sequencer =
-    Evm_node.Sequencer
-      {
-        initial_kernel = kernel;
-        preimage_dir = Some preimages_dir;
-        private_rpc_port = Some (Port.fresh ());
-        time_between_blocks = Some Nothing;
-        sequencer = Constant.bootstrap1.alias;
-        genesis_timestamp = None;
-        max_blueprints_lag = None;
-        max_blueprints_ahead = None;
-        max_blueprints_catchup = None;
-        catchup_cooldown = None;
-        max_number_of_chunks = None;
-        wallet_dir = Some (Client.base_dir client);
-        tx_pool_timeout_limit = None;
-        tx_pool_addr_limit = None;
-        tx_pool_tx_per_addr_limit = None;
-        dal_slots = None;
-      }
-  in
-  let rpc_port = Port.fresh () in
-  (* we activate the experimental feature in the sequencer necessary to have the
-     tezlink rpc server
-     - l2 chains
-     - spawn rpc *)
-  let patch_config =
-    JSON.update "experimental_features" @@ fun json ->
-    JSON.(
-      put
-        ( "l2_chains",
-          JSON.annotate ~origin:"evm_node.config_patch"
-          @@ `A [`O [("chain_id", `String (string_of_int chain_id_1))]] )
-        json)
-    |> JSON.(
-         put
-           ( "spawn_rpc",
-             JSON.annotate ~origin:"evm_node.config_patch"
-             @@ `O [("protected_port", `Float (float_of_int rpc_port))] ))
-  in
-  let* sequencer =
-    Evm_node.init
-      ~mode:sequencer
-      ~patch_config
-      ~spawn_rpc:rpc_port
-      (Sc_rollup_node.endpoint sc_rollup_node)
-  in
-
-  (* end of setup *)
-
+let test_tezlink_current_level =
+  register_tezlink_test
+    ~title:"Test of the current_level rpc"
+    ~tags:["evm"; "rpc"; "current_level"]
+  @@ fun {sequencer; _} _protocol ->
   (* call the current_level rpc and parse the result *)
   let rpc_current_level ?offset block =
     let offset_str =
@@ -634,133 +529,10 @@ let test_current_level =
   unit
 
 let test_tezlink_version =
-  let chain_family = "Michelson" in
-  Protocol.register_test
-    ~__FILE__
+  register_tezlink_test
     ~title:"Test of the version rpc"
-    ~tags:["evm"; "tezlink"; "rpc"; "version"]
-    ~uses:(fun _protocol ->
-      [
-        Constant.octez_evm_node;
-        Constant.octez_smart_rollup_node;
-        Constant.WASM.evm_kernel;
-        Constant.smart_rollup_installer;
-      ])
-  @@ fun protocol ->
-  (* Setup: TODO: refactor once generic setup !17201 is merged *)
-  let* node, client = setup_l1 protocol in
-
-  (* Random chain id, let's not take one that could have been set by default (1, 42, 1337) *)
-  let chain_id_1 = 2988 in
-
-  (* Configuration files for the two l2 chains and for the rollup *)
-  let l2_config_1 = Temp.file "l2-chain-1-config.yaml" in
-  let rollup_config = Temp.file "rollup-chain-config.yaml" in
-
-  (* Argument for the l2 chain, a bootstrap account and a new world_state_path *)
-  let world_state_path = "/test/chain/" in
-  let address = Eth_account.bootstrap_accounts.(0).address in
-  let*! () =
-    Evm_node.make_l2_kernel_installer_config
-      ~chain_id:chain_id_1
-      ~chain_family
-      ~world_state_path
-      ~bootstrap_accounts:[address]
-      ~output:l2_config_1
-      ()
-  in
-  let*! () =
-    Evm_node.make_kernel_installer_config
-    (* No need for a real sequencer governance *)
-      ~sequencer_governance:"KT1"
-      ~l2_chain_ids:[chain_id_1]
-      ~output:rollup_config
-        (* we enable the multichain feature flag in the kernel *)
-      ~enable_multichain:true
-      ()
-  in
-
-  (* Setup the rollup (Origination and Start a rollup node) *)
-  let sc_rollup_node =
-    Sc_rollup_node.create
-      ~default_operator:Constant.bootstrap1.public_key_hash
-      Batcher
-      node
-      ~base_dir:(Client.base_dir client)
-  in
-
-  let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
-  let kernel = Constant.WASM.evm_kernel in
-  let* {output = kernel; _} =
-    prepare_installer_kernel_with_multiple_setup_file
-      ~output:(Temp.file "kernel.hex")
-      ~preimages_dir
-      ~configs:[rollup_config; l2_config_1]
-      (Uses.path kernel)
-  in
-  let* sc_rollup_address =
-    originate_sc_rollup
-      ~keys:[]
-      ~kind:"wasm_2_0_0"
-      ~boot_sector:("file:" ^ kernel)
-      ~parameters_ty:Test_helpers.evm_type
-      client
-  in
-  let* () =
-    Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
-  in
-
-  (* Setup a sequencer with a private rpc port to verify the durable storage. *)
-  let sequencer =
-    Evm_node.Sequencer
-      {
-        initial_kernel = kernel;
-        preimage_dir = Some preimages_dir;
-        private_rpc_port = Some (Port.fresh ());
-        time_between_blocks = Some Nothing;
-        sequencer = Constant.bootstrap1.alias;
-        genesis_timestamp = None;
-        max_blueprints_lag = None;
-        max_blueprints_ahead = None;
-        max_blueprints_catchup = None;
-        catchup_cooldown = None;
-        max_number_of_chunks = None;
-        wallet_dir = Some (Client.base_dir client);
-        tx_pool_timeout_limit = None;
-        tx_pool_addr_limit = None;
-        tx_pool_tx_per_addr_limit = None;
-        dal_slots = None;
-      }
-  in
-  let rpc_port = Port.fresh () in
-  (* we activate the experimental feature in the sequencer necessary to have the
-     tezlink rpc server
-     - l2 chains
-     - spawn rpc *)
-  let patch_config =
-    JSON.update "experimental_features" @@ fun json ->
-    JSON.(
-      put
-        ( "l2_chains",
-          JSON.annotate ~origin:"evm_node.config_patch"
-          @@ `A [`O [("chain_id", `String (string_of_int chain_id_1))]] )
-        json)
-    |> JSON.(
-         put
-           ( "spawn_rpc",
-             JSON.annotate ~origin:"evm_node.config_patch"
-             @@ `O [("protected_port", `Float (float_of_int rpc_port))] ))
-  in
-  let* sequencer =
-    Evm_node.init
-      ~mode:sequencer
-      ~patch_config
-      ~spawn_rpc:rpc_port
-      (Sc_rollup_node.endpoint sc_rollup_node)
-  in
-
-  (* end of setup *)
-
+    ~tags:["evm"; "rpc"; "version"]
+  @@ fun {sequencer; _} _protocol ->
   (* call the version rpc and parse the result *)
   let rpc_version () =
     let path = "/tezlink/version" in
@@ -12654,7 +12426,14 @@ let () =
   test_multichain_feature_flag protocols ;
   test_make_l2_kernel_installer_config "EVM" protocols ;
   test_make_l2_kernel_installer_config "Michelson" protocols ;
-  test_multichain_produceBlock ~number_of_chains:2 protocols ;
+  test_multichain_produceBlock
+    ~l2_setups:
+      (Some
+         [
+           Evm_node.default_l2_setup ~l2_chain_id:0;
+           Evm_node.default_l2_setup ~l2_chain_id:1;
+         ])
+    protocols ;
   test_fast_withdrawal_feature_flag protocols ;
   test_deposit_and_fast_withdraw protocols ;
   test_fast_withdraw_feature_flag_deactivated protocols ;
@@ -12729,6 +12508,6 @@ let () =
   test_deposit_event [Alpha] ;
   test_withdrawal_events [Alpha] ;
   test_fa_deposit_and_withdrawals_events [Alpha] ;
-  test_current_level protocols ;
   test_block_producer_validation [Alpha] ;
-  test_tezlink_version protocols
+  test_tezlink_current_level [Alpha] ;
+  test_tezlink_version [Alpha]

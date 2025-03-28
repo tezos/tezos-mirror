@@ -53,24 +53,6 @@ type sequencer_setup = {
   l2_chains : Evm_node.l2_setup list;
 }
 
-let default_bootstrap_accounts =
-  List.map
-    (fun account -> account.Eth_account.address)
-    (Array.to_list Eth_account.bootstrap_accounts)
-
-let default_l2_setup ~l2_chain_id =
-  Evm_node.
-    {
-      l2_chain_id;
-      l2_chain_family = "EVM";
-      world_state_path = Some "/evm/world_state";
-      bootstrap_accounts = Some default_bootstrap_accounts;
-      sequencer_pool_address = None;
-      minimum_base_fee_per_gas = None;
-      da_fee_per_byte = None;
-      maximum_gas_per_transaction = None;
-    }
-
 let multichain_setup_to_single ~(setup : multichain_sequencer_setup) =
   let observer =
     match setup.observers with [observer] -> observer | _ -> assert false
@@ -260,11 +242,12 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
 
 let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
     ~mainnet_compat ?delayed_inbox_timeout ?delayed_inbox_min_levels
-    ?(bootstrap_accounts = default_bootstrap_accounts) ?sequencer_pool_address
-    ?da_fee_per_byte ?minimum_base_fee_per_gas ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ?enable_fast_withdrawal ~enable_dal ?dal_slots
-    ?evm_version ~sequencer ~preimages_dir ~kernel () =
+    ?(bootstrap_accounts = Evm_node.default_bootstrap_accounts)
+    ?sequencer_pool_address ?da_fee_per_byte ?minimum_base_fee_per_gas
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
+    ?enable_fast_withdrawal ~enable_dal ?dal_slots ?evm_version ~sequencer
+    ~preimages_dir ~kernel () =
   let output_config = Temp.file "config.yaml" in
   let*! () =
     Evm_node.make_kernel_installer_config
@@ -653,7 +636,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
     ?commitment_period ?challenge_window
-    ?(bootstrap_accounts = default_bootstrap_accounts) ?sequencer
+    ?(bootstrap_accounts = Evm_node.default_bootstrap_accounts) ?sequencer
     ?sequencer_pool_address ?kernel ?da_fee ?minimum_base_fee_per_gas
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
@@ -665,7 +648,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
   let l2_chains =
     [
       {
-        (default_l2_setup ~l2_chain_id:1) with
+        (Evm_node.default_l2_setup ~l2_chain_id:1) with
         sequencer_pool_address;
         bootstrap_accounts = Some bootstrap_accounts;
         da_fee_per_byte = da_fee;
@@ -722,7 +705,7 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
     ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
     ?delayed_inbox_min_levels ?max_number_of_chunks
-    ?(bootstrap_accounts = default_bootstrap_accounts) ?sequencer
+    ?(bootstrap_accounts = Evm_node.default_bootstrap_accounts) ?sequencer
     ?sequencer_pool_address ~kernel ?da_fee ?minimum_base_fee_per_gas
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
@@ -730,7 +713,7 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?(threshold_encryption = false) ?(uses = uses) ?(additional_uses = [])
     ?rollup_history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None)
-    ~enable_multichain ~number_of_chains ?rpc_server ?websockets ?history_mode
+    ~enable_multichain ~l2_setups ?rpc_server ?websockets ?history_mode
     ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path body ~title ~tags
     protocols =
   let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
@@ -748,15 +731,19 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     | _, Latest -> Some Evm_node.Dream (* test with Dream for latest kernel *)
   in
   let l2_chains =
-    List.init number_of_chains (fun l2_chain_id ->
-        {
-          (default_l2_setup ~l2_chain_id) with
-          sequencer_pool_address;
-          da_fee_per_byte = da_fee;
-          minimum_base_fee_per_gas;
-          maximum_gas_per_transaction;
-          bootstrap_accounts = Some bootstrap_accounts;
-        })
+    match l2_setups with
+    | None ->
+        [
+          {
+            (Evm_node.default_l2_setup ~l2_chain_id:0) with
+            da_fee_per_byte = da_fee;
+            sequencer_pool_address;
+            minimum_base_fee_per_gas;
+            maximum_gas_per_transaction;
+            bootstrap_accounts = Some bootstrap_accounts;
+          };
+        ]
+    | Some l2_chains -> l2_chains
   in
   let body protocol =
     let* sequencer_setup =
@@ -834,15 +821,15 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
     ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
     ?delayed_inbox_min_levels ?max_number_of_chunks
-    ?(bootstrap_accounts = default_bootstrap_accounts) ?sequencer
+    ?(bootstrap_accounts = Evm_node.default_bootstrap_accounts) ?sequencer
     ?sequencer_pool_address ~kernel ?da_fee ?minimum_base_fee_per_gas
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?enable_fast_withdrawal ?commitment_period ?challenge_window
     ?threshold_encryption ?uses ?additional_uses ?rollup_history_mode
     ~enable_dal ?dal_slots ~enable_multichain ?rpc_server ?websockets
-    ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path body
-    ~title ~tags protocols =
+    ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?l2_setups
+    body ~title ~tags protocols =
   let body sequencer_setup =
     body (multichain_setup_to_single ~setup:sequencer_setup)
   in
@@ -881,13 +868,13 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ~enable_dal
     ?dal_slots
     ~enable_multichain
-    ~number_of_chains:1
     ?rpc_server
     ?websockets
     ?history_mode
     ?enable_tx_queue
     ?spawn_rpc
     ?periodic_snapshot_path
+    ~l2_setups
     body
     ~title
     ~tags
@@ -898,15 +885,15 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
     ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
     ?delayed_inbox_min_levels ?max_number_of_chunks
-    ?(bootstrap_accounts = default_bootstrap_accounts) ?sequencer
+    ?(bootstrap_accounts = Evm_node.default_bootstrap_accounts) ?sequencer
     ?sequencer_pool_address ?(kernels = Kernel.all) ?da_fee
     ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
     ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
     ?additional_uses ~threshold_encryption ~enable_dal ?dal_slots
     ~enable_multichain ?rpc_server ?websockets ?enable_fast_withdrawal
-    ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ~title
-    ~tags body protocols =
+    ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?l2_setups
+    ~title ~tags body protocols =
   List.iter
     (fun kernel ->
       register_test
@@ -949,6 +936,7 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?enable_tx_queue
         ?spawn_rpc
         ?periodic_snapshot_path
+        ?l2_setups
         ~title
         ~tags
         body

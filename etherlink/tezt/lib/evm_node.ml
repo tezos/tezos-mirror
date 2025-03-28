@@ -41,6 +41,23 @@ type l2_setup = {
   maximum_gas_per_transaction : int64 option;
 }
 
+let default_bootstrap_accounts =
+  List.map
+    (fun account -> account.Eth_account.address)
+    (Array.to_list Eth_account.bootstrap_accounts)
+
+let default_l2_setup ~l2_chain_id =
+  {
+    l2_chain_id;
+    l2_chain_family = "EVM";
+    world_state_path = Some "/evm/world_state";
+    bootstrap_accounts = Some default_bootstrap_accounts;
+    sequencer_pool_address = None;
+    minimum_base_fee_per_gas = None;
+    da_fee_per_byte = None;
+    maximum_gas_per_transaction = None;
+  }
+
 type mode =
   | Observer of {
       initial_kernel : string;
