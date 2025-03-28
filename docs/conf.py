@@ -55,6 +55,13 @@ html_baseurl = 'https://octez.tezos.com/docs/'
 
 # pushfeedback.com
 pushfeedback_project = '42c4fpgh27'
+pushfeedback_message_placeholder = (
+    'Comments on specific points and/or aspects'
+    ' (out of date, wrong, incomplete, ...)'
+)
+pushfeedback_email_placeholder = 'Email/Slack (optional)'
+pushfeedback_modal_title = 'Provide feedback'
+
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
