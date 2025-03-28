@@ -932,7 +932,7 @@ let suite =
     Alcotest.test_case_eio "add" `Quick test_add;
     Alcotest.test_case_eio "remove" `Quick test_remove;
     Alcotest.test_case_eio "update" `Quick test_update;
-    Alcotest.test_case_eio "clear" `Quick test_clear;
+    Alcotest.test_case_eio "clear" `Slow test_clear;
     Alcotest.test_case_eio "minimal_reads" `Quick test_minimal_reads;
     Alcotest.test_case_eio "fold" `Quick test_fold_force;
     Alcotest.test_case_eio "Broken.hashes" `Quick Broken.test_hashes;
