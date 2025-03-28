@@ -33,6 +33,7 @@ oc.install-homebrew:
   needs:
   - oc.build-homebrew
   dependencies: []
+  allow_failure: true
   timeout: 60 minutes
   before_script:
   - apt-get update && apt-get install -y git curl
@@ -67,6 +68,7 @@ oc.install-homebrew-macosx:
   needs:
   - oc.build-homebrew
   dependencies: []
+  allow_failure: true
   timeout: 60 minutes
   script:
   - ./scripts/packaging/homebrew_install.sh

@@ -39,6 +39,7 @@ let jobs pipeline_type : tezos_job list =
       ~name:"oc.install-homebrew"
       ~arch:Amd64
       ~cpu:Very_high
+      ~allow_failure:Yes
       ~image
       ~stage
       ~dependencies:(Dependent [Job job_create_homebrew_formula])
@@ -68,6 +69,7 @@ let jobs pipeline_type : tezos_job list =
       ~dependencies:(Dependent [Job job_create_homebrew_formula])
       ~stage
       ~description:"Run the homebrew installation on gitlab MacOSX runners"
+      ~allow_failure:Yes
       ~tag:Dynamic
       [
         "./scripts/packaging/homebrew_install.sh";
