@@ -73,13 +73,6 @@ val get_global_tezos_head : unit -> JSON.t RPC_core.t
 (** RPC: [GET global/tezos_level]. *)
 val get_global_tezos_level : unit -> JSON.t RPC_core.t
 
-type slot_header = {level : int; commitment : string; index : int}
-
-(** RPC: [GET global/block/<block>/dal/slot_headers] returns the dal slot headers
-    of the [block] (default ["head"]).  *)
-val get_global_block_dal_slot_headers :
-  ?block:string -> unit -> slot_header list RPC_core.t
-
 (** RPC: [GET local/batcher/queue] returns the queue of messages, as pairs of
     message id and binary message, in the batcher. *)
 val get_local_batcher_queue : unit -> (string * string) list RPC_core.t
@@ -111,12 +104,6 @@ val post_global_block_simulate :
     [< `Durable_storage_key of string list | `Pvm_state_key of string list] list ->
   string list ->
   simulation_result RPC_core.t
-
-(** RPC: [GET global/block/<block>/dal/processed_slots] returns the slots indices
-    that have been marked by the rollup node as confirmed or unconfirmed for block
-    [block] (default ["head"]), with their statuses.  *)
-val get_global_block_dal_processed_slots :
-  ?block:string -> unit -> (int * string) list RPC_core.t
 
 type commitment_and_hash = {
   commitment : RPC.smart_rollup_commitment;
