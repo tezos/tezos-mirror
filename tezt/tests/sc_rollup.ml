@@ -243,7 +243,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
         let dest_dir = Filename.concat data_dir kind in
         (* Copying used here instead of softlink to avoid tampering of artefact
            when debugging from the temp test directory *)
-        Process.run "cp" ["-r"; Uses.path src_dir; dest_dir]
+        Process.run "cp" ["-R"; Uses.path src_dir; dest_dir]
   in
   scenario protocol rollup_node sc_rollup tezos_node tezos_client
 

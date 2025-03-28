@@ -207,14 +207,12 @@ impl<'hooks, MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, M>, M: ManagerRead
                     .reveal_request_response_map
                     .get_response(reveal_request.as_slice())
                 else {
-                    return StepperStatus::Errored {
-                        steps: 0,
-                        cause: "PVM was waiting for reveal response".to_owned(),
-                        message: format!(
-                            "Unable to handle reveal request {}",
-                            hex::encode(reveal_request.as_slice())
-                        ),
-                    };
+                    // TODO: RV-573: Handle incorrectly encoded request/ Unavailable data differently in the sandbox.
+                    // When the PVM sends an incorrectly encoded reveal request, the stepper should return an error.
+                    // When the PVM sends a request for unavailable data, the stepper should exit.
+                    self.pvm.provide_reveal_error_response();
+
+                    return StepperStatus::Running { steps: 1 };
                 };
 
                 let success = self.pvm.provide_reveal_response(&reveal_response);

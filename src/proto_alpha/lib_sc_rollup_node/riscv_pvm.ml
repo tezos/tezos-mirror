@@ -51,15 +51,15 @@ let make_is_input_state (get_status : 'a -> Backend.status Lwt.t)
           return
             (Sc_rollup.First_after
                (Raw_level.of_int32_exn level, Z.of_int64 message_counter)))
-  | Waiting_for_reveal ->
-      let* reveal_request_string = get_reveal_request state in
-      let reveal_request =
-        (* TODO: RV-501: Errors during decode reveal request should not be fatal *)
-        Data_encoding.Binary.of_string_exn
+  | Waiting_for_reveal -> (
+      let+ reveal_request_string = get_reveal_request state in
+      match
+        Data_encoding.Binary.of_string
           Alpha_context.Sc_rollup.reveal_encoding
           reveal_request_string
-      in
-      return Sc_rollup.(Needs_reveal reveal_request)
+      with
+      | Ok reveal -> Sc_rollup.(Needs_reveal reveal)
+      | Error _ -> Sc_rollup.No_input_required)
 
 module Insert_failure_impl = struct
   let insert_failure _state =

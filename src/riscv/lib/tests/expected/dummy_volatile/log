@@ -34,6 +34,7 @@ Reveal metadata succeeded, result:
 Rollup address: RollupMetadata { raw_rollup_address: [244, 228, 124, 179, 196, 58, 104, 176, 212, 142, 48, 148, 9, 44, 164, 45, 113, 58, 221, 181], origination_level: 1 }
 Reveal preimage...
 Preimage: "cafebabe"
+Invalid reveal request...
 Reveals Done
 Internal(
     StartOfLevel,
