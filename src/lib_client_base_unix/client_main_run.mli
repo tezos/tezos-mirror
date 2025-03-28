@@ -83,6 +83,9 @@ sig
        logger that might come from elsewhere. Default (in [Client_config]) is
        [None], but [Main_signer] uses this overriding feature. *)
     RPC_client_unix.logger option
+
+  (** Activate logging of levels when set to [true]. *)
+  val advertise_log_levels : bool option
 end
 
 val register_default_signer :

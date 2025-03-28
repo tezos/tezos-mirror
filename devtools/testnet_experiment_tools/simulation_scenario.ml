@@ -517,6 +517,8 @@ module Custom_client_config : Client_main_run.M = struct
     commands
 
   let logger = None
+
+  let advertise_log_levels = None
 end
 
 let () =

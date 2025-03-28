@@ -157,7 +157,7 @@ let add_reorganised_blocks_row (block_id, block_hash, level, round) acc =
 
 let add_delegates_row (id, address) acc = Query_map.add id address acc
 
-(** [find_key_by_value]: searches the first key in [map] with 
+(** [find_key_by_value]: searches the first key in [map] with
     corresponding value [v] *)
 let find_key_by_value map v =
   Query_map.filter (fun _key value -> value = v) map
@@ -167,7 +167,7 @@ let find_key_by_value map v =
 (* Query helper functions. *)
 
 (** [get_head_id] obtains the unique block id that is the predecessor of the
-    predecessor of the block with highest level from the teztale db; the 
+    predecessor of the block with highest level from the teztale db; the
     uniqueness property is due to the tenderbake block finality 2 *)
 let get_head_id db_pool =
   let open Lwt_result_syntax in
@@ -200,7 +200,7 @@ let create_table ~db_pool ~query ~query_error =
 (** [get_entries]: obtains the entries that will populate a new table in
     the teztale db according to [query]
     - [db_pool]: the teztale db we connected to
-    - [add_to_map]: method to aggregate the entries for each row from 
+    - [add_to_map]: method to aggregate the entries for each row from
     the result of [query] into a Query_map object initialised as empty
     - [arg]: additional input argument for [query]
     - [query_error]: depending on the command, we have a different error *)
@@ -217,7 +217,7 @@ let get_entries ~db_pool ~query ~add_to_map ~arg ~query_error =
   | Ok map -> return map
 
 (** [insert_entry]: adds a row in the corresponding teztale db, according
-    to [query] with values from [entry] 
+    to [query] with values from [entry]
     - [entry]: tuple of values matching the schema of the table from [query] *)
 let insert_entry ~db_pool ~query ~entry ~query_error =
   let open Lwt_result_syntax in
@@ -232,9 +232,9 @@ let insert_entry ~db_pool ~query ~entry ~query_error =
 
 (* Printing. *)
 
-(** [print_canonical_block]: print the current (canonical) block 
+(** [print_canonical_block]: print the current (canonical) block
     - [map]: maps a block id to the id of its predecessor
-    - [current_predecessor]: optional value of the predecessor of the 
+    - [current_predecessor]: optional value of the predecessor of the
     current block that we are printing (None for the first block) *)
 let rec print_canonical_block ~map ~current_predecessor =
   let current_block_opt = find_key_by_value map current_predecessor in
@@ -547,6 +547,8 @@ module Custom_client_config : Client_main_run.M = struct
     commands
 
   let logger = None
+
+  let advertise_log_levels = None
 end
 
 let () =
