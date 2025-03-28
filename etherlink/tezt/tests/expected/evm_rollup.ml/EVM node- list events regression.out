@@ -1420,6 +1420,19 @@ reconstruct_replace_mainnet_kernel:
     { /* reconstruct_replace_mainnet_kernel version 0 */
       "reconstruct_replace_mainnet_kernel.v0": any }
   
+replay_csv_available:
+  description: Replay data will be streamlined to {path}.
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* replay_csv_available version 0 */
+      "replay_csv_available.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 request_completed_debug:
   description: {view} {worker_status}
   level: debug

@@ -430,6 +430,7 @@ let replay ctxt ?(log_file = "replay") ?profile
     Evm_store.use ctxt.store @@ fun conn ->
     Evm_store.Blueprints.get_with_events conn (Qty number)
   in
+  let log_file = Printf.sprintf "%s_%s" log_file (Z.to_string number) in
   Evm_state.apply_blueprint
     ~log_file
     ?profile
