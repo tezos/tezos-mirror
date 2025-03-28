@@ -9552,12 +9552,13 @@ let test_finalized_view =
   let* finalized_observer =
     run_new_observer_node ~finalized_view:true ~sc_rollup_node sequencer
   in
+  let p = Evm_node.wait_for_blueprint_applied finalized_observer 4 in
   (* Produce a few EVM blocks *)
   let* _ =
     repeat 4 @@ fun () ->
     let* _ = produce_block sequencer in
     unit
-  in
+  and* () = p in
   (* Produces two L1 blocks to ensure the L2 blocks are posted onchain by the sequencer *)
   let* () =
     bake_until_sync ~__LOC__ ~sc_rollup_node ~proxy ~sequencer ~client ()
