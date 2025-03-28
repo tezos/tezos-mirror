@@ -5,7 +5,8 @@
 use crate::Error;
 use tezos_crypto_rs::{
     hash::{self, HashTrait},
-    public_key, public_key_hash, signature, PublicKeySignatureVerifier, PublicKeyWithHash,
+    public_key, public_key_hash, signature, CryptoError, PublicKeySignatureVerifier,
+    PublicKeyWithHash,
 };
 
 macro_rules! bind_hash {
@@ -85,6 +86,29 @@ bind_pk_to_pkh!(PublicKeySecp256k1, ContractTz2Hash);
 bind_pk_to_pkh!(PublicKeyP256, ContractTz3Hash);
 bind_pk_to_pkh!(PublicKeyBls, ContractTz4Hash);
 bind_pk_to_pkh!(PublicKey, PublicKeyHash);
+
+macro_rules! generic_sig_conv {
+    ($sig:ident) => {
+        impl $sig {
+            pub fn into_generic(self) -> Signature {
+                Signature(signature::Signature::from(self.0))
+            }
+
+            pub fn try_from_generic(sig: Signature) -> Result<Self, Error> {
+                sig.0
+                    .try_into()
+                    .map(Self)
+                    .map_err(|err| Error::Crypto(CryptoError::SignatureType(err)))
+            }
+        }
+    };
+}
+
+generic_sig_conv!(Ed25519Signature);
+generic_sig_conv!(Secp256k1Signature);
+generic_sig_conv!(P256Signature);
+generic_sig_conv!(BlsSignature);
+generic_sig_conv!(UnknownSignature);
 
 macro_rules! bind_verify_sig {
     ($pk:ident, $sig:ident) => {
@@ -181,6 +205,270 @@ mod tests {
         // sk: BLsk2SdiXbRuYrWkfkSDbN1tCBGjGV7tTHxjVrokaiJsv17rDd8scd
         "BLpk1wG4V4ZterYpzvidZsyrerGDWhrbkPBTUfYaT7A9KsAzapSbgynLGdCZX4VoWHKT6S33Aumf",
         "tz4Uzyxg26DJyM4pc1V2pUvLpdsR5jdyzYsZ",
+    );
+
+    macro_rules! test_into_generic_sig {
+        ($name:ident, $sig_ty:ty, $($b58_sig:expr),+ $(,)?) => {
+            #[test]
+            fn $name() {
+                $(
+                    let sig = <$sig_ty>::from_b58check($b58_sig).expect(&format!(
+                        "Deriving {} from {} should succeed",
+                        $b58_sig,
+                        stringify!($sig_ty)
+                    ));
+                    let sig = sig.into_generic();
+                    assert_eq!(sig.to_b58check(), $b58_sig, "Value must not have changed");
+                )+
+            }
+        };
+    }
+
+    test_into_generic_sig!(
+        edsig_into_generic_sig,
+        Ed25519Signature,
+        // sk: edsk2stcDLHYC5N5AFowvKTvdQ86zuqQCn7QsFBoFJUgYyHL4xSaYB
+        // msg: "a"
+        "edsigtmnB915emZPLVrk7oyuRtZXrYhc2ychu5e7kHHSd7LUmiCReV5C16HCNXxt6hnnWxSKQmHFvuNZzUm5K1BKWBM2vejS4T1"
+    );
+
+    test_into_generic_sig!(
+        spsig_into_generic_sig,
+        Secp256k1Signature,
+        // sk: spsk2YJesPtHH4swmdVdJpGXU1NLnpKiq2nicQFEtR5Eyb6i8Lju4z
+        // msg: "a"
+        "spsig1VhaJFmN7HW4vHUHmHKu8AjVRCzYfmRNf83caYz6EYqH4PDkaNbh5hofmEoejZmpj2cw7w9iZYDiibgRRKcWzWzrW7GA1E"
+    );
+
+    test_into_generic_sig!(
+        p2sig_into_generic_sig,
+        P256Signature,
+        // sk: p2sk37fQnziQeeWmZFuTDpf5Kn42BncafWsJ1wZ29yNUzNppV4eN8n
+        // msg: "a"
+        "p2sigU4yPcGNuYzkTVGy7VTyFSbGBAnVWBQrnkfrUEgTSuuM7mSUoaggwUxCqE9gnnaatnahJosNpAUwKUVBbiWwZhkbgBXncD"
+    );
+
+    test_into_generic_sig!(
+        blsig_into_generic_sig,
+        BlsSignature,
+        // sk: BLsk2rrqeqLp7ujt4NSCG8W6xDMFDBm6QHoTabeSQ4HjPDewaX4F6k
+        // msg: "a"
+        "BLsigBcuqVyAuyYiMhPmcf16B8BmvhujB8DPUAmgYb94ixJ9wkraLfxzJpt2eyWMePtzuRNhRWSF4LukEv39LxAi7nGiH83ihKc9jnyhjbLc76QKTs4h1sTzQQEKR15yF9tSyU39iEsyTx"
+    );
+
+    test_into_generic_sig!(
+        unknown_sig_into_generic_sig,
+        UnknownSignature,
+        // sk: spsk36wmmgfs88ffW7ujgw9wm511zhZUkM4GnsYxhHMD9ZDy1AsKRa
+        // msg: "a"
+        "sigaeDzBgzkdvQRhYV2YUFpzYGE19bRe62YdZnnodZMDSXD9P97jBro2v8W2o8a1wRxfJEWJpLEbv2W1TM8jKqBdFCCuKcDp"
+    );
+
+    macro_rules! test_from_generic_sig {
+        ($name:ident, $sig_ty:ty, $({ $b58_sig:expr, $converted_b58_sig:expr }),+ $(,)?) => {
+            #[test]
+            fn $name() {
+                $(
+                    let sig = Signature::from_b58check($b58_sig).expect(&format!(
+                        "Deriving {} from {} should succeed",
+                        $b58_sig,
+                        stringify!(Signature)
+                    ));
+                    let sig = <$sig_ty>::try_from_generic(sig).expect(&format!(
+                        "Specify signature {} into {} should succeed",
+                        $b58_sig,
+                        stringify!($sig_ty)
+                    ));
+                    assert_eq!(
+                        sig.to_b58check(),
+                        $converted_b58_sig,
+                        "Signature must match the expected value"
+                    );
+                )+
+            }
+        };
+    }
+
+    test_from_generic_sig!(
+        edsig_from_generic_sig,
+        Ed25519Signature,
+        {
+            // sk: edsk2stcDLHYC5N5AFowvKTvdQ86zuqQCn7QsFBoFJUgYyHL4xSaYB
+            // msg: "a"
+            "edsigtmnB915emZPLVrk7oyuRtZXrYhc2ychu5e7kHHSd7LUmiCReV5C16HCNXxt6hnnWxSKQmHFvuNZzUm5K1BKWBM2vejS4T1",
+            "edsigtmnB915emZPLVrk7oyuRtZXrYhc2ychu5e7kHHSd7LUmiCReV5C16HCNXxt6hnnWxSKQmHFvuNZzUm5K1BKWBM2vejS4T1"
+        },
+        {
+            "sigbxi1wrkVdCJSfkpfx4EwGFLmsX6zyqJhxN1YwSe6zTpQNV3zBGv1DxTVNGJcKcAWtqnqmUa4kcDjy37M2yXzHxpmqXh1V",
+            "edsigtmnB915emZPLVrk7oyuRtZXrYhc2ychu5e7kHHSd7LUmiCReV5C16HCNXxt6hnnWxSKQmHFvuNZzUm5K1BKWBM2vejS4T1"
+        },
+        {
+            // sig: [0; 64]
+            "sigMzJ4GVAvXEd2RjsKGfG2H9QvqTSKCZsuB2KiHbZRGFz72XgF6KaKADznh674fQgBatxw3xdHqTtMHUZAGRprxy64wg1aq",
+            "edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q"
+        }
+    );
+
+    test_from_generic_sig!(
+        spsig_from_generic_sig,
+        Secp256k1Signature,
+        {
+            // sk: spsk2YJesPtHH4swmdVdJpGXU1NLnpKiq2nicQFEtR5Eyb6i8Lju4z
+            // msg: "a"
+            "spsig1VhaJFmN7HW4vHUHmHKu8AjVRCzYfmRNf83caYz6EYqH4PDkaNbh5hofmEoejZmpj2cw7w9iZYDiibgRRKcWzWzrW7GA1E",
+            "spsig1VhaJFmN7HW4vHUHmHKu8AjVRCzYfmRNf83caYz6EYqH4PDkaNbh5hofmEoejZmpj2cw7w9iZYDiibgRRKcWzWzrW7GA1E"
+        },
+        {
+            // sk: spsk2YJesPtHH4swmdVdJpGXU1NLnpKiq2nicQFEtR5Eyb6i8Lju4z
+            // msg: "a"
+            "sigmstyCA7dwXvY7UXo8mkUG47WPCybhngBYvHokpnReuZdKZwPoXK8aKp4sEZgAhxeJsnNyJ68Q4zdJyJuSw25JTjxgtVpA",
+            "spsig1VhaJFmN7HW4vHUHmHKu8AjVRCzYfmRNf83caYz6EYqH4PDkaNbh5hofmEoejZmpj2cw7w9iZYDiibgRRKcWzWzrW7GA1E"
+        },
+        {
+            // sig: [0; 64]
+            "sigMzJ4GVAvXEd2RjsKGfG2H9QvqTSKCZsuB2KiHbZRGFz72XgF6KaKADznh674fQgBatxw3xdHqTtMHUZAGRprxy64wg1aq",
+            "spsig15oyPL6RPsCmQbjdHRDQgBpnqfF1PGCaNk9eV5ksEABhY6BVRfPxGHhrV4fC84UYGJe7g1pFiyccSaBfg97KnBWCXYZh9c"
+        }
+    );
+
+    test_from_generic_sig!(
+        p2sig_from_generic_sig,
+        P256Signature,
+        {
+            // sk: p2sk37fQnziQeeWmZFuTDpf5Kn42BncafWsJ1wZ29yNUzNppV4eN8n
+            // msg: "a"
+            "p2sigU4yPcGNuYzkTVGy7VTyFSbGBAnVWBQrnkfrUEgTSuuM7mSUoaggwUxCqE9gnnaatnahJosNpAUwKUVBbiWwZhkbgBXncD",
+            "p2sigU4yPcGNuYzkTVGy7VTyFSbGBAnVWBQrnkfrUEgTSuuM7mSUoaggwUxCqE9gnnaatnahJosNpAUwKUVBbiWwZhkbgBXncD"
+        },
+        {
+            // sk: p2sk37fQnziQeeWmZFuTDpf5Kn42BncafWsJ1wZ29yNUzNppV4eN8n
+            // msg: "a"
+            "sigUkkYXApp64hzZ2CrmsSTw8Unn8GF5zSaJu15qE29hT4aEAhVCdbiCmnY3DAZMP1aAZBHjdSUfXcx5oFs84k8S4FhnDrUk",
+            "p2sigU4yPcGNuYzkTVGy7VTyFSbGBAnVWBQrnkfrUEgTSuuM7mSUoaggwUxCqE9gnnaatnahJosNpAUwKUVBbiWwZhkbgBXncD"
+        },
+        {
+            // sig: [0; 64]
+            "sigMzJ4GVAvXEd2RjsKGfG2H9QvqTSKCZsuB2KiHbZRGFz72XgF6KaKADznh674fQgBatxw3xdHqTtMHUZAGRprxy64wg1aq",
+            "p2sigMJWuMaj1zAfVMzdZzFnoncCKE7faHzJ7coB6h3ziUiGeZoTZUNfYSQR5t2dJ6cFWCvUx8CZdLRCigAUtrt2JEfRzvbDnL"
+        }
+    );
+
+    test_from_generic_sig!(
+        blsig_from_generic_sig,
+        BlsSignature,
+        {
+            // sk: BLsk2rrqeqLp7ujt4NSCG8W6xDMFDBm6QHoTabeSQ4HjPDewaX4F6k
+            // msg: "a"
+            "BLsigBcuqVyAuyYiMhPmcf16B8BmvhujB8DPUAmgYb94ixJ9wkraLfxzJpt2eyWMePtzuRNhRWSF4LukEv39LxAi7nGiH83ihKc9jnyhjbLc76QKTs4h1sTzQQEKR15yF9tSyU39iEsyTx",
+            "BLsigBcuqVyAuyYiMhPmcf16B8BmvhujB8DPUAmgYb94ixJ9wkraLfxzJpt2eyWMePtzuRNhRWSF4LukEv39LxAi7nGiH83ihKc9jnyhjbLc76QKTs4h1sTzQQEKR15yF9tSyU39iEsyTx"
+        }
+    );
+
+    test_from_generic_sig!(
+        sig_from_generic_sig,
+        UnknownSignature,
+        {
+            // sk: spsk36wmmgfs88ffW7ujgw9wm511zhZUkM4GnsYxhHMD9ZDy1AsKRa
+            // msg: "a"
+            "sigaeDzBgzkdvQRhYV2YUFpzYGE19bRe62YdZnnodZMDSXD9P97jBro2v8W2o8a1wRxfJEWJpLEbv2W1TM8jKqBdFCCuKcDp",
+            "sigaeDzBgzkdvQRhYV2YUFpzYGE19bRe62YdZnnodZMDSXD9P97jBro2v8W2o8a1wRxfJEWJpLEbv2W1TM8jKqBdFCCuKcDp"
+        },
+        {
+            // sig: [0; 64]
+            "sigMzJ4GVAvXEd2RjsKGfG2H9QvqTSKCZsuB2KiHbZRGFz72XgF6KaKADznh674fQgBatxw3xdHqTtMHUZAGRprxy64wg1aq",
+            "sigMzJ4GVAvXEd2RjsKGfG2H9QvqTSKCZsuB2KiHbZRGFz72XgF6KaKADznh674fQgBatxw3xdHqTtMHUZAGRprxy64wg1aq"
+        },
+        {
+            // sk: edsk2stcDLHYC5N5AFowvKTvdQ86zuqQCn7QsFBoFJUgYyHL4xSaYB
+            // msg: "a"
+            "edsigtmnB915emZPLVrk7oyuRtZXrYhc2ychu5e7kHHSd7LUmiCReV5C16HCNXxt6hnnWxSKQmHFvuNZzUm5K1BKWBM2vejS4T1",
+            "sigbxi1wrkVdCJSfkpfx4EwGFLmsX6zyqJhxN1YwSe6zTpQNV3zBGv1DxTVNGJcKcAWtqnqmUa4kcDjy37M2yXzHxpmqXh1V"
+        },
+        {
+            // sk: spsk2YJesPtHH4swmdVdJpGXU1NLnpKiq2nicQFEtR5Eyb6i8Lju4z
+            // msg: "a"
+            "spsig1VhaJFmN7HW4vHUHmHKu8AjVRCzYfmRNf83caYz6EYqH4PDkaNbh5hofmEoejZmpj2cw7w9iZYDiibgRRKcWzWzrW7GA1E",
+            "sigmstyCA7dwXvY7UXo8mkUG47WPCybhngBYvHokpnReuZdKZwPoXK8aKp4sEZgAhxeJsnNyJ68Q4zdJyJuSw25JTjxgtVpA"
+        },
+        {
+            // sk: p2sk37fQnziQeeWmZFuTDpf5Kn42BncafWsJ1wZ29yNUzNppV4eN8n
+            // msg: "a"
+            "p2sigU4yPcGNuYzkTVGy7VTyFSbGBAnVWBQrnkfrUEgTSuuM7mSUoaggwUxCqE9gnnaatnahJosNpAUwKUVBbiWwZhkbgBXncD",
+            "sigUkkYXApp64hzZ2CrmsSTw8Unn8GF5zSaJu15qE29hT4aEAhVCdbiCmnY3DAZMP1aAZBHjdSUfXcx5oFs84k8S4FhnDrUk"
+        }
+    );
+
+    macro_rules! test_from_wrong_generic_sig {
+        ($name:ident, $b58_sig:expr, $($sig_ty:ty),+ $(,)?) => {
+            #[test]
+            fn $name() {
+                $(
+                    let sig = Signature::from_b58check($b58_sig).expect(&format!(
+                        "Deriving {} from {} should succeed",
+                        $b58_sig,
+                        stringify!(Signature)
+                    ));
+                    assert!(
+                        matches!(
+                            <$sig_ty>::try_from_generic(sig),
+                            Err(Error::Crypto(CryptoError::SignatureType(
+                                signature::TryFromSignatureError::InvalidKind(_)
+                            )))
+                        ),
+                        "Converting generic signature into the wrong kind of signature must fail with Crypto(SignatureType(InvalidKind(_)))"
+                    );
+                )+
+            }
+        };
+    }
+
+    test_from_wrong_generic_sig!(
+        edsig_from_wrong_generic_sig,
+        // sk: edsk2stcDLHYC5N5AFowvKTvdQ86zuqQCn7QsFBoFJUgYyHL4xSaYB
+        // msg: "a"
+        "edsigtmnB915emZPLVrk7oyuRtZXrYhc2ychu5e7kHHSd7LUmiCReV5C16HCNXxt6hnnWxSKQmHFvuNZzUm5K1BKWBM2vejS4T1",
+        Secp256k1Signature,
+        P256Signature,
+        BlsSignature,
+    );
+
+    test_from_wrong_generic_sig!(
+        spsig_from_wrong_generic_sig,
+        // sk: spsk2YJesPtHH4swmdVdJpGXU1NLnpKiq2nicQFEtR5Eyb6i8Lju4z
+        // msg: "a"
+        "spsig1VhaJFmN7HW4vHUHmHKu8AjVRCzYfmRNf83caYz6EYqH4PDkaNbh5hofmEoejZmpj2cw7w9iZYDiibgRRKcWzWzrW7GA1E",
+        Ed25519Signature,
+        P256Signature,
+        BlsSignature,
+    );
+
+    test_from_wrong_generic_sig!(
+        p2sig_from_wrong_generic_sig,
+        // sk: p2sk37fQnziQeeWmZFuTDpf5Kn42BncafWsJ1wZ29yNUzNppV4eN8n
+        // msg: "a"
+        "p2sigU4yPcGNuYzkTVGy7VTyFSbGBAnVWBQrnkfrUEgTSuuM7mSUoaggwUxCqE9gnnaatnahJosNpAUwKUVBbiWwZhkbgBXncD",
+        Ed25519Signature,
+        Secp256k1Signature,
+        BlsSignature,
+    );
+
+    test_from_wrong_generic_sig!(
+        blsig_from_wrong_generic_sig,
+        // sk: BLsk2rrqeqLp7ujt4NSCG8W6xDMFDBm6QHoTabeSQ4HjPDewaX4F6k
+        // msg: "a"
+        "BLsigBcuqVyAuyYiMhPmcf16B8BmvhujB8DPUAmgYb94ixJ9wkraLfxzJpt2eyWMePtzuRNhRWSF4LukEv39LxAi7nGiH83ihKc9jnyhjbLc76QKTs4h1sTzQQEKR15yF9tSyU39iEsyTx",
+        Ed25519Signature,
+        Secp256k1Signature,
+        P256Signature,
+        UnknownSignature,
+    );
+
+    test_from_wrong_generic_sig!(
+        sig_from_wrong_generic_sig,
+        // sk: spsk36wmmgfs88ffW7ujgw9wm511zhZUkM4GnsYxhHMD9ZDy1AsKRa
+        // msg: "a"
+        "sigaeDzBgzkdvQRhYV2YUFpzYGE19bRe62YdZnnodZMDSXD9P97jBro2v8W2o8a1wRxfJEWJpLEbv2W1TM8jKqBdFCCuKcDp",
+        BlsSignature,
     );
 
     macro_rules! test_verify_sig {
