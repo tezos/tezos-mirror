@@ -1,33 +1,15 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2025 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (*****************************************************************************)
 
 (** Testing
     -------
     Component:    Workers
-    Invocation:   dune exec src/lib_workers/test/main.exe \
-                  -- --file test_workers_unit.ml
+    Invocation:   dune exec src/lib_bees/test/main.exe \
+                  -- --file test_bees_unit_eio.ml
     Subject:      Unit tests for [Worker]
 *)
 
@@ -39,46 +21,47 @@ type error += TzCrashError
 
 exception RaisedExn
 
+let sleep d =
+  let env = Tezos_base_unix.Event_loop.env_exn () in
+  Eio.Time.sleep env#clock d
+
 let create_handlers (type a) ?on_completion ?(slow = false) () =
   (module struct
     type self = a Worker.t
 
     let on_request :
         type r request_error.
-        self -> (r, request_error) Request.t -> (r, request_error) result Lwt.t
-        =
+        self -> (r, request_error) Request.t -> (r, request_error) result =
      fun _w request ->
-      let open Lwt_result_syntax in
-      let*! () = if slow then Lwt_unix.sleep 0.2 else Lwt.return_unit in
+      let () = if slow then sleep 0.2 else () in
       match request with
-      | Request.RqA _i -> (return_unit : (r, request_error) result Lwt.t)
-      | Request.RqB -> return_unit
-      | Request.RqErr Crash -> Lwt.return_error `CrashError
-      | Request.RqErr Simple -> Lwt.return_error `SimpleError
+      | Request.RqA _i -> (Ok () : (r, request_error) result)
+      | Request.RqB -> Ok ()
+      | Request.RqErr Crash -> Error `CrashError
+      | Request.RqErr Simple -> Error `SimpleError
       | Request.RqErr RaiseExn -> raise RaisedExn
 
     type launch_error = error trace
 
     let on_launch _w _name _param =
-      let open Lwt_result_syntax in
+      let open Result_syntax in
       return (ref [])
 
     let on_error (type a b) w _st (r : (a, b) Request.t) (errs : b) :
-        unit tzresult Lwt.t =
-      let open Lwt_result_syntax in
+        unit tzresult =
+      let open Result_syntax in
       let history = Worker.state w in
       match r with
       | Request.RqA _ -> return_unit
       | Request.RqB -> return_unit
       | Request.RqErr _ -> (
           match errs with
-          | `CrashError -> Lwt.return_error [TzCrashError]
+          | `CrashError -> Error [TzCrashError]
           | `SimpleError ->
               history := "RqErr" :: !history ;
               return_unit)
 
     let on_completion w r _ _st =
-      let open Lwt_syntax in
       let history = Worker.state w in
       let () =
         match Request.view r with
@@ -87,15 +70,12 @@ let create_handlers (type a) ?on_completion ?(slow = false) () =
         | View RqB -> history := "RqB" :: !history
         | View (RqErr _) -> ()
       in
-      let* () =
-        match on_completion with Some f -> f () | None -> Lwt.return_unit
-      in
-      Lwt.return_unit
+      match on_completion with Some f -> f () | None -> ()
 
-    let on_no_request _ = Lwt.return_unit
+    let on_no_request _ = ()
 
-    let on_close _w = Lwt.return_unit
-  end : Worker.HANDLERS
+    let on_close _w = ()
+  end : Worker.EIO_HANDLERS
     with type self = a Worker.t
      and type launch_error = error trace)
 
@@ -104,7 +84,7 @@ let create table handlers ?(timeout : float option) name =
     Option.bind timeout (fun timeout ->
         Ptime.(of_float_s timeout |> Option.map Ptime.to_span))
   in
-  Worker.launch ?timeout table name 0 handlers
+  Worker.launch_eio ?timeout table ~name 0 handlers
 
 let create_queue ?timeout ?on_completion =
   let table = Worker.create_table Queue in
@@ -159,9 +139,11 @@ let assert_status w expected_status =
     | Closing _ -> "Closing"
     | Closed _ -> "Closed"
   in
-  Assert.assert_true
-    (Format.asprintf "Worker should be of status %s" expected_status)
-    (status_str = expected_status)
+  Alcotest.check
+    Alcotest.string
+    "Worker should be of status"
+    expected_status
+    status_str
 
 open Qcheck2_helpers
 
@@ -189,21 +171,23 @@ let get_history w =
 (* General function to send requests
  * and build the expected history *)
 let push_multiple_requests w l =
-  let open Lwt_syntax in
+  (* Using a ref instead of calling it at the end of requests processing
+     because you might want to have a failing request that would trigger
+     a worker shutdown but still wanting to have the history when it
+     failed. *)
   let history = ref [] in
-  let* () =
-    Lwt.catch
-      (fun () ->
-        List.iter_s
-          (fun (Box r) ->
-            let open Lwt_syntax in
-            let* _ = Worker.Queue.push_request_and_wait w r in
-            history := get_history w ;
-            Lwt.return_unit)
-          l)
-      (fun _ -> Lwt.return_unit)
+  let () =
+    try
+      List.iter
+        (fun (Box r) ->
+          let p = Worker.Queue.push_request_and_wait_eio w r in
+          match Eio.Promise.await p with
+          | Error _ -> ()
+          | Ok () -> history := get_history w)
+        l
+    with _ -> ()
   in
-  return !history
+  !history
 
 let print_list l = Format.sprintf "[%s]" (String.concat ", " l)
 
@@ -211,20 +195,18 @@ let test_random_requests create_queue =
   let open QCheck2 in
   Test.make ~name:"Non-failing requests" Generators.request_series
   @@ fun series ->
-  let actual_t =
-    List.map_s
+  let actual =
+    List.map
       (fun l ->
-        let open Lwt_syntax in
-        let* w = create_queue "random_worker" in
+        let w = create_queue "random_worker" in
         match w with
         | Ok w ->
-            let* r = push_multiple_requests w l in
-            let* () = Worker.shutdown w in
-            return r
-        | Error _ -> Lwt.return_nil)
+            let r = push_multiple_requests w l in
+            let () = Worker.shutdown_eio w in
+            r
+        | Error _ -> [])
       series
   in
-  let actual = Lwt_main.run actual_t in
   let expected = List.map build_expected_history series in
   let pp fmt l =
     Format.fprintf fmt "%s" (print_list @@ List.map print_list l)
@@ -240,32 +222,31 @@ let assert_history actual expected =
     (actual = expected)
 
 let push_and_assert_history w l =
-  let open Lwt_syntax in
   let expected = build_expected_history l in
-  let* actual = push_multiple_requests w l in
-  assert_history actual expected ;
-  return_unit
+  let actual = push_multiple_requests w l in
+  assert_history actual expected
 
 (* Checks a non crashing request actually doesn't make the worker crash *)
 let test_push_crashing_request () =
-  let open Lwt_result_syntax in
+  let open Result_syntax in
   let* w = create_queue "crashing_worker" in
   assert_status w "Running" ;
-  let*! () =
-    push_and_assert_history w [Box RqB; Box RqB; Box (RqErr Crash); Box RqB]
-  in
+  push_and_assert_history w [Box RqB; Box RqB; Box (RqErr Crash); Box RqB] ;
+  (* The worker loop run in another fiber, let the scheduler run the shutdown
+     process before continuing. *)
+  let () = sleep 0.1 in
   assert_status w "Closed" ;
   return_unit
 
 (* Checks status is Closed when worker is has been shutdown and that accessing
    the state raises an exception *)
 let test_cancel_worker () =
-  let open Lwt_result_syntax in
+  let open Result_syntax in
   let* w = create_queue "canceled_worker" in
   assert_status w "Running" ;
-  let*! () = push_and_assert_history w [Box RqB] in
+  push_and_assert_history w [Box RqB] ;
   assert_status w "Running" ;
-  let*! () = Worker.shutdown w in
+  Worker.shutdown_eio w ;
   let state_not_available =
     try
       let _ = Worker.state w in
@@ -282,31 +263,30 @@ let test_cancel_worker () =
    in follow-up MR: fix the handling of exceptions and
    integrate this test *)
 let _test_raise_exn () =
-  let open Lwt_result_syntax in
+  let open Result_syntax in
   let* w = create_queue "exn_worker" in
   assert_status w "Running" ;
-  let*! _ = Worker.Queue.push_request_and_wait w (RqErr RaiseExn) in
+  let _ = Worker.Queue.push_request_and_wait w (RqErr RaiseExn) in
   (* Define the right behavior when exception is raised *)
   return_unit
 
 (* On dropbox mode, checks asynchronous requests leads to merge when the
    completion takes time *)
 let test_async_dropbox () =
-  let open Lwt_result_syntax in
-  let t_end, u_end = Lwt.task () in
-  let t_each, u_each = Lwt.task () in
+  let open Result_syntax in
+  let t_end, u_end = Eio.Promise.create ~label:"end" () in
+  let t_each, u_each = Eio.Promise.create ~label:"each" () in
   let nb_completion = ref 0 in
   let* w =
     (* We want slow request in order to make sure that all the injected
-       requests are merged while the first one is being treated *)
+       requests are merge while the first one is being treated *)
     create_dropbox
       ~slow:true
       ~on_completion:(fun () ->
-        let open Lwt_syntax in
         incr nb_completion ;
-        let* () = t_each in
-        if !nb_completion = 2 then Lwt.wakeup u_end () ;
-        Lwt.return_unit)
+        let () = Eio.Promise.await t_each in
+        if !nb_completion = 2 then Eio.Promise.resolve u_end () ;
+        ())
       "dropbox_worker"
   in
   let rq = RqA 1 in
@@ -315,14 +295,14 @@ let test_async_dropbox () =
   Worker.Dropbox.put_request w rq ;
   (* Sleep in order to make sure that the first request is handled
      before the others one are sent *)
-  let*! () = Lwt_unix.sleep 0.1 in
+  sleep 0.1 ;
   (* While the first request is handled, n other requests are sent *)
   (* These requests should be merged into one *)
   for _i = 1 to n do
     Worker.Dropbox.put_request w rq
   done ;
-  Lwt.wakeup u_each () ;
-  let*! () = t_end in
+  Eio.Promise.resolve u_each () ;
+  Eio.Promise.await t_end ;
   (* Hence the expected result being two requests, the first blocking one *)
   (* and the second being the result of the merge *)
   let expected = build_expected_history [Box (RqA 1); Box (RqA n)] in
@@ -332,46 +312,55 @@ let test_async_dropbox () =
 
 let wrap_qcheck test () =
   let _ = QCheck_alcotest.to_alcotest test in
-  Lwt_result_syntax.return_unit
+  Result_syntax.return_unit
 
+(** Because our tests might be ran in the same process as other tests,
+    we need to run our tests in a child process or next tests ran
+    will fail if using [Unix.fork].
+*)
 let tztest label fn =
-  Tztest.tztest label `Quick @@ fun () ->
+  Alcotest.test_case label `Quick @@ fun () ->
   match Lwt_unix.fork () with
   | 0 -> (
-      match Tezos_base_unix.Event_loop.main_run ~eio:true fn with
+      (* FIXME: do we want to use [Tezos_base_unix.Event_loop.main_run_eio]?
+         If so, the tests block at some point. *)
+      match
+        Tezos_base_unix.Event_loop.main_run ~eio:true @@ fun () ->
+        Lwt_eio.run_eio fn
+      with
       | Ok () -> exit 0
       | Error _ -> exit 1)
   | pid -> (
-      let open Lwt_result_syntax in
-      let*! _, status = Lwt_unix.waitpid [] pid in
+      let _, status = Unix.waitpid [] pid in
       match status with
-      | Unix.WEXITED 0 -> return_unit
-      | _ -> Lwt.return_error [])
+      | Unix.WEXITED 0 -> ()
+      | _ ->
+          let msg = Format.sprintf "Error in %s." label in
+          raise (Alcotest.fail msg))
 
 let tests_history =
   ( "Queue history",
     [
       tztest
-        "Random normal requests"
+        "Random normal requests (eio handlers)"
         (wrap_qcheck (test_random_requests create_queue));
       tztest
-        "Random normal requests on Bounded"
+        "Random normal requests on Bounded (eio handlers)"
         (wrap_qcheck (test_random_requests create_bounded));
     ] )
 
 let tests_status =
   ( "Status",
     [
-      tztest "Canceled worker" test_cancel_worker;
-      tztest "Crashing requests" test_push_crashing_request;
+      tztest "Canceled worker (eio handlers)" test_cancel_worker;
+      tztest "Crashing requests (eio handlers)" test_push_crashing_request;
     ] )
 
 let tests_buffer =
-  ("Buffer handling", [tztest "Dropbox/Async" test_async_dropbox])
+  ("Buffer handling", [tztest "Dropbox/Async (eio handlers)" test_async_dropbox])
 
 let () =
-  Alcotest_lwt.run
+  Alcotest.run
     ~__FILE__
-    "Bees_workers"
+    "Bees_workers (eio handlers)"
     [tests_history; tests_status; tests_buffer]
-  |> Lwt_main.run
