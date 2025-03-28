@@ -1,6 +1,6 @@
 This OCaml library implements the Sapling protocol for privacy-preserving
 transactions as described in its
-[specification](https://github.com/zcash/zips/blob/master/protocol/sapling.pdf),
+[specification](https://github.com/zcash/zips/blob/main/rendered/protocol/sapling.pdf),
 version 2020.1.2.
 
 A large part of the functionalities are implemented by the
