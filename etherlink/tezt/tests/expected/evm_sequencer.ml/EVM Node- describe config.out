@@ -172,7 +172,8 @@
         /* Configuration of l2_chains for multisequencing.
                             If not set, the node will adopt a single chain
            behaviour. */
-        [ { "chain_id": $bignum /* The id of the l2 chain */ } ... ]
+        [ { "chain_id": $bignum /* The id of the l2 chain */,
+            "chain_family": "Michelson" | "EVM" } ... ]
         /* Some */
         || null
         /* None */,

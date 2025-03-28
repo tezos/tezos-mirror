@@ -132,7 +132,18 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
         let*! () = Events.multichain_node_singlechain_kernel () in
         return EVM
     | Some [l2_chain], true ->
-        Evm_ro_context.read_chain_family ctxt l2_chain.chain_id
+        let* chain_family =
+          Evm_ro_context.read_chain_family ctxt l2_chain.chain_id
+        in
+        if l2_chain.chain_family = chain_family then return chain_family
+        else
+          tzfail
+            (Node_error.Mismatched_chain_family
+               {
+                 chain_id = l2_chain.chain_id;
+                 node_family = l2_chain.chain_family;
+                 kernel_family = chain_family;
+               })
     | _ -> tzfail Node_error.Unexpected_multichain
   in
 

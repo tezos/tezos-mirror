@@ -26,6 +26,16 @@ features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
 
+Configuration files created with versions v0.17 and v0.18 might cause encoding errors related to `l2_chain` or lead to `Mismatched_chain_family` issues. Operators of EVM nodes should verify their configurations by running:
+
+```
+octez-evm-node check config
+```
+
+If issues persist after verification, remove the `l2_chains` entry from the `experimental_features` section of your configuration file.
+
+By default, the configuration file (`config.json`) is located in your `data_dir` directory.
+
 ## Version 0.20 (2025-03-21)
 
 This release contains general UX improvements with the configuration and command

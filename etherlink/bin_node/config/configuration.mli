@@ -88,7 +88,10 @@ type monitor_websocket_heartbeat = {ping_interval : float; ping_timeout : float}
 
 val chain_id : supported_network -> Ethereum_types.chain_id
 
-type l2_chain = {chain_id : Ethereum_types.chain_id}
+type l2_chain = {
+  chain_id : Ethereum_types.chain_id;
+  chain_family : Ethereum_types.chain_family;
+}
 
 type tx_queue = {
   max_size : int;

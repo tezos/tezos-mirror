@@ -253,11 +253,28 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     match
       (configuration.experimental_features.l2_chains, enable_multichain)
     with
+    | None, false -> return_unit
     | None, true -> tzfail Node_error.Singlechain_node_multichain_kernel
     | Some _, false ->
         let*! () = Events.multichain_node_singlechain_kernel () in
         return_unit
-    | _ -> return_unit
+    | Some l2_chains, true ->
+        List.iter_es
+          (fun l2_chain ->
+            let chain_id = l2_chain.chain_id in
+            let* chain_family =
+              Evm_ro_context.read_chain_family ro_ctxt chain_id
+            in
+            if chain_family = l2_chain.chain_family then return_unit
+            else
+              tzfail
+                (Node_error.Mismatched_chain_family
+                   {
+                     chain_id;
+                     node_family = l2_chain.chain_family;
+                     kernel_family = chain_family;
+                   }))
+          l2_chains
   in
   let* finalizer_public_server =
     Rpc_server.start_public_server

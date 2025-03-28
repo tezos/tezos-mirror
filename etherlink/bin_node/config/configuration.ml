@@ -69,7 +69,10 @@ let chain_id_encoding : Ethereum_types.chain_id Data_encoding.t =
   let open Data_encoding in
   conv (fun (Chain_id z) -> z) (fun z -> Chain_id z) z
 
-type l2_chain = {chain_id : Ethereum_types.chain_id}
+type l2_chain = {
+  chain_id : Ethereum_types.chain_id;
+  chain_family : Ethereum_types.chain_family;
+}
 
 type tx_queue = {
   max_size : int;
@@ -898,10 +901,17 @@ let opt_monitor_websocket_heartbeat_encoding =
     ]
 
 let l2_chain_encoding : l2_chain Data_encoding.t =
+  let open Ethereum_types in
   let open Data_encoding in
-  conv (fun {chain_id} -> chain_id) (fun chain_id -> {chain_id})
-  @@ obj1
+  conv
+    (fun {chain_id; chain_family} -> (chain_id, chain_family))
+    (fun (chain_id, chain_family) -> {chain_id; chain_family})
+  @@ obj2
        (req "chain_id" ~description:"The id of the l2 chain" chain_id_encoding)
+       (req
+          "chain_family"
+          ~description:"The family of the l2 chain"
+          Chain_family.encoding)
 
 let experimental_features_encoding =
   let open Data_encoding in

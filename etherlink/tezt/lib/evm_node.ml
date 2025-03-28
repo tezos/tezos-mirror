@@ -1425,8 +1425,12 @@ let patch_config_with_experimental_feature
   |> optional_json_put ~name:"l2_chains" l2_chains (fun l2_chains ->
          `A
            (List.map
-              (fun {l2_chain_id; _} ->
-                `O [("chain_id", `String (string_of_int l2_chain_id))])
+              (fun {l2_chain_id; l2_chain_family; _} ->
+                `O
+                  [
+                    ("chain_id", `String (string_of_int l2_chain_id));
+                    ("chain_family", `String l2_chain_family);
+                  ])
               l2_chains))
 
 let patch_config_gc ?history_mode json =
