@@ -2358,6 +2358,59 @@ let send_messages ?(bake = true) ?(src = Constant.bootstrap2.alias)
   let* () = Client.Sc_rollup.send_message ~hooks ~src ~msg client in
   if bake then bake_for client else unit
 
+let check_saved_value_in_pvm ~rpc_hooks ~name ~expected_value sc_rollup_node =
+  let* encoded_value =
+    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks
+    @@ Sc_rollup_rpc.get_global_block_state ~key:(sf "vars/%s" name) ()
+  in
+  match Data_encoding.(Binary.of_bytes int31) @@ encoded_value with
+  | Error error ->
+      failwith
+        (Format.asprintf
+           "The arithmetic PVM has an unexpected state: %a"
+           Data_encoding.Binary.pp_read_error
+           error)
+  | Ok value ->
+      Check.(
+        (value = expected_value)
+          int
+          ~error_msg:
+            "Invalid value in rollup state (current = %L, expected = %R)") ;
+      return ()
+
+let rollup_node_interprets_dal_pages_helper ~protocol:_ client sc_rollup
+    sc_rollup_node =
+  let* genesis_info =
+    Client.RPC.call ~hooks client
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
+         sc_rollup
+  in
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
+  let* level =
+    Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node init_level
+  in
+
+  (* The Dal content is as follows:
+      - the page 0 of slot 0 contains 10,
+      - the page 0 of slot 1 contains 200,
+      - the page 0 of slot 2 contains 400.
+     Only slot 1 abd 2 are confirmed. But PVM Arith only interprets even
+     slots, we expect to have value = 502
+     (including the values 99 and 3 send via Inbox).
+  *)
+  let expected_value = 502 in
+  (* The code should be adapted if the current level changes. *)
+  let* () = send_messages client [" 99 3 "; " + + value"] in
+  let* () = repeat 2 (fun () -> bake_for client) in
+  let* _lvl =
+    Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node (level + 1)
+  in
+  check_saved_value_in_pvm
+    ~rpc_hooks
+    ~name:"value"
+    ~expected_value
+    sc_rollup_node
+
 let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
     sc_rollup_node sc_rollup_address node client _pvm_name =
   (* Check that the rollup node downloaded the confirmed slots to which it is
@@ -2586,59 +2639,6 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   match expand_test with
   | None -> return ()
   | Some f -> f ~protocol client sc_rollup_address sc_rollup_node
-
-let check_saved_value_in_pvm ~rpc_hooks ~name ~expected_value sc_rollup_node =
-  let* encoded_value =
-    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks
-    @@ Sc_rollup_rpc.get_global_block_state ~key:(sf "vars/%s" name) ()
-  in
-  match Data_encoding.(Binary.of_bytes int31) @@ encoded_value with
-  | Error error ->
-      failwith
-        (Format.asprintf
-           "The arithmetic PVM has an unexpected state: %a"
-           Data_encoding.Binary.pp_read_error
-           error)
-  | Ok value ->
-      Check.(
-        (value = expected_value)
-          int
-          ~error_msg:
-            "Invalid value in rollup state (current = %L, expected = %R)") ;
-      return ()
-
-let rollup_node_interprets_dal_pages ~protocol:_ client sc_rollup sc_rollup_node
-    =
-  let* genesis_info =
-    Client.RPC.call ~hooks client
-    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
-         sc_rollup
-  in
-  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
-  let* level =
-    Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node init_level
-  in
-
-  (* The Dal content is as follows:
-      - the page 0 of slot 0 contains 10,
-      - the page 0 of slot 1 contains 200,
-      - the page 0 of slot 2 contains 400.
-     Only slot 1 abd 2 are confirmed. But PVM Arith only interprets even
-     slots, we expect to have value = 502
-     (including the values 99 and 3 send via Inbox).
-  *)
-  let expected_value = 502 in
-  (* The code should be adapted if the current level changes. *)
-  let* () = send_messages client [" 99 3 "; " + + value"] in
-  let* () = repeat 2 (fun () -> bake_for client) in
-  let* _lvl =
-    Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node (level + 1)
-  in
-  check_saved_value_in_pvm
-    ~rpc_hooks
-    ~name:"value"
-    ~expected_value
-    sc_rollup_node
 
 (* Test that the rollup kernel can fetch and store a requested DAL page. Works as follows:
    - Originate a rollup with a kernel that:
@@ -10491,7 +10491,8 @@ let register ~protocols =
   scenario_with_all_nodes
     ~operator_profiles:[0; 1; 2; 3; 4; 5; 6]
     "rollup_node_applies_dal_pages"
-    (rollup_node_stores_dal_slots ~expand_test:rollup_node_interprets_dal_pages)
+    (rollup_node_stores_dal_slots
+       ~expand_test:rollup_node_interprets_dal_pages_helper)
     protocols ;
   scenario_with_all_nodes
     ~operator_profiles:[0]
