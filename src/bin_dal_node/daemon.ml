@@ -502,8 +502,8 @@ module Handler = struct
       attestations ;
     count_per_slot
 
-  let check_attesters_attested node_ctxt parameters ~block_level
-      get_attestations is_attested =
+  let check_attesters_attested node_ctxt parameters ~block_level attestations
+      is_attested =
     let open Lwt_result_syntax in
     let attesters =
       match
@@ -518,7 +518,6 @@ module Handler = struct
       let* committee =
         Node_context.fetch_committee node_ctxt ~level:attestation_level
       in
-      let attestations = get_attestations () in
       let attested_shards_per_slot =
         attested_shards_per_slot
           attestations
@@ -718,16 +717,21 @@ module Handler = struct
           Int32.(sub block_level (of_int proto_parameters.attestation_lag))
         (Plugin.is_attested dal_attestation)
     in
+    let* attestations = Plugin.get_attestations block_level cctxt in
     let* () =
-      let get_attestations () = Plugin.get_attestations block_info in
       check_attesters_attested
         ctxt
         proto_parameters
         ~block_level
-        get_attestations
+        attestations
         Plugin.is_attested
     in
-    Accuser.inject_entrapment_evidences (module Plugin) ctxt cctxt block_info
+    Accuser.inject_entrapment_evidences
+      (module Plugin)
+      attestations
+      ctxt
+      cctxt
+      block_info
 
   let process_block ctxt cctxt proto_parameters finalized_shell_header
       finalized_block_hash =

@@ -8,12 +8,7 @@
 (* [get_attestation_map] retrieves DAL attestation operations from a
    block and transforms them into a map where delegates are mapped to
    their corresponding attestation operation and DAL attestation. *)
-let get_attestation_map (type block_info attestation_operation dal_attestation)
-    (module Plugin : Dal_plugin.T
-      with type block_info = block_info
-       and type attestation_operation = attestation_operation
-       and type dal_attestation = dal_attestation) block =
-  let attestations = Plugin.get_attestations block in
+let get_attestation_map attestations =
   List.fold_left
     (fun map (_tb_slot, delegate_opt, operation, dal_attestation) ->
       match delegate_opt with
@@ -61,8 +56,12 @@ let filter_injectable_traps attestation_map traps =
 
    Guarded by [proto_parameters.incentives_enable].
 *)
-let inject_entrapment_evidences (type block_info)
-    (module Plugin : Dal_plugin.T with type block_info = block_info) node_ctxt
+let inject_entrapment_evidences
+    (type block_info attestation_operation dal_attestation)
+    (module Plugin : Dal_plugin.T
+      with type block_info = block_info
+       and type attestation_operation = attestation_operation
+       and type dal_attestation = dal_attestation) attestations node_ctxt
     rpc_ctxt block =
   let open Lwt_result_syntax in
   let attested_level = (Plugin.block_shell_header block).level in
@@ -82,7 +81,7 @@ let inject_entrapment_evidences (type block_info)
       match traps with
       | [] -> return_unit
       | traps ->
-          let attestation_map = get_attestation_map (module Plugin) block in
+          let attestation_map = get_attestation_map attestations in
           let traps_to_inject = filter_injectable_traps attestation_map traps in
           List.iter_es
             (fun ( delegate,

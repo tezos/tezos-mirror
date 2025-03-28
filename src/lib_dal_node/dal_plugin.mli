@@ -78,12 +78,15 @@ module type T = sig
       exists, its [dal_attestation] to be passed to the [is_attested]
       function. *)
   val get_attestations :
-    block_info ->
+    int32 ->
+    Tezos_rpc__RPC_context.generic ->
     (int
     * Signature.public_key_hash option
     * attestation_operation
     * dal_attestation option)
     list
+    tzresult
+    Lwt.t
 
   (** [get_committee ctxt ~level] retrieves the DAL committee at [level] from L1 as a
       map that associates to the public key hash [pkh] of the member of

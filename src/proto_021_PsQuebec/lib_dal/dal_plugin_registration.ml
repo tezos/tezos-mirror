@@ -136,51 +136,55 @@ module Plugin = struct
            let slot_index = Dal.Slot_index.to_int slot_index in
            return Dal_plugin.({published_level; slot_index; commitment}, status))
 
-  let get_attestations block_info =
+  let get_attestations block_level ctxt =
+    let open Lwt_result_syntax in
     let open Protocol.Alpha_context in
     let open Protocol_client_context.Alpha_block_services in
-    match block_info.operations with
-    | [consensus_ops; _anonymous; _votes; _managers] ->
-        List.filter_map
-          (fun operation ->
-            let (Operation_data operation_data) = operation.protocol_data in
-            match operation_data.contents with
-            | Single (Attestation attestation) -> (
-                let packed_operation : Kind.attestation Alpha_context.operation
-                    =
-                  {
-                    Alpha_context.shell = operation.shell;
-                    protocol_data = operation_data;
-                  }
-                in
-                let tb_slot = Slot.to_int attestation.consensus_content.slot in
-                let dal_attestation : dal_attestation option =
-                  Option.map
-                    (fun x -> (x.attestation :> dal_attestation))
-                    attestation.dal_content
-                in
-                match operation.receipt with
-                | Receipt (Operation_metadata operation_metadata) -> (
-                    match operation_metadata.contents with
-                    | Single_result (Attestation_result result) ->
-                        let delegate =
-                          Tezos_crypto.Signature.Of_V1.public_key_hash
-                            result.delegate
-                        in
-                        Some
-                          ( tb_slot,
-                            Some delegate,
-                            packed_operation,
-                            dal_attestation )
-                    | _ ->
-                        Some (tb_slot, None, packed_operation, dal_attestation))
-                | Empty | Too_large | Receipt No_operation_metadata ->
-                    Some (tb_slot, None, packed_operation, dal_attestation))
-            | _ -> None)
-          consensus_ops
-    | _ ->
-        (* that should be unreachable, as there are 4 operation passes *)
-        []
+    let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
+    let* consensus_ops =
+      Protocol_client_context.Alpha_block_services.Operations.operations_in_pass
+        cpctxt
+        ~block:(`Level block_level)
+        ~metadata:`Always
+        0
+    in
+    return
+    @@ List.filter_map
+         (fun operation ->
+           let (Operation_data operation_data) = operation.protocol_data in
+           match operation_data.contents with
+           | Single (Attestation attestation) -> (
+               let packed_operation : Kind.attestation Alpha_context.operation =
+                 {
+                   Alpha_context.shell = operation.shell;
+                   protocol_data = operation_data;
+                 }
+               in
+               let tb_slot = Slot.to_int attestation.consensus_content.slot in
+               let dal_attestation : dal_attestation option =
+                 Option.map
+                   (fun x -> (x.attestation :> dal_attestation))
+                   attestation.dal_content
+               in
+               match operation.receipt with
+               | Receipt (Operation_metadata operation_metadata) -> (
+                   match operation_metadata.contents with
+                   | Single_result (Attestation_result result) ->
+                       let delegate =
+                         Tezos_crypto.Signature.Of_V1.public_key_hash
+                           result.delegate
+                       in
+                       Some
+                         ( tb_slot,
+                           Some delegate,
+                           packed_operation,
+                           dal_attestation )
+                   | _ -> Some (tb_slot, None, packed_operation, dal_attestation)
+                   )
+               | Empty | Too_large | Receipt No_operation_metadata ->
+                   Some (tb_slot, None, packed_operation, dal_attestation))
+           | _ -> None)
+         consensus_ops
 
   let get_committee ctxt ~level =
     let open Lwt_result_syntax in

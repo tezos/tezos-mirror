@@ -60,12 +60,15 @@ module type T = sig
     (slot_header * operation_application_result) list tzresult Lwt.t
 
   val get_attestations :
-    block_info ->
+    int32 ->
+    Tezos_rpc__RPC_context.generic ->
     (int
     * Signature.public_key_hash option
     * attestation_operation
     * dal_attestation option)
     list
+    tzresult
+    Lwt.t
 
   val get_committee :
     Tezos_rpc.Context.generic ->
