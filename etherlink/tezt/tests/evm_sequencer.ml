@@ -2317,6 +2317,44 @@ let call_fa_withdraw ?timestamp ?expect_failure ~sender ~endpoint ~evm_node
             content))
     evm_node
 
+let call_fa_fast_withdraw ?expect_failure ?timestamp ~sender ~sequencer
+    ~ticket_owner ~receiver ~amount ~ticketer ~content
+    ~fast_withdrawal_contract_address () =
+  let endpoint = Evm_node.endpoint sequencer in
+  let produce_block () = produce_block sequencer in
+  let* receiver = ticket_creator receiver in
+  let routing_info =
+    String.concat "" [receiver |> Hex.of_bytes |> Hex.show; ticketer]
+  in
+  let* () =
+    Eth_cli.add_abi
+      ~label:"fa_fast_withdraw"
+      ~abi:(fast_withdrawal_abi_path ())
+      ()
+  in
+  let call_fast_withdraw () =
+    send_transaction_to_sequencer
+      ?timestamp
+      (Eth_cli.contract_send
+         ?expect_failure
+         ~source_private_key:sender.Eth_account.private_key
+         ~endpoint
+         ~abi_label:"fa_fast_withdraw"
+         ~address:Solidity_contracts.Precompile.fa_withdrawal
+         ~method_call:
+           (sf
+              {|fa_fast_withdraw("%s", "0x%s", %d, "0x%s", "0x%s", "%s", "%s")|}
+              ticket_owner
+              routing_info
+              amount
+              ticketer
+              content
+              fast_withdrawal_contract_address
+              "0x0000000000000000000000000000000000000000000000000000000000000001"))
+      sequencer
+  in
+  wait_for_application ~produce_block call_fast_withdraw
+
 let test_fa_withdrawal_is_included =
   register_all
     ~da_fee:Wei.one
@@ -12134,6 +12172,7 @@ let test_fa_deposit_and_withdrawals_events =
       ~enable_dal:false
       ~enable_multichain:false
       ~enable_fa_bridge:true
+      ~enable_fast_fa_withdrawal:true
       protocol
   in
   (* Send a FA deposit to the delayed inbox *)
@@ -12203,6 +12242,39 @@ let test_fa_deposit_and_withdrawals_events =
 
   (* Capture the log *)
   capture_logs ~header:"FA Withdrawal" receipt.logs ;
+
+  let* fast_withdrawal_contract_address =
+    Client.originate_contract
+      ~alias:"fast_withdrawal_contract_address"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap5.public_key_hash
+      ~init:(sf "Pair %S {}" l1_contracts.exchanger)
+      ~prg:(fast_withdrawal_path ())
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
+
+  (* Withdrawing to the zero implicit account *)
+  let* _ =
+    call_fa_fast_withdraw
+      ~timestamp:(next_timestamp ())
+      ~sender:Eth_account.bootstrap_accounts.(0)
+      ~sequencer
+      ~ticket_owner:Eth_account.bootstrap_accounts.(0).address
+      ~amount:2
+      ~ticketer:(ticketer |> Hex.of_bytes |> Hex.show)
+      ~content:(content |> Hex.of_bytes |> Hex.show)
+      ~receiver:Constant.bootstrap5.public_key_hash
+      ~fast_withdrawal_contract_address
+      ()
+  in
+
+  (* Fetch the deposit events *)
+  let* receipt = get_one_receipt_from_latest_or_fail sequencer in
+
+  (* Capture the log *)
+  capture_logs ~header:"FA Fast Withdrawal" receipt.logs ;
   unit
 
 let test_block_producer_validation =
