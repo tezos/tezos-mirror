@@ -594,20 +594,19 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id
   let* simulation_kind =
     match simulation_kind with
     | Filter operation_pool ->
+        (* We cannot include operations that are not live with respect
+           to our predecessor otherwise the node would reject the block. *)
+        let filtered_pool =
+          retain_live_operations_only
+            ~live_blocks:pred_live_blocks
+            operation_pool
+        in
         if constants.aggregate_attestation then
           let*? consensus =
-            aggregate_attestations_on_proposal operation_pool.consensus
+            aggregate_attestations_on_proposal filtered_pool.consensus
           in
-          return (Filter {operation_pool with consensus})
-        else
-          (* We cannot include operations that are not live with respect
-             to our predecessor otherwise the node would reject the block. *)
-          let filtered_pool =
-            retain_live_operations_only
-              ~live_blocks:pred_live_blocks
-              operation_pool
-          in
-          return (Filter filtered_pool)
+          return (Filter {filtered_pool with consensus})
+        else return (Filter filtered_pool)
     | Apply {ordered_pool; payload_hash} ->
         if constants.aggregate_attestation then
           let*? consensus =
