@@ -750,7 +750,7 @@ module Daemon_node_config = struct
       ~other_commands ~require_auth:_ =
     other_commands
 
-  let advertise_log_levels = None
+  let advertise_log_levels = Some true
 end
 
 let () = Client_main_run.run (module Daemon_node_config) ~select_commands
