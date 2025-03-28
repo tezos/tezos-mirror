@@ -34,6 +34,17 @@ Client
 - Update signer messages encoding. Signing message for BLS (Tz4) addresses now
   contain signing version. (MR :gl:`!16986`)
 
+- Add a new command ``list known remote keys <remote_signer_addr>`` that lists
+  the public key hashes known to the remote signer. The signer returns them only
+  if it is launched with ``--allow-list-known-keys`` argument. (MR :gl:`!17403`)
+
+Signer
+------
+
+- Add a ``--allow-list-known-keys`` argument at signer launch to allow client to
+  ask for the signer list of known public key hashes. The signer return ``List
+  known keys request not allowed.`` otherwise. (MR :gl:`!17403`)
+
 Baker
 -----
 
