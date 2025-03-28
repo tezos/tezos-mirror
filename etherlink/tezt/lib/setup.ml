@@ -815,7 +815,11 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
   (* Only register DAL tests for supporting kernels *)
   if (not enable_dal) || Kernel.supports_dal kernel then
     Protocol.register_test
-      ~additional_tags:(function Alpha -> [] | _ -> [Tag.slow])
+      ~additional_tags:(function
+        | Alpha -> []
+        | _ ->
+            (* There is no point in testing the multichain feature on non-alpha protocols *)
+            [(if enable_multichain then Tag.ci_disabled else Tag.slow)])
       ~__FILE__
       ~uses:(fun protocol -> uses protocol @ additional_uses)
       body
