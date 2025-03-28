@@ -54,7 +54,7 @@ let test_check_signature =
   let* () = Process.check_error yes_transfer in
 
   Log.info "Restart node with yes_crypto enabled" ;
-  let* () = Node.kill node in
+  let* () = Node.terminate node in
   let* () = Node.run ~env node [Node.Allow_yes_crypto] in
   let* () = Node.wait_for_ready node in
 
@@ -87,7 +87,7 @@ let test_check_signature =
 
   Log.info
     "Check that running a node with only environement variable is refused" ;
-  let* () = Node.kill node in
+  let* () = Node.terminate node in
   let* () = Node.run ~env node [] in
   let* () =
     Node.check_error
