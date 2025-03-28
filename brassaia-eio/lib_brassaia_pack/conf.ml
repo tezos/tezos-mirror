@@ -131,7 +131,8 @@ module Key = struct
          (function
            | `Always -> Indexing_strategy.always
            | `Minimal -> Indexing_strategy.minimal)
-         (fun _ -> Fmt.failwith "Can't serialise indexing strategy"))
+         (fun _ ->
+           `Minimal (* Dirty fix but Brassaia only uses minimal strategy *)))
       Default.indexing_strategy
 
   let use_fsync =
