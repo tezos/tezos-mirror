@@ -28,10 +28,17 @@ RollupMetadata {
     origination_level: 1,
 }
 [09, 90, A8, 2F, DD, B2, 8D, E6, 07, 33, 28, 86, 5C, EF, 23, A4, D5, 2A, CC, 6C, D4, 17, D8, AB, 39, 66, 69, D6, 3C, 3B, A8, BD]
+Signature is [133, 153, 89, 165, 225, 52, 223, 180, 255, 131, 0, 136, 151, 153, 173, 101, 89, 156, 116, 182, 204, 196, 243, 216, 218, 77, 17, 96, 8, 132, 254, 190, 220, 2, 63, 202, 122, 112, 169, 61, 119, 166, 30, 78, 142, 64, 30, 40, 210, 60, 25, 219, 193, 87, 197, 19, 194, 101, 0, 232, 241, 244, 56, 2]
+Reveal metadata...
+Reveal metadata succeeded, result: 
+Rollup address: RollupMetadata { raw_rollup_address: [244, 228, 124, 179, 196, 58, 104, 176, 212, 142, 48, 148, 9, 44, 164, 45, 113, 58, 221, 181], origination_level: 1 }
+Reveal preimage...
+Preimage: "cafebabe"
+Reveals Done
 Internal(
     StartOfLevel,
 )
-Internal(InforPerLevel)
+Internal(InfoPerLevel)
 External(
     [
         1,
@@ -54,7 +61,7 @@ Internal(
 Internal(
     StartOfLevel,
 )
-Internal(InforPerLevel)
+Internal(InfoPerLevel)
 External(
     [
         1,
@@ -67,7 +74,7 @@ Internal(
 Internal(
     StartOfLevel,
 )
-Internal(InforPerLevel)
+Internal(InfoPerLevel)
 External(
     [
         1,
@@ -80,7 +87,7 @@ Internal(
 Internal(
     StartOfLevel,
 )
-Internal(InforPerLevel)
+Internal(InfoPerLevel)
 Internal(
     Transfer(
         Transfer {
@@ -104,10 +111,3 @@ Internal(
 Internal(
     EndOfLevel,
 )
-Signature is [133, 153, 89, 165, 225, 52, 223, 180, 255, 131, 0, 136, 151, 153, 173, 101, 89, 156, 116, 182, 204, 196, 243, 216, 218, 77, 17, 96, 8, 132, 254, 190, 220, 2, 63, 202, 122, 112, 169, 61, 119, 166, 30, 78, 142, 64, 30, 40, 210, 60, 25, 219, 193, 87, 197, 19, 194, 101, 0, 232, 241, 244, 56, 2]
-Reveal metadata...
-Reveal metadata succeeded, result: 
-Rollup address: RollupMetadata { raw_rollup_address: [244, 228, 124, 179, 196, 58, 104, 176, 212, 142, 48, 148, 9, 44, 164, 45, 113, 58, 221, 181], origination_level: 1 }
-Reveal preimage...
-Preimage: "cafebabe"
-Done
