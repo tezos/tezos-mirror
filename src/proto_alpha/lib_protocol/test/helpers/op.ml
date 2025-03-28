@@ -38,10 +38,11 @@ let raw_sign (type kind) ctxt ?(watermark = Signature.Generic_operation)
   let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
   let encoding =
     if Constants.aggregate_attestation alpha_ctxt then
-      (* Under the [aggregate_attestation] feature flag, attestations signed
-         with BLS keys must use a dedicated serialization encoding *)
-      match (contents, sk) with
-      | Single (Attestation _), Bls _ -> Operation.bls_mode_unsigned_encoding
+      (* Under the [aggregate_attestation] feature flag, operations signed with
+         BLS keys use a dedicated serialization encoding, which differs only for
+         attestations and preattestations. *)
+      match sk with
+      | Bls _ -> Operation.bls_mode_unsigned_encoding
       | _ -> Operation.unsigned_encoding
     else Operation.unsigned_encoding
   in
