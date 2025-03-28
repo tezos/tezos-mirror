@@ -654,7 +654,7 @@ module Handler = struct
       (module Plugin : Dal_plugin.T) =
     let open Lwt_result_syntax in
     let* block_info =
-      Plugin.block_info cctxt ~block:(`Level block_level) ~metadata:`Always
+      Plugin.block_info cctxt ~block:(`Level block_level) ~metadata:`Never
     in
     let* () =
       if supports_refutations ctxt then
