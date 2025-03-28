@@ -188,3 +188,16 @@ val single_sapling_get_diff :
   (Sapling.root * Sapling.diff) shell_tzresult Lwt.t
 
 val register : unit -> unit
+
+(** Functions used in the implementation of this file's RPCs, but also
+    useful elsewhere (as opposed to the functions above, which call
+    the RPCs). These functions are gathered in a separate module to
+    avoid naming conflicts. *)
+module Implem : sig
+  val unstake_requests :
+    Alpha_context.t ->
+    Contract.t ->
+    Unstake_requests.For_RPC.prepared_finalize_unstake option
+    Environment.Error_monad.tzresult
+    Lwt.t
+end
