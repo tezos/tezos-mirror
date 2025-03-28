@@ -11,14 +11,6 @@ type mode =
   | Sequencer
   | Relay
       (** Relays the transactions when they are valid w.r.t. the local state. *)
-  | Forward of {
-      injector :
-        Ethereum_types.legacy_transaction_object ->
-        string ->
-        (Ethereum_types.hash, string) result tzresult Lwt.t;
-    }
-      (** Forwards the transactions without checking the
-          transaction validity. *)
 
 type parameters = {
   backend : (module Services_backend_sig.S);  (** The backend RPC module. *)
@@ -95,3 +87,7 @@ val clear_popped_transactions : unit -> unit tzresult Lwt.t
 
 (** [mode] retrieves the current pool mode *)
 val mode : unit -> mode tzresult Lwt.t
+
+(** wrapper of the Tx_pool to be compatible with the Tx_container
+    signature for the services. *)
+module Tx_container : Services_backend_sig.Tx_container

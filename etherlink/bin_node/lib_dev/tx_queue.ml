@@ -1094,3 +1094,27 @@ module Internal_for_tests = struct
   module Nonce_bitset = Nonce_bitset
   module Address_nonce = Address_nonce
 end
+
+module Tx_container = struct
+  let nonce = nonce
+
+  let add ~next_nonce tx_object ~raw_tx =
+    let open Lwt_result_syntax in
+    let* res = inject ~next_nonce tx_object raw_tx in
+    match res with
+    | Ok () -> return (Ok tx_object.hash)
+    | Error errs -> return (Error errs)
+
+  let find hash =
+    let open Lwt_result_syntax in
+    let* legacy_tx_object = find hash in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7747
+       We should instrument the TX queue to return the real
+       transaction objects. *)
+    return
+      (Option.map
+         Transaction_object.from_store_transaction_object
+         legacy_tx_object)
+
+  let content = content
+end

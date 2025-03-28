@@ -197,24 +197,31 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   in
 
   let backend = Evm_ro_context.ro_backend ro_ctxt configuration in
-  let* () =
+  let* tx_container =
     match configuration.experimental_features.enable_tx_queue with
     | Some tx_queue_config ->
-        Tx_queue.start
-          ~config:tx_queue_config
-          ~keep_alive:configuration.keep_alive
-          ()
+        let* () =
+          Tx_queue.start
+            ~config:tx_queue_config
+            ~keep_alive:configuration.keep_alive
+            ()
+        in
+        return
+          (module Tx_queue.Tx_container : Services_backend_sig.Tx_container)
     | None ->
-        Tx_pool.start
-          {
-            backend;
-            smart_rollup_address = smart_rollup_address_b58;
-            mode = Sequencer;
-            tx_timeout_limit = configuration.tx_pool_timeout_limit;
-            tx_pool_addr_limit = Int64.to_int configuration.tx_pool_addr_limit;
-            tx_pool_tx_per_addr_limit =
-              Int64.to_int configuration.tx_pool_tx_per_addr_limit;
-          }
+        let* () =
+          Tx_pool.start
+            {
+              backend;
+              smart_rollup_address = smart_rollup_address_b58;
+              mode = Sequencer;
+              tx_timeout_limit = configuration.tx_pool_timeout_limit;
+              tx_pool_addr_limit = Int64.to_int configuration.tx_pool_addr_limit;
+              tx_pool_tx_per_addr_limit =
+                Int64.to_int configuration.tx_pool_tx_per_addr_limit;
+            }
+        in
+        return (module Tx_pool.Tx_container : Services_backend_sig.Tx_container)
   in
   Metrics.init
     ~mode:"sequencer"
@@ -292,6 +299,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       (if Configuration.is_tx_queue_enabled configuration then Stateless
        else Full)
       configuration
+      tx_container
       (backend, smart_rollup_address_typed)
   in
   let* finalizer_private_server =
@@ -301,6 +309,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
          else Rpc_types.Single_chain_node_rpc_server EVM)
       ~block_production:`Single_node
       configuration
+      tx_container
       (backend, smart_rollup_address_typed)
   in
   let finalizer_rpc_process =

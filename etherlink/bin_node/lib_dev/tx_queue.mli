@@ -136,6 +136,10 @@ val confirm_transactions :
   confirmed_txs:Ethereum_types.hash Seq.t ->
   unit tzresult Lwt.t
 
+(** wrapper of the Tx_queue to be compatible with the Tx_container
+    signature for the services. *)
+module Tx_container : Services_backend_sig.Tx_container
+
 (**/*)
 
 module Internal_for_tests : sig

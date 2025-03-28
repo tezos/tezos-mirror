@@ -21,3 +21,16 @@ val inject_transaction :
   tx_object:Ethereum_types.legacy_transaction_object ->
   raw_tx:string ->
   (Ethereum_types.hash, string) result tzresult Lwt.t
+
+val get_transaction_count :
+  keep_alive:bool ->
+  base:Uri.t ->
+  Ethereum_types.address ->
+  Ethereum_types.Block_parameter.extended ->
+  (Ethereum_types.quantity, string) result tzresult Lwt.t
+
+val get_transaction_by_hash :
+  keep_alive:bool ->
+  base:Uri.t ->
+  Ethereum_types.hash ->
+  (Transaction_object.t option, string) result tzresult Lwt.t

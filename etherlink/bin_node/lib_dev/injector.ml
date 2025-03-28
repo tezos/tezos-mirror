@@ -67,3 +67,31 @@ let inject_transaction ~keep_alive ~base ~tx_object ~raw_tx =
     ~path:Resto.Path.(root / "private")
     (inject_transaction_request tx_object raw_tx)
     Inject_transaction.output_encoding
+
+let get_transaction_count_request address block_param =
+  construct_rpc_call
+    ~method_:Get_transaction_count.method_
+    ~input_encoding:Get_transaction_count.input_encoding
+    (address, block_param)
+
+let get_transaction_count ~keep_alive ~base address block_param =
+  call_rpc_service
+    ~keep_alive
+    ~base
+    ~path:Resto.Path.root
+    (get_transaction_count_request address block_param)
+    Get_transaction_count.output_encoding
+
+let get_transaction_by_hash_request tx_hash =
+  construct_rpc_call
+    ~method_:Get_transaction_by_hash.method_
+    ~input_encoding:Get_transaction_by_hash.input_encoding
+    tx_hash
+
+let get_transaction_by_hash ~keep_alive ~base tx_hash =
+  call_rpc_service
+    ~keep_alive
+    ~base
+    ~path:Resto.Path.root
+    (get_transaction_by_hash_request tx_hash)
+    Get_transaction_by_hash.output_encoding
