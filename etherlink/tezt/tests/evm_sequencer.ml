@@ -449,6 +449,7 @@ let register_tezlink_test ~title ~tags scenario protocols =
       ]
     ~use_multichain:Register_with_feature
     ~rpc_server:Evm_node.Resto
+    ~time_between_blocks:Nothing
     scenario
     protocols
 
