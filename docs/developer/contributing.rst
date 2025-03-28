@@ -11,8 +11,8 @@ There are several ways to get involved with the codebase and its documentation, 
 
 .. _feedback_doc:
 
-Feedback on documentation
-~~~~~~~~~~~~~~~~~~~~~~~~~
+Providing feedback on documentation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 As your journey will likely start by reading this documentation, please consider giving us feedback using the "Send feedback" button available in all entries.
 You can use it to mention aspects you like or don't like.
