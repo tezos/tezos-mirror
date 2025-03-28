@@ -2856,8 +2856,8 @@ test_evm_compatibility:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - etherlink.mk
-    - etherlink/kernel_evm/evm_evaluation/**/*
-    - etherlink/kernel_evm/evm_execution/**/*
+    - etherlink/kernel_latest/evm_evaluation/**/*
+    - etherlink/kernel_latest/evm_execution/**/*
     - images/**/*
     when: on_success
   needs:
@@ -2881,7 +2881,7 @@ test_evm_compatibility:
   - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs evm-evaluation-assessor
   - git clone --depth 1 --branch v14.1@etherlink https://github.com/functori/tests
     ethereum_tests
-  - ./evm-evaluation-assessor --eth-tests ./ethereum_tests/ --resources ./etherlink/kernel_evm/evm_evaluation/resources/
+  - ./evm-evaluation-assessor --eth-tests ./ethereum_tests/ --resources ./etherlink/kernel_latest/evm_evaluation/resources/
     -c
   after_script:
   - ./scripts/ci/sccache-stop.sh

@@ -17,7 +17,7 @@ type contract = {
   deployed_bin : string;
 }
 
-let solidity_contracts_path = "etherlink/kernel_evm/solidity_examples"
+let solidity_contracts_path = "etherlink/kernel_latest/solidity_examples"
 
 module JSON = Tezt.JSON
 
@@ -301,7 +301,7 @@ let coinbase =
     ~contract:"Coinbase"
 
 (** The info for the "block_constants.sol" contract.
-    See [etherlink/kernel_evm/solidity_examples/block_constants.sol] *)
+    See [etherlink/kernel_latest/solidity_examples/block_constants.sol] *)
 let block_constants =
   compile_contract
     ~source:(solidity_contracts_path ^ "/block_constants.sol")
@@ -309,7 +309,7 @@ let block_constants =
     ~contract:"BlockConstants"
 
 (** The info for the "call_withdrawal.sol" contract.
-    See [etherlink/kernel_evm/solidity_examples/call_withdrawal.sol] *)
+    See [etherlink/kernel_latest/solidity_examples/call_withdrawal.sol] *)
 let call_withdrawal =
   compile_contract
     ~source:(solidity_contracts_path ^ "/call_withdrawal.sol")
@@ -317,7 +317,7 @@ let call_withdrawal =
     ~contract:"CallPrecompile"
 
 (** The info for the "callcode_withdrawal.sol" contract.
-    See [etherlink/kernel_evm/solidity_examples/callcode_withdrawal.sol]
+    See [etherlink/kernel_latest/solidity_examples/callcode_withdrawal.sol]
     Deprecated Callcode withdrawal contract can't be compiled with the current solc version *)
 let callcode_withdrawal =
   {
@@ -392,7 +392,7 @@ let batcher =
 let reentrancy_test =
   compile_contract
     ~source:
-      "etherlink/kernel_evm/evm_execution/tests/contracts/src/ReentrancyTester.sol"
+      "etherlink/kernel_latest/evm_execution/tests/contracts/src/ReentrancyTester.sol"
     ~label:"reentrancy_tester"
     ~contract:"ReentrancyTester"
 

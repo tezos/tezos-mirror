@@ -46,7 +46,7 @@
   (glob_files evm_kernel_inputs/*)
   (glob_files ../../tezos_contracts/*)
   (glob_files ../../config/*)
-  (glob_files_rec ../../kernel_evm/*))
+  (glob_files_rec ../../kernel_latest/*))
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 

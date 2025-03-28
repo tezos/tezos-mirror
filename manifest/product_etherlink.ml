@@ -335,7 +335,7 @@ let _octez_evm_node_tests =
       [
         "rlptest.json";
         "invalidRLPTest.json";
-        "../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm";
+        "../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm";
       ]
     ~deps:
       [
@@ -384,7 +384,7 @@ let _tezt_etherlink =
     ~with_macos_security_framework:true
     ~dep_globs:
       ["evm_kernel_inputs/*"; "../../tezos_contracts/*"; "../../config/*"]
-    ~dep_globs_rec:["../../kernel_evm/*"]
+    ~dep_globs_rec:["../../kernel_latest/*"]
     ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
 
 let _evm_node =

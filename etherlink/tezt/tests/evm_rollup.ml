@@ -3337,8 +3337,8 @@ let test_mainnet_ghostnet_kernel_migration =
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
-        Constant.WASM.ghostnet_evm_kernel;
-        Constant.WASM.mainnet_evm_kernel;
+        Constant.WASM.ghostnet_kernel;
+        Constant.WASM.mainnet_kernel;
       ])
     ~title:
       "Ensures EVM kernel's upgrade succeeds with potential migration(s). \
@@ -3608,7 +3608,7 @@ let test_deposit_before_and_after_migration =
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
         Constant.WASM.evm_kernel;
-        Constant.WASM.ghostnet_evm_kernel;
+        Constant.WASM.ghostnet_kernel;
       ])
     ~title:"Deposit before and after migration"
   @@ fun protocol ->
@@ -3671,7 +3671,7 @@ let test_block_storage_before_and_after_migration =
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
         Constant.WASM.evm_kernel;
-        Constant.WASM.ghostnet_evm_kernel;
+        Constant.WASM.ghostnet_kernel;
       ])
     ~title:"Block storage before and after migration"
   @@ fun protocol ->
@@ -3707,7 +3707,7 @@ let test_kernel_upgrade_version_change =
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
         Constant.WASM.evm_kernel;
-        Constant.WASM.ghostnet_evm_kernel;
+        Constant.WASM.ghostnet_kernel;
       ])
     ~title:"Kernel version changes after an upgrade"
   @@ fun protocol ->
@@ -3801,7 +3801,7 @@ let test_transaction_storage_before_and_after_migration =
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
         Constant.WASM.evm_kernel;
-        Constant.WASM.ghostnet_evm_kernel;
+        Constant.WASM.ghostnet_kernel;
       ])
     ~title:"Transaction storage before and after migration"
   @@ fun protocol ->
@@ -5218,13 +5218,13 @@ let test_ghostnet_kernel =
         Constant.octez_evm_node;
         Constant.octez_smart_rollup_node;
         Constant.smart_rollup_installer;
-        Constant.WASM.ghostnet_evm_kernel;
+        Constant.WASM.ghostnet_kernel;
       ])
     ~title:"Regression test for Ghostnet kernel"
   @@ fun protocol ->
   let* {evm_node; _} = setup_evm_kernel ~kernel:Ghostnet ~admin:None protocol in
   let*@ version = Rpc.tez_kernelVersion evm_node in
-  Check.((version = Constant.WASM.ghostnet_evm_commit) string)
+  Check.((version = Constant.WASM.ghostnet_commit) string)
     ~error_msg:"The ghostnet kernel has version %L but constant says %R" ;
   unit
 
