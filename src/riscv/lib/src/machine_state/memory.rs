@@ -181,6 +181,49 @@ pub trait Memory<M: ManagerBase>: Sized {
     ) -> Result<(), OutOfBounds>
     where
         M: ManagerWrite;
+
+    /// Allocate pages for the given address range.
+    #[cfg(feature = "supervisor")]
+    fn allocate_pages(
+        &mut self,
+        address_hint: Option<Address>,
+        length: usize,
+        allow_replace: bool,
+    ) -> Result<Address, OutOfBounds>
+    where
+        M: ManagerReadWrite;
+
+    /// Allocate pages for the given address range.
+    #[cfg(feature = "supervisor")]
+    fn deallocate_pages(&mut self, address: Address, length: usize) -> Result<(), OutOfBounds>
+    where
+        M: ManagerReadWrite;
+
+    /// Allocate pages for the given address range and amend the protections for them.
+    #[cfg(feature = "supervisor")]
+    fn allocate_and_protect_pages(
+        &mut self,
+        address_hint: Option<Address>,
+        length: usize,
+        perms: Permissions,
+        allow_replace: bool,
+    ) -> Result<Address, OutOfBounds>
+    where
+        M: ManagerReadWrite;
+
+    /// Free the pages in that address range and make sure the range is no longer accessible.
+    #[cfg(feature = "supervisor")]
+    fn deallocate_and_protect_pages(
+        &mut self,
+        address: Address,
+        length: usize,
+    ) -> Result<(), OutOfBounds>
+    where
+        M: ManagerReadWrite,
+    {
+        self.deallocate_pages(address, length)?;
+        self.protect_pages(address, length, Permissions::None)
+    }
 }
 
 /// Memory configuration

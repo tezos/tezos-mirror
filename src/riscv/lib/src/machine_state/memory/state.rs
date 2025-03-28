@@ -9,6 +9,7 @@ use super::Memory;
 use super::OutOfBounds;
 #[cfg(feature = "supervisor")]
 use super::Permissions;
+use super::buddy::Buddy;
 #[cfg(feature = "supervisor")]
 use super::protection::PagePermissions;
 use crate::state_backend::DynCells;
@@ -20,7 +21,7 @@ use crate::state_backend::ManagerReadWrite;
 use crate::state_backend::ManagerWrite;
 
 /// Machine's memory
-pub struct MemoryImpl<const PAGES: usize, const TOTAL_BYTES: usize, M: ManagerBase> {
+pub struct MemoryImpl<const PAGES: usize, const TOTAL_BYTES: usize, B, M: ManagerBase> {
     /// Memory contents
     pub(super) data: DynCells<TOTAL_BYTES, M>,
 
@@ -35,10 +36,19 @@ pub struct MemoryImpl<const PAGES: usize, const TOTAL_BYTES: usize, M: ManagerBa
     /// Execute permissions per page
     #[cfg(feature = "supervisor")]
     pub(super) executable_pages: PagePermissions<PAGES, M>,
+
+    /// Allocation tracker
+    #[cfg(feature = "supervisor")]
+    pub(super) allocated_pages: B,
+
+    /// When the `supervisor` feature is disabled, we need to make use of `B` somehow to make the
+    /// compiler happy
+    #[cfg(not(feature = "supervisor"))]
+    pub(super) _pd: std::marker::PhantomData<B>,
 }
 
-impl<const PAGES: usize, const TOTAL_BYTES: usize, M: ManagerBase>
-    MemoryImpl<PAGES, TOTAL_BYTES, M>
+impl<const PAGES: usize, const TOTAL_BYTES: usize, B, M: ManagerBase>
+    MemoryImpl<PAGES, TOTAL_BYTES, B, M>
 {
     /// Ensure the access is within bounds.
     #[inline]
@@ -51,9 +61,10 @@ impl<const PAGES: usize, const TOTAL_BYTES: usize, M: ManagerBase>
     }
 }
 
-impl<const PAGES: usize, const TOTAL_BYTES: usize, M> Memory<M>
-    for MemoryImpl<PAGES, TOTAL_BYTES, M>
+impl<const PAGES: usize, const TOTAL_BYTES: usize, B, M> Memory<M>
+    for MemoryImpl<PAGES, TOTAL_BYTES, B, M>
 where
+    B: Buddy<M>,
     M: ManagerBase,
 {
     #[inline]
@@ -174,6 +185,10 @@ where
             writable_pages: self.writable_pages.clone(),
             #[cfg(feature = "supervisor")]
             executable_pages: self.executable_pages.clone(),
+            #[cfg(feature = "supervisor")]
+            allocated_pages: self.allocated_pages.clone(),
+            #[cfg(not(feature = "supervisor"))]
+            _pd: std::marker::PhantomData,
         }
     }
 
@@ -220,6 +235,96 @@ where
 
         Ok(())
     }
+
+    #[cfg(feature = "supervisor")]
+    fn deallocate_pages(&mut self, address: Address, length: usize) -> Result<(), OutOfBounds>
+    where
+        M: ManagerReadWrite,
+    {
+        Self::check_bounds(address, length)?;
+
+        // See RV-561: Use `u64` for indices and lengths that come from the PVM
+        let pages = (length as u64).div_ceil(super::PAGE_SIZE.get());
+
+        // Buddy memory manager works on page indices, not addresses
+        let idx = address >> super::OFFSET_BITS;
+        self.allocated_pages.deallocate(idx, pages);
+
+        Ok(())
+    }
+
+    #[cfg(feature = "supervisor")]
+    fn allocate_pages(
+        &mut self,
+        address_hint: Option<Address>,
+        length: usize,
+        allow_replace: bool,
+    ) -> Result<Address, OutOfBounds>
+    where
+        M: ManagerReadWrite,
+    {
+        // The interface works on usize at the moment, however, going forward we'll convert all
+        // length types to u64 to avoid machine-specific behavior for lengths.
+        // See RV-561: Use `u64` for indices and lengths that come from the PVM
+        let pages = (length as u64).div_ceil(super::PAGE_SIZE.get());
+
+        match address_hint {
+            // Caller wants to allocate at a specific address
+            Some(address) => {
+                Self::check_bounds(address, length)?;
+
+                // Buddy memory manager works on page indices, not addresses
+                let idx = address >> super::OFFSET_BITS;
+                self.allocated_pages
+                    .allocate_fixed(idx, pages, allow_replace)
+                    .map(|()| address)
+            }
+
+            // Allocate anywhere
+            None => self.allocated_pages.allocate(pages).map(|idx| {
+                // Convert page index to address
+                idx << super::OFFSET_BITS
+            }),
+        }
+        .ok_or(OutOfBounds)
+    }
+
+    #[cfg(feature = "supervisor")]
+    fn allocate_and_protect_pages(
+        &mut self,
+        address_hint: Option<Address>,
+        length: usize,
+        perms: Permissions,
+        allow_replace: bool,
+    ) -> Result<Address, OutOfBounds>
+    where
+        M: ManagerReadWrite,
+    {
+        // Mark the page range as occupied
+        let address = self.allocate_pages(address_hint, length, allow_replace)?;
+
+        // Configure the permissions on the page range
+        if self.protect_pages(address, length, perms).is_err() {
+            self.deallocate_pages(address, length)?;
+        }
+
+        // Zero initialise in 8-byte chunks. Using larger writes first, means we do fewer writes
+        // altogether. This speeds things up.
+        let mut remaining = length;
+        while remaining >= 8 {
+            remaining -= 8;
+            let address = (address as usize).saturating_add(remaining);
+            self.data.write(address, 0u64);
+        }
+
+        // Zero initialise the tail byte by byte
+        for i in 0..remaining {
+            let address = (address as usize).saturating_add(i);
+            self.data.write(address, 0u8);
+        }
+
+        Ok(address)
+    }
 }
 
 #[cfg(test)]
@@ -232,7 +337,7 @@ pub mod tests {
 
     #[test]
     fn bounds_check() {
-        type OwnedM0 = MemoryImpl<0, 0, Owned>;
+        type OwnedM0 = MemoryImpl<0, 0, (), Owned>;
         type OwnedM4K = <M4K as MemoryConfig>::State<Owned>;
 
         // Zero-sized reads or writes are always valid

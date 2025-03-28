@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use super::buddy::BuddyLayout;
+use super::buddy::BuddyLayoutProxy;
 #[cfg(feature = "supervisor")]
 use super::protection::PagePermissions;
 #[cfg(feature = "supervisor")]
@@ -14,10 +16,12 @@ use crate::state_backend::ManagerBase;
 use crate::state_backend::Ref;
 
 /// State layout for the memory component
-pub struct MemoryConfig<const PAGES: usize, const TOTAL_BYTES: usize>(DynArray<TOTAL_BYTES>);
+pub struct MemoryConfig<const PAGES: usize, const TOTAL_BYTES: usize>;
 
 impl<const PAGES: usize, const TOTAL_BYTES: usize> super::MemoryConfig
     for MemoryConfig<PAGES, TOTAL_BYTES>
+where
+    BuddyLayoutProxy<PAGES>: BuddyLayout + 'static,
 {
     const TOTAL_BYTES: usize = TOTAL_BYTES;
 
@@ -30,9 +34,11 @@ impl<const PAGES: usize, const TOTAL_BYTES: usize> super::MemoryConfig
         PagePermissionsLayout<PAGES>,
         PagePermissionsLayout<PAGES>,
         PagePermissionsLayout<PAGES>,
+        BuddyLayoutProxy<PAGES>,
     );
 
-    type State<M: ManagerBase> = MemoryImpl<PAGES, TOTAL_BYTES, M>;
+    type State<M: ManagerBase> =
+        MemoryImpl<PAGES, TOTAL_BYTES, <BuddyLayoutProxy<PAGES> as BuddyLayout>::Buddy<M>, M>;
 
     fn bind<M: ManagerBase>(space: AllocatedOf<Self::Layout, M>) -> Self::State<M> {
         if TOTAL_BYTES == 0 {
@@ -48,7 +54,10 @@ impl<const PAGES: usize, const TOTAL_BYTES: usize> super::MemoryConfig
         }
 
         #[cfg(not(feature = "supervisor"))]
-        return MemoryImpl { data: space };
+        return MemoryImpl {
+            data: space,
+            _pd: std::marker::PhantomData,
+        };
 
         #[cfg(feature = "supervisor")]
         MemoryImpl {
@@ -56,6 +65,7 @@ impl<const PAGES: usize, const TOTAL_BYTES: usize> super::MemoryConfig
             readable_pages: PagePermissions::bind(space.1),
             writable_pages: PagePermissions::bind(space.2),
             executable_pages: PagePermissions::bind(space.3),
+            allocated_pages: <BuddyLayoutProxy<PAGES> as BuddyLayout>::bind(space.4),
         }
     }
 
@@ -73,6 +83,7 @@ impl<const PAGES: usize, const TOTAL_BYTES: usize> super::MemoryConfig
             instance.readable_pages.struct_ref::<F>(),
             instance.writable_pages.struct_ref::<F>(),
             instance.executable_pages.struct_ref::<F>(),
+            <BuddyLayoutProxy<PAGES> as BuddyLayout>::struct_ref::<F, M>(&instance.allocated_pages),
         )
     }
 }
