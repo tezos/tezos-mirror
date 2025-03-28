@@ -50,7 +50,12 @@ module Misbehaviour_repr = struct
       match duplicate_op.protocol_data.contents with
       | Single (Preattestation {level; round; _}) ->
           (level, round, Double_preattesting)
-      | Single (Attestation {consensus_content = {level; round; _}; _})
+      | Single (Attestation {consensus_content = {level; round; _}; _}) ->
+          (level, round, Double_attesting)
+      | Single
+          (Preattestations_aggregate {consensus_content = {level; round; _}; _})
+        ->
+          (level, round, Double_preattesting)
       | Single
           (Attestations_aggregate {consensus_content = {level; round; _}; _}) ->
           (level, round, Double_attesting)

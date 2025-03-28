@@ -172,6 +172,37 @@ let aggregate attestations =
   in
   {shell; protocol_data}
 
+let aggregate_preattestations preattestations =
+  let aggregate_content =
+    List.fold_left
+      (fun acc ({shell; protocol_data = {contents; signature}} : _ Operation.t) ->
+        match (contents, signature) with
+        | Single (Preattestation consensus_content), Some (Bls bls_sig) -> (
+            let {slot; _} = consensus_content in
+            match acc with
+            | Some (shell, proposal, slots, signatures) ->
+                Some (shell, proposal, slot :: slots, bls_sig :: signatures)
+            | None ->
+                let {level; round; block_payload_hash; _} = consensus_content in
+                let proposal = {level; round; block_payload_hash} in
+                Some (shell, proposal, [slot], [bls_sig]))
+        | _, _ -> acc)
+      None
+      preattestations
+  in
+  let open Option_syntax in
+  let* shell, consensus_content, committee, signatures = aggregate_content in
+  let+ signature =
+    Bls12_381_signature.MinPk.aggregate_signature_opt signatures
+  in
+  let contents =
+    Single (Preattestations_aggregate {consensus_content; committee})
+  in
+  let protocol_data =
+    Operation_data {contents; signature = Some (Bls signature)}
+  in
+  {shell; protocol_data}
+
 let attestation ?delegate ?slot ?level ?round ?block_payload_hash ?dal_content
     ?branch attested_block =
   let open Lwt_result_syntax in
@@ -255,6 +286,38 @@ let preattestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
       attested_block
   in
   return (Operation.pack op)
+
+let preattestations_aggregate ?committee ?level ?round ?block_payload_hash
+    ?branch attested_block =
+  let open Lwt_result_syntax in
+  let* committee =
+    match committee with
+    | Some committee -> return committee
+    | None ->
+        let* attesters = Context.get_attesters (B attested_block) in
+        return
+        @@ List.filter_map
+             (fun attester ->
+               match attester.Plugin.RPC.Validators.consensus_key with
+               | Bls _ -> Some attester.delegate
+               | _ -> None)
+             attesters
+  in
+  let* preattestations =
+    List.map_es
+      (fun delegate ->
+        raw_preattestation
+          ~delegate
+          ?level
+          ?round
+          ?block_payload_hash
+          ?branch
+          attested_block)
+      committee
+  in
+  match aggregate_preattestations preattestations with
+  | Some preattestations_aggregate -> return preattestations_aggregate
+  | None -> failwith "no Bls delegate found"
 
 let sign ?watermark ctxt sk branch (Contents_list contents) =
   let open Lwt_result_syntax in

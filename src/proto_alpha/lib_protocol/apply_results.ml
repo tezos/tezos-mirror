@@ -887,6 +887,12 @@ type 'kind contents_result =
       consensus_power : int;
     }
       -> Kind.attestation contents_result
+  | Preattestations_aggregate_result : {
+      balance_updates : Receipt.balance_updates;
+      committee : Consensus_key.t list;
+      consensus_power : int;
+    }
+      -> Kind.preattestations_aggregate contents_result
   | Attestations_aggregate_result : {
       balance_updates : Receipt.balance_updates;
       committee : Consensus_key.t list;
@@ -1435,6 +1441,7 @@ module Encoding = struct
                        {op with operation_result = Failed (kind, errs)}))
           | Contents_result (Preattestation_result _) -> None
           | Contents_result (Attestation_result _) -> None
+          | Contents_result (Preattestations_aggregate_result _) -> None
           | Contents_result (Attestations_aggregate_result _) -> None
           | Contents_result Ballot_result -> None
           | Contents_result (Seed_nonce_revelation_result _) -> None
@@ -1909,6 +1916,8 @@ let kind_equal :
   | Attestation _, _ -> None
   | Preattestation _, Preattestation_result _ -> Some Eq
   | Preattestation _, _ -> None
+  | Preattestations_aggregate _, Preattestations_aggregate_result _ -> Some Eq
+  | Preattestations_aggregate _, _ -> None
   | Attestations_aggregate _, Attestations_aggregate_result _ -> Some Eq
   | Attestations_aggregate _, _ -> None
   | Seed_nonce_revelation _, Seed_nonce_revelation_result _ -> Some Eq

@@ -73,6 +73,12 @@ and 'kind contents_result =
       consensus_power : int;
     }
       -> Kind.attestation contents_result
+  | Preattestations_aggregate_result : {
+      balance_updates : Receipt.balance_updates;
+      committee : Consensus_key.t list;
+      consensus_power : int;
+    }
+      -> Kind.preattestations_aggregate contents_result
   | Attestations_aggregate_result : {
       balance_updates : Receipt.balance_updates;
       committee : Consensus_key.t list;

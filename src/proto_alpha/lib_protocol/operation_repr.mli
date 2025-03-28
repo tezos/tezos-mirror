@@ -68,18 +68,26 @@ module Kind : sig
 
   type attestation_consensus_kind = Attestation_consensus_kind
 
+  type preattestations_aggregate_consensus_kind =
+    | Preattestations_aggregate_consensus_kind
+
   type attestations_aggregate_consensus_kind =
     | Attestations_aggregate_consensus_kind
 
   type 'a consensus =
     | Preattestation_kind : preattestation_consensus_kind consensus
     | Attestation_kind : attestation_consensus_kind consensus
+    | Preattestations_aggregate_kind
+        : preattestations_aggregate_consensus_kind consensus
     | Attestations_aggregate_kind
         : attestations_aggregate_consensus_kind consensus
 
   type preattestation = preattestation_consensus_kind consensus
 
   type attestation = attestation_consensus_kind consensus
+
+  type preattestations_aggregate =
+    preattestations_aggregate_consensus_kind consensus
 
   type attestations_aggregate = attestations_aggregate_consensus_kind consensus
 
@@ -184,6 +192,8 @@ end
 type 'a consensus_operation_type =
   | Attestation : Kind.attestation consensus_operation_type
   | Preattestation : Kind.preattestation consensus_operation_type
+  | Preattestations_aggregate
+      : Kind.preattestations_aggregate consensus_operation_type
   | Attestations_aggregate
       : Kind.attestations_aggregate consensus_operation_type
 
@@ -273,6 +283,12 @@ and _ contents =
       dal_content : dal_content option;
     }
       -> Kind.attestation contents
+  (* Aggregate of preattestations. *)
+  | Preattestations_aggregate : {
+      consensus_content : consensus_aggregate_content;
+      committee : Slot_repr.t list;
+    }
+      -> Kind.preattestations_aggregate contents
   (* Aggregate of attestations without dal_content. *)
   | Attestations_aggregate : {
       consensus_content : consensus_aggregate_content;
@@ -637,11 +653,12 @@ val compare_by_passes : packed_operation -> packed_operation -> int
 
    The global order is as follows:
 
-   {!Attestations_aggregate}, {!Attestation} and {!Preattestation} >
-   {!Proposals} > {!Ballot} > {!Double_preattestation_evidence} >
-   {!Double_attestation_evidence} > {!Double_baking_evidence} >
-   {!Dal_entrapment_evidence} > {!Vdf_revelation} > {!Seed_nonce_revelation} >
-   {!Activate_account} > {!Drain_delegate} > {!Manager_operation}.
+   {!Attestations_aggregate}, {!Preattestations_aggregate}, {!Attestation} and
+   {!Preattestation} > {!Proposals} > {!Ballot} >
+   {!Double_preattestation_evidence} > {!Double_attestation_evidence} >
+   {!Double_baking_evidence} > {!Dal_entrapment_evidence} > {!Vdf_revelation} >
+   {!Seed_nonce_revelation} > {!Activate_account} > {!Drain_delegate} >
+   {!Manager_operation}.
 
    {!Attestation} and {!Preattestation} are compared by the pair of their
    [level] and [round] such as the farther to the current state [level] and

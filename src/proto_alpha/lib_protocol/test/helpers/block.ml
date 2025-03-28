@@ -1168,6 +1168,7 @@ let balance_updates_of_single_content :
   | Proposals_result | Ballot_result -> []
   | Preattestation_result {balance_updates; _}
   | Attestation_result {balance_updates; _}
+  | Preattestations_aggregate_result {balance_updates; _}
   | Attestations_aggregate_result {balance_updates; _}
   | Seed_nonce_revelation_result balance_updates
   | Vdf_revelation_result balance_updates

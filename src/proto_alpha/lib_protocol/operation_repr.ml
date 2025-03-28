@@ -32,18 +32,26 @@ module Kind = struct
 
   type attestation_consensus_kind = Attestation_consensus_kind
 
+  type preattestations_aggregate_consensus_kind =
+    | Preattestations_aggregate_consensus_kind
+
   type attestations_aggregate_consensus_kind =
     | Attestations_aggregate_consensus_kind
 
   type 'a consensus =
     | Preattestation_kind : preattestation_consensus_kind consensus
     | Attestation_kind : attestation_consensus_kind consensus
+    | Preattestations_aggregate_kind
+        : preattestations_aggregate_consensus_kind consensus
     | Attestations_aggregate_kind
         : attestations_aggregate_consensus_kind consensus
 
   type preattestation = preattestation_consensus_kind consensus
 
   type attestation = attestation_consensus_kind consensus
+
+  type preattestations_aggregate =
+    preattestations_aggregate_consensus_kind consensus
 
   type attestations_aggregate = attestations_aggregate_consensus_kind consensus
 
@@ -148,6 +156,8 @@ end
 type 'a consensus_operation_type =
   | Attestation : Kind.attestation consensus_operation_type
   | Preattestation : Kind.preattestation consensus_operation_type
+  | Preattestations_aggregate
+      : Kind.preattestations_aggregate consensus_operation_type
   | Attestations_aggregate
       : Kind.attestations_aggregate consensus_operation_type
 
@@ -279,6 +289,11 @@ and _ contents =
       dal_content : dal_content option;
     }
       -> Kind.attestation contents
+  | Preattestations_aggregate : {
+      consensus_content : consensus_aggregate_content;
+      committee : Slot_repr.t list;
+    }
+      -> Kind.preattestations_aggregate contents
   | Attestations_aggregate : {
       consensus_content : consensus_aggregate_content;
       committee : Slot_repr.t list;
@@ -1927,6 +1942,7 @@ let acceptable_pass (op : packed_operation) =
   | Single (Failing_noop _) -> None
   | Single (Preattestation _) -> Some consensus_pass
   | Single (Attestation _) -> Some consensus_pass
+  | Single (Preattestations_aggregate _) -> Some consensus_pass
   | Single (Attestations_aggregate _) -> Some consensus_pass
   | Single (Proposals _) -> Some voting_pass
   | Single (Ballot _) -> Some voting_pass
@@ -2031,7 +2047,8 @@ let check_signature (type kind) encoding key chain_id (op : kind operation) =
             | Vdf_revelation _ | Double_attestation_evidence _
             | Double_preattestation_evidence _ | Double_baking_evidence _
             | Dal_entrapment_evidence _ | Activate_account _ | Drain_delegate _
-            | Manager_operation _ | Attestations_aggregate _ ) ->
+            | Manager_operation _ | Preattestations_aggregate _
+            | Attestations_aggregate _ ) ->
             Generic_operation
         | Cons (Manager_operation _, _ops) -> Generic_operation
       in
@@ -2111,6 +2128,8 @@ let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
   | Preattestation _, _ -> None
   | Attestation _, Attestation _ -> Some Eq
   | Attestation _, _ -> None
+  | Preattestations_aggregate _, Preattestations_aggregate _ -> Some Eq
+  | Preattestations_aggregate _, _ -> None
   | Attestations_aggregate _, Attestations_aggregate _ -> Some Eq
   | Attestations_aggregate _, _ -> None
   | Seed_nonce_revelation _, Seed_nonce_revelation _ -> Some Eq
@@ -2476,6 +2495,11 @@ let weight_of : packed_operation -> operation_weight =
         ( Consensus,
           Weight_attestation
             (attestation_infos_from_content consensus_content dal_content) )
+  | Single (Preattestations_aggregate {consensus_content; committee}) ->
+      let aggregate_infos =
+        aggregate_infos_from_content consensus_content committee
+      in
+      W (Consensus, Weight_attestations_aggregate aggregate_infos)
   | Single (Attestations_aggregate {consensus_content; committee}) ->
       let aggregate_infos =
         aggregate_infos_from_content consensus_content committee

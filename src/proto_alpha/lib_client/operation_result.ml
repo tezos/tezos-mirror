@@ -1039,6 +1039,23 @@ let pp_contents_and_result :
           Consensus_key.pp
           {delegate; consensus_pkh = consensus_key}
           consensus_power
+    | ( Preattestations_aggregate {consensus_content = {level; _}; _},
+        Preattestations_aggregate_result
+          {balance_updates; committee; consensus_power} ) ->
+        Format.fprintf
+          ppf
+          "@[<v 2>Preattestations aggregate:@,\
+           Level: %a@,\
+           Balance updates:%a@,\
+           Delegates: %a@,\
+           Consensus Power: %d@]"
+          Raw_level.pp
+          level
+          pp_balance_updates
+          balance_updates
+          (Format.pp_print_list Consensus_key.pp)
+          committee
+          consensus_power
     | ( Attestations_aggregate {consensus_content = {level; _}; _},
         Attestations_aggregate_result
           {balance_updates; committee; consensus_power} ) ->

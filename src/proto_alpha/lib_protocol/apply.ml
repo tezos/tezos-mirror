@@ -2256,6 +2256,7 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
   match operation.protocol_data.contents with
   | Single (Preattestation _) -> ctxt
   | Single (Attestation _) -> ctxt
+  | Single (Preattestations_aggregate _) -> ctxt
   | Single (Attestations_aggregate _) -> ctxt
   | Single
       ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
@@ -2546,6 +2547,8 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       record_preattestation ctxt mode consensus_content
   | Single (Attestation {consensus_content; dal_content}) ->
       record_attestation ctxt mode consensus_content dal_content
+  | Single (Preattestations_aggregate _) ->
+      tzfail Validate_errors.Consensus.Aggregate_not_implemented
   | Single (Attestations_aggregate {committee; _}) ->
       let*? () =
         error_unless
