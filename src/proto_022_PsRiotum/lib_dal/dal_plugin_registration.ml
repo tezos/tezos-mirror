@@ -155,25 +155,25 @@ module Plugin = struct
     | Protocol.Apply_operation_result.Applied _ -> Dal_plugin.Succeeded
     | _ -> Dal_plugin.Failed
 
-  let get_published_slot_headers (block : block_info) =
+  let get_published_slot_headers block_level ctxt =
     let open Lwt_result_syntax in
-    let open Protocol.Alpha_context in
-    let apply_internal acc ~source:_ _op _res = acc in
-    let apply (type kind) acc ~source:_ (op : kind manager_operation)
-        (result : (kind, _, _) Protocol.Apply_operation_result.operation_result)
-        =
-      match op with
-      | Dal_publish_commitment operation ->
-          (operation.slot_index, operation.commitment, status_of_result result)
-          :: acc
-      | _ -> acc
+    let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
+    let* slot_headers =
+      Plugin.RPC.Dal.dal_published_slot_headers
+        cpctxt
+        (`Main, `Level block_level)
+        ()
     in
-    Layer1_services.(
-      process_manager_operations [] block.operations {apply; apply_internal})
-    |> List.map_es (fun (slot_index, commitment, status) ->
-           let published_level = block.header.shell.level in
-           let slot_index = Dal.Slot_index.to_int slot_index in
-           return Dal_plugin.({published_level; slot_index; commitment}, status))
+    return
+    @@ List.map
+         (fun Dal.Slot.Header.{id = {published_level; index}; commitment} ->
+           Dal_plugin.
+             {
+               published_level = Raw_level.to_int32 published_level;
+               slot_index = Dal.Slot_index.to_int index;
+               commitment;
+             })
+         slot_headers
 
   let get_attestations block_level ctxt =
     let open Lwt_result_syntax in

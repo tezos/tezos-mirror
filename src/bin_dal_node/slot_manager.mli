@@ -159,7 +159,7 @@ val publish_slot_data :
 val store_slot_headers :
   number_of_slots:int ->
   block_level:int32 ->
-  (Dal_plugin.slot_header * Dal_plugin.operation_application_result) list ->
+  Dal_plugin.slot_header list ->
   Store.t ->
   unit tzresult Lwt.t
 

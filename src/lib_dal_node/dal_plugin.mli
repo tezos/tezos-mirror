@@ -69,8 +69,7 @@ module type T = sig
     Tezos_dal_node_services.Types.proto_parameters tzresult Lwt.t
 
   val get_published_slot_headers :
-    block_info ->
-    (slot_header * operation_application_result) list tzresult Lwt.t
+    int32 -> Tezos_rpc__RPC_context.generic -> slot_header list tzresult Lwt.t
 
   (** For a given block, returns for each included attestation, as a
       list, its Tenderbake slot, its attester if available in the

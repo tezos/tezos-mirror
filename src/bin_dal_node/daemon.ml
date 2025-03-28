@@ -667,7 +667,7 @@ module Handler = struct
           (module Plugin : Dal_plugin.T with type block_info = Plugin.block_info)
       else return_unit
     in
-    let* slot_headers = Plugin.get_published_slot_headers block_info in
+    let* slot_headers = Plugin.get_published_slot_headers block_level cctxt in
     let* () =
       Slot_manager.store_slot_headers
         ~number_of_slots:proto_parameters.Types.number_of_slots
@@ -680,24 +680,18 @@ module Handler = struct
          data, post it to gossipsub.  Note that this is done independently
          of the profile. *)
       List.iter_es
-        (fun (slot_header, status) ->
-          match status with
-          | Dal_plugin.Succeeded ->
-              let Dal_plugin.{slot_index; commitment; published_level} =
-                slot_header
-              in
-              let slot_id : Types.slot_id =
-                {slot_level = published_level; slot_index}
-              in
-              Slot_manager.publish_slot_data
-                ctxt
-                ~level_committee:(Node_context.fetch_committee ctxt)
-                ~slot_size:proto_parameters.cryptobox_parameters.slot_size
-                (Node_context.get_gs_worker ctxt)
-                proto_parameters
-                commitment
-                slot_id
-          | Dal_plugin.Failed -> return_unit)
+        (fun Dal_plugin.{slot_index; commitment; published_level} ->
+          let slot_id : Types.slot_id =
+            {slot_level = published_level; slot_index}
+          in
+          Slot_manager.publish_slot_data
+            ctxt
+            ~level_committee:(Node_context.fetch_committee ctxt)
+            ~slot_size:proto_parameters.cryptobox_parameters.slot_size
+            (Node_context.get_gs_worker ctxt)
+            proto_parameters
+            commitment
+            slot_id)
         slot_headers
     in
     let*? dal_attestation = Plugin.dal_attestation block_info in
