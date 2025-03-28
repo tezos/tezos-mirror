@@ -18,6 +18,35 @@
 open! Import
 include Tree_intf
 
+module Events = struct
+  include Internal_event.Simple
+
+  let section = ["brassaia"; "tree"]
+
+  let tree_function =
+    declare_2
+      ~section
+      ~level:Debug
+      ~name:"tree_function"
+      ~msg:"Tree.{function} {path}"
+      ("function", Data_encoding.string)
+      ("path", Data_encoding.string)
+
+  let tree_export =
+    declare_1
+      ~section
+      ~level:Debug
+      ~name:"tree_export"
+      ~msg:"Export clear: {clear}"
+      ("clear", Data_encoding.(option bool))
+
+  let tree_key =
+    declare_0 ~section ~level:Debug ~name:"tree_key" ~msg:"Tree.key" ()
+
+  let tree_hash =
+    declare_0 ~section ~level:Debug ~name:"tree_hash" ~msg:"Tree.hash" ()
+end
+
 let src =
   Logs.Src.create "brassaia.tree" ~doc:"Persistent lazy trees for Brassaia"
 
@@ -1911,7 +1940,8 @@ module Make (P : Backend.S) = struct
 
   let find_tree (t : t) path =
     let cache = true in
-    [%log.debug "Tree.find_tree %a" pp_path path] ;
+    Events.(emit__dont_wait__use_with_care tree_function)
+      ("find_tree", Logging.to_string_exn Path.encoding path) ;
     match (t, Path.rdecons path) with
     | v, None -> Some v
     | _, Some (path, file) -> (
@@ -1991,7 +2021,8 @@ module Make (P : Backend.S) = struct
 
   let kind t path =
     let cache = true in
-    [%log.debug "Tree.kind %a" pp_path path] ;
+    Events.(emit__dont_wait__use_with_care tree_function)
+      ("kind", Logging.to_string_exn Path.encoding path) ;
     match (t, Path.rdecons path) with
     | `Contents _, None -> Some `Contents
     | `Node _, None -> Some `Node
@@ -2005,13 +2036,15 @@ module Make (P : Backend.S) = struct
             | Some (`Node _) -> Some `Node))
 
   let length t ?(cache = true) path =
-    [%log.debug "Tree.length %a" pp_path path] ;
+    Events.(emit__dont_wait__use_with_care tree_function)
+      ("length", Logging.to_string_exn Path.encoding path) ;
     sub ~cache "length" t path |> function
     | None -> 0
     | Some n -> Node.length ~cache:true n
 
   let seq t ?offset ?length ?(cache = true) path =
-    [%log.debug "Tree.seq %a" pp_path path] ;
+    Events.(emit__dont_wait__use_with_care tree_function)
+      ("seq", Logging.to_string_exn Path.encoding path) ;
     sub ~cache "seq.sub" t path |> function
     | None -> Seq.empty
     | Some n -> Node.seq ?offset ?length ~cache n |> get_ok "seq"
@@ -2022,7 +2055,8 @@ module Make (P : Backend.S) = struct
   let empty () = `Node (Node.empty ())
 
   let singleton k ?(metadata = Metadata.default) c =
-    [%log.debug "Tree.singleton %a" pp_path k] ;
+    Events.(emit__dont_wait__use_with_care tree_function)
+      ("singleton", Logging.to_string_exn Path.encoding k) ;
     let env = Env.empty () in
     let base_tree = `Contents (Contents.of_value ~env c, metadata) in
     Path.fold_right
@@ -2138,7 +2172,8 @@ module Make (P : Backend.S) = struct
 
   let update t k ?(metadata = Metadata.default) f =
     let cache = true in
-    [%log.debug "Tree.update %a" pp_path k] ;
+    Events.(emit__dont_wait__use_with_care tree_function)
+      ("update", Logging.to_string_exn Path.encoding k) ;
     update_tree ~cache t k ~f_might_return_empty_node:false ~f:(fun t ->
         let old_contents =
           match t with
@@ -2152,7 +2187,8 @@ module Make (P : Backend.S) = struct
         | Some c -> of_contents ~metadata c |> Option.some)
 
   let add t k ?(metadata = Metadata.default) c =
-    [%log.debug "Tree.add %a" pp_path k] ;
+    Events.(emit__dont_wait__use_with_care tree_function)
+      ("add", Logging.to_string_exn Path.encoding k) ;
     update_tree
       ~cache:true
       t
@@ -2161,7 +2197,8 @@ module Make (P : Backend.S) = struct
       ~f_might_return_empty_node:false
 
   let add_tree t k v =
-    [%log.debug "Tree.add_tree %a" pp_path k] ;
+    Events.(emit__dont_wait__use_with_care tree_function)
+      ("add_tree", Logging.to_string_exn Path.encoding k) ;
     update_tree
       ~cache:true
       t
@@ -2170,7 +2207,8 @@ module Make (P : Backend.S) = struct
       ~f_might_return_empty_node:true
 
   let remove t k =
-    [%log.debug "Tree.remove %a" pp_path k] ;
+    Events.(emit__dont_wait__use_with_care tree_function)
+      ("remove", Logging.to_string_exn Path.encoding k) ;
     update_tree
       ~cache:true
       t
@@ -2179,7 +2217,8 @@ module Make (P : Backend.S) = struct
       ~f_might_return_empty_node:false
 
   let update_tree t k f =
-    [%log.debug "Tree.update_tree %a" pp_path k] ;
+    Events.(emit__dont_wait__use_with_care tree_function)
+      ("update_tree", Logging.to_string_exn Path.encoding k) ;
     update_tree ~cache:true t k ~f ~f_might_return_empty_node:true
 
   let import repo = function
@@ -2214,7 +2253,7 @@ module Make (P : Backend.S) = struct
      a node's children before the node itself in order to get the {i keys} of
      any un-persisted child values. *)
   let export ?clear repo contents_t node_t n =
-    [%log.debug "Tree.export clear=%a" Fmt.(option bool) clear] ;
+    Events.(emit__dont_wait__use_with_care tree_export) clear ;
     let cache =
       match clear with
       | Some true | None ->
@@ -2704,7 +2743,7 @@ module Make (P : Backend.S) = struct
     tree t (fun x -> x)
 
   let key (t : t) =
-    [%log.debug "Tree.key"] ;
+    Events.(emit__dont_wait__use_with_care tree_key) () ;
     match t with
     | `Node n -> (
         match Node.key n with Some key -> Some (`Node key) | None -> None)
@@ -2714,7 +2753,7 @@ module Make (P : Backend.S) = struct
         | None -> None)
 
   let hash ?(cache = true) (t : t) =
-    [%log.debug "Tree.hash"] ;
+    Events.(emit__dont_wait__use_with_care tree_hash) () ;
     match t with
     | `Node n -> `Node (Node.hash ~cache n)
     | `Contents (c, m) -> `Contents (Contents.hash ~cache c, m)
