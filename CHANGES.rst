@@ -139,7 +139,7 @@ Smart Rollup node
   outside the data directory. (MR :gl:`!17225`)
 
 - Allow to provide a remote URL for downloading snapshots in commands ``snapshot
-  info`` and ``snapshot import``. (MRs :gl:`!17407`, :gl:`!17420`)
+  info`` and ``snapshot import``. (MRs :gl:`!17407`, :gl:`!17420`, :gl:`!17477`)
 
 - Display logging levels in logs by default. (MR :gl:`!17479`)
 
