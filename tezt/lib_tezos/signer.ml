@@ -30,6 +30,7 @@ module Parameters = struct
     uri : Uri.t;
     keys : Account.key list;
     magic_byte : string option;
+    allow_list_known_keys : bool;
     mutable pending_ready : unit option Lwt.u list;
   }
 
@@ -93,7 +94,7 @@ let import_secret_key signer (key : Account.key) =
   spawn_import_secret_key signer key |> Process.check
 
 let create ?name ?color ?event_pipe ?base_dir ?uri ?runner ?magic_byte
-    ?(keys = [Constant.bootstrap1]) () =
+    ?(allow_list_known_keys = false) ?(keys = [Constant.bootstrap1]) () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
     match base_dir with None -> Temp.dir name | Some dir -> dir
@@ -108,7 +109,15 @@ let create ?name ?color ?event_pipe ?base_dir ?uri ?runner ?magic_byte
       ?color
       ?event_pipe
       ?runner
-      {runner; base_dir; uri; keys; pending_ready = []; magic_byte}
+      {
+        runner;
+        base_dir;
+        uri;
+        keys;
+        pending_ready = [];
+        magic_byte;
+        allow_list_known_keys;
+      }
   in
   on_event signer (handle_readiness signer) ;
   let* () = Lwt_list.iter_s (import_secret_key signer) keys in
@@ -134,6 +143,11 @@ let run signer =
     | None -> []
     | Some magic_byte -> ["--magic-bytes"; magic_byte]
   in
+  let allow_list_known_keys_args =
+    if signer.persistent_state.allow_list_known_keys then
+      ["--allow-list-known-keys"]
+    else []
+  in
   let arguments =
     [
       "--base-dir";
@@ -144,7 +158,7 @@ let run signer =
       "--address";
       host;
     ]
-    @ port_args @ magic_bytes_args
+    @ port_args @ magic_bytes_args @ allow_list_known_keys_args
   in
   let arguments =
     if !passfile = "" then arguments
@@ -174,9 +188,20 @@ let wait_for_ready signer =
         resolver :: signer.persistent_state.pending_ready ;
       check_event signer "Signer started." promise
 
-let init ?name ?color ?event_pipe ?base_dir ?uri ?runner ?keys ?magic_byte () =
+let init ?name ?color ?event_pipe ?base_dir ?uri ?runner ?keys ?magic_byte
+    ?allow_list_known_keys () =
   let* signer =
-    create ?name ?color ?event_pipe ?base_dir ?uri ?runner ?keys ?magic_byte ()
+    create
+      ?name
+      ?color
+      ?event_pipe
+      ?base_dir
+      ?uri
+      ?runner
+      ?keys
+      ?magic_byte
+      ?allow_list_known_keys
+      ()
   in
   let* () = run signer in
   let* () = wait_for_ready signer in

@@ -30,6 +30,7 @@ val run_https :
   key:string ->
   ?signing_version:Signature.version ->
   ?magic_bytes:int list ->
+  ?allow_list_known_keys:bool ->
   check_high_watermark:bool ->
   require_auth:bool ->
   #Client_context.io_wallet ->
@@ -40,6 +41,7 @@ val run_http :
   port:int ->
   ?signing_version:Signature.version ->
   ?magic_bytes:int list ->
+  ?allow_list_known_keys:bool ->
   check_high_watermark:bool ->
   require_auth:bool ->
   #Client_context.io_wallet ->

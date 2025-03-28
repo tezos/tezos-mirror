@@ -171,6 +171,13 @@ let signer_known_remote_keys_test =
   let* _node, client = Client.init_with_protocol `Client ~protocol () in
   let keys = [Constant.tz4_account; Constant.bootstrap1; Constant.bootstrap2] in
   let* signer = Signer.init ~keys () in
+  let process =
+    Client.spawn_list_known_remote_keys client (Signer.uri signer)
+  in
+  let* () =
+    Process.check_error ~msg:(rex "List known keys request not allowed") process
+  in
+  let* signer = Signer.init ~keys ~allow_list_known_keys:true () in
   let* pkhs = Client.list_known_remote_keys client (Signer.uri signer) in
   let expected =
     keys
