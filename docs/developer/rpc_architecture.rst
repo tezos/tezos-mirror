@@ -307,9 +307,10 @@ The files declare services by calling into
 - specialises the service type and constructors with the error-management type ``tzresult``
 
 .. mermaid::
+   :align: center
 
    %%{init: {"flowchart": {"htmlLabels": false}} }%%
-   flowchart TD
+   graph TD
      classDef default font-size:95%
      Services[src/lib_*_services/] --> RPCservices[src/lib_rpc/RPC_services.ml]
      RPCservices --> Restoservices[resto/src/resto.ml]
@@ -356,6 +357,7 @@ The ``cohttp`` library delegates the network management (bind, accept,
 close, etc.) to the ``conduit`` library.
 
 .. mermaid::
+   :align: center
 
    %%{init: {"flowchart": {"htmlLabels": false}} }%%
    graph TD
@@ -450,6 +452,7 @@ The code in :src:`src/lib_rpc_http/RPC_client.ml` is a wrapper around
 - media-types management and de/serialisation.
 
 .. mermaid::
+   :align: center
 
    %%{init: {"flowchart": {"htmlLabels": false}} }%%
    graph TD
