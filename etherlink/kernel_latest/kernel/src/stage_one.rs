@@ -201,7 +201,8 @@ pub fn fetch_blueprints<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use crate::{
-        chains::test_chain_config,
+        blueprint_storage::ChainHeader,
+        chains::{test_chain_config, ChainFamily},
         dal_slot_import_signal::{
             DalSlotImportSignals, DalSlotIndicesList, DalSlotIndicesOfLevel,
             UnsignedDalSlotSignals,
@@ -511,8 +512,8 @@ mod tests {
             &mut host,
             &mut conf,
             U256::from(10),
-            crate::block::GENESIS_PARENT_HASH,
             Timestamp::from(0),
+            &ChainHeader::genesis_header(ChainFamily::Evm),
         )
         .expect("Blueprint reading shouldn't fail")
         .0

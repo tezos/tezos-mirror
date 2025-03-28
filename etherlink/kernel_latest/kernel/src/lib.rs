@@ -55,6 +55,7 @@ mod fallback_upgrade;
 mod fees;
 mod gas_price;
 mod inbox;
+mod l2block;
 mod linked_list;
 mod migration;
 mod parsing;

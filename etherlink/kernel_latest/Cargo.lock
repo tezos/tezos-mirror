@@ -800,6 +800,7 @@ dependencies = [
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "tezos_ethereum_latest",
+ "tezos_tezlink_latest",
  "thiserror",
 ]
 
@@ -2464,6 +2465,16 @@ dependencies = [
  "tezos-smart-rollup-encoding",
  "tezos_crypto_rs",
  "thiserror",
+]
+
+[[package]]
+name = "tezos_tezlink_latest"
+version = "0.1.0"
+dependencies = [
+ "primitive-types",
+ "rlp",
+ "tezos-smart-rollup",
+ "tezos_ethereum_latest",
 ]
 
 [[package]]

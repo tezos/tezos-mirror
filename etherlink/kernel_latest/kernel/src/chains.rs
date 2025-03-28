@@ -40,6 +40,12 @@ pub struct MichelsonChainConfig {
     pub chain_id: U256,
 }
 
+impl MichelsonChainConfig {
+    pub fn create_config(chain_id: U256) -> Self {
+        Self { chain_id }
+    }
+}
+
 #[allow(clippy::large_enum_variant)]
 pub enum ChainConfig {
     Evm(EvmChainConfig),

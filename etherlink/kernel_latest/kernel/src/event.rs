@@ -3,7 +3,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{storage, transaction::Transaction, upgrade};
+use crate::{
+    blueprint_storage::{BlockHeader, BlueprintHeader, ChainHeader},
+    storage,
+    transaction::Transaction,
+    upgrade,
+};
 use primitive_types::{H256, U256};
 use rlp::{Encodable, RlpStream};
 use tezos_ethereum::rlp_helpers::{append_timestamp, append_u256_le};
@@ -72,5 +77,26 @@ impl Encodable for Event<'_> {
 impl Event<'_> {
     pub fn store<Host: Runtime>(&self, host: &mut Host) -> anyhow::Result<()> {
         storage::store_event(host, self)
+    }
+
+    pub fn blueprint_applied(block: BlockHeader<ChainHeader>) -> Self {
+        let BlockHeader {
+            blueprint_header:
+                BlueprintHeader {
+                    number,
+                    timestamp: _,
+                },
+            chain_header,
+        } = block;
+        match chain_header {
+            ChainHeader::Eth(evm_block_header) => Self::BlueprintApplied {
+                number,
+                hash: evm_block_header.hash,
+            },
+            ChainHeader::Tez(_tez_block_header) => Self::BlueprintApplied {
+                number,
+                hash: H256::zero(),
+            },
+        }
     }
 }
