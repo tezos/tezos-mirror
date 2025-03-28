@@ -2411,8 +2411,8 @@ let rollup_node_interprets_dal_pages_helper ~protocol:_ client sc_rollup
     ~expected_value
     sc_rollup_node
 
-let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
-    sc_rollup_node sc_rollup_address node client _pvm_name =
+let rollup_node_applies_dal_pages protocol parameters dal_node sc_rollup_node
+    sc_rollup_address node client _pvm_name =
   (* Check that the rollup node downloaded the confirmed slots to which it is
      subscribed:
 
@@ -2636,9 +2636,11 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
         unit)
       downloaded_confirmed_slots
   in
-  match expand_test with
-  | None -> return ()
-  | Some f -> f ~protocol client sc_rollup_address sc_rollup_node
+  rollup_node_interprets_dal_pages_helper
+    ~protocol
+    client
+    sc_rollup_address
+    sc_rollup_node
 
 (* Test that the rollup kernel can fetch and store a requested DAL page. Works as follows:
    - Originate a rollup with a kernel that:
@@ -10491,8 +10493,7 @@ let register ~protocols =
   scenario_with_all_nodes
     ~operator_profiles:[0; 1; 2; 3; 4; 5; 6]
     "rollup_node_applies_dal_pages"
-    (rollup_node_stores_dal_slots
-       ~expand_test:rollup_node_interprets_dal_pages_helper)
+    rollup_node_applies_dal_pages
     protocols ;
   scenario_with_all_nodes
     ~operator_profiles:[0]
