@@ -249,12 +249,11 @@ module Make (Args : Gc_args.S) = struct
     @@ fun () ->
     let dict = File_Manager.dict file_manager in
     let dispatcher = Dispatcher.init file_manager |> Errs.raise_if_error in
-    let lru = Lru.create config in
     let node_store =
-      Node_store.init ~config ~file_manager ~dict ~dispatcher ~lru
+      Node_store.init ~config ~file_manager ~dict ~dispatcher ~lru:None
     in
     let commit_store =
-      Commit_store.init ~config ~file_manager ~dict ~dispatcher ~lru
+      Commit_store.init ~config ~file_manager ~dict ~dispatcher ~lru:None
     in
 
     (* Step 2. Load commit which will make [commit_key] [Direct] if it's not
