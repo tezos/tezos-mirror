@@ -34,9 +34,6 @@ module Slot_pages_map = struct
   include Map.Make (Dal.Slot_index)
 end
 
-let get_dal_processed_slots node_ctxt block =
-  Node_context.list_slots_statuses node_ctxt ~confirmed_in_block_hash:block
-
 module Block_directory = Make_sub_directory (struct
   include Sc_rollup_services.Block
 
@@ -167,26 +164,6 @@ let () =
     get_status ~is_reveal_enabled (Ctxt_wrapper.of_node_pvmstate state)
   in
   return (string_of_status status)
-
-let () =
-  Block_directory.register0 Sc_rollup_services.Block.dal_slots
-  @@ fun (node_ctxt, block) () () ->
-  let open Lwt_result_syntax in
-  let* constants =
-    Protocol_plugins.get_constants_of_block_hash node_ctxt block
-  in
-  let+ slots =
-    Node_context.get_all_slot_headers node_ctxt ~published_in_block_hash:block
-  in
-  List.rev_map
-    (Sc_rollup_proto_types.Dal.Slot_header.of_octez
-       ~number_of_slots:constants.dal.number_of_slots)
-    slots
-  |> List.rev
-
-let () =
-  Block_directory.register0 Sc_rollup_services.Block.dal_processed_slots
-  @@ fun (node_ctxt, block) () () -> get_dal_processed_slots node_ctxt block
 
 let get_outbox_messages node_ctxt block outbox_level =
   let open Lwt_result_syntax in
