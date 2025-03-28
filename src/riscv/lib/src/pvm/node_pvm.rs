@@ -147,8 +147,7 @@ impl Eq for NodePvm {}
 
 impl NodePvm<Owned> {
     /// Construct an empty PVM state.
-    pub fn empty() -> Self
-where {
+    pub fn empty() -> Self {
         let space = Owned::allocate::<StateLayout>();
         let state = State::bind(space);
         Self {
@@ -160,6 +159,14 @@ where {
         self.with_backend(|state| {
             let refs = state.struct_ref::<state_backend::FnManagerIdent>();
             <StateLayout as CommitmentLayout>::state_hash(refs).unwrap()
+        })
+    }
+
+    /// Used for testing refutation games, corrupt the state so commitments
+    /// after this point will conflict with those of an honest operator.
+    pub fn insert_failure(&mut self) {
+        self.with_backend_mut(|state| {
+            state.pvm.insert_failure();
         })
     }
 }

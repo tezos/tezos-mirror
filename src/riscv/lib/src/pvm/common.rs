@@ -18,6 +18,7 @@ use crate::default::ConstDefault;
 use crate::instruction_context::ICB;
 use crate::machine_state;
 use crate::machine_state::block_cache::bcall;
+use crate::machine_state::csregisters::CSRegister;
 use crate::machine_state::memory;
 use crate::machine_state::registers::a0;
 use crate::pvm::sbi;
@@ -205,6 +206,18 @@ impl<
         self.version.write(INITIAL_VERSION);
         self.machine_state.reset();
         self.status.write(PvmStatus::DEFAULT);
+    }
+
+    /// Used for testing, corrupt the state so the following proofs will be incorrect.
+    pub fn insert_failure(&mut self)
+    where
+        M: state_backend::ManagerReadWrite,
+    {
+        // We want to just slightly modify the state without interfering with normal execution.
+        // dscratch1 is a debug register, any reasonable (test) kernel shouldn't interact with it.
+        let csregs = &mut self.machine_state.core.hart.csregisters;
+        let dscratch1 = csregs.read::<u64>(CSRegister::dscratch1);
+        csregs.write(CSRegister::dscratch1, dscratch1 + 1);
     }
 
     /// Handle an exception using the defined Execution Environment.
