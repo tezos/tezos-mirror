@@ -691,57 +691,6 @@ type event =
   | New_forge_event of forge_event
   | Timeout of timeout_kind
 
-let event_encoding =
-  let open Data_encoding in
-  union
-    [
-      case
-        (Tag 0)
-        ~title:"New_valid_proposal"
-        (tup2 (constant "New_valid_proposal") proposal_encoding)
-        (function New_valid_proposal p -> Some ((), p) | _ -> None)
-        (fun ((), p) -> New_valid_proposal p);
-      case
-        (Tag 1)
-        ~title:"New_head_proposal"
-        (tup2 (constant "New_head_proposal") proposal_encoding)
-        (function New_head_proposal p -> Some ((), p) | _ -> None)
-        (fun ((), p) -> New_head_proposal p);
-      case
-        (Tag 2)
-        ~title:"Prequorum_reached"
-        (tup3
-           (constant "Prequorum_reached")
-           Operation_worker.candidate_encoding
-           (Data_encoding.list (dynamic_size Operation.encoding)))
-        (function
-          | Prequorum_reached (candidate, ops) ->
-              Some ((), candidate, List.map Operation.pack ops)
-          | _ -> None)
-        (fun ((), candidate, ops) ->
-          Prequorum_reached
-            (candidate, Operation_pool.filter_preattestations ops));
-      case
-        (Tag 3)
-        ~title:"Quorum_reached"
-        (tup3
-           (constant "Quorum_reached")
-           Operation_worker.candidate_encoding
-           (Data_encoding.list (dynamic_size Operation.encoding)))
-        (function
-          | Quorum_reached (candidate, ops) ->
-              Some ((), candidate, List.map Operation.pack ops)
-          | _ -> None)
-        (fun ((), candidate, ops) ->
-          Quorum_reached (candidate, Operation_pool.filter_attestations ops));
-      case
-        (Tag 4)
-        ~title:"Timeout"
-        (tup2 (constant "Timeout") timeout_kind_encoding)
-        (function Timeout tk -> Some ((), tk) | _ -> None)
-        (fun ((), tk) -> Timeout tk);
-    ]
-
 let vote_kind_encoding =
   let open Data_encoding in
   union
@@ -868,6 +817,63 @@ let forge_event_encoding =
           | Attestation_ready signed_attestation -> Some signed_attestation
           | _ -> None)
         (fun signed_attestation -> Attestation_ready signed_attestation);
+    ]
+
+let event_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"New_valid_proposal"
+        (tup2 (constant "New_valid_proposal") proposal_encoding)
+        (function New_valid_proposal p -> Some ((), p) | _ -> None)
+        (fun ((), p) -> New_valid_proposal p);
+      case
+        (Tag 1)
+        ~title:"New_head_proposal"
+        (tup2 (constant "New_head_proposal") proposal_encoding)
+        (function New_head_proposal p -> Some ((), p) | _ -> None)
+        (fun ((), p) -> New_head_proposal p);
+      case
+        (Tag 2)
+        ~title:"Prequorum_reached"
+        (tup3
+           (constant "Prequorum_reached")
+           Operation_worker.candidate_encoding
+           (Data_encoding.list (dynamic_size Operation.encoding)))
+        (function
+          | Prequorum_reached (candidate, ops) ->
+              Some ((), candidate, List.map Operation.pack ops)
+          | _ -> None)
+        (fun ((), candidate, ops) ->
+          Prequorum_reached
+            (candidate, Operation_pool.filter_preattestations ops));
+      case
+        (Tag 3)
+        ~title:"Quorum_reached"
+        (tup3
+           (constant "Quorum_reached")
+           Operation_worker.candidate_encoding
+           (Data_encoding.list (dynamic_size Operation.encoding)))
+        (function
+          | Quorum_reached (candidate, ops) ->
+              Some ((), candidate, List.map Operation.pack ops)
+          | _ -> None)
+        (fun ((), candidate, ops) ->
+          Quorum_reached (candidate, Operation_pool.filter_attestations ops));
+      case
+        (Tag 4)
+        ~title:"Timeout"
+        (tup2 (constant "Timeout") timeout_kind_encoding)
+        (function Timeout tk -> Some ((), tk) | _ -> None)
+        (fun ((), tk) -> Timeout tk);
+      case
+        (Tag 5)
+        ~title:"New_forge_event"
+        (tup2 (constant "New_forge_event") forge_event_encoding)
+        (function New_forge_event event -> Some ((), event) | _ -> None)
+        (fun ((), event) -> New_forge_event event);
     ]
 
 (* Disk state *)
