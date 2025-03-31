@@ -72,23 +72,18 @@ impl Signal {
 }
 
 /// An address of a signal action in the VM memory
-pub struct SignalAction(pub NonZeroU64);
+pub struct SignalAction(pub Option<NonZeroU64>);
 
-impl TryFrom<u64> for SignalAction {
-    type Error = Error;
-
-    fn try_from(value: u64) -> Result<Self, Self::Error> {
-        match NonZeroU64::new(value) {
-            Some(old_action) => Ok(SignalAction(old_action)),
-            _ => Err(Error::InvalidArgument),
-        }
+impl From<u64> for SignalAction {
+    fn from(value: u64) -> Self {
+        SignalAction(NonZeroU64::new(value))
     }
 }
 
 impl SignalAction {
     /// Extract the address of the signal action in the VM memory
-    pub fn address(&self) -> u64 {
-        self.0.get()
+    pub fn address(&self) -> Option<u64> {
+        self.0.map(|nz| nz.get())
     }
 }
 

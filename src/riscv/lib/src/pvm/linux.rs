@@ -719,8 +719,9 @@ impl<M: ManagerBase> SupervisorState<M> {
         /// `sizeof(struct sigaltstack)` on the Kernel side
         const SIZE_SIGALTSTACK: usize = 24;
 
-        core.main_memory
-            .write(old.address(), [0u8; SIZE_SIGALTSTACK])?;
+        if let Some(old) = old.address() {
+            core.main_memory.write(old, [0u8; SIZE_SIGALTSTACK])?;
+        }
 
         // Return 0 as an indicator of success
         Ok(0)
@@ -744,9 +745,10 @@ impl<M: ManagerBase> SupervisorState<M> {
         /// `sizeof(struct sigaction)` on the Kernel side
         const SIZE_SIGACTION: usize = 32;
 
-        // As we don't store the previous signal handler, we just zero out the memory
-        core.main_memory
-            .write(old.address(), [0u8; SIZE_SIGACTION])?;
+        if let Some(old) = old.address() {
+            // As we don't store the previous signal handler, we just zero out the memory
+            core.main_memory.write(old, [0u8; SIZE_SIGACTION])?;
+        }
 
         // Return 0 as an indicator of success
         Ok(0)
@@ -765,9 +767,11 @@ impl<M: ManagerBase> SupervisorState<M> {
     where
         M: ManagerReadWrite,
     {
-        // As we don't store the previous mask, we just zero out the memory
-        core.main_memory
-            .write(old.address(), [0u8; parameters::SIGSET_SIZE as usize])?;
+        if let Some(old) = old.address() {
+            // As we don't store the previous mask, we just zero out the memory
+            core.main_memory
+                .write(old, [0u8; parameters::SIGSET_SIZE as usize])?;
+        }
 
         // Return 0 as an indicator of success
         Ok(0)
@@ -989,5 +993,109 @@ mod tests {
         // Check if the location where the old handler was is now zeroed out
         let old_action = machine_state.main_memory.read::<[u8; 32]>(0x40).unwrap();
         assert_eq!(old_action, [0u8; 32]);
+    });
+
+    // Check that the `sigaltstack` system call can accept 0 for the `old` parameter.
+    backend_test!(sigaltstack_zero_parameter, F, {
+        type MemLayout = M4K;
+
+        let mut machine_state = create_state!(
+            MachineCoreState,
+            MachineCoreStateLayout<MemLayout>,
+            F,
+            MemLayout
+        );
+        let mut supervisor_state = create_state!(SupervisorState, SupervisorStateLayout, F);
+
+        // System call number
+        machine_state
+            .hart
+            .xregisters
+            .write(registers::a7, SIGALTSTACK);
+
+        // Zero old signal
+        machine_state.hart.xregisters.write(registers::a0, 0u64);
+
+        // Perform the system call
+        let result = supervisor_state.handle_system_call(
+            &mut machine_state,
+            &mut PvmHooks::default(),
+            default_on_tezos_handler,
+        );
+        assert!(result);
+    });
+
+    // Check that the `rt_sigaction system call can accept 0 for the `old` parameter.
+    backend_test!(rt_sigaction_zero_parameter, F, {
+        type MemLayout = M4K;
+
+        let mut machine_state = create_state!(
+            MachineCoreState,
+            MachineCoreStateLayout<MemLayout>,
+            F,
+            MemLayout
+        );
+        let mut supervisor_state = create_state!(SupervisorState, SupervisorStateLayout, F);
+
+        // System call number
+        machine_state
+            .hart
+            .xregisters
+            .write(registers::a7, RT_SIGACTION);
+
+        machine_state.hart.xregisters.write(registers::a0, 0u64);
+
+        machine_state.hart.xregisters.write(registers::a1, 0u64);
+
+        // Zero old signal
+        machine_state.hart.xregisters.write(registers::a2, 0u64);
+
+        // Size of sigset_t
+        machine_state.hart.xregisters.write(registers::a3, 8u64);
+
+        // Perform the system call
+        let result = supervisor_state.handle_system_call(
+            &mut machine_state,
+            &mut PvmHooks::default(),
+            default_on_tezos_handler,
+        );
+        assert!(result);
+    });
+
+    // Check that the `rt_sigprocmask system call can accept 0 for the `old` parameter.
+    backend_test!(rt_sigprocmask_zero_parameter, F, {
+        type MemLayout = M4K;
+
+        let mut machine_state = create_state!(
+            MachineCoreState,
+            MachineCoreStateLayout<MemLayout>,
+            F,
+            MemLayout
+        );
+        let mut supervisor_state = create_state!(SupervisorState, SupervisorStateLayout, F);
+
+        // System call number
+        machine_state
+            .hart
+            .xregisters
+            .write(registers::a7, RT_SIGPROCMASK);
+
+        machine_state.hart.xregisters.write(registers::a0, 0u64);
+
+        machine_state.hart.xregisters.write(registers::a1, 0u64);
+
+        // Zero old signal
+        machine_state.hart.xregisters.write(registers::a2, 0u64);
+
+        // Size of sigset_t
+        machine_state.hart.xregisters.write(registers::a3, 8u64);
+
+        // Perform the system call
+        let result = supervisor_state.handle_system_call(
+            &mut machine_state,
+            &mut PvmHooks::default(),
+            default_on_tezos_handler,
+        );
+        assert!(result);
     });
 }
