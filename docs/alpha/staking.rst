@@ -1,5 +1,7 @@
 .. note::
 
+  For information about how to stake, see `Staking <https://docs.tezos.com/using/staking>`__ on docs.tezos.com.
+
   For operational details about the staking mechanism and its configuration, see `a staking mechanism tutorial <https://docs.google.com/document/d/1-1WTG2Vuez9D8fROTJrs42twbIErR16xyknRRBrjr-A/edit?usp=sharing>`__.
 
 =================
