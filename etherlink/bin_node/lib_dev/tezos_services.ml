@@ -4,9 +4,11 @@
 (* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (*****************************************************************************)
-module Imported_protocol = Tezos_protocol_021_PsQuebec
+
+module Imported_protocol = Tezos_protocol_021_PsQuebec.Protocol
 module Imported_protocol_plugin = Tezos_protocol_plugin_021_PsQuebec
 module Imported_protocol_parameters = Tezos_protocol_021_PsQuebec_parameters
+module Imported_env = Tezos_protocol_environment_021_PsQuebec
 
 (* The output type of the current_level service but with less duplicated
    information. Can be changed, as long as the [conversion_encoding] is also
@@ -60,7 +62,7 @@ let convert_using_serialization ~name ~dst ~src value =
    might be difficult to actually build, so we define conversion function from
    local types to protocol types. *)
 module Protocol_types = struct
-  module Alpha_context = Imported_protocol.Protocol.Alpha_context
+  module Alpha_context = Imported_protocol.Alpha_context
   module Raw_level = Alpha_context.Raw_level
 
   module Cycle = struct
@@ -112,6 +114,15 @@ module Protocol_types = struct
         ~dst:encoding
         ~src:conversion_encoding
   end
+
+  module Tez = struct
+    include Alpha_context.Tez
+
+    let convert q =
+      q |> Ethereum_types.Qty.to_z |> Z.to_int64 |> Alpha_context.Tez.of_mutez
+      |> Option.value ~default:Alpha_context.Tez.zero
+      |> Result_syntax.return
+  end
 end
 
 (** [wrap conversion service_implementation] changes the output type
@@ -136,6 +147,8 @@ type tezlink_rpc_context = {
   block : Tezos_shell_services.Block_services.block;
   chain : Tezos_shell_services.Chain_services.chain;
 }
+
+type contract = Imported_protocol.Alpha_context.Contract.t
 
 (** Builds a [tezlink_rpc_context] from paths parameters. *)
 let make_env (chain : Tezos_shell_services.Chain_services.chain)
@@ -209,6 +222,32 @@ module Imported_services = struct
         Tezlink_protocols.protocols )
       Tezos_rpc.Service.t =
     import_service Tezos_shell_services.Shell_services.Blocks.S.protocols
+
+  let contract_arg_path s =
+    let contract_path = Imported_protocol_plugin.RPC.Contract.S.path in
+    let contract_args = Imported_protocol.Alpha_context.Contract.rpc_arg in
+    Imported_env.RPC_path.(contract_path /: contract_args / s)
+
+  (* TODO: #7876 Expose and import the service definition from the plugin. *)
+  let balance :
+      ( [`GET],
+        tezlink_rpc_context,
+        tezlink_rpc_context * contract,
+        unit,
+        unit,
+        Protocol_types.Tez.t )
+      Tezos_rpc.Service.t =
+    Tezos_rpc.Service.subst1
+    (* TODO: #7876 should be imported *)
+    @@ Tezos_rpc.Service.get_service
+         ~description:
+           "The spendable balance of a contract (in mutez), also known as \
+            liquid balance. Corresponds to tez owned by the contract that are \
+            neither staked, nor in unstaked requests, nor in frozen bonds. \
+            Identical to the 'spendable' RPC."
+         ~query:Tezos_rpc.Query.empty
+         ~output:Protocol_types.Tez.encoding
+         (contract_arg_path "balance")
 end
 
 type block = Tezos_shell_services.Block_services.block
@@ -228,6 +267,7 @@ type tezos_services_implementation = {
     chain -> block -> Imported_services.level_query -> level tzresult Lwt.t;
   version : unit -> Tezlink_version.version tzresult Lwt.t;
   protocols : unit -> Tezlink_protocols.protocols tzresult Lwt.t;
+  balance : chain -> block -> contract -> Ethereum_types.quantity tzresult Lwt.t;
 }
 
 (** Builds the directory registering services under `/chains/<main>/blocks/<head>/...`. *)
@@ -243,6 +283,11 @@ let build_block_dir impl =
        ~convert_output:Protocol_types.Level.convert
   |> register ~service:Imported_services.protocols ~impl:(fun _ _ () ->
          impl.protocols ())
+  |> register_with_conversion
+       ~service:Imported_services.balance
+       ~impl:(fun ({block; chain}, contract) _ _ ->
+         impl.balance chain block contract)
+       ~convert_output:Protocol_types.Tez.convert
 
 (** Builds the root director. *)
 let build_dir impl =

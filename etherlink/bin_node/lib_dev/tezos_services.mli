@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Imported_protocol = Tezos_protocol_021_PsQuebec
+module Imported_protocol = Tezos_protocol_021_PsQuebec.Protocol
 module Imported_protocol_parameters = Tezos_protocol_021_PsQuebec_parameters
 
 module Tezlink_protocols : sig
@@ -42,11 +42,14 @@ type block = Tezos_shell_services.Block_services.block
 
 type chain = Tezos_shell_services.Chain_services.chain
 
+type contract = Imported_protocol.Alpha_context.Contract.t
+
 (** Container for the implementations necessary to answer tezos RPC requests. *)
 type tezos_services_implementation = {
   current_level : chain -> block -> level_query -> level tzresult Lwt.t;
   version : unit -> Tezlink_version.version tzresult Lwt.t;
   protocols : unit -> Tezlink_protocols.protocols tzresult Lwt.t;
+  balance : chain -> block -> contract -> Ethereum_types.quantity tzresult Lwt.t;
 }
 
 (* THIS IS THE ENTRYPOINT *)

@@ -21,12 +21,18 @@ Available services:
   - GET /health_check
       Assess the health of the RPC server 
   + tezlink/
-    - GET /tezlink/chains/<chain_id>/blocks/<block_id>/helpers/current_level
-        Returns the level of the interrogated block, or the one of a block
-        located `offset` blocks after it in the chain. For instance, the next
-        block if `offset` is 1. The offset cannot be negative. 
-    - GET /tezlink/chains/<chain_id>/blocks/<block_id>/protocols
-        Current and next protocol. 
+    + chains/<chain_id>/blocks/<block_id>/
+      - GET /tezlink/chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/balance
+          The spendable balance of a contract (in mutez), also known as
+          liquid balance. Corresponds to tez owned by the contract that are
+          neither staked, nor in unstaked requests, nor in frozen bonds.
+          Identical to the 'spendable' RPC. 
+      - GET /tezlink/chains/<chain_id>/blocks/<block_id>/helpers/current_level
+          Returns the level of the interrogated block, or the one of a block
+          located `offset` blocks after it in the chain. For instance, the
+          next block if `offset` is 1. The offset cannot be negative. 
+      - GET /tezlink/chains/<chain_id>/blocks/<block_id>/protocols
+          Current and next protocol. 
     - GET /tezlink/describe
         RPCs documentation and input/output schema 
     - GET /tezlink/version
@@ -37,6 +43,8 @@ Available services:
 
 Dynamic parameter description:
   
+  <contract_id>
+      A contract identifier encoded in b58check. 
   <block_id>
       A block identifier. This can take one of the following
       values:
