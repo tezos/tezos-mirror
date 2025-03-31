@@ -7,13 +7,49 @@ Octez.
 Introduction
 ------------
 
-There are several ways to get involved with the codebase, and you may want to start with some preliminary steps.
+There are several ways to get involved with the codebase and its documentation, and you may want to start with some preliminary steps.
 
+.. _feedback_doc:
+
+Providing feedback on documentation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+As your journey will likely start by reading this documentation, please consider giving us feedback using the "Send feedback" button available in all entries.
+You can use it to mention aspects you like or don't like.
+Many kinds of feedback are useful!
+For instance, there are more objective aspects of documentation, such as:
+
+- reliable: are the explanations accurate? up-to-date?
+- consistent: are there any contradictions between the different parts?
+- complete: are there important topics or aspects not described?
+- precise: are the explanations detailed enough?
+- grammatically correct: is the phrasing correct?
+
+or more subjective aspects such as:
+
+- clear: are the explanations easy to understand?
+- easy to find: did you have troubles locating some information?
+- useful: does the text help in some way?
+
+However, if the feedback is about grammar, spelling, and other similar aspects, please consider implementing your suggested changes by submitting fixes to the Octez Docs' typo train -- explained next.
+
+Fixing typos
+~~~~~~~~~~~~
+
+You may want to fix some typos and minor errors or incoherencies in the documentation, which is situated in the ``docs/`` subfolder of the code repository, or within *comments* or *docstrings* within the code.
+Small tweaks like these can be contributed without creating a merge request and commits can rather be pushed directly to the ``typo-doc`` branch in the ``tezos/tezos`` repository. This branch is regularly merged into the master branch, e.g., every one or two weeks.
+(If the branch has been automatically deleted following a merge, just create it again.)
+This periodic merging is implemented by a series of MRs named "the Typo Train", created for you by a volunteer, and batching the currently pending fixes.
+Of course, all these commits will be reviewed before being integrated.
+The current edition of the typo train MR can be found in meta-issue :gl:`#2329`.
+
+If you don't have enough permissions to push to the branch above, you can still make commits in your own fork of the Octez repository, and ask for them to be cherry-picked on the typo/train on the ``#documentation`` channel on the Tezos Dev Slack space.
+Alternatively, you may of course create your own MRs on the tezos/tezos repository for submitting documentations changes without using the Typo Train. In that case, Doc owners might contact you on the MR to suggest changes, including integrating these in a current open train. 
 
 Reporting issues
 ~~~~~~~~~~~~~~~~
 
-The simplest way to contribute to Octez is to report issues that you may
+Another simple way to contribute to Octez is to report issues that you may
 find with the software on `GitLab <https://gitlab.com/tezos/tezos/-/issues>`__.
 If you are unsure about an issue
 consult the :ref:`Tezos community <tezos_community>`
@@ -26,19 +62,6 @@ binary or component (e.g. *octez-node crashes* or *rpc X returns Y
 while Z was expected*).
 
 Other useful contributions consist in inspecting existing issues and adding details, suggesting workarounds, etc.
-
-Fixing typos
-~~~~~~~~~~~~
-
-You may also want to fix some typos and minor errors or incoherencies in the *documentation*, which is situated in the ``docs/`` subfolder of the code repository, or within *comments* or *docstrings* within the code.
-Small tweaks like these can be contributed without creating a merge request and commits can rather be pushed directly to the ``typo-doc`` branch in the ``tezos/tezos`` repository. This branch is regularly merged into the master branch, e.g., every one or two weeks.
-(If the branch has been automatically deleted following a merge, just create it again.)
-This periodic merging is implemented by a series of MRs named "the typo train", created for you by a volunteer, and batching the currently pending fixes.
-Of course, all these commits will be reviewed before being integrated.
-The current edition of the typo train MR can be found in meta-issue :gl:`#2329`.
-
-If you don't have enough permissions to push to the branch above, you can  still make commits in your own fork of the Octez repository, and ask for them to be cherry-picked on the typo/train on the ``#documentation`` channel on the Tezos Dev Slack space.
-Alternatively, you may of course create your own MRs for submitting your changes, without using the typo train.
 
 Other non-code contributions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
