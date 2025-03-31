@@ -144,6 +144,19 @@ module Node = struct
         | Some pid -> Cloud.notify_service_start ~name ~pid
       in
       Lwt.return_unit
+
+    let terminate ?timeout node =
+      let name = name node in
+      (* Notify the Service manager. *)
+      let () =
+        match Node.pid node with
+        | None ->
+            Log.error
+              "Cannot update service %s: no pid. Is the program running ?"
+              name
+        | Some pid -> Cloud.notify_service_start ~name ~pid
+      in
+      terminate ?timeout node
   end
 end
 
@@ -251,6 +264,11 @@ module Dal_node = struct
         | Some pid -> Cloud.notify_service_start ~name ~pid
       in
       Lwt.return_unit
+
+    let terminate ?timeout dal_node =
+      let name = Dal_node.name dal_node in
+      Cloud.notify_service_stop ~name ;
+      terminate ?timeout dal_node
   end
 end
 
