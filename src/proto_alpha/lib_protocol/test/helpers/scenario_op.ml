@@ -235,6 +235,90 @@ let finalize_unstake src_name : (t, t) scenarios =
       let state = State.apply_finalize src_name state in
       return (state, [operation]))
 
+let update_consensus_key_ ?proof_signer ?(force_no_signer = false) ~ck_name
+    src_name (block, state) =
+  let open Lwt_result_syntax in
+  let delegate = State.find_account src_name state in
+  let ck = State.find_account ck_name state in
+  let* {pk = consensus_pk; pkh = consensus_pkh; sk = _} = Account.find ck.pkh in
+  Log.info
+    ~color:action_color
+    "[Update consensus key for \"%s\" to %a]"
+    src_name
+    Signature.Public_key_hash.pp
+    consensus_pkh ;
+  let current_cycle = current_cycle block in
+  let proof_signer =
+    match
+      (force_no_signer, proof_signer, (consensus_pk : Signature.public_key))
+    with
+    | true, _, _ -> None
+    | false, Some proof_signer_name, _ ->
+        Some (State.find_account proof_signer_name state).contract
+    | false, None, Signature.Bls _ ->
+        Some (Protocol.Alpha_context.Contract.Implicit consensus_pkh)
+    | _ -> None
+  in
+  let* operation =
+    Op.update_consensus_key
+      ?proof_signer
+      ~fee:Tez_helpers.zero
+      (B block)
+      delegate.contract
+      consensus_pk
+  in
+  let state =
+    State.apply_update_consensus_key src_name current_cycle consensus_pkh state
+  in
+  return (state, [operation])
+
+let update_consensus_key ?proof_signer ?(force_no_signer = false) ~ck_name
+    src_name : (t, t) scenarios =
+  exec_op
+    (update_consensus_key_ ?proof_signer ~force_no_signer ~ck_name src_name)
+
+let update_companion_key_ ?proof_signer ?(force_no_signer = false) ~ck_name
+    src_name (block, state) =
+  let open Lwt_result_syntax in
+  let delegate = State.find_account src_name state in
+  let ck = State.find_account ck_name state in
+  let* {pk = companion_pk; pkh = companion_pkh; sk = _} = Account.find ck.pkh in
+  Log.info
+    ~color:action_color
+    "[Update companion key for \"%s\" to %a]"
+    src_name
+    Signature.Public_key_hash.pp
+    companion_pkh ;
+  let current_cycle = current_cycle block in
+  let proof_signer =
+    match
+      (force_no_signer, proof_signer, (companion_pk : Signature.public_key))
+    with
+    | true, _, _ -> None
+    | false, Some proof_signer_name, _ ->
+        Some (State.find_account proof_signer_name state).contract
+    | false, None, Signature.Bls _ ->
+        Some (Protocol.Alpha_context.Contract.Implicit companion_pkh)
+    | _ -> None
+  in
+  let* operation =
+    Op.update_companion_key
+      ?proof_signer
+      ~fee:Tez_helpers.zero
+      (B block)
+      delegate.contract
+      companion_pk
+  in
+  let state =
+    State.apply_update_companion_key src_name current_cycle companion_pkh state
+  in
+  return (state, [operation])
+
+let update_companion_key ?proof_signer ?(force_no_signer = false) ~ck_name
+    src_name : (t, t) scenarios =
+  exec_op
+    (update_companion_key_ ?proof_signer ~force_no_signer ~ck_name src_name)
+
 (* ======== Slashing ======== *)
 
 let check_pending_slashings ~loc (block, state) : unit tzresult Lwt.t =

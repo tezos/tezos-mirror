@@ -193,6 +193,43 @@ let update_delegate account_name delegate_name_opt state : t =
   let account = find_account account_name state in
   update_account account_name {account with delegate = delegate_name_opt} state
 
+let apply_update_consensus_key src_name current_cycle consensus_pkh (state : t)
+    : t =
+  let src = find_account src_name state in
+  let activation_cycle =
+    Protocol.Alpha_context.Cycle.add
+      current_cycle
+      (state.constants.consensus_rights_delay + 1)
+  in
+  let src =
+    {
+      src with
+      consensus_keys =
+        CycleMap.add activation_cycle consensus_pkh src.consensus_keys;
+    }
+  in
+  update_account src_name src state
+
+let apply_update_companion_key src_name current_cycle companion_pkh (state : t)
+    : t =
+  match companion_pkh with
+  | (Signature.Bls companion_pkh : Signature.public_key_hash) ->
+      let src = find_account src_name state in
+      let activation_cycle =
+        Protocol.Alpha_context.Cycle.add
+          current_cycle
+          (state.constants.consensus_rights_delay + 1)
+      in
+      let src =
+        {
+          src with
+          companion_keys =
+            CycleMap.add activation_cycle companion_pkh src.companion_keys;
+        }
+      in
+      update_account src_name src state
+  | _ -> (* Noop: invalid algo *) state
+
 let add_pending_operations operations state =
   {state with pending_operations = state.pending_operations @ operations}
 
