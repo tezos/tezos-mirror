@@ -1355,6 +1355,117 @@ let test_fix_delegated_balance =
   in
   Lwt.return_unit
 
+(* This scenario tests set_delegate_parameters and update_delegate_parameters UX
+*)
+let test_delegate_parameter_UX =
+  Protocol.register_test
+    ~__FILE__
+    ~title:
+      "Staking - test set_delegate_parameters and update_delegate_parameters UX"
+    ~tags:["staking"; "node"; "client"]
+  @@ fun protocol ->
+  let* _proto_hash, endpoint, client, _node_1 = init protocol in
+  let bake = Helpers.bake ~ai_vote:Pass ~endpoint ~protocol in
+  let current_cycle () =
+    let* level =
+      Client.RPC.call client @@ RPC.get_chain_block_helper_current_level ()
+    in
+    return level.cycle
+  in
+
+  let* delegate_parameters_activation_delay =
+    let* json =
+      Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
+    in
+    Lwt.return
+    @@ JSON.(json |-> "delegate_parameters_activation_delay" |> as_int)
+  in
+  let delegate = "bootstrap2" in
+  let* delegate_key = Client.show_address ~alias:delegate client in
+  log_step 1 "set delegate parameters" ;
+  let limit_int = 10 in
+  let edge_pct = 2 in
+  let* () =
+    Client.set_delegate_parameters
+      ~delegate
+      ~limit:(string_of_int limit_int)
+      ~edge:(string_of_int edge_pct ^ "%")
+      client
+  in
+  let* () = bake client in
+  let* operation_cycle = current_cycle () in
+  let* () = Helpers.bake_n_cycles bake 1 client in
+  let check_parameters ~operation_cycle ~limit ~edge_pct =
+    let* json =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_delegate_pending_staking_parameters
+           Account.(delegate_key.public_key_hash)
+    in
+    let cycle = operation_cycle + 1 + delegate_parameters_activation_delay in
+    let parameter_json =
+      try
+        List.find
+          (fun json -> JSON.(json |-> "cycle" |> as_int) = cycle)
+          JSON.(as_list json)
+      with Not_found ->
+        Log.error "cycle %d not found in %s@." cycle (JSON.encode json) ;
+        failwith "NOT_found"
+    in
+    let expected_limit = limit * 1_000_000 in
+    let expected_edge = edge_pct * 1_000_000_000 / 100 in
+    if
+      JSON.(
+        parameter_json |-> "parameters"
+        |-> "limit_of_staking_over_baking_millionth" |> as_int)
+      = expected_limit
+      && JSON.(
+           parameter_json |-> "parameters"
+           |-> "edge_of_baking_over_staking_billionth" |> as_int)
+         = expected_edge
+    then return ()
+    else (
+      Log.error
+        "expected: limit %d, edge %d at cycle %d. got %s"
+        expected_limit
+        expected_edge
+        cycle
+        (JSON.encode json) ;
+      failwith "wrong delegate parameter")
+  in
+  let* () = check_parameters ~operation_cycle ~limit:limit_int ~edge_pct in
+  let* () =
+    Client.set_delegate_parameters ~delegate ~limit:"10" ~edge:"3%" client
+  in
+  let* () = bake client in
+  let* operation_cycle = current_cycle () in
+  let* () = check_parameters ~operation_cycle ~limit:10 ~edge_pct:3 in
+  let updater =
+    Client.spawn_update_delegate_parameters
+      ~delegate
+      ~limit:"10"
+      ~edge:"3%"
+      client
+  in
+  let* () = Process.check ~expect_failure:true updater in
+  let updater =
+    Client.spawn_update_delegate_parameters ~delegate ~edge:"3%" client
+  in
+  let* () = Process.check ~expect_failure:true updater in
+  let updater =
+    Client.spawn_update_delegate_parameters ~delegate ~limit:"10" client
+  in
+  let* () = Process.check ~expect_failure:true updater in
+  let* () = Client.update_delegate_parameters ~delegate ~edge:"4%" client in
+  let* () = bake client in
+  let* operation_cycle = current_cycle () in
+  let* () = check_parameters ~operation_cycle ~limit:10 ~edge_pct:4 in
+  let* () = Client.update_delegate_parameters ~delegate ~limit:"9" client in
+  let* () = bake client in
+  let* operation_cycle = current_cycle () in
+  let* () = check_parameters ~operation_cycle ~limit:9 ~edge_pct:4 in
+  unit
+
 let register ~protocols =
   test_staking protocols ;
-  test_fix_delegated_balance protocols
+  test_fix_delegated_balance protocols ;
+  test_delegate_parameter_UX protocols
