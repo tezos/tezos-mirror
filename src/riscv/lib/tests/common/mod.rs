@@ -14,11 +14,20 @@ use rand::seq::SliceRandom;
 use tezos_smart_rollup_utils::inbox::InboxBuilder;
 
 pub fn make_stepper_factory() -> impl Fn() -> PvmStepper<'static, M64M, DefaultCacheLayouts> {
-    const BOOT_PROGRAM_PATH: &str = "../assets/hermit-loader";
-    let boot_program = fs::read(BOOT_PROGRAM_PATH).unwrap();
+    let (program, initrd) = {
+        #[cfg(feature = "supervisor")]
+        {
+            let program = fs::read("../assets/jstz-linux-musl").unwrap();
+            (program, None::<Vec<u8>>)
+        }
 
-    const MAIN_PROGRAM_PATH: &str = "../assets/jstz";
-    let main_program = fs::read(MAIN_PROGRAM_PATH).unwrap();
+        #[cfg(not(feature = "supervisor"))]
+        {
+            let program = fs::read("../assets/hermit-loader").unwrap();
+            let initrd = fs::read("../assets/jstz").unwrap();
+            (program, Some(initrd))
+        }
+    };
 
     let mut inbox = InboxBuilder::new();
     inbox
@@ -33,8 +42,8 @@ pub fn make_stepper_factory() -> impl Fn() -> PvmStepper<'static, M64M, DefaultC
         let block_builder = InterpretedBlockBuilder;
 
         PvmStepper::<'_, M64M, _>::new(
-            &boot_program,
-            Some(&main_program),
+            &program,
+            initrd.as_deref(),
             inbox.clone(),
             hooks,
             address,
