@@ -120,6 +120,30 @@ module Node = struct
         ~metrics_port
         ~event_level:`Notice
         arguments
+
+    let run ?env ?patch_config ?on_terminate ?event_level ?event_sections_levels
+        node args =
+      let name = name node in
+      let* () =
+        run
+          ?env
+          ?patch_config
+          ?on_terminate
+          ?event_level
+          ?event_sections_levels
+          node
+          args
+      in
+      (* Notify service manager. Need to run before to get the pid *)
+      let () =
+        match Node.pid node with
+        | None ->
+            Log.error
+              "Cannot update service %s: no pid. Is the program running ?"
+              name
+        | Some pid -> Cloud.notify_service_start ~name ~pid
+      in
+      Lwt.return_unit
   end
 end
 
@@ -211,7 +235,22 @@ module Dal_node = struct
         in
         String_map.union (fun _ _ _ -> None) otel_env memtrace_env
       in
-      run ~env ?event_level dal_node
+      let* () = run ~env ?event_level dal_node in
+      (* Update the state in the service manager *)
+      let () =
+        match Dal_node.pid dal_node with
+        | None ->
+            (* Here, we simply log the error (in RED)
+               Users of tezt-cloud are expected to read their logs.
+               As a rule of thumb, if error arise in components of tezt-cloud,
+               tezt-cloud SHALL NOT hinder the scenario and raise errors
+               in deployment, unless errors are fatal *)
+            Log.error
+              "Cannot update service state %s: no pid. Is the program running ?"
+              name
+        | Some pid -> Cloud.notify_service_start ~name ~pid
+      in
+      Lwt.return_unit
   end
 end
 
