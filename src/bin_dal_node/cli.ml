@@ -215,7 +215,7 @@ module Term = struct
           ~docs
           ~doc
           ~docv:"INDEX1,INDEX2,..."
-          ["producer-profiles"; "producer"; "operator"])
+          ["producer-profiles"; "producer"; "operator-profiles"; "operator"])
 
   let observer_profile =
     let open Cmdliner in
