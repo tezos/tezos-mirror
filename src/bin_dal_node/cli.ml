@@ -138,7 +138,7 @@ module Term = struct
     Arg.(
       value
       & opt (some endpoint_arg) None
-      & info ~docs ~doc ~docv:"URI" ["endpoint"])
+      & info ~docs ~doc ~docv:"URI" ["endpoint"; "E"])
 
   let attester_profile_printer = Signature.Public_key_hash.pp
 
