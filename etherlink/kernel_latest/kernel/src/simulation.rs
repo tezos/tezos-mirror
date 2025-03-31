@@ -8,8 +8,12 @@
 // Module containing most Simulation related code, in one place, to be deleted
 // when the proxy node simulates directly
 
+use std::borrow::Cow;
+
 use crate::block_storage;
+use crate::chains::ChainFamily;
 use crate::fees::simulation_add_gas_for_fees;
+use crate::l2block::L2Block;
 use crate::storage::{
     read_last_info_per_level_timestamp, read_maximum_allowed_ticks,
     read_sequencer_pool_address, read_tracer_input,
@@ -395,8 +399,8 @@ impl Evaluation {
             }
         }
 
-        let constants = match block_storage::read_current(host) {
-            Ok(block) => {
+        let constants = match block_storage::read_current(host, &ChainFamily::Evm) {
+            Ok(L2Block::Etherlink(block)) => {
                 // Timestamp is taken from the simulation caller if provided.
                 // If the timestamp is missing, because of an older evm-node,
                 // default to last block timestamp.
@@ -419,6 +423,16 @@ impl Evaluation {
                     chain_id,
                     prevrandao: None,
                 }
+            }
+            Ok(L2Block::Tezlink(_block)) => {
+                log!(
+                    host,
+                    Fatal,
+                    "Read a tezlink block when expecting an etherlink block"
+                );
+                return Err(Error::Simulation(EthereumError::WrappedError(Cow::from(
+                    "Should not have found a Tezlink block",
+                ))));
             }
             Err(_) => {
                 // Timestamp is taken from the simulation caller if provided.

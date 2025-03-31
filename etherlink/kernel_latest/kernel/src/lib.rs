@@ -169,9 +169,11 @@ fn retrieve_base_fee_per_gas<Host: Runtime>(
     host: &mut Host,
     minimum_base_fee_per_gas: U256,
 ) -> U256 {
-    match block_storage::read_current(host) {
+    use chains::ChainFamily;
+
+    match block_storage::read_current(host, &ChainFamily::Evm) {
         Ok(current_block) => {
-            let current_base_fee_per_gas = current_block.base_fee_per_gas;
+            let current_base_fee_per_gas = current_block.base_fee_per_gas();
             if current_base_fee_per_gas < minimum_base_fee_per_gas {
                 minimum_base_fee_per_gas
             } else {

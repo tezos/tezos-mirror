@@ -8,6 +8,7 @@ use crate::blueprint::Blueprint;
 use crate::chains::ChainFamily;
 use crate::configuration::{Configuration, ConfigurationMode};
 use crate::error::{Error, StorageError};
+use crate::l2block::L2Block;
 use crate::sequencer_blueprint::{
     BlueprintWithDelayedHashes, UnsignedSequencerBlueprint,
 };
@@ -186,6 +187,15 @@ impl From<TezBlock> for BlockHeader<ChainHeader> {
                 timestamp: block.timestamp,
             },
             chain_header: ChainHeader::Tez(TezBlockHeader { hash: block.hash }),
+        }
+    }
+}
+
+impl From<L2Block> for BlockHeader<ChainHeader> {
+    fn from(value: L2Block) -> Self {
+        match value {
+            L2Block::Etherlink(block) => (*block).into(),
+            L2Block::Tezlink(block) => block.into(),
         }
     }
 }

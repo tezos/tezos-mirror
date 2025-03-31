@@ -4,6 +4,7 @@
 
 use primitive_types::{H256, U256};
 use std::{array::TryFromSliceError, str::FromStr};
+use tezos_crypto_rs::blake2b::digest_256;
 use tezos_smart_rollup::types::Timestamp;
 
 // WIP: This structure will evolve to look like Tezos block
@@ -21,6 +22,34 @@ impl TezBlock {
         // That is the ghostnet genesis hash according to 'devtools/get_contracts/config.ml'
         H256::from_str("8fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed8423e7c02934")
             .unwrap()
+    }
+
+    fn hash(&self) -> H256 {
+        let Self {
+            hash: _,
+            number,
+            timestamp,
+            previous_hash,
+        } = self;
+        let mut data = number.to_string();
+        data.push_str(&timestamp.i64().to_string());
+        data.push_str(&previous_hash.to_string());
+        let encoded_data = hex::encode(&data);
+        let hashed_data = digest_256(encoded_data.as_bytes());
+        H256::from_slice(&hashed_data)
+    }
+
+    pub fn new(number: U256, timestamp: Timestamp, previous_hash: H256) -> Self {
+        let block = Self {
+            hash: H256::zero(),
+            number,
+            timestamp,
+            previous_hash,
+        };
+        Self {
+            hash: block.hash(),
+            ..block
+        }
     }
 
     // Encoded size for parameter were taken from this command:
@@ -56,13 +85,7 @@ impl TezBlock {
         let timestamp_array: [u8; 8] = bytes[36..44].try_into()?;
         let timestamp = Timestamp::from(i64::from_le_bytes(timestamp_array));
 
-        // In a next MR, genesis_block_hash will be replaced by a true hash function
-        Ok(TezBlock {
-            number,
-            hash: TezBlock::genesis_block_hash(),
-            timestamp,
-            previous_hash,
-        })
+        Ok(TezBlock::new(number, timestamp, previous_hash))
     }
 }
 
@@ -84,12 +107,7 @@ mod tests {
         let number = U256::one();
         let timestamp = Timestamp::from(0);
         let previous_hash = TezBlock::genesis_block_hash();
-        TezBlock {
-            number,
-            hash: TezBlock::genesis_block_hash(),
-            timestamp,
-            previous_hash,
-        }
+        TezBlock::new(number, timestamp, previous_hash)
     }
 
     #[test]

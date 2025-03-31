@@ -18,12 +18,12 @@ use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
 use crate::event::Event;
 use crate::l2block::L2Block;
-use crate::storage;
 use crate::transaction::Transaction;
 use crate::upgrade;
 use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
 use crate::{block_in_progress, tick_model};
+use crate::{block_storage, storage};
 use anyhow::Context;
 use block_in_progress::EthBlockInProgress;
 use evm::Config;
@@ -249,14 +249,18 @@ fn compute<Host: Runtime>(
 #[allow(clippy::large_enum_variant)]
 pub enum BlockInProgress {
     Etherlink(EthBlockInProgress),
-    Tezlink(U256, Timestamp),
+    Tezlink {
+        number: U256,
+        timestamp: Timestamp,
+        previous_hash: H256,
+    },
 }
 
 impl BlockInProgress {
     pub fn number(&self) -> U256 {
         match self {
             Self::Etherlink(bip) => bip.number,
-            Self::Tezlink(n, _) => *n,
+            Self::Tezlink { number, .. } => *number,
         }
     }
 }
@@ -330,11 +334,12 @@ fn next_bip_from_blueprints<Host: Runtime>(
                         BlockInProgress::Etherlink(bip),
                     )))
                 }
-                (ChainConfig::Michelson(_), ChainHeader::Tez(_)) => {
-                    Ok(BlueprintParsing::Next(Box::new(BlockInProgress::Tezlink(
-                        next_bip_number,
-                        blueprint.timestamp,
-                    ))))
+                (ChainConfig::Michelson(_), ChainHeader::Tez(header)) => {
+                    Ok(BlueprintParsing::Next(Box::new(BlockInProgress::Tezlink {
+                        number: next_bip_number,
+                        timestamp: blueprint.timestamp,
+                        previous_hash: header.hash,
+                    })))
                 }
                 (_, _) => {
                     log!(
@@ -411,7 +416,7 @@ fn compute_bip<Host: Runtime>(
                 .context("Failed to finalize the block in progress")?;
             Ok(BlockComputationResult::Finished {
                 included_delayed_transactions,
-                block: L2Block::Etherlink(Box::new(new_block)),
+                block: new_block,
             })
         }
     }
@@ -580,21 +585,28 @@ pub fn produce<Host: Runtime>(
                 &chain_config.evm_config,
             )
         }
-        (ChainConfig::Michelson(_), BlockInProgress::Tezlink(number, timestamp)) => {
+        (
+            ChainConfig::Michelson(_),
+            BlockInProgress::Tezlink {
+                number,
+                timestamp,
+                previous_hash,
+            },
+        ) => {
             log!(
                 safe_host,
                 Debug,
                 "Computing the BlockInProgress for Tezlink at level {}",
                 number
             );
+
+            let tezblock = TezBlock::new(number, timestamp, previous_hash);
+            let new_block = L2Block::Tezlink(tezblock);
+            block_storage::store_current(&mut safe_host, &new_block)
+                .context("Failed to store the current block")?;
             Ok(BlockComputationResult::Finished {
                 included_delayed_transactions: vec![],
-                block: L2Block::Tezlink(TezBlock {
-                    number,
-                    hash: TezBlock::genesis_block_hash(),
-                    timestamp,
-                    previous_hash: TezBlock::genesis_block_hash(),
-                }),
+                block: new_block,
             })
         }
         (_, _) => {
@@ -663,10 +675,12 @@ pub fn produce<Host: Runtime>(
 mod tests {
     use super::*;
     use crate::block_storage;
+    use crate::block_storage::read_current_number;
     use crate::blueprint::Blueprint;
     use crate::blueprint_storage::read_next_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
+    use crate::chains::ChainFamily;
     use crate::chains::MichelsonChainConfig;
     use crate::fees::DA_FEE_PER_BYTE;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
@@ -949,7 +963,7 @@ mod tests {
     }
 
     fn assert_current_block_reading_validity<Host: Runtime>(host: &mut Host) {
-        match block_storage::read_current(host) {
+        match block_storage::read_current(host, &ChainFamily::Evm) {
             Ok(_) => (),
             Err(e) => {
                 panic!("Block reading failed: {:?}\n", e)
@@ -958,18 +972,31 @@ mod tests {
     }
 
     #[test]
-    // Test if tezlink block production doesn't panic
+    // Test if tezlink block production works
     fn test_produce_tezlink_block() {
         let mut host = MockKernelHost::default();
 
         let mut config = dummy_tez_configuration();
 
-        store_blueprints(&mut host, vec![tezlink_blueprint()]);
+        store_blueprints(
+            &mut host,
+            vec![
+                tezlink_blueprint(),
+                tezlink_blueprint(),
+                tezlink_blueprint(),
+            ],
+        );
 
+        produce(&mut host, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        produce(&mut host, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        produce(&mut host, &mut config, None, None)
+            .expect("The block production should have succeeded.");
         let computation = produce(&mut host, &mut config, None, None)
-            .expect("The block production failed.");
-
-        assert_eq!(computation, ComputationResult::RebootNeeded)
+            .expect("The block production should have succeeded.");
+        assert_eq!(ComputationResult::Finished, computation);
+        assert_eq!(U256::from(2), read_current_number(&host).unwrap());
     }
 
     #[test]
@@ -1351,11 +1378,12 @@ mod tests {
 
         let new_number_of_blocks_indexed = blocks_index.length(&host).unwrap();
 
-        let current_block_hash = block_storage::read_current(&mut host)
-            .unwrap()
-            .hash
-            .as_bytes()
-            .to_vec();
+        let current_block_hash =
+            block_storage::read_current(&mut host, &ChainFamily::Evm)
+                .unwrap()
+                .hash()
+                .as_bytes()
+                .to_vec();
 
         assert_eq!(number_of_blocks_indexed + 1, new_number_of_blocks_indexed);
 
@@ -1954,12 +1982,10 @@ mod tests {
 
         produce(&mut host, &mut configuration, None, None).expect("Should have produced");
 
-        let block =
-            block_storage::read_current(&mut host).expect("Should have found a block");
-        let failed_loop_hash = block
-            .transactions
-            .first()
-            .expect("There should have been a transaction");
+        let block = block_storage::read_current(&mut host, &ChainFamily::Evm)
+            .expect("Should have found a block");
+        let transaction = block.first_transaction_hash();
+        let failed_loop_hash = transaction.expect("There should have been a transaction");
         let failed_loop_status =
             storage::read_transaction_receipt_status(&mut host, failed_loop_hash)
                 .expect("There should have been a receipt");

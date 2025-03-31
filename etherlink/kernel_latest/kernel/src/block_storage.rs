@@ -3,8 +3,6 @@
 // SPDX-License-Identifier: MIT
 
 use primitive_types::{H256, U256};
-use tezos_ethereum::block::EthBlock;
-use tezos_ethereum::rlp_helpers::VersionedEncoding;
 use tezos_evm_logging::{
     log,
     Level::{Debug, Info},
@@ -16,9 +14,9 @@ use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_smart_rollup_host::path::RefPath;
 use tezos_storage::{read_h256_be, read_u256_le, write_h256_be, write_u256_le};
 
-use crate::migration::allow_path_not_found;
 use crate::storage::EVM_TRANSACTIONS_OBJECTS;
 use crate::storage::EVM_TRANSACTIONS_RECEIPTS;
+use crate::{chains::ChainFamily, l2block::L2Block, migration::allow_path_not_found};
 
 mod path {
     use super::*;
@@ -52,45 +50,45 @@ fn store_current_hash(host: &mut impl Runtime, hash: H256) -> anyhow::Result<()>
 
 fn store_block(
     host: &mut impl Runtime,
-    block: &EthBlock,
+    block: &L2Block,
     index_block: bool,
 ) -> anyhow::Result<()> {
     if index_block {
         // Index the block, /evm/world_state/indexes/blocks/<n> points to
         // the block hash.
         let index = IndexableStorage::new(&path::INDEXES)?;
-        index.push_value(host, block.hash.as_bytes())?;
+        index.push_value(host, block.hash().as_bytes())?;
     }
-    let path = path::path(block.hash)?;
+    let path = path::path(block.hash())?;
     let bytes = block.to_bytes();
     Ok(host.store_write_all(&path, &bytes)?)
 }
 
 fn store_current_index_or_not(
     host: &mut impl Runtime,
-    block: &EthBlock,
+    block: &L2Block,
     index_block: bool,
 ) -> anyhow::Result<()> {
-    store_current_number(host, block.number)?;
-    store_current_hash(host, block.hash)?;
+    store_current_number(host, block.number())?;
+    store_current_hash(host, block.hash())?;
     store_block(host, block, index_block)?;
     log!(
         host,
         Info,
         "Storing block {} at {} containing {} transaction(s) for {} gas used.",
-        block.number,
-        block.timestamp,
-        block.transactions.len(),
-        U256::to_string(&block.gas_used)
+        block.number(),
+        block.timestamp(),
+        block.number_of_transactions(),
+        U256::to_string(&block.gas_used())
     );
     Ok(())
 }
 
-pub fn store_current(host: &mut impl Runtime, block: &EthBlock) -> anyhow::Result<()> {
+pub fn store_current(host: &mut impl Runtime, block: &L2Block) -> anyhow::Result<()> {
     store_current_index_or_not(host, block, true)
 }
 
-pub fn restore_current(host: &mut impl Runtime, block: &EthBlock) -> anyhow::Result<()> {
+pub fn restore_current(host: &mut impl Runtime, block: &L2Block) -> anyhow::Result<()> {
     store_current_index_or_not(host, block, false)
 }
 
@@ -102,17 +100,23 @@ pub fn read_current_hash(host: &impl Runtime) -> anyhow::Result<H256> {
     read_h256_be(host, &path::CURRENT_HASH)
 }
 
-pub fn read_current(host: &mut impl Runtime) -> anyhow::Result<EthBlock> {
+pub fn read_current(
+    host: &mut impl Runtime,
+    chain_family: &ChainFamily,
+) -> anyhow::Result<L2Block> {
     let hash = read_current_hash(host)?;
     let block_path = path::path(hash)?;
     let bytes = &host.store_read_all(&block_path)?;
-    let block_from_bytes = EthBlock::from_bytes(bytes)?;
+    let block_from_bytes = L2Block::try_from_bytes(chain_family, bytes)?;
     Ok(block_from_bytes)
 }
 
-pub fn garbage_collect_blocks(host: &mut impl Runtime) -> anyhow::Result<()> {
+pub fn garbage_collect_blocks(
+    host: &mut impl Runtime,
+    chain_family: &ChainFamily,
+) -> anyhow::Result<()> {
     log!(host, Debug, "Garbage collecting blocks.");
-    if let Ok(block) = read_current(host) {
+    if let Ok(block) = read_current(host, chain_family) {
         // The kernel needs the current block to process the next one. Therefore
         // we garbage collect everything but the current block.
         host.store_delete(&path::PATH)?;
