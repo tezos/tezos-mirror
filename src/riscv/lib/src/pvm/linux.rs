@@ -471,9 +471,10 @@ impl<M: ManagerBase> SupervisorState<M> {
             ($system_call:ty$(, $arg:ident)*) => {{
                 try_blocks::try_block! {
                     paste::paste! {
-                        let result = self.[<handle_$system_call>]($($arg)*)?;
-                        core.hart.xregisters.write(registers::a0, result.into());
-                        true
+                        let result: parameters::SystemCallResultExecution =
+                            self.[<handle_$system_call>]($($arg)*)?.into();
+                        core.hart.xregisters.write(registers::a0, result.result);
+                        result.control_flow
                     }
                 }
             }};
@@ -486,9 +487,10 @@ impl<M: ManagerBase> SupervisorState<M> {
                 try_blocks::try_block! {
                     paste::paste! {
                         let arg1 = core.hart.xregisters.try_read(registers::a0)?;
-                        let result = self.[<handle_$system_call>]($($arg, )* arg1)?;
-                        core.hart.xregisters.write(registers::a0, result.into());
-                        true
+                        let result: parameters::SystemCallResultExecution =
+                            self.[<handle_$system_call>]($($arg, )* arg1)?.into();
+                        core.hart.xregisters.write(registers::a0, result.result);
+                        result.control_flow
                     }
                 }
             }};
@@ -502,9 +504,10 @@ impl<M: ManagerBase> SupervisorState<M> {
                     paste::paste! {
                         let arg1 = core.hart.xregisters.try_read(registers::a0)?;
                         let arg2 = core.hart.xregisters.try_read(registers::a1)?;
-                        let result = self.[<handle_$system_call>]($($arg, )* arg1, arg2)?;
-                        core.hart.xregisters.write(registers::a0, result.into());
-                        true
+                        let result: parameters::SystemCallResultExecution =
+                            self.[<handle_$system_call>]($($arg, )* arg1, arg2)?.into();
+                        core.hart.xregisters.write(registers::a0, result.result);
+                        result.control_flow
                     }
                 }
             }};
@@ -519,9 +522,10 @@ impl<M: ManagerBase> SupervisorState<M> {
                         let arg1 = core.hart.xregisters.try_read(registers::a0)?;
                         let arg2 = core.hart.xregisters.try_read(registers::a1)?;
                         let arg3 = core.hart.xregisters.try_read(registers::a2)?;
-                        let result = self.[<handle_$system_call>]($($arg, )* arg1, arg2, arg3)?;
-                        core.hart.xregisters.write(registers::a0, result.into());
-                        true
+                        let result: parameters::SystemCallResultExecution =
+                            self.[<handle_$system_call>]($($arg, )* arg1, arg2, arg3)?.into();
+                        core.hart.xregisters.write(registers::a0, result.result);
+                        result.control_flow
                     }
                 }
             }};
@@ -537,9 +541,11 @@ impl<M: ManagerBase> SupervisorState<M> {
                         let arg2 = core.hart.xregisters.try_read(registers::a1)?;
                         let arg3 = core.hart.xregisters.try_read(registers::a2)?;
                         let arg4 = core.hart.xregisters.try_read(registers::a3)?;
-                        let result = self.[<handle_$system_call>]($($arg, )* arg1, arg2, arg3, arg4)?;
-                        core.hart.xregisters.write(registers::a0, result.into());
-                        true
+                        let result: parameters::SystemCallResultExecution =
+                            self.[<handle_$system_call>]($($arg, )* arg1, arg2, arg3,
+                            arg4)?.into();
+                        core.hart.xregisters.write(registers::a0, result.result);
+                        result.control_flow
                     }
                 }
             }};
@@ -557,9 +563,11 @@ impl<M: ManagerBase> SupervisorState<M> {
                         let arg3 = core.hart.xregisters.try_read(registers::a2)?;
                         let arg4 = core.hart.xregisters.try_read(registers::a3)?;
                         let arg5 = core.hart.xregisters.try_read(registers::a4)?;
-                        let result = self.[<handle_$system_call>]($($arg, )* arg1, arg2, arg3, arg4, arg5)?;
-                        core.hart.xregisters.write(registers::a0, result.into());
-                        true
+                        let result: parameters::SystemCallResultExecution =
+                            self.[<handle_$system_call>]($($arg, )* arg1, arg2, arg3, arg4,
+                            arg5)?.into();
+                        core.hart.xregisters.write(registers::a0, result.result);
+                        result.control_flow
                     }
                 }
             }};
@@ -578,9 +586,11 @@ impl<M: ManagerBase> SupervisorState<M> {
                         let arg4 = core.hart.xregisters.try_read(registers::a3)?;
                         let arg5 = core.hart.xregisters.try_read(registers::a4)?;
                         let arg6 = core.hart.xregisters.try_read(registers::a5)?;
-                        let result = self.[<handle_$system_call>]($($arg, )* arg1, arg2, arg3, arg4, arg5, arg6)?;
-                        core.hart.xregisters.write(registers::a0, result.into());
-                        true
+                        let result: parameters::SystemCallResultExecution =
+                            self.[<handle_$system_call>]($($arg, )* arg1, arg2, arg3, arg4, arg5,
+                            arg6)?.into();
+                        core.hart.xregisters.write(registers::a0, result.result);
+                        result.control_flow
                     }
                 }
             }};
@@ -600,9 +610,11 @@ impl<M: ManagerBase> SupervisorState<M> {
                         let arg5 = core.hart.xregisters.try_read(registers::a4)?;
                         let arg6 = core.hart.xregisters.try_read(registers::a5)?;
                         let arg7 = core.hart.xregisters.try_read(registers::a6)?;
-                        let result = self.[<handle_$system_call>]($($arg, )* arg1, arg2, arg3, arg4, arg5, arg6)?;
-                        core.hart.xregisters.write(registers::a0, result.into());
-                        true
+                        let result: parameters::SystemCallResultExecution =
+                            self.[<handle_$system_call>]($($arg, )* arg1, arg2, arg3, arg4, arg5,
+                            arg6)?.into();
+                        core.hart.xregisters.write(registers::a0, result.result);
+                        result.control_flow
                     }
                 }
             }};
@@ -623,9 +635,9 @@ impl<M: ManagerBase> SupervisorState<M> {
             WRITEV => dispatch3!(writev, core, hooks),
             PPOLL => dispatch2!(ppoll, core),
             READLINKAT => dispatch0!(readlinkat),
-            EXIT | EXITGROUP => self.handle_exit(core),
+            EXIT | EXITGROUP => dispatch0!(exit, core),
             SET_TID_ADDRESS => dispatch1!(set_tid_address, core),
-            TKILL => self.handle_tkill(core),
+            TKILL => dispatch0!(tkill, core),
             SIGALTSTACK => dispatch2!(sigaltstack, core),
             RT_SIGACTION => dispatch4!(rt_sigaction, core),
             RT_SIGPROCMASK => dispatch4!(rt_sigprocmask, core),
@@ -691,7 +703,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     fn handle_exit(
         &mut self,
         core: &mut MachineCoreState<impl MemoryConfig, M>,
-    ) -> Result<bool, Error>
+    ) -> Result<parameters::SystemCallResultExecution, Error>
     where
         M: ManagerReadWrite,
     {
@@ -702,7 +714,10 @@ impl<M: ManagerBase> SupervisorState<M> {
         self.exit_code.write(status.exit_code());
         self.exited.write(true);
 
-        Ok(false)
+        Ok(parameters::SystemCallResultExecution {
+            result: status.exit_code(),
+            control_flow: false,
+        })
     }
 
     /// Handle `sigaltstack` system call. The new signal stack configuration is discarded. If the
@@ -782,7 +797,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     fn handle_tkill(
         &mut self,
         core: &mut MachineCoreState<impl MemoryConfig, M>,
-    ) -> Result<bool, Error>
+    ) -> Result<parameters::SystemCallResultExecution, Error>
     where
         M: ManagerReadWrite,
     {
@@ -800,9 +815,10 @@ impl<M: ManagerBase> SupervisorState<M> {
         self.exit_code.write(signal.exit_code());
 
         // Return 0 as an indicator of success, even if this might not actually be used
-        core.hart.xregisters.write(registers::a0, 0);
-
-        Ok(false)
+        Ok(parameters::SystemCallResultExecution {
+            result: 0,
+            control_flow: false,
+        })
     }
 }
 

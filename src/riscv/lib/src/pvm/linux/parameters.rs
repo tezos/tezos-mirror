@@ -14,16 +14,37 @@ use super::error::Error;
 /// As we're building a 64-bit system, the sigset should be 64-bit wide as well.
 pub const SIGSET_SIZE: u64 = 8;
 
+/// A type coupling the result of the system call with how the program should continue.
+pub struct SystemCallResultExecution {
+    pub result: u64,
+    pub control_flow: bool,
+}
+
+impl<T: Into<u64>> From<T> for SystemCallResultExecution {
+    fn from(value: T) -> Self {
+        // The default action is to continue execution after the system call. In cases where the
+        // execution should halt, this should be specified.
+        SystemCallResultExecution {
+            result: value.into(),
+            control_flow: true,
+        }
+    }
+}
+
 /// The status of the program upon exit. While the C standard specifies that this should be equal
-/// to EXIT_SUCCESS or EXIT_FAILURE, this is rarely enforeced, and can be any int - where `0`
-/// indicates success
+/// to EXIT_SUCCESS or EXIT_FAILURE, this is rarely enforced, and can be any int - where `0`
+/// indicates success.
 pub struct ExitStatus(u64);
 
-impl TryFrom<u64> for ExitStatus {
-    type Error = Error;
+impl From<ExitStatus> for u64 {
+    fn from(value: ExitStatus) -> Self {
+        value.0
+    }
+}
 
-    fn try_from(value: u64) -> Result<Self, Self::Error> {
-        Ok(ExitStatus(value))
+impl From<u64> for ExitStatus {
+    fn from(value: u64) -> Self {
+        ExitStatus(value)
     }
 }
 

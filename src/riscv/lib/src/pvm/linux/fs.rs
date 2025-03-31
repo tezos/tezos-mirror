@@ -16,7 +16,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// Handle the `openat` system call. All access to the file system is denied.
     ///
     /// See: <https://www.man7.org/linux/man-pages/man3/openat.3p.html>
-    pub(super) fn handle_openat(&mut self) -> Result<bool, Error>
+    pub(super) fn handle_openat(&mut self) -> Result<u64, Error>
     where
         M: ManagerReadWrite,
     {
@@ -26,7 +26,7 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// Handle the `readlinkat` system call. All access to the file system is denied.
     ///
     /// See: <https://man7.org/linux/man-pages/man2/readlink.2.html>
-    pub(super) fn handle_readlinkat(&mut self) -> Result<bool, Error>
+    pub(super) fn handle_readlinkat(&mut self) -> Result<u64, Error>
     where
         M: ManagerReadWrite,
     {
