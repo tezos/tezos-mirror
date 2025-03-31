@@ -12,20 +12,24 @@ use tezos_crypto_rs::{
 
 macro_rules! bind_hash {
     ($bind_name:ident, $name:ty) => {
-        #[derive(uniffi::Object)]
-        pub struct $bind_name(pub(crate) $name);
+        paste! {
+            #[derive(uniffi::Object)]
+            pub struct $bind_name(pub(crate) $name);
 
-        #[uniffi::export]
-        impl $bind_name {
-            #[uniffi::constructor]
-            pub fn from_b58check(data: &str) -> Result<Self, Error> {
-                <$name>::from_b58check(data)
-                    .map(Self)
-                    .map_err(Error::Base58)
-            }
+            #[uniffi::export]
+            impl $bind_name {
+                #[doc = "Decodes a Base58Check-encoded string into a `" $bind_name "`."]
+                #[uniffi::constructor]
+                pub fn from_b58check(data: &str) -> Result<Self, Error> {
+                    <$name>::from_b58check(data)
+                        .map(Self)
+                        .map_err(Error::Base58)
+                }
 
-            pub fn to_b58check(&self) -> String {
-                <$name>::to_b58check(&self.0)
+                #[doc = "Encodes the `" $bind_name "` into a Base58Check-encoded string."]
+                pub fn to_b58check(&self) -> String {
+                    <$name>::to_b58check(&self.0)
+                }
             }
         }
     };
@@ -75,6 +79,7 @@ macro_rules! bind_pk_to_pkh {
     ($pk:ident, $pkh:ident) => {
         #[uniffi::export]
         impl $pk {
+            #[doc = "Hashes the public key."]
             pub fn pk_hash(&self) -> $pkh {
                 $pkh(self.0.pk_hash())
             }
@@ -90,30 +95,34 @@ bind_pk_to_pkh!(PublicKey, PublicKeyHash);
 
 macro_rules! generic_sig_conv {
     ($sig:ident) => {
-        #[uniffi::export]
-        impl $sig {
-            pub fn into_generic(&self) -> Signature {
-                Signature(signature::Signature::from(self.0.clone()))
-            }
-
-            #[uniffi::constructor]
-            pub fn try_from_generic(sig: &Signature) -> Result<Self, Error> {
-                sig.0
-                    .clone()
-                    .try_into()
-                    .map(Self)
-                    .map_err(|err| Error::Crypto(CryptoError::SignatureType(err)))
-            }
-        }
-
         paste! {
             #[uniffi::export]
+            impl $sig {
+                #[doc = "Converts the `" $sig "` into a `Signature`."]
+                pub fn into_generic(&self) -> Signature {
+                    Signature(signature::Signature::from(self.0.clone()))
+                }
+
+                #[doc = "Converts a `Signature` into a `" $sig "`."]
+                #[uniffi::constructor]
+                pub fn try_from_generic(sig: &Signature) -> Result<Self, Error> {
+                    sig.0
+                        .clone()
+                        .try_into()
+                        .map(Self)
+                        .map_err(|err| Error::Crypto(CryptoError::SignatureType(err)))
+                }
+            }
+
+            #[uniffi::export]
             impl Signature {
+                #[doc = "Converts a `" $sig "` into a `Signature`."]
                 #[uniffi::constructor]
                 pub fn [<from_ $sig:snake>](sig: &$sig) -> Self {
                     sig.into_generic()
                 }
 
+                #[doc = "Converts the `Signature` into a `" $sig "`."]
                 pub fn [<try_into_ $sig:snake>](&self) -> Result<$sig, Error> {
                     <$sig>::try_from_generic(self)
                 }
@@ -132,6 +141,7 @@ macro_rules! bind_verify_sig {
     ($pk:ident, $sig:ident) => {
         #[uniffi::export]
         impl $pk {
+            #[doc = "Verifies that the signature has been signed by the public key."]
             pub fn verify_signature(&self, signature: &$sig, msg: &[u8]) -> Result<bool, Error> {
                 self.0
                     .verify_signature(&signature.0, msg)
