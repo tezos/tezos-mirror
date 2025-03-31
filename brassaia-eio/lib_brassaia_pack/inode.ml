@@ -94,15 +94,9 @@ struct
 
     let step_encoding = Node.step_encoding
 
-    type metadata = Node.metadata [@@deriving brassaia ~equal]
-
-    let metadata_encoding = Node.metadata_encoding
-
     type value = Node.value [@@deriving brassaia ~equal]
 
     let value_encoding = Node.value_encoding
-
-    module Metadata = Node.Metadata
 
     exception Dangling_hash = Node.Dangling_hash
 
@@ -111,11 +105,11 @@ struct
       raise (Dangling_hash {context; hash})
 
     let unsafe_keyvalue_of_hashvalue = function
-      | `Contents (h, m) -> `Contents (Key.unfindable_of_hash h, m)
+      | `Contents (h, ()) -> `Contents (Key.unfindable_of_hash h, ())
       | `Node h -> `Node (Key.unfindable_of_hash h)
 
     let hashvalue_of_keyvalue = function
-      | `Contents (k, m) -> `Contents (Key.to_hash k, m)
+      | `Contents (k, ()) -> `Contents (Key.to_hash k, ())
       | `Node k -> `Node (Key.to_hash k)
   end
 
@@ -440,11 +434,7 @@ struct
     type tree = {depth : int; length : int; entries : ptr list}
     [@@deriving brassaia]
 
-    type value =
-      | Contents of name * address * metadata
-      | Node of name * address
-
-    let is_default = T.(equal_metadata Metadata.default)
+    type value = Contents of name * address * unit | Node of name * address
 
     (* We distribute products over sums in the type representation of [value]
        in order to pack many possible cases into a single tag character in the
@@ -469,38 +459,38 @@ struct
           let do_ = [%typ: step * pack_offset]
           let dh  = [%typ: step * H.t]
           (* As above but for contents values with non-default metadata: *)
-          let x_io = [%typ: dict_key * pack_offset * metadata]
-          let x_ih = [%typ: dict_key * H.t * metadata]
-          let x_do = [%typ: step * pack_offset * metadata]
-          let x_dh = [%typ: step * H.t * metadata]
+          let x_io = [%typ: dict_key * pack_offset * unit]
+          let x_ih = [%typ: dict_key * H.t * unit]
+          let x_do = [%typ: step * pack_offset * unit]
+          let x_dh = [%typ: step * H.t * unit]
       end in
       let open Brassaia.Type in
       variant "Compress.value"
         (fun
           (* The ordering of these arguments determines which tags are assigned
              to the cases, so should not be changed: *)
-          contents_io contents_x_io node_io contents_ih contents_x_ih node_ih
-          contents_do contents_x_do node_do contents_dh contents_x_dh node_dh
+          contents_io _contents_x_io node_io contents_ih _contents_x_ih node_ih
+          contents_do _contents_x_do node_do contents_dh _contents_x_dh node_dh
         -> function
         | Node (Indirect n, Offset o) -> node_io (n, o)
         | Node (Indirect n, Hash h)   -> node_ih (n, h)
         | Node (Direct n,   Offset o) -> node_do (n, o)
         | Node (Direct n,   Hash h)   -> node_dh (n, h)
-        | Contents (Indirect n, Offset o, m) -> if is_default m then contents_io (n, o) else contents_x_io (n, o, m)
-        | Contents (Indirect n, Hash h,   m) -> if is_default m then contents_ih (n, h) else contents_x_ih (n, h, m)
-        | Contents (Direct n,   Offset o, m) -> if is_default m then contents_do (n, o) else contents_x_do (n, o, m)
-        | Contents (Direct n,   Hash h,   m) -> if is_default m then contents_dh (n, h) else contents_x_dh (n, h, m))
-      |~ case1 "contents-io"   Payload.io   (fun (n, o)    -> Contents (Indirect n, Offset o, Metadata.default))
-      |~ case1 "contents-x-io" Payload.x_io (fun (n, i, m) -> Contents (Indirect n, Offset i, m))
+        | Contents (Indirect n, Offset o, ()) ->  contents_io (n, o)
+        | Contents (Indirect n, Hash h,   ()) ->  contents_ih (n, h)
+        | Contents (Direct n,   Offset o, ()) ->  contents_do (n, o)
+        | Contents (Direct n,   Hash h,   ()) ->  contents_dh (n, h))
+      |~ case1 "contents-io"   Payload.io   (fun (n, o)    -> Contents (Indirect n, Offset o, ()))
+      |~ case1 "contents-x-io" Payload.x_io (fun (n, i, ()) -> Contents (Indirect n, Offset i, ()))
       |~ case1 "node-io"       Payload.io   (fun (n, i)    -> Node (Indirect n, Offset i))
-      |~ case1 "contents-ih"   Payload.ih   (fun (n, h)    -> Contents (Indirect n, Hash h, Metadata.default))
-      |~ case1 "contents-x-ih" Payload.x_ih (fun (n, h, m) -> Contents (Indirect n, Hash h, m))
+      |~ case1 "contents-ih"   Payload.ih   (fun (n, h)    -> Contents (Indirect n, Hash h, ()))
+      |~ case1 "contents-x-ih" Payload.x_ih (fun (n, h, ()) -> Contents (Indirect n, Hash h, ()))
       |~ case1 "node-ih"       Payload.ih   (fun (n, h)    -> Node (Indirect n, Hash h))
-      |~ case1 "contents-do"   Payload.do_  (fun (n, i)    -> Contents (Direct n, Offset i, Metadata.default))
-      |~ case1 "contents-x-do" Payload.x_do (fun (n, i, m) -> Contents (Direct n, Offset i, m))
+      |~ case1 "contents-do"   Payload.do_  (fun (n, i)    -> Contents (Direct n, Offset i, ()))
+      |~ case1 "contents-x-do" Payload.x_do (fun (n, i, ()) -> Contents (Direct n, Offset i, ()))
       |~ case1 "node-do"       Payload.do_  (fun (n, i)    -> Node (Direct n, Offset i))
-      |~ case1 "contents-dh"   Payload.dh   (fun (n, i)    -> Contents (Direct n, Hash i, Metadata.default))
-      |~ case1 "contents-x-dh" Payload.x_dh (fun (n, i, m) -> Contents (Direct n, Hash i, m))
+      |~ case1 "contents-dh"   Payload.dh   (fun (n, i)    -> Contents (Direct n, Hash i, ()))
+      |~ case1 "contents-x-dh" Payload.x_dh (fun (n, i, ()) -> Contents (Direct n, Hash i, ()))
       |~ case1 "node-dd"       Payload.dh   (fun (n, i)    -> Node (Direct n, Hash i))
       |> sealv
 
@@ -1097,7 +1087,7 @@ struct
     module Concrete = struct
       type kinded_key =
         | Contents of contents_key
-        | Contents_x of metadata * contents_key
+        | Contents_x of unit * contents_key
         | Node of node_key
       [@@deriving brassaia]
 
@@ -1114,17 +1104,14 @@ struct
 
       let to_entry (name, v) =
         match v with
-        | `Contents (contents_key, m) ->
-            if T.equal_metadata m Metadata.default then
-              {name; key = Contents contents_key}
-            else {name; key = Contents_x (m, contents_key)}
+        | `Contents (contents_key, ()) -> {name; key = Contents contents_key}
         | `Node node_key -> {name; key = Node node_key}
 
       let of_entry e =
         ( e.name,
           match e.key with
-          | Contents key -> `Contents (key, Metadata.default)
-          | Contents_x (m, key) -> `Contents (key, m)
+          | Contents key -> `Contents (key, ())
+          | Contents_x ((), key) -> `Contents (key, ())
           | Node key -> `Node key )
 
       type error =
@@ -1785,7 +1772,7 @@ struct
     let is_tree t = match t.v with Tree _ -> true | Values _ -> false
 
     module Proof = struct
-      type value = [`Contents of hash * metadata | `Node of hash]
+      type value = [`Contents of hash * unit | `Node of hash]
       [@@deriving brassaia]
 
       type t =
@@ -1941,7 +1928,7 @@ struct
     module Snapshot = struct
       include T
 
-      type kinded_hash = Contents of hash * metadata | Node of hash
+      type kinded_hash = Contents of hash * unit | Node of hash
       [@@deriving brassaia]
 
       type entry = {step : string; hash : kinded_hash} [@@deriving brassaia]
@@ -2001,8 +1988,6 @@ struct
     type key = Key.t
 
     type t = T.key Bin.t [@@deriving brassaia]
-
-    type metadata = T.metadata [@@deriving brassaia]
 
     type Pack_value.kinded += Node of t
 
@@ -2141,10 +2126,10 @@ struct
         {index = n.index; vref}
       in
       let value : Compress.value -> T.step * T.value = function
-        | Contents (n, h, metadata) ->
+        | Contents (n, h, ()) ->
             let name = step n in
             let hash = key h in
-            (name, `Contents (hash, metadata))
+            (name, `Contents (hash, ()))
         | Node (n, h) ->
             let name = step n in
             let hash = key h in
@@ -2484,7 +2469,7 @@ struct
 
       let contents_key_encoding = hash_encoding
 
-      type value = [`Contents of hash * metadata | `Node of hash]
+      type value = [`Contents of hash * unit | `Node of hash]
       [@@deriving brassaia]
 
       let value_encoding =
@@ -2494,7 +2479,7 @@ struct
             case
               (Tag 1)
               ~title:"`Contents"
-              (tup2 hash_encoding metadata_encoding)
+              (tup2 hash_encoding unit)
               (function `Contents t -> Some t | _ -> None)
               (fun t -> `Contents t);
             case
@@ -2610,7 +2595,6 @@ module Make
     (Inter : Internal
                with type hash = H.t
                 and type key = Key.t
-                and type Snapshot.metadata = Node.metadata
                 and type Val.step = Node.step)
     (Pack : Indexable.S
               with type hash = H.t

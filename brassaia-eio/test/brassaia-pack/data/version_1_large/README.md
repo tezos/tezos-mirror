@@ -16,7 +16,7 @@ let rm_dir () =
 module Conf = Brassaia_tezos.Conf
 
 module Store =
-  Brassaia_pack.V1 (Conf) (Brassaia.Metadata.None) (Brassaia.Contents.String)
+  Brassaia_pack.V1 (Conf) (Brassaia.Contents.String)
     (Brassaia.Path.String_list)
     (Brassaia.Branch.String)
     (Brassaia.Hash.SHA1)

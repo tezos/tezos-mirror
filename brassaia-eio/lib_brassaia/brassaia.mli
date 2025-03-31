@@ -77,11 +77,6 @@ module Info = Info
 module Node = Node
 module Commit = Commit
 
-(** [Metadata] defines metadata that is attached to contents but stored in
-    nodes. For instance, the Git backend uses this to indicate the type of file
-    (normal, executable or symlink). *)
-module Metadata = Metadata
-
 (** Store paths.
 
     An Brassaia {{!Brassaia.S} store} binds {{!Path.S.type-t} paths} to user-defined
@@ -204,10 +199,7 @@ module Maker (CA : Content_addressable.Maker) (AW : Atomic_write.Maker) :
 (** [KV_maker] is like {!module-Maker} but uses sensible default implementations
     for everything except the contents type. *)
 module KV_maker (CA : Content_addressable.Maker) (AW : Atomic_write.Maker) :
-  KV_maker
-    with type endpoint = unit
-     and type metadata = unit
-     and type info = Info.default
+  KV_maker with type endpoint = unit and type info = Info.default
 
 (** {2 Backend} *)
 

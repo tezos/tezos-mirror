@@ -22,8 +22,6 @@ module type S = sig
 
   module Info : Info.S
 
-  module Metadata : Metadata.S
-
   module Path : Path.S
 
   module Contents : Contents.S
@@ -36,8 +34,7 @@ module type Extended = sig
       (Contents_key : Key.S with type hash = Hash.t)
       (Node_key : Key.S with type hash = Hash.t) :
     Node.Generic_key.S
-      with type metadata = Metadata.t
-       and type step = Path.step
+      with type step = Path.step
        and type hash = Hash.t
        and type contents_key = Contents_key.t
        and type node_key = Node_key.t
@@ -62,7 +59,6 @@ module type KV =
     with type Hash.t = default_hash
      and type Branch.t = string
      and type Info.t = Info.default
-     and type Metadata.t = unit
      and type Path.step = string
      and type Path.t = string list
 
@@ -71,8 +67,7 @@ module KV (C : Contents.S) : KV with module Contents = C = struct
   module Info = Info.Default
   module Branch = Branch.String
   module Path = Path.String_list
-  module Metadata = Metadata.None
   module Contents = C
-  module Node = Node.Generic_key.Make (Hash) (Path) (Metadata)
+  module Node = Node.Generic_key.Make (Hash) (Path)
   module Commit = Commit.Generic_key.Make (Hash)
 end

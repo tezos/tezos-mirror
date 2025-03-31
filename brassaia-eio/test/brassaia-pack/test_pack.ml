@@ -27,7 +27,7 @@ module Brassaia_pack_store (Config : Brassaia_pack.Conf.S) :
 
   include Make (struct
     include Brassaia_test.Schema
-    module Node = Brassaia.Node.Generic_key.Make (Hash) (Path) (Metadata)
+    module Node = Brassaia.Node.Generic_key.Make (Hash) (Path)
     module Commit_maker = Brassaia.Commit.Generic_key.Maker (Info)
     module Commit = Commit_maker.Make (Hash)
   end)
@@ -69,7 +69,7 @@ module Brassaia_pack_mem_maker : Brassaia_test.Generic_key = struct
 
   include Make (struct
     include Brassaia_test.Schema
-    module Node = Brassaia.Node.Generic_key.Make (Hash) (Path) (Metadata)
+    module Node = Brassaia.Node.Generic_key.Make (Hash) (Path)
     module Commit_maker = Brassaia.Commit.Generic_key.Maker (Info)
     module Commit = Commit_maker.Make (Hash)
   end)
