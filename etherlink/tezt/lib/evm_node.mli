@@ -683,6 +683,7 @@ val make_kernel_installer_config :
   ?enable_dal:bool ->
   ?dal_slots:int list ->
   ?enable_fast_withdrawal:bool ->
+  ?enable_fast_fa_withdrawal:bool ->
   ?enable_multichain:bool ->
   ?evm_version:Evm_version.t ->
   output:string ->

@@ -1748,7 +1748,8 @@ let make_kernel_installer_config ?(l2_chain_ids = [])
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?(max_blueprint_lookahead_in_seconds = ten_years_in_seconds)
     ?(set_account_code = []) ?(enable_fa_bridge = false) ?(enable_dal = false)
-    ?dal_slots ?(enable_fast_withdrawal = false) ?(enable_multichain = false)
+    ?dal_slots ?(enable_fast_withdrawal = false)
+    ?(enable_fast_fa_withdrawal = false) ?(enable_multichain = false)
     ?evm_version ~output () =
   let set_account_code =
     List.flatten
@@ -1818,6 +1819,9 @@ let make_kernel_installer_config ?(l2_chain_ids = [])
     @ Cli_arg.optional_switch "enable-multichain" enable_multichain
     @ Cli_arg.optional_switch "enable-dal" enable_dal
     @ Cli_arg.optional_switch "enable-fast-withdrawal" enable_fast_withdrawal
+    @ Cli_arg.optional_switch
+        "enable-fast-fa-withdrawal"
+        enable_fast_fa_withdrawal
     @ Cli_arg.optional_arg
         "dal-slots"
         (fun l -> String.concat "," (List.map string_of_int l))
