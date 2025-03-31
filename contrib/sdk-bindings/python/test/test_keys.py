@@ -40,8 +40,10 @@ def test_edsig_into_generic_sig():
     # msg: "a"
     b58_sig = "edsigtmnB915emZPLVrk7oyuRtZXrYhc2ychu5e7kHHSd7LUmiCReV5C16HCNXxt6hnnWxSKQmHFvuNZzUm5K1BKWBM2vejS4T1"
     sig = Ed25519Signature.from_b58check(b58_sig)
-    sig = sig.into_generic()
-    assert sig.to_b58check() == b58_sig
+    generic_sig = sig.into_generic()
+    assert generic_sig.to_b58check() == b58_sig
+    generic_sig = Signature.from_ed25519_signature(sig)
+    assert generic_sig.to_b58check() == b58_sig
 
 
 def test_spsig_from_generic_sig():
@@ -49,8 +51,10 @@ def test_spsig_from_generic_sig():
     # msg: "a"
     b58_sig = "sigmstyCA7dwXvY7UXo8mkUG47WPCybhngBYvHokpnReuZdKZwPoXK8aKp4sEZgAhxeJsnNyJ68Q4zdJyJuSw25JTjxgtVpA"
     expected_b58_sig = "spsig1VhaJFmN7HW4vHUHmHKu8AjVRCzYfmRNf83caYz6EYqH4PDkaNbh5hofmEoejZmpj2cw7w9iZYDiibgRRKcWzWzrW7GA1E"
-    sig = Signature.from_b58check(b58_sig)
-    sig = Secp256k1Signature.try_from_generic(sig)
+    generic_sig = Signature.from_b58check(b58_sig)
+    sig = Secp256k1Signature.try_from_generic(generic_sig)
+    assert sig.to_b58check() == expected_b58_sig
+    sig = generic_sig.try_into_secp256k1_signature()
     assert sig.to_b58check() == expected_b58_sig
 
 

@@ -44,6 +44,8 @@ class TestKeys: XCTestCase {
         let sig = try! UnknownSignature.fromB58check(data: b58Sig)
         let genericSig = sig.intoGeneric()
         XCTAssertEqual(genericSig.toB58check(), b58Sig)
+        let genericSig2 = Signature.fromUnknownSignature(sig: sig)
+        XCTAssertEqual(genericSig2.toB58check(), b58Sig)
     }
 
     func blsSigFromGenericSig() {
@@ -53,6 +55,8 @@ class TestKeys: XCTestCase {
         let genericSig = try! Signature.fromB58check(data: b58Sig)
         let sig = try! BlsSignature.tryFromGeneric(sig: genericSig)
         XCTAssertEqual(sig.toB58check(), b58Sig)
+        let sig2 = try! genericSig.tryIntoBlsSignature()
+        XCTAssertEqual(sig2.toB58check(), b58Sig)
     }
 
     func verifyP2sig() {

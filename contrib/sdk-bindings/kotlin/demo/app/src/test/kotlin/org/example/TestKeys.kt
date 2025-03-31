@@ -39,6 +39,8 @@ class KeysTest {
         val sig = BlsSignature.fromB58check(b58Sig)
         val genericSig = sig.intoGeneric()
         assertEquals(genericSig.toB58check(), b58Sig)
+        val genericSig2 = Signature.fromBlsSignature(sig)
+        assertEquals(genericSig2.toB58check(), b58Sig)
     }
 
     @Test fun sigFromGenericSig() {
@@ -49,6 +51,8 @@ class KeysTest {
         val genericSig = Signature.fromB58check(b58Sig)
         val sig = UnknownSignature.tryFromGeneric(genericSig)
         assertEquals(sig.toB58check(), expectedB58Sig)
+        val sig2 = genericSig.tryIntoUnknownSignature()
+        assertEquals(sig2.toB58check(), expectedB58Sig)
     }
 
     @Test fun verifyP2sig() {
