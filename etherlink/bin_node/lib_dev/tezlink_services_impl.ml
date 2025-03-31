@@ -57,4 +57,5 @@ let michelson_services_methods backend constants =
       (fun () ->
         (* TODO: #7857 need proper implementation *)
         Lwt_result_syntax.return Tezlink_version.mock);
+    protocols = (fun () -> Lwt_result_syntax.return Tezlink_protocols.current);
   }

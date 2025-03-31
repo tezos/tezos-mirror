@@ -126,8 +126,10 @@ let wrap conv impl p q i =
     types in the signature of the service [s]. *)
 let import_service s = Tezos_rpc.Service.subst0 s
 
-let register_protocol_service ~dir ~service ~impl ~convert_output =
+let register_with_conversion ~service ~impl ~convert_output dir =
   Tezos_rpc.Directory.register dir service (wrap convert_output impl)
+
+let register ~service ~impl dir = Tezos_rpc.Directory.register dir service impl
 
 (* TODO *)
 type tezlink_rpc_context = {
@@ -162,6 +164,16 @@ module Tezlink_version = struct
       }
 end
 
+module Tezlink_protocols = struct
+  module Shell_impl = Tezos_shell_services.Block_services
+
+  type protocols = Shell_impl.protocols
+
+  let quebec = Tezos_protocol_021_PsQuebec.Protocol.hash
+
+  let current = Shell_impl.{current_protocol = quebec; next_protocol = quebec}
+end
+
 (* This is where we import service declarations from the protocol. *)
 module Imported_services = struct
   module Protocol_plugin_services = Imported_protocol_plugin.RPC.S
@@ -187,6 +199,16 @@ module Imported_services = struct
         Tezlink_version.version )
       Tezos_rpc.Service.t =
     Tezos_shell_services.Version_services.S.version
+
+  let protocols :
+      ( [`GET],
+        tezlink_rpc_context,
+        tezlink_rpc_context,
+        unit,
+        unit,
+        Tezlink_protocols.protocols )
+      Tezos_rpc.Service.t =
+    import_service Tezos_shell_services.Shell_services.Blocks.S.protocols
 end
 
 type block = Tezos_shell_services.Block_services.block
@@ -205,22 +227,26 @@ type tezos_services_implementation = {
   current_level :
     chain -> block -> Imported_services.level_query -> level tzresult Lwt.t;
   version : unit -> Tezlink_version.version tzresult Lwt.t;
+  protocols : unit -> Tezlink_protocols.protocols tzresult Lwt.t;
 }
 
-(** Builds the directory registering services under `.../helpers`. *)
-let build_helper_dir impl =
+(** Builds the directory registering services under `/chains/<main>/blocks/<head>/...`. *)
+let build_block_dir impl =
   let dir : tezlink_rpc_context Tezos_rpc.Directory.t =
     Tezos_rpc.Directory.empty
   in
-  register_protocol_service
-    ~dir
-    ~service:Imported_services.current_level
-    ~impl:(fun {block; chain} query () -> impl.current_level chain block query)
-    ~convert_output:Protocol_types.Level.convert
+  dir
+  |> register_with_conversion
+       ~service:Imported_services.current_level
+       ~impl:(fun {block; chain} query () ->
+         impl.current_level chain block query)
+       ~convert_output:Protocol_types.Level.convert
+  |> register ~service:Imported_services.protocols ~impl:(fun _ _ () ->
+         impl.protocols ())
 
 (** Builds the root director. *)
 let build_dir impl =
-  let helper_dir = build_helper_dir impl in
+  let helper_dir = build_block_dir impl in
   let root_directory =
     Tezos_rpc.Directory.prefix
       block_directory_path
