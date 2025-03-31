@@ -9019,35 +9019,70 @@ let test_fast_withdraw_feature_flag_deactivated =
   if not (err =~ rex "Error") then Test.fail "Test should fail with error" ;
   unit
 
-let find_and_decode_fast_withdrawal_event ~receipt =
-  let fast_withdrawal_event_signature =
-    "FastWithdrawal(bytes22,uint256,uint256,uint256,bytes,address)"
-  in
+type fast_withdrawal_event =
+  | Tez of {
+      target : string;
+      withdrawal_id : string;
+      amount : Tez.t;
+      timestamp : string;
+      payload : string;
+      l2_caller : string;
+    }
+  | FA of {
+      sender : string; (* Holds the L2 caller *)
+      ticket_owner : string;
+      receiver : string;
+      proxy : string;
+      amount : Tez.t;
+          (* The amount of an FA token is denominated in the underlying asset's unit.
+             Since we're testing wrapped Tez, the unit in this case is Tez. *)
+      withdrawal_id : string;
+      timestamp : string;
+      payload : string;
+    }
+
+let fast_withdrawal_tez_event_signature =
+  "FastWithdrawal(bytes22,uint256,uint256,uint256,bytes,address)"
+
+let fast_withdrawal_fa_token_event_signature =
+  "FastFaWithdrawal(address,address,bytes22,bytes22,uint256,uint256,uint256,bytes)"
+
+let fast_withdrawal_event_topic ~event_signature =
+  Tezos_crypto.Hacl.Hash.Keccak_256.digest (Bytes.of_string event_signature)
+  |> Hex.of_bytes |> Hex.show |> add_0x
+
+let fast_withdrawal_tez_event_topic =
+  fast_withdrawal_event_topic
+    ~event_signature:fast_withdrawal_tez_event_signature
+
+let fast_withdrawal_fa_token_event_topic =
+  fast_withdrawal_event_topic
+    ~event_signature:fast_withdrawal_fa_token_event_signature
+
+let find_and_decode_fast_withdrawal_event ?(fa_tokens = false) receipt :
+    fast_withdrawal_event Lwt.t =
   (* Define the fast withdrawal event log topic, which will be searched for in the EVM logs.
      This topic is a hashed identifier that corresponds to the fast withdrawal transaction event. *)
-  let fast_withdrawal_event_topic =
-    Tezos_crypto.Hacl.Hash.Keccak_256.digest
-      (Bytes.of_string fast_withdrawal_event_signature)
-    |> Hex.of_bytes |> Hex.show |> add_0x
+  let fast_withdrawal_event_signature, fast_withdrawal_event_topic =
+    if fa_tokens then
+      ( fast_withdrawal_fa_token_event_signature,
+        fast_withdrawal_fa_token_event_topic )
+    else (fast_withdrawal_tez_event_signature, fast_withdrawal_tez_event_topic)
   in
 
-  (* Function to extract the event data from the EVM logs based on the provided topic.
+  (* Extract the event data from the EVM logs based on the provided topic.
      This searches the transaction logs for the specified topic and returns the corresponding data. *)
-  let extract_data_by_topic ~topic (logs : Transaction.tx_log list) =
-    List.find_opt
-      (fun tx ->
-        match tx.Transaction.topics with
-        | [x] when String.equal x topic -> true
-        | _ -> false)
-      logs
-    |> Option.map (fun tx_log -> tx_log.Transaction.data)
-  in
-
   let log =
-    extract_data_by_topic
-      ~topic:fast_withdrawal_event_topic
-      receipt.Transaction.logs
-    |> Option.get
+    let tx_log =
+      List.find_opt
+        (fun tx ->
+          List.exists
+            (String.equal fast_withdrawal_event_topic)
+            tx.Transaction.topics)
+        receipt.Transaction.logs
+      |> Option.get
+    in
+    tx_log.Transaction.data
   in
 
   let* res =
@@ -9056,33 +9091,65 @@ let find_and_decode_fast_withdrawal_event ~receipt =
       ~method_:(String.sub fast_withdrawal_event_topic 2 8 ^ log)
       ()
   in
-  let open Ezjsonm in
-  let target, withdrawal_id, amount, timestamp, payload, l2_caller =
-    let json = from_string res in
-    match json with
-    | `A
-        [
-          `String target;
-          `String withdrawal_id;
-          `String amount;
-          `String timestamp;
-          `String payload;
-          `String l2_caller;
-        ] ->
-        ( target,
-          withdrawal_id,
-          Wei.of_string amount |> Wei.to_tez,
-          timestamp,
-          payload,
-          l2_caller )
-    | _ -> assert false
-  in
-  return (target, withdrawal_id, amount, timestamp, payload, l2_caller)
+  return
+  @@
+  match JSON.parse ~origin:"tx_log" res |> JSON.unannotate with
+  | `A
+      [
+        `String target;
+        `String withdrawal_id;
+        `String amount;
+        `String timestamp;
+        `String payload;
+        `String l2_caller;
+      ]
+    when not fa_tokens ->
+      Tez
+        {
+          target;
+          withdrawal_id;
+          amount = Wei.of_string amount |> Wei.to_tez;
+          timestamp;
+          payload;
+          l2_caller;
+        }
+  | `A
+      [
+        `String sender;
+        `String ticket_owner;
+        `String receiver;
+        `String proxy;
+        `String amount;
+        `String withdrawal_id;
+        `String timestamp;
+        `String payload;
+      ]
+    when fa_tokens ->
+      FA
+        {
+          sender;
+          ticket_owner;
+          receiver;
+          proxy;
+          amount = Tez.of_int @@ int_of_string amount;
+          withdrawal_id;
+          timestamp;
+          payload;
+        }
+  | _ -> failwith "Failed to decode fast withdrawal's event"
 
 let execute_payout ~service_provider_pkh ~exchanger
-    ~fast_withdrawal_contract_address ~service_provider_proxy client receipt =
-  let* target, withdrawal_id, amount, timestamp, payload, l2_caller =
-    find_and_decode_fast_withdrawal_event ~receipt
+    ~fast_withdrawal_contract_address ~service_provider_proxy
+    ?(fa_tokens = false) client receipt =
+  let* fast_withdrawal_event =
+    find_and_decode_fast_withdrawal_event ~fa_tokens receipt
+  in
+  let withdraw_amount, withdrawal_id, target, timestamp, payload, l2_caller =
+    match fast_withdrawal_event with
+    | Tez {amount; withdrawal_id; target; timestamp; payload; l2_caller; _} ->
+        (amount, withdrawal_id, target, timestamp, payload, l2_caller)
+    | FA {amount; withdrawal_id; receiver; timestamp; payload; sender; _} ->
+        (amount, withdrawal_id, receiver, timestamp, payload, sender)
   in
   Client.transfer
     ~fee:(Tez.of_int 1) (* Small fee for the transaction *)
@@ -9090,15 +9157,16 @@ let execute_payout ~service_provider_pkh ~exchanger
     ~gas_limit:100_000_000
     ~storage_limit:Int.max_int
     ~burn_cap:(Tez.of_int 100)
-    ~amount
+    ~amount:withdraw_amount
     ~giver:Constant.bootstrap1.public_key_hash
     ~receiver:service_provider_proxy
-    ~entrypoint:"payout_proxy_tez"
+    ~entrypoint:(if fa_tokens then "payout_proxy_fa" else "payout_proxy_tez")
     ~arg:
       (Printf.sprintf
-         "(Pair %S %S %s %s %s %S %s %s)"
+         "(Pair %S %S %s%s %s %s %S %s %s)"
          fast_withdrawal_contract_address
          exchanger
+         (if fa_tokens then Tez.to_string withdraw_amount ^ " " else "")
          withdrawal_id
          target
          timestamp
@@ -9170,8 +9238,11 @@ let test_fast_withdrawal_l2_caller =
   let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
   let receipt = Option.get receipt in
 
-  let* _, _, _, _, _, l2_caller =
-    find_and_decode_fast_withdrawal_event ~receipt
+  let* fast_withdrawal_event = find_and_decode_fast_withdrawal_event receipt in
+  let l2_caller =
+    match fast_withdrawal_event with
+    | Tez {l2_caller; _} -> l2_caller
+    | _ -> failwith "Tez case of the fast withdrawal event expected"
   in
   Check.((withdrawal_forwarder_contract_address = l2_caller) string)
     ~error_msg:"Expected %L as L2 caller instead of %R" ;
@@ -9355,6 +9426,212 @@ let test_deposit_and_fast_withdraw =
       "Expected %R amount instead of %L after outbox message was executed" ;
 
   return ()
+
+let test_deposit_and_fa_fast_withdraw =
+  let commitment_period = 5 and challenge_window = 5 in
+  register_all
+    ~tags:["fast_withdrawal"; "fa_tokens"; "deposit"]
+    ~title:"Deposit and fast withdraw FA tokens"
+    ~commitment_period
+    ~challenge_window
+    ~time_between_blocks:Nothing
+    ~kernels:[Kernel.Latest]
+    ~additional_uses:[Constant.octez_codec]
+    ~enable_fa_bridge:true
+    ~enable_fast_fa_withdrawal:true
+  @@ fun {
+           sequencer;
+           sc_rollup_address;
+           client;
+           l1_contracts;
+           proxy;
+           sc_rollup_node;
+           _;
+         }
+             _protocol ->
+  let* fast_withdrawal_contract_address =
+    Client.originate_contract
+      ~alias:"fast_withdrawal_contract_address"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap5.public_key_hash
+      ~init:(sf "Pair %S {}" l1_contracts.exchanger)
+      ~prg:(fast_withdrawal_path ())
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
+
+  let* ticketer = ticket_creator l1_contracts.ticket_router_tester in
+
+  let* service_provider_proxy =
+    Client.originate_contract
+      ~alias:"service_provider"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:
+        "Pair \"KT1CeFqjJRJPNVvhvznQrWfHad2jCiDZ6Lyj\" \
+         \"KT1CeFqjJRJPNVvhvznQrWfHad2jCiDZ6Lyj\" 0 \
+         \"tz1etHLky7fuVumvBDi92ogXQZZPESiFimWR\" 0 \
+         \"tz1etHLky7fuVumvBDi92ogXQZZPESiFimWR\" 0x00 0x00"
+      ~prg:(service_provider_path ())
+      ~burn_cap:(Tez.of_int 890)
+      client
+  in
+  let depositor = Constant.bootstrap5 in
+  let produce_block () = Rpc.produce_block sequencer in
+
+  let withdraw_amount = 50 in
+  (* Define the amount to deposit in tez (100 tez), and specify the Ethereum-based receiver for the rollup. *)
+  let deposit_amount = 100 in
+  let service_provider_pkh = "tz1TGKSrZrBpND3PELJ43nVdyadoeiM1WMzb" in
+  let* initial_service_provider_balance =
+    Client.get_balance_for ~account:service_provider_pkh client
+  in
+
+  let receiver = Eth_account.bootstrap_accounts.(0) in
+
+  (* Define the Tezos address that will receive the fast withdrawal on L1. *)
+  let withdraw_receiver = "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX" in
+
+  (* Switch ticket tester contract to proxy mode *)
+  let* () =
+    Client.transfer
+      ~entrypoint:"set"
+      ~arg:(sf "Pair %S (Pair (Left Unit) 0)" depositor.public_key_hash)
+      ~amount:Tez.zero
+      ~giver:depositor.Account.public_key_hash
+      ~receiver:l1_contracts.ticket_router_tester
+      ~burn_cap:Tez.one
+      client
+  in
+
+  (* Check the initial balance of the L1 withdraw receiver. It should be 0 before the fast withdrawal occurs. *)
+  let* receiver_balance =
+    Client.ticket_balance
+      ~contract:withdraw_receiver
+      ~ticketer:l1_contracts.ticket_router_tester
+      ~content_type:"pair nat (option bytes)"
+      ~content:"Pair 0 None"
+      client
+  in
+
+  Check.((int_of_string @@ String.trim receiver_balance = 0) int)
+    ~error_msg:"Expected %R as initial balance instead of %L" ;
+  let* () = Client.bake_for_and_wait ~keys:[] client in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+
+  (* Execute the deposit of 100 tez to the rollup. The depositor is the admin account, and the receiver is the Ethereum address. *)
+  let* () =
+    send_fa_deposit_to_delayed_inbox
+      ~l1_contracts
+      ~amount:deposit_amount
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~depositor
+      ~receiver:receiver.address
+      client
+  in
+
+  (* We bake enough blocks for the sequencer to realize there's a deposit. *)
+  let* () =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  (* We create a L2 block to include the deposit *)
+  let*@ _ = produce_block () in
+  (* We make sure the L2 block is posted on the L1 and processed by the rollup
+     node *)
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+
+  (* Check that the receiver's balance in the rollup matches the deposited amount. *)
+  let* zero_ticket_hash = ticket_hash l1_contracts.ticket_router_tester 0 in
+
+  let* ticket_balance_after_deposit =
+    ticket_balance
+      ~ticket_hash:zero_ticket_hash
+      ~account:receiver.address
+      (Either.Right sequencer)
+  in
+  Check.((deposit_amount = ticket_balance_after_deposit) int)
+    ~error_msg:
+      "After deposit we expect %L ticket balance in the sequencer, got %R" ;
+
+  let* withdrawal_level = Client.level client in
+  let* content = ticket_content 0 in
+  let* tx_hash =
+    call_fa_fast_withdraw
+      ~sender:receiver
+      ~sequencer
+      ~ticket_owner:receiver.address
+      ~receiver:withdraw_receiver
+      ~amount:withdraw_amount
+      ~ticketer:(ticketer |> Hex.of_bytes |> Hex.show)
+      ~content:(content |> Hex.of_bytes |> Hex.show)
+      ~fast_withdrawal_contract_address
+      ()
+  in
+
+  let*@! receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+
+  let* () =
+    execute_payout
+      ~exchanger:l1_contracts.ticket_router_tester
+      ~service_provider_pkh
+      ~fast_withdrawal_contract_address
+      ~service_provider_proxy
+      ~fa_tokens:true
+      client
+      receipt
+  in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+
+  let* receiver_balance =
+    Client.ticket_balance
+      ~contract:withdraw_receiver
+      ~ticketer:l1_contracts.ticket_router_tester
+      ~content_type:"pair nat (option bytes)"
+      ~content:"Pair 0 None"
+      client
+  in
+
+  (* Check that the destination address of the withdrawal has a balance of
+     50 tez after the fast withdrawal is complete, i.e. the payout is applied. *)
+  Check.((int_of_string @@ String.trim receiver_balance = withdraw_amount) int)
+    ~error_msg:"Expected %R amount instead of %L after withdrawal" ;
+
+  let* _ =
+    find_and_execute_withdrawal
+      ~outbox_lookup_depth:100
+      ~withdrawal_level
+      ~commitment_period
+      ~challenge_window
+      ~evm_node:proxy
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~client
+      ()
+  in
+
+  (* Verify that the service provider's balance increased by 50 tez after the
+     fast withdrawal payout. *)
+  let* final_service_provider_balance =
+    Client.ticket_balance
+      ~contract:service_provider_pkh
+      ~ticketer:l1_contracts.ticket_router_tester
+      ~content_type:"pair nat (option bytes)"
+      ~content:"Pair 0 None"
+      client
+  in
+  Check.(
+    (Tez.(initial_service_provider_balance + of_int withdraw_amount)
+    = Tez.of_int (int_of_string (String.trim final_service_provider_balance)))
+      Tez.typ)
+    ~error_msg:
+      "After outbox message execution we expect %L ticket balance for the \
+       receiver, got %R" ;
+  Lwt.return_unit
 
 let test_trace_call =
   register_all
@@ -12847,6 +13124,7 @@ let () =
     protocols ;
   test_fast_withdrawal_feature_flag protocols ;
   test_deposit_and_fast_withdraw protocols ;
+  test_deposit_and_fa_fast_withdraw protocols ;
   test_fast_withdraw_feature_flag_deactivated protocols ;
   test_fast_withdrawal_l2_caller protocols ;
   test_trace_call protocols ;
