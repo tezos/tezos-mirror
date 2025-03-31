@@ -82,6 +82,7 @@ let job_release_page ~test ?dependencies () =
        else
          [
            ("S3_BUCKET", "site-prod.octez.tezos.com/releases");
+           ("URL", "octez.tezos.com");
            ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
          ])
     ["./scripts/releases/publish_release_page.sh"]
