@@ -39,8 +39,7 @@ module type S = sig
 
   type step
 
-  type kinded_hash = [`Contents of hash * unit | `Node of hash]
-  [@@deriving brassaia]
+  type kinded_hash = [`Contents of hash | `Node of hash] [@@deriving brassaia]
 
   (** The type for (internal) inode proofs.
 
@@ -97,8 +96,8 @@ module type S = sig
 
       [Extender e] proves that an inode extender [e] exist in the store. *)
   type tree =
-    | Contents of contents * unit
-    | Blinded_contents of hash * unit
+    | Contents of contents
+    | Blinded_contents of hash
     | Node of (step * tree) list
     | Blinded_node of hash
     | Inode of inode_tree inode

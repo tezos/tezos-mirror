@@ -102,12 +102,12 @@ struct
         (function Some _ -> some | None -> none)
 
     let metadata_of_entry (_, t) =
-      match t with `Node _ -> None | `Contents (_, ()) -> Some ()
+      match t with `Node _ -> None | `Contents _ -> Some ()
 
     let hash_of_entry (_, t) =
       match t with
       | `Node h -> Node_key.to_hash h
-      | `Contents (h, _) -> Contents_key.to_hash h
+      | `Contents h -> Contents_key.to_hash h
 
     (* Brassaia 1.4 uses int64 to store list lengths *)
     let entry_t : entry Brassaia.Type.t =

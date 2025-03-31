@@ -45,7 +45,7 @@ module type Core = sig
   val step_encoding : step Data_encoding.t
 
   (** The type for either (node) keys or (contents) keys  *)
-  type value = [`Node of node_key | `Contents of contents_key * unit]
+  type value = [`Node of node_key | `Contents of contents_key]
   [@@deriving brassaia]
 
   (** [value_encoding] is the data_encoding for {!type-value}. *)
@@ -286,7 +286,7 @@ module type Graph = sig
   type path [@@deriving brassaia]
 
   (** The type for store values. *)
-  type value = [`Node of node_key | `Contents of contents_key * unit]
+  type value = [`Node of node_key | `Contents of contents_key]
   [@@deriving brassaia]
 
   (** The empty node. *)

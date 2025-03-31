@@ -188,7 +188,7 @@ let pp_pred = Brassaia.Type.pp pred_t
 
 module H_contents = Brassaia.Hash.Typed (Hash) (Schema.Contents)
 
-let normal x = `Contents (x, ())
+let normal x = `Contents x
 
 let node x = `Node x
 

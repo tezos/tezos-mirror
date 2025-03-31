@@ -60,13 +60,12 @@ module type S = sig
   val of_node : node -> t
 
   (** The type for tree elements. *)
-  type elt = [`Node of node | `Contents of contents * unit]
+  type elt = [`Node of node | `Contents of contents]
 
   (** General-purpose constructor for trees. *)
   val init : elt -> t
 
-  type kinded_hash = [`Contents of hash * unit | `Node of hash]
-  [@@deriving brassaia]
+  type kinded_hash = [`Contents of hash | `Node of hash] [@@deriving brassaia]
 
   (** [pruned h] is a purely in-memory tree with the hash [h]. Such trees can be
       used as children of other in-memory tree nodes, for instance in order to
@@ -89,7 +88,7 @@ module type S = sig
   (** {1 Diffs} *)
 
   (** [diff x y] is the difference of contents between [x] and [y]. *)
-  val diff : t -> t -> (path * (contents * unit) Diff.t) list
+  val diff : t -> t -> (path * contents Diff.t) list
 
   (** {1 Manipulating Contents} *)
 
@@ -151,7 +150,7 @@ module type S = sig
 
   (** [find_all t k] is [Some (b, m)] if [k] is associated to the contents [b]
       in [t] and [None] if [k] is not present in [t]. *)
-  val find_all : t -> path -> (contents * unit) option
+  val find_all : t -> path -> contents option
 
   (** [length t key] is the number of files and sub-nodes stored under [key] in
       [t].
@@ -167,7 +166,7 @@ module type S = sig
   val find : t -> path -> contents option
 
   (** Same as {!find_all} but raise [Invalid_arg] if [k] is not present in [t]. *)
-  val get_all : t -> path -> contents * unit
+  val get_all : t -> path -> contents
 
   (** [list t key] is the list of files and sub-nodes stored under [k] in [t].
       The result order is not specified but is stable.
@@ -234,7 +233,7 @@ module type S = sig
   (** {1 Folds} *)
 
   (** General-purpose destructor for trees. *)
-  val destruct : t -> [`Node of node | `Contents of Contents.t * unit]
+  val destruct : t -> [`Node of node | `Contents of Contents.t]
 
   (** The type for fold marks. *)
   type marks
@@ -334,8 +333,7 @@ module type S = sig
   (** {1 Concrete Trees} *)
 
   (** The type for concrete trees. *)
-  type concrete =
-    [`Tree of (step * concrete) list | `Contents of contents * unit]
+  type concrete = [`Tree of (step * concrete) list | `Contents of contents]
   [@@deriving brassaia]
 
   (** [of_concrete c] is the subtree equivalent of the concrete tree [c].
@@ -439,8 +437,7 @@ module type Sigs = sig
          and type contents_key = B.Contents.Key.t
          and type hash = B.Hash.t
 
-    type kinded_key =
-      [`Contents of B.Contents.Key.t * unit | `Node of B.Node.Key.t]
+    type kinded_key = [`Contents of B.Contents.Key.t | `Node of B.Node.Key.t]
     [@@deriving brassaia]
 
     val import : B.Repo.t -> kinded_key -> t option

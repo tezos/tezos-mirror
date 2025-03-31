@@ -30,8 +30,17 @@ struct
 
   type step = S.step [@@deriving brassaia]
 
-  type kinded_hash = [`Contents of hash * unit | `Node of hash]
-  [@@deriving brassaia]
+  type kinded_hash = [`Contents of hash | `Node of hash]
+
+  (* Custom Repr encoding to be coherent with the previous binary
+     representation that included metadatas *)
+  let kinded_hash_t =
+    let open Type in
+    variant "kinded_hash" (fun c n -> function
+      | `Contents h -> c ((), h) | `Node h -> n h)
+    |~ case1 "contents" (pair unit hash_t) (fun ((), h) -> `Contents h)
+    |~ case1 "node" hash_t (fun h -> `Node h)
+    |> sealv
 
   type 'a inode = {length : int; proofs : (int * 'a) list} [@@deriving brassaia]
 
@@ -39,8 +48,8 @@ struct
   [@@deriving brassaia]
 
   type tree =
-    | Contents of contents * unit
-    | Blinded_contents of hash * unit
+    | Contents of contents
+    | Blinded_contents of hash
     | Node of (step * tree) list
     | Blinded_node of hash
     | Inode of inode_tree inode
@@ -53,6 +62,29 @@ struct
     | Inode_tree of inode_tree inode
     | Inode_extender of inode_tree inode_extender
   [@@deriving brassaia]
+
+  (* Custom Repr encoding to be coherent with the previous binary
+     representation that included metadatas *)
+  let tree_t =
+    let open Type in
+    variant
+      "tree"
+      (fun contents blinded_contents node blinded_node inode extender ->
+        function
+      | Contents c -> contents (c, ())
+      | Blinded_contents h -> blinded_contents (h, ())
+      | Node l -> node l
+      | Blinded_node h -> blinded_node h
+      | Inode i -> inode i
+      | Extender e -> extender e)
+    |~ case1 "contents" (pair contents_t unit) (fun (c, ()) -> Contents c)
+    |~ case1 "blinded-contents" (pair hash_t unit) (fun (h, ()) ->
+           Blinded_contents h)
+    |~ case1 "node" (list (pair step_t tree_t)) (fun h -> Node h)
+    |~ case1 "blinded-node" hash_t (fun h -> Blinded_node h)
+    |~ case1 "inode" (inode_t inode_tree_t) (fun i -> Inode i)
+    |~ case1 "extender" (inode_extender_t inode_tree_t) (fun e -> Extender e)
+    |> sealv
 
   type elt =
     | Contents of contents

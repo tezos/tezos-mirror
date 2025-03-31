@@ -437,7 +437,7 @@ module type S_generic_key = sig
 
     (** Keys in the Brassaia store are tagged with the type of the value they
         reference (either {!contents} or {!node}). *)
-    type kinded_key = [`Contents of contents_key * unit | `Node of node_key]
+    type kinded_key = [`Contents of contents_key | `Node of node_key]
     [@@deriving brassaia]
 
     (** [key t] is the key of tree [t] in the underlying repository, if it
@@ -463,7 +463,7 @@ module type S_generic_key = sig
 
     (** Like {!kinded_key}, but with hashes as value references rather than
         keys. *)
-    type kinded_hash = [`Contents of hash * unit | `Node of hash]
+    type kinded_hash = [`Contents of hash | `Node of hash]
 
     (** [kinded_hash t] is [c]'s kinded hash. *)
     val kinded_hash : ?cache:bool -> tree -> kinded_hash
@@ -550,13 +550,13 @@ module type S_generic_key = sig
   val mem_tree : t -> path -> bool
 
   (** [find_all t] is {!Tree.find_all} applied to [t]'s root tree. *)
-  val find_all : t -> path -> (contents * unit) option
+  val find_all : t -> path -> contents option
 
   (** [find t] is {!Tree.find} applied to [t]'s root tree. *)
   val find : t -> path -> contents option
 
   (** [get_all t] is {!Tree.get_all} applied on [t]'s root tree. *)
-  val get_all : t -> path -> contents * unit
+  val get_all : t -> path -> contents
 
   (** [get t] is {!Tree.get} applied to [t]'s root tree. *)
   val get : t -> path -> contents

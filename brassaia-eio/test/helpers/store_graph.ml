@@ -45,7 +45,7 @@ module Make (S : Generic_key) = struct
         visited := `Node k :: !visited
       in
       let contents ?order k =
-        let e = `Contents (k, ()) in
+        let e = `Contents k in
         if mem e !visited then
           Alcotest.failf
             "contents %a visited twice"
@@ -122,7 +122,7 @@ module Make (S : Generic_key) = struct
       in
       let test1 () =
         let foo = with_contents repo (fun c -> B.Contents.add c "foo") in
-        let foo_k = (foo, ()) in
+        let foo_k = foo in
         let k1 = with_node repo (fun g -> Graph.init g [("b", normal foo)]) in
         let k2 = with_node repo (fun g -> Graph.init g [("a", `Node k1)]) in
         let k3 = with_node repo (fun g -> Graph.init g [("c", `Node k1)]) in
@@ -153,7 +153,7 @@ module Make (S : Generic_key) = struct
         (* Graph.iter requires a node as max, we cannot test a graph with only
            contents. *)
         let foo = with_contents repo (fun c -> B.Contents.add c "foo") in
-        let foo_k = (foo, ()) in
+        let foo_k = foo in
         let k1 = with_node repo (fun g -> Graph.init g [("b", normal foo)]) in
         visited := [] ;
         test_rev_order ~nodes:[`Contents foo_k; `Node k1] ~max:[k1] ;
@@ -163,7 +163,7 @@ module Make (S : Generic_key) = struct
       in
       let test3 () =
         let foo = with_contents repo (fun c -> B.Contents.add c "foo") in
-        let foo_k = (foo, ()) in
+        let foo_k = foo in
         let kb1 = with_node repo (fun g -> Graph.init g [("b1", normal foo)]) in
         let ka1 = with_node repo (fun g -> Graph.init g [("a1", `Node kb1)]) in
         let ka2 = with_node repo (fun g -> Graph.init g [("a2", `Node kb1)]) in
