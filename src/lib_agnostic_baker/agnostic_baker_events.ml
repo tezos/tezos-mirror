@@ -102,16 +102,3 @@ let period_status =
     ("block", Block_hash.encoding)
     ("period", string)
     ("remaining", int31)
-
-(* Warning *)
-let experimental_binary =
-  declare_0
-    ~section
-    ~alternative_color
-    ~level:Warning
-    ~name:"experimental_binary"
-    ~msg:
-      "[WARNING] As the name suggests, this binary is EXPERIMENTAL, therefore \
-       it is intended for testing purposes only. Please do not use it on \
-       `mainnet`."
-    ()
