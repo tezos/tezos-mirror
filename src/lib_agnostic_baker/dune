@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name octez_experimental_agnostic_baker)
- (public_name octez-experimental-agnostic-baker-lib)
+ (name octez_agnostic_baker)
+ (public_name octez-agnostic-baker-lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-rustzcash-deps

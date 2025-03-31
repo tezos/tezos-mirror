@@ -49,6 +49,8 @@ kaitai-of-data-encoding: client-libs/lib_kaitai_of_data_encoding, client-libs/li
 octez-accuser-PsQuebec: src/proto_021_PsQuebec/bin_accuser
 octez-accuser-PsRiotum: src/proto_022_PsRiotum/bin_accuser
 octez-accuser-alpha: src/proto_alpha/bin_accuser
+octez-agnostic-baker: src/bin_agnostic_baker
+octez-agnostic-baker-lib: src/lib_agnostic_baker
 octez-alcotezt: tezt/lib_alcotezt
 octez-baker-PsQuebec: src/proto_021_PsQuebec/bin_baker
 octez-baker-PsRiotum: src/proto_022_PsRiotum/bin_baker
@@ -64,8 +66,6 @@ octez-evm-node: etherlink/bin_node
 octez-evm-node-libs: etherlink/bin_node/config, etherlink/bin_node/installers, etherlink/bin_node/lib_dev, etherlink/bin_node/lib_dev/client, etherlink/bin_node/lib_dev/encodings, etherlink/bin_node/migrations, etherlink/lib_wasm_runtime, etherlink/lib_wasm_runtime/ocaml-api, etherlink/lib_wasm_runtime_callbacks, websocket/core, websocket/lwt
 octez-evm-node-tests: etherlink/bin_node/test
 octez-evm-wasm-runtime-tests: etherlink/lib_wasm_runtime_callbacks/test
-octez-experimental-agnostic-baker: src/bin_agnostic_baker
-octez-experimental-agnostic-baker-lib: src/lib_agnostic_baker
 octez-injector: src/lib_injector
 octez-injector-server: contrib/octez_injector_server
 octez-internal-libs: irmin/lib_irmin, irmin/lib_irmin/data, irmin/lib_irmin/mem, irmin/lib_irmin_pack, irmin/lib_irmin_pack/mem, irmin/lib_irmin_pack/unix, irmin/lib_irmin_tezos, irmin/lib_ppx_irmin, irmin/lib_ppx_irmin/internal, irmin/test/helpers

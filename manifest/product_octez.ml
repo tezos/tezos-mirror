@@ -5641,12 +5641,12 @@ let _octez_scoru_wasm_fast_tests =
       ]
     ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
 
-let octez_experimental_agnostic_baker_lib =
+let octez_agnostic_baker_lib =
   let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   public_lib
-    "octez-experimental-agnostic-baker-lib"
+    "octez-agnostic-baker-lib"
     ~path:"src/lib_agnostic_baker"
-    ~internal_name:"octez_experimental_agnostic_baker"
+    ~internal_name:"octez_agnostic_baker"
     ~synopsis:"Octez: library for Agnostic Baker"
     ~preprocess
     ~preprocessor_deps
@@ -7513,7 +7513,7 @@ let hash = Protocol.hash
             main |> open_;
             baking |> if_some |> open_;
             baking_commands |> if_some |> open_;
-            octez_experimental_agnostic_baker_lib |> open_;
+            octez_agnostic_baker_lib |> open_;
           ]
         ~linkall:true
     in
@@ -8587,7 +8587,7 @@ let _octez_node =
             ~section:"bin";
         ]
 
-let _octez_experimental_agnostic_baker =
+let _octez_agnostic_baker =
   let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   let protocol_deps =
     let deps_for_protocol protocol =
@@ -8602,10 +8602,10 @@ let _octez_experimental_agnostic_baker =
     List.map deps_for_protocol Protocol.all |> List.flatten
   in
   public_exe
-    "octez-experimental-agnostic-baker"
+    "octez-agnostic-baker"
     ~path:"src/bin_agnostic_baker"
     ~internal_name:"main_agnostic_baker"
-    ~synopsis:"Tezos: `octez-experimental-agnostic-baker` binary for baking"
+    ~synopsis:"Tezos: `octez-agnostic-baker` binary for baking"
     ~preprocess
     ~preprocessor_deps
     ~release_status:Released
@@ -8617,7 +8617,7 @@ let _octez_experimental_agnostic_baker =
          octez_base |> open_ ~m:"TzPervasives" |> open_;
          octez_base_unix |> open_;
          octez_client_base_unix |> open_;
-         octez_experimental_agnostic_baker_lib |> open_;
+         octez_agnostic_baker_lib |> open_;
          octez_profiler |> open_;
        ]
       @ protocol_deps)

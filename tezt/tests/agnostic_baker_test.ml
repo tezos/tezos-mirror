@@ -7,7 +7,7 @@
 
 (* Testing
    -------
-   Component:    Agnostic baker (octez-experimental-agnostic-baker)
+   Component:    Agnostic baker (octez-agnostic-baker)
    Invocation:   dune exec tezt/tests/main.exe -- --file agnostic_baker_test.ml
    Subject:      Ensure that the agnostic baker behaves as expected
 

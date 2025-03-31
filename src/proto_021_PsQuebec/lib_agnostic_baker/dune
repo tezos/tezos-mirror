@@ -11,7 +11,7 @@
   tezos-protocol-021-PsQuebec.protocol
   octez-protocol-021-PsQuebec-libs.baking
   octez-protocol-021-PsQuebec-libs.baking-commands
-  octez-experimental-agnostic-baker-lib)
+  octez-agnostic-baker-lib)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -20,4 +20,4 @@
   -open Tezos_protocol_021_PsQuebec
   -open Tezos_baking_021_PsQuebec
   -open Tezos_baking_021_PsQuebec_commands
-  -open Octez_experimental_agnostic_baker))
+  -open Octez_agnostic_baker))
