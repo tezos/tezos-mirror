@@ -2267,6 +2267,134 @@ let commands_rw () =
             successor_level ));
     command
       ~group
+      ~desc:"Update delegate parameters"
+      (args15
+         limit_of_staking_over_baking_millionth_arg
+         edge_of_baking_over_staking_billionth_arg
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         force_switch
+         gas_limit_arg
+         safety_guard_arg
+         storage_limit_arg
+         counter_arg
+         no_print_source_flag
+         fee_parameter_args
+         replace_by_fees_arg
+         successor_level_arg)
+      (prefixes ["update"; "delegate"; "parameters"; "for"]
+      @@ Public_key_hash.source_param ~name:"src" ~desc:"name of the delegate"
+      @@ stop)
+      (fun ( limit_of_staking_over_baking_millionth_opt,
+             edge_of_baking_over_staking_billionth_opt,
+             fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             force,
+             gas_limit,
+             safety_guard,
+             storage_limit,
+             counter,
+             no_print_source,
+             fee_parameter,
+             replace_by_fees,
+             successor_level )
+           source
+           cctxt ->
+        let open Lwt_result_syntax in
+        let* latest =
+          get_latest_staking_parameters
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            source
+        in
+        let* ( limit_of_staking_over_baking_millionth,
+               edge_of_baking_over_staking_billionth ) =
+          match
+            ( limit_of_staking_over_baking_millionth_opt,
+              edge_of_baking_over_staking_billionth_opt )
+          with
+          | None, None ->
+              cctxt#error
+                "You must specify at least one of the following parameters: \
+                 %s, %s@."
+                "--limit-of-staking-over-baking"
+                "--edge-of-baking-over-staking"
+          | None, Some x ->
+              let latest =
+                Int32.to_int latest.limit_of_staking_over_baking_millionth
+              in
+              let*! () =
+                cctxt#warning
+                  "The limit of staking over baking has not been changed, it \
+                   will be kept at %d millionth.\n"
+                  latest
+              in
+              return (latest, x)
+          | Some limit, None ->
+              let latest_edge =
+                Int32.to_int latest.edge_of_baking_over_staking_billionth
+              in
+              let*! () =
+                cctxt#warning
+                  "The edge of baking over staking has not been changed, it \
+                   will be kept at %d billionth.\n"
+                  latest_edge
+              in
+              return (limit, latest_edge)
+          | Some limit, Some edge -> return (limit, edge)
+        in
+        if
+          edge_of_baking_over_staking_billionth
+          = Int32.to_int latest.edge_of_baking_over_staking_billionth
+          && limit_of_staking_over_baking_millionth
+             = Int32.to_int latest.limit_of_staking_over_baking_millionth
+        then
+          cctxt#error
+            "You must change at least one parameter. Latest pending parameters \
+             correspond to the values you specified@."
+        else
+          let contract = Contract.Implicit source in
+          let arg =
+            (* Is there a better way? *)
+            Some
+              (Format.sprintf
+                 "Pair %d %d Unit"
+                 limit_of_staking_over_baking_millionth
+                 edge_of_baking_over_staking_billionth)
+          in
+          let amount = Tez.zero in
+          let entrypoint = Some Entrypoint.set_delegate_parameters in
+          (* TODO #6162
+             (unless --force)
+                - check contract is a baker
+          *)
+          transfer_command
+            amount
+            contract
+            contract
+            cctxt
+            ( fee,
+              dry_run,
+              verbose_signing,
+              simulation,
+              force,
+              gas_limit,
+              safety_guard,
+              storage_limit,
+              counter,
+              arg,
+              no_print_source,
+              fee_parameter,
+              entrypoint,
+              replace_by_fees,
+              successor_level ));
+    command
+      ~group
       ~desc:"Reveal the public key of the contract manager."
       (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
       (prefixes ["reveal"; "key"; "for"]
