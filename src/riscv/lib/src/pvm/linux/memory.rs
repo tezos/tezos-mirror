@@ -129,18 +129,9 @@ impl<M: ManagerBase> SupervisorState<M> {
     /// Handle `madvise` system call.
     ///
     /// See: <https://man7.org/linux/man-pages/man2/madvise.2.html>
-    pub(super) fn handle_madvise<MC>(
-        &mut self,
-        core: &mut MachineCoreState<MC, M>,
-    ) -> Result<bool, Error>
-    where
-        MC: MemoryConfig,
-        M: ManagerWrite,
-    {
+    pub(super) fn handle_madvise(&mut self) -> Result<u64, Error> {
         // We don't make use of advice yet. We just return 0 to indicate success.
-        core.hart.xregisters.write(registers::a0, 0);
-
-        Ok(true)
+        Ok(0)
     }
 
     /// Handle `mprotect` system call.
