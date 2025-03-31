@@ -16,6 +16,22 @@ pub enum ChainFamily {
     Michelson,
 }
 
+impl Default for ChainFamily {
+    fn default() -> Self {
+        Self::Evm
+    }
+}
+
+impl From<String> for ChainFamily {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            "Michelson" => Self::Michelson,
+            "Evm" => Self::Evm,
+            _ => Self::default(),
+        }
+    }
+}
+
 pub struct EvmChainConfig {
     pub chain_id: U256,
     pub limits: EvmLimits,
@@ -59,6 +75,10 @@ impl ChainConfig {
         evm_config: evm_execution::Config,
     ) -> Self {
         ChainConfig::Evm(EvmChainConfig::create_config(chain_id, limits, evm_config))
+    }
+
+    pub fn new_michelson_config(chain_id: U256) -> Self {
+        ChainConfig::Michelson(MichelsonChainConfig::create_config(chain_id))
     }
 
     pub fn get_chain_family(&self) -> ChainFamily {
