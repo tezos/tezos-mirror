@@ -98,8 +98,6 @@ let protocol_dependent_uses ~tag ~path =
 
 let accuser = protocol_dependent_uses ~tag:"accuser_" ~path:"./octez-accuser-"
 
-let baker = protocol_dependent_uses ~tag:"baker_" ~path:"./octez-baker-"
-
 let encoding_prefix = function
   | Alpha -> "alpha"
   | p -> sf "%03d-%s" (number p) (String.sub (hash p) 0 8)
