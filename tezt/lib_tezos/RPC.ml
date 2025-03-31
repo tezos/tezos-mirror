@@ -1337,6 +1337,22 @@ let get_chain_block_context_delegate_active_staking_parameters ?(chain = "main")
     ]
     Fun.id
 
+let get_chain_block_context_delegate_pending_staking_parameters
+    ?(chain = "main") ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "pending_staking_parameters";
+    ]
+    Fun.id
+
 let get_chain_block_context_delegate_current_frozen_deposits ?(chain = "main")
     ?(block = "head") pkh =
   make
