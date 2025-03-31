@@ -18,6 +18,9 @@ There are several options for getting the binaries, depending on how you plan to
 - :ref:`getting static binaries <getting_static_binaries>`.
   This is the easiest way to get native binaries for the latest stable release,
   requiring no dependencies, under Linux.
+- :ref:`using homebrew <using_homebrew>`.
+  For macOS (and also Linux) you can use our Homebrew formula to compile and
+  install octez.
 - :ref:`building the binaries via the OPAM source package manager <building_with_opam>`.
   Take this way to install the latest stable release in your native OS
   environment, automatically built from sources.
@@ -227,6 +230,33 @@ However, note that, by embedding all dependencies, static binary executables are
 
 For upgrading to a newer release, you just have to download and run the new
 versions of the binaries.
+
+.. _using_homebrew:
+
+Using Homebrew
+--------------
+
+On macOS and Linux, you can compile and install Octez using Homebrew. If
+Homebrew is not yet installed on your system, please refer to the official
+[Homebrew installation guide](https://brew.sh/) for detailed instructions.
+
+Once Homebrew is set up, follow these steps to install Octez:
+
+Download the Octez formula by executing the following command in your terminal:
+
+    curl -q "https://packages.nomadic-labs.com/homebrew/Formula/octez.rb" -O
+
+For ``RC`` versions, do rather:
+
+    curl -q "https://packages.nomadic-labs.com/homebrew/RC/Formula/octez.rb" -O
+
+Install Octez using the downloaded formula with the following command:
+
+    brew install -v ./octez.rb
+
+Depending on the speed of your system, the build can take more than 10
+minutes. We regularly test the build in our CI using macOS 14 (Sonoma) with Xcode 15 on an ARM-based Mac.
+More recent configurations should also work.
 
 .. _using_docker_images:
 
