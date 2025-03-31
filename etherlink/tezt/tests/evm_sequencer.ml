@@ -8988,7 +8988,7 @@ let execute_payout ~service_provider_pkh ~exchanger
     ~amount
     ~giver:Constant.bootstrap1.public_key_hash
     ~receiver:service_provider_proxy
-    ~entrypoint:"payout_proxy"
+    ~entrypoint:"payout_proxy_tez"
     ~arg:
       (Printf.sprintf
          "(Pair %S %S %s %s %s %S %s %s)"
