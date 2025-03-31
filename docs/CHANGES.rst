@@ -155,6 +155,8 @@ Smart Rollup node
 Agnostic Baker
 --------------
 
+- The agnostic baker binary becomes ``octez-agnostic-baker``. (MR :gl:`!17491`)
+
 - Released agnostic baker binary as experimental. (MR :gl:`!16318`)
 
 - Use of a generic watchdog. (MR :gl:`!15508`)
@@ -170,9 +172,6 @@ and executes the appropriate baking binary based on the active protocol. It cont
 monitors the blockchain state and automatically transitions to the correct binary whenever
 a new protocol is detected, such as during migrations or at startup.
 
-Please note that this feature is in an EXPERIMENTAL phase, as clearly suggested by its name.
-Therefore, it should NOT be used on ``mainnet``. For further clarifications, you can consult
-the README from ``src/bin_agnostic_baker``.
 
 Protocol Compiler And Environment
 ---------------------------------
