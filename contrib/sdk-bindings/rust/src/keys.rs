@@ -89,13 +89,16 @@ bind_pk_to_pkh!(PublicKey, PublicKeyHash);
 
 macro_rules! generic_sig_conv {
     ($sig:ident) => {
+        #[uniffi::export]
         impl $sig {
-            pub fn into_generic(self) -> Signature {
-                Signature(signature::Signature::from(self.0))
+            pub fn into_generic(&self) -> Signature {
+                Signature(signature::Signature::from(self.0.clone()))
             }
 
-            pub fn try_from_generic(sig: Signature) -> Result<Self, Error> {
+            #[uniffi::constructor]
+            pub fn try_from_generic(sig: &Signature) -> Result<Self, Error> {
                 sig.0
+                    .clone()
                     .try_into()
                     .map(Self)
                     .map_err(|err| Error::Crypto(CryptoError::SignatureType(err)))
@@ -274,7 +277,7 @@ mod tests {
                         $b58_sig,
                         stringify!(Signature)
                     ));
-                    let sig = <$sig_ty>::try_from_generic(sig).expect(&format!(
+                    let sig = <$sig_ty>::try_from_generic(&sig).expect(&format!(
                         "Specify signature {} into {} should succeed",
                         $b58_sig,
                         stringify!($sig_ty)
@@ -410,7 +413,7 @@ mod tests {
                     ));
                     assert!(
                         matches!(
-                            <$sig_ty>::try_from_generic(sig),
+                            <$sig_ty>::try_from_generic(&sig),
                             Err(Error::Crypto(CryptoError::SignatureType(
                                 signature::TryFromSignatureError::InvalidKind(_)
                             )))

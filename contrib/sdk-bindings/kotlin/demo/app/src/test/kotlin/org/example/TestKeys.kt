@@ -32,6 +32,25 @@ class KeysTest {
         assertEquals(expectedB58Pkh, b58Pkh)
     }
 
+    @Test fun blsigIntoGenericSig() {
+        // sk: BLsk2rrqeqLp7ujt4NSCG8W6xDMFDBm6QHoTabeSQ4HjPDewaX4F6k
+        // msg: "a"
+        val b58Sig = "BLsigBcuqVyAuyYiMhPmcf16B8BmvhujB8DPUAmgYb94ixJ9wkraLfxzJpt2eyWMePtzuRNhRWSF4LukEv39LxAi7nGiH83ihKc9jnyhjbLc76QKTs4h1sTzQQEKR15yF9tSyU39iEsyTx"
+        val sig = BlsSignature.fromB58check(b58Sig)
+        val genericSig = sig.intoGeneric()
+        assertEquals(genericSig.toB58check(), b58Sig)
+    }
+
+    @Test fun sigFromGenericSig() {
+        // sk: p2sk37fQnziQeeWmZFuTDpf5Kn42BncafWsJ1wZ29yNUzNppV4eN8n
+        // msg: "a"
+        val b58Sig = "p2sigU4yPcGNuYzkTVGy7VTyFSbGBAnVWBQrnkfrUEgTSuuM7mSUoaggwUxCqE9gnnaatnahJosNpAUwKUVBbiWwZhkbgBXncD"
+        val expectedB58Sig = "sigUkkYXApp64hzZ2CrmsSTw8Unn8GF5zSaJu15qE29hT4aEAhVCdbiCmnY3DAZMP1aAZBHjdSUfXcx5oFs84k8S4FhnDrUk"
+        val genericSig = Signature.fromB58check(b58Sig)
+        val sig = UnknownSignature.tryFromGeneric(genericSig)
+        assertEquals(sig.toB58check(), expectedB58Sig)
+    }
+
     @Test fun verifyP2sig() {
         // sk: p2sk37fQnziQeeWmZFuTDpf5Kn42BncafWsJ1wZ29yNUzNppV4eN8n
         // msg: "a"
