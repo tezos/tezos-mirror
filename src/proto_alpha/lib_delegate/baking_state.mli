@@ -63,6 +63,11 @@ module Consensus_key : sig
 
   val encoding : t Data_encoding.t
 
+  (* Encodes the consensus_key but removes the [secret_key_uri] to avoid
+     leaking information.
+     Warning: this encoding was designed to encode, decoding will fail. *)
+  val consensus_key_without_sk_encoding__cannot_decode : t Data_encoding.t
+
   val pp : Format.formatter -> t -> unit
 end
 

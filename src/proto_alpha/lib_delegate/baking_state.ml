@@ -77,6 +77,17 @@ module Consensus_key = struct
          (req "public_key_hash" Signature.Public_key_hash.encoding)
          (req "secret_key_uri" string))
 
+  let consensus_key_without_sk_encoding__cannot_decode =
+    let open Data_encoding in
+    conv
+      (fun {alias; public_key; id; _} -> (alias, public_key, id))
+      (fun (_alias, _public_key, _id) ->
+        Stdlib.failwith "Unexpected secret key")
+      (obj3
+         (req "alias" (option string))
+         (req "public_key" Signature.Public_key.encoding)
+         (req "public_key_hash" Signature.Public_key_hash.encoding))
+
   let pp fmt {alias; id; _} =
     match alias with
     | None -> Format.fprintf fmt "%a" Signature.Public_key_hash.pp id
