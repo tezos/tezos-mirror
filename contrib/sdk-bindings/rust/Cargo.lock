@@ -1153,6 +1153,7 @@ name = "tezos-bindings"
 version = "0.1.0"
 dependencies = [
  "tezos_crypto_rs",
+ "tezos_data_encoding",
  "thiserror",
  "uniffi",
 ]

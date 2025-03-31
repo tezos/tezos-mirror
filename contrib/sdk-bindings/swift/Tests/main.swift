@@ -8,5 +8,6 @@ XCTMain(
   [
     testCase(TestBase58Check.allTests),
     testCase(TestKeys.allTests),
+    testCase(TestForging.allTests),
   ]
 )
