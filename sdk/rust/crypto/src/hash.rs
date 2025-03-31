@@ -1,5 +1,6 @@
 // Copyright (c) SimpleStaking, Viable Systems and Tezedge Contributors
 // SPDX-CopyrightText: 2022-2024 Trilitech <contact@trili.tech>
+// SPDX-CopyrightText: 2025 Functori <contact@functori.com>
 // SPDX-License-Identifier: MIT
 
 use std::convert::{TryFrom, TryInto};
@@ -42,6 +43,8 @@ mod prefix_bytes {
     // SecretKeyEd25519 uses identical b58 encoding as SeedEd25519 in
     // non-legacy format.
     pub const SECRET_KEY_ED25519: [u8; 4] = SEED_ED25519;
+    pub const SECRET_KEY_SECP256K1: [u8; 4] = [17, 162, 224, 201];
+    pub const SECRET_KEY_P256: [u8; 4] = [16, 81, 238, 189];
     pub const SECRET_KEY_BLS: [u8; 4] = [3, 150, 192, 40];
     pub const GENERIC_SIGNATURE_HASH: [u8; 3] = [4, 130, 43];
     pub const ED22519_SIGNATURE_HASH: [u8; 5] = [9, 245, 205, 134, 18];
@@ -299,6 +302,8 @@ define_hash!(PublicKeyP256);
 define_hash!(PublicKeyBls);
 define_hash!(SeedEd25519);
 define_hash!(SecretKeyEd25519);
+define_hash!(SecretKeySecp256k1);
+define_hash!(SecretKeyP256);
 define_hash!(SecretKeyBls);
 define_hash!(UnknownSignature);
 define_hash!(Ed25519Signature);
@@ -377,6 +382,10 @@ pub enum HashType {
     SeedEd25519,
     // "\013\015\058\007" (* edsk(54) *)
     SecretKeyEd25519,
+    // "\017\162\224\201" (* spsk(54) *)
+    SecretKeySecp256k1,
+    // "\016\081\238\189" (* p2sk(54) *)
+    SecretKeyP256,
     // "\003\150\192\040" (* BLsk(54) *)
     SecretKeyBls,
     // "\004\130\043" (* sig(96) *)
@@ -424,6 +433,8 @@ impl HashType {
             HashType::PublicKeyBls => &PUBLIC_KEY_BLS,
             HashType::SeedEd25519 => &SEED_ED25519,
             HashType::SecretKeyEd25519 => &SECRET_KEY_ED25519,
+            HashType::SecretKeySecp256k1 => &SECRET_KEY_SECP256K1,
+            HashType::SecretKeyP256 => &SECRET_KEY_P256,
             HashType::SecretKeyBls => &SECRET_KEY_BLS,
             HashType::UnknownSignature => &GENERIC_SIGNATURE_HASH,
             HashType::Ed25519Signature => &ED22519_SIGNATURE_HASH,
@@ -460,7 +471,11 @@ impl HashType {
             | HashType::ContractTz4Hash
             | HashType::SmartRollupHash => 20,
             HashType::PublicKeySecp256k1 | HashType::PublicKeyP256 => 33,
-            HashType::SecretKeyEd25519 | HashType::SeedEd25519 | HashType::SecretKeyBls => 32,
+            HashType::SecretKeyEd25519
+            | HashType::SeedEd25519
+            | HashType::SecretKeySecp256k1
+            | HashType::SecretKeyP256
+            | HashType::SecretKeyBls => 32,
             HashType::PublicKeyBls => 48,
             HashType::Ed25519Signature
             | HashType::Secp256k1Signature
@@ -1243,6 +1258,24 @@ mod tests {
             [
                 "edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6",
                 "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh"
+            ]
+        );
+
+        test!(
+            sk_secp256k1,
+            SecretKeySecp256k1,
+            [
+                "spsk1sheno8Jt8FoBEoamFoNBxUEpjEggNNpepTFc8cEoJBA9QjDJq",
+                "spsk3A48fpDpqfFL5s6htBCJhA5c6a1PB63T6vr5qUpxG4AtTmtyxN"
+            ]
+        );
+
+        test!(
+            sk_p256,
+            SecretKeyP256,
+            [
+                "p2sk2o1iwxijPVfzBQyFMPYdomJs1RMgKGQ88Y9WCn1YUosYistbQR",
+                "p2sk3BrqNsbVuQnkuoTLLirsMcKRZ2jJtLG4hu43ZsmCfibPHk3oM4"
             ]
         );
 
