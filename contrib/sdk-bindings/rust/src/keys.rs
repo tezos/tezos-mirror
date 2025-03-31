@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::Error;
+use paste::paste;
 use tezos_crypto_rs::{
     hash::{self, HashTrait},
     public_key, public_key_hash, signature, CryptoError, PublicKeySignatureVerifier,
@@ -102,6 +103,20 @@ macro_rules! generic_sig_conv {
                     .try_into()
                     .map(Self)
                     .map_err(|err| Error::Crypto(CryptoError::SignatureType(err)))
+            }
+        }
+
+        paste! {
+            #[uniffi::export]
+            impl Signature {
+                #[uniffi::constructor]
+                pub fn [<from_ $sig:snake>](sig: &$sig) -> Self {
+                    sig.into_generic()
+                }
+
+                pub fn [<try_into_ $sig:snake>](&self) -> Result<$sig, Error> {
+                    <$sig>::try_from_generic(self)
+                }
             }
         }
     };
@@ -220,8 +235,12 @@ mod tests {
                         $b58_sig,
                         stringify!($sig_ty)
                     ));
-                    let sig = sig.into_generic();
-                    assert_eq!(sig.to_b58check(), $b58_sig, "Value must not have changed");
+                    let generic_sig = sig.into_generic();
+                    assert_eq!(generic_sig.to_b58check(), $b58_sig, "Value must not have changed");
+                    paste! {
+                        let generic_sig = Signature::[<from_ $sig_ty:snake>](&sig);
+                        assert_eq!(generic_sig.to_b58check(), $b58_sig, "Value must not have changed");
+                    }
                 )+
             }
         };
@@ -272,12 +291,12 @@ mod tests {
             #[test]
             fn $name() {
                 $(
-                    let sig = Signature::from_b58check($b58_sig).expect(&format!(
+                    let generic_sig = Signature::from_b58check($b58_sig).expect(&format!(
                         "Deriving {} from {} should succeed",
                         $b58_sig,
                         stringify!(Signature)
                     ));
-                    let sig = <$sig_ty>::try_from_generic(&sig).expect(&format!(
+                    let sig = <$sig_ty>::try_from_generic(&generic_sig).expect(&format!(
                         "Specify signature {} into {} should succeed",
                         $b58_sig,
                         stringify!($sig_ty)
@@ -287,6 +306,18 @@ mod tests {
                         $converted_b58_sig,
                         "Signature must match the expected value"
                     );
+                    paste! {
+                        let sig = Signature::[<try_into_ $sig_ty:snake>](&generic_sig).expect(&format!(
+                            "Specify signature {} into {} should succeed",
+                            $b58_sig,
+                            stringify!($sig_ty)
+                        ));
+                        assert_eq!(
+                            sig.to_b58check(),
+                            $converted_b58_sig,
+                            "Signature must match the expected value"
+                        );
+                    }
                 )+
             }
         };
