@@ -58,6 +58,7 @@ mod prefix_bytes {
     pub const NONCE_HASH: [u8; 3] = [69, 220, 169];
     pub const OPERATION_LIST_HASH: [u8; 2] = [133, 233];
     pub const SMART_ROLLUP_HASH: [u8; 3] = [6, 124, 117];
+    pub const SCRIPT_EXPR_HASH: [u8; 4] = [13, 44, 64, 27];
 }
 
 pub type Hash = Vec<u8>;
@@ -321,6 +322,7 @@ define_hash!(BlsSignature);
 define_hash!(NonceHash);
 define_hash!(OperationListHash);
 define_hash!(SmartRollupHash);
+define_hash!(ScriptExprHash);
 
 macro_rules! unknown_sig {
     ($sig:ident) => {
@@ -420,6 +422,8 @@ pub enum HashType {
     OperationListHash,
     // "\006\124\117" (* sr1(36) *)
     SmartRollupHash,
+    // "\013\044\064\027" (* expr(54) *)
+    ScriptExprHash,
 }
 
 impl HashType {
@@ -464,6 +468,7 @@ impl HashType {
             HashType::NonceHash => &NONCE_HASH,
             HashType::OperationListHash => &OPERATION_LIST_HASH,
             HashType::SmartRollupHash => &SMART_ROLLUP_HASH,
+            HashType::ScriptExprHash => &SCRIPT_EXPR_HASH,
         }
     }
 
@@ -495,7 +500,8 @@ impl HashType {
             | HashType::SeedEd25519
             | HashType::SecretKeySecp256k1
             | HashType::SecretKeyP256
-            | HashType::SecretKeyBls => 32,
+            | HashType::SecretKeyBls
+            | HashType::ScriptExprHash => 32,
             HashType::PublicKeyBls => 48,
             HashType::EncryptedSecretKeyEd25519
             | HashType::EncryptedSecretKeySecp256k1
@@ -1406,6 +1412,15 @@ mod tests {
             [
                 "sr1VN4vvy9uW7zftBvCRmh3RXm3KWS9atR9Q",
                 "sr1VHPsgVnB3gzRyRULuVV2zmbKyRBMq9gbV"
+            ]
+        );
+
+        test!(
+            script_expr_hash,
+            ScriptExprHash,
+            [
+                "exprtWsu7N8st7XBhS685Qa2B4xP6TuTN9ve9UPCU29fV94ySDo5Va",
+                "expru1WEuDy9T9KtXzxBpyBNZ14Q4QankpRGrsAdBYRgHKu1qbqw3H"
             ]
         );
     }
