@@ -76,3 +76,12 @@ val authorized_keys :
     unit,
     Tezos_crypto.Signature.Public_key_hash.t list option )
   Tezos_rpc.Service.t
+
+val known_keys :
+  ( [`GET],
+    unit,
+    unit,
+    unit,
+    unit,
+    Tezos_crypto.Signature.Public_key_hash.t list )
+  Tezos_rpc.Service.t

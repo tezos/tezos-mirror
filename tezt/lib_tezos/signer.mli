@@ -59,6 +59,7 @@ val init :
   ?runner:Runner.t ->
   ?keys:Account.key list ->
   ?magic_byte:string ->
+  ?allow_list_known_keys:bool ->
   unit ->
   t Lwt.t
 

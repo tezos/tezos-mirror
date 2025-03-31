@@ -122,6 +122,14 @@ module Authorized_keys : sig
   end
 end
 
+module Known_keys : sig
+  module Response : sig
+    type t = Tezos_crypto.Signature.Public_key_hash.t list
+
+    val encoding : t Data_encoding.t
+  end
+end
+
 module Request : sig
   type t =
     | Sign of Sign.Request.t
@@ -130,6 +138,7 @@ module Request : sig
     | Deterministic_nonce of Deterministic_nonce.Request.t
     | Deterministic_nonce_hash of Deterministic_nonce_hash.Request.t
     | Supports_deterministic_nonces of Supports_deterministic_nonces.Request.t
+    | Known_keys
 
   val encoding : t Data_encoding.t
 end

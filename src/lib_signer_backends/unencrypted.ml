@@ -77,6 +77,8 @@ let public_key_hash pk_uri =
 
 let import_secret_key ~io:_ = public_key_hash
 
+let list_known_keys path = Client_keys.list_known_keys path
+
 let sign ?version ?watermark sk_uri buf =
   let open Lwt_result_syntax in
   let* sk = secret_key sk_uri in

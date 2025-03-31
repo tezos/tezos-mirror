@@ -122,6 +122,7 @@ enums:
     3: deterministic_nonce
     4: deterministic_nonce_hash
     5: supports_deterministic_nonces
+    6: known_keys
 seq:
 - id: signer_messages__request_tag
   type: u1

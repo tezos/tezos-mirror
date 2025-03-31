@@ -26,7 +26,7 @@
 module Events = Signer_events.Http_daemon
 
 let run (cctxt : #Client_context.wallet) ~hosts ?signing_version ?magic_bytes
-    ~check_high_watermark ~require_auth mode =
+    ?(allow_list_known_keys = false) ~check_high_watermark ~require_auth mode =
   let open Lwt_result_syntax in
   let dir = Tezos_rpc.Directory.empty in
   let dir =
@@ -68,6 +68,14 @@ let run (cctxt : #Client_context.wallet) ~hosts ?signing_version ?magic_bytes
           return_some hashes
         else return_none)
   in
+  let dir =
+    if allow_list_known_keys then
+      Tezos_rpc.Directory.register0 dir Signer_services.known_keys (fun () () ->
+          Handler.known_keys cctxt)
+    else
+      Tezos_rpc.Directory.register0 dir Signer_services.known_keys (fun () () ->
+          failwith "List known keys request not allowed.")
+  in
   let server =
     RPC_server.init_server ~media_types:Media_type.all_media_types dir
   in
@@ -92,7 +100,8 @@ let run (cctxt : #Client_context.wallet) ~hosts ?signing_version ?magic_bytes
       | exn -> fail_with_exn exn)
 
 let run_https ~host ~port ~cert ~key ?signing_version ?magic_bytes
-    ~check_high_watermark ~require_auth (cctxt : #Client_context.wallet) =
+    ?allow_list_known_keys ~check_high_watermark ~require_auth
+    (cctxt : #Client_context.wallet) =
   let open Lwt_syntax in
   let* points =
     Lwt_utils_unix.getaddrinfo
@@ -113,12 +122,13 @@ let run_https ~host ~port ~cert ~key ?signing_version ?magic_bytes
         ~hosts
         ?signing_version
         ?magic_bytes
+        ?allow_list_known_keys
         ~check_high_watermark
         ~require_auth
         mode
 
-let run_http ~host ~port ?signing_version ?magic_bytes ~check_high_watermark
-    ~require_auth (cctxt : #Client_context.wallet) =
+let run_http ~host ~port ?signing_version ?magic_bytes ?allow_list_known_keys
+    ~check_high_watermark ~require_auth (cctxt : #Client_context.wallet) =
   let open Lwt_syntax in
   let* points =
     Lwt_utils_unix.getaddrinfo
@@ -137,6 +147,7 @@ let run_http ~host ~port ?signing_version ?magic_bytes ~check_high_watermark
         ~hosts
         ?signing_version
         ?magic_bytes
+        ?allow_list_known_keys
         ~check_high_watermark
         ~require_auth
         mode

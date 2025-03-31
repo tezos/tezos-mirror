@@ -98,6 +98,13 @@ let high_watermark_switch =
     ~long:"check-high-watermark"
     ()
 
+let allow_list_known_keys_switch =
+  Tezos_clic.switch
+    ~doc:
+      "allow remote request for the list of known public key hash in the wallet"
+    ~long:"allow-list-known-keys"
+    ()
+
 let pidfile_arg =
   Tezos_clic.arg
     ~doc:"write process id in file"
@@ -126,10 +133,11 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
       command
         ~group
         ~desc:"Launch a signer daemon over a TCP socket."
-        (args6
+        (args7
            pidfile_arg
            magic_bytes_arg
            high_watermark_switch
+           allow_list_known_keys_switch
            (default_arg
               ~doc:"listening address or host name"
               ~short:'a'
@@ -158,7 +166,13 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
               (parameter (fun _ s ->
                    return (Time.System.Span.of_seconds_exn (Float.of_string s))))))
         (prefixes ["launch"; "socket"; "signer"] @@ stop)
-        (fun (pidfile, magic_bytes, check_high_watermark, host, port, timeout)
+        (fun ( pidfile,
+               magic_bytes,
+               check_high_watermark,
+               allow_list_known_keys,
+               host,
+               port,
+               timeout )
              cctxt ->
           may_setup_pidfile pidfile @@ fun () ->
           let* () = Tezos_signer_backends.Encrypted.decrypt_all cctxt in
@@ -168,6 +182,7 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
               (Tcp (host, port, [AI_SOCKTYPE SOCK_STREAM]))
               ?magic_bytes
               ?signing_version:signing_version_for_test
+              ~allow_list_known_keys
               ~check_high_watermark
               ~require_auth
               ~timeout
@@ -176,10 +191,11 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
       command
         ~group
         ~desc:"Launch a signer daemon over a local Unix socket."
-        (args4
+        (args5
            pidfile_arg
            magic_bytes_arg
            high_watermark_switch
+           allow_list_known_keys_switch
            (default_arg
               ~doc:"path to the local socket file"
               ~short:'s'
@@ -188,7 +204,12 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
               ~default:(Filename.concat base_dir "socket")
               (parameter (fun _ s -> return s))))
         (prefixes ["launch"; "local"; "signer"] @@ stop)
-        (fun (pidfile, magic_bytes, check_high_watermark, path) cctxt ->
+        (fun ( pidfile,
+               magic_bytes,
+               check_high_watermark,
+               allow_list_known_keys,
+               path )
+             cctxt ->
           may_setup_pidfile pidfile @@ fun () ->
           let* () = Tezos_signer_backends.Encrypted.decrypt_all cctxt in
           let* _ =
@@ -197,6 +218,7 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
               (Unix path)
               ?magic_bytes
               ?signing_version:signing_version_for_test
+              ~allow_list_known_keys
               ~check_high_watermark
               ~require_auth
           in
@@ -204,10 +226,11 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
       command
         ~group
         ~desc:"Launch a signer daemon over HTTP."
-        (args5
+        (args6
            pidfile_arg
            magic_bytes_arg
            high_watermark_switch
+           allow_list_known_keys_switch
            (default_arg
               ~doc:"listening address or host name"
               ~short:'a'
@@ -225,7 +248,13 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
                    try return (int_of_string x)
                    with Failure _ -> failwith "Invalid port %s" x))))
         (prefixes ["launch"; "http"; "signer"] @@ stop)
-        (fun (pidfile, magic_bytes, check_high_watermark, host, port) cctxt ->
+        (fun ( pidfile,
+               magic_bytes,
+               check_high_watermark,
+               allow_list_known_keys,
+               host,
+               port )
+             cctxt ->
           may_setup_pidfile pidfile @@ fun () ->
           let* () = Tezos_signer_backends.Encrypted.decrypt_all cctxt in
           Http_daemon.run_http
@@ -235,14 +264,16 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
             ?magic_bytes
             ?signing_version:signing_version_for_test
             ~check_high_watermark
+            ~allow_list_known_keys
             ~require_auth);
       command
         ~group
         ~desc:"Launch a signer daemon over HTTPS."
-        (args5
+        (args6
            pidfile_arg
            magic_bytes_arg
            high_watermark_switch
+           allow_list_known_keys_switch
            (default_arg
               ~doc:"listening address or host name"
               ~short:'a'
@@ -275,7 +306,12 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
                     failwith "No such TLS key file %s" s
                   else return s))
         @@ stop)
-        (fun (pidfile, magic_bytes, check_high_watermark, host, port)
+        (fun ( pidfile,
+               magic_bytes,
+               check_high_watermark,
+               allow_list_known_keys,
+               host,
+               port )
              cert
              key
              cctxt ->
@@ -290,6 +326,7 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
             ?magic_bytes
             ?signing_version:signing_version_for_test
             ~check_high_watermark
+            ~allow_list_known_keys
             ~require_auth);
       command
         ~group

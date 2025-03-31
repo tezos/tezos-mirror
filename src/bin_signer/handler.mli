@@ -68,3 +68,9 @@ val supports_deterministic_nonces :
   #Client_context.wallet ->
   Tezos_crypto.Signature.public_key_hash ->
   bool tzresult Lwt.t
+
+(** [known_keys cctxt] returns the list of public key hashes known to the
+    signer. *)
+val known_keys :
+  #Client_context.wallet ->
+  Tezos_crypto.Signature.public_key_hash list tzresult Lwt.t

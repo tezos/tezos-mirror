@@ -803,6 +803,14 @@ val list_known_addresses : t -> (string * string) list Lwt.t
     exit. *)
 val spawn_list_known_addresses : t -> Process.t
 
+(** Run [octez-client list known remote keys] and parse the output into a list
+    of public key hashes. *)
+val list_known_remote_keys : t -> Uri.t -> string list Lwt.t
+
+(** Same as [list_known_remote_keys] but do not wait for the process to
+    exit. *)
+val spawn_list_known_remote_keys : t -> Uri.t -> Process.t
+
 (** Run [octez-client gen keys] and return the key alias.
 
     The default value for [alias] is a fresh alias of the form [tezt_<n>]. *)

@@ -27,6 +27,7 @@ val run :
   ?signing_version:Signature.version ->
   ?magic_bytes:int list ->
   ?timeout:Time.System.Span.t ->
+  ?allow_list_known_keys:bool ->
   check_high_watermark:bool ->
   require_auth:bool ->
   #Client_context.io_wallet ->

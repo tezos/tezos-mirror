@@ -160,6 +160,17 @@ struct
           return_some signature
       | None -> return_none
 
+    let list_known_keys base =
+      RPC_client.call_service
+        ~logger:P.logger
+        ?headers
+        Media_type.all_media_types
+        ~base
+        Signer_services.known_keys
+        ()
+        ()
+        ()
+
     let sign ?version ?watermark uri msg =
       let open Lwt_result_syntax in
       let* base, pkh = parse (uri : sk_uri :> Uri.t) in
