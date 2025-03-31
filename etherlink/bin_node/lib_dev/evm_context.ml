@@ -270,7 +270,7 @@ module State = struct
           ( store,
             context,
             Ethereum_types.Qty Z.zero,
-            Ethereum_types.genesis_parent_hash,
+            L2_types.genesis_parent_hash ~chain_family:EVM,
             Created )
 
   let commit store (context : Irmin_context.rw) evm_state number =
@@ -689,25 +689,27 @@ module State = struct
 
     match try_apply with
     | Apply_success {evm_state; block} ->
+        let block_number = L2_types.block_number block in
+        let block_hash = L2_types.block_hash block in
         let* () =
           if is_sequencer ctxt then return_unit
           else
             let* finalized_hash =
-              Evm_store.Pending_confirmations.find_with_level conn block.number
+              Evm_store.Pending_confirmations.find_with_level conn block_number
             in
             match finalized_hash with
             | None -> return_unit
             | Some expected_block_hash ->
-                if expected_block_hash = block.hash then
+                if expected_block_hash = block_hash then
                   Evm_store.Pending_confirmations.delete_with_level
                     conn
-                    block.number
+                    block_number
                 else
-                  let Ethereum_types.(Qty number) = block.number in
+                  let Ethereum_types.(Qty number) = block_number in
 
                   let*! () =
                     Evm_events_follower_events.diverged
-                      (number, expected_block_hash, block.hash)
+                      (number, expected_block_hash, block_hash)
                   in
                   (* If the observer cannot reset to finalized level it must
                      exit. *)
@@ -716,7 +718,7 @@ module State = struct
                       {
                         level = number;
                         expected_block_hash;
-                        found_block_hash = Some block.hash;
+                        found_block_hash = Some block_hash;
                         must_exit = true;
                       }
                   in
@@ -730,39 +732,58 @@ module State = struct
                        {
                          level = number;
                          expected_block_hash;
-                         found_block_hash = Some block.hash;
+                         found_block_hash = Some block_hash;
                          must_exit = false;
                        })
         in
-
-        let number_of_transactions =
-          match block.transactions with
-          | TxHash l -> List.length l
-          | TxFull l -> List.length l
+        (* Set metrics for the block *)
+        let () =
+          match block with
+          | Eth block ->
+              let number_of_transactions =
+                match block.transactions with
+                | TxHash l -> List.length l
+                | TxFull l -> List.length l
+              in
+              Metrics.set_block
+                ~time_processed:!time_processed
+                ~transactions:number_of_transactions ;
+              Option.iter
+                (fun baseFeePerGas ->
+                  baseFeePerGas |> Ethereum_types.Qty.to_z
+                  |> Metrics.set_gas_price)
+                block.baseFeePerGas
+          | Tez _ ->
+              (* TODO: https://gitlab.com/tezos/tezos/-/issues/7866 *)
+              ()
         in
-        Metrics.set_block
-          ~time_processed:!time_processed
-          ~transactions:number_of_transactions ;
-        Option.iter
-          (fun baseFeePerGas ->
-            baseFeePerGas |> Ethereum_types.Qty.to_z |> Metrics.set_gas_price)
-          block.baseFeePerGas ;
         let* () =
           Evm_store.Blueprints.store
             conn
-            {number = block.number; timestamp; payload}
+            {number = block_number; timestamp; payload}
         in
 
         let* evm_state, receipts =
           if not ctxt.legacy_block_storage then
-            let* receipts = store_block_unsafe conn evm_state block in
+            let* receipts =
+              match block with
+              | Eth block -> store_block_unsafe conn evm_state block
+              | Tez _ ->
+                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7866 *)
+                  Lwt_result.return []
+            in
             let*! evm_state = Evm_state.clear_block_storage block evm_state in
             return (evm_state, receipts)
           else
             let*! receipts =
-              Durable_storage.block_receipts_of_block
-                (read_from_state evm_state)
-                block
+              match block with
+              | Eth block ->
+                  Durable_storage.block_receipts_of_block
+                    (read_from_state evm_state)
+                    block
+              | Tez _ ->
+                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7866 *)
+                  Lwt.return []
             in
             return (evm_state, receipts)
         in
@@ -794,12 +815,21 @@ module State = struct
   let on_new_head ?split_info ctxt ~applied_upgrade evm_state context block
       blueprint_with_events =
     let open Lwt_syntax in
+    let block_hash = L2_types.block_hash block in
     let (Qty level) = ctxt.session.next_blueprint_number in
     ctxt.session.evm_state <- evm_state ;
     ctxt.session.context <- context ;
     ctxt.session.next_blueprint_number <- Qty (Z.succ level) ;
-    ctxt.session.current_block_hash <- Ethereum_types.(block.hash) ;
-    Lwt_watcher.notify head_watcher (Ethereum_types.Subscription.NewHeads block) ;
+    ctxt.session.current_block_hash <- block_hash ;
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7865 *)
+    (match block with
+    | Eth block ->
+        Lwt_watcher.notify
+          head_watcher
+          (Ethereum_types.Subscription.NewHeads block)
+    | Tez _ ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7866 *)
+        ()) ;
     Option.iter
       (fun (split_level, split_timestamp) ->
         ctxt.session.last_split_block <- Some (split_level, split_timestamp))
@@ -856,7 +886,7 @@ module State = struct
     return_unit
 
   let rec apply_blueprint ?(events = []) ctxt conn timestamp payload
-      delayed_transactions =
+      delayed_transactions : 'a L2_types.block tzresult Lwt.t =
     let open Lwt_result_syntax in
     Misc.with_timing_f_e Blueprint_events.blueprint_applied @@ fun () ->
     let* evm_state, context, current_block, applied_kernel_upgrade, split_info =
@@ -876,8 +906,14 @@ module State = struct
       | _ -> None
     in
 
-    let*? current_block =
-      Transaction_object.reconstruct_block payload current_block
+    let* current_block =
+      match current_block with
+      | Eth block ->
+          let*? current_block =
+            Transaction_object.reconstruct_block payload block
+          in
+          return (L2_types.Eth current_block)
+      | Tez block -> return (L2_types.Tez block)
     in
 
     let*! () =
@@ -1738,10 +1774,13 @@ module Handlers = struct
             delayed_transactions
         in
         let tx_hashes =
-          match block.transactions with
-          | TxHash tx_hashes -> List.to_seq tx_hashes
-          | TxFull tx_objects ->
-              List.to_seq tx_objects |> Seq.map Transaction_object.hash
+          match block with
+          | Eth block -> (
+              match block.transactions with
+              | TxHash tx_hashes -> List.to_seq tx_hashes
+              | TxFull tx_objects ->
+                  List.to_seq tx_objects |> Seq.map Transaction_object.hash)
+          | Tez _ -> Seq.empty
         in
         return tx_hashes
     | Last_known_L1_level -> (

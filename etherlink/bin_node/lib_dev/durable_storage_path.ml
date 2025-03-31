@@ -227,6 +227,8 @@ module Trace = struct
 end
 
 module Chain_configuration = struct
+  open L2_types
+
   let root chain_id =
     EVM.make "/chain_configurations/" ^ Chain_id.to_string chain_id
 

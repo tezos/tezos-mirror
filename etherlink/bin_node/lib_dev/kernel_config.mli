@@ -14,7 +14,7 @@ type evm_version = Shanghai | Cancun
 val make :
   mainnet_compat:bool ->
   boostrap_balance:Ethereum_types.NonceMap.key ->
-  ?l2_chain_ids:Ethereum_types.chain_id list ->
+  ?l2_chain_ids:L2_types.chain_id list ->
   ?bootstrap_accounts:Ethereum_types.address list ->
   ?kernel_root_hash:string * string ->
   ?chain_id:string * string ->
@@ -60,7 +60,7 @@ val make_l2 :
   ?set_account_code:(string * string) list ->
   ?world_state_path:string * string ->
   l2_chain_id:string ->
-  l2_chain_family:Ethereum_types.chain_family ->
+  l2_chain_family:L2_types.chain_family ->
   output:string ->
   unit ->
   unit tzresult Lwt.t

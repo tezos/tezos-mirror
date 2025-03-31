@@ -165,18 +165,30 @@ let blueprint_injection_failed level trace =
 
 let blueprint_applied block process_time =
   let open Ethereum_types in
-  let count_txs = function
-    | TxHash l -> List.length l
-    | TxFull l -> List.length l
-  in
-  emit
-    blueprint_application
-    ( Qty.to_z block.number,
-      block.timestamp |> Qty.to_z |> Z.to_int64 |> Time.Protocol.of_seconds,
-      count_txs block.transactions,
-      Qty.to_z block.gasUsed,
-      block.hash,
-      process_time )
+  match block with
+  | L2_types.Eth block ->
+      let count_txs = function
+        | TxHash l -> List.length l
+        | TxFull l -> List.length l
+      in
+      emit
+        blueprint_application
+        ( Qty.to_z block.number,
+          block.timestamp |> Qty.to_z |> Z.to_int64 |> Time.Protocol.of_seconds,
+          count_txs block.transactions,
+          Qty.to_z block.gasUsed,
+          block.hash,
+          process_time )
+  | Tez block ->
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7866 *)
+      emit
+        blueprint_application
+        ( Qty.to_z block.number,
+          block.timestamp |> Qty.to_z |> Z.to_int64 |> Time.Protocol.of_seconds,
+          0,
+          Z.zero,
+          block.hash,
+          process_time )
 
 let invalid_blueprint_produced level = emit invalid_blueprint_produced level
 

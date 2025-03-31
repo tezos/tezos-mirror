@@ -7,6 +7,7 @@
 (*****************************************************************************)
 
 open Ethereum_types
+open L2_types
 
 let confirm_txs config confirmed_txs =
   let open Lwt_result_syntax in

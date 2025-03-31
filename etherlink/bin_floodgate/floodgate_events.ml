@@ -28,7 +28,7 @@ let is_ready =
        {base_fee_per_gas})"
     ~level:Notice
     ~pp2:pp_eth
-    ("chain_id", Ethereum_types.Chain_id.encoding)
+    ("chain_id", L2_types.Chain_id.encoding)
     ("base_fee_per_gas", Data_encoding.n)
 
 let tx_queue_is_ready =

@@ -1855,7 +1855,7 @@ let evm_version_arg =
 let make_l2_kernel_config_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
-  let open Evm_node_lib_dev_encoding.Ethereum_types in
+  let open Evm_node_lib_dev_encoding.L2_types in
   command
     ~group:Groups.kernel
     ~desc:
@@ -1938,7 +1938,7 @@ let l2_chain_ids_arg =
     ~doc:"Specify one of the chain ids in the kernel, can be used several times"
     ~placeholder:"1"
   @@ Tezos_clic.parameter (fun _ chain_id ->
-         Lwt.return_ok @@ Ethereum_types.Chain_id.of_string_exn chain_id)
+         Lwt.return_ok @@ L2_types.Chain_id.of_string_exn chain_id)
 
 let make_kernel_config_command =
   let open Tezos_clic in

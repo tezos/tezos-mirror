@@ -7,6 +7,7 @@
 (*****************************************************************************)
 
 open Ethereum_types
+open L2_types
 
 type transaction_type = Legacy | Eip2930 | Eip1559
 

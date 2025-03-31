@@ -40,9 +40,9 @@ let le_int64_bytes i =
   String.of_bytes b
 
 module ChainSet = Set.Make (struct
-  type t = Ethereum_types.chain_id
+  type t = L2_types.chain_id
 
-  let compare = Ethereum_types.Chain_id.compare
+  let compare = L2_types.Chain_id.compare
 end)
 
 let all_duplicate_chain_ids ~l2_chain_ids =
@@ -70,7 +70,7 @@ let check_for_duplicate ~l2_chain_ids =
       (Format.pp_print_list
          ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
          (fun ppf chain_id ->
-           Format.fprintf ppf "%s" (Ethereum_types.Chain_id.to_string chain_id)))
+           Format.fprintf ppf "%s" (L2_types.Chain_id.to_string chain_id)))
       (ChainSet.elements duplicate_chain_ids)
 
 (* When splitting the path given in argument,
@@ -136,8 +136,7 @@ let make_l2 ~boostrap_balance ?bootstrap_accounts ?minimum_base_fee_per_gas
     @ make_l2_config_instr
         ~l2_chain_id
         (Some
-           ( "chain_family",
-             l2_chain_family |> Ethereum_types.Chain_family.to_string ))
+           ("chain_family", l2_chain_family |> L2_types.Chain_family.to_string))
     @ make_l2_config_instr ~l2_chain_id world_state_path
   in
   let world_state_instrs =
@@ -204,7 +203,7 @@ let make ~mainnet_compat ~boostrap_balance ?l2_chain_ids ?bootstrap_accounts
         let chain_ids =
           List.map
             (fun chain_id ->
-              let chain_id = Ethereum_types.Chain_id.to_string chain_id in
+              let chain_id = L2_types.Chain_id.to_string chain_id in
               Value (Bytes.of_string chain_id))
             l2_chain_ids
         in

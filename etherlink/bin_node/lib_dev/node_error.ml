@@ -34,9 +34,9 @@ type error +=
   | Proxy_finalize_with_multichain of error_source
   | Singlechain_node_multichain_kernel
   | Mismatched_chain_family of {
-      chain_id : Ethereum_types.chain_id;
-      node_family : Ethereum_types.chain_family;
-      kernel_family : Ethereum_types.chain_family;
+      chain_id : L2_types.chain_id;
+      node_family : L2_types.chain_family;
+      kernel_family : L2_types.chain_family;
     }
   | Dream_rpc_tezlink
 
@@ -162,17 +162,17 @@ let () =
         ppf
         "The node was configured with the %a chain family for chain %a but the \
          rollup expects the %a chain family for this chain."
-        Ethereum_types.Chain_id.pp
+        L2_types.Chain_id.pp
         chain_id
-        Ethereum_types.Chain_family.pp
+        L2_types.Chain_family.pp
         node_family
-        Ethereum_types.Chain_family.pp
+        L2_types.Chain_family.pp
         kernel_family)
     Data_encoding.(
       obj3
-        (req "chain_id" Ethereum_types.Chain_id.encoding)
-        (req "node_family" Ethereum_types.Chain_family.encoding)
-        (req "kernel_family" Ethereum_types.Chain_family.encoding))
+        (req "chain_id" L2_types.Chain_id.encoding)
+        (req "node_family" L2_types.Chain_family.encoding)
+        (req "kernel_family" L2_types.Chain_family.encoding))
     (function
       | Mismatched_chain_family {chain_id; node_family; kernel_family} ->
           Some (chain_id, node_family, kernel_family)

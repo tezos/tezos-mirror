@@ -5,11 +5,8 @@
 (* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
-
-open Ethereum_types
-
-let keccak256 (Hex s) =
-  let bytes = Hex.to_bytes_exn (`Hex s) in
+let keccak256 s =
+  let bytes = Hex.to_bytes_exn s in
   Tezos_crypto.Hacl.Hash.Keccak_256.digest bytes
 
 let encode_i32_le i =
@@ -36,6 +33,18 @@ let encoding_with_optional_last_param encoding second_param_encoding
         (fun (t, _) -> Some t)
         (fun t -> (t, default_second_param));
     ]
+
+let z_to_hexa = Z.format "#x"
+
+let decode_z_le bytes = Bytes.to_string bytes |> Z.of_bits
+
+let decode_z_be bytes =
+  Bytes.fold_left
+    (fun acc c ->
+      let open Z in
+      add (of_int (Char.code c)) (shift_left acc 8))
+    Z.zero
+    bytes
 
 (* A variation of List.fold_left where the function f returns an option.
    If f returns None, the fold stops and returns None.

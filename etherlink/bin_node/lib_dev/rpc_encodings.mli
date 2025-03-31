@@ -137,12 +137,12 @@ module Kernel_root_hash :
 module Network_id : METHOD with type input = unit and type output = string
 
 module Chain_id :
-  METHOD with type input = unit and type output = Ethereum_types.chain_id
+  METHOD with type input = unit and type output = L2_types.chain_id
 
 module Chain_family :
   METHOD
-    with type input = Ethereum_types.chain_id
-     and type output = Ethereum_types.chain_family
+    with type input = L2_types.chain_id
+     and type output = L2_types.chain_family
 
 module Accounts :
   METHOD with type input = unit and type output = Ethereum_types.address list

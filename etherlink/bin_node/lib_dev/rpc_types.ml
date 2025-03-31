@@ -13,4 +13,4 @@
 
 type rpc_server_family =
   | Multichain_sequencer_rpc_server
-  | Single_chain_node_rpc_server of Ethereum_types.chain_family
+  | Single_chain_node_rpc_server of L2_types.chain_family

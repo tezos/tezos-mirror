@@ -190,13 +190,12 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ctxt in
 
   let* chain_family =
-    let open Ethereum_types in
     match (config.experimental_features.l2_chains, enable_multichain) with
-    | None, false -> return EVM
+    | None, false -> return L2_types.EVM
     | None, true -> tzfail Node_error.Singlechain_node_multichain_kernel
     | Some [_], false ->
         let*! () = Events.multichain_node_singlechain_kernel () in
-        return EVM
+        return L2_types.EVM
     | Some [l2_chain], true ->
         let* chain_family =
           Evm_ro_context.read_chain_family ctxt l2_chain.chain_id
@@ -221,7 +220,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
       ~data_dir
       ~rpc_server_family:(Rpc_types.Single_chain_node_rpc_server chain_family)
       ?tezlink_services:
-        (if chain_family = Michelson then
+        (if chain_family = L2_types.Michelson then
            Some
              Tezlink_services_impl.(
                michelson_services_methods rpc_backend Tezlink_constants.mainnet)

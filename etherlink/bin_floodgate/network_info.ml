@@ -6,7 +6,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {chain_id : Ethereum_types.chain_id; base_fee_per_gas : Z.t}
+type t = {chain_id : L2_types.chain_id; base_fee_per_gas : Z.t}
 
 let get_chain_id ~evm_node_endpoint =
   let open Lwt_result_syntax in

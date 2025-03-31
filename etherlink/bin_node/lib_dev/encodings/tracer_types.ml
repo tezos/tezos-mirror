@@ -950,8 +950,8 @@ module CallTracer = struct
   }
 
   let solidity_revert_selector =
-    let error = Ethereum_types.hex_of_utf8 "Error(string)" in
-    let selector = Helpers.keccak256 error in
+    let (Hex error) = Ethereum_types.hex_of_utf8 "Error(string)" in
+    let selector = Helpers.keccak256 (`Hex error) in
     Bytes.sub selector 0 4
 
   let logs_encoding =
