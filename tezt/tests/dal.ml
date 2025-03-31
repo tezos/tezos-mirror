@@ -62,11 +62,11 @@ end
 
 let init_logger () =
   let counter = ref 1 in
-  fun msg ->
+  fun fmt ->
     let color = Log.Color.(bold ++ FG.blue) in
     let prefix = "step-" ^ string_of_int !counter in
-    Log.info ~color ~prefix msg ;
-    incr counter
+    incr counter ;
+    Log.info ~color ~prefix fmt
 
 let read_dir dir =
   let* dir = Lwt_unix.opendir dir in
