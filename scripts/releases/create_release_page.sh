@@ -7,6 +7,9 @@ if [ -z "${S3_BUCKET:-}" ]; then
   exit 1
 fi
 
+# If [URL] is not defined, we use the [S3_BUCKET] address.
+URL="${URL:-${S3_BUCKET}}"
+
 versions_list_filename="${1:-}"
 
 if [ -z "${versions_list_filename}" ]; then
@@ -58,9 +61,9 @@ while read -r version rc latest announcement; do
       # Write sha256sum only if it's an actual binary (and not a checksums file)
       if [[ "$binary_name" != "sha256sums.txt" ]]; then
         checksum=$(grep " ${binary_name}$" sha256sums.txt | awk '{print $1}')
-        echo "- [${binary_name}](https://${S3_BUCKET}/${binary}) <span class=\"sha256\">(**sha256:** \`$checksum\`)</span>" >> index.md
+        echo "- [${binary_name}](https://${URL}/${binary}) <span class=\"sha256\">(**sha256:** \`$checksum\`)</span>" >> index.md
       else
-        echo "- [${binary_name}](https://${S3_BUCKET}/${binary})" >> index.md
+        echo "- [${binary_name}](https://${URL}/${binary})" >> index.md
       fi
     done
     echo -e "\n" >> index.md
