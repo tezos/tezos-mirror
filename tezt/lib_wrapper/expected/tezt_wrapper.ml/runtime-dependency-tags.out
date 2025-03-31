@@ -21,7 +21,7 @@ dac_node: octez-dac-node
 dal_node: octez-dal-node
 dsn_node: octez-dsn-node
 evm_node: octez-evm-node
-experimental_agnostic_baker: octez-experimental-agnostic-baker
+agnostic_baker: octez-experimental-agnostic-baker
 node: octez-node
 protocol_compiler: octez-protocol-compiler
 signer: octez-signer

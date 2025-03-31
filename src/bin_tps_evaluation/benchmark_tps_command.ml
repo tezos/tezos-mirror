@@ -206,7 +206,7 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection ~blocks_total
      give very little Tez to the extra bootstraps, the default bootstraps will
      dominate in terms of stake. *)
   let delegates = make_delegates Constants.default_bootstraps_count in
-  let _baker = Baker.init ~protocol ~delegates node client in
+  let _baker = Agnostic_baker.init ~delegates node client in
   Log.info "Originating smart contracts" ;
   let* () =
     Client.stresstest_originate_smart_contracts originating_bootstrap client
@@ -297,7 +297,7 @@ let register () =
     ~tags:[Dashboard.Test.benchmark_tps]
     ~timeout:(Long_test.Minutes 60)
     ~executors:Long_test.[x86_executor1]
-    ~uses:[Tezt_wrapper.Uses.octez_baker_alpha]
+    ~uses:[Tezt_wrapper.Uses.octez_experimental_agnostic_baker]
     (fun () ->
       let lift_protocol_limits =
         Cli.get_bool ~default:false "lift-protocol-limits"

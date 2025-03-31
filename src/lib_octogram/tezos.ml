@@ -62,12 +62,12 @@ end
 
 let () = Agent_state.register_key (module Octez_node_key)
 
-type _ key += Octez_baker_k : string -> Baker.t key
+type _ key += Octez_baker_k : string -> Agnostic_baker.t key
 
 module Octez_baker_key = struct
   type t = string
 
-  type r = Baker.t
+  type r = Agnostic_baker.t
 
   let proj : type a. a key -> (t * (a, r) eq) option = function
     | Octez_baker_k name -> Some (name, Eq)
@@ -2592,13 +2592,13 @@ module Start_octez_baker = struct
   let run state
       {
         name;
-        protocol;
         base_dir;
         node_uri;
         node_data_dir;
         delegates;
         dal_node_uri;
         baker_path;
+        _;
       } =
     let client = Agent_state.http_client state in
     (* Get the L1 node's data-dir and RPC endpoint. *)
@@ -2636,10 +2636,9 @@ module Start_octez_baker = struct
     in
     (* Create a baker state. *)
     let octez_baker =
-      Baker.create_from_uris
+      Agnostic_baker.create_from_uris
         ?name
         ?path:baker_path
-        ~protocol
         ~base_dir
         ~node_data_dir
         ~node_rpc_endpoint
@@ -2648,10 +2647,10 @@ module Start_octez_baker = struct
         ()
     in
     (* Register the baker state. *)
-    let name = Baker.name octez_baker in
+    let name = Agnostic_baker.name octez_baker in
     Agent_state.add (Octez_baker_k name) octez_baker state ;
     (* Start the baker. *)
-    let* () = Baker.run octez_baker in
+    let* () = Agnostic_baker.run octez_baker in
     return {name}
 
   let on_completion ~on_new_service:_ ~on_new_metrics_source:_ (_ : r) = ()

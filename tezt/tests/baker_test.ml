@@ -508,7 +508,7 @@ let simple_attestations_aggregation =
     ~title:"Simple attestations aggregation"
     ~tags:[team; "baker"; "attestation"; "aggregation"]
     ~supports:Protocol.(From_protocol 023)
-    ~uses:(fun protocol -> [Protocol.baker protocol])
+    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
   @@ fun protocol ->
   log_step 1 "Initialize a node and a client with protocol" ;
   let consensus_rights_delay = 1 in
@@ -611,7 +611,7 @@ let simple_attestations_aggregation =
   let () = check_aggregate ~expected_committee aggregate_json in
   log_step 14 "Start a baker and bake until level 12" ;
   (* Testing the baker automaton *)
-  let* _baker = Baker.init ~protocol ~delegates node client in
+  let* _baker = Agnostic_baker.init ~delegates node client in
   let* _ = Node.wait_for_level node 12 in
   log_step 15 "Fetch latest block consensus operations" ;
   let* consensus_operations =
