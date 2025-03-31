@@ -326,7 +326,7 @@ module Rounds = struct
       ~title:test
       ~tags:["tenderbake"; "basic"]
       ~team
-      ~uses:[Constant.octez_experimental_agnostic_baker]
+      ~uses:[Constant.octez_agnostic_baker]
       ~executors
       ~timeout:(Long_test.Seconds (repeat * 8 * timeout))
     @@ fun () ->
@@ -483,7 +483,7 @@ module Long_dynamic_bake = struct
       ~title:(test topology)
       ~tags:["tenderbake"; "dynamic"; string_of_topology topology]
       ~team
-      ~uses:[Constant.octez_experimental_agnostic_baker]
+      ~uses:[Constant.octez_agnostic_baker]
       ~executors
       ~timeout:(Long_test.Seconds (repeat * 8 * timeout))
     @@ fun () ->

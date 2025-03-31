@@ -57,7 +57,7 @@ let test_nonce_seed_revelation =
     ~__FILE__
     ~title:"Nonce seed revelation"
     ~tags:[team; "nonce"; "seed"; "revelation"; Tag.memory_3k]
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   (* Run a node and a baker.
      The node runs in archive mode to obtain metadata with [RPC.get_chain_block]. *)
@@ -235,7 +235,7 @@ let test_baking_nonce_migration =
     ~__FILE__
     ~title:"Baking nonce format migration"
     ~tags:[team; "nonce"; "migration"]
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   Log.info "Initialize node and client" ;
   let* node, client =

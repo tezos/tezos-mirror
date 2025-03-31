@@ -457,7 +457,7 @@ let baker_test ~network =
     ~__FILE__
     ~title:(sf "Join %s and bake" network)
     ~tags:[Tag.tezos2; "dal"; "baker"; network]
-    ~uses:[Constant.octez_experimental_agnostic_baker]
+    ~uses:[Constant.octez_agnostic_baker]
   @@ fun () ->
   let baker_sk = Cli.get_string_opt "baker-sk" in
   let dal_bootstrap_peers =

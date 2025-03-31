@@ -75,7 +75,7 @@ let signer_simple_test =
     ~title:"signer test"
     ~tags:[team; "node"; "baker"; "tz1"]
     ~uses:(fun _protocol ->
-      [Constant.octez_signer; Constant.octez_experimental_agnostic_baker])
+      [Constant.octez_signer; Constant.octez_agnostic_baker])
   @@ fun protocol ->
   let* _ =
     signer_test protocol ~keys:(Account.Bootstrap.keys |> Array.to_list)

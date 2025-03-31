@@ -3638,7 +3638,7 @@ let register_end_to_end_tests ~protocols =
         ~activation_timestamp:(Ago activation_timestamp)
         ~minimal_block_delay:(string_of_int block_delay)
         ~tags
-        ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+        ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
         title
         (e2e_test_script
            ~slot_index
@@ -4599,7 +4599,7 @@ let test_migration_accuser_issue ~migrate_from ~migrate_to =
     ~scenario
     ~tags
     ~description
-    ~uses:[Constant.octez_experimental_agnostic_baker]
+    ~uses:[Constant.octez_agnostic_baker]
     ~activation_timestamp:Now
     ~producer_profiles:[slot_index]
     ~minimal_block_delay:
@@ -7408,7 +7408,7 @@ let scenario_tutorial_dal_baker =
     ~__FILE__
     ~tags:[team; Tag.memory_3k; "tutorial"; "dal"; "baker"]
     ~uses:(fun _protocol ->
-      [Constant.octez_experimental_agnostic_baker; Constant.octez_dal_node])
+      [Constant.octez_agnostic_baker; Constant.octez_dal_node])
     (Printf.sprintf "%s" description)
     (fun protocol ->
       (* Note: Step 1 consists in setting up docker which we don't use
@@ -10218,7 +10218,7 @@ let register ~protocols =
     test_attester_with_bake_for
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
     ~attestation_threshold:100
     ~attestation_lag:16
     ~activation_timestamp:Now
@@ -10274,7 +10274,7 @@ let register ~protocols =
     protocols ;
   scenario_with_layer1_and_dal_nodes
     "baker registers profiles with dal node"
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
     ~activation_timestamp:Now
     ~prover:false
     test_baker_registers_profiles
@@ -10393,7 +10393,7 @@ let register ~protocols =
     test_attesters_receive_dal_rewards
     (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
   scenario_with_layer1_and_dal_nodes
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
     ~tags:["restart"]
     ~activation_timestamp:Now
     ~producer_profiles:[0]
@@ -10402,7 +10402,7 @@ let register ~protocols =
     test_restart_dal_node
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
     ~tags:["restart"]
     ~activation_timestamp:Now
     ~bootstrap_profile:true

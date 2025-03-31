@@ -3588,7 +3588,7 @@ let register (module Cli : Scenarios_cli.Dal) =
            [
              "octez-dal-node";
              "octez-client";
-             Tezt_wrapper.Uses.path Constant.octez_experimental_agnostic_baker;
+             Tezt_wrapper.Uses.path Constant.octez_agnostic_baker;
            ]
            @ (if Cli.etherlink then
                 ["evm_kernel.wasm"; "octez-evm-node"; "octez-smart-rollup-node"]

@@ -82,9 +82,8 @@ let liquidity_baking_votefile ?path vote =
       ]) ;
   votefile
 
-let create_from_uris ?runner
-    ?(path = Uses.path Constant.octez_experimental_agnostic_baker) ?name ?color
-    ?event_pipe ?(delegates = []) ?votefile
+let create_from_uris ?runner ?(path = Uses.path Constant.octez_agnostic_baker)
+    ?name ?color ?event_pipe ?(delegates = []) ?votefile
     ?(liquidity_baking_toggle_vote = Some Pass) ?force_apply_from_round
     ?(remote_mode = false) ?operations_pool ?dal_node_rpc_endpoint
     ?dal_node_timeout_percentage ?(state_recorder = false)
@@ -270,10 +269,9 @@ let wait_for_ready agnostic_baker =
         resolver :: agnostic_baker.persistent_state.pending_ready ;
       check_event agnostic_baker "agnostic baker started" promise
 
-let init ?env ?runner
-    ?(path = Uses.path Constant.octez_experimental_agnostic_baker) ?name ?color
-    ?event_level ?event_pipe ?event_sections_levels ?(delegates = []) ?votefile
-    ?liquidity_baking_toggle_vote ?force_apply_from_round ?remote_mode
+let init ?env ?runner ?(path = Uses.path Constant.octez_agnostic_baker) ?name
+    ?color ?event_level ?event_pipe ?event_sections_levels ?(delegates = [])
+    ?votefile ?liquidity_baking_toggle_vote ?force_apply_from_round ?remote_mode
     ?operations_pool ?dal_node ?dal_node_timeout_percentage ?state_recorder
     ?node_version_check_bypass ?node_version_allowed node client =
   let* () = Node.wait_for_ready node in

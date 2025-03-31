@@ -338,7 +338,7 @@ let test_baker_external_operations =
     ~__FILE__
     ~title:"Baker external operations"
     ~tags:[Tag.layer1; "baker"; "external"; "operations"]
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   Log.info "Init" ;
   let node_args = Node.[Synchronisation_threshold 0] in
@@ -501,7 +501,7 @@ let test_baker_state_recorder_memory =
     ~__FILE__
     ~title:"Baker state recorder - memory case"
     ~tags:[Tag.layer1; "baker"; "state"; "recorder"; "memory"]
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol -> test_baker_state_recorder protocol false
 
 let test_baker_state_recorder_filesystem =
@@ -509,7 +509,7 @@ let test_baker_state_recorder_filesystem =
     ~__FILE__
     ~title:"Baker state recorder - filesystem case"
     ~tags:[Tag.layer1; "baker"; "state"; "recorder"; "filesystem"]
-    ~uses:(fun _protocol -> [Constant.octez_experimental_agnostic_baker])
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol -> test_baker_state_recorder protocol true
 
 let register ~protocols =

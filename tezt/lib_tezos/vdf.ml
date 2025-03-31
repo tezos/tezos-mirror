@@ -67,7 +67,7 @@ let create ~protocol ?name ?color ?event_pipe ?runner node =
   let name = match name with None -> fresh_name () | Some name -> name in
   let vdf_baker =
     create
-      ~path:(Uses.path Constant.octez_experimental_agnostic_baker)
+      ~path:(Uses.path Constant.octez_agnostic_baker)
       ?name:(Some name)
       ?color
       ?event_pipe

@@ -162,11 +162,8 @@ module WASM = struct
     Uses.make ~tag:"tx_kernel_dal" ~path:"tx_kernel_dal.wasm" ()
 end
 
-let octez_experimental_agnostic_baker =
-  Uses.make
-    ~tag:"experimental_agnostic_baker"
-    ~path:"./octez-experimental-agnostic-baker"
-    ()
+let octez_agnostic_baker =
+  Uses.make ~tag:"agnostic_baker" ~path:"./octez-experimental-agnostic-baker" ()
 
 (* TODO: tezos/tezos#4803
    Can we do better than to depend on script-inputs?
