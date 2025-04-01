@@ -145,7 +145,9 @@ module Node = struct
             in
             let* () = may_copy_node_identity_file agent node identity_file in
             let* () =
-              Node.run node [Network (Network.to_octez_network_options network)]
+              Node.Agent.run
+                node
+                [Network (Network.to_octez_network_options network)]
             in
             let* () = Node.wait_for_ready node in
             Lwt.return node
@@ -223,7 +225,7 @@ module Node = struct
             in
             toplog "Launching the node." ;
             let* () =
-              Node.run
+              Node.Agent.run
                 node
                 (Force_history_mode_switch :: Synchronisation_threshold 1
                :: arguments)
@@ -255,7 +257,7 @@ module Node = struct
             in
             let* () = may_copy_node_identity_file agent node identity_file in
             let* () =
-              Node.run
+              Node.Agent.run
                 node
                 ([
                    No_bootstrap_peers;
@@ -283,7 +285,7 @@ module Node = struct
                 agent
             in
             let* () = may_copy_node_identity_file agent node identity_file in
-            let* () = Node.run node [] in
+            let* () = Node.Agent.run node [] in
             let* () = Node.wait_for_ready node in
             Lwt.return node)
 end
@@ -3285,7 +3287,7 @@ let on_new_level t level ~metadata =
               let baker_to_disconnect = List.nth t.bakers (b mod nb_bakers) in
               (* Invariant: Option.get don't fail because t.configuration.dal is true *)
               let dal_node = baker_to_disconnect.dal_node |> Option.get in
-              Dal_node.terminate dal_node)
+              Dal_node.Agent.terminate dal_node)
         in
         let* disconnection_state =
           Disconnect.reconnect disconnection_state level (fun b ->

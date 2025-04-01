@@ -566,7 +566,7 @@ let number_of_bakers ~snapshot ~network cloud agent =
     Node.config_init node (Node.isolated_config ~peers:[] ~network ~delay:0)
   in
   let* () = Node.snapshot_import ~no_check:true node snapshot in
-  let* () = Node.run node (Node.isolated_args []) in
+  let* () = Node.Agent.run node (Node.isolated_args []) in
   let* () = Node.wait_for_ready node in
   let* client =
     Client.Agent.create ~name:"tmp-client" ~endpoint:(Node node) agent
@@ -577,7 +577,7 @@ let number_of_bakers ~snapshot ~network cloud agent =
       client
     |> Lwt.map (fun json -> JSON.(json |> as_list |> List.length))
   in
-  let* () = Node.terminate node in
+  let* () = Node.Agent.terminate node in
   Lwt.return n
 
 let init ~(configuration : configuration) cloud next_agent =

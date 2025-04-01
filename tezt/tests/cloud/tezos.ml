@@ -53,18 +53,23 @@ module Node = struct
           Metadata_size_limit (Some 10_000) :: arguments
         else arguments
       in
-      create
-        ?data_dir
-        ?name
-        ~path
-        ?runner
-        ?rpc_external
-        ?net_addr
-        ~rpc_port
-        ~net_port
-        ~metrics_port
-        arguments
-      |> Lwt.return
+      let node =
+        create
+          ?data_dir
+          ?name
+          ~path
+          ?runner
+          ?rpc_external
+          ?net_addr
+          ~rpc_port
+          ~net_port
+          ~metrics_port
+          arguments
+      in
+      let name = Node.name node in
+      let executable = Node.path node in
+      Cloud.service_register ~name ~executable agent ;
+      Lwt.return node
 
     let init ?(group = "L1") ?rpc_external ?(metadata_size_limit = true)
         ?(arguments = []) ?data_dir ?(path = Uses.path Constant.octez_node)
@@ -115,6 +120,43 @@ module Node = struct
         ~metrics_port
         ~event_level:`Notice
         arguments
+
+    let run ?env ?patch_config ?on_terminate ?event_level ?event_sections_levels
+        node args =
+      let name = name node in
+      let* () =
+        run
+          ?env
+          ?patch_config
+          ?on_terminate
+          ?event_level
+          ?event_sections_levels
+          node
+          args
+      in
+      (* Notify service manager. Need to run before to get the pid *)
+      let () =
+        match Node.pid node with
+        | None ->
+            Log.error
+              "Cannot update service %s: no pid. Is the program running ?"
+              name
+        | Some pid -> Cloud.notify_service_start ~name ~pid
+      in
+      Lwt.return_unit
+
+    let terminate ?timeout node =
+      let name = name node in
+      (* Notify the Service manager. *)
+      let () =
+        match Node.pid node with
+        | None ->
+            Log.error
+              "Cannot update service %s: no pid. Is the program running ?"
+              name
+        | Some pid -> Cloud.notify_service_start ~name ~pid
+      in
+      terminate ?timeout node
   end
 end
 
@@ -159,16 +201,21 @@ module Dal_node = struct
       let metrics_port = Agent.next_available_port agent in
       let metrics_addr = Format.asprintf "0.0.0.0:%d" metrics_port in
       let listen_addr = Format.asprintf "0.0.0.0:%d" net_port in
-      create_from_endpoint
-        ?name
-        ~path
-        ?runner
-        ~rpc_port
-        ~metrics_addr
-        ~listen_addr
-        ~l1_node_endpoint
-        ()
-      |> Lwt.return
+      let node =
+        create_from_endpoint
+          ?name
+          ~path
+          ?runner
+          ~rpc_port
+          ~metrics_addr
+          ~listen_addr
+          ~l1_node_endpoint
+          ()
+      in
+      let name = Dal_node.name node in
+      let executable = Dal_node.path node in
+      Cloud.service_register ~name ~executable agent ;
+      Lwt.return node
 
     let create ?net_port ?path ?name ~node agent =
       create_from_endpoint
@@ -201,7 +248,27 @@ module Dal_node = struct
         in
         String_map.union (fun _ _ _ -> None) otel_env memtrace_env
       in
-      run ~env ?event_level dal_node
+      let* () = run ~env ?event_level dal_node in
+      (* Update the state in the service manager *)
+      let () =
+        match Dal_node.pid dal_node with
+        | None ->
+            (* Here, we simply log the error (in RED)
+               Users of tezt-cloud are expected to read their logs.
+               As a rule of thumb, if error arise in components of tezt-cloud,
+               tezt-cloud SHALL NOT hinder the scenario and raise errors
+               in deployment, unless errors are fatal *)
+            Log.error
+              "Cannot update service state %s: no pid. Is the program running ?"
+              name
+        | Some pid -> Cloud.notify_service_start ~name ~pid
+      in
+      Lwt.return_unit
+
+    let terminate ?timeout dal_node =
+      let name = Dal_node.name dal_node in
+      Cloud.notify_service_stop ~name ;
+      terminate ?timeout dal_node
   end
 end
 
