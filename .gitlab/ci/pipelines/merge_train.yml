@@ -712,8 +712,10 @@ oc.build_x86_64-released:
     - LICENSES/**/*
     - Makefile
     - brassaia/**/*
+    - client-libs/**/*
     - cohttp/**/*
     - data-encoding/**/*
+    - docs/**/*
     - dune
     - dune-project
     - dune-workspace
@@ -726,11 +728,14 @@ oc.build_x86_64-released:
     - resto/**/*
     - rust-toolchain
     - script-inputs/**/*
+    - script-inputs/**/*/
     - scripts/**/*
+    - scripts/**/*/
     - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   needs:
   - job: oc.docker:ci:amd64
@@ -821,8 +826,10 @@ oc.build_x86_64-exp-dev-extra:
     - LICENSES/**/*
     - Makefile
     - brassaia/**/*
+    - client-libs/**/*
     - cohttp/**/*
     - data-encoding/**/*
+    - docs/**/*
     - dune
     - dune-project
     - dune-workspace
@@ -835,11 +842,14 @@ oc.build_x86_64-exp-dev-extra:
     - resto/**/*
     - rust-toolchain
     - script-inputs/**/*
+    - script-inputs/**/*/
     - scripts/**/*
+    - scripts/**/*/
     - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   needs:
   - job: oc.docker:ci:amd64
@@ -1079,8 +1089,10 @@ oc.build_kernels:
     - LICENSES/**/*
     - Makefile
     - brassaia/**/*
+    - client-libs/**/*
     - cohttp/**/*
     - data-encoding/**/*
+    - docs/**/*
     - dune
     - dune-project
     - dune-workspace
@@ -1096,12 +1108,15 @@ oc.build_kernels:
     - resto/**/*
     - rust-toolchain
     - script-inputs/**/*
+    - script-inputs/**/*/
     - scripts/**/*
+    - scripts/**/*/
     - scripts/ci/**/*
     - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   dependencies:
   - oc.docker:rust-toolchain:amd64

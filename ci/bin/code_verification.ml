@@ -582,6 +582,15 @@ let jobs pipeline_type =
         Dependent ([Job job_start] @ List.map (fun job -> Optional job) sanity))
       ~schedule_extended_test:(fun () -> Staged [])
   in
+  (* Job [documentation:manuals] requires the build jobs, because it needs
+     to run Octez executables to generate the man pages.
+     So the build jobs need to be included if the documentation changes. *)
+  let changeset_octez_or_doc =
+    Changeset.(changeset_octez @ changeset_octez_docs)
+  in
+  let changeset_octez_or_kernels_or_doc =
+    Changeset.(changeset_octez_or_kernels @ changeset_octez_docs)
+  in
   (* The build_x86_64 jobs are split in two to keep the artifact size
      under the 1GB hard limit set by GitLab. *)
   (* [job_build_x86_64_release] builds the released executables. *)
@@ -594,7 +603,7 @@ let jobs pipeline_type =
         {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~dependencies:dependencies_needs_start
       ~release:true
-      ~rules:(make_rules ~changes:changeset_octez ())
+      ~rules:(make_rules ~changes:changeset_octez_or_doc ())
       ()
   in
   (* 'oc.build_x86_64-exp-dev-extra' builds the developer and experimental
@@ -612,7 +621,7 @@ let jobs pipeline_type =
         {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~dependencies:dependencies_needs_start
       ~release:false
-      ~rules:(make_rules ~changes:changeset_octez ())
+      ~rules:(make_rules ~changes:changeset_octez_or_doc ())
       ()
     |> enable_dune_cache ~key:build_cache_key ~policy:Push
   in
@@ -626,7 +635,11 @@ let jobs pipeline_type =
   in
   let job_build_kernels =
     job_build_kernels
-      ~rules:(make_rules ~changes:changeset_octez_or_kernels ~dependent:true ())
+      ~rules:
+        (make_rules
+           ~changes:changeset_octez_or_kernels_or_doc
+           ~dependent:true
+           ())
       ()
   in
   let job_build_dsn_node =
