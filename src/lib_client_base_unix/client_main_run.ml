@@ -419,6 +419,35 @@ let warn_if_argv0_name_not_octez () =
         expected_name
         executable_name
 
+let init_logging (module C : M) ?(parsed_args : Client_config.cli_args option)
+    ?parsed_config_file ~base_dir () =
+  let open Tezos_base_unix.Internal_event_unix in
+  let daily_logs_path =
+    C.default_daily_logs_path
+    |> Option.map Filename.Infix.(fun logdir -> base_dir // "logs" // logdir)
+  in
+  (* Update config with color logging switch and advertise levels *)
+  let log_cfg =
+    let colors =
+      match parsed_args with
+      | None -> None
+      | Some parsed_args -> parsed_args.log_coloring
+    in
+    Tezos_base_unix.Logs_simple_config.create_cfg
+      ?advertise_levels:C.advertise_log_levels
+      ?colors
+      ()
+  in
+  let config =
+    make_with_defaults ?enable_default_daily_logs_at:daily_logs_path ~log_cfg ()
+  in
+  match parsed_config_file with
+  | None -> init ~config ()
+  | Some cf -> (
+      match cf.Client_config.Cfg_file.internal_events with
+      | None -> init ~config ()
+      | Some config -> init ~config ())
+
 (* Main (lwt) entry *)
 let main (module C : M) ~select_commands ?(disable_logging = false) () =
   let open Lwt_result_syntax in
@@ -481,36 +510,12 @@ let main (module C : M) ~select_commands ?(disable_logging = false) () =
           let*! () =
             if disable_logging then Lwt.return_unit
             else
-              let open Tezos_base_unix.Internal_event_unix in
-              let daily_logs_path =
-                C.default_daily_logs_path
-                |> Option.map
-                     Filename.Infix.(fun logdir -> base_dir // "logs" // logdir)
-              in
-              (* Update config with color logging switch and advertise levels *)
-              let log_cfg =
-                let colors =
-                  match parsed_args with
-                  | None -> None
-                  | Some parsed_args -> parsed_args.log_coloring
-                in
-                Tezos_base_unix.Logs_simple_config.create_cfg
-                  ?advertise_levels:C.advertise_log_levels
-                  ?colors
-                  ()
-              in
-              let config =
-                make_with_defaults
-                  ?enable_default_daily_logs_at:daily_logs_path
-                  ~log_cfg
-                  ()
-              in
-              match parsed_config_file with
-              | None -> init ~config ()
-              | Some cf -> (
-                  match cf.Client_config.Cfg_file.internal_events with
-                  | None -> init ~config ()
-                  | Some config -> init ~config ())
+              init_logging
+                (module C)
+                ?parsed_args
+                ?parsed_config_file
+                ~base_dir
+                ()
           in
           let rpc_config =
             let rpc_config : RPC_client_unix.config =

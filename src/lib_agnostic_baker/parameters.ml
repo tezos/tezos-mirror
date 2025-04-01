@@ -15,16 +15,6 @@ let default_node_endpoint =
 
 let default_daily_logs_path = Some "octez-experimental-agnostic-baker"
 
-let log_config ~base_dir =
-  let daily_logs_path =
-    default_daily_logs_path
-    |> Option.map Filename.Infix.(fun logdir -> base_dir // "logs" // logdir)
-  in
-  Tezos_base_unix.Internal_event_unix.make_with_defaults
-    ?enable_default_daily_logs_at:daily_logs_path
-    ~log_cfg:Tezos_base_unix.Logs_simple_config.default_cfg
-    ()
-
 let extra_levels_for_old_baker = 3
 
 (* Protocol status *)

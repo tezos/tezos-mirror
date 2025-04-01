@@ -26,13 +26,11 @@ let lwt_run ~args () =
   let open Lwt_result_syntax in
   let base_dir =
     Option.value
-      ~default:Client_config.Cfg_file.default.base_dir
+      ~default:Agnostic_baker_config.default_base_dir
       (Run_args.get_base_dir args)
   in
   let*! () =
-    Tezos_base_unix.Internal_event_unix.init
-      ~config:(Parameters.log_config ~base_dir)
-      ()
+    Client_main_run.init_logging (module Agnostic_baker_config) ~base_dir ()
   in
   () [@profiler.overwrite may_start_profiler base_dir] ;
   let daemon = Daemon.create ~node_endpoint:(Run_args.get_endpoint args) in

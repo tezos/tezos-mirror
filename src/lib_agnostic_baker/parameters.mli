@@ -13,8 +13,6 @@ val default_node_endpoint : string
 (** Default logs path for the agnostic baker. *)
 val default_daily_logs_path : string option
 
-val log_config : base_dir:string -> Tezos_base.Internal_event_config.t
-
 (** Number of extra levels to keep the old baker alive before shutting it down.
     This extra time is used to avoid halting the chain in cases such as
     reorganization or high round migration blocks. *)
