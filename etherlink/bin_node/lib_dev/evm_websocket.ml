@@ -59,7 +59,7 @@ end
 
 module Request = struct
   type ('a, 'b) t =
-    | Frame : Websocket.Frame.t -> (unit, error trace) t
+    | Frame : Websocket.Frame.t * Time.System.t -> (unit, error trace) t
         (** The only possible request is receiving a new frame on the
             websocket. *)
 
@@ -70,11 +70,14 @@ module Request = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun (View (Frame r)) -> r)
-      (fun r -> View (Frame r))
-      Websocket_encodings.frame_encoding
+      (fun (View (Frame (r, ts))) -> (r, ts))
+      (fun (r, ts) -> View (Frame (r, ts)))
+    @@ obj2
+         (req "frame" Websocket_encodings.frame_encoding)
+         (req "timestamp" Time.System.rfc_encoding)
 
-  let pp ppf (View (Frame r)) = Websocket.Frame.pp ppf r
+  let pp ppf (View (Frame (r, ts))) =
+    Format.fprintf ppf "%a: %a" Time.System.pp_hum ts Websocket.Frame.pp r
 end
 
 module Event = struct
@@ -239,7 +242,7 @@ let mk_error_response (output_media_type : Media_type.t) id error =
     JSONRPC.response_encoding
     {value = Error error; id}
 
-let on_frame worker fr =
+let on_frame worker fr _frame_ts =
   let open Lwt_syntax in
   let state = Worker.state worker in
   let {
@@ -390,8 +393,8 @@ module Handlers = struct
       =
    fun worker request ->
     match request with
-    | Request.Frame fr ->
-        protect @@ fun () -> on_frame worker fr |> Lwt_result.ok
+    | Request.Frame (fr, ts) ->
+        protect @@ fun () -> on_frame worker fr ts |> Lwt_result.ok
 
   type launch_error = [`Not_acceptable | `Unsupported_media_type of string]
 
@@ -515,13 +518,14 @@ let start (conn : Cohttp_lwt_unix.Server.conn) (http_request : Cohttp.Request.t)
   return_unit
 
 let new_frame conn fr =
+  let frame_ts = Time.System.now () in
   match Worker.find_opt table conn with
   | None -> Event.(emit__dont_wait__use_with_care missing_worker) conn
   | Some w ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/7660
          The worker can still be alive but its queue closed in some degenerated
          cases. In this case we could lose frames. *)
-      Worker.Queue.push_request_now w (Request.Frame fr)
+      Worker.Queue.push_request_now w (Request.Frame (fr, frame_ts))
 
 let cohttp_callback ?monitor ~max_message_length handler
     (conn : Cohttp_lwt_unix.Server.conn) req _body =
