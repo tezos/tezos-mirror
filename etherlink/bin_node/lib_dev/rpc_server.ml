@@ -71,17 +71,20 @@ module Resto = struct
       match config.Configuration.experimental_features with
       | {
        enable_websocket = true;
-       websocket_rate_limit = Some {max_messages; interval; strategy};
+       websocket_rate_limit =
+         Some {max_frames; max_messages; interval; strategy};
        _;
       } ->
-          Evm_websocket.setup_rate_limiters
-            ~messages_limit:
-              {
-                max = max_messages;
-                interval = Ptime.Span.of_int_s interval;
-                strategy;
-              }
-            ()
+          let interval = Ptime.Span.of_int_s interval in
+          let messages_limit =
+            Option.map
+              (fun max -> {Evm_websocket.max; interval; strategy})
+              max_messages
+          in
+          let frames_limit =
+            {Evm_websocket.max = max_frames; interval; strategy = `Close}
+          in
+          Evm_websocket.setup_rate_limiters ?messages_limit ~frames_limit ()
       | _ -> Ok ()
     in
     let*! () =

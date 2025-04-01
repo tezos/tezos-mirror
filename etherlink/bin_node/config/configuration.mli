@@ -101,7 +101,8 @@ type tx_queue = {
 }
 
 type websocket_rate_limit = {
-  max_messages : int;
+  max_frames : int;
+  max_messages : int option;
   interval : int;
   strategy : [`Wait | `Error | `Close];
 }
