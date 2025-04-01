@@ -11,15 +11,15 @@ use softfloat::F64;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
-// actual ~34M, allow some overhead for less effecient ERC20 transfers.
-const ERC20_TICKS: u64 = 40_000_000;
+// A reasonable ERC20 transaction cost is gas unit
+const ERC20_GAS: u64 = 40_000;
 // 50 TPS of ERC20 transfers should be sustained without increasing price.
-const SPEED_LIMIT: u64 = 50 * ERC20_TICKS;
+const SPEED_LIMIT: u64 = 50 * ERC20_GAS;
 const TOLERANCE: u64 = 10 * SPEED_LIMIT;
 
 // chosen so that gas price will decrease ~7/8 if there's no usage for ~10 seconds.
 // ALPHA = -ln(7/8)/(SPEED_LIMIT * 10)
-const ALPHA: F64 = softfloat::f64!(0.000_000_000_007);
+const ALPHA: F64 = softfloat::f64!(0.000_000_007);
 
 /// Register a completed block into the tick backlog
 pub fn register_block(
@@ -30,7 +30,14 @@ pub fn register_block(
         anyhow::bail!("update_gas_price on non-empty block");
     }
 
-    update_tick_backlog(host, bip.estimated_ticks_in_block, bip.timestamp)?;
+    let cumulative_execution_gas = if bip.cumulative_execution_gas >= U256::from(u64::MAX)
+    {
+        u64::MAX
+    } else {
+        bip.cumulative_execution_gas.low_u64()
+    };
+
+    update_backlog(host, cumulative_execution_gas, bip.timestamp)?;
 
     Ok(())
 }
@@ -45,16 +52,16 @@ pub fn base_fee_per_gas(
     let minimum_gas_price = minimum_gas_price.as_u64();
 
     let last_timestamp =
-        crate::storage::read_tick_backlog_timestamp(host).unwrap_or(timestamp);
+        crate::storage::read_backlog_timestamp(host).unwrap_or(timestamp);
 
     let backlog = backlog_with_time_elapsed(host, 0, timestamp, last_timestamp);
 
-    price_from_tick_backlog(backlog, minimum_gas_price).into()
+    price_from_backlog(backlog, minimum_gas_price).into()
 }
 
 fn backlog_with_time_elapsed(
     host: &impl Runtime,
-    extra_ticks: u64,
+    extra_gas: u64,
     current_timestamp: u64,
     last_timestamp: u64,
 ) -> u64 {
@@ -62,35 +69,39 @@ fn backlog_with_time_elapsed(
         .saturating_sub(last_timestamp)
         .saturating_mul(SPEED_LIMIT);
 
-    crate::storage::read_tick_backlog(host)
+    crate::storage::read_backlog(host)
         .unwrap_or_default()
         .saturating_sub(diff) // first take into account time elapsed
-        .saturating_add(extra_ticks) // then add the extra ticks just consumed
+        .saturating_add(extra_gas) // then add the extra ticks just consumed
 }
 
-fn update_tick_backlog(
+fn update_backlog(
     host: &mut impl Runtime,
-    ticks_in_block: u64,
+    cumulative_execution_gas: u64,
     timestamp: Timestamp,
 ) -> anyhow::Result<()> {
     let timestamp = timestamp.as_u64();
 
-    let last_timestamp_opt = crate::storage::read_tick_backlog_timestamp(host).ok();
+    let last_timestamp_opt = crate::storage::read_backlog_timestamp(host).ok();
     let last_timestamp = last_timestamp_opt.unwrap_or(timestamp);
 
     if last_timestamp_opt.is_none() || timestamp > last_timestamp {
-        crate::storage::store_tick_backlog_timestamp(host, timestamp)?;
+        crate::storage::store_backlog_timestamp(host, timestamp)?;
     }
 
-    let backlog =
-        backlog_with_time_elapsed(host, ticks_in_block, timestamp, last_timestamp);
+    let backlog = backlog_with_time_elapsed(
+        host,
+        cumulative_execution_gas,
+        timestamp,
+        last_timestamp,
+    );
 
-    crate::storage::store_tick_backlog(host, backlog)?;
+    crate::storage::store_backlog(host, backlog)?;
 
     Ok(())
 }
 
-fn price_from_tick_backlog(backlog: u64, minimum: u64) -> u64 {
+fn price_from_backlog(backlog: u64, minimum: u64) -> u64 {
     if backlog <= TOLERANCE {
         return minimum;
     }
@@ -171,7 +182,7 @@ mod test {
 
         #[test]
         fn gas_price(backlog in any::<u64>(), minimum in any::<u64>()) {
-            let price = price_from_tick_backlog(backlog, minimum);
+            let price = price_from_backlog(backlog, minimum);
 
             if backlog <= TOLERANCE {
                 assert_eq!(price, minimum);
@@ -207,7 +218,7 @@ mod test {
             vec![0; 32],
             vec![0; 32],
         );
-        bip.estimated_ticks_in_block = TOLERANCE;
+        bip.cumulative_execution_gas = U256::from(TOLERANCE);
 
         register_block(&mut host, &bip).unwrap();
         bip.clone()
