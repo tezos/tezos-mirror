@@ -835,6 +835,7 @@ Debug commands:
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
       [--kernel <evm_kernel.wasm>] [--kernel-verbosity <info>] [--profile]
+      [--up-to <UPTO_LEVEL>] [--disable-da-fees]
     Replay a specific block level.
     <level>: Level to replay.
     --data-dir <data-dir>: The path to the EVM node data directory.
@@ -856,6 +857,9 @@ Debug commands:
     --kernel-verbosity <info>: Sets kernel's logging verbosity, either
       `fatal`, `error`, `info`, `debug`.
     --profile: Profile the execution of the WASM PVM.
+    --up-to <UPTO_LEVEL>: Replay the successors until 'UPTO_LEVEL' is
+      reached.
+    --disable-da-fees: Disable DA fees for this replay.
   
   transform dump <dump.json> to rlp <dump.rlp> [-k --keep-everything]
     Transforms the JSON list of instructions to a RLP list.
