@@ -162,6 +162,15 @@
                number
                /* Timeout in seconds after which the connection will be
                   considered dead and closed. */ },
+      "websocket_rate_limit"?:
+        { /* Rate limit for websocket server */
+          "max_messages":
+            integer ∈ [-2^30, 2^30]
+            /* Max allowed websocket messages in the below interval. */,
+          "interval":
+            integer ∈ [-2^30, 2^30]
+            /* Interval in seconds for the rate limit. */,
+          "strategy"?: "wait" | "error" | "close" },
       "spawn_rpc"?:
         /* Spawn a RPC node listening on the given port */
         { /* Some */

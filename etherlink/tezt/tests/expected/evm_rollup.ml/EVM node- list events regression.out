@@ -1441,20 +1441,22 @@ request_completed_debug:
     { /* request_completed_debug version 0 */
       "request_completed_debug.v0":
         { "view":
-            { "opcode":
-                "continuation"
-                || "text"
-                || "binary"
-                || "close"
-                || "ping"
-                || "pong"
-                || { /* ctrl */
-                     "ctrl": integer ∈ [-2^30, 2^30] }
-                || { /* nonctrl */
-                     "nonctrl": integer ∈ [-2^30, 2^30] },
-              "extension": integer ∈ [-2^30, 2^30],
-              "final": boolean,
-              "content": $unistring },
+            { "frame":
+                { "opcode":
+                    "continuation"
+                    || "text"
+                    || "binary"
+                    || "close"
+                    || "ping"
+                    || "pong"
+                    || { /* ctrl */
+                         "ctrl": integer ∈ [-2^30, 2^30] }
+                    || { /* nonctrl */
+                         "nonctrl": integer ∈ [-2^30, 2^30] },
+                  "extension": integer ∈ [-2^30, 2^30],
+                  "final": boolean,
+                  "content": $unistring },
+              "timestamp": $timestamp.rfc },
           "worker_status":
             { "pushed": $timestamp.system,
               "treated": $timestamp.system,
@@ -1485,20 +1487,22 @@ request_failed:
     { /* request_failed version 0 */
       "request_failed.v0":
         { "view":
-            { "opcode":
-                "continuation"
-                || "text"
-                || "binary"
-                || "close"
-                || "ping"
-                || "pong"
-                || { /* ctrl */
-                     "ctrl": integer ∈ [-2^30, 2^30] }
-                || { /* nonctrl */
-                     "nonctrl": integer ∈ [-2^30, 2^30] },
-              "extension": integer ∈ [-2^30, 2^30],
-              "final": boolean,
-              "content": $unistring },
+            { "frame":
+                { "opcode":
+                    "continuation"
+                    || "text"
+                    || "binary"
+                    || "close"
+                    || "ping"
+                    || "pong"
+                    || { /* ctrl */
+                         "ctrl": integer ∈ [-2^30, 2^30] }
+                    || { /* nonctrl */
+                         "nonctrl": integer ∈ [-2^30, 2^30] },
+                  "extension": integer ∈ [-2^30, 2^30],
+                  "final": boolean,
+                  "content": $unistring },
+              "timestamp": $timestamp.rfc },
           "worker_status":
             { "pushed": $timestamp.system,
               "treated": $timestamp.system,
