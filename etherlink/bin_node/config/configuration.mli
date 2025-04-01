@@ -100,6 +100,12 @@ type tx_queue = {
   tx_per_addr_limit : int64;
 }
 
+type websocket_rate_limit = {
+  max_messages : int;
+  interval : int;
+  strategy : [`Wait | `Error | `Close];
+}
+
 (** Configuration settings for experimental features, with no backward
     compatibility guarantees. *)
 type experimental_features = {
@@ -111,6 +117,7 @@ type experimental_features = {
   enable_websocket : bool;
   max_websocket_message_length : int;
   monitor_websocket_heartbeat : monitor_websocket_heartbeat option;
+  websocket_rate_limit : websocket_rate_limit option;
   spawn_rpc : int option;
   l2_chains : l2_chain list option;
   enable_tx_queue : tx_queue option;

@@ -136,6 +136,14 @@ let tx_queue_opt_encoding =
         (function true -> Some default_tx_queue | _ -> None);
     ]
 
+type websocket_rate_limit = {
+  max_messages : int;
+  interval : int;
+  strategy : [`Wait | `Error | `Close];
+}
+
+let default_websocket_rate_limit_strategy = `Close
+
 type experimental_features = {
   drop_duplicate_on_injection : bool;
   blueprints_publisher_order_enabled : bool;
@@ -145,6 +153,7 @@ type experimental_features = {
   enable_websocket : bool;
   max_websocket_message_length : int;
   monitor_websocket_heartbeat : monitor_websocket_heartbeat option;
+  websocket_rate_limit : websocket_rate_limit option;
   spawn_rpc : int option;
   l2_chains : l2_chain list option;
   enable_tx_queue : tx_queue option;
@@ -292,6 +301,7 @@ let default_experimental_features =
     enable_websocket = false;
     max_websocket_message_length = default_max_socket_message_length;
     monitor_websocket_heartbeat = default_monitor_websocket_heartbeat;
+    websocket_rate_limit = None;
     spawn_rpc = None;
     l2_chains = default_l2_chains;
     enable_tx_queue = None;
@@ -913,6 +923,34 @@ let l2_chain_encoding : l2_chain Data_encoding.t =
           ~description:"The family of the l2 chain"
           Chain_family.encoding)
 
+let websocket_rate_limit_strategy_encoding =
+  Data_encoding.string_enum
+    [("wait", `Wait); ("error", `Error); ("close", `Close)]
+
+let websocket_rate_limit_encoding =
+  let open Data_encoding in
+  conv
+    (fun {max_messages; interval; strategy} ->
+      (max_messages, interval, strategy))
+    (fun (max_messages, interval, strategy) ->
+      {max_messages; interval; strategy})
+  @@ obj3
+       (req
+          "max_messages"
+          ~description:"Max allowed websocket messages in the below interval."
+          int31)
+       (req
+          "interval"
+          ~description:"Interval in seconds for the rate limit."
+          int31)
+       (dft
+          "strategy"
+          ~description:
+            "Strategy to adopt when a client sends messages which exceed the \
+             defined rate limit."
+          websocket_rate_limit_strategy_encoding
+          default_websocket_rate_limit_strategy)
+
 let experimental_features_encoding =
   let open Data_encoding in
   conv
@@ -925,6 +963,7 @@ let experimental_features_encoding =
            enable_websocket;
            max_websocket_message_length;
            monitor_websocket_heartbeat;
+           websocket_rate_limit;
            spawn_rpc;
            l2_chains : l2_chain list option;
            enable_tx_queue;
@@ -940,6 +979,7 @@ let experimental_features_encoding =
           enable_websocket,
           max_websocket_message_length,
           monitor_websocket_heartbeat,
+          websocket_rate_limit,
           spawn_rpc,
           l2_chains,
           enable_tx_queue,
@@ -954,6 +994,7 @@ let experimental_features_encoding =
              enable_websocket,
              max_websocket_message_length,
              monitor_websocket_heartbeat,
+             websocket_rate_limit,
              spawn_rpc,
              l2_chains,
              enable_tx_queue,
@@ -967,6 +1008,7 @@ let experimental_features_encoding =
         enable_websocket;
         max_websocket_message_length;
         monitor_websocket_heartbeat;
+        websocket_rate_limit;
         spawn_rpc;
         l2_chains;
         enable_tx_queue;
@@ -1021,7 +1063,7 @@ let experimental_features_encoding =
                 DEPRECATED: You should remove this option from your \
                 configuration file."
              bool))
-       (obj8
+       (obj9
           (dft
              "rpc_server"
              ~description:
@@ -1046,6 +1088,10 @@ let experimental_features_encoding =
              ~description:"Parameters to monitor websocket connections"
              opt_monitor_websocket_heartbeat_encoding
              default_monitor_websocket_heartbeat)
+          (opt
+             "websocket_rate_limit"
+             ~description:"Rate limit for websocket server"
+             websocket_rate_limit_encoding)
           (dft
              "spawn_rpc"
              ~description:"Spawn a RPC node listening on the given port"

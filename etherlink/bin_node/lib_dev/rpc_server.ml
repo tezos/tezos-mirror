@@ -44,7 +44,7 @@ module Resto = struct
 
   let conn_closed conn = Evm_websocket.on_conn_closed conn
 
-  let start_server rpc directory =
+  let start_server config rpc directory =
     let open Lwt_result_syntax in
     let open Tezos_rpc_http_server in
     let Configuration.
@@ -67,7 +67,23 @@ module Resto = struct
         ~media_types:Supported_media_types.all
         directory.Evm_directory.dir
     in
-
+    let*? () =
+      match config.Configuration.experimental_features with
+      | {
+       enable_websocket = true;
+       websocket_rate_limit = Some {max_messages; interval; strategy};
+       _;
+      } ->
+          Evm_websocket.setup_rate_limiters
+            ~messages_limit:
+              {
+                max = max_messages;
+                interval = Ptime.Span.of_int_s interval;
+                strategy;
+              }
+            ()
+      | _ -> Ok ()
+    in
     let*! () =
       RPC_server.launch
         ~max_active_connections
@@ -110,8 +126,8 @@ module Dream = struct
     return shutdown
 end
 
-let start_server rpc = function
-  | Evm_directory.Resto dir -> Resto.start_server rpc dir
+let start_server config rpc = function
+  | Evm_directory.Resto dir -> Resto.start_server config rpc dir
   | Evm_directory.Dream routes -> Dream.start_server rpc routes
 
 let monitor_performances ~data_dir =
@@ -174,7 +190,7 @@ let start_public_server ~(rpc_server_family : Rpc_types.rpc_server_family)
     |> Evm_directory.register_metrics "/metrics"
     |> Evm_directory.register_describe
   in
-  let* finalizer = start_server rpc directory in
+  let* finalizer = start_server config rpc directory in
   let*! () =
     Events.is_ready
       ~rpc_addr:rpc.addr
@@ -200,7 +216,7 @@ let start_private_server ~(rpc_server_family : Rpc_types.rpc_server_family)
         |> Evm_directory.register_metrics "/metrics"
         |> Evm_directory.register_describe
       in
-      let* finalizer = start_server private_rpc directory in
+      let* finalizer = start_server config private_rpc directory in
       let*! () =
         Events.private_server_is_ready
           ~rpc_addr:private_rpc.addr
