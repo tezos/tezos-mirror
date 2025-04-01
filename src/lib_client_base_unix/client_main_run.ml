@@ -82,6 +82,8 @@ module type M = sig
     Tezos_client_base.Client_context.full Tezos_clic.command list
 
   val logger : RPC_client_unix.logger option
+
+  val advertise_log_levels : bool option
 end
 
 let register_default_signer ?signing_version ?other_registrations ?logger
@@ -485,16 +487,17 @@ let main (module C : M) ~select_commands ?(disable_logging = false) () =
                 |> Option.map
                      Filename.Infix.(fun logdir -> base_dir // "logs" // logdir)
               in
-              (* Update config with color logging switch *)
+              (* Update config with color logging switch and advertise levels *)
               let log_cfg =
-                match parsed_args with
-                | None -> Tezos_base_unix.Logs_simple_config.default_cfg
-                | Some parsed_args ->
-                    {
-                      Tezos_base_unix.Logs_simple_config.default_cfg with
-                      colors =
-                        Option.value parsed_args.log_coloring ~default:true;
-                    }
+                let colors =
+                  match parsed_args with
+                  | None -> None
+                  | Some parsed_args -> parsed_args.log_coloring
+                in
+                Tezos_base_unix.Logs_simple_config.create_cfg
+                  ?advertise_levels:C.advertise_log_levels
+                  ?colors
+                  ()
               in
               let config =
                 make_with_defaults

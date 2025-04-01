@@ -436,6 +436,8 @@ module Signer_config = struct
     commands base_dir require_auth @ other_commands
 
   let logger = Some (RPC_client_unix.full_logger Format.err_formatter)
+
+  let advertise_log_levels = None
 end
 
 let () =

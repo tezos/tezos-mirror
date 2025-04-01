@@ -749,6 +749,8 @@ module Daemon_node_config = struct
   let clic_commands ~base_dir:_ ~config_commands:_ ~builtin_commands:_
       ~other_commands ~require_auth:_ =
     other_commands
+
+  let advertise_log_levels = Some true
 end
 
 let () = Client_main_run.run (module Daemon_node_config) ~select_commands

@@ -115,6 +115,8 @@ Smart Rollup node
 - Add a CLI argument ``--config-file`` to allow specifying a configuration file
   outside the data directory. (MR :gl:`!17225`)
 
+- Display logging levels in logs by default. (MR :gl:`!17479`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
