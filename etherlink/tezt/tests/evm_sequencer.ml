@@ -10501,6 +10501,110 @@ let test_websocket_max_message_length () =
           unit
       | e -> Lwt.reraise e)
 
+let test_websocket_rate_limit strategy =
+  let max_messages = 5 in
+  let interval = 3 in
+  let strategy_str =
+    match strategy with
+    | `Wait -> "wait"
+    | `Error -> "error"
+    | `Close -> "close"
+  in
+  let patch_config =
+    Evm_node.patch_config_with_experimental_feature
+      ~rpc_server:Resto (* The limit is not implemented for Dream *)
+      ~enable_websocket:true
+      ~monitor_websocket_heartbeat:false (* To not count ping/pong frames *)
+      ~websocket_rate_limit:
+        (`O
+          [
+            ("max_messages", `Float (float_of_int max_messages));
+            ("interval", `Float (float_of_int interval));
+            ("strategy", `String strategy_str);
+          ])
+      ()
+  in
+  register_sandbox
+    ~tags:["evm"; "rpc"; "websocket"; "rate_limit"; strategy_str]
+    ~title:(sf "Websocket server limits rate of messages (%s)" strategy_str)
+    ~patch_config
+  @@ fun sequencer ->
+  let* websocket = Evm_node.open_websocket sequencer in
+  let*@ _ = produce_block sequencer in
+  Log.info "Send messages below limit" ;
+  let send_requests n =
+    List.init n Fun.id
+    |> Lwt_list.map_s (fun _ ->
+           Lwt.catch
+             (fun () ->
+               Rpc.block_number ~websocket sequencer
+               |> Lwt_result.map_error (fun e -> `Rpc_error e))
+             (fun e -> Lwt.return_error (`Exn e)))
+  in
+  let* responses = send_requests max_messages in
+  List.iteri
+    (fun i -> function
+      | Ok _ -> ()
+      | Error (`Rpc_error ({code; message; _} : Rpc.error)) ->
+          Test.fail
+            ~__LOC__
+            "Websocket message %i resulted in error %d: %s"
+            i
+            code
+            message
+      | Error (`Exn e) -> raise e)
+    responses ;
+  Log.info "Wait for rate limit interval" ;
+  let* () = Lwt_unix.sleep (float_of_int interval) in
+  let ws_server_shutdown =
+    Evm_node.wait_for sequencer "websocket_shutdown.v0" @@ fun json ->
+    Some JSON.(json |-> "reason" |> as_string)
+  in
+  let t1 = Unix.gettimeofday () in
+  Log.info "Sending messages above limit" ;
+  let* responses = send_requests (max_messages + 1) in
+  let t2 = Unix.gettimeofday () in
+  let handle_time = t2 -. t1 in
+  let errors =
+    List.filter_map (function Ok _ -> None | Error e -> Some e) responses
+  in
+  match (strategy, errors) with
+  | `Error, [] ->
+      Test.fail ~__LOC__ "Websocket server should have rate limited a message"
+  | `Error, _ :: _ :: _ ->
+      Test.fail
+        ~__LOC__
+        "Websocket server should have rate limited only one message"
+  | `Error, [`Rpc_error {code; message; _}] ->
+      Check.((code = -32005) int)
+        ~error_msg:"Rate limit error should have code %R but was %L" ;
+      Check.(message =~ rex "Rate limited by messages on websocket")
+        ~error_msg:"Expected message to match %R, got %L" ;
+      unit
+  | `Wait, _ :: _ ->
+      Test.fail
+        ~__LOC__
+        "Websocket server should have blocked in rate limit instead of error"
+  | `Wait, [] ->
+      Check.((handle_time > float_of_int interval) float)
+        ~error_msg:"Rate limit blocked for %L but should block for %R" ;
+      unit
+  | `Close, _ ->
+      let* reason =
+        Lwt.pick
+          [
+            ws_server_shutdown;
+            (let* () = Lwt_unix.sleep 5. in
+             Test.fail
+               ~__LOC__
+               "Websocket worker should have closed on rate limit.");
+          ]
+      in
+      Check.(reason =~ rex "Rate limited by messages on websocket")
+        ~error_msg:"Expected close reason to match %R, got %L" ;
+      unit
+  | _, [`Exn e] -> raise e
+
 let test_websocket_heartbeat_monitoring () =
   let patch_config =
     Evm_node.patch_config_with_experimental_feature
@@ -12537,6 +12641,9 @@ let () =
   test_websocket_newHeads_event [Protocol.Alpha] ;
   test_websocket_cleanup [Protocol.Alpha] ;
   test_websocket_max_message_length () ;
+  test_websocket_rate_limit `Close ;
+  test_websocket_rate_limit `Error ;
+  test_websocket_rate_limit `Wait ;
   test_websocket_heartbeat_monitoring () ;
   test_websocket_newPendingTransactions_event [Protocol.Alpha] ;
   test_websocket_logs_event [Protocol.Alpha] ;
