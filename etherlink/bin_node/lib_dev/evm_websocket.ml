@@ -177,12 +177,11 @@ let shutdown_worker ~reason ?(status = default_close_info.status) w =
   (match st.close_info with
   | Some _ -> ()
   | None -> st.close_info <- Some {status; reason}) ;
-  Worker.shutdown w
+  Worker.trigger_shutdown w
 
 let shutdown ~reason ?status conn =
-  let open Lwt_syntax in
   match Worker.find_opt table conn with
-  | None -> return_unit
+  | None -> ()
   | Some w -> shutdown_worker ~reason ?status w
 
 let handle_subscription
@@ -299,11 +298,13 @@ let on_frame worker fr =
   | {opcode = Close; _} ->
       (* Client has sent a close frame, we shut everything down for this
          worker *)
-      shutdown_worker ~reason:"Received close frame" worker
+      shutdown_worker ~reason:"Received close frame" worker ;
+      return_unit
   | {opcode = Text | Binary; content; _}
     when String.length content > max_message_length ->
       (* We are receiving a message too big for the server *)
-      shutdown_worker ~reason:"Message too big" ~status:Message_too_big worker
+      shutdown_worker ~reason:"Message too big" ~status:Message_too_big worker ;
+      return_unit
   | {opcode = Continuation; content; _}
     when Buffer.length state.message_buffer + String.length content
          > max_message_length ->
@@ -311,7 +312,8 @@ let on_frame worker fr =
       shutdown_worker
         ~reason:"Fragmented message too big"
         ~status:Message_too_big
-        worker
+        worker ;
+      return_unit
   | {opcode = Text | Binary; content; final = false; _} ->
       (* New fragmented message *)
       Buffer.clear state.message_buffer ;
@@ -365,7 +367,8 @@ let monitor_websocket_aux worker
         shutdown_worker
           worker
           ~status:Going_away
-          ~reason:"Timeout in ping/pong heartbeat"
+          ~reason:"Timeout in ping/pong heartbeat" ;
+        return_unit
   in
   loop ~push:true 0
 
@@ -534,7 +537,8 @@ let cohttp_callback ?monitor ~max_message_length handler
         let reason =
           "Websocket asynchronous IO exception: " ^ Printexc.to_string io_exn
         in
-        shutdown ~reason conn_name)
+        shutdown ~reason conn_name ;
+        return_unit)
   in
   let+ res =
     start ?monitor conn req media_types ~max_message_length handler push_frame
@@ -557,8 +561,5 @@ let cohttp_callback ?monitor ~max_message_length handler
       `Response (Cohttp.Response.make ~status (), body)
 
 let on_conn_closed (conn : Cohttp_lwt_unix.Server.conn) =
-  Lwt.dont_wait
-    (fun () ->
-      let conn_str = Cohttp.Connection.to_string (snd conn) in
-      shutdown ~reason:"Connection closed" conn_str)
-    ignore
+  let conn_str = Cohttp.Connection.to_string (snd conn) in
+  shutdown ~reason:"Connection closed" conn_str
