@@ -551,7 +551,6 @@ type dal_parameters = {
   attestation_lag : string;
   attestation_threshold : string;
   number_of_slots : string;
-  blocks_per_epoch : string;
 }
 
 (* This encoding should be compatible with the protocol parameters. *)
@@ -564,19 +563,14 @@ let dal_parameters_encoding =
            attestation_lag;
            attestation_threshold;
            number_of_slots;
-           blocks_per_epoch;
          } ->
       ( cryptobox,
-        ( attestation_lag,
-          attestation_threshold,
-          number_of_slots,
-          blocks_per_epoch,
-          feature_enable ) ))
+        (attestation_lag, attestation_threshold, number_of_slots, feature_enable)
+      ))
     (fun ( cryptobox,
            ( attestation_lag,
              attestation_threshold,
              number_of_slots,
-             blocks_per_epoch,
              feature_enable ) ) ->
       {
         feature_enable;
@@ -584,15 +578,13 @@ let dal_parameters_encoding =
         attestation_lag;
         attestation_threshold;
         number_of_slots;
-        blocks_per_epoch;
       })
     (merge_objs
        dal_cryptobox_parameters_encoding
-       (obj5
+       (obj4
           (req "attestation_lag" string)
           (req "attestation_threshold" string)
           (req "number_of_slots" string)
-          (req "blocks_per_epoch" string)
           (req "feature_enable" string)))
 
 type 'uri generate_protocol_parameters_file = {
@@ -727,7 +719,6 @@ module Generate_protocol_parameters_file = struct
         attestation_lag = run base.dal.attestation_lag;
         attestation_threshold = run base.dal.attestation_threshold;
         number_of_slots = run base.dal.number_of_slots;
-        blocks_per_epoch = run base.dal.blocks_per_epoch;
       }
     in
     let minimal_block_delay = Option.map run base.minimal_block_delay in
