@@ -1271,8 +1271,7 @@ module Documentation = struct
              "docs/developer/rollup_metrics.csv";
              "docs/user/node-config.json";
            ])
-      ["./scripts/ci/documentation:manuals.sh"]
-    |> enable_cargo_cache |> enable_sccache
+      ["make -C docs -j octez-gen"]
 
   (** Create the docgen job.
 

@@ -1950,7 +1950,19 @@ let jobs pipeline_type =
       let job_odoc =
         Documentation.job_odoc ~rules ~dependencies ~lite:true ()
       in
-      let job_manuals = Documentation.job_manuals ~rules ~dependencies () in
+      let job_manuals =
+        Documentation.job_manuals
+          ~rules
+          ~dependencies:
+            (Dependent
+               [
+                 Artifacts job_build_x86_64_release;
+                 Artifacts job_build_x86_64_exp_dev_extra;
+                 Artifacts job_build_kernels;
+                 Artifacts job_build_dsn_node;
+               ])
+          ()
+      in
       let job_docgen = Documentation.job_docgen ~rules ~dependencies () in
       let job_build_all =
         Documentation.job_build_all
