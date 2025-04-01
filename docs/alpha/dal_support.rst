@@ -110,10 +110,10 @@ corresponding to the following scenario. Suppose there are five delegates with e
 DAL participation rewards
 -------------------------
 
-A fixed percentage, defined by a protocol parameter called ``DAL_REWARDS_RATIO``, set to %10, of the total :ref:`participation rewards<adaptive_rewards_alpha>` is allocated to the DAL.
+A fixed percentage, defined by a protocol parameter called ``REWARDS_RATIO``, set to 10%, of the total :ref:`participation rewards<adaptive_rewards_alpha>` is allocated to the DAL.
 
 The DAL rewards per level are implicitly given by their weight, ``DAL_REWARDS_WEIGHT``, as for the other types of :ref:`participation rewards<rewards_weights_alpha>`.
-The value of ``DAL_REWARDS_WEIGHT`` is such that it represents ``DAL_REWARDS_RATIO`` of all reward weights.
+The value of ``DAL_REWARDS_WEIGHT`` is such that it represents ``REWARDS_RATIO`` of all reward weights.
 
 The rewards are distributed at the end of a cycle, and are computed in the same manner as for the other :ref:`participation rewards<adaptive_rewards_alpha>`.
 For instance, the stakers' share of these reward is proportional to the weight of their stake in relation to their baker's baking power.
@@ -180,6 +180,6 @@ This section describes the protocol constants specific to the DAL as well as the
 - ``REDUNDANCY_FACTOR`` (8): the erasure-code factor (see :ref:`dal_slots`)
 - ``NUMBER_OF_SHARDS`` (512): the number of shards per slot (see :ref:`dal_slots`)
 - ``MINIMAL_PARTICIPATION_RATIO`` (64%): the minimum percentage of slots attested by a baker during a cycle (among all slots deemed available) that entitles them to rewards
-- ``DAL_REWARDS_RATIO`` (10%): the ratio of the DAL rewards over the total participation rewards
+- ``REWARDS_RATIO`` (10%): the ratio of the DAL rewards over the total participation rewards
 - ``DAL_REWARDS_WEIGHT`` (2275): the weight of the DAL rewards (relative to other participation rewards)
 - ``TRAPS_FRACTION`` (0.0005): the fraction of shards that are traps
