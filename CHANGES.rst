@@ -116,6 +116,9 @@ Client
 - Secret key URI is no longer printed if an alias conflict occurs during key
   generation or import. (MR :gl:`!18509`)
 
+- Add a new command ``update delegate parameters`` that allows to change either
+  one or both of the staking parameters of a delegate. (MR :gl:`!17472`)
+
 Signer
 ------
 
