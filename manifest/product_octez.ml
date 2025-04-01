@@ -554,13 +554,7 @@ let octez_rust_deps =
           ];
           [
             S "rule";
-            [
-              S "targets";
-              S "liboctez_rust_deps.a";
-              S "dlloctez_rust_deps.so";
-              S "wasmer.h";
-              S "wasm.h";
-            ];
+            [S "targets"; S "liboctez_rust_deps.a"; S "dlloctez_rust_deps.so"];
             [
               S "deps";
               [S "file"; S "build.sh"];
@@ -2726,7 +2720,7 @@ let octez_wasmer =
         {
           external_library_name = "octez_rust_deps";
           include_header = "wasmer.h";
-          extra_search_dir = "../rust_deps";
+          extra_search_dir = "../rust_deps/wasmer-3.3.0/lib/c-api";
           type_description = {instance = "Types"; functor_ = "Api_types_desc"};
           function_description =
             {instance = "Functions"; functor_ = "Api_funcs_desc"};
@@ -2734,7 +2728,11 @@ let octez_wasmer =
           generated_entry_point = "Api";
           c_flags = ["-Wno-incompatible-pointer-types"];
           c_library_flags = [];
-          deps = ["../rust_deps/wasmer.h"; "../rust_deps/wasm.h"];
+          deps =
+            [
+              "../rust_deps/wasmer-3.3.0/lib/c-api/wasmer.h";
+              "../rust_deps/wasmer-3.3.0/lib/c-api/wasm.h";
+            ];
         }
 
 let _octez_wasmer_test =
