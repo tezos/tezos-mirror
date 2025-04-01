@@ -438,6 +438,24 @@ let _tezt_testnet_scenarios =
         tezt_etherlink |> open_;
       ]
 
+let _tezt_etherlink_benchmark_producer =
+  public_exe
+    "etherlink-benchmark-producer"
+    ~internal_name:"main"
+    ~path:"etherlink/bin_benchmark_producer"
+    ~synopsis:"Produce benchmark data to test etherlink primitives"
+    ~bisect_ppx:No
+    ~static:false
+    ~deps:
+      [
+        bls12_381_archive;
+        octez_test_helpers |> open_;
+        tezt_wrapper |> open_ |> open_ ~m:"Base";
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        tezt_etherlink |> open_;
+        octez_base |> open_ ~m:"TzPervasives";
+      ]
+
 let _etherlink_governance_observer =
   public_exe
     "etherlink-governance-observer"

@@ -7,6 +7,7 @@
 (package (name bls12-381))
 (package (name dal_node_migrations))
 (package (name efunc_core))
+(package (name etherlink-benchmark-producer))
 (package (name etherlink-governance-observer))
 (package (name etherlink-outbox-monitor))
 (package (name floodgate))

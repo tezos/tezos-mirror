@@ -38,15 +38,14 @@ for i in $(seq 0 $((num_splits - 1))); do
 
   echo "Launching replay from $from to $to in $data_dir"
 
-  ./octez-evm-node replay blueprint "$from" \
+  ./octez-evm-node replay blueprints from "$from" to "$to" \
     --data-dir "$data_dir" \
-    --disable-da-fees \
-    --profile \
-    --up-to "$to" &
+    --profile export &
 
   pids+=($!)
 
-  sleep 0.1
+  # Sleep to avoid simultaneous SQL open calls
+  sleep 0.2
 done
 
 wait
