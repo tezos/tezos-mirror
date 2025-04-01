@@ -235,6 +235,11 @@ let opcode_of_media media =
   | "application/octet-stream" -> Websocket.Frame.Opcode.Binary
   | _ -> Websocket.Frame.Opcode.Text
 
+let mk_error_response (output_media_type : Media_type.t) id error =
+  output_media_type.construct
+    JSONRPC.response_encoding
+    {value = Error error; id}
+
 let on_frame worker fr =
   let open Lwt_syntax in
   let state = Worker.state worker in
@@ -257,8 +262,8 @@ let on_frame worker fr =
       match input_media_type.destruct JSONRPC.request_encoding message with
       | Error err ->
           let response =
-            Rpc_errors.parse_error err
-            |> output_media_type.construct JSONRPC.error_encoding
+            mk_error_response output_media_type None
+            @@ Rpc_errors.parse_error err
           in
           Lwt.return (response, None)
       | Ok request ->
