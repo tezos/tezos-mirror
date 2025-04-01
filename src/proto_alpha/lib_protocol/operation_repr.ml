@@ -1530,7 +1530,6 @@ module Encoding = struct
 
   let contents_cases_common =
     [
-      PCase preattestation_case;
       PCase attestations_aggregate_case;
       PCase double_preattestation_evidence_case;
       PCase double_attestation_evidence_case;
@@ -1568,7 +1567,7 @@ module Encoding = struct
 
   let contents_cases =
     PCase attestation_case :: PCase attestation_with_dal_case
-    :: contents_cases_common
+    :: PCase preattestation_case :: contents_cases_common
 
   let contents_encoding =
     let make (PCase (Case {tag; name; encoding; select; proj; inj})) =
@@ -1754,10 +1753,29 @@ module Encoding = struct
          Operation.shell_header_encoding
          (obj1 (req "contents" contents_list_encoding))
 
-  (* Encoding to sign and verify attestations and preattestations signatures
-     with BLS keys. In this encoding, the signed payload is omitting slots to
-     enable BLS proof of possession aggregation. *)
+  (* Encoding for signing and verifying operations signed by BLS keys.
+     Differs only for attestations and preattestations, where the signed payload
+     omits slots to ensure that all delegates sign the same message,
+     which is required for BLS proof of possession aggregation. *)
   module Bls_mode = struct
+    let preattestation_case =
+      Case
+        {
+          tag = 40;
+          name = "bls_mode_preattestation";
+          encoding = consensus_aggregate_content_encoding;
+          select =
+            (function
+            | Contents (Preattestation _ as op) -> Some op | _ -> None);
+          proj =
+            (fun (Preattestation {level; round; block_payload_hash; _}) ->
+              {level; round; block_payload_hash});
+          inj =
+            (fun {level; round; block_payload_hash} ->
+              Preattestation
+                {level; round; block_payload_hash; slot = Slot_repr.zero});
+        }
+
     let attestation_case =
       Case
         {
@@ -1791,8 +1809,9 @@ module Encoding = struct
         }
 
     let contents_cases =
-      (* attestations without slots *)
-      PCase attestation_case :: contents_cases_common
+      PCase attestation_case (* attestations without slots *)
+      :: PCase preattestation_case (* preattestations without slots *)
+      :: contents_cases_common
 
     let contents_encoding =
       let make (PCase (Case {tag; name; encoding; select; proj; inj})) =

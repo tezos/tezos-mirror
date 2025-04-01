@@ -222,9 +222,10 @@ module Operation = struct
       (op : kind operation) =
     let encoding =
       if Constants.aggregate_attestation ctxt then
-        (* attestations signed by BLS keys uses a dedicated serialization encoding *)
-        match (op.protocol_data.contents, key) with
-        | Single (Attestation _), Bls _ -> bls_mode_unsigned_encoding
+        (* Operations signed by BLS keys use a dedicated serialization encoding,
+           which differs only for attestations and preattestations. *)
+        match key with
+        | Bls _ -> bls_mode_unsigned_encoding
         | _ -> unsigned_encoding
       else unsigned_encoding
     in
