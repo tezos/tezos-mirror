@@ -8,6 +8,12 @@
 
 open Rpc_encodings
 
+type rate_limit = {
+  max : int;
+  interval : Time.System.Span.t;
+  strategy : [`Wait | `Error | `Close];
+}
+
 type parameters = {
   push_frame : Websocket.Frame.t option -> unit;
   http_request : Cohttp.Request.t;
@@ -17,6 +23,25 @@ type parameters = {
   handler : websocket_handler;
   monitor : Configuration.monitor_websocket_heartbeat option;
 }
+
+type ip_rate_limiter = {mutable count : int; mutable last : Time.System.t}
+
+module Ip_table = Hashtbl.Make (struct
+  type t = Ipaddr.t
+
+  let equal ip1 ip2 = Ipaddr.compare ip1 ip2 = 0
+
+  let hash ip = Hashtbl.hash ip
+end)
+
+type rate_limiter = {
+  kind : string;
+  mutable limit : rate_limit option;
+  table : ip_rate_limiter Ip_table.t;
+}
+
+let messages_rate_limiter : rate_limiter =
+  {kind = "messages"; limit = None; table = Ip_table.create 31}
 
 module Types = struct
   type subscriptions_table =
@@ -40,6 +65,7 @@ module Types = struct
     subscriptions : subscriptions_table;
     mutable close_info : close_info option;
     monitor : monitor_state option;
+    rate_limited_ip : Ipaddr.t option;
   }
 
   type nonrec parameters = parameters
@@ -242,7 +268,83 @@ let mk_error_response (output_media_type : Media_type.t) id error =
     JSONRPC.response_encoding
     {value = Error error; id}
 
-let on_frame worker fr _frame_ts =
+let rate_limit_reason rate_limiter =
+  match rate_limiter.limit with
+  | None -> assert false
+  | Some limit ->
+      Format.asprintf
+        "Rate limited by %s on websocket: %d/%a"
+        rate_limiter.kind
+        limit.max
+        Ptime.Span.pp
+        limit.interval
+
+let rate_limit worker frame_ts (rate_limiter : rate_limiter) =
+  let state = Worker.state worker in
+  let {Types.rate_limited_ip; _} = state in
+  match (rate_limiter.limit, rate_limited_ip) with
+  | None, _ | _, None -> `Ok
+  | Some limit, Some ip -> (
+      match Ip_table.find rate_limiter.table ip with
+      | None | Some {count = 0; _} ->
+          Ip_table.replace rate_limiter.table ip {count = 1; last = frame_ts} ;
+          `Ok
+      | Some l ->
+          if Ptime.Span.compare (Ptime.diff frame_ts l.last) limit.interval >= 0
+          then (
+            (* More than [interval] time has passed since last first call, reset
+               timer and counter. *)
+            l.count <- 1 ;
+            l.last <- frame_ts ;
+            `Ok)
+          else if l.count < limit.max then (
+            (* Still below limit but within rate interval, increment counter
+               only. *)
+            l.count <- l.count + 1 ;
+            `Ok)
+          else (* We have exceeded the limit *)
+            `Limit_reached (limit, l))
+
+let rate_limit_messages worker frame_ts
+    (decode_message : unit -> (JSONRPC.request, string) result) f =
+  let open Lwt_syntax in
+  let state = Worker.state worker in
+  let {Types.push_frame; output_media_type; _} = state in
+  match rate_limit worker frame_ts messages_rate_limiter with
+  | `Ok -> f ()
+  | `Limit_reached (limit, l) -> (
+      match limit.strategy with
+      | `Wait ->
+          let time_until_limit_lifted =
+            Ptime.Span.sub limit.interval (Ptime.diff frame_ts l.last)
+            |> Ptime.Span.to_float_s
+          in
+          let* () = Lwt_unix.sleep time_until_limit_lifted in
+          l.count <- 1 ;
+          l.last <- frame_ts ;
+          f ()
+      | `Error ->
+          let id =
+            match decode_message () with Error _ -> None | Ok {id; _} -> id
+          in
+          let content =
+            mk_error_response output_media_type id
+            @@ Rpc_errors.limit_exceeded
+                 (rate_limit_reason messages_rate_limiter)
+                 None
+          in
+          let opcode = opcode_of_media output_media_type in
+          (* Instead of handling the message, we respond with a JSONRPC error on
+             the websocket indicating that the call was rate limited. *)
+          push_frame (Some (Websocket.Frame.create ~opcode ~content ())) ;
+          (* Ignore frame *)
+          return_unit
+      | `Close ->
+          let reason = rate_limit_reason messages_rate_limiter in
+          shutdown_worker ~reason ~status:Policy worker ;
+          return_unit)
+
+let on_frame worker fr frame_ts =
   let open Lwt_syntax in
   let state = Worker.state worker in
   let {
@@ -260,8 +362,12 @@ let on_frame worker fr _frame_ts =
   let handle_message message =
     (* We clear the current message buffer for future frames *)
     Buffer.clear state.message_buffer ;
+    let decode_message () =
+      input_media_type.destruct JSONRPC.request_encoding message
+    in
+    rate_limit_messages worker frame_ts decode_message @@ fun () ->
     let* response_content, subscription =
-      match input_media_type.destruct JSONRPC.request_encoding message with
+      match decode_message () with
       | Error err ->
           let response =
             mk_error_response output_media_type None
@@ -396,7 +502,10 @@ module Handlers = struct
     | Request.Frame (fr, ts) ->
         protect @@ fun () -> on_frame worker fr ts |> Lwt_result.ok
 
-  type launch_error = [`Not_acceptable | `Unsupported_media_type of string]
+  type launch_error =
+    [ `Not_acceptable
+    | `Unsupported_media_type of string
+    | `Rate_limit_on_non_tcp ]
 
   let on_launch _w _name
       ({
@@ -423,8 +532,8 @@ module Handlers = struct
         ~headers
         medias
     in
+    let endp, conn = conn in
     let conn_descr =
-      let endp, conn = conn in
       Format.sprintf
         "%s[%s]"
         Conduit_lwt_unix.(
@@ -436,6 +545,14 @@ module Handlers = struct
       Option.map
         (fun params -> {Types.mbox = Lwt_mvar.create_empty (); params})
         monitor
+    in
+    let*? rate_limited_ip =
+      match messages_rate_limiter.limit with
+      | None -> Ok None
+      | Some _ -> (
+          match endp with
+          | Conduit_lwt_unix.TCP {ip; _} -> Ok (Some ip)
+          | _ -> Error `Rate_limit_on_non_tcp)
     in
     let state =
       Types.
@@ -450,6 +567,7 @@ module Handlers = struct
           subscriptions = Stdlib.Hashtbl.create 3;
           close_info = None;
           monitor;
+          rate_limited_ip;
         }
     in
     return state
@@ -558,6 +676,11 @@ let cohttp_callback ?monitor ~max_message_length handler
         | `Not_acceptable ->
             (* HTTP error 406 *)
             (`Not_acceptable, "")
+        | `Rate_limit_on_non_tcp ->
+            (* HTTP error 503 *)
+            ( `Service_unavailable,
+              ": Can only start rate limited websocket connection on TCP \
+               connection" )
       in
       let body =
         Cohttp_lwt.Body.of_string ("Cannot accept websocket connection" ^ expl)
@@ -567,3 +690,17 @@ let cohttp_callback ?monitor ~max_message_length handler
 let on_conn_closed (conn : Cohttp_lwt_unix.Server.conn) =
   let conn_str = Cohttp.Connection.to_string (snd conn) in
   shutdown ~reason:"Connection closed" conn_str
+
+let setup_rate_limiter rate_limiter limit =
+  let open Result_syntax in
+  let+ () =
+    if limit.max <= 0 then
+      error_with
+        "Max %s in websocket rate limiter must be strictly positive"
+        rate_limiter.kind
+    else return_unit
+  in
+  rate_limiter.limit <- Some limit
+
+let setup_rate_limiters ?messages_limit () =
+  Option.iter_e (setup_rate_limiter messages_rate_limiter) messages_limit

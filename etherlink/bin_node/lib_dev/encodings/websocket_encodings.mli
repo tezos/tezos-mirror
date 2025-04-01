@@ -8,7 +8,7 @@
 
 (* Close status for websocket close frame
    https://datatracker.ietf.org/doc/html/rfc6455#section-7.4.1 *)
-type close_status = Normal_closure | Going_away | Message_too_big
+type close_status = Normal_closure | Going_away | Policy | Message_too_big
 
 val code_of_close_status : close_status -> int
 

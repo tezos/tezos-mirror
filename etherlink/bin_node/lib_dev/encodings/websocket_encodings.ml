@@ -6,12 +6,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type close_status = Normal_closure | Going_away | Message_too_big
+type close_status = Normal_closure | Going_away | Policy | Message_too_big
 
 (* https://datatracker.ietf.org/doc/html/rfc6455#section-7.4.1 *)
 let code_of_close_status = function
   | Normal_closure -> 1000
   | Going_away -> 1001
+  | Policy -> 1008
   | Message_too_big -> 1009
 
 let opcode_encoding : Websocket.Frame.Opcode.t Data_encoding.t =
