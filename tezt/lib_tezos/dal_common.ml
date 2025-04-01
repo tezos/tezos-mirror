@@ -35,9 +35,6 @@ module Parameters = struct
     number_of_slots : int;
     attestation_lag : int;
     attestation_threshold : int;
-    blocks_per_epoch : int;
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6923
-           To be removed when [Protocol.previous_protocol Alpha >= P]. *)
   }
 
   let parameter_file protocol =
@@ -55,10 +52,6 @@ module Parameters = struct
     let attestation_threshold =
       JSON.(json |-> "attestation_threshold" |> as_int)
     in
-    let blocks_per_epoch =
-      JSON.(json |-> "blocks_per_epoch" |> as_int_opt)
-      |> Option.value ~default:1
-    in
     let feature_enabled = JSON.(json |-> "feature_enable" |> as_bool) in
     let incentives_enabled =
       JSON.(json |-> "incentives_enable" |> as_bool_opt)
@@ -73,7 +66,6 @@ module Parameters = struct
       number_of_slots;
       attestation_lag;
       attestation_threshold;
-      blocks_per_epoch;
     }
 
   let from_client client =
