@@ -9,7 +9,7 @@
 (* Main entrypoint for the agnostic baker binary.
 
    We distinguish two cases:
-   1. If the binary is called against a `--help` or `--version` command, then
+   1. If the binary is called against a `--help`, `--version` or `man` command, then
    there is no reason to connect to a node, find the current protocol etc.
    2. Otherwise, we run the agnostic baker daemon, which first obtains the
    current protocol from the connected node, and then it monitors the chain
@@ -68,5 +68,6 @@ let () =
   if Run_args.(is_help_cmd args || is_version_cmd args || is_man_cmd args) then
     Client_main_run.run
       (module Daemon_config)
-      ~select_commands:(fun _ _ -> Lwt_result_syntax.return_nil)
+      ~select_commands:(fun _ _ ->
+        Lwt_result_syntax.return @@ Commands.baker_commands ())
   else run ~args ()
