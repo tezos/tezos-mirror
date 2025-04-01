@@ -8,11 +8,12 @@
 
 open Rpc_encodings
 
-type rate_limit = {
+type 'strategy rate_limit = {
   max : int;
   interval : Time.System.Span.t;
-  strategy : [`Wait | `Error | `Close];
+  strategy : 'strategy;
 }
+  constraint 'strategy = [< `Wait | `Error | `Close]
 
 type parameters = {
   push_frame : Websocket.Frame.t option -> unit;
@@ -34,14 +35,21 @@ module Ip_table = Hashtbl.Make (struct
   let hash ip = Hashtbl.hash ip
 end)
 
-type rate_limiter = {
+type 'a rate_limiter = {
   kind : string;
-  mutable limit : rate_limit option;
+  mutable limit : 'a rate_limit option;
   table : ip_rate_limiter Ip_table.t;
 }
 
-let messages_rate_limiter : rate_limiter =
+type messages_rate_limiter = [`Wait | `Error | `Close] rate_limiter
+
+type frames_rate_limiter = [`Close] rate_limiter
+
+let messages_rate_limiter : messages_rate_limiter =
   {kind = "messages"; limit = None; table = Ip_table.create 31}
+
+let frames_rate_limiter : frames_rate_limiter =
+  {kind = "frames"; limit = None; table = Ip_table.create 31}
 
 module Types = struct
   type subscriptions_table =
@@ -279,7 +287,7 @@ let rate_limit_reason rate_limiter =
         Ptime.Span.pp
         limit.interval
 
-let rate_limit worker frame_ts (rate_limiter : rate_limiter) =
+let rate_limit worker frame_ts (rate_limiter : 'a rate_limiter) =
   let state = Worker.state worker in
   let {Types.rate_limited_ip; _} = state in
   match (rate_limiter.limit, rate_limited_ip) with
@@ -344,6 +352,13 @@ let rate_limit_messages worker frame_ts
           shutdown_worker ~reason ~status:Policy worker ;
           return_unit)
 
+let rate_limit_frame worker frame_ts f =
+  match rate_limit worker frame_ts frames_rate_limiter with
+  | `Ok -> f ()
+  | `Limit_reached ({strategy = `Close; _}, _) ->
+      let reason = rate_limit_reason frames_rate_limiter in
+      shutdown_worker ~reason ~status:Policy worker
+
 let cleanup_rate_limiters_on_close worker =
   let state = Worker.state worker in
   match state.rate_limited_ip with
@@ -363,10 +378,11 @@ let cleanup_rate_limiters_on_close worker =
             | Some ip' -> Ipaddr.compare ip ip' = 0)
           (Worker.list table)
       in
-      if not ip_has_other_workers then
+      if not ip_has_other_workers then (
         (* [worker] is being closed and is the last connection for [ip], we can
            safely remove the rate limiters for it. *)
-        Ip_table.remove messages_rate_limiter.table ip
+        Ip_table.remove messages_rate_limiter.table ip ;
+        Ip_table.remove frames_rate_limiter.table ip)
 
 let on_frame worker fr frame_ts =
   let open Lwt_syntax in
@@ -571,9 +587,9 @@ module Handlers = struct
         monitor
     in
     let*? rate_limited_ip =
-      match messages_rate_limiter.limit with
-      | None -> Ok None
-      | Some _ -> (
+      match (messages_rate_limiter.limit, frames_rate_limiter.limit) with
+      | None, None -> Ok None
+      | _ -> (
           match endp with
           | Conduit_lwt_unix.TCP {ip; _} -> Ok (Some ip)
           | _ -> Error `Rate_limit_on_non_tcp)
@@ -668,6 +684,7 @@ let new_frame conn fr =
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/7660
          The worker can still be alive but its queue closed in some degenerated
          cases. In this case we could lose frames. *)
+      rate_limit_frame w frame_ts @@ fun () ->
       Worker.Queue.push_request_now w (Request.Frame (fr, frame_ts))
 
 let cohttp_callback ?monitor ~max_message_length handler
@@ -727,5 +744,9 @@ let setup_rate_limiter rate_limiter limit =
   in
   rate_limiter.limit <- Some limit
 
-let setup_rate_limiters ?messages_limit () =
-  Option.iter_e (setup_rate_limiter messages_rate_limiter) messages_limit
+let setup_rate_limiters ?messages_limit ?frames_limit () =
+  let open Result_syntax in
+  let* () =
+    Option.iter_e (setup_rate_limiter messages_rate_limiter) messages_limit
+  in
+  Option.iter_e (setup_rate_limiter frames_rate_limiter) frames_limit

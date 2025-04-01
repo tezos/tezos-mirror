@@ -28,23 +28,29 @@ val cohttp_callback :
     cleans resources associated to connection [conn], if it exists. *)
 val on_conn_closed : Cohttp_lwt_unix.Server.conn -> unit
 
-type rate_limit = {
+type 'strategy rate_limit = {
   max : int;
       (** Max allowed websocket frames or messages in the below interval. *)
   interval : Time.System.Span.t;  (** Interval for the rate limit. *)
-  strategy :
-    [ `Wait  (** The call is blocking for [interval]. *)
-    | `Error
-      (** The server responds with a JSONRPC error indicating the rate limiting
-          as the reason and the limit. *)
-    | `Close
-      (** The server closes the websocket connection with a close frame
-          indicating the rate limiting as the reason and the limit. *)
-    ];
+  strategy : 'strategy;
       (** Strategy to adopt when a client sends messages which exceed the
           defined rate limit. *)
 }
+  constraint
+    'strategy =
+    [< `Wait  (** The call is blocking for [interval]. *)
+    | `Error
+      (** The server responds with a JSONRPC error indicating the rate limiting as
+        the reason and the limit. *)
+    | `Close
+      (** The server closes the websocket connection with a close frame
+          indicating the rate limiting as the reason and the limit. *)
+    ]
 
 (** Setup the rate limiters parameters for the websocket server (for all
     connections). *)
-val setup_rate_limiters : ?messages_limit:rate_limit -> unit -> unit tzresult
+val setup_rate_limiters :
+  ?messages_limit:[`Wait | `Close | `Error] rate_limit ->
+  ?frames_limit:[`Close] rate_limit ->
+  unit ->
+  unit tzresult
