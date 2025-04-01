@@ -111,14 +111,8 @@ exception Bad_proof of {context : string}
 
 let bad_proof_exn context = raise (Bad_proof {context})
 
-module Env
-    (B : Backend.S)
-    (P : S
-           with type contents := B.Contents.Val.t
-            and type hash := B.Hash.t
-            and type step := B.Node.Val.step) =
-struct
-  module H = B.Hash
+module Env (Backend : Backend.S) = struct
+  module H = Backend.Hash
 
   module Hashes = struct
     module Unsafe = Hashtbl.Make (struct
@@ -162,14 +156,14 @@ struct
 
   module Set = struct
     type produce = {
-      nodes : B.Node.Val.t Hashes.t;
-      contents : B.Contents.Val.t Hashes.t;
+      nodes : Backend.Node.Val.t Hashes.t;
+      contents : Backend.Contents.Val.t Hashes.t;
     }
     [@@deriving brassaia]
 
     type deserialise = {
-      nodes : B.Node_portable.t Hashes.t;
-      contents : B.Contents.Val.t Hashes.t;
+      nodes : Backend.Node_portable.t Hashes.t;
+      contents : Backend.Contents.Val.t Hashes.t;
     }
     [@@deriving brassaia]
 
@@ -227,7 +221,7 @@ struct
     Atomic.set t Empty ;
     res
 
-  module Contents_hash = Hash.Typed (H) (B.Contents.Val)
+  module Contents_hash = Hash.Typed (H) (Backend.Contents.Val)
 
   let find_contents t h =
     match Atomic.get t with

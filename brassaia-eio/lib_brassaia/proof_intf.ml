@@ -269,15 +269,10 @@ module type Proof = sig
       S with type contents := C.t and type hash := H.t and type step := P.step
   end
 
-  module Env
-      (B : Backend.S)
-      (P : S
-             with type contents := B.Contents.Val.t
-              and type hash := B.Hash.t
-              and type step := B.Node.Val.step) :
+  module Env (Backend : Backend.S) :
     Env
-      with type hash := B.Hash.t
-       and type contents := B.Contents.Val.t
-       and type node := B.Node.Val.t
-       and type pnode := B.Node_portable.t
+      with type hash := Backend.Hash.t
+       and type contents := Backend.Contents.Val.t
+       and type node := Backend.Node.Val.t
+       and type pnode := Backend.Node_portable.t
 end

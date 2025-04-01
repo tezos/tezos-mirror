@@ -193,7 +193,7 @@ module Make (P : Backend.S) = struct
 
   module Brassaia_proof = Proof
   module Tree_proof = Proof.Make (P.Contents.Val) (P.Hash) (Path)
-  module Env = Proof.Env (P) (Tree_proof)
+  module Env = Proof.Env (P)
 
   let merge_env x y =
     match (Env.is_empty x, Env.is_empty y) with
