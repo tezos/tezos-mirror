@@ -286,7 +286,7 @@ let test_baking_nonce_migration =
     "Bake until the level: %d (end of the second cycle) then kill the baker"
     target_level ;
   let* _ = target_level_promise in
-  let* () = Agnostic_baker.terminate baker in
+  let* () = Agnostic_baker.kill baker in
 
   Log.info "Retrieve the nonce file contents" ;
   let* chain_id = Client.RPC.call client @@ RPC.get_chain_chain_id () in
@@ -309,7 +309,7 @@ let test_baking_nonce_migration =
     target_level ;
   let* () = Agnostic_baker.run baker in
   let* _ = target_level_promise in
-  let* () = Agnostic_baker.terminate baker in
+  let* () = Agnostic_baker.kill baker in
 
   Log.info "Concat old nonces contents with the new one" ;
   let new_nonces_contents = Base.read_file nonces_file in
@@ -327,7 +327,7 @@ let test_baking_nonce_migration =
   in
   let* () = Agnostic_baker.run baker in
   let* _ = failed_migration_event in
-  let* () = Agnostic_baker.terminate baker in
+  let* () = Agnostic_baker.kill baker in
 
   Log.info "Remove old nonces contents from nonces file" ;
   let () = Base.write_file nonces_file ~contents:new_nonces_contents in

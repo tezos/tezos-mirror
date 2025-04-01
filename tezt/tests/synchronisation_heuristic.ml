@@ -295,7 +295,7 @@ let test_threshold_one =
   in
   let* () = Client.Admin.connect_address client ~peer:node1 in
   let* _ = Node.wait_for_level node 2 in
-  let* () = Agnostic_baker.terminate baker in
+  let* () = Agnostic_baker.kill baker in
 
   Log.info "Check bootstrapped state of second peer" ;
   let* () = Client.bootstrapped client1 in
@@ -363,7 +363,7 @@ let test_threshold_two =
         unit)
       [node; node1; node2; node3]
   in
-  let* () = Agnostic_baker.terminate baker in
+  let* () = Agnostic_baker.kill baker in
 
   let* () = Client.bootstrapped client in
   let* () = Client.bootstrapped client1 in

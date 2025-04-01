@@ -313,7 +313,7 @@ let baker_check_consensus_branch =
   Log.info "Start a baker and bake until level %d" target_level ;
   let* baker = Agnostic_baker.init node client in
   let* _ = Node.wait_for_level node target_level in
-  let* () = Agnostic_baker.terminate baker in
+  let* () = Agnostic_baker.kill baker in
 
   Log.info "Retrieve mempool" ;
   let* mempool =
