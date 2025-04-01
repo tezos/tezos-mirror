@@ -627,7 +627,10 @@ module Make (P : External_process_parameters.S) = struct
       Lwt.catch
         (fun () ->
           (* Try to trigger the clean shutdown of the external process. *)
-          Lwt_unix_socket.send process_input P.request_encoding request)
+          Lwt_unix_socket.send
+            process_input
+            Hypervisor_params.Params.request_encoding
+            Hypervisor_params.Params.terminate_request)
         (function
           | Unix.Unix_error (ECONNREFUSED, _, _)
           | Unix.Unix_error (EPIPE, _, _)
