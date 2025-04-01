@@ -107,9 +107,10 @@ let default_initial_staked_balance =
 let default_initial_spendable_balance =
   Tez_helpers.(default_initial_full_balance -! default_initial_staked_balance)
 
-let generate_accounts ?rng_state n : t list tzresult =
+let generate_accounts ?algo ?rng_state n : t list tzresult =
   Signature.Public_key_hash.Table.clear known_accounts ;
-  List.init ~when_negative_length:[] n (fun _i -> new_account ?rng_state ())
+  List.init ~when_negative_length:[] n (fun _i ->
+      new_account ?algo ?rng_state ())
 
 let commitment_secret =
   Blinded_public_key_hash.activation_code_of_hex

@@ -27,7 +27,6 @@
 
 open Protocol
 open Alpha_context
-open Environment
 
 type t = B of Block.t | I of Incremental.t
 
@@ -178,9 +177,10 @@ module Vote : sig
   val get_listings :
     t -> (Signature.Public_key_hash.t * int64) list tzresult Lwt.t
 
-  val get_proposals : t -> int64 Protocol_hash.Map.t tzresult Lwt.t
+  val get_proposals : t -> int64 Environment.Protocol_hash.Map.t tzresult Lwt.t
 
-  val get_current_proposal : t -> Protocol_hash.t option tzresult Lwt.t
+  val get_current_proposal :
+    t -> Environment.Protocol_hash.t option tzresult Lwt.t
 
   val get_protocol : Block.t -> Protocol_hash.t Lwt.t
 
@@ -277,8 +277,8 @@ module Delegate : sig
     voting_info : Vote.delegate_info;
     active_consensus_key : Signature.Public_key_hash.t;
     pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
-    active_companion_key : Bls.Public_key_hash.t option;
-    pending_companion_keys : (Cycle.t * Bls.Public_key_hash.t) list;
+    active_companion_key : Signature.Bls.Public_key_hash.t option;
+    pending_companion_keys : (Cycle.t * Signature.Bls.Public_key_hash.t) list;
   }
 
   type stake = {frozen : Tez.t; weighted_delegated : Tez.t}
@@ -435,11 +435,13 @@ val init3 :
   init
 
 val init_with_constants_gen :
+  ?algo:Signature.algo ->
   (Alpha_context.Contract.t, 'contracts) tup ->
   Constants.Parametric.t ->
   (Block.t * 'contracts) tzresult Lwt.t
 
 val init_with_constants_n :
+  ?algo:Signature.algo ->
   Constants.Parametric.t ->
   int ->
   (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t

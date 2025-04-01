@@ -70,11 +70,11 @@ let set_delegate_params delegate_name parameters : (t, t) scenarios =
       return (state, [operation]))
 
 (** Add a new account with the given name *)
-let add_account name : (t, t) scenarios =
+let add_account ?algo name : (t, t) scenarios =
   let open Lwt_result_syntax in
   exec_state (fun (_block, state) ->
       Log.info ~color:action_color "[Add account \"%s\"]" name ;
-      let new_account = Account.new_account () in
+      let new_account = Account.new_account ?algo () in
       let pkh = new_account.pkh in
       let contract = Protocol.Alpha_context.Contract.Implicit pkh in
       let account_state =
@@ -656,5 +656,5 @@ let make_denunciations ?single ?rev ?filter () =
   exec_op (make_denunciations_op ?single ?rev ?filter)
 
 (** Create an account and give an initial balance funded by [funder] *)
-let add_account_with_funds name ~funder amount =
-  add_account name --> transfer funder name amount --> reveal name
+let add_account_with_funds ?algo name ~funder amount =
+  add_account ?algo name --> transfer funder name amount --> reveal name

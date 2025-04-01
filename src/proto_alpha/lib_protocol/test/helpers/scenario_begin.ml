@@ -81,7 +81,7 @@ let init_constants ?(default = Test) ?(reward_per_block = 0L)
   else Empty
 
 (** Initialize the test, given some initial parameters *)
-let begin_test ?(burn_rewards = false) ?(force_attest_all = false)
+let begin_test ?algo ?(burn_rewards = false) ?(force_attest_all = false)
     delegates_name_list : (constants, t) scenarios =
   exec (fun (constants : constants) ->
       let open Lwt_result_syntax in
@@ -89,7 +89,7 @@ let begin_test ?(burn_rewards = false) ?(force_attest_all = false)
       let delegates_name_list = bootstrap :: delegates_name_list in
       (* Override threshold value if activate *)
       let n = List.length delegates_name_list in
-      let* block, delegates = Context.init_with_constants_n constants n in
+      let* block, delegates = Context.init_with_constants_n ?algo constants n in
       let*? init_level = Context.get_level (B block) in
       let*? account_map =
         List.fold_left2
