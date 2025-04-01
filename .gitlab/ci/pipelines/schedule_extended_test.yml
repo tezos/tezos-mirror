@@ -3521,30 +3521,24 @@ documentation:manuals:
   - gcp
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.build_dsn_node
   dependencies:
   - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.build_dsn_node
   timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   interruptible: false
   before_script:
   - eval $(opam env)
-  - . ./scripts/ci/sccache-start.sh
   script:
-  - ./scripts/ci/documentation:manuals.sh
-  after_script:
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+  - make -C docs -j octez-gen
   artifacts:
     expire_in: 1 week
     paths:
