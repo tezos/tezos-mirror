@@ -21,8 +21,6 @@ module type S = sig
 
   module Async : Async_intf.S
 
-  module Errs : Io_errors.S with module Io = File_Manager.Io
-
   module Dispatcher : Dispatcher.S with module File_Manager = File_Manager
 
   type hash

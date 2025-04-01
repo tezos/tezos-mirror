@@ -12,7 +12,6 @@
   octez-libs.brassaia_eio_test_helpers
   octez-libs.brassaia_eio_pack
   octez-libs.brassaia_eio_pack.io
-  octez-libs.brassaia_eio_pack.unix
   octez-libs.brassaia_eio_tezos
   octez-libs.brassaia_eio_pack.mem
   octez-libs.test-helpers
@@ -31,7 +30,6 @@
   -open Brassaia_eio_test_helpers
   -open Brassaia_eio_pack
   -open Brassaia_eio_pack_io
-  -open Brassaia_eio_pack_unix
   -open Brassaia_eio_tezos
   -open Brassaia_eio_pack_mem
   -open Tezos_test_helpers

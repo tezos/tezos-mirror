@@ -14,4 +14,4 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-module Unix : Brassaia_eio_pack_io.Brassaia_pack_io.Async_intf.S
+module Unix : Io_intf.S

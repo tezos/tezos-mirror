@@ -21,7 +21,7 @@ module type S = sig
 
   type t
 
-  val init : File_Manager.t -> (t, [> File_Manager.Errs.t]) result
+  val init : File_Manager.t -> (t, [> Io_errors.t]) result
 
   (** [read_exn t ~off ~len buffer] writes into [buffer] the bytes from [off] to
       [off+len]. If the read occurred, in a lower volume, its identifier is

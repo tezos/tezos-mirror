@@ -25,11 +25,7 @@ module type S = sig
       - [start_idx] and [chunk_num] for the open functions to know the starting
         file name and how many files there are. *)
 
-  module Io : Io_intf.S
-
-  module Errs : Io_errors.S
-
-  module Ao : Append_only_file.S
+  module Io = Io.Unix
 
   type t
 
@@ -133,9 +129,4 @@ module type S = sig
     'a
 end
 
-module type Sigs = sig
-  module type S = S
-
-  module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) :
-    S with module Io = Io and module Errs = Errs
-end
+module type Sigs = S

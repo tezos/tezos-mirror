@@ -297,7 +297,7 @@ module type S = sig
 
       None of the functions raise exceptions. *)
 
-  module Io : Io_intf.S
+  module Io = Io.Unix
 
   type payload
 
@@ -422,7 +422,7 @@ module type Sigs = sig
 
   module type Volume = Volume
 
-  module Upper (Io : Io_intf.S) : Upper with module Io = Io
+  module Upper : Upper
 
-  module Volume (Io : Io_intf.S) : Volume with module Io = Io
+  module Volume : Volume
 end

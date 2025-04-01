@@ -16,6 +16,7 @@
 
 open! Import
 include Checks_intf
+module Io = Io.Unix
 
 let setup_log =
   let init _style_renderer level =
@@ -55,13 +56,9 @@ let ppf_or_null = function
   | Some p -> p
   | None -> Format.make_formatter (fun _ _ _ -> ()) (fun () -> ())
 
-module Make
-    (Io : Io_intf.S)
-    (Io_index : Brassaia_index.Index.Platform.S)
-    (Store : Store) =
-struct
+module Make (Store : Store) = struct
   module Hash = Store.Hash
-  module Index = Pack_index.Make_io (Io) (Io_index) (Hash)
+  module Index = Pack_index.Make_io (Hash)
   module Object_counter = Utils.Object_counter (Io.Progress)
 
   (** Read basic metrics from an existing store. *)
@@ -392,7 +389,6 @@ struct
 end
 
 module Integrity_checks
-    (Io : Io_intf.S)
     (XKey : Pack_key.S)
     (X : Brassaia.Backend.S
            with type Commit.key = XKey.t

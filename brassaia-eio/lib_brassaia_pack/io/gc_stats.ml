@@ -15,8 +15,9 @@
  *)
 
 open! Import
+module Io = Io.Unix
 
-module Steps_timer (Io : Io_intf.S) = struct
+module Steps_timer = struct
   type duration = Stats.Latest_gc.duration = {
     wall : float;
     sys : float;
@@ -47,9 +48,8 @@ module Steps_timer (Io : Io_intf.S) = struct
     (next, delta)
 end
 
-module Main (Io : Io_intf.S) = struct
+module Main = struct
   module S = Stats.Latest_gc
-  module Steps_timer = Steps_timer (Io)
 
   (** [t] is the running state while computing the stats *)
   type t = {stats : S.stats; timer : Steps_timer.t}
@@ -91,7 +91,7 @@ module Main (Io : Io_intf.S) = struct
     }
 end
 
-module Worker (Io : Io_intf.S) = struct
+module Worker = struct
   module S = Stats.Latest_gc
 
   (** [t] is the running state while computing the stats *)

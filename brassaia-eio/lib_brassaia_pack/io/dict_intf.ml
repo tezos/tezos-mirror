@@ -17,7 +17,7 @@
 open! Import
 
 module type S = sig
-  module Io : Io_intf.S
+  module Io = Io.Unix
 
   type t
 
@@ -54,8 +54,4 @@ module type S = sig
   val flush : t -> (unit, [> Io.write_error]) result
 end
 
-module type Sigs = sig
-  module type S = S
-
-  module Make (Io : Io_intf.S) : S with module Io = Io
-end
+module type Sigs = S

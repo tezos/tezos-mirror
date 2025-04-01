@@ -16,7 +16,7 @@
 
 module Brassaia = Brassaia_eio.Brassaia
 module Brassaia_pack = Brassaia_eio_pack.Brassaia_pack
-module Brassaia_pack_unix = Brassaia_eio_pack_unix.Brassaia_pack_unix
+module Brassaia_pack_unix = Brassaia_eio_pack_io.Brassaia_pack_unix
 open Brassaia.Export_for_backends
 module Int63 = Optint.Int63
 
@@ -101,17 +101,18 @@ module I = Brassaia_pack_unix.Index
 module Index = Brassaia_pack_unix.Index.Make (Schema.Hash)
 module Key = Brassaia_pack_unix.Pack_key.Make (Schema.Hash)
 module Io = Brassaia_pack_unix.Io.Unix
-module Errs = Brassaia_pack_unix.Io_errors.Make (Io)
-module File_manager = Brassaia_pack_unix.File_manager.Make (Io) (Index) (Errs)
+module Io_errors = Brassaia_pack_unix.Io_errors
+module File_manager = Brassaia_pack_unix.File_manager.Make (Index)
 module Dict = File_manager.Dict
 module Dispatcher = Brassaia_pack_unix.Dispatcher.Make (File_manager)
 module Pack =
   Brassaia_pack_unix.Pack_store.Make (File_manager) (Dispatcher) (Schema.Hash)
     (Contents)
-    (Errs)
 module Branch =
-  Brassaia_pack_unix.Atomic_write.Make_persistent (Io) (Brassaia.Branch.String)
+  Brassaia_pack_unix.Atomic_write.Make_persistent
+    (Brassaia.Branch.String)
     (Brassaia_pack.Atomic_write.Value.Of_hash (Schema.Hash))
+module Lower = Brassaia_pack_unix.Lower
 
 module Make_context (Config : sig
   val root : string
@@ -150,14 +151,15 @@ struct
   (* TODO : remove duplication with brassaia_pack/ext.ml *)
   let get_file_manager config =
     let readonly = Brassaia_pack.Conf.readonly config in
-    if readonly then File_manager.open_ro config |> Errs.raise_if_error
+    if readonly then File_manager.open_ro config |> Io_errors.raise_if_error
     else
       let fresh = Brassaia_pack.Conf.fresh config in
       if fresh then (
         let root = Brassaia_pack.Conf.root config in
         mkdir_dash_p root ;
-        File_manager.create_rw ~overwrite:true config |> Errs.raise_if_error)
-      else File_manager.open_rw config |> Errs.raise_if_error
+        File_manager.create_rw ~overwrite:true config
+        |> Io_errors.raise_if_error)
+      else File_manager.open_rw config |> Io_errors.raise_if_error
 
   let get_dict ?name ~readonly ~fresh () =
     let name = Option.value name ~default:(fresh_name "dict") in
@@ -165,7 +167,8 @@ struct
     let dict = File_manager.dict file_manager in
     {name; dict; file_manager}
 
-  let close_dict d = File_manager.close d.file_manager |> Errs.raise_if_error
+  let close_dict d =
+    File_manager.close d.file_manager |> Io_errors.raise_if_error
 
   type t = {
     name : string;
@@ -179,13 +182,13 @@ struct
     let f = ref (fun () -> ()) in
     let config = config ~readonly ~fresh name in
     let file_manager = get_file_manager config in
-    let dispatcher = Dispatcher.init file_manager |> Errs.raise_if_error in
+    let dispatcher = Dispatcher.init file_manager |> Io_errors.raise_if_error in
     (* open the index created by the file_manager. *)
     let index = File_manager.index file_manager in
     let dict = File_manager.dict file_manager in
     let lru = Some (Brassaia_pack_unix.Lru.create config) in
     let pack = Pack.init ~config ~file_manager ~dict ~dispatcher ~lru in
-    (f := fun () -> File_manager.flush file_manager |> Errs.raise_if_error) ;
+    (f := fun () -> File_manager.flush file_manager |> Io_errors.raise_if_error) ;
     {name; index; pack; dict; file_manager}
 
   let get_rw_pack () =
@@ -198,7 +201,7 @@ struct
 
   let close_pack t =
     let _ = File_manager.flush t.file_manager in
-    File_manager.close t.file_manager |> Errs.raise_if_error
+    File_manager.close t.file_manager |> Io_errors.raise_if_error
 end
 
 module Alcotest = struct

@@ -26,13 +26,13 @@ module type S = sig
 
   type value = int63 * int * Pack_value.Kind.t
 
-  module Index_raw :
+  module Index :
     Brassaia_index.Index.S
       with type value := value
        and type t := t
        and type key := key
 
-  module Io : Io_intf.S
+  module Io = Io.Unix
 
   val init_exn :
     ?flush_callback:(unit -> unit) ->
@@ -87,8 +87,5 @@ end
 module type Sigs = sig
   module type S = S
 
-  module Make_io
-      (Io : Io_intf.S)
-      (Io_index : Brassaia_index.Index.Platform.S)
-      (K : Brassaia.Hash.S) : S with type key = K.t and module Io = Io
+  module Make_io (K : Brassaia.Hash.S) : S with type key = K.t
 end

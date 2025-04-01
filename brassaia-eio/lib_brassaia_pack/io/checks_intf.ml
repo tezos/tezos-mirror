@@ -135,13 +135,9 @@ module type Sigs = sig
 
   module type S = S
 
-  module Make
-      (Io : Io_intf.S)
-      (Io_index : Brassaia_index.Index.Platform.S)
-      (_ : Store) : S
+  module Make (_ : Store) : S
 
   module Integrity_checks
-      (Io : Io_intf.S)
       (XKey : Pack_key.S)
       (X : Brassaia.Backend.S
              with type Commit.key = XKey.t

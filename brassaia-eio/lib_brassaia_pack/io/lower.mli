@@ -15,4 +15,8 @@
  *)
 
 (** @inline *)
-include Lower_intf.Sigs
+include Lower_intf.S
+
+module Brassaia = Brassaia_eio.Brassaia
+
+type volume_identifier = string [@@deriving brassaia]

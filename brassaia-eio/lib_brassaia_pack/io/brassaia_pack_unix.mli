@@ -14,51 +14,57 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-module Brassaia = Brassaia_eio.Brassaia
-module Brassaia_pack = Brassaia_eio_pack.Brassaia_pack
+(** The [brassaia-pack-unix] package provides an implementation of {!Brassaia_pack}
+    for Unix systems.
+
+    [brassaia-pack-unix] provides advanced features such as garbage collection,
+    snapshoting, integrity checks. *)
 
 (** {1 Store} *)
 
+module Brassaia = Brassaia_eio.Brassaia
+module Brassaia_pack = Brassaia_eio_pack.Brassaia_pack
+
 module type S = Store_intf.S
 
-module type Io_s = Io_intf.S
+module Maker (Config : Brassaia_pack.Conf.S) : Store_intf.Maker
 
-module Store_intf = Store_intf
-module Maker_io = Store.Maker
-
-module KV
-    (Io : Io_intf.S)
-    (Index_io : Brassaia_index.Index.Platform.S)
-    (Async : Async_intf.S)
-    (Config : Brassaia_pack.Conf.S) =
-struct
-  type endpoint = unit
-
-  type hash = Brassaia.Schema.default_hash
-
-  include Pack_key.Store_spec
-  module Maker = Store.Maker (Io) (Index_io) (Async) (Config)
-  module Make (C : Brassaia.Contents.S) = Maker.Make (Brassaia.Schema.KV (C))
-end
+module KV (Config : Brassaia_pack.Conf.S) : Store_intf.KV
 
 (** {1 Key and Values} *)
 
+(* module Pack_store = Pack_store *)
 module Pack_key = Pack_key
 module Pack_value = Pack_value
 
-(** {1 Internal} *)
+(** {1 Integrity Checks} *)
+
+module Checks : sig
+  module Make (_ : Checks_intf.Store) : Checks_intf.S
+end
+
+(** {1 Statistics} *)
 
 module Stats = Stats
-module Stats_intf = Stats_intf
-module Index = Pack_index
+
+(** {1 Internal Functors and Utilities} *)
+
+(** Following functors and modules are instantiated automatically or used
+    internally when creating a store with {!Maker} or {!KV}.*)
+
+module Index : sig
+  module type S = Brassaia_index.Index.S
+
+  module Make (K : Brassaia.Hash.S) : module type of Pack_index.Make_io (K)
+end
+
 module Inode = Inode
 module Pack_store = Pack_store
-module Checks = Checks
-module Checks_intf = Checks_intf
 module Atomic_write = Atomic_write
 module Dict = Dict
 module Dispatcher = Dispatcher
-module Async_intf = Async_intf
+module Io = Io
+module Async = Async
 module Errors = Errors
 module Io_errors = Io_errors
 module Control_file = Control_file
@@ -74,4 +80,3 @@ module Lru = Lru
 module Gc_raw = Gc
 module Traverse_pack_file = Traverse_pack_file
 module Snapshot = Snapshot
-module Import = Import

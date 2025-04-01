@@ -17,9 +17,7 @@
 open! Import
 
 module type S = sig
-  module Io : Io_intf.S
-
-  module Errs : Io_errors.S with module Io = Io
+  module Io = Io.Unix
 
   type t
 
@@ -63,7 +61,7 @@ module type S = sig
 
       The exceptions raised by [f] are caught and returned (as long as they are
       known by [Errs]). *)
-  val iter : t -> (off:int63 -> len:int -> unit) -> (unit, Errs.t) result
+  val iter : t -> (off:int63 -> len:int -> unit) -> (unit, Io_errors.t) result
 
   module Wo : sig
     type t
@@ -152,8 +150,4 @@ module type S = sig
   end
 end
 
-module type Sigs = sig
-  module type S = S
-
-  module Make (Io : Io_intf.S) : S with module Io = Io
-end
+module type Sigs = S

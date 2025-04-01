@@ -18,7 +18,7 @@ open! Import
 
 (** Stat collection during GC *)
 
-module Main (Io : Io_intf.S) : sig
+module Main : sig
   type t
 
   val create :
@@ -39,7 +39,7 @@ module Main (Io : Io_intf.S) : sig
     Stats.Latest_gc.stats
 end
 
-module Worker (Io : Io_intf.S) : sig
+module Worker : sig
   type t
 
   val create : string -> t

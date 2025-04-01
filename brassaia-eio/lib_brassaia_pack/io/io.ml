@@ -14,9 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-module Brassaia_pack_io = Brassaia_eio_pack_io.Brassaia_pack_io
-open! Brassaia_pack_io.Import
-module Errors = Brassaia_pack_io.Errors
+open! Import
 module Syscalls = Brassaia_index_unix.Index_unix.Syscalls
 
 (* File utils, taken from index.unix package.
@@ -330,7 +328,7 @@ module Unix = struct
       let maxrss =
         if Lazy.force is_darwin then Int64.div maxrss 1000L else maxrss
       in
-      Brassaia_pack_io.Stats_intf.Latest_gc.
+      Stats_intf.Latest_gc.
         {maxrss; minflt; majflt; inblock; oublock; nvcsw; nivcsw}
   end
 

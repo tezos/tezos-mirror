@@ -58,21 +58,16 @@ module type S = sig
 
       3. and 5. are highly critical. *)
 
-  module Io : Io_intf.S
+  module Io = Io.Unix
 
-  module Control : Control_file.Upper with module Io = Io
+  module Control : Control_file.Upper
 
-  module Dict : Dict.S with module Io = Io
-
-  module Suffix : Chunked_suffix.S with module Io = Io
+  module Dict = Dict
+  module Suffix = Chunked_suffix
 
   module Index : Pack_index.S
 
-  module Errs : Io_errors.S with module Io = Io
-
-  module Sparse : Sparse_file.S with module Io = Io
-
-  module Lower : Lower.S with module Io = Io
+  module Sparse = Sparse_file
 
   type t
 
@@ -248,10 +243,10 @@ module type S = sig
   (** Execute the reload routine.
 
       Is a no-op if the control file did not change. *)
-  val reload : ?hook:reload_stages hook -> t -> (unit, [> Errs.t]) result
+  val reload : ?hook:reload_stages hook -> t -> (unit, [> Io_errors.t]) result
 
   val register_prefix_consumer :
-    t -> after_reload:(unit -> (unit, Errs.t) result) -> unit
+    t -> after_reload:(unit -> (unit, Io_errors.t) result) -> unit
 
   val register_suffix_consumer : t -> after_flush:(unit -> unit) -> unit
 
@@ -285,7 +280,7 @@ module type S = sig
     suffix_dead_bytes:int63 ->
     latest_gc_target_offset:int63 ->
     volume:Lower.volume_identifier option ->
-    (unit, [> Errs.t]) result
+    (unit, [> Io_errors.t]) result
 
   val readonly : t -> bool
 
@@ -293,9 +288,9 @@ module type S = sig
 
   val gc_allowed : t -> bool
 
-  val split : t -> (unit, [> Errs.t]) result
+  val split : t -> (unit, [> Io_errors.t]) result
 
-  val add_volume : t -> (unit, [> Errs.t]) result
+  val add_volume : t -> (unit, [> Io_errors.t]) result
 
   (** Decides if the GC will delete or archive the garbage data, depending on
       the presence of a lower layer. *)
@@ -319,9 +314,5 @@ end
 module type Sigs = sig
   module type S = S
 
-  module Make
-      (Io : Io_intf.S)
-      (Index : Pack_index.S with module Io = Io)
-      (Errs : Io_errors.S with module Io = Io) :
-    S with module Io = Io and module Index = Index and module Errs = Errs
+  module Make (Index : Pack_index.S) : S with module Index = Index
 end

@@ -287,21 +287,15 @@ module type S = sig
     (** Unstable internal API agnostic about the underlying storage. Use it only
         to implement or test inodes. *)
 
-    module Io : Io_intf.S
-
-    module Errs : Io_errors.S with module Io = Io
+    module Io = Io.Unix
 
     module Index : Pack_index.S with type key = hash
 
-    module File_manager :
-      File_manager.S
-        with module Io = Io
-         and module Errs = Errs
-         and module Index = Index
+    module File_manager : File_manager.S with module Index = Index
 
     val file_manager : repo -> File_manager.t
 
-    module Dict : Dict.S
+    module Dict = Dict
 
     val dict : repo -> Dict.t
 

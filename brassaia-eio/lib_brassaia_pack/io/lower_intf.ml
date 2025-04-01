@@ -15,16 +15,15 @@
  *)
 
 open! Import
+module Io = Io.Unix
+module Control = Control_file.Volume
+module Layout = Brassaia_pack.Layout.V5.Volume
+module Payload = Control_file.Payload.Volume.Latest
+module Brassaia = Brassaia_eio.Brassaia
 
 type volume_identifier = string [@@deriving brassaia]
 
 module type Volume = sig
-  module Io : Io_intf.S
-
-  module Errs : Io_errors.S
-
-  module Sparse : Sparse_file.S
-
   type t
 
   type open_error =
@@ -51,11 +50,7 @@ module type Volume = sig
 end
 
 module type S = sig
-  module Io : Io_intf.S
-
-  module Errs : Io_errors.S
-
-  module Volume : Volume with module Io = Io
+  module Volume : Volume
 
   type t
 
@@ -183,16 +178,4 @@ module type S = sig
   (** [cleanup ~generation t] will attempt to cleanup the appendable volume if a
       GC crash has occurred. *)
   val cleanup : generation:int -> t -> (unit, [> `Sys_error of string]) result
-end
-
-module type Sigs = sig
-  module type S = S
-
-  type nonrec volume_identifier = volume_identifier [@@deriving brassaia]
-
-  module Make_volume (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) :
-    Volume with module Io = Io and module Errs = Errs
-
-  module Make (Io : Io_intf.S) (Errs : Io_errors.S with module Io = Io) :
-    S with module Io = Io and module Errs = Errs
 end

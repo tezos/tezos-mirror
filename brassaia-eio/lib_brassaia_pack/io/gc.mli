@@ -45,12 +45,12 @@ module Make
   val finalise :
     wait:bool ->
     t ->
-    ([> `Running | `Finalised of Stats.Latest_gc.stats], Args.Errs.t) result
+    ([> `Running | `Finalised of Stats.Latest_gc.stats], Io_errors.t) result
 
   (** Attaches a callback to the GC process, which will be called when the GC
       finalises. *)
   val on_finalise :
-    t -> ((Stats.Latest_gc.stats, Args.Errs.t) result -> unit) -> unit
+    t -> ((Stats.Latest_gc.stats, Io_errors.t) result -> unit) -> unit
 
   val cancel : t -> bool
 
