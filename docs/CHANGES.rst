@@ -198,7 +198,7 @@ DAL node
 - **Change** The DAL node store version has been upgraded from 1 to 2.
   The DAL node store will automatically upgrade without requiring any
   user action. For users running the DAL node with the
-  ``--operator-profile`` flag enabled, the node now uses SQLite
+  ``--operator-profiles`` flag enabled, the node now uses SQLite
   specifically for managing skip list cells (MR :gl:`!15780`),
   preventing inode exhaustion. All other stores remain unchanged.
 
@@ -227,6 +227,10 @@ DAL node
 - Added a new RPC ``GET /protocol_parameters/`` that retrieve the protocol
   parameters that the DAL node uses for a given level, which by default is the
   last finalized level the node is aware of. (MR :gl:`!16704`)
+
+- Aliases have been added to the command line. ``--operator-profiles`` is now
+  equivalent to ``--operator`` and ``-E`` is equivalent to ``--endpoint``.
+  (MR :gl:`!17496`)
 
 Miscellaneous
 -------------

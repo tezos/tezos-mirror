@@ -175,7 +175,7 @@ DAL node
 - **Change** The DAL node store version has been upgraded from 1 to 2.
   The DAL node store will automatically upgrade without requiring any
   user action. For users running the DAL node with the
-  ``--operator-profile`` flag enabled, the node now uses SQLite
+  ``--operator-profiles`` flag enabled, the node now uses SQLite
   specifically for managing skip list cells (MR :gl:`!15780`),
   preventing inode exhaustion. All other stores remain unchanged.
 
