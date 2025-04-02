@@ -116,6 +116,7 @@ you start using them, you probably want to use `octez-evm-node check config
 - An sequencer EVM node can uses the tx_queue to speed the inclusion
   of transaction. (!17134 !17100 !17109 !17211)
 - A proxy EVM node can now use the tx_queue. (!17246)
+- A RPC EVM node can uses the tx_queue. (!17246)
 - `tx_queue` now has a maximum number of transactions. (!17083)
 - Observer nodes can now be run with `periodic_snapshot_path` defined in
   the configuration. It exports a snapshot to the given path every time they

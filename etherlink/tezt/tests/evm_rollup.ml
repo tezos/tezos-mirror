@@ -309,7 +309,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     ?(force_install_kernel = true) ?whitelist ?maximum_allowed_ticks
     ?restricted_rpcs ?(enable_dal = false) ?dal_slots
     ?(enable_multichain = false) ?websockets ?(enable_fast_withdrawal = false)
-    protocol =
+    ?enable_tx_queue protocol =
   let _, kernel_installee = Kernel.to_uses_and_tags kernel in
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
@@ -431,10 +431,15 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
       unit
     else unit
   in
+  let enable_tx_queue =
+    match enable_tx_queue with
+    | Some enable_tx_queue -> enable_tx_queue
+    | None -> Evm_node.Enable true
+  in
   let patch_config =
     Evm_node.patch_config_with_experimental_feature
       ?enable_websocket:websockets
-      ~enable_tx_queue:(Enable true)
+      ~enable_tx_queue
       ()
   in
   let* produce_block, evm_node =
@@ -461,11 +466,6 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
           max_blueprints_ahead;
           genesis_timestamp;
         } ->
-        let patch_config =
-          Evm_node.patch_config_with_experimental_feature
-            ?enable_websocket:websockets
-            ()
-        in
         let private_rpc_port = Some (Port.fresh ()) in
         let sequencer_mode =
           Evm_node.Sequencer
@@ -531,8 +531,8 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
     ?bootstrap_accounts ?whitelist ?da_fee_per_byte ?minimum_base_fee_per_gas
     ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs ~setup_mode
     ~enable_dal ?(dal_slots = if enable_dal then Some [4] else None)
-    ~enable_multichain ?websockets ?enable_fast_withdrawal ?evm_version f
-    protocols =
+    ~enable_multichain ?websockets ?enable_fast_withdrawal ?evm_version
+    ?enable_tx_queue f protocols =
   let extra_tag =
     match setup_mode with
     | Setup_proxy -> "proxy"
@@ -589,6 +589,7 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
               ?websockets
               ?enable_fast_withdrawal
               ?evm_version
+              ?enable_tx_queue
               protocol
           in
           f ~protocol ~evm_setup)
@@ -636,8 +637,8 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
     ?challenge_window ?bootstrap_accounts ?da_fee_per_byte
     ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
     ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs
-    ?max_blueprints_ahead ?websockets ?evm_version ?genesis_timestamp f
-    protocols =
+    ?max_blueprints_ahead ?websockets ?evm_version ?genesis_timestamp
+    ?enable_tx_queue f protocols =
   let register ~enable_dal ~enable_multichain : unit =
     register_test
       ~title
@@ -657,6 +658,7 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
       ?restricted_rpcs
       ?websockets
       ?evm_version
+      ?enable_tx_queue
       f
       protocols
       ~enable_dal
@@ -1834,7 +1836,10 @@ let test_rpc_txpool_content =
     ~title:"Check RPC txpool_content is available"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~time_between_blocks:Nothing
-  @@ fun ~protocol:_ ~evm_setup:{evm_node; produce_block; _} ->
+    ~enable_tx_queue:(Enable false)
+  (*This test does not work for the tx_queue yet. It needs to be adapted *)
+  @@
+  fun ~protocol:_ ~evm_setup:{evm_node; produce_block; _} ->
   let get_transaction_field transaction_content field_name =
     transaction_content |> JSON.get field_name |> JSON.as_string_opt
     |> Option.value ~default:"null"
@@ -3517,7 +3522,9 @@ let test_latest_kernel_migration protocols =
   latest_kernel_migration ~from:Mainnet protocols
 
 let test_cannot_prepayed_leads_to_no_inclusion =
-  register_both
+  (* In sequencer the balance validation is only done during the
+     production of the block. *)
+  register_proxy
     ~tags:["evm"; "prepay"; "inclusion"]
     ~title:
       "Not being able to prepay a transaction leads to it not being included."
@@ -5925,6 +5932,7 @@ let test_tx_pool_timeout =
       ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
       ~tx_pool_timeout_limit:ttl
       ~setup_mode
+      ~enable_tx_queue:(Enable false)
       protocol
   in
   (* We send one transaction and produce a block immediatly to check that it's included
@@ -6011,6 +6019,7 @@ let test_tx_pool_address_boundaries =
   in
   let* {evm_node = sequencer_node; produce_block; _} =
     setup_evm_kernel
+      ~enable_tx_queue:(Enable false)
       ~sequencer_admin
       ~admin
       ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
