@@ -155,7 +155,7 @@ module Plugin = struct
     | Protocol.Apply_operation_result.Applied _ -> Dal_plugin.Succeeded
     | _ -> Dal_plugin.Failed
 
-  let get_published_slot_headers block_level ctxt =
+  let get_published_slot_headers ~block_level ctxt =
     let open Lwt_result_syntax in
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     let* slot_headers =
@@ -175,7 +175,7 @@ module Plugin = struct
              })
          slot_headers
 
-  let get_attestations block_level ctxt =
+  let get_attestations ~block_level ctxt =
     let open Lwt_result_syntax in
     let open Protocol.Alpha_context in
     let open Protocol_client_context.Alpha_block_services in

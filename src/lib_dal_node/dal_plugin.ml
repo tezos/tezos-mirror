@@ -56,10 +56,12 @@ module type T = sig
     Tezos_dal_node_services.Types.proto_parameters tzresult Lwt.t
 
   val get_published_slot_headers :
-    int32 -> Tezos_rpc__RPC_context.generic -> slot_header list tzresult Lwt.t
+    block_level:int32 ->
+    Tezos_rpc__RPC_context.generic ->
+    slot_header list tzresult Lwt.t
 
   val get_attestations :
-    int32 ->
+    block_level:int32 ->
     Tezos_rpc__RPC_context.generic ->
     (int
     * Signature.public_key_hash option

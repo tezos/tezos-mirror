@@ -667,7 +667,7 @@ module Handler = struct
           (module Plugin : Dal_plugin.T with type block_info = Plugin.block_info)
       else return_unit
     in
-    let* slot_headers = Plugin.get_published_slot_headers block_level cctxt in
+    let* slot_headers = Plugin.get_published_slot_headers ~block_level cctxt in
     let* () =
       Slot_manager.store_slot_headers
         ~number_of_slots:proto_parameters.Types.number_of_slots
@@ -711,7 +711,7 @@ module Handler = struct
           Int32.(sub block_level (of_int proto_parameters.attestation_lag))
         (Plugin.is_attested dal_attestation)
     in
-    let* attestations = Plugin.get_attestations block_level cctxt in
+    let* attestations = Plugin.get_attestations ~block_level cctxt in
     let* () =
       check_attesters_attested
         ctxt
