@@ -260,17 +260,6 @@ pub fn precompile_set_with_revert_withdrawals<Host: Runtime>(
     precompiles
 }
 
-#[macro_export]
-macro_rules! fail_if_too_much {
-    ($estimated_ticks : expr, $handler: expr) => {
-        if $estimated_ticks + $handler.estimated_ticks_used > $handler.ticks_allocated {
-            return Err(EthereumError::OutOfTicks);
-        } else {
-            $estimated_ticks
-        }
-    };
-}
-
 mod tick_model {
     pub fn ticks_of_sha256(data_size: usize) -> u64 {
         let size = data_size as u64;
