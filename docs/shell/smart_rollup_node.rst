@@ -9,6 +9,8 @@ The Octez rollup node is used by a rollup operator to deploy a
 rollup. The rollup node is responsible for making the rollup progress
 by publishing commitments and by playing refutation games.
 
+A complete manual page of the rollup node is available :ref:`here <smart_rollup_node_manual>`.
+
 Just like the Octez node, the Octez rollup node provides an :doc:`RPC
 interface<../api/openapi>`. The services of this interface can be
 called directly with HTTP requests.
