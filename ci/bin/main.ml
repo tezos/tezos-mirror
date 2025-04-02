@@ -144,6 +144,8 @@ let () =
   let octez_evm_node_release_tag_re =
     "/^octez-evm-node-v\\d+\\.\\d+(?:\\-rc\\d+)?$/"
   in
+  (* Matches Grafazos release tags, e.g. [grafazos-v1.2]. *)
+  let grafazos_release_tag_re = "/^grafazos-v\\d+\\.\\d+$/" in
   let open Rules in
   let open Pipeline in
   (* Matches either Octez release tags or Octez beta release tags,
@@ -157,7 +159,8 @@ let () =
     If.(
       Predefined_vars.ci_commit_tag != null
       && (not has_any_octez_release_tag)
-      && not (has_tag_match octez_evm_node_release_tag_re))
+      && (not (has_tag_match octez_evm_node_release_tag_re))
+      && not (has_tag_match grafazos_release_tag_re))
   in
   let release_description =
     "\n\n\
@@ -219,6 +222,17 @@ let () =
     ~description:
       "Dry-run pipeline for 'octez_release_tag'.\n\n\
        This pipeline checks that 'octez_release_tag' pipelines work as \
+       intended, without publishing any release. Developers or release \
+       managers can create this pipeline by pushing a tag to a fork of \
+       'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;
+  (* TODO: We should be able to register this pipeline in [grafazos/ci]. *)
+  register
+    "grafazos_release_tag_test"
+    If.(not_on_tezos_namespace && push && has_tag_match grafazos_release_tag_re)
+    ~jobs:Grafazos_ci.Release.jobs
+    ~description:
+      "Test release pipeline for Grafazos.\n\n\
+       This pipeline checks that 'grafazos_release_tag' pipelines work as \
        intended, without publishing any release. Developers or release \
        managers can create this pipeline by pushing a tag to a fork of \
        'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;
