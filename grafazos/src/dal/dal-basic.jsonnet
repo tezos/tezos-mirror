@@ -23,20 +23,24 @@
 local grafonnet = import 'github.com/grafana/grafonnet/gen/grafonnet-latest/main.libsonnet';
 local dashboard = grafonnet.dashboard;
 local panel = grafonnet.panel;
-
 local base = import '../base.jsonnet';
+
 // We reuse Octez-p2p for p2p pannels
 local p2p = import '../p2p.jsonnet';
 local gossipsub = import './gossipsub.jsonnet';
 local dalNode = import './dal-node.jsonnet';
+
+// External variables
+local uid_ext = std.extVar('uid_ext');
+local uid = uid_ext == 'default';
 
 //Position variables
 local node_y = 1;
 local gossipsub_y = node_y + 16;
 local p2p_y = gossipsub_y + 24;
 
-
-dashboard.new('Octez DAL Node Dashboard')
+dashboard.new('Octez DAL Node Dashboard' + if !uid && uid_ext != '' then ' (' + std.strReplace(uid_ext, '-', '') + ')' else '')
++ (if !uid then dashboard.withUid('dal-basic' + uid_ext) else {})
 + dashboard.withDescription('A dashboard for Octez DAL node')
 + dashboard.withTags(['tezos', 'octez', 'dal'])
 + dashboard.time.withFrom('now-3h')

@@ -20,10 +20,15 @@ local hardware_h = panel_height * 4 + 1;
 
 local misc_y = hardware_y + hardware_h + 1;
 
+// External variables
+local uid_ext = std.extVar('uid_ext');
+local uid = uid_ext == 'default';
+
 //###
 // Grafana main stuffs
 //##
-dashboard.new('Tezt Cloud - Layer 1 dashboard')
+dashboard.new('Tezt Cloud - Layer 1 dashboard' + if !uid && uid_ext != '' then ' (' + std.strReplace(uid_ext, '-', '') + ')' else '')
++ (if !uid then dashboard.withUid('tezt-cloud-layer1' + uid_ext) else {})
 + dashboard.withDescription('A dashboard for Layer 1 related experiments with tezt cloud')
 + dashboard.time.withFrom('now-3h')
 + dashboard.withRefresh('20s')
