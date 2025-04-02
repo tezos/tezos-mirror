@@ -7612,7 +7612,7 @@ let test_trace_transaction =
 
 let test_overwrite_simulation_tick_limit =
   register_all
-    ~kernels:Kernel.all
+    ~kernels:[Kernel.Ghostnet; Kernel.Mainnet]
     ~tags:["evm"; "rpc"; "overwrite_tick_limit"; "eth_call"]
     ~title:"Can overwrite tick limit in eth_call with the experimental feature"
     ~time_between_blocks:Nothing
