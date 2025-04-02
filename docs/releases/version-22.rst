@@ -1,5 +1,5 @@
-Version 22.0~rc3
-================
+Version 22.0
+============
 
 Changes
 -------
@@ -79,14 +79,14 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout octez-v22.0-rc3
+  git checkout octez-v22.0
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v22.0-rc3`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v22.0`` Docker images of Octez.
 
 
 .. _packages_v22:
@@ -112,6 +112,7 @@ Alternatively, you can run them individually. For instance, to start a baker for
 Changelog
 ---------
 
+- `Version 22.0 <../CHANGES.html#version-22-0>`_
 - `Version 22.0~rc3 <../CHANGES.html#version-22-0-rc3>`_
 - `Version 22.0~rc2 <../CHANGES.html#version-22-0-rc2>`_
 - `Version 22.0~rc1 <../CHANGES.html#version-22-0-rc1>`_
