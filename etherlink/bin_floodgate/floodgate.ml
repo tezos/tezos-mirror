@@ -59,16 +59,16 @@ let send_transaction_and_wait ~infos ~gas_limit ~from ~to_ ~value =
 
 let transactions_count = ref 0
 
-let rec report_tps () =
+let rec report_tps ~elapsed_time =
   let open Lwt_syntax in
   let start = Time.System.now () in
   transactions_count := 0 ;
-  let* () = Lwt_unix.sleep 60. in
+  let* () = Lwt_unix.sleep elapsed_time in
   let stop = Time.System.now () in
   let* () =
     Floodgate_events.measured_tps !transactions_count (Ptime.diff stop start)
   in
-  report_tps ()
+  report_tps ~elapsed_time
 
 let rec spam_with_account ~token ~infos ~gas_limit account =
   let open Lwt_syntax in
@@ -268,7 +268,7 @@ let prepare_scenario ~rpc_endpoint ~scenario infos simple_gas_limit controller =
 
 let run ~scenario ~relay_endpoint ~rpc_endpoint ~controller ~max_active_eoa
     ~max_transaction_batch_length ~spawn_interval ~tick_interval
-    ~base_fee_factor ~initial_balance =
+    ~base_fee_factor ~initial_balance ~elapsed_time_between_report =
   let open Lwt_result_syntax in
   let* controller =
     controller_from_sk ~rpc_endpoint ~min_balance:(xtz_of_int 100) controller
@@ -339,5 +339,5 @@ let run ~scenario ~relay_endpoint ~rpc_endpoint ~controller ~max_active_eoa
         (Seq.ints 0 |> Stdlib.Seq.take max_active_eoa)
     in
     Lwt_result.ok (Floodgate_events.setup_completed ())
-  and* () = report_tps () in
+  and* () = report_tps ~elapsed_time:elapsed_time_between_report in
   return_unit

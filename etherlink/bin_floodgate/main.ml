@@ -183,6 +183,16 @@ module Arg = struct
       ~doc:
         "Specifies the transfer mode: ERC20 transfers or native XTZ transfers."
       Parameter.scenario
+
+  let elapsed_time_between_report =
+    let default = "60." in
+    Tezos_clic.default_arg
+      ~default
+      ~long:"report"
+      ~short:'r'
+      ~placeholder:"SECONDS"
+      ~doc:"The elapsed time between two reports of measured TPS."
+      Parameter.float
 end
 
 let log_config ~verbose () =
@@ -201,7 +211,7 @@ let run_command =
   command
     ~desc:"Start Floodgate to spam an EVM-compatible network"
     Arg.(
-      args11
+      args12
         verbose
         relay_endpoint
         rpc_endpoint
@@ -212,7 +222,8 @@ let run_command =
         tick_interval
         base_fee_factor
         initial_balance
-        scenario)
+        scenario
+        elapsed_time_between_report)
     (prefixes ["run"] @@ stop)
     (fun ( verbose,
            relay_endpoint,
@@ -224,7 +235,8 @@ let run_command =
            tick_interval,
            base_fee_factor,
            initial_balance,
-           scenario )
+           scenario,
+           elapsed_time_between_report )
          () ->
       let open Lwt_result_syntax in
       let*! () = log_config ~verbose () in
@@ -241,6 +253,7 @@ let run_command =
         ~tick_interval
         ~base_fee_factor
         ~initial_balance
+        ~elapsed_time_between_report
         ~scenario)
 
 let commands = [run_command]
