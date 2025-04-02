@@ -48,6 +48,7 @@ use octez_riscv::stepper::Stepper;
 use octez_riscv::stepper::StepperStatus;
 use octez_riscv::stepper::pvm::PvmStepper;
 use tezos_smart_rollup::utils::inbox::InboxBuilder;
+use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 
 use crate::cli::GdbServerOptions;
 
@@ -62,15 +63,21 @@ pub fn gdb_server(opts: GdbServerOptions) -> Result<(), Box<dyn Error>> {
 
     let initrd = opts.initrd.as_ref().map(fs::read).transpose()?;
 
-    let inbox = InboxBuilder::new().build();
+    let mut inbox = InboxBuilder::new();
+    if let Some(inbox_file) = opts.inbox.file {
+        inbox.load_from_file(inbox_file)?;
+    }
+    let inbox = inbox.build();
+
+    let rollup_address = SmartRollupAddress::from_b58check(opts.inbox.address.as_str())?;
 
     let mut stepper = PvmStepper::<M1G>::new(
         program.as_slice(),
         initrd.as_deref(),
         inbox,
         PvmHooks::default(),
-        [0; 20],
-        0,
+        rollup_address.into_hash().as_ref().try_into()?,
+        opts.inbox.origination_level,
         opts.preimage.preimages_dir,
         InterpretedBlockBuilder,
     )?;

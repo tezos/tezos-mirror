@@ -73,6 +73,9 @@ pub struct GdbServerOptions {
 
     #[command(flatten)]
     pub preimage: PreimageOptions,
+
+    #[command(flatten)]
+    pub inbox: InboxOptions,
 }
 
 #[derive(Clone, ValueEnum, Debug)]
