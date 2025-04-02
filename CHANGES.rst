@@ -28,6 +28,15 @@ General
 Node
 ----
 
+- Added RPC ``POST /bls/aggregate_public_keys`` to aggregate BLS
+  public keys. (MR :gl:`!17461`)
+
+- Added RPC ``POST /bls/aggregate_signatures`` to aggregate BLS
+  signatures. (MR :gl:`!17461`)
+
+- Added RPC ``POST /bls/check_proof`` to check a BLS proof. (MR
+  :gl:`!17461`)
+
 Client
 ------
 
@@ -37,6 +46,18 @@ Client
 - Add a new command ``list known remote keys <remote_signer_addr>`` that lists
   the public key hashes known to the remote signer. The signer returns them only
   if it is launched with ``--allow-list-known-keys`` argument. (MR :gl:`!17403`)
+
+- Add a new command ``aggregate bls public keys`` to aggregate BLS
+  public keys. (MR :gl:`!17461`)
+
+- Add a new command ``aggregate bls signatures`` to aggregate BLS
+  signatures. (MR :gl:`!17461`)
+
+- Add a new command ``create bls proof`` to create a BLS proof. (MR
+  :gl:`!17461`)
+
+- Add a new command ``check bls proof`` to check a BLS proof. (MR
+  :gl:`!17461`)
 
 Signer
 ------
