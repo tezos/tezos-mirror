@@ -252,14 +252,21 @@ module Manager : sig
       }
     | Incorrect_reveal_position
     | Update_consensus_key_with_tz4_without_proof of {
+        kind : Operation_repr.consensus_key_kind;
         source : public_key_hash;
         public_key : public_key;
       }
     | Update_consensus_key_with_incorrect_proof of {
+        kind : Operation_repr.consensus_key_kind;
         public_key : public_key;
         proof : Bls.t;
       }
     | Update_consensus_key_with_unused_proof of {
+        kind : Operation_repr.consensus_key_kind;
+        source : public_key_hash;
+        public_key : public_key;
+      }
+    | Update_companion_key_not_tz4 of {
         source : public_key_hash;
         public_key : public_key;
       }

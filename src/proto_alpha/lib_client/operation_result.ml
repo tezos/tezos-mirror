@@ -234,10 +234,12 @@ let pp_manager_operation_content (type kind) source ppf
         source
         Contract_hash.pp
         destination
-  | Update_consensus_key {public_key = pk; proof} ->
+  | Update_consensus_key {public_key = pk; proof; kind} ->
       Format.fprintf
         ppf
-        "Update_consensus_key:@,Public key hash: %a%a"
+        "Update_%a_key:@,Public key hash: %a%a"
+        Operation_repr.pp_consensus_key_kind
+        kind
         Signature.Public_key_hash.pp
         (Signature.Public_key.hash pk)
         (fun ppf proof ->

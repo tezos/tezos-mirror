@@ -231,7 +231,7 @@ let test_tz4_consensus_key ~allow_tz4_delegate_enable () =
       | [
           Environment.Ecoproto_error
             (Validate_errors.Manager.Update_consensus_key_with_tz4_without_proof
-              {source; public_key});
+              {kind = Consensus; source; public_key});
         ]
         when Signature.Public_key.(public_key = consensus_pk)
              && source = delegate ->
@@ -260,7 +260,7 @@ let test_tz4_consensus_key ~allow_tz4_delegate_enable () =
       | [
           Environment.Ecoproto_error
             (Validate_errors.Manager.Update_consensus_key_with_incorrect_proof
-              {public_key; proof = _});
+              {kind = Consensus; public_key; proof = _});
         ]
         when Signature.Public_key.(public_key = consensus_pk) ->
           return_unit

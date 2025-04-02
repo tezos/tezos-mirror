@@ -669,6 +669,18 @@ val update_consensus_key :
   public_key ->
   (packed_operation, tztrace) result Lwt.t
 
+val update_companion_key :
+  ?force_reveal:bool ->
+  ?counter:Manager_counter.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  ?proof_signer:Contract.t ->
+  Context.t ->
+  Contract.t ->
+  public_key ->
+  (packed_operation, tztrace) result Lwt.t
+
 val drain_delegate :
   Context.t ->
   consensus_key:Signature.Public_key_hash.t ->

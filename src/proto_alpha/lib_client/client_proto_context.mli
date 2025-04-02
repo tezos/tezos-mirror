@@ -216,6 +216,22 @@ val update_consensus_key :
   Signature.public_key ->
   Kind.update_consensus_key Kind.manager Injection.result tzresult Lwt.t
 
+val update_companion_key :
+  #Protocol_client_context.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?simulation:bool ->
+  ?fee:Tez.t ->
+  ?secret_key_uri:Client_keys.sk_uri ->
+  public_key:Signature.public_key ->
+  manager_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
+  Signature.public_key ->
+  Kind.update_consensus_key Kind.manager Injection.result tzresult Lwt.t
+
 val drain_delegate :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->

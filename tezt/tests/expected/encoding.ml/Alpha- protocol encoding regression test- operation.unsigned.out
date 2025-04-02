@@ -605,6 +605,35 @@
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents": [
     {
+      "kind": "update_companion_key",
+      "source": "tz4XsUYECWrJ5c4gktAnr1nkFC9mjDEVn3qh",
+      "fee": "33",
+      "counter": "732",
+      "gas_limit": "9451117",
+      "storage_limit": "57024931117",
+      "pk": "BLpk1xXdveUYh7YFsyf6LwGWfv5zAfLvnMG71byiMFDZc4CkXzZPVko3Dz4sD43Ln5uFNvdjiQJY",
+      "proof": "BLsigA5hv9bjFDmrbvVfam6CaXM87xZv1GYhFmn3uaR4LTXahHpADaNk9LcEcQb2EF1w9b72AutNqPxzVT5EhRFQN1Ue43XA3HkMfmCYTCHa3WiLsJYLmuQvchTwoMy8zx8EibsZAJ3Dug"
+    }
+  ]
+}'
+0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a87303fad261084d3e363c48b61d2ad617de8b798841ff21dc05edecc004adcacdb7d40103b1835898e501798f26d7ee20cb772fedc4e4e0e963f6ef47a7925ac9cfb61d5100bde3ee7f1e9e37175842b3d378776dff000000608ed0b1d82e17ce7e927ffd9470f8208ec5d8d32556135c2c670000815f20a81b9de3f2ac50919751b4872644be2f75cb041108a9fbf9b550b6c5f90b5626d5a99f7784b11194561768220cff18e9a142a4246d279311f46de4ba9727740c6438
+
+./octez-codec decode alpha.operation.unsigned from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a87303fad261084d3e363c48b61d2ad617de8b798841ff21dc05edecc004adcacdb7d40103b1835898e501798f26d7ee20cb772fedc4e4e0e963f6ef47a7925ac9cfb61d5100bde3ee7f1e9e37175842b3d378776dff000000608ed0b1d82e17ce7e927ffd9470f8208ec5d8d32556135c2c670000815f20a81b9de3f2ac50919751b4872644be2f75cb041108a9fbf9b550b6c5f90b5626d5a99f7784b11194561768220cff18e9a142a4246d279311f46de4ba9727740c6438
+{ "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+  "contents":
+    [ { "kind": "update_companion_key",
+        "source": "tz4XsUYECWrJ5c4gktAnr1nkFC9mjDEVn3qh", "fee": "33",
+        "counter": "732", "gas_limit": "9451117",
+        "storage_limit": "57024931117",
+        "pk":
+          "BLpk1xXdveUYh7YFsyf6LwGWfv5zAfLvnMG71byiMFDZc4CkXzZPVko3Dz4sD43Ln5uFNvdjiQJY",
+        "proof":
+          "BLsigA5hv9bjFDmrbvVfam6CaXM87xZv1GYhFmn3uaR4LTXahHpADaNk9LcEcQb2EF1w9b72AutNqPxzVT5EhRFQN1Ue43XA3HkMfmCYTCHa3WiLsJYLmuQvchTwoMy8zx8EibsZAJ3Dug" } ] }
+
+./octez-codec encode alpha.operation.unsigned from '{
+  "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+  "contents": [
+    {
       "kind": "update_consensus_key",
       "source": "tz4XsUYECWrJ5c4gktAnr1nkFC9mjDEVn3qh",
       "fee": "33",

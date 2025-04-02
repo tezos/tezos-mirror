@@ -2389,6 +2389,9 @@ module Delegate : sig
 
     val register_update :
       context -> public_key_hash -> public_key -> context tzresult Lwt.t
+
+    val register_update_companion :
+      context -> public_key_hash -> Bls.Public_key.t -> context tzresult Lwt.t
   end
 
   (** See {!Stake_storage.prepare_stake_distribution}. *)
@@ -4803,6 +4806,7 @@ and _ manager_operation =
   | Update_consensus_key : {
       public_key : Signature.Public_key.t;
       proof : Bls.t option;
+      kind : Operation_repr.consensus_key_kind;
     }
       -> Kind.update_consensus_key manager_operation
   | Transfer_ticket : {
@@ -5028,6 +5032,8 @@ module Operation : sig
 
     val update_consensus_key_case : Kind.update_consensus_key Kind.manager case
 
+    val update_companion_key_case : Kind.update_consensus_key Kind.manager case
+
     val transfer_ticket_case : Kind.transfer_ticket Kind.manager case
 
     val dal_publish_commitment_case :
@@ -5090,6 +5096,8 @@ module Operation : sig
       val update_consensus_key_tag : int
 
       val update_consensus_key_case : Kind.update_consensus_key case
+
+      val update_companion_key_case : Kind.update_consensus_key case
 
       val register_global_constant_case : Kind.register_global_constant case
 

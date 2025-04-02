@@ -225,6 +225,12 @@ val to_watermark : consensus_watermark -> Signature.watermark
 
 val of_watermark : Signature.watermark -> consensus_watermark option
 
+type consensus_key_kind = Consensus | Companion
+
+val consensus_key_kind_encoding : consensus_key_kind Data_encoding.t
+
+val pp_consensus_key_kind : Format.formatter -> consensus_key_kind -> unit
+
 type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
 
 val raw_encoding : raw Data_encoding.t
@@ -428,6 +434,7 @@ and _ manager_operation =
   | Update_consensus_key : {
       public_key : Signature.Public_key.t;
       proof : Bls.t option;
+      kind : consensus_key_kind;
     }
       -> Kind.update_consensus_key manager_operation
       (** [Transfer_ticket] allows an implicit account (the "claimer") to receive
@@ -765,6 +772,8 @@ module Encoding : sig
 
   val update_consensus_key_case : Kind.update_consensus_key Kind.manager case
 
+  val update_companion_key_case : Kind.update_consensus_key Kind.manager case
+
   val register_global_constant_case :
     Kind.register_global_constant Kind.manager case
 
@@ -825,6 +834,8 @@ module Encoding : sig
     val update_consensus_key_tag : int
 
     val update_consensus_key_case : Kind.update_consensus_key case
+
+    val update_companion_key_case : Kind.update_consensus_key case
 
     val register_global_constant_case : Kind.register_global_constant case
 

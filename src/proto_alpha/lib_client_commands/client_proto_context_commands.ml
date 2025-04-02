@@ -2425,6 +2425,52 @@ let commands_rw () =
         match r with Ok _ -> return_unit | Error el -> Lwt.return_error el);
     command
       ~group
+      ~desc:"Update the companion key of a delegate."
+      (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
+      (prefixes ["set"; "companion"; "key"; "for"]
+      @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
+      @@ prefixes ["to"]
+      @@ Public_key.source_param ~name:"key" ~desc:"the companion key"
+      @@ stop)
+      (fun (fee, dry_run, verbose_signing, fee_parameter)
+           delegate_pkh
+           (name_pk, public_key)
+           cctxt ->
+        let open Lwt_result_syntax in
+        let* _, delegate_pk, delegate_sk =
+          Client_keys.get_key cctxt delegate_pkh
+        in
+        let* public_key =
+          match public_key with
+          | Some pk -> return pk
+          | None -> Client_keys.public_key name_pk
+        in
+        let* secret_key_uri =
+          match public_key with
+          | Bls _ ->
+              let pkh = Signature.Public_key.hash public_key in
+              let* _, _, secret_key_uri = Client_keys.get_key cctxt pkh in
+              return_some secret_key_uri
+          | _ -> return_none
+        in
+        let*! r =
+          update_companion_key
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ?confirmations:cctxt#confirmations
+            ~dry_run
+            ~fee_parameter
+            ~verbose_signing
+            ?fee
+            ?secret_key_uri
+            ~public_key
+            ~manager_sk:delegate_sk
+            delegate_pk
+        in
+        match r with Ok _ -> return_unit | Error el -> Lwt.return_error el);
+    command
+      ~group
       ~desc:"Drain all funds from a delegate."
       (args2 dry_run_switch verbose_signing_switch)
       (prefixes ["drain"; "delegate"]

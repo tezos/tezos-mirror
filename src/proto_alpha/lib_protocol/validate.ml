@@ -2549,15 +2549,15 @@ module Manager = struct
         record_trace Gas.Gas_limit_too_high
 
   let check_update_consensus_key vi remaining_gas source
-      (public_key : Signature.Public_key.t) proof =
+      (public_key : Signature.Public_key.t) proof kind =
     let open Result_syntax in
     if Constants.allow_tz4_delegate_enable vi.ctxt then
-      match (public_key, proof) with
-      | Bls _bls_public_key, None ->
+      match (public_key, proof, kind) with
+      | Bls _bls_public_key, None, kind ->
           result_error
             (Validate_errors.Manager.Update_consensus_key_with_tz4_without_proof
-               {source; public_key})
-      | Bls bls_public_key, Some _ ->
+               {kind; source; public_key})
+      | Bls bls_public_key, Some _, _kind ->
           (* Compute the gas cost to encode the consensus public key and
              check the proof. *)
           let gas_cost_for_sig_check =
@@ -2576,18 +2576,28 @@ module Manager = struct
                  gas_cost_for_sig_check)
           in
           return_unit
-      | (Ed25519 _ | Secp256k1 _ | P256 _), Some _proof ->
+      | (Ed25519 _ | Secp256k1 _ | P256 _), _, Operation_repr.Companion ->
+          result_error
+            (Validate_errors.Manager.Update_companion_key_not_tz4
+               {source; public_key})
+      | (Ed25519 _ | Secp256k1 _ | P256 _), Some _proof, Consensus ->
           result_error
             (Validate_errors.Manager.Update_consensus_key_with_unused_proof
-               {source; public_key})
-      | (Ed25519 _ | Secp256k1 _ | P256 _), None -> return_unit
+               {kind = Consensus; source; public_key})
+      | (Ed25519 _ | Secp256k1 _ | P256 _), None, Consensus -> return_unit
     else
       let* () = Delegate.Consensus_key.check_not_tz4 public_key in
-      if Option.is_some proof then
-        result_error
-          (Validate_errors.Manager.Update_consensus_key_with_unused_proof
-             {source; public_key})
-      else return_unit
+      match kind with
+      | Companion ->
+          result_error
+            (Validate_errors.Manager.Update_companion_key_not_tz4
+               {source; public_key})
+      | Consensus ->
+          if Option.is_some proof then
+            result_error
+              (Validate_errors.Manager.Update_consensus_key_with_unused_proof
+                 {kind; source; public_key})
+          else return_unit
 
   let check_kind_specific_content (type kind)
       (contents : kind Kind.manager contents) remaining_gas vi =
@@ -2622,8 +2632,8 @@ module Manager = struct
     | Delegation (Some pkh) ->
         if Constants.allow_tz4_delegate_enable vi.ctxt then return_unit
         else Delegate.check_not_tz4 pkh
-    | Update_consensus_key {public_key; proof} ->
-        check_update_consensus_key vi remaining_gas source public_key proof
+    | Update_consensus_key {public_key; proof; kind} ->
+        check_update_consensus_key vi remaining_gas source public_key proof kind
     | Delegation None | Set_deposits_limit _ | Increase_paid_storage _ ->
         return_unit
     | Transfer_ticket {contents; ty; _} ->

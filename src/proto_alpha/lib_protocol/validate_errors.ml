@@ -1592,14 +1592,21 @@ module Manager = struct
       }
     | Incorrect_reveal_position
     | Update_consensus_key_with_tz4_without_proof of {
+        kind : Operation_repr.consensus_key_kind;
         source : public_key_hash;
         public_key : public_key;
       }
     | Update_consensus_key_with_incorrect_proof of {
+        kind : Operation_repr.consensus_key_kind;
         public_key : public_key;
         proof : Bls.t;
       }
     | Update_consensus_key_with_unused_proof of {
+        kind : Operation_repr.consensus_key_kind;
+        source : public_key_hash;
+        public_key : public_key;
+      }
+    | Update_companion_key_not_tz4 of {
         source : public_key_hash;
         public_key : public_key;
       }
@@ -1696,74 +1703,107 @@ module Manager = struct
       ~id:"validate.operation.update_consensus_key_with_tz4_without_proof"
       ~title:"update consensus key with tz4 without proof"
       ~description:"Update to a tz4 consensus key without proof of possession"
-      ~pp:(fun ppf (pk, source) ->
+      ~pp:(fun ppf (kind, pk, source) ->
         Format.fprintf
           ppf
-          "Update to a BLS consensus key %a from %a should contain a proof of \
+          "Update to a BLS %a key %a from %a should contain a proof of \
            possession."
+          Operation_repr.pp_consensus_key_kind
+          kind
           Signature.Public_key_hash.pp
           pk
           Signature.Public_key.pp
           source)
       Data_encoding.(
-        obj2
+        obj3
+          (req "kind" Operation_repr.consensus_key_kind_encoding)
           (req "source" Signature.Public_key_hash.encoding)
           (req "public_key" Signature.Public_key.encoding))
       (function
-        | Update_consensus_key_with_tz4_without_proof {source; public_key} ->
-            Some (source, public_key)
+        | Update_consensus_key_with_tz4_without_proof {kind; source; public_key}
+          ->
+            Some (kind, source, public_key)
         | _ -> None)
-      (fun (source, public_key) ->
-        Update_consensus_key_with_tz4_without_proof {source; public_key}) ;
+      (fun (kind, source, public_key) ->
+        Update_consensus_key_with_tz4_without_proof {kind; source; public_key}) ;
     register_error_kind
       `Permanent
-      ~id:"validate.operation.update_consensus_key_with_with_incorrect_proof"
+      ~id:"validate.operation.update_consensus_key_with_incorrect_proof"
       ~title:"update consensus key with tz4 with incorrect proof"
       ~description:
         "Update to a tz4 consensus key with an incorrect proof of possession"
-      ~pp:(fun ppf (pk, proof) ->
+      ~pp:(fun ppf (kind, pk, proof) ->
         Format.fprintf
           ppf
-          "Update to a BLS consensus key %a contains an incorrect proof of \
-           possession %a."
+          "Update to a BLS %a key %a contains an incorrect proof of possession \
+           %a."
+          Operation_repr.pp_consensus_key_kind
+          kind
           Signature.Public_key.pp
           pk
           Bls.pp
           proof)
       Data_encoding.(
-        obj2
+        obj3
+          (req "kind" Operation_repr.consensus_key_kind_encoding)
           (req "public_key" Signature.Public_key.encoding)
           (req "proof" Bls.encoding))
       (function
-        | Update_consensus_key_with_incorrect_proof {public_key; proof} ->
-            Some (public_key, proof)
+        | Update_consensus_key_with_incorrect_proof {kind; public_key; proof} ->
+            Some (kind, public_key, proof)
         | _ -> None)
-      (fun (public_key, proof) ->
-        Update_consensus_key_with_incorrect_proof {public_key; proof}) ;
+      (fun (kind, public_key, proof) ->
+        Update_consensus_key_with_incorrect_proof {kind; public_key; proof}) ;
     register_error_kind
       `Permanent
       ~id:"validate.operation.update_consensus_key_with_unused_proof"
       ~title:"update consensus key with unused proof"
       ~description:"Update consensus key with unused proof of possession"
-      ~pp:(fun ppf (pk, source) ->
+      ~pp:(fun ppf (kind, pk, source) ->
         Format.fprintf
           ppf
-          "Consensus key update to %a from %a contains an unused proof of \
-           possession."
+          "Update %a key of %a from %a contains an unused proof of possession."
+          Operation_repr.pp_consensus_key_kind
+          kind
           Signature.Public_key_hash.pp
           pk
           Signature.Public_key.pp
           source)
       Data_encoding.(
+        obj3
+          (req "kind" Operation_repr.consensus_key_kind_encoding)
+          (req "source" Signature.Public_key_hash.encoding)
+          (req "public_key" Signature.Public_key.encoding))
+      (function
+        | Update_consensus_key_with_unused_proof {kind; source; public_key} ->
+            Some (kind, source, public_key)
+        | _ -> None)
+      (fun (kind, source, public_key) ->
+        Update_consensus_key_with_unused_proof {kind; source; public_key}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.update_companion_key_not_tz4"
+      ~title:"update companion key without a tz4 key"
+      ~description:"Update to a tz4 companion key without providing a tz4 key"
+      ~pp:(fun ppf (source, pk) ->
+        Format.fprintf
+          ppf
+          "Update to the BLS companion key of %a with key %a that should be a \
+           tz4."
+          Signature.Public_key_hash.pp
+          source
+          Signature.Public_key.pp
+          pk)
+      Data_encoding.(
         obj2
           (req "source" Signature.Public_key_hash.encoding)
           (req "public_key" Signature.Public_key.encoding))
       (function
-        | Update_consensus_key_with_unused_proof {source; public_key} ->
+        | Update_companion_key_not_tz4 {source; public_key} ->
             Some (source, public_key)
         | _ -> None)
       (fun (source, public_key) ->
-        Update_consensus_key_with_unused_proof {source; public_key}) ;
+        Update_companion_key_not_tz4 {source; public_key}) ;
     register_error_kind
       `Permanent
       ~id:"validate.operation.insufficient_gas_for_manager"

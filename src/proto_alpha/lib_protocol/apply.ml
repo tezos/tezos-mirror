@@ -35,7 +35,8 @@ type error +=
   | Set_deposits_limit_on_unregistered_delegate of Signature.Public_key_hash.t
   | Set_deposits_limit_when_automated_staking_off
   | Error_while_taking_fees
-  | Update_consensus_key_on_unregistered_delegate of Signature.Public_key_hash.t
+  | Update_consensus_key_on_unregistered_delegate of
+      (Signature.Public_key_hash.t * Operation_repr.consensus_key_kind)
   | Empty_transaction of Contract.t
   | Non_empty_transaction_from of Destination.t
   | Internal_operation_replay of
@@ -115,14 +116,19 @@ let () =
     `Temporary
     ~id:"operation.update_consensus_key_on_unregistered_delegate"
     ~title:"Update consensus key on an unregistered delegate"
-    ~description:"Cannot update consensus key an unregistered delegate."
-    ~pp:(fun ppf c ->
+    ~description:"Cannot update consensus key for an unregistered delegate."
+    ~pp:(fun ppf (delegate, kind) ->
       Format.fprintf
         ppf
-        "Cannot update the consensus key on the unregistered delegate %a."
+        "Cannot update the %a key on the unregistered delegate %a."
+        Operation_repr.pp_consensus_key_kind
+        kind
         Signature.Public_key_hash.pp
-        c)
-    Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+        delegate)
+    Data_encoding.(
+      obj2
+        (req "delegate" Signature.Public_key_hash.encoding)
+        (req "kind" Operation_repr.consensus_key_kind_encoding))
     (function
       | Update_consensus_key_on_unregistered_delegate c -> Some c | _ -> None)
     (fun c -> Update_consensus_key_on_unregistered_delegate c) ;
@@ -1424,13 +1430,14 @@ let apply_manager_operation :
             }
         in
         (ctxt, result, [])
-    | Update_consensus_key {public_key; proof} ->
+    | Update_consensus_key {public_key; proof; kind} ->
         let*! is_registered = Delegate.registered ctxt source in
         let*? () =
           error_unless
             is_registered
-            (Update_consensus_key_on_unregistered_delegate source)
+            (Update_consensus_key_on_unregistered_delegate (source, kind))
         in
+        (* Check proof *)
         let* ctxt =
           match (public_key, proof) with
           | Bls bls_public_key, Some proof ->
@@ -1459,13 +1466,26 @@ let apply_manager_operation :
                   (Signature.check public_key (Bls proof) bytes)
                   (Validate_errors.Manager
                    .Update_consensus_key_with_incorrect_proof
-                     {public_key; proof})
+                     {kind; public_key; proof})
               in
               return ctxt
           | _, _ -> return ctxt
         in
+        (* Register key *)
         let* ctxt =
-          Delegate.Consensus_key.register_update ctxt source public_key
+          match (public_key, kind) with
+          | _, Consensus ->
+              Delegate.Consensus_key.register_update ctxt source public_key
+          | Bls bls_pk, Companion ->
+              Delegate.Consensus_key.register_update_companion
+                ctxt
+                source
+                bls_pk
+          | (Ed25519 _ | Secp256k1 _ | P256 _), Companion ->
+              (* Should not happen if operation has been validated *)
+              tzfail
+                (Validate_errors.Manager.Update_companion_key_not_tz4
+                   {source; public_key})
         in
         return
           ( ctxt,

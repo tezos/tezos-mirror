@@ -155,7 +155,7 @@ let test_consensus_key_storage () =
     let*! err = Consensus_key.register_update ctxt del1.pkh a1.pk in
     Assert.proto_error ~loc:__LOC__ err (function
         | Delegate_consensus_key.Invalid_consensus_key_update_noop c ->
-            c = Cycle_repr.of_int32_exn 4l
+            c = (Cycle_repr.of_int32_exn 4l, Consensus)
         | _ -> false)
   in
   let* () =
@@ -189,7 +189,7 @@ let test_consensus_key_storage () =
     let*! err = Consensus_key.register_update ctxt del1.pkh a1.pk in
     Assert.proto_error ~loc:__LOC__ err (function
         | Delegate_consensus_key.Invalid_consensus_key_update_noop c ->
-            c = Cycle_repr.of_int32_exn 4l
+            c = (Cycle_repr.of_int32_exn 4l, Consensus)
         | _ -> false)
   in
   let* ctxt = Consensus_key.register_update ctxt del1.pkh a2.pk in
@@ -219,7 +219,7 @@ let test_consensus_key_storage () =
     let*! err = Consensus_key.register_update ctxt del1.pkh a2.pk in
     Assert.proto_error ~loc:__LOC__ err (function
         | Delegate_consensus_key.Invalid_consensus_key_update_noop c ->
-            c = Cycle_repr.of_int32_exn 5l
+            c = (Cycle_repr.of_int32_exn 5l, Consensus)
         | _ -> false)
   in
   let* ctxt = Consensus_key.register_update ctxt del1.pkh a1.pk in
