@@ -717,7 +717,12 @@ module Handlers = struct
           in
           Transactions_per_addr.decrement state.tx_per_address tx_object.from ;
           Tx_object.remove state.tx_object tx_object.hash ;
-          callback (reason :> all_variant)
+          Lwt.dont_wait
+            (fun () -> callback (reason :> all_variant))
+            (fun exn ->
+              Tx_queue_events.callback_error__dont_wait__use_with_care
+                [Error_monad.error_of_exn exn]) ;
+          Lwt.return_unit
         in
         let queue_callback reason =
           let open Lwt_syntax in
@@ -745,7 +750,12 @@ module Handlers = struct
             | Ok () -> return_unit
             | Error errs -> Tx_queue_events.callback_error errs
           in
-          callback (reason :> all_variant)
+          Lwt.dont_wait
+            (fun () -> callback (reason :> all_variant))
+            (fun exn ->
+              Tx_queue_events.callback_error__dont_wait__use_with_care
+                [Error_monad.error_of_exn exn]) ;
+          Lwt.return_unit
         in
         if Compare.Int.(Queue.length state.queue < state.config.max_size) then (
           (* Check number of txs by user in tx_queue. *)
@@ -787,7 +797,7 @@ module Handlers = struct
         protect @@ fun () ->
         match Pending_transactions.pop state.pending txn_hash with
         | Some {pending_callback; _} ->
-            Lwt.async (fun () -> pending_callback `Confirmed) ;
+            let*! () = pending_callback `Confirmed in
             return_unit
         | None -> return_unit)
     | Find {txn_hash} ->
@@ -819,7 +829,7 @@ module Handlers = struct
         in
         state.queue <- Queue.of_seq remaining_transactions ;
 
-        let+ () =
+        let* () =
           send_transactions_batch
             ~keep_alive:state.keep_alive
             ~evm_node_endpoint
@@ -831,10 +841,12 @@ module Handlers = struct
             ~max_lifespan:(Ptime.Span.of_int_s state.config.max_lifespan_s)
             state.pending
         in
-        List.iter
-          (fun {pending_callback; _} ->
-            Lwt.async (fun () -> pending_callback `Dropped))
-          txns
+        let*! () =
+          List.iter_s
+            (fun {pending_callback; _} -> pending_callback `Dropped)
+            txns
+        in
+        return_unit
     | Clear ->
         protect @@ fun () ->
         clear state ;

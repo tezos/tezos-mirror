@@ -39,5 +39,9 @@ val rpc_error : Rpc_encodings.JSONRPC.error -> unit Lwt.t
     tx_object associated to [hash]. *)
 val missing_tx_object : Ethereum_types.hash -> unit Lwt.t
 
+(** [callback_error__dont_wait__use_with_care error] advertises an RPC
+    produced the error [error] without waiting. *)
+val callback_error__dont_wait__use_with_care : tztrace -> unit
+
 (** [callback_error error] advertises an RPC produced the error [error]. *)
 val callback_error : tztrace -> unit Lwt.t
