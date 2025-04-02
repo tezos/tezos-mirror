@@ -573,7 +573,7 @@ Snapshots commands:
 
   snapshot info <snapshot>
     Display information about an EVM node snapshot file.
-    <snapshot>: Snapshot archive file or URL.
+    <snapshot>: Snapshot archive file, URL or stdin (when given `-`).
   
   snapshot export [--data-dir <data-dir>] [--config-file <path>]
       [-s --snapshot-file <path>] [--compress-on-the-fly] [--uncompressed]
@@ -599,7 +599,7 @@ Snapshots commands:
   
   snapshot import <snapshot> [--data-dir <data-dir>] [-f --force]
     Import a snapshot of the EVM node.
-    <snapshot>: Snapshot archive file or URL.
+    <snapshot>: Snapshot archive file, URL or stdin (when given `-`).
     --data-dir <data-dir>: The path to the EVM node data directory.
       Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
       if it exists, or `$HOME/.octez-evm-node` otherwise.
