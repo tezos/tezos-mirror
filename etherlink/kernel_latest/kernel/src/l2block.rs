@@ -41,16 +41,6 @@ impl L2Block {
         }
     }
 
-    #[cfg(test)]
-    pub fn first_transaction_hash(
-        &self,
-    ) -> Option<&tezos_ethereum::transaction::TransactionHash> {
-        match &self {
-            Self::Etherlink(block) => block.transactions.first(),
-            Self::Tezlink(_) => None,
-        }
-    }
-
     pub fn gas_used(&self) -> U256 {
         match self {
             Self::Etherlink(block) => block.gas_used,

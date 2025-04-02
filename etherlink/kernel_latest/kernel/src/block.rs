@@ -631,7 +631,6 @@ mod tests {
     use crate::block_storage;
     use crate::block_storage::read_current_number;
     use crate::blueprint::Blueprint;
-    use crate::blueprint_storage::read_next_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
     use crate::chains::{
@@ -660,6 +659,7 @@ mod tests {
         TransactionHash, TransactionStatus, TransactionType, TRANSACTION_HASH_SIZE,
     };
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
+    use tezos_evm_runtime::extensions::WithGas;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime::Runtime;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -1407,8 +1407,10 @@ mod tests {
             vec![0; 32],
             vec![0; 32],
         );
-        // run is almost full wrt ticks
-        block_in_progress.estimated_ticks_in_run = MAX_ALLOWED_TICKS - 1000;
+        // run is almost full wrt gas consumption in the current run
+        let limits = EvmLimits::default();
+        let cumulative_gas_in_run = max_gas_per_reboot(&limits) - 1000;
+        host.add_execution_gas(cumulative_gas_in_run);
 
         // act
         let result = compute(
@@ -1440,9 +1442,9 @@ mod tests {
             "should not have consumed any gas"
         );
         assert_eq!(
-            block_in_progress.estimated_ticks_in_run,
-            tick_model::constants::MAX_TICKS - 1000,
-            "should not have consumed any tick"
+            host.executed_gas(),
+            cumulative_gas_in_run,
+            "should not have consumed any gas"
         );
         assert_eq!(
             block_in_progress.estimated_ticks_in_block, 0,
@@ -1588,14 +1590,8 @@ mod tests {
 
     const CREATE_LOOP_DATA: &str = "608060405234801561001057600080fd5b506101d0806100206000396000f3fe608060405234801561001057600080fd5b506004361061002b5760003560e01c80630b7d796e14610030575b600080fd5b61004a600480360381019061004591906100c2565b61004c565b005b60005b81811015610083576001600080828254610069919061011e565b92505081905550808061007b90610152565b91505061004f565b5050565b600080fd5b6000819050919050565b61009f8161008c565b81146100aa57600080fd5b50565b6000813590506100bc81610096565b92915050565b6000602082840312156100d8576100d7610087565b5b60006100e6848285016100ad565b91505092915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b60006101298261008c565b91506101348361008c565b925082820190508082111561014c5761014b6100ef565b5b92915050565b600061015d8261008c565b91507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff820361018f5761018e6100ef565b5b60018201905091905056fea26469706673582212200cd6584173dbec22eba4ce6cc7cc4e702e00e018d340f84fc0ff197faf980ad264736f6c63430008150033";
 
-    const LOOP_1300: &str =
-        "0b7d796e0000000000000000000000000000000000000000000000000000000000000514";
-
-    const LOOP_4600: &str =
-        "0b7d796e00000000000000000000000000000000000000000000000000000000000011f8";
-
-    const LOOP_5800: &str =
-        "0b7d796e00000000000000000000000000000000000000000000000000000000000016a8";
+    const LOOP_300: &str =
+        "0b7d796e000000000000000000000000000000000000000000000000000000000000012c";
 
     const TEST_SK: &str =
         "84e147b8bc36d99cc6b1676318a0635d8febc9f02897b0563ad27358589ee502";
@@ -1648,11 +1644,6 @@ mod tests {
     fn test_reboot_many_tx_one_proposal() {
         // init host
         let mut host = MockKernelHost::default();
-        crate::storage::store_minimum_base_fee_per_gas(
-            &mut host,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .unwrap();
 
         // sanity check: no current block
         assert!(
@@ -1673,38 +1664,30 @@ mod tests {
 
         // These transactions are generated with the loop.sol contract, which are:
         // - create the contract
-        // - call `loop(1200)`
-        // - call `loop(4600)`
+        // - call `loop(300)`
+        // - call `loop(300)`
         let create_transaction =
-            create_and_sign_transaction(CREATE_LOOP_DATA, 0, 3_000_000, None, TEST_SK);
+            create_and_sign_transaction(CREATE_LOOP_DATA, 0, 160_000, None, TEST_SK);
         let loop_addr: H160 =
             evm_execution::utilities::create_address_legacy(&sender, &0);
-        let loop_1200_tx =
-            create_and_sign_transaction(LOOP_1300, 1, 900_000, Some(loop_addr), TEST_SK);
-        let loop_4600_tx = create_and_sign_transaction(
-            LOOP_4600,
-            2,
-            2_600_000,
-            Some(loop_addr),
-            TEST_SK,
-        );
+        let loop_300_tx =
+            create_and_sign_transaction(LOOP_300, 1, 230_000, Some(loop_addr), TEST_SK);
+        let loop_300_tx2 =
+            create_and_sign_transaction(LOOP_300, 2, 230_000, Some(loop_addr), TEST_SK);
 
         let proposals = vec![
             wrap_transaction(0, create_transaction),
-            wrap_transaction(1, loop_1200_tx),
-            wrap_transaction(2, loop_4600_tx),
+            wrap_transaction(1, loop_300_tx),
+            wrap_transaction(2, loop_300_tx2),
         ];
 
         store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(proposals)]);
 
         host.reboot_left().expect("should be some reboot left");
 
-        // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
-        let chain_config = dummy_evm_config(EVMVersion::current_test_config());
-        let mut configuration = Configuration {
-            maximum_allowed_ticks: 9_000_000_000,
-            ..dummy_configuration()
-        };
+        let mut chain_config = dummy_evm_config(EVMVersion::current_test_config());
+        chain_config.limits_mut().maximum_gas_limit = 300_000;
+        let mut configuration = dummy_configuration();
 
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         let computation_result =
@@ -1719,13 +1702,32 @@ mod tests {
 
         // test reboot is set
         matches!(computation_result, ComputationResult::RebootNeeded);
+
+        // The block is in progress, therefore it is in the safe storage.
+        let safe_host = SafeStorage { host: &mut host };
+        let bip = read_block_in_progress(&safe_host)
+            .expect("Should be able to read the block in progress")
+            .expect("The reboot context should have a block in progress");
+
+        assert_eq!(
+            bip.number,
+            U256::zero(),
+            "The block in progress should be number 0"
+        );
+
+        assert_eq!(bip.queue_length(), 1, "There should be a transaction left");
+
+        assert_eq!(
+            bip.valid_txs().len(),
+            2,
+            "Two transactions should have been already applied"
+        );
     }
 
     #[test]
     fn test_reboot_many_tx_many_proposal() {
         // init host
         let mut host = MockKernelHost::default();
-        let mut config = Configuration::default();
 
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
@@ -1751,38 +1753,32 @@ mod tests {
 
         // These transactions are generated with the loop.sol contract, which are:
         // - create the contract
-        // - call `loop(1200)`
-        // - call `loop(4600)`
+        // - call `loop(300)`
+        // - call `loop(300)`
         let create_transaction =
-            create_and_sign_transaction(CREATE_LOOP_DATA, 0, 3_000_000, None, TEST_SK);
+            create_and_sign_transaction(CREATE_LOOP_DATA, 0, 160_000, None, TEST_SK);
         let loop_addr: H160 =
             evm_execution::utilities::create_address_legacy(&sender, &0);
-        let loop_1200_tx =
-            create_and_sign_transaction(LOOP_1300, 1, 900_000, Some(loop_addr), TEST_SK);
-        let loop_4600_tx = create_and_sign_transaction(
-            LOOP_4600,
-            2,
-            2_600_000,
-            Some(loop_addr),
-            TEST_SK,
-        );
+
+        let loop_300_tx =
+            create_and_sign_transaction(LOOP_300, 1, 230_000, Some(loop_addr), TEST_SK);
+        let loop_300_tx2 =
+            create_and_sign_transaction(LOOP_300, 2, 230_000, Some(loop_addr), TEST_SK);
 
         let proposals = vec![
             blueprint(vec![wrap_transaction(0, create_transaction)]),
             blueprint(vec![
-                wrap_transaction(1, loop_1200_tx),
-                wrap_transaction(2, loop_4600_tx),
+                wrap_transaction(1, loop_300_tx),
+                wrap_transaction(2, loop_300_tx2),
             ]),
         ];
 
         store_blueprints::<_, EvmChainConfig>(&mut host, proposals);
 
-        // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
-        let chain_config = dummy_evm_config(EVMVersion::current_test_config());
-        let mut configuration = Configuration {
-            maximum_allowed_ticks: 9_000_000_000,
-            ..dummy_configuration()
-        };
+        let mut chain_config = dummy_evm_config(EVMVersion::current_test_config());
+        chain_config.limits_mut().maximum_gas_limit = 300_000;
+        let mut configuration = dummy_configuration();
+
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         let computation_result =
             produce(&mut host, &chain_config, &mut configuration, None, None)
@@ -1811,13 +1807,19 @@ mod tests {
             .expect("Should be able to read the block in progress")
             .expect("The reboot context should have a block in progress");
 
-        assert!(
-            bip.queue_length() > 0,
-            "There should be some transactions left"
+        assert_eq!(
+            bip.number,
+            U256::from(1),
+            "The block in progress should be number 1"
         );
 
-        let _next_blueprint = read_next_blueprint(&mut host, &mut config)
-            .expect("The next blueprint should be available");
+        assert_eq!(bip.queue_length(), 1, "There should be a transaction left");
+
+        assert_eq!(
+            bip.valid_txs().len(),
+            1,
+            "One transaction should have been already applied"
+        );
     }
 
     #[test]
@@ -1889,92 +1891,6 @@ mod tests {
             .expect("Should have found receipt");
         assert_eq!(TransactionStatus::Success, receipt.status);
         assert_eq!(Some(expected_created_contract), receipt.contract_address);
-    }
-
-    #[test]
-    fn test_non_retriable_transaction_are_marked_as_failed() {
-        // init host
-        let mut host = MockKernelHost::default();
-        crate::storage::store_minimum_base_fee_per_gas(
-            &mut host,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .unwrap();
-
-        //provision sender account
-        let sender = H160::from_str(TEST_ADDR).unwrap();
-        let sender_initial_balance = U256::from(10000000000000000000u64);
-        let mut evm_account_storage = init_account_storage().unwrap();
-        set_balance(
-            &mut host,
-            &mut evm_account_storage,
-            &sender,
-            sender_initial_balance,
-        );
-
-        // These transactions are generated with the loop.sol contract, which are:
-        // - create the contract
-        // - call `loop(1200)`
-        // - call `loop(5800)`
-        let create_transaction =
-            create_and_sign_transaction(CREATE_LOOP_DATA, 0, 3_000_000, None, TEST_SK);
-        let loop_addr: H160 =
-            evm_execution::utilities::create_address_legacy(&sender, &0);
-        let loop_5800_tx = create_and_sign_transaction(
-            LOOP_5800,
-            1,
-            4_000_000,
-            Some(loop_addr),
-            TEST_SK,
-        );
-
-        let proposals_first_reboot = vec![wrap_transaction(0, create_transaction)];
-
-        store_inbox_blueprint(&mut host, blueprint(proposals_first_reboot)).unwrap();
-
-        // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
-        let chain_config = dummy_evm_config(EVMVersion::current_test_config());
-        let mut configuration = Configuration {
-            maximum_allowed_ticks: 9_000_000_000,
-            ..dummy_configuration()
-        };
-        // sanity check: no current block
-        assert!(
-            block_storage::read_current_number(&host).is_err(),
-            "Should not have found current block number"
-        );
-        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
-        produce(&mut host, &chain_config, &mut configuration, None, None)
-            .expect("Should have produced");
-
-        assert!(
-            block_storage::read_current_number(&host).is_ok(),
-            "Should have found a block"
-        );
-
-        // We start a new proposal, calling produce again simulates a reboot.
-
-        let proposals_second_reboot = vec![wrap_transaction(2, loop_5800_tx)];
-
-        store_inbox_blueprint(&mut host, blueprint(proposals_second_reboot)).unwrap();
-        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
-
-        produce(&mut host, &chain_config, &mut configuration, None, None)
-            .expect("Should have produced");
-
-        let block = block_storage::read_current(&mut host, &ChainFamily::Evm)
-            .expect("Should have found a block");
-        let transaction = block.first_transaction_hash();
-        let failed_loop_hash = transaction.expect("There should have been a transaction");
-        let failed_loop_status =
-            storage::read_transaction_receipt_status(&mut host, failed_loop_hash)
-                .expect("There should have been a receipt");
-
-        assert_eq!(
-            failed_loop_status,
-            TransactionStatus::Failure,
-            "The transaction should have failed"
-        )
     }
 
     // Comment out `ignore` when resigning the dummy transactions

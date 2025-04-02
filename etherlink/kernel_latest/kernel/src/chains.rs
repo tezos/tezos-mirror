@@ -344,6 +344,10 @@ impl EvmChainConfig {
         &self.limits
     }
 
+    pub fn limits_mut(&mut self) -> &mut EvmLimits {
+        &mut self.limits
+    }
+
     pub fn get_evm_config(&self) -> &evm_execution::Config {
         &self.evm_config
     }
