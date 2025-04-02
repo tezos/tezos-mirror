@@ -725,7 +725,7 @@ module Handler = struct
       attestations
       ctxt
       cctxt
-      block_info
+      ~attested_level:block_level
 
   let process_block ctxt cctxt proto_parameters finalized_shell_header
       finalized_block_hash =

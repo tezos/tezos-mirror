@@ -5,9 +5,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [inject_entrapment_evidences plugin attestations node_ctxt rpc_ctxt block]
+(** [inject_entrapment_evidences plugin attestations node_ctxt rpc_ctxt attested_level]
     processes and injects trap evidence retrieving traps from a
-    specific published level according to the [block]'s level,
+    specific published level according to the [attested_level],
     filtering them to identify injectable ones.
     It then injects an entrapment evidence for each injectable trap
     that is actually attested in [attestations].
@@ -15,8 +15,7 @@
     Guarded by [proto_parameters.incentives_enable]. *)
 val inject_entrapment_evidences :
   (module Dal_plugin.T
-     with type block_info = 'block
-      and type attestation_operation = 'attestation_operation
+     with type attestation_operation = 'attestation_operation
       and type dal_attestation = 'dal_attestation) ->
   (int
   * Signature.public_key_hash option
@@ -25,5 +24,5 @@ val inject_entrapment_evidences :
   list ->
   Node_context.t ->
   Rpc_context.t ->
-  'block ->
+  attested_level:int32 ->
   unit tzresult Lwt.t

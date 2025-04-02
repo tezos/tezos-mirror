@@ -56,15 +56,12 @@ let filter_injectable_traps attestation_map traps =
 
    Guarded by [proto_parameters.incentives_enable].
 *)
-let inject_entrapment_evidences
-    (type block_info attestation_operation dal_attestation)
+let inject_entrapment_evidences (type attestation_operation dal_attestation)
     (module Plugin : Dal_plugin.T
-      with type block_info = block_info
-       and type attestation_operation = attestation_operation
+      with type attestation_operation = attestation_operation
        and type dal_attestation = dal_attestation) attestations node_ctxt
-    rpc_ctxt block =
+    rpc_ctxt ~attested_level =
   let open Lwt_result_syntax in
-  let attested_level = (Plugin.block_shell_header block).level in
   let*? proto_parameters =
     Node_context.get_proto_parameters node_ctxt ~level:(`Level attested_level)
   in
