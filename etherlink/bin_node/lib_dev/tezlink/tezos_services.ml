@@ -372,6 +372,17 @@ module Imported_services = struct
         Block_hash.t * Time.Protocol.t )
       Constants_services.RPC_service.t =
     import_service Tezos_shell_services.Monitor_services.S.bootstrapped
+
+  let _monitor_heads :
+      ( [`GET],
+        unit,
+        unit * chain,
+        < protocols : Protocol_hash.t list
+        ; next_protocols : Protocol_hash.t list >,
+        unit,
+        Block_hash.t * Block_header.t )
+      Tezos_rpc.Service.t =
+    Tezos_shell_services.Monitor_services.S.heads
 end
 
 let chain_directory_path = Tezos_shell_services.Chain_services.path
