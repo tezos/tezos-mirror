@@ -17,7 +17,6 @@ use tezos_smart_rollup_constants::riscv::SBI_FIRMWARE_TEZOS;
 
 use self::addr::VirtAddr;
 use self::error::Error;
-use self::memory::BREAK_SIZE;
 use self::memory::STACK_SIZE;
 use super::Pvm;
 use super::PvmHooks;
@@ -357,13 +356,26 @@ where
 
         // Setup heap addresses
         let program_end = self.system_state.program.end;
-        let heap_start = (program_end + BREAK_SIZE)
+        let heap_start = program_end
             .align_up(PAGE_SIZE)
             .ok_or(MachineError::MemoryTooSmall)?;
+
         self.system_state
             .heap
             .write(heap_start..self.system_state.stack_guard.start);
-        self.system_state.heap_next_free.write(heap_start);
+
+        // Mark all memory as allocated. This also has the benefit of initialising the buddy memory
+        // manager properly.
+        self.machine_state
+            .core
+            .main_memory
+            .allocate_pages(Some(0), MC::TOTAL_BYTES, true)?;
+
+        // Make sure only the heap can be used for allocation by the user kernel.
+        self.machine_state.core.main_memory.deallocate_pages(
+            self.system_state.heap.start.to_machine_address(),
+            (self.system_state.heap.end - self.system_state.heap.start) as usize,
+        )?;
 
         Ok(())
     }
@@ -388,9 +400,7 @@ struct_layout! {
         exited: Atom<bool>,
         exit_code: Atom<u64>,
         program: Atom<Range<VirtAddr>>,
-        program_break: Atom<VirtAddr>,
         heap: Atom<Range<VirtAddr>>,
-        heap_next_free: Atom<VirtAddr>,
         stack_guard: Atom<Range<VirtAddr>>,
     }
 }
@@ -409,14 +419,8 @@ pub struct SupervisorState<M: ManagerBase> {
     /// Program in memory
     program: Cell<Range<VirtAddr>, M>,
 
-    /// Program break
-    program_break: Cell<VirtAddr, M>,
-
     /// Heap memory
     heap: Cell<Range<VirtAddr>, M>,
-
-    /// First free byte in the heap
-    heap_next_free: Cell<VirtAddr, M>,
 
     /// Stack guard
     stack_guard: Cell<Range<VirtAddr>, M>,
@@ -430,10 +434,8 @@ impl<M: ManagerBase> SupervisorState<M> {
             exited: space.exited,
             exit_code: space.exit_code,
             program: space.program,
-            program_break: space.program_break,
             stack_guard: space.stack_guard,
             heap: space.heap,
-            heap_next_free: space.heap_next_free,
         }
     }
 
@@ -447,10 +449,8 @@ impl<M: ManagerBase> SupervisorState<M> {
             exited: self.exited.struct_ref::<F>(),
             exit_code: self.exit_code.struct_ref::<F>(),
             program: self.program.struct_ref::<F>(),
-            program_break: self.program_break.struct_ref::<F>(),
             stack_guard: self.stack_guard.struct_ref::<F>(),
             heap: self.heap.struct_ref::<F>(),
-            heap_next_free: self.heap_next_free.struct_ref::<F>(),
         }
     }
 
@@ -629,7 +629,7 @@ impl<M: ManagerBase> SupervisorState<M> {
             SIGALTSTACK => dispatch2!(sigaltstack, core),
             RT_SIGACTION => dispatch4!(rt_sigaction, core),
             RT_SIGPROCMASK => dispatch4!(rt_sigprocmask, core),
-            BRK => dispatch1!(brk, core),
+            BRK => dispatch0!(brk),
             MMAP => dispatch4!(mmap, core),
             MPROTECT => dispatch3!(mprotect, core),
             MUNMAP => dispatch2!(munmap, core),
@@ -809,10 +809,8 @@ impl<M: ManagerClone> Clone for SupervisorState<M> {
             exited: self.exited.clone(),
             exit_code: self.exit_code.clone(),
             program: self.program.clone(),
-            program_break: self.program_break.clone(),
             stack_guard: self.stack_guard.clone(),
             heap: self.heap.clone(),
-            heap_next_free: self.heap_next_free.clone(),
         }
     }
 }
@@ -886,6 +884,13 @@ mod tests {
             F,
             MemLayout
         );
+        machine_state.reset();
+
+        // Make sure everything is readable and writable. Otherwise, we'd get access faults.
+        machine_state
+            .main_memory
+            .protect_pages(0, MemLayout::TOTAL_BYTES, Permissions::ReadWrite)
+            .unwrap();
 
         for fd in [0i32, 1, 2] {
             let mut supervisor_state = create_state!(SupervisorState, SupervisorStateLayout, F);
@@ -938,6 +943,14 @@ mod tests {
             F,
             MemLayout
         );
+        machine_state.reset();
+
+        // Make sure everything is readable and writable. Otherwise, we'd get access faults.
+        machine_state
+            .main_memory
+            .protect_pages(0, MemLayout::TOTAL_BYTES, Permissions::ReadWrite)
+            .unwrap();
+
         let mut supervisor_state = create_state!(SupervisorState, SupervisorStateLayout, F);
 
         // System call number

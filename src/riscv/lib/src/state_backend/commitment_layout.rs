@@ -27,6 +27,12 @@ pub trait CommitmentLayout: Layout {
     fn state_hash<M: ManagerSerialise>(state: AllocatedOf<Self, M>) -> Result<Hash, HashError>;
 }
 
+impl<T: CommitmentLayout> CommitmentLayout for Box<T> {
+    fn state_hash<M: ManagerSerialise>(state: AllocatedOf<Self, M>) -> Result<Hash, HashError> {
+        T::state_hash(*state)
+    }
+}
+
 impl<T> CommitmentLayout for Atom<T>
 where
     T: serde::Serialize + ConstDefault + 'static,

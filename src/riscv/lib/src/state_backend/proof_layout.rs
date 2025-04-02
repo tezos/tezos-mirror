@@ -237,6 +237,23 @@ pub trait ProofLayout: Layout {
     ) -> Result<Hash, PartialHashError>;
 }
 
+impl<T: ProofLayout> ProofLayout for Box<T> {
+    fn to_merkle_tree(state: RefProofGenOwnedAlloc<Self>) -> Result<MerkleTree, HashError> {
+        T::to_merkle_tree(*state)
+    }
+
+    fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
+        T::from_proof(proof).map(Box::new)
+    }
+
+    fn partial_state_hash(
+        state: RefVerifierAlloc<Self>,
+        proof: ProofTree,
+    ) -> Result<Hash, PartialHashError> {
+        T::partial_state_hash(*state, proof)
+    }
+}
+
 impl<T> ProofLayout for Atom<T>
 where
     T: serde::Serialize + serde::de::DeserializeOwned + ConstDefault + 'static,
