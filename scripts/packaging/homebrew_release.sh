@@ -12,59 +12,48 @@ set -ue
 # be set accordingly but the CI.
 BUCKET="$GCP_LINUX_PACKAGES_BUCKET"
 
-# set version
-
-. ./scripts/version.sh
-. ./scripts/ci/octez-release.sh
-
 # fetch tags for releases
 git fetch -q --tags
 
-if [ -n "${gitlab_release_no_v:-}" ]; then
-  VERSION=$gitlab_release_no_v
-elif [ -n "${CI_COMMIT_TAG:-}" ]; then
-  VERSION=$(date +'%Y%m%d%H%M')+$CI_COMMIT_TAG
+if [ -z "${CI:-}" ]; then
+  TIMESTAMP=$(date '+%Y%m%d%H%M')
+  CI_COMMIT_SHORT_SHA=$(git rev-parse --short HEAD)
+  CI_COMMIT_REF_NAME=$(git rev-parse --abbrev-ref HEAD)
+  CI_COMMIT_TAG=$(git describe --exact-match --tags 2> /dev/null || git rev-parse --short HEAD)
 else
-  VERSION=$(date +'%Y%m%d%H%M')+$CI_COMMIT_SHORT_SHA
+  TIMESTAMP="$(date -d "$CI_PIPELINE_CREATED_AT" '+%Y%m%d%H%M')"
 fi
 
-# prepare target dir
+# set $VERSION ( for release* branches ) and $RELEASETYPE
+. scripts/ci/octez-packages-version.sh
 
-if [ -n "${gitlab_release_no_v:-}" ]; then
-  # if it's a release tag, then it can be a RC release or a final release
-  if [ -n "${gitlab_release_rc_version}" ]; then
-    # Release candidate
-    TARGETDIR="public/homebrew/RC/Formula"
-  else
-    # Release
-    TARGETDIR="public/homebrew/Formula"
-  fi
-else
-  if [ "$CI_COMMIT_REF_PROTECTED" = "false" ]; then
-    if [ "$CI_COMMIT_REF_NAME" = "RC" ]; then
-      echo "Cannot create a repository for a branch named 'RC'"
-      exit 1
-    else
-      # Branch is not protected, this is for testing ordinary MRs
-      TARGETDIR="public/homebrew/$CI_COMMIT_REF_NAME/Formula"
-    fi
-  else
-    # For protected branches that are not release, we allow
-    # a repository only for master.
-    if [ "$CI_COMMIT_REF_NAME" = "master" ]; then
-      TARGETDIR="public/homebrew/master/Formula"
-    else
-      if [ -n "${CI_COMMIT_TAG:-}" ]; then
-        TARGETDIR="public/homebrew/${CI_COMMIT_TAG}/Formula"
-      else
-        echo "Cannot create a repository for a protected branch that is not associated to a tag or master"
-        exit 1
-      fi
-    fi
-  fi
-fi
+case "$RELEASETYPE" in
+ReleaseCandidate | TestReleaseCandidate)
+  TARGETDIR="public/homebrew/RC/Formula"
+  ;;
+Release | TestRelease)
+  TARGETDIR="public/homebrew/Formula"
+  ;;
+Master)
+  VERSION="$TIMESTAMP+$CI_COMMIT_SHORT_SHA"
+  TARGETDIR="public/homebrew/master/Formula"
+  ;;
+SoftRelease)
+  VERSION="$TIMESTAMP+${CI_COMMIT_TAG:-}"
+  TARGETDIR="public/homebrew/${CI_COMMIT_TAG}/Formula"
+  ;;
+TestBranch)
+  VERSION="$TIMESTAMP+$CI_COMMIT_SHORT_SHA"
+  TARGETDIR="public/homebrew/$CI_COMMIT_REF_NAME/Formula"
+  ;;
+*)
+  echo "Cannot create a repository for this branch"
+  exit 1
+  ;;
+esac
 
 # prepare formula
+echo "Preparing homebrew formula $VERSION -> $TARGETDIR"
 
 mkdir -p "$TARGETDIR"
 
