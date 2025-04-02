@@ -277,6 +277,8 @@ module Delegate : sig
     voting_info : Vote.delegate_info;
     active_consensus_key : Signature.Public_key_hash.t;
     pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
+    active_companion_key : Bls.Public_key_hash.t option;
+    pending_companion_keys : (Cycle.t * Bls.Public_key_hash.t) list;
   }
 
   type stake = {frozen : Tez.t; weighted_delegated : Tez.t}
@@ -318,6 +320,9 @@ module Delegate : sig
 
   val consensus_key :
     t -> public_key_hash -> Delegate_services.consensus_keys_info tzresult Lwt.t
+
+  val companion_key :
+    t -> public_key_hash -> Delegate_services.companion_keys_info tzresult Lwt.t
 
   val participation :
     t -> public_key_hash -> Delegate.For_RPC.participation_info tzresult Lwt.t

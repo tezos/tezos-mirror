@@ -51,6 +51,7 @@
     { "active":
         { "pkh": "[PUBLIC_KEY_HASH]",
           "pk": "[PUBLIC_KEY]" } },
+  "companion_key": { "active": null },
   "stakers":
     [ { "staker": "[PUBLIC_KEY_HASH]",
         "frozen_deposits": "200000000000" } ],
@@ -79,6 +80,14 @@ false
 
 ./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/voting_power'
 "4000000000000"
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/consensus_key'
+{ "active":
+    { "pkh": "[PUBLIC_KEY_HASH]",
+      "pk": "[PUBLIC_KEY]" } }
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/companion_key'
+{ "active": null }
 
 ./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
 Fatal error:
@@ -124,4 +133,16 @@ Fatal error:
 ./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/voting_power'
 Fatal error:
   Command failed: The provided public key hash ([PUBLIC_KEY_HASH]) is not the address of a registered delegate. If you own this account and want to register it as a delegate, use a delegation operation to delegate the account to itself.
+  
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/consensus_key'
+Fatal error:
+  Command failed: Storage error:
+                    Missing key 'contracts/index/0000b443c2c85e0aeb6a4c0a37783f4d8251a956e8ad/consensus_key/active'.
+  
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/companion_key'
+Fatal error:
+  Command failed: Storage error:
+                    Missing key 'contracts/index/0000b443c2c85e0aeb6a4c0a37783f4d8251a956e8ad/consensus_key/active'.
   

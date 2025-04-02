@@ -143,6 +143,7 @@ This sequence of operations was run:
     { "active":
         { "pkh": "[PUBLIC_KEY_HASH]",
           "pk": "[PUBLIC_KEY]" } },
+  "companion_key": { "active": null },
   "stakers":
     [ { "staker": "[PUBLIC_KEY_HASH]",
         "frozen_deposits": "499900000000" } ],
