@@ -19,6 +19,7 @@ use crate::machine_state::mode::Mode;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::registers::XRegister;
 use crate::machine_state::registers::XValue;
+use crate::machine_state::registers::XValue32;
 use crate::parser::XRegisterParsed;
 use crate::parser::instruction::InstrWidth;
 use crate::parser::split_x0;
@@ -59,6 +60,18 @@ pub trait ICB {
 
     /// Type for boolean operations.
     type Bool;
+
+    /// A 32-bit value to be used only in word-width operations.
+    type XValue32: Arithmetic<Self>;
+
+    /// Convert an [`XValue`] to a [`XValue32`].
+    fn narrow(&mut self, value: Self::XValue) -> Self::XValue32;
+
+    /// Sign-extend an [`XValue32`] to an [`XValue`].
+    fn extend_signed(&mut self, value: Self::XValue32) -> Self::XValue;
+
+    /// Zero-extend an [`XValue32`] to an [`XValue`].
+    fn extend_unsigned(&mut self, value: Self::XValue32) -> Self::XValue;
 
     /// Compare two values, given the operation to compare them with.
     fn xvalue_compare(
@@ -168,6 +181,23 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
     }
 
     type Bool = bool;
+
+    type XValue32 = XValue32;
+
+    #[inline(always)]
+    fn narrow(&mut self, value: Self::XValue) -> Self::XValue32 {
+        value as u32
+    }
+
+    #[inline(always)]
+    fn extend_signed(&mut self, value: Self::XValue32) -> Self::XValue {
+        value as i32 as u64
+    }
+
+    #[inline(always)]
+    fn extend_unsigned(&mut self, value: Self::XValue32) -> Self::XValue {
+        value as u64
+    }
 
     #[inline(always)]
     fn xvalue_compare(
