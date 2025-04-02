@@ -344,6 +344,30 @@ let rate_limit_messages worker frame_ts
           shutdown_worker ~reason ~status:Policy worker ;
           return_unit)
 
+let cleanup_rate_limiters_on_close worker =
+  let state = Worker.state worker in
+  match state.rate_limited_ip with
+  | None ->
+      (* Not rate limited *)
+      ()
+  | Some ip ->
+      (* Find if there are other connections/workers for the same IP *)
+      let ip_has_other_workers =
+        List.exists
+          (fun (_conn, w) ->
+            w != worker
+            &&
+            let state = Worker.state w in
+            match state.rate_limited_ip with
+            | None -> false
+            | Some ip' -> Ipaddr.compare ip ip' = 0)
+          (Worker.list table)
+      in
+      if not ip_has_other_workers then
+        (* [worker] is being closed and is the last connection for [ip], we can
+           safely remove the rate limiters for it. *)
+        Ip_table.remove messages_rate_limiter.table ip
+
 let on_frame worker fr frame_ts =
   let open Lwt_syntax in
   let state = Worker.state worker in
@@ -610,6 +634,7 @@ module Handlers = struct
     in
     Stdlib.Hashtbl.iter (fun _id stopper -> stopper ()) subscriptions ;
     Stdlib.Hashtbl.clear subscriptions ;
+    cleanup_rate_limiters_on_close w ;
     return_unit
 end
 
