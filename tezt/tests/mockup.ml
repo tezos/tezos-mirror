@@ -1205,25 +1205,6 @@ let test_create_mockup_config_show_init_roundtrip protocols =
               ]
             else []))
     in
-    (* To fulfill the requirement that [blocks_per_epoch], present in protocols
-       up to O, divides [blocks_per_cycle], we set [blocks_per_cycle] to 1, for
-       simplicity (even if the default value is also 1). *)
-    let updated_dal_parametric =
-      let dal_parametric_constants_succ =
-        JSON.(parametric_constants_succ |-> "dal_parametric")
-      in
-      let constant_blocks_per_epoch =
-        JSON.annotate ~origin:"constant_blocks_per_epoch"
-        @@ `O [("blocks_per_epoch", `Float 1.0)]
-      in
-      let updated_dal =
-        JSON.merge_objects
-          dal_parametric_constants_succ
-          constant_blocks_per_epoch
-      in
-      JSON.annotate ~origin:"updated_dal_parametric"
-      @@ `O [("dal_parametric", JSON.unannotate updated_dal)]
-    in
     (* These are the mockup specific protocol parameters as per [src/proto_alpha/lib_client/mockup.ml] *)
     let mockup_constants : JSON.t =
       JSON.annotate ~origin:"mockup_constants"
@@ -1275,12 +1256,6 @@ let test_create_mockup_config_show_init_roundtrip protocols =
                ( "adaptive_rewards_params",
                  JSON.unannotate new_adaptive_rewards_params );
              ]
-    in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6923
-       remove when `blocks_per_epoch` is not used anymore in tests *)
-    let parametric_constants_succ =
-      if Protocol.number protocol > 018 then parametric_constants_succ
-      else JSON.merge_objects parametric_constants_succ updated_dal_parametric
     in
     return
       JSON.(

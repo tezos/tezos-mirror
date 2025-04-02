@@ -34,7 +34,6 @@ module Parameters : sig
     number_of_slots : int;
     attestation_lag : int;
     attestation_threshold : int;
-    blocks_per_epoch : int;
   }
 
   val parameter_file : Protocol.t -> string Lwt.t
