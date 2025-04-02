@@ -18,6 +18,7 @@ use crate::machine_state::mode::Mode;
 use crate::program::Program;
 use crate::pvm::common::PvmHooks;
 use crate::pvm::common::PvmStatus;
+use crate::state::NewState;
 use crate::state_backend;
 use crate::state_backend::AllocatedOf;
 use crate::state_backend::owned_backend::Owned;
@@ -183,8 +184,7 @@ impl<M: state_backend::ManagerBase> NodePvm<M> {
 impl NodePvm {
     /// Construct an empty PVM state.
     pub fn empty() -> Self {
-        let space = Owned::allocate::<NodePvmLayout>();
-        Self::bind(space)
+        Self::new(&mut Owned)
     }
 
     /// Compute the root hash of the PVM state.
@@ -229,6 +229,17 @@ impl PartialEq for NodePvm {
 }
 
 impl Eq for NodePvm {}
+
+impl<M: state_backend::ManagerBase> NewState<M> for NodePvm<M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: state_backend::ManagerAlloc,
+    {
+        Self {
+            state: Box::new(NodePvmState::<M>::new(manager, InterpretedBlockBuilder)),
+        }
+    }
+}
 
 #[derive(Error, Debug)]
 pub enum PvmStorageError {

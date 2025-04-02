@@ -24,6 +24,7 @@ mod proxy;
 
 pub use proxy::BuddyLayoutProxy;
 
+use crate::state::NewState;
 use crate::state_backend::CommitmentLayout;
 use crate::state_backend::FnManager;
 use crate::state_backend::ManagerBase;
@@ -48,23 +49,8 @@ pub trait BuddyLayout: CommitmentLayout + ProofLayout {
         F: FnManager<Ref<'a, M>>;
 }
 
-impl<B: BuddyLayout> BuddyLayout for Box<B> {
-    type Buddy<M: ManagerBase> = Box<B::Buddy<M>>;
-
-    fn bind<M: ManagerBase>(space: Self::Allocated<M>) -> Self::Buddy<M> {
-        Box::new(B::bind(*space))
-    }
-
-    fn struct_ref<'a, F, M: ManagerBase>(space: &'a Self::Buddy<M>) -> Self::Allocated<F::Output>
-    where
-        F: FnManager<Ref<'a, M>>,
-    {
-        Box::new(B::struct_ref::<F, M>(space.as_ref()))
-    }
-}
-
 /// Buddy-style memory manager
-pub trait Buddy<M: ManagerBase> {
+pub trait Buddy<M: ManagerBase>: NewState<M> {
     /// Number of pages being managed
     const PAGES: u64;
 
@@ -109,71 +95,6 @@ pub trait Buddy<M: ManagerBase> {
     fn clone(&self) -> Self
     where
         M: ManagerClone;
-}
-
-impl<B, M> Buddy<M> for Box<B>
-where
-    B: Buddy<M>,
-    M: ManagerBase,
-{
-    const PAGES: u64 = B::PAGES;
-
-    fn allocate(&mut self, pages: u64) -> Option<u64>
-    where
-        M: ManagerReadWrite,
-    {
-        self.as_mut().allocate(pages)
-    }
-
-    fn allocate_fixed(&mut self, idx: u64, pages: u64, replace: bool) -> Option<()>
-    where
-        M: ManagerReadWrite,
-    {
-        self.as_mut().allocate_fixed(idx, pages, replace)
-    }
-
-    fn deallocate(&mut self, idx: u64, pages: u64)
-    where
-        M: ManagerReadWrite,
-    {
-        self.as_mut().deallocate(idx, pages)
-    }
-
-    fn longest_free_sequence(&self) -> u64
-    where
-        M: ManagerRead,
-    {
-        self.as_ref().longest_free_sequence()
-    }
-
-    fn count_free_start(&self) -> u64
-    where
-        M: ManagerRead,
-    {
-        self.as_ref().count_free_start()
-    }
-
-    fn count_free_end(&self) -> u64
-    where
-        M: ManagerRead,
-    {
-        self.as_ref().count_free_end()
-    }
-
-    #[cfg(test)]
-    fn deep_refresh(&mut self)
-    where
-        M: ManagerReadWrite,
-    {
-        self.as_mut().deep_refresh()
-    }
-
-    fn clone(&self) -> Self
-    where
-        M: ManagerClone,
-    {
-        Box::new(self.as_ref().clone())
-    }
 }
 
 #[cfg(test)]

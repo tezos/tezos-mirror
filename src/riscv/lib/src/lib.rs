@@ -17,6 +17,7 @@ pub mod parser;
 pub mod program;
 pub mod pvm;
 pub mod range_utils;
+pub mod state;
 pub mod state_backend;
 pub mod stepper;
 pub mod storage;

@@ -37,15 +37,18 @@ use strum::EnumCount;
 
 use super::AccessType;
 use super::PAGE_OFFSET_WIDTH;
+use crate::array_utils::boxed_from_fn;
 use crate::bits::ones;
 use crate::cache_utils::FenceCounter;
 use crate::machine_state::csregisters::CSRRepr;
 use crate::machine_state::memory::Address;
 use crate::machine_state::mode::Mode;
+use crate::state::NewState;
 use crate::state_backend::AllocatedOf;
 use crate::state_backend::Atom;
 use crate::state_backend::Cell;
 use crate::state_backend::FnManager;
+use crate::state_backend::ManagerAlloc;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerClone;
 use crate::state_backend::ManagerRead;
@@ -178,6 +181,21 @@ impl<M: ManagerBase> Cached<M> {
             Some(self.phys_page.read() | virt_offset)
         } else {
             None
+        }
+    }
+}
+
+impl<M: ManagerBase> NewState<M> for Cached<M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        Self {
+            mode: Cell::new(manager),
+            satp: Cell::new(manager),
+            virt_page: Cell::new(manager),
+            phys_page: Cell::new(manager),
+            fence_counter: Cell::new(manager),
         }
     }
 }
@@ -315,6 +333,18 @@ impl<M: ManagerBase> AccessCache<M> {
     }
 }
 
+impl<M: ManagerBase> NewState<M> for AccessCache<M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        Self {
+            fence_counter: Cell::new(manager),
+            entries: boxed_from_fn(|| Cached::new(manager)),
+        }
+    }
+}
+
 impl<M: ManagerClone> Clone for AccessCache<M> {
     fn clone(&self) -> Self {
         Self {
@@ -421,6 +451,17 @@ impl<M: ManagerBase> TranslationCache<M> {
     {
         let access_type_index = access_type_index(access_type);
         self.entries[access_type_index].cache_translation(satp, mode, virt_addr, phys_addr);
+    }
+}
+
+impl<M: ManagerBase> NewState<M> for TranslationCache<M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        Self {
+            entries: NewState::new(manager),
+        }
     }
 }
 

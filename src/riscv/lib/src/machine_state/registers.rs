@@ -12,6 +12,7 @@ use arbitrary_int::u5;
 
 use crate::default::ConstDefault;
 use crate::machine_state::backend;
+use crate::state::NewState;
 
 /// Integer register index
 #[allow(non_camel_case_types)] // To make names consistent with specification
@@ -260,6 +261,17 @@ impl<M: backend::ManagerBase> XRegisters<M> {
     {
         for i in 0..31 {
             self.registers.write(i, XValue::default());
+        }
+    }
+}
+
+impl<M: backend::ManagerBase> NewState<M> for XRegisters<M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: backend::ManagerAlloc,
+    {
+        XRegisters {
+            registers: backend::Cells::new(manager),
         }
     }
 }
@@ -571,6 +583,16 @@ pub struct FRegisters<M: backend::ManagerBase> {
 }
 
 impl<M: backend::ManagerBase> FRegisters<M> {
+    /// Allocate a new floating-point registers state.
+    pub fn new(manager: &mut M) -> Self
+    where
+        M: backend::ManagerAlloc,
+    {
+        Self {
+            registers: backend::Cells::new(manager),
+        }
+    }
+
     /// Bind the floating-point register space to the allocated space.
     pub fn bind(space: backend::AllocatedOf<FRegistersLayout, M>) -> Self {
         FRegisters { registers: space }

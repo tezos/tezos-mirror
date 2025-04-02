@@ -12,11 +12,13 @@ use crate::machine_state::csregisters::xstatus::MPPValue;
 use crate::machine_state::csregisters::xstatus::MStatus;
 use crate::machine_state::csregisters::xstatus::SPPValue;
 use crate::machine_state::csregisters::xstatus::XLenValue;
+use crate::state::NewState;
 use crate::state_backend::AllocatedOf;
 use crate::state_backend::Atom;
 use crate::state_backend::Cell;
 use crate::state_backend::EffectCell;
 use crate::state_backend::FnManager;
+use crate::state_backend::ManagerAlloc;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerClone;
 use crate::state_backend::ManagerRead;
@@ -104,6 +106,35 @@ impl<M: ManagerBase> MStatusValue<M> {
             sxl: self.sxl.struct_ref::<F>(),
             sbe: self.sbe.struct_ref::<F>(),
             mbe: self.mbe.struct_ref::<F>(),
+        }
+    }
+}
+
+impl<M: ManagerBase> NewState<M> for MStatusValue<M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        MStatusValue {
+            sie: EffectCell::new(manager),
+            mie: EffectCell::new(manager),
+            spie: Cell::new(manager),
+            ube: Cell::new(manager),
+            mpie: Cell::new(manager),
+            spp: Cell::new(manager),
+            mpp: Cell::new(manager),
+            fs: Cell::new(manager),
+            xs: Cell::new(manager),
+            mprv: Cell::new(manager),
+            sum: Cell::new(manager),
+            mxr: Cell::new(manager),
+            tvm: Cell::new(manager),
+            tw: Cell::new(manager),
+            tsr: Cell::new(manager),
+            uxl: Cell::new(manager),
+            sxl: Cell::new(manager),
+            sbe: Cell::new(manager),
+            mbe: Cell::new(manager),
         }
     }
 }

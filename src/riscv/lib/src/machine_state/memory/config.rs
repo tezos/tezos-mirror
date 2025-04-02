@@ -9,14 +9,44 @@ use super::protection::PagePermissions;
 #[cfg(feature = "supervisor")]
 use super::protection::PagePermissionsLayout;
 use super::state::MemoryImpl;
+use crate::state::NewState;
 use crate::state_backend::AllocatedOf;
 use crate::state_backend::DynArray;
+use crate::state_backend::DynCells;
 use crate::state_backend::FnManager;
+use crate::state_backend::ManagerAlloc;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::Ref;
 
 /// State layout for the memory component
 pub struct MemoryConfig<const PAGES: usize, const TOTAL_BYTES: usize>;
+
+impl<const PAGES: usize, const TOTAL_BYTES: usize, B, M> NewState<M>
+    for MemoryImpl<PAGES, TOTAL_BYTES, B, M>
+where
+    B: NewState<M>,
+    M: ManagerBase,
+{
+    fn new(manager: &mut M) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        #[cfg(not(feature = "supervisor"))]
+        return MemoryImpl {
+            data: DynCells::new(manager),
+            _pd: std::marker::PhantomData,
+        };
+
+        #[cfg(feature = "supervisor")]
+        MemoryImpl {
+            data: DynCells::new(manager),
+            readable_pages: PagePermissions::new(manager),
+            writable_pages: PagePermissions::new(manager),
+            executable_pages: PagePermissions::new(manager),
+            allocated_pages: B::new(manager),
+        }
+    }
+}
 
 impl<const PAGES: usize, const TOTAL_BYTES: usize> super::MemoryConfig
     for MemoryConfig<PAGES, TOTAL_BYTES>

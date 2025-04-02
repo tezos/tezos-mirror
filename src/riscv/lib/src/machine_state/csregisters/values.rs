@@ -16,6 +16,7 @@ use super::effects::NoEffect;
 use super::effects::handle_csr_effect;
 use super::root::RootCSRegister;
 use crate::bits::Bits64;
+use crate::state::NewState;
 use crate::state_backend::AllocatedOf;
 use crate::state_backend::Cell;
 use crate::state_backend::CommitmentLayout;
@@ -107,6 +108,20 @@ impl<M: ManagerBase> CSRValues<M> {
     }
 }
 
+impl<M: ManagerBase> NewState<M> for CSRValues<M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        let manager = std::cell::RefCell::new(manager);
+        CSRValuesF::new_with(
+            || MStatusValue::new(*manager.borrow_mut()),
+            || XipCell,
+            || RawValue::new(*manager.borrow_mut()),
+        )
+    }
+}
+
 impl<M: ManagerBase> CSRegisters<M> {
     /// Perform a general read of a CSR.
     #[inline(always)]
@@ -165,7 +180,7 @@ impl Layout for CSRValuesLayout {
 
     fn allocate<M: ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
         let backend = std::cell::RefCell::new(backend);
-        Self::Allocated::new(
+        Self::Allocated::new_with(
             || MStatusLayout::allocate(*backend.borrow_mut()),
             || XipCellLayout::allocate(*backend.borrow_mut()),
             || EffectCellLayout::<CSRRepr>::allocate(*backend.borrow_mut()),
@@ -187,7 +202,7 @@ impl ProofLayout for CSRValuesLayout {
 
     fn from_proof(proof: ProofTree) -> FromProofResult<Self> {
         fn make_absent() -> AllocatedOf<CSRValuesLayout, verify_backend::Verifier> {
-            CSRValuesF::new(
+            CSRValuesF::new_with(
                 || mstatus::MStatusLayoutF {
                     sie: Cell::absent(),
                     mie: Cell::absent(),
@@ -529,7 +544,7 @@ impl<Raw, MStatus, MIP> CSRValuesF<Raw, MStatus, MIP> {
     /// Create a new CSR values structure. The given functions are used to initialise each CSR
     /// value.
     #[inline]
-    fn new(
+    fn new_with(
         make_mstatus: impl FnOnce() -> MStatus,
         make_mip: impl FnOnce() -> MIP,
         mut make_raw: impl FnMut() -> Raw,
@@ -2027,7 +2042,7 @@ mod tests {
     fn fold_ref_mut_consistent() {
         let counter = AtomicUsize::new(0);
 
-        let mut example = CSRValuesF::new(
+        let mut example = CSRValuesF::new_with(
             || counter.fetch_add(1, Ordering::SeqCst),
             || counter.fetch_add(1, Ordering::SeqCst),
             || counter.fetch_add(1, Ordering::SeqCst),
@@ -2045,7 +2060,7 @@ mod tests {
     fn as_ref_consistent() {
         let counter = AtomicUsize::new(0);
 
-        let example = CSRValuesF::new(
+        let example = CSRValuesF::new_with(
             || counter.fetch_add(1, Ordering::SeqCst),
             || counter.fetch_add(1, Ordering::SeqCst),
             || counter.fetch_add(1, Ordering::SeqCst),

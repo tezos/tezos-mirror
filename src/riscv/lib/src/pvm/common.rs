@@ -26,6 +26,7 @@ use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::registers::a0;
 use crate::pvm::sbi;
 use crate::range_utils::less_than_bound;
+use crate::state::NewState;
 use crate::state_backend;
 use crate::state_backend::Atom;
 use crate::state_backend::Cell;
@@ -170,7 +171,32 @@ pub struct Pvm<MC: MemoryConfig, CL: CacheLayouts, B: bcall::Block<MC, M>, M: Ma
     status: Cell<PvmStatus, M>,
 }
 
-impl<MC: MemoryConfig, CL: CacheLayouts, B: bcall::Block<MC, M>, M: ManagerBase> Pvm<MC, CL, B, M> {
+impl<
+    MC: MemoryConfig,
+    CL: machine_state::CacheLayouts,
+    B: bcall::Block<MC, M>,
+    M: state_backend::ManagerBase,
+> Pvm<MC, CL, B, M>
+{
+    /// Allocate a new PVM.
+    pub fn new(manager: &mut M, block_builder: B::BlockBuilder) -> Self
+    where
+        M: state_backend::ManagerAlloc,
+    {
+        Self {
+            machine_state: machine_state::MachineState::new(manager, block_builder),
+            reveal_request: RevealRequest::new(manager),
+            #[cfg(feature = "supervisor")]
+            system_state: linux::SupervisorState::new(manager),
+            version: Cell::new_with(manager, INITIAL_VERSION),
+            status: Cell::new(manager),
+            tick: Cell::new(manager),
+            message_counter: Cell::new(manager),
+            level: Cell::new(manager),
+            level_is_set: Cell::new(manager),
+        }
+    }
+
     /// Bind the block cache to the given allocated state and the given [block builder].
     ///
     /// [block builder]: bcall::Block::BlockBuilder
@@ -432,8 +458,7 @@ impl<MC: MemoryConfig, CL: CacheLayouts, B: bcall::Block<MC, M>, M: ManagerBase>
 
 impl<MC: MemoryConfig, CL: CacheLayouts, B: Block<MC, Owned>> Pvm<MC, CL, B, Owned> {
     pub(crate) fn empty(block_builder: B::BlockBuilder) -> Self {
-        let space = Owned::allocate::<PvmLayout<MC, CL>>();
-        Self::bind(space, block_builder)
+        Self::new(&mut Owned, block_builder)
     }
 
     pub(crate) fn hash(&self) -> Result<Hash, HashError> {

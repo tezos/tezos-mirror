@@ -10,9 +10,11 @@ use serde::Serialize;
 use super::Buddy;
 use super::BuddyLayout;
 use crate::default::ConstDefault;
+use crate::state::NewState;
 use crate::state_backend::Atom;
 use crate::state_backend::Cell;
 use crate::state_backend::FnManager;
+use crate::state_backend::ManagerAlloc;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerClone;
 use crate::state_backend::ManagerDeserialise;
@@ -69,8 +71,8 @@ impl<B: BuddyLayout> BuddyLayout for BuddyBranch2Layout<B> {
     fn bind<M: ManagerBase>(space: Self::Allocated<M>) -> Self::Buddy<M> {
         BuddyBranch2 {
             free_info: space.free_info,
-            left: <Box<B> as BuddyLayout>::bind(space.left),
-            right: <Box<B> as BuddyLayout>::bind(space.right),
+            left: Box::new(B::bind(*space.left)),
+            right: Box::new(B::bind(*space.right)),
         }
     }
 
@@ -80,8 +82,8 @@ impl<B: BuddyLayout> BuddyLayout for BuddyBranch2Layout<B> {
     {
         BuddyBranch2LayoutF {
             free_info: space.free_info.struct_ref::<F>(),
-            left: <Box<B> as BuddyLayout>::struct_ref::<F, M>(&space.left),
-            right: <Box<B> as BuddyLayout>::struct_ref::<F, M>(&space.right),
+            left: Box::new(B::struct_ref::<F, M>(&space.left)),
+            right: Box::new(B::struct_ref::<F, M>(&space.right)),
         }
     }
 }
@@ -106,6 +108,23 @@ impl<B: Buddy<M>, M: ManagerBase> BuddyBranch2<B, M> {
             right_free_start: self.right.count_free_start(),
             right_free_end: self.right.count_free_end(),
         });
+    }
+}
+
+impl<B, M> NewState<M> for BuddyBranch2<B, M>
+where
+    B: NewState<M>,
+    M: ManagerBase,
+{
+    fn new(manager: &mut M) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        Self {
+            free_info: Cell::new(manager),
+            left: Box::new(B::new(manager)),
+            right: Box::new(B::new(manager)),
+        }
     }
 }
 
@@ -282,8 +301,8 @@ where
     {
         Self {
             free_info: self.free_info.clone(),
-            left: self.left.clone(),
-            right: self.right.clone(),
+            left: Box::new(self.left.clone()),
+            right: Box::new(self.right.clone()),
         }
     }
 }

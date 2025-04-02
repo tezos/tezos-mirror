@@ -8,14 +8,15 @@ use super::AllocatedOf;
 use super::Atom;
 use super::Cell;
 use super::FnManager;
+use super::ManagerAlloc;
 use super::ManagerBase;
 use super::ManagerClone;
 use super::ManagerRead;
 use super::ManagerReadWrite;
 use super::ManagerWrite;
 use super::Ref;
-use super::StaticCopy;
 use crate::default::ConstDefault;
+use crate::state::NewState;
 
 /// XXX: Workaround trait for not having enum variants as const-generics
 pub trait EffectGetter {
@@ -33,7 +34,7 @@ pub struct EffectCell<T: 'static, EG, M: ManagerBase> {
     _pd: PhantomData<EG>,
 }
 
-impl<T: ConstDefault + StaticCopy, EG, M: ManagerBase> EffectCell<T, EG, M> {
+impl<T: ConstDefault, EG, M: ManagerBase> EffectCell<T, EG, M> {
     pub fn bind(space: AllocatedOf<EffectCellLayout<T>, M>) -> Self {
         Self {
             inner: space,
@@ -76,6 +77,18 @@ impl<T: Copy, EG: EffectGetter, M: ManagerBase> EffectCell<T, EG, M> {
         M: ManagerReadWrite,
     {
         (self.inner.replace(value), EG::EFFECT)
+    }
+}
+
+impl<T: ConstDefault, EG, M: ManagerBase> NewState<M> for EffectCell<T, EG, M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        Self {
+            inner: Cell::new(manager),
+            _pd: PhantomData,
+        }
     }
 }
 

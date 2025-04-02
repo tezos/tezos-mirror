@@ -19,6 +19,7 @@ use crate::machine_state::backend;
 /// pair with the most recent LR, and LR with the next following SC, in program
 /// order."
 use crate::machine_state::backend::Cell;
+use crate::state::NewState;
 
 pub struct ReservationSet<M: backend::ManagerBase> {
     start_addr: Cell<u64, M>,
@@ -104,6 +105,17 @@ impl<M: backend::ManagerBase> ReservationSet<M> {
         // invalidates any reservation held by this hart.
         self.reset();
         start_addr != UNSET_VALUE && start_addr == align_address(addr, SIZE)
+    }
+}
+
+impl<M: backend::ManagerBase> NewState<M> for ReservationSet<M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: backend::ManagerAlloc,
+    {
+        ReservationSet {
+            start_addr: Cell::new(manager),
+        }
     }
 }
 

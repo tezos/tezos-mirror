@@ -9,6 +9,7 @@ use super::Elem;
 use super::EnrichedValue;
 use super::EnrichedValueLinked;
 use super::FnManager;
+use super::ManagerAlloc;
 use super::ManagerBase;
 use super::ManagerClone;
 use super::ManagerDeserialise;
@@ -19,6 +20,8 @@ use super::ManagerWrite;
 use super::Ref;
 use super::proof_backend::ProofGen;
 use super::proof_backend::merkle::AccessInfoAggregatable;
+use crate::default::ConstDefault;
+use crate::state::NewState;
 
 /// Link a stored value directly with a derived value -
 /// that would either be expensive to compute each time, or cannot
@@ -30,6 +33,17 @@ pub struct EnrichedCell<V: EnrichedValue, M: ManagerBase> {
 }
 
 impl<V: EnrichedValue, M: ManagerBase> EnrichedCell<V, M> {
+    /// Allocate a new enriched cell with the given value.
+    pub fn new_with(manager: &mut M, value: V::E) -> Self
+    where
+        M: ManagerAlloc,
+        V: EnrichedValueLinked,
+    {
+        let region = manager.allocate_region([value]);
+        let cell = M::enrich_cell(region);
+        Self { cell }
+    }
+
     /// Bind this state to the enriched cell.
     pub fn bind(cell: Cell<V::E, M>) -> Self
     where
@@ -93,6 +107,19 @@ impl<V: EnrichedValue, M: ManagerBase> EnrichedCell<V, M> {
     }
 }
 
+impl<V: EnrichedValue, M: ManagerBase> NewState<M> for EnrichedCell<V, M>
+where
+    V: EnrichedValueLinked,
+    V::E: ConstDefault,
+{
+    fn new(manager: &mut M) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        Self::new_with(manager, <V::E as ConstDefault>::DEFAULT)
+    }
+}
+
 impl<V: EnrichedValue, M: ManagerClone> Clone for EnrichedCell<V, M>
 where
     V::E: Clone,
@@ -122,6 +149,17 @@ pub struct Cell<E: 'static, M: ManagerBase> {
 }
 
 impl<E: 'static, M: ManagerBase> Cell<E, M> {
+    /// Allocate a new cell with the given value.
+    pub fn new_with(manager: &mut M, value: E) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        let region = manager.allocate_region([value]);
+        Self {
+            region: Cells::bind(region),
+        }
+    }
+
     /// Bind this state to the single element region.
     pub const fn bind(region: M::Region<E, 1>) -> Self {
         Self {
@@ -141,9 +179,7 @@ impl<E: 'static, M: ManagerBase> Cell<E, M> {
     pub fn into_region(self) -> M::Region<E, 1> {
         self.region.into_region()
     }
-}
 
-impl<E: 'static, M: ManagerBase> Cell<E, M> {
     /// Read the value managed by the cell.
     #[inline(always)]
     pub fn read(&self) -> E
@@ -171,6 +207,15 @@ impl<E: 'static, M: ManagerBase> Cell<E, M> {
         M: ManagerReadWrite,
     {
         self.region.replace(0, value)
+    }
+}
+
+impl<E: ConstDefault, M: ManagerBase> NewState<M> for Cell<E, M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        Self::new_with(manager, E::DEFAULT)
     }
 }
 
@@ -333,6 +378,15 @@ pub struct Cells<E: 'static, const LEN: usize, M: ManagerBase> {
 }
 
 impl<E: 'static, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
+    /// Allocate new cells with the given values.
+    pub fn new_with(manager: &mut M, values: [E; LEN]) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        let region = manager.allocate_region(values);
+        Self { region }
+    }
+
     /// Bind this state to the given region.
     pub const fn bind(region: M::Region<E, LEN>) -> Self {
         Self { region }
@@ -355,9 +409,7 @@ impl<E: 'static, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
     pub fn into_region(self) -> M::Region<E, LEN> {
         self.region
     }
-}
 
-impl<E: 'static, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
     /// Read an element in the region.
     #[inline]
     pub fn read(&self, index: usize) -> E
@@ -405,6 +457,15 @@ impl<E: 'static, const LEN: usize, M: ManagerBase> Cells<E, LEN, M> {
         M: ManagerReadWrite,
     {
         M::region_replace(&mut self.region, index, value)
+    }
+}
+
+impl<E: ConstDefault + 'static, const LEN: usize, M: ManagerBase> NewState<M> for Cells<E, LEN, M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        Self::new_with(manager, [E::DEFAULT; LEN])
     }
 }
 
@@ -552,6 +613,16 @@ impl<const LEN: usize, M: ManagerBase> DynCells<LEN, M> {
         M: ManagerWrite,
     {
         M::dyn_region_write_all(&mut self.region, address, values)
+    }
+}
+
+impl<const LEN: usize, M: ManagerBase> NewState<M> for DynCells<LEN, M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        let region = manager.allocate_dyn_region();
+        Self { region }
     }
 }
 

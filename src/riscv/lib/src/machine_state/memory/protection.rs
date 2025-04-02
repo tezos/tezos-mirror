@@ -3,10 +3,13 @@
 // SPDX-License-Identifier: MIT
 
 use super::Address;
+use crate::array_utils::boxed_from_fn;
+use crate::state::NewState;
 use crate::state_backend::AllocatedOf;
 use crate::state_backend::Atom;
 use crate::state_backend::Cell;
 use crate::state_backend::FnManager;
+use crate::state_backend::ManagerAlloc;
 use crate::state_backend::ManagerBase;
 use crate::state_backend::ManagerClone;
 use crate::state_backend::ManagerDeserialise;
@@ -94,6 +97,17 @@ impl<const PAGES: usize, M: ManagerBase> PagePermissions<PAGES, M> {
             .for_each(|page| {
                 self.pages[page].write(accessible);
             })
+    }
+}
+
+impl<const PAGES: usize, M: ManagerBase> NewState<M> for PagePermissions<PAGES, M> {
+    fn new(manager: &mut M) -> Self
+    where
+        M: ManagerAlloc,
+    {
+        PagePermissions {
+            pages: boxed_from_fn(|| Cell::new(manager)),
+        }
     }
 }
 
