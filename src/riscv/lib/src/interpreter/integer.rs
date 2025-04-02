@@ -96,6 +96,7 @@ pub fn run_sub(
 ///
 /// Relevant RISC-V opcodes:
 /// - SUBW
+/// - C.SUBW
 pub fn run_sub_word(icb: &mut impl ICB, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
     // We do not need to explicitly truncate for the lower bits since wrapping_sub
     // has the same semantics & result on the lower 32 bits irrespective of bit width

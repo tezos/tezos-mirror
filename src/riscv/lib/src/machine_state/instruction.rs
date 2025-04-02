@@ -381,7 +381,6 @@ pub enum OpCode {
     /// Effects are to store the next instruction address in rd and jump to val(rs1).
     Jalr,
     CAddw,
-    CSubw,
 
     // RV64C compressed instructions
     CAddiw,
@@ -624,7 +623,6 @@ impl OpCode {
             Self::Li => Args::run_li,
             Self::Mv => Args::run_mv,
             Self::CAddw => Args::run_caddw,
-            Self::CSubw => Args::run_csubw,
             Self::Nop => Args::run_nop,
             Self::CAddiw => Args::run_caddiw,
             Self::CFld => Args::run_cfld,
@@ -1596,7 +1594,6 @@ impl Args {
     // RV64C compressed instructions
     impl_ci_type!(run_caddiw, non_zero);
     impl_cr_type!(run_caddw);
-    impl_cr_type!(run_csubw);
 
     // RV64C compressed instructions
     impl_fload_type!(run_cfld);
@@ -2219,10 +2216,7 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::CAddw,
                 args: args.into(),
             },
-            InstrCacheable::CSubw(args) => Instruction {
-                opcode: OpCode::CSubw,
-                args: args.into(),
-            },
+            InstrCacheable::CSubw(args) => Instruction::from_ic_csubw(args),
 
             // RV64DC compressed instructions
             InstrCacheable::CFld(args) => Instruction {

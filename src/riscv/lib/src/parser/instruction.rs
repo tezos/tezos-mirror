@@ -635,6 +635,9 @@ pub enum InstrCacheable {
     /// then writes the result to register `rd_rs1`.
     CSub(CRTypeArgs),
     CAddw(CRTypeArgs),
+    /// `C.SUBW` - Subtracts the value in register `rs2` from the value in register `rd_rs1`,
+    /// then sign-extends the lower 32 bits of the difference and writes the result to
+    /// register `rd_rs1`.
     CSubw(CRTypeArgs),
     /// `C.NOP` - Does not change any user-visible state, except for advancing the pc and
     /// incrementing any applicable performance counters. Equivalent to `NOP`.

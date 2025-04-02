@@ -1162,6 +1162,19 @@ impl Instruction {
         }
     }
 
+    /// Convert [`InstrCacheable::CSubw`] according to whether registers are non-zero.
+    ///
+    /// [`InstrCacheable::CSubw`]: crate::parser::instruction::InstrCacheable::CSubw
+    pub(super) fn from_ic_csubw(args: &CRTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match split_x0(args.rd_rs1) {
+            X::X0 => Instruction::new_nop(InstrWidth::Compressed),
+            X::NonZero(rd_rs1) => {
+                Instruction::new_sub_word(rd_rs1, args.rd_rs1, args.rs2, InstrWidth::Compressed)
+            }
+        }
+    }
+
     /// Convert [`InstrCacheable::Addi`] according to whether registers are non-zero.
     ///
     /// [`InstrCacheable::Addi`]: crate::parser::instruction::InstrCacheable::Addi
