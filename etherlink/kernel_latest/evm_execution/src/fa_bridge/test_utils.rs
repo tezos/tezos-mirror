@@ -97,7 +97,6 @@ pub fn deploy_mock_wrapper(
         U256::one(),
         U256::zero(),
         false,
-        1_000_000_000,
         false,
         None,
     )
@@ -143,7 +142,6 @@ pub fn deploy_reentrancy_tester(
         U256::one(),
         U256::zero(),
         false,
-        1_000_000_000,
         false,
         None,
     )
@@ -171,7 +169,6 @@ pub fn run_fa_deposit(
         &EVMVersion::current_test_config(),
         *caller,
         deposit,
-        100_000_000_000,
         None,
         gas_limit,
     )

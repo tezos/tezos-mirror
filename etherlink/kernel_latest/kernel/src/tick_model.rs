@@ -87,19 +87,6 @@ pub mod constants {
     pub const TICKS_PER_DEPOSIT_PARSING: u64 = 1_500_000;
 }
 
-/// Estimation of the number of ticks the kernel can safely spend in the
-/// execution of the opcodes.
-pub fn estimate_remaining_ticks_for_transaction_execution(
-    max_allowed_ticks: u64,
-    ticks: u64,
-    tx_data_size: u64,
-) -> u64 {
-    max_allowed_ticks
-        .saturating_sub(TICKS_FOR_CRYPTO)
-        .saturating_sub(ticks_of_transaction_overhead(tx_data_size))
-        .saturating_sub(ticks)
-}
-
 /// Estimation of the number of ticks used up for executing a transaction
 /// besides executing the opcodes.
 fn ticks_of_transaction_overhead(tx_data_size: u64) -> u64 {
@@ -148,7 +135,7 @@ pub fn ticks_of_valid_transaction(
 /// or fail (if the VM encountered an error).
 fn ticks_of_valid_transaction_ethereum(resulting_ticks: u64, tx_data_size: u64) -> u64 {
     resulting_ticks
-        .saturating_add(constants::TICKS_FOR_CRYPTO)
+        .saturating_add(TICKS_FOR_CRYPTO)
         .saturating_add(ticks_of_transaction_overhead(tx_data_size))
 }
 

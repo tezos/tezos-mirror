@@ -144,7 +144,6 @@ pub fn execute_fa_deposit<'a, Host: Runtime>(
     config: &Config,
     caller: H160,
     deposit: &FaDeposit,
-    _allocated_ticks: u64,
     tracer_input: Option<TracerInput>,
     gas_limit: u64,
 ) -> Result<ExecutionOutcome, EthereumError> {

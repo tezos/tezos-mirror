@@ -15,13 +15,12 @@ use crate::chains::ChainFamily;
 use crate::fees::simulation_add_gas_for_fees;
 use crate::l2block::L2Block;
 use crate::storage::{
-    read_last_info_per_level_timestamp, read_maximum_allowed_ticks,
-    read_sequencer_pool_address, read_tracer_input,
+    read_last_info_per_level_timestamp, read_sequencer_pool_address, read_tracer_input,
 };
-use crate::tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS};
+use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
 use crate::{error::Error, error::StorageError, storage};
 
-use crate::{parsable, parsing, retrieve_chain_id, tick_model};
+use crate::{parsable, parsing, retrieve_chain_id};
 
 use evm::Config;
 use evm_execution::account_storage::account_path;
@@ -463,15 +462,6 @@ impl Evaluation {
         };
 
         let precompiles = precompiles::precompile_set::<Host>(enable_fa_withdrawals);
-        let tx_data_size = self.data.len() as u64;
-        let maximum_allowed_ticks =
-            read_maximum_allowed_ticks(host).unwrap_or(MAX_ALLOWED_TICKS);
-        let allocated_ticks =
-            tick_model::estimate_remaining_ticks_for_transaction_execution(
-                maximum_allowed_ticks,
-                0,
-                tx_data_size,
-            );
 
         let gas_price = if let Some(gas_price) = self.gas_price {
             U256::from(gas_price)
@@ -494,7 +484,6 @@ impl Evaluation {
             gas_price,
             self.value.unwrap_or_default(),
             false,
-            allocated_ticks,
             false,
             tracer_input,
         ) {
@@ -748,8 +737,6 @@ mod tests {
     // call: get (public view)
     const STORAGE_CONTRACT_CALL_GET: &str = "6d4ce63c";
 
-    const DUMMY_ALLOCATED_TICKS: u64 = 1_000_000_000;
-
     fn create_contract<Host>(host: &mut Host) -> H160
     where
         Host: Runtime,
@@ -795,7 +782,6 @@ mod tests {
             gas_price,
             transaction_value,
             false,
-            DUMMY_ALLOCATED_TICKS,
             false,
             None,
         );
