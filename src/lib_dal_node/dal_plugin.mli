@@ -69,8 +69,9 @@ module type T = sig
     Tezos_dal_node_services.Types.proto_parameters tzresult Lwt.t
 
   val get_published_slot_headers :
-    block_info ->
-    (slot_header * operation_application_result) list tzresult Lwt.t
+    block_level:int32 ->
+    Tezos_rpc__RPC_context.generic ->
+    slot_header list tzresult Lwt.t
 
   (** For a given block, returns for each included attestation, as a
       list, its Tenderbake slot, its attester if available in the
@@ -78,12 +79,15 @@ module type T = sig
       exists, its [dal_attestation] to be passed to the [is_attested]
       function. *)
   val get_attestations :
-    block_info ->
+    block_level:int32 ->
+    Tezos_rpc__RPC_context.generic ->
     (int
     * Signature.public_key_hash option
     * attestation_operation
     * dal_attestation option)
     list
+    tzresult
+    Lwt.t
 
   (** [get_committee ctxt ~level] retrieves the DAL committee at [level] from L1 as a
       map that associates to the public key hash [pkh] of the member of

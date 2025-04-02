@@ -226,7 +226,7 @@ val init : Configuration_file.t -> t tzresult Lwt.t
 val add_slot_headers :
   number_of_slots:int ->
   block_level:int32 ->
-  (Dal_plugin.slot_header * Dal_plugin.operation_application_result) list ->
+  Dal_plugin.slot_header list ->
   t ->
   unit tzresult Lwt.t
 

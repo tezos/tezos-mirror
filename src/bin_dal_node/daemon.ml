@@ -502,8 +502,8 @@ module Handler = struct
       attestations ;
     count_per_slot
 
-  let check_attesters_attested node_ctxt parameters ~block_level
-      get_attestations is_attested =
+  let check_attesters_attested node_ctxt parameters ~block_level attestations
+      is_attested =
     let open Lwt_result_syntax in
     let attesters =
       match
@@ -518,7 +518,6 @@ module Handler = struct
       let* committee =
         Node_context.fetch_committee node_ctxt ~level:attestation_level
       in
-      let attestations = get_attestations () in
       let attested_shards_per_slot =
         attested_shards_per_slot
           attestations
@@ -655,7 +654,7 @@ module Handler = struct
       (module Plugin : Dal_plugin.T) =
     let open Lwt_result_syntax in
     let* block_info =
-      Plugin.block_info cctxt ~block:(`Level block_level) ~metadata:`Always
+      Plugin.block_info cctxt ~block:(`Level block_level) ~metadata:`Never
     in
     let* () =
       if supports_refutations ctxt then
@@ -668,7 +667,7 @@ module Handler = struct
           (module Plugin : Dal_plugin.T with type block_info = Plugin.block_info)
       else return_unit
     in
-    let* slot_headers = Plugin.get_published_slot_headers block_info in
+    let* slot_headers = Plugin.get_published_slot_headers ~block_level cctxt in
     let* () =
       Slot_manager.store_slot_headers
         ~number_of_slots:proto_parameters.Types.number_of_slots
@@ -681,24 +680,18 @@ module Handler = struct
          data, post it to gossipsub.  Note that this is done independently
          of the profile. *)
       List.iter_es
-        (fun (slot_header, status) ->
-          match status with
-          | Dal_plugin.Succeeded ->
-              let Dal_plugin.{slot_index; commitment; published_level} =
-                slot_header
-              in
-              let slot_id : Types.slot_id =
-                {slot_level = published_level; slot_index}
-              in
-              Slot_manager.publish_slot_data
-                ctxt
-                ~level_committee:(Node_context.fetch_committee ctxt)
-                ~slot_size:proto_parameters.cryptobox_parameters.slot_size
-                (Node_context.get_gs_worker ctxt)
-                proto_parameters
-                commitment
-                slot_id
-          | Dal_plugin.Failed -> return_unit)
+        (fun Dal_plugin.{slot_index; commitment; published_level} ->
+          let slot_id : Types.slot_id =
+            {slot_level = published_level; slot_index}
+          in
+          Slot_manager.publish_slot_data
+            ctxt
+            ~level_committee:(Node_context.fetch_committee ctxt)
+            ~slot_size:proto_parameters.cryptobox_parameters.slot_size
+            (Node_context.get_gs_worker ctxt)
+            proto_parameters
+            commitment
+            slot_id)
         slot_headers
     in
     let*? dal_attestation = Plugin.dal_attestation block_info in
@@ -718,16 +711,21 @@ module Handler = struct
           Int32.(sub block_level (of_int proto_parameters.attestation_lag))
         (Plugin.is_attested dal_attestation)
     in
+    let* attestations = Plugin.get_attestations ~block_level cctxt in
     let* () =
-      let get_attestations () = Plugin.get_attestations block_info in
       check_attesters_attested
         ctxt
         proto_parameters
         ~block_level
-        get_attestations
+        attestations
         Plugin.is_attested
     in
-    Accuser.inject_entrapment_evidences (module Plugin) ctxt cctxt block_info
+    Accuser.inject_entrapment_evidences
+      (module Plugin)
+      attestations
+      ctxt
+      cctxt
+      ~attested_level:block_level
 
   let process_block ctxt cctxt proto_parameters finalized_shell_header
       finalized_block_hash =

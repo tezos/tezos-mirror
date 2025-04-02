@@ -967,28 +967,19 @@ let add_slot_headers ~number_of_slots ~block_level slot_headers t =
   let slot_header_statuses = t.slot_header_statuses in
   let* waiting =
     List.fold_left_es
-      (fun waiting (slot_header, status) ->
+      (fun waiting slot_header ->
         let Dal_plugin.{slot_index; commitment = _; published_level} =
           slot_header
         in
         (* This invariant should hold. *)
         assert (Int32.equal published_level block_level) ;
         let index = Types.Slot_id.{slot_level = published_level; slot_index} in
-        match status with
-        | Dal_plugin.Succeeded ->
-            let* () =
-              Statuses.add_status
-                slot_header_statuses
-                `Waiting_attestation
-                index
-              |> Errors.to_tzresult
-            in
-            Slot_id_cache.add
-              ~number_of_slots
-              t.finalized_commitments
-              slot_header ;
-            return (SI.add slot_index waiting)
-        | Dal_plugin.Failed -> return waiting)
+        let* () =
+          Statuses.add_status slot_header_statuses `Waiting_attestation index
+          |> Errors.to_tzresult
+        in
+        Slot_id_cache.add ~number_of_slots t.finalized_commitments slot_header ;
+        return (SI.add slot_index waiting))
       SI.empty
       slot_headers
   in
