@@ -308,9 +308,9 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
     ?max_number_of_chunks ?(setup_mode = Setup_proxy)
     ?(force_install_kernel = true) ?whitelist ?maximum_allowed_ticks
-    ?restricted_rpcs ?(enable_dal = false) ?dal_slots
-    ?(enable_multichain = false) ?websockets ?(enable_fast_withdrawal = false)
-    ?enable_tx_queue protocol =
+    ?maximum_gas_per_transaction ?restricted_rpcs ?(enable_dal = false)
+    ?dal_slots ?(enable_multichain = false) ?websockets
+    ?(enable_fast_withdrawal = false) ?enable_tx_queue protocol =
   let _, kernel_installee = Kernel.to_uses_and_tags kernel in
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
@@ -382,6 +382,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
           (Option.bind l1_contracts (fun {sequencer_governance; _} ->
                sequencer_governance))
         ?maximum_allowed_ticks
+        ?maximum_gas_per_transaction
         ~output:output_config
         ~enable_dal
         ~enable_multichain
@@ -532,7 +533,7 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
     ?(additional_uses = []) ?commitment_period ?challenge_window
     ?eth_bootstrap_accounts ?tez_bootstrap_accounts ?whitelist ?da_fee_per_byte
     ?minimum_base_fee_per_gas ?rollup_operator_key ?maximum_allowed_ticks
-    ?restricted_rpcs ~setup_mode ~enable_dal
+    ?maximum_gas_per_transaction ?restricted_rpcs ~setup_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [4] else None) ~enable_multichain
     ?websockets ?enable_fast_withdrawal ?evm_version ?enable_tx_queue f
     protocols =
@@ -584,6 +585,7 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
               ?minimum_base_fee_per_gas
               ?rollup_operator_key
               ?maximum_allowed_ticks
+              ?maximum_gas_per_transaction
               ?restricted_rpcs
               ~admin
               ~setup_mode
@@ -603,8 +605,9 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
 let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?eth_bootstrap_accounts
     ?tez_bootstrap_accounts ?da_fee_per_byte ?minimum_base_fee_per_gas
-    ?whitelist ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs
-    ?websockets ?enable_fast_withdrawal ?evm_version f protocols =
+    ?whitelist ?rollup_operator_key ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?restricted_rpcs ?websockets
+    ?enable_fast_withdrawal ?evm_version f protocols =
   let register ~enable_dal ~enable_multichain : unit =
     register_test
       ~title
@@ -622,6 +625,7 @@ let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
       ?whitelist
       ?rollup_operator_key
       ?maximum_allowed_ticks
+      ?maximum_gas_per_transaction
       ?restricted_rpcs
       ?websockets
       ?enable_fast_withdrawal
@@ -641,9 +645,9 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
     ?additional_uses ?additional_config ?admin ?commitment_period
     ?challenge_window ?eth_bootstrap_accounts ?tez_bootstrap_accounts
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
-    ?rollup_operator_key ?maximum_allowed_ticks ?restricted_rpcs
-    ?max_blueprints_ahead ?websockets ?evm_version ?genesis_timestamp
-    ?enable_tx_queue f protocols =
+    ?rollup_operator_key ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?restricted_rpcs ?max_blueprints_ahead ?websockets ?evm_version
+    ?genesis_timestamp ?enable_tx_queue f protocols =
   let register ~enable_dal ~enable_multichain : unit =
     register_test
       ~title
@@ -661,6 +665,7 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
       ?whitelist
       ?rollup_operator_key
       ?maximum_allowed_ticks
+      ?maximum_gas_per_transaction
       ?restricted_rpcs
       ?websockets
       ?evm_version
@@ -688,8 +693,8 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?eth_bootstrap_accounts
     ?tez_bootstrap_accounts ?da_fee_per_byte ?minimum_base_fee_per_gas
     ?time_between_blocks ?whitelist ?rollup_operator_key ?maximum_allowed_ticks
-    ?restricted_rpcs ?max_blueprints_ahead ?websockets ?evm_version f protocols
-    : unit =
+    ?maximum_gas_per_transaction ?restricted_rpcs ?max_blueprints_ahead
+    ?websockets ?evm_version f protocols : unit =
   register_proxy
     ~title
     ~tags
@@ -706,6 +711,7 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?whitelist
     ?rollup_operator_key
     ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction
     ?restricted_rpcs
     ?websockets
     ?evm_version
@@ -728,6 +734,7 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?whitelist
     ?rollup_operator_key
     ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction
     ?restricted_rpcs
     ?max_blueprints_ahead
     ?websockets
