@@ -4758,44 +4758,53 @@ let test_keep_alive =
       let*@ _block_number = Rpc.block_number evm_node in
       unit)
 
-let test_reboot_out_of_ticks =
+let test_reboot_gas_limit =
   register_proxy
-    ~tags:["evm"; "reboot"; "loop"; "out_of_ticks"; Tag.flaky]
+    ~tags:["evm"; "reboot"; "loop"; "gas_limit"]
     ~title:
-      "Check that the kernel can handle transactions that take too many ticks \
+      "Check that the kernel can handle transactions that take too much gas \
        for a single run"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~maximum_allowed_ticks:9_000_000_000L
+    ~maximum_gas_per_transaction:250_000L
   @@ fun ~protocol:_
-             ~evm_setup:{evm_node; produce_block; sc_rollup_node; node; _} ->
-  (* Retrieves all the messages and prepare them for the current rollup. *)
-  let txs =
-    read_file (kernel_inputs_path ^ "/loops-out-of-ticks")
-    |> String.trim |> String.split_on_char '\n'
-  in
-  (* The first three transactions are sent in a separate block, to handle any nonce issue. *)
-  let first_block, second_block, third_block, fourth_block =
-    match txs with
-    | faucet1 :: faucet2 :: create :: rem ->
-        ([faucet1], [faucet2], [create], rem)
-    | _ ->
-        failwith
-          "The prepared transactions should contain at least 3 transactions"
-  in
-  let* () =
-    Lwt_list.iter_s
-      (fun block ->
-        let* _requests, _receipt, _hashes =
-          send_n_transactions ~produce_block ~evm_node ~wait_for_blocks:5 block
-        in
-        unit)
-      [first_block; second_block; third_block]
-  in
+             ~evm_setup:
+               ({evm_node; produce_block; sc_rollup_node; node; evm_version; _}
+                as evm_setup) ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* loop_resolved = loop evm_version in
+  let* loop_address, _tx = deploy ~contract:loop_resolved ~sender evm_setup in
+
   let* total_tick_number_before_expected_reboots =
     Sc_rollup_node.RPC.call sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_total_ticks ()
   in
-  let* l1_level_before_out_of_ticks = Node.get_level node in
+
+  let* l1_level_before_reaching_gas_limit = Node.get_level node in
+
+  let loop_transaction sender =
+    let*@ nonce =
+      Rpc.get_transaction_count ~address:sender.Eth_account.address evm_node
+    in
+    let* gas_price = Rpc.get_gas_price evm_node in
+    Cast.craft_tx
+      ~source_private_key:sender.Eth_account.private_key
+      ~chain_id:1337
+      ~nonce:(Int64.to_int nonce)
+      ~gas_price:(Int32.to_int gas_price)
+      ~gas:230_000
+      ~value:Wei.zero
+      ~address:loop_address
+      ~signature:"loop(uint256)"
+      ~arguments:["300"]
+      ()
+  in
+
+  let* transactions =
+    Lwt_list.map_s
+      loop_transaction
+      (Array.to_list Eth_account.bootstrap_accounts)
+  in
+
   let* requests, receipt, _hashes =
     send_n_transactions
       ~produce_block
@@ -4805,20 +4814,18 @@ let test_reboot_out_of_ticks =
          blocks before the inclusion which is generally 2. The loops can be a
          bit long to execute, as such the inclusion test might fail before the
          execution is over, making it flaky. *)
-      fourth_block
+      transactions
   in
-  let* total_tick_number_with_expected_reboots =
-    Sc_rollup_node.RPC.call sc_rollup_node
-    @@ Sc_rollup_rpc.get_global_block_total_ticks ()
-  in
-  let*@ block_with_out_of_ticks =
+
+  let*@ block_with_gas_limit_reached =
     Rpc.get_block_by_number
       ~block:(Format.sprintf "%#lx" receipt.blockNumber)
       evm_node
   in
+
   (* Check that all the transactions are actually included in the same block,
      otherwise it wouldn't make sense to continue. *)
-  (match block_with_out_of_ticks.Block.transactions with
+  (match block_with_gas_limit_reached.transactions with
   | Block.Empty -> Test.fail "Expected a non empty block"
   | Block.Full _ ->
       Test.fail "Block is supposed to contain only transaction hashes"
@@ -4827,11 +4834,17 @@ let test_reboot_out_of_ticks =
         ~error_msg:"Expected %R transactions in the resulting block, got %L") ;
 
   (* Check the number of ticks spent during the period when there should have
-     been a reboot due to out of ticks. There have been a reboot if the number
+     been a reboot due to gas limit. There have been a reboot if the number
      of ticks is not `number of blocks` * `ticks per l1 level`. *)
-  let* l1_level_after_out_of_ticks = Node.get_level node in
+  let* l1_level_after_reaching_gas_limit = Node.get_level node in
+
+  let* total_tick_number_with_expected_reboots =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_total_ticks ()
+  in
+
   let number_of_blocks =
-    l1_level_after_out_of_ticks - l1_level_before_out_of_ticks
+    l1_level_after_reaching_gas_limit - l1_level_before_reaching_gas_limit
   in
   let ticks_after_expected_reboot =
     total_tick_number_with_expected_reboots
@@ -6658,7 +6671,7 @@ let register_evm_node ~protocols =
   test_l2_intermediate_OOG_call protocols ;
   test_l2_ether_wallet protocols ;
   test_keep_alive protocols ;
-  test_reboot_out_of_ticks protocols ;
+  test_reboot_gas_limit protocols ;
   test_l2_timestamp_opcode protocols ;
   test_migrate_proxy_to_sequencer_past protocols ;
   test_migrate_proxy_to_sequencer_future protocols ;
