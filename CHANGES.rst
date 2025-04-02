@@ -341,7 +341,7 @@ DAL node
 - **Change** The DAL node store version has been upgraded from 1 to 2.
   The DAL node store will automatically upgrade without requiring any
   user action. For users running the DAL node with the
-  ``--operator-profile`` flag enabled, the node now uses SQLite
+  ``--operator-profiles`` flag enabled, the node now uses SQLite
   specifically for managing skip list cells (MR :gl:`!15780`),
   preventing inode exhaustion. All other stores remain unchanged.
 
@@ -359,6 +359,10 @@ DAL node
   :gl:`!16869`)
 - Added a new RPC ``GET /published_levels/<level>/known_traps`` that returns the
   trap shards that the DAL node knows. (MR :gl:`!16870`)
+
+- Aliases have been added to the command line. ``--operator-profiles`` is now
+  equivalent to ``--operator`` and ``-E`` is equivalent to ``--endpoint``.
+  (MR :gl:`!17496`)
 
 Protocol
 ~~~~~~~~
