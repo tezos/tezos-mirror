@@ -55,12 +55,52 @@ However, if you encounter problems when performing one of the installation scena
 Installing binary packages
 --------------------------
 
+When it comes to installing software, especially for critical
+applications like Tezos/Octez, it’s crucial to ensure a secure and
+stable environment. While compiling from source can provide
+customization options, it often introduces complexities and risks.
+Instead, opting for binary packages sucha as Deb or RPM packages from a trusted source simplifies
+installation and enhances security.
+
+Deb or RPM packages compiled for a specific platform should be always preferred
+over statically compiled binaries. Deb or RPM packages can also be used to
+simplify the creation of `OCI <https://opencontainers.org/>`__ images or simply
+deployed on bare metal using provisioning tools such as
+`Ansible <https://docs.ansible.com/>`__.
+
+Using the official Deb or RPM packages offers several advantages:
+
+-  **Security**: Packages are pre-compiled and thoroughly tested,
+   reducing the risk of vulnerabilities introduced during compilation.
+   All our packages are signed and our supply chain is strictly
+   monitored to make sure the packages that we deliver only use
+   components that were vetted by our engineering team.
+
+-  **Stability**: Packages from a trusted repository undergo rigorous testing,
+   ensuring stability and compatibility with the target system. We make sure to
+   compile our binaries in a clean environment and using an up-to-date software
+   distribution. We use LTS (long-term service) distributions to enhance
+   stability and reduce the attack surface.
+
+-  **Ease of Installation**: Packages can be installed using standard package
+   management tools, streamlining the process. For instance, ``apt`` is
+   ubiquitous in the Debian world. These tools allow us to sign our packages
+   that can be automatically verified by the end user during installation. We
+   provide packages that allow the end user to easily tailor their installation
+   for different use cases.
+
+-  **Reduced Downtime**: With reliable binaries and straightforward
+   installation, system downtime due to installation errors or
+   compatibility issues is minimized. We carefully test the upgrade
+   process of our packages to make sure that end users can enjoy a click and go
+   upgrade process with near to zero downtime.
+
 .. _installing_deb:
 
 Ubuntu and Debian Octez packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you're using Ubuntu or Debian, you can install the packages
+If you're using Ubuntu or Debian, you can install the Deb packages
 using ``apt`` directly from our APT repository.
 
 We support the following distribution/releases:
@@ -113,10 +153,10 @@ If runnning Octez as services, see also how to :ref:`restart them <services_upgr
 
 .. _installing_rpm:
 
-Fedora Octez packages
-~~~~~~~~~~~~~~~~~~~~~
+RPM Octez packages
+~~~~~~~~~~~~~~~~~~
 
-If you're using Fedora, you can install packages with Octez binaries from the
+If you're using Fedora or Rocky Linux, you can install RPM packages with Octez binaries from the
 Octez from our DNF repository. Currently we support the latest LTS release for
 Fedora and for RockyLinux :
 
