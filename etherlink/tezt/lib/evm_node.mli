@@ -341,6 +341,8 @@ val patch_config_with_experimental_feature :
   ?rpc_server:rpc_server ->
   ?enable_websocket:bool ->
   ?max_websocket_message_length:int ->
+  ?monitor_websocket_heartbeat:bool ->
+  ?websocket_rate_limit:Ezjsonm.value ->
   ?enable_tx_queue:tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->

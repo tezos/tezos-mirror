@@ -1355,6 +1355,13 @@ let conditional_json_put ~name cond value_json json =
       json
   else json
 
+let conditional_json_put_default ~name cond value_json ~default json =
+  JSON.put
+    ( name,
+      JSON.annotate ~origin:"evm_node.config_patch"
+      @@ if cond then value_json else default )
+    json
+
 let optional_json_put ~name v f json =
   match v with
   | None -> json
@@ -1372,6 +1379,7 @@ let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false)
     ?(blueprints_publisher_order_enabled = false) ?(next_wasm_runtime = true)
     ?rpc_server ?(enable_websocket = false) ?max_websocket_message_length
+    ?(monitor_websocket_heartbeat = enable_websocket) ?websocket_rate_limit
     ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?l2_chains () =
   JSON.update "experimental_features" @@ fun json ->
   conditional_json_put
@@ -1406,10 +1414,12 @@ let patch_config_with_experimental_feature
        (fun max -> `Float (float_of_int max))
   (* Monitor websocket connections with frequent heartbeats and small timeout
      for the tests. *)
-  |> conditional_json_put
-       enable_websocket
+  |> conditional_json_put_default
+       monitor_websocket_heartbeat
        ~name:"monitor_websocket_heartbeat"
        (`O [("ping_interval", `Float 0.5); ("ping_timeout", `Float 2.)])
+       ~default:(`String "disabled")
+  |> optional_json_put websocket_rate_limit ~name:"websocket_rate_limit" Fun.id
   |> optional_json_put spawn_rpc ~name:"spawn_rpc" (fun port ->
          `O [("protected_port", `Float (float_of_int port))])
   |> optional_json_put

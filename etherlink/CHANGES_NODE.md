@@ -38,7 +38,11 @@ octez-evm-node check config
 
 If issues persist after verification, remove the `l2_chains` entry from the `experimental_features` section of your configuration file.
 
-By default, the configuration file (`config.json`) is located in your `data_dir` directory.
+By default, the configuration file (`config.json`) is located in your `data_dir`
+directory.
+
+- Websocket server (with Resto backend) can be configured to rate limit messages
+  with the field `experimental_features.websocket_rate_limit`. (!17510)
 
 ## Version 0.20 (2025-03-21)
 

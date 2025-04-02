@@ -18,10 +18,7 @@
     "rpc_server": "resto",
     "enable_websocket": false,
     "max_websocket_message_length": 4194304,
-    "monitor_websocket_heartbeat": {
-      "ping_interval": 5,
-      "ping_timeout": 30
-    },
+    "monitor_websocket_heartbeat": "disabled",
     "spawn_rpc": null,
     "l2_chains": null,
     "enable_tx_queue": {
@@ -84,10 +81,7 @@
     "rpc_server": "resto",
     "enable_websocket": false,
     "max_websocket_message_length": 4194304,
-    "monitor_websocket_heartbeat": {
-      "ping_interval": 5,
-      "ping_timeout": 30
-    },
+    "monitor_websocket_heartbeat": "disabled",
     "spawn_rpc": null,
     "l2_chains": null,
     "enable_tx_queue": null,
@@ -138,10 +132,7 @@
     "rpc_server": "resto",
     "enable_websocket": false,
     "max_websocket_message_length": 4194304,
-    "monitor_websocket_heartbeat": {
-      "ping_interval": 5,
-      "ping_timeout": 30
-    },
+    "monitor_websocket_heartbeat": "disabled",
     "spawn_rpc": null,
     "l2_chains": null,
     "enable_tx_queue": null,
