@@ -222,3 +222,5 @@ You should now be familiar enough with Tobi to:
 - speed up compilation times in some scenarios;
 - store multiple versions of a component in Tobi's cache to quickly
   switch between them.
+
+To explore more about Tobi, go back to the [index](index.md).
