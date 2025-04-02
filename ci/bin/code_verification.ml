@@ -644,7 +644,11 @@ let jobs pipeline_type =
   in
   let job_build_dsn_node =
     job_build_dsn_node
-      ~rules:(make_rules ~changes:changeset_octez_or_kernels ~dependent:true ())
+      ~rules:
+        (make_rules
+           ~changes:changeset_octez_or_kernels_or_doc
+           ~dependent:true
+           ())
       ()
   in
   let job_tezt_fetch_records =

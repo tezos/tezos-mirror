@@ -1170,8 +1170,10 @@ oc.build_dsn_node:
     - LICENSES/**/*
     - Makefile
     - brassaia/**/*
+    - client-libs/**/*
     - cohttp/**/*
     - data-encoding/**/*
+    - docs/**/*
     - dune
     - dune-project
     - dune-workspace
@@ -1187,12 +1189,15 @@ oc.build_dsn_node:
     - resto/**/*
     - rust-toolchain
     - script-inputs/**/*
+    - script-inputs/**/*/
     - scripts/**/*
+    - scripts/**/*/
     - scripts/ci/**/*
     - sdk/**/*
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
+    - vendors/**/*
     when: on_success
   dependencies:
   - oc.docker:rust-toolchain:amd64
