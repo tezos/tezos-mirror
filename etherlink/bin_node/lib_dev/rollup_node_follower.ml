@@ -5,12 +5,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let process_new_block ~proxy ~finalized_level () =
+(** [process_new_block ?on_new_head ~finalized_level] call each worker
+    that might have a logic dependent of the l1 level,
+    {!Evm_events_follower.new_rollup_block},
+    {!Blueprints_publisher.new_rollup_block}, and
+    {!Signals_publisher.new_rollup_block}.
+
+    Finally calls [on_new_head] if it is defined. *)
+let process_new_block ?on_new_head ~finalized_level () =
   let open Lwt_result_syntax in
   let* () = Evm_events_follower.new_rollup_block finalized_level in
   let* () = Blueprints_publisher.new_rollup_block finalized_level in
   let* () = Signals_publisher.new_rollup_block ~finalized_level in
-  if proxy then Tx_pool.pop_and_inject_transactions_lazy () else return_unit
+  match on_new_head with
+  | None -> return_unit
+  | Some on_new_head -> on_new_head ()
 
 type error += Connection_lost | Connection_timeout
 
@@ -34,19 +43,21 @@ let () =
     (function Connection_timeout -> Some () | _ -> None)
     (fun () -> Connection_timeout)
 
-(** [process_finalized_level ~oldest_rollup_node_known_l1_level
-    ~finalized_level ~rollup_node_endpoint] process the rollup node
-    block level [finalized_level] iff it's known by the rollup node
-    (i.e. superior to [oldest_rollup_node_known_l1_level].
+(** [process_finalized_level ?on_new_head
+    ~oldest_rollup_node_known_l1_level ~finalized_level
+    ~rollup_node_endpoint] process the rollup node block level
+    [finalized_level] with {!process_new_block ?on_new_head} iff it's
+    known by the rollup node (i.e. superior to
+    [oldest_rollup_node_known_l1_level].
 
     This is necessary for the very beginning of the rollup life, when
     the evm node is started at the same moment at the origination of
     the rollup, and so `finalized_level` is < origination level. *)
-let process_finalized_level ~proxy ~oldest_rollup_node_known_l1_level
+let process_finalized_level ?on_new_head ~oldest_rollup_node_known_l1_level
     ~finalized_level () =
   let open Lwt_result_syntax in
   if oldest_rollup_node_known_l1_level <= finalized_level then
-    process_new_block ~proxy ~finalized_level ()
+    process_new_block ?on_new_head ~finalized_level ()
   else return_unit
 
 let reconnection_delay = 5.0
@@ -112,7 +123,7 @@ let rec connect_to_stream ?(count = 0) ~rollup_node_endpoint () =
         ~rollup_node_endpoint
         ()
 
-(** [get_next_block ~proxy ~connection] returns the next block found
+(** [get_next_block ?on_new_head ~connection] returns the next block found
     in [connection.stream].
 
     - If the connection drops then it tries to reconnect the stream
@@ -121,7 +132,7 @@ let rec connect_to_stream ?(count = 0) ~rollup_node_endpoint () =
     - If the connection timeout (takes more than [connection.timeout])
     or if the connection fails then reconnect with [connect_to_stream]
     and try to fetch [get_next_block] with that new stream.*)
-let rec get_next_block ~proxy ~connection =
+let rec get_next_block ?on_new_head ~connection () =
   let open Lwt_result_syntax in
   let get_promise () =
     let*! res = Lwt_stream.get connection.stream in
@@ -145,40 +156,43 @@ let rec get_next_block ~proxy ~connection =
           ~rollup_node_endpoint:connection.rollup_node_endpoint
           ()
       in
-      (get_next_block [@tailcall]) ~proxy ~connection
+      (get_next_block [@tailcall]) ?on_new_head ~connection ()
   | Error errs ->
       let*! () = Rollup_node_follower_events.stream_failed errs in
       fail errs
 
-(** [loop_on_rollup_node_stream ~proxy
+(** [loop_on_rollup_node_stream ~keep_alive ?on_new_head
     ~oldest_rollup_node_known_l1_level ~connection] main loop to
     process the block.
 
     get the current rollup node block with [get_next_block], process it
-    with [process_finalized_level] then loop over. *)
-let rec loop_on_rollup_node_stream ~keep_alive ~proxy
+    with [process_finalized_level] then loop over.
+
+    [on_hew_head] is a process to be called on each new head that must
+    be processed, i.e. {!process_new_block}. *)
+let rec loop_on_rollup_node_stream ~keep_alive ?on_new_head
     ~oldest_rollup_node_known_l1_level ~connection () =
   let open Lwt_result_syntax in
   let start_time = Unix.gettimeofday () in
-  let* block, connection = get_next_block ~proxy ~connection in
+  let* block, connection = get_next_block ?on_new_head ~connection () in
   let elapsed = Unix.gettimeofday () -. start_time in
   let connection = update_timeout ~elapsed ~connection in
   let finalized_level = Sc_rollup_block.(Int32.(sub block.header.level 2l)) in
   let* () =
     process_finalized_level
-      ~proxy
+      ?on_new_head
       ~oldest_rollup_node_known_l1_level
       ~finalized_level
       ()
   in
   (loop_on_rollup_node_stream [@tailcall])
     ~keep_alive
-    ~proxy
+    ?on_new_head
     ~oldest_rollup_node_known_l1_level
     ~connection
     ()
 
-let start ~keep_alive ~proxy ~rollup_node_endpoint () =
+let start ~keep_alive ?on_new_head ~rollup_node_endpoint () =
   Lwt.async @@ fun () ->
   let open Lwt_syntax in
   let* () = Rollup_node_follower_events.started () in
@@ -190,7 +204,7 @@ let start ~keep_alive ~proxy ~rollup_node_endpoint () =
   let* connection = connect_to_stream ~rollup_node_endpoint () in
   loop_on_rollup_node_stream
     ~keep_alive
-    ~proxy
+    ?on_new_head
     ~oldest_rollup_node_known_l1_level
     ~connection
     ()

@@ -11277,27 +11277,17 @@ let test_tx_queue =
     ~use_threshold_encryption:Register_without_feature
     ~use_dal:Register_without_feature
     ~websockets:false
-    ~enable_tx_queue:true
+    ~enable_tx_queue:
+      (Config
+         {
+           max_size = 1000;
+           max_lifespan = 100000 (* absurd value so no TX are dropped *);
+           tx_per_addr_limit = 100000;
+         })
     ~title:"Submits a transaction to an observer with a tx queue."
     ~use_multichain:Register_without_feature
   (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; observer; _} _protocol ->
-  let* () = Evm_node.terminate observer in
-
-  let* () =
-    Evm_node.Config_file.update observer
-    @@ Evm_node.patch_config_with_experimental_feature
-         ~enable_tx_queue:true
-         ~tx_queue_config:
-           {
-             max_size = 1000;
-             max_lifespan = 100000 (* absurd value so no TX are dropped *);
-             tx_per_addr_limit = 100000;
-           }
-         ()
-  in
-  let* () = Evm_node.run observer in
-
   let* () =
     let*@ _ = produce_block sequencer in
     unit
@@ -11398,7 +11388,13 @@ let test_tx_queue_clear =
   register_all
     ~title:"Tx_queue clears after delayed inbox flush"
     ~tags:["evm"; "tx_queue"; "clear"; "delayed_inbox"; "flush"]
-    ~enable_tx_queue:true
+    ~enable_tx_queue:
+      (Config
+         {
+           max_size = 1000;
+           max_lifespan = 100000 (* absurd value so no TX are dropped *);
+           tx_per_addr_limit = 100000;
+         })
     ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:0
     ~delayed_inbox_min_levels:1
@@ -11420,18 +11416,6 @@ let test_tx_queue_clear =
          }
              _protocol ->
   let* () = Evm_node.terminate observer in
-  let* () =
-    Evm_node.Config_file.update observer
-    @@ Evm_node.patch_config_with_experimental_feature
-         ~enable_tx_queue:true
-         ~tx_queue_config:
-           {
-             max_size = 1000;
-             max_lifespan = 100_000 (* absurd value so no TX are dropped *);
-             tx_per_addr_limit = 100_000;
-           }
-         ()
-  in
   let* () =
     Evm_node.run ~extra_arguments:["--dont-track-rollup-node"] observer
   in
@@ -11511,29 +11495,19 @@ let test_tx_queue_nonce =
     ~use_threshold_encryption:Register_without_feature
     ~use_dal:Register_without_feature
     ~websockets:false
-    ~enable_tx_queue:true
+    ~enable_tx_queue:
+      (Config
+         {
+           max_size = 1000;
+           max_lifespan = 100000 (* absurd value so no TX are dropped *);
+           tx_per_addr_limit = 100000;
+         })
     ~title:
       "Submits transactions to an observer with a tx queue and make sure it \
        can respond to getTransactionCount."
     ~use_multichain:Register_without_feature
   (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; observer; _} _protocol ->
-  let* () = Evm_node.terminate observer in
-
-  let* () =
-    Evm_node.Config_file.update observer
-    @@ Evm_node.patch_config_with_experimental_feature
-         ~enable_tx_queue:true
-         ~tx_queue_config:
-           {
-             max_size = 1000;
-             max_lifespan = 100000 (* absurd value so no TX are dropped *);
-             tx_per_addr_limit = 100000;
-           }
-         ()
-  in
-  let* () = Evm_node.run observer in
-
   let* () =
     let*@ _ = produce_block sequencer in
     unit
@@ -11810,6 +11784,7 @@ let test_observer_init_from_snapshot =
   unit
 
 let test_tx_queue_limit =
+  let max_number_of_txs = 10 in
   register_all
     ~tags:["observer"; "tx_queue"; "limit"]
     ~time_between_blocks:Nothing
@@ -11817,7 +11792,13 @@ let test_tx_queue_limit =
     ~use_threshold_encryption:Register_without_feature
     ~use_dal:Register_without_feature
     ~websockets:false
-    ~enable_tx_queue:true (* enables it in the sequencer *)
+    ~enable_tx_queue:
+      (Config
+         {
+           max_size = 1000;
+           max_lifespan = 100000 (* absurd value so no TX are dropped *);
+           tx_per_addr_limit = max_number_of_txs;
+         })
     ~title:
       "Submits transactions to an observer with a tx queue and make sure its \
        limit are respected."
@@ -11828,23 +11809,6 @@ let test_tx_queue_limit =
     let*@ _ = produce_block sequencer in
     unit
   and* () = Evm_node.wait_for_blueprint_applied observer 1 in
-  let* () = Evm_node.terminate observer in
-
-  let max_number_of_txs = 10 in
-  let* () =
-    (* modify the config of the observer. *)
-    Evm_node.Config_file.update observer
-    @@ Evm_node.patch_config_with_experimental_feature
-         ~enable_tx_queue:true
-         ~tx_queue_config:
-           {
-             max_size = 1000;
-             max_lifespan = 100000 (* absurd value so no TX are dropped *);
-             tx_per_addr_limit = max_number_of_txs;
-           }
-         ()
-  in
-  let* () = Evm_node.run observer in
 
   (* helper to craft a tx with given nonce. *)
   let send_raw_tx ~nonce =
@@ -12309,7 +12273,13 @@ let test_block_producer_validation =
     ~use_threshold_encryption:Register_without_feature
     ~use_dal:Register_without_feature
     ~websockets:false
-    ~enable_tx_queue:true (* enables it in the sequencer *)
+    ~enable_tx_queue:
+      (Config
+         {
+           max_size = 1000;
+           max_lifespan = 100000 (* absurd value so no TX are dropped *);
+           tx_per_addr_limit = 1000000 (* absurd value so no TX are limited *);
+         })
     ~title:"Test part of the validation is done when producing blocks."
     ~use_multichain:Register_without_feature
   (* TODO #7843: Adapt this test to multichain context *)
@@ -12318,22 +12288,6 @@ let test_block_producer_validation =
     let*@ _ = produce_block sequencer in
     unit
   and* () = Evm_node.wait_for_blueprint_applied observer 1 in
-  let* () = Evm_node.terminate observer in
-
-  let* () =
-    (* modify the config of the observer. *)
-    Evm_node.Config_file.update observer
-    @@ Evm_node.patch_config_with_experimental_feature
-         ~enable_tx_queue:true
-         ~tx_queue_config:
-           {
-             max_size = 1000;
-             max_lifespan = 100000 (* absurd value so no TX are dropped *);
-             tx_per_addr_limit = 1000000 (* absurd value so no TX are limited *);
-           }
-         ()
-  in
-  let* () = Evm_node.run observer in
   let send_and_wait_sequencer_receive ~raw_tx =
     let wait_sequencer_see_tx =
       Evm_node.wait_for_tx_queue_add_transaction sequencer

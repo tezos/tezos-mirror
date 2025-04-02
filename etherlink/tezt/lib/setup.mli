@@ -116,7 +116,7 @@ val register_test :
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?history_mode:Evm_node.history_mode ->
-  ?enable_tx_queue:bool ->
+  ?enable_tx_queue:Evm_node.tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
   ?l2_setups:Evm_node.l2_setup list ->
@@ -166,7 +166,7 @@ val register_multichain_test :
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?history_mode:Evm_node.history_mode ->
-  ?enable_tx_queue:bool ->
+  ?enable_tx_queue:Evm_node.tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
   (multichain_sequencer_setup -> Protocol.t -> unit Lwt.t) ->
@@ -216,7 +216,7 @@ val register_test_for_kernels :
   ?enable_fast_withdrawal:bool ->
   ?enable_fast_fa_withdrawal:bool ->
   ?history_mode:Evm_node.history_mode ->
-  ?enable_tx_queue:bool ->
+  ?enable_tx_queue:Evm_node.tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
   ?l2_setups:Evm_node.l2_setup list ->
@@ -266,7 +266,7 @@ val setup_sequencer :
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?history_mode:Evm_node.history_mode ->
-  ?enable_tx_queue:bool ->
+  ?enable_tx_queue:Evm_node.tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
   Protocol.t ->
