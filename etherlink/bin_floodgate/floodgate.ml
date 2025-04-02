@@ -70,31 +70,7 @@ let rec report_tps ~elapsed_time =
   in
   report_tps ~elapsed_time
 
-let rec spam_with_account ~token ~infos ~gas_limit account =
-  let open Lwt_syntax in
-  let start = ref (Time.System.now ()) in
-
-  let callback reason =
-    match reason with
-    | `Accepted _ ->
-        start := Time.System.now () ;
-        return_unit
-    | `Confirmed ->
-        let end_ = Time.System.now () in
-        let* () =
-          Floodgate_events.transaction_confirmed
-            account
-            Ptime.(diff end_ !start)
-        in
-        spam_with_account ~token ~infos ~gas_limit account
-    | `Refused ->
-        let* () = Floodgate_events.transaction_refused account in
-        spam_with_account ~token ~infos ~gas_limit account
-    | `Dropped ->
-        let* () = Floodgate_events.transaction_dropped account in
-        spam_with_account ~token ~infos ~gas_limit account
-  in
-
+let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit account =
   let data, to_ =
     match token with
     | `Native -> (None, Account.address account)
@@ -107,7 +83,46 @@ let rec spam_with_account ~token ~infos ~gas_limit account =
         in
         (Some data, contract)
   in
-  Tx_queue.transfer ~infos ~callback ~gas_limit ~from:account ~to_ ?data ()
+  let rec salvo ~start ~nonce_limit ~nonce =
+    let open Lwt_syntax in
+    if nonce > nonce_limit then return_unit
+    else
+      let callback reason =
+        match reason with
+        | `Accepted _ -> return_unit
+        | `Refused ->
+            let* () = Floodgate_events.transaction_refused account in
+            return_unit
+        | `Confirmed ->
+            let end_ = Time.System.now () in
+            let* () =
+              Floodgate_events.transaction_confirmed
+                account
+                Ptime.(diff end_ start)
+            in
+            if nonce = nonce_limit then loop () else return_unit
+        | `Dropped ->
+            let* () = Floodgate_events.transaction_dropped account in
+            if nonce = nonce_limit then loop () else return_unit
+      in
+      let* () =
+        Tx_queue.transfer
+          ~nonce
+          ~infos
+          ~callback
+          ~gas_limit
+          ~from:account
+          ~to_
+          ?data
+          ()
+      in
+      salvo ~start ~nonce_limit ~nonce:(Z.succ nonce)
+  and loop () =
+    let start = Time.System.now () in
+    let nonce_limit = Z.(of_int txs_per_salvo + account.nonce) in
+    salvo ~start ~nonce_limit ~nonce:account.nonce
+  in
+  loop ()
 
 let rec get_transaction_receipt rpc_endpoint txn_hash =
   let open Lwt_result_syntax in
@@ -268,7 +283,8 @@ let prepare_scenario ~rpc_endpoint ~scenario infos simple_gas_limit controller =
 
 let run ~scenario ~relay_endpoint ~rpc_endpoint ~controller ~max_active_eoa
     ~max_transaction_batch_length ~spawn_interval ~tick_interval
-    ~base_fee_factor ~initial_balance ~elapsed_time_between_report =
+    ~base_fee_factor ~initial_balance ~txs_per_salvo
+    ~elapsed_time_between_report =
   let open Lwt_result_syntax in
   let* controller =
     controller_from_sk ~rpc_endpoint ~min_balance:(xtz_of_int 100) controller
@@ -333,7 +349,8 @@ let run ~scenario ~relay_endpoint ~rpc_endpoint ~controller ~max_active_eoa
             let*! () =
               Floodgate_events.spam_started (Account.address_et node)
             in
-            Lwt_result.ok (spam_with_account ~token ~infos ~gas_limit node)
+            Lwt_result.ok
+              (spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit node)
           in
           return_unit)
         (Seq.ints 0 |> Stdlib.Seq.take max_active_eoa)

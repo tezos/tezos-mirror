@@ -17,5 +17,6 @@ val run :
   tick_interval:float ->
   base_fee_factor:float ->
   initial_balance:Z.t ->
+  txs_per_salvo:int ->
   elapsed_time_between_report:float ->
   unit tzresult Lwt.t

@@ -193,6 +193,17 @@ module Arg = struct
       ~placeholder:"SECONDS"
       ~doc:"The elapsed time between two reports of measured TPS."
       Parameter.float
+
+  let txs_salvo_eoa =
+    let default = "1" in
+    Tezos_clic.default_arg
+      ~default
+      ~long:"txs-per-salvo"
+      ~placeholder:""
+      ~doc:
+        "The number of transactions an EOA inject before waiting for their \
+         confirmation."
+      Parameter.int
 end
 
 let log_config ~verbose () =
@@ -211,7 +222,7 @@ let run_command =
   command
     ~desc:"Start Floodgate to spam an EVM-compatible network"
     Arg.(
-      args12
+      args13
         verbose
         relay_endpoint
         rpc_endpoint
@@ -223,6 +234,7 @@ let run_command =
         base_fee_factor
         initial_balance
         scenario
+        txs_salvo_eoa
         elapsed_time_between_report)
     (prefixes ["run"] @@ stop)
     (fun ( verbose,
@@ -236,6 +248,7 @@ let run_command =
            base_fee_factor,
            initial_balance,
            scenario,
+           txs_per_salvo,
            elapsed_time_between_report )
          () ->
       let open Lwt_result_syntax in
@@ -253,6 +266,7 @@ let run_command =
         ~tick_interval
         ~base_fee_factor
         ~initial_balance
+        ~txs_per_salvo
         ~elapsed_time_between_report
         ~scenario)
 
