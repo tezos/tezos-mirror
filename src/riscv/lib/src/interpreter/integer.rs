@@ -12,14 +12,14 @@ use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::registers::XRegister;
 use crate::parser::SHIFT_BITMASK;
 
-/// Moves the two's complement representation of `rs1` into `rd`.
+/// Moves the two's complement of `val(rs1)` into `rd`.
 ///
 /// Relevant RISC-V opcodes:
 /// - SUB
-pub fn run_neg(icb: &mut impl ICB, rd_rs1: NonZeroXRegister, rs2: NonZeroXRegister) {
-    let rs2_val = icb.xregister_read_nz(rs2);
-    let result = rs2_val.negate(icb);
-    icb.xregister_write_nz(rd_rs1, result)
+pub fn run_neg(icb: &mut impl ICB, rd: NonZeroXRegister, rs1: NonZeroXRegister) {
+    let rs1_val = icb.xregister_read_nz(rs1);
+    let result = rs1_val.negate(icb);
+    icb.xregister_write_nz(rd, result)
 }
 
 /// Copies the value in register `rs2` into register `rd_rs1`.
