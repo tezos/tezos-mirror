@@ -1252,7 +1252,7 @@ module Documentation = struct
       of octez binaries, for inclusion in the documentation.
 
       This job is one of the prerequisites to {!job_build_all}. *)
-  let job_manuals ?rules ?dependencies () : tezos_job =
+  let job_manuals ?rules ?dependencies ~use_static_executables () : tezos_job =
     job
       ~__POS__
       ~name:"documentation:manuals"
@@ -1271,7 +1271,9 @@ module Documentation = struct
              "docs/developer/rollup_metrics.csv";
              "docs/user/node-config.json";
            ])
-      ["make -C docs -j octez-gen"]
+      (if use_static_executables then
+         ["scripts/ci/documentation:manuals_static.sh"]
+       else ["make -C docs -j octez-gen"])
 
   (** Create the docgen job.
 

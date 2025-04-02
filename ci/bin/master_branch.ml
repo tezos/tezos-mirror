@@ -96,7 +96,13 @@ let jobs =
     in
     let dependencies = Dependent [] in
     let job_odoc = Documentation.job_odoc ~rules ~dependencies () in
-    let job_manuals = Documentation.job_manuals ~rules ~dependencies () in
+    let job_manuals =
+      Documentation.job_manuals
+        ~rules
+        ~dependencies:(Dependent [Artifacts job_static_x86_64])
+        ~use_static_executables:true
+        ()
+    in
     let job_docgen = Documentation.job_docgen ~rules ~dependencies () in
     let job_build_all =
       Documentation.job_build_all ~job_odoc ~job_manuals ~job_docgen ~rules ()

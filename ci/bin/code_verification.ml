@@ -1966,6 +1966,7 @@ let jobs pipeline_type =
       let job_manuals =
         Documentation.job_manuals
           ~rules
+          ~use_static_executables:false
           ~dependencies:
             (Dependent
                [
