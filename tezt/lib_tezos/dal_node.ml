@@ -398,7 +398,7 @@ let run ?(wait_ready = true) ?env ?event_level node =
 let as_rpc_endpoint (t : t) =
   let state = t.persistent_state in
   let scheme = "http" in
-  Endpoint.{scheme; host = state.rpc_host; port = state.rpc_port}
+  Endpoint.make ~scheme ~host:state.rpc_host ~port:state.rpc_port ()
 
 let runner (t : t) = t.persistent_state.runner
 

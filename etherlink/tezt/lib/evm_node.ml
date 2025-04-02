@@ -1342,7 +1342,7 @@ let rpc_endpoint_record ?(local = false) (evm_node : t) =
     else Runner.address evm_node.persistent_state.runner
   in
   let port = evm_node.persistent_state.rpc_port in
-  Endpoint.{host; scheme = "http"; port}
+  Endpoint.make ~host ~scheme:"http" ~port ()
 
 let endpoint = rpc_endpoint ?local:None
 

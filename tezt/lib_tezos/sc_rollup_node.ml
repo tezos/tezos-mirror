@@ -811,7 +811,7 @@ let import_snapshot ?(apply_unsafe_patches = false) ?(force = false)
 let as_rpc_endpoint (t : t) =
   let state = t.persistent_state in
   let scheme = "http" in
-  Endpoint.{scheme; host = state.rpc_host; port = state.rpc_port}
+  Endpoint.make ~scheme ~host:state.rpc_host ~port:state.rpc_port ()
 
 let operators t =
   (t.persistent_state.default_operator, t.persistent_state.operators)

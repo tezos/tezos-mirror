@@ -27,18 +27,17 @@ let default_protocol : t -> Protocol.t = function
   | `Rionet -> R022
 
 let public_rpc_endpoint testnet =
-  Endpoint.
-    {
-      scheme = "https";
-      host =
-        (match testnet with
-        | `Mainnet -> "rpc.tzbeta.net"
-        | `Ghostnet -> "rpc.ghostnet.teztnets.com"
-        | `Nextnet date -> sf "rpc.nextnet-%s.teztnets.com" date
-        | `Weeklynet date -> sf "rpc.weeklynet-%s.teztnets.com" date
-        | `Rionet -> "rpc.rionet.teztnets.com");
-      port = 443;
-    }
+  Endpoint.make
+    ~scheme:"https"
+    ~host:
+      (match testnet with
+      | `Mainnet -> "rpc.tzbeta.net"
+      | `Ghostnet -> "rpc.ghostnet.teztnets.com"
+      | `Nextnet date -> sf "rpc.nextnet-%s.teztnets.com" date
+      | `Weeklynet date -> sf "rpc.weeklynet-%s.teztnets.com" date
+      | `Rionet -> "rpc.rionet.teztnets.com")
+    ~port:443
+    ()
 
 let snapshot_service = function
   | `Mainnet -> "https://snapshots.eu.tzinit.org/mainnet"
@@ -99,12 +98,11 @@ let versions network =
             decoder)
       in
       let endpoint =
-        Endpoint.
-          {
-            host = Format.asprintf "api.%s.tzkt.io" (to_string public_network);
-            scheme = "https";
-            port = 443;
-          }
+        Endpoint.make
+          ~host:(Format.asprintf "api.%s.tzkt.io" (to_string public_network))
+          ~scheme:"https"
+          ~port:443
+          ()
       in
       let* response = RPC_core.call_raw endpoint rpc in
       try
@@ -144,12 +142,11 @@ let delegates ?(accounts = []) network =
             decoder)
       in
       let endpoint =
-        Endpoint.
-          {
-            host = Format.asprintf "api.%s.tzkt.io" (to_string network);
-            scheme = "https";
-            port = 443;
-          }
+        Endpoint.make
+          ~host:(Format.asprintf "api.%s.tzkt.io" (to_string network))
+          ~scheme:"https"
+          ~port:443
+          ()
       in
       let* response = RPC_core.call_raw endpoint rpc in
       try
