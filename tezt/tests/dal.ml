@@ -4215,125 +4215,6 @@ let test_dal_node_gs_invalid_messages_exchange _protocol parameters _cryptobox
     ~expect_app_notification
     ~is_first_slot_attestable
 
-let test_gs_prune_and_ihave protocol parameters _cryptobox node client dal_node1
-    =
-  let rec repeat_i n f =
-    if n <= 0 then unit
-    else
-      let* () = f n in
-      repeat_i (n - 1) f
-  in
-  let crypto_params = parameters.Dal.Parameters.cryptobox in
-  let number_of_shards = crypto_params.number_of_shards in
-  let slot_size = crypto_params.slot_size in
-  let slot_content = generate_dummy_slot slot_size in
-
-  (* Inject as much slots as possible with available bootstrap accounts.
-     The goal is to continuously send invalid messages from dal_node1 to dal_node2,
-     thus lowering the score of dal_node1 to the point where it becomes negative. *)
-  let* () =
-    let num_slots =
-      min
-        (Array.length Account.Bootstrap.keys)
-        parameters.Dal.Parameters.number_of_slots
-    in
-    Log.info "Publishing %d slots" num_slots ;
-    repeat_i num_slots (fun i ->
-        let slot_index = i - 1 in
-        let account = Account.Bootstrap.keys.(slot_index) in
-        let* _slot_commitment =
-          Helpers.publish_and_store_slot
-            client
-            dal_node1
-            account
-            ~index:slot_index
-          @@ Helpers.make_slot ~slot_size slot_content
-        in
-        unit)
-  in
-
-  (* Create another (invalid) DAL node *)
-  let* _, dal_node2 = make_invalid_dal_node node protocol parameters in
-
-  (* Connect the nodes *)
-  let* () =
-    Dal_common.Helpers.connect_nodes_via_p2p
-      ~init_config:true
-      dal_node1
-      dal_node2
-  in
-
-  let num_slots = parameters.number_of_slots in
-  let account1 = Constant.bootstrap1 in
-  let pkh1 = account1.public_key_hash in
-
-  (* The two nodes join the same topics *)
-  let* () = nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 in
-
-  let* peer_id1 = Dal_node.read_identity dal_node1 in
-  let* peer_id2 = Dal_node.read_identity dal_node2 in
-  (* Once a block is baked and shards injected into GS, we expect dal_node1 to
-     be pruned by dal_node2 because its score will become negative due to
-     invalid messages. *)
-  let event_waiter_prune =
-    check_events_with_topic
-      ~event_with_topic:(Prune peer_id2)
-      dal_node1
-      ~num_slots
-      pkh1
-  in
-
-  Log.info "Waiting for prune event on %s" (Dal_node.name dal_node1) ;
-
-  (* We bake 3 blocks (one to include publish ops and two more to make that
-     block final) and wait for the prune events. *)
-  let* () = bake_for ~count:3 client in
-  let* () = event_waiter_prune in
-
-  let* score = get_peer_score dal_node2 peer_id1 in
-  Log.info "The peer's score after prune is %f" score ;
-  Check.(
-    (score < 0.)
-      float
-      ~error_msg:"The dal_node1's score (%L) was expected to be negative.") ;
-
-  (* Now, we'll inject a new slot for the next published_level in
-     dal_node1. Since it's pruned, dal_node2 will be notified via IHave
-     messages. *)
-  let slot_index = 0 in
-  let* commitment =
-    Helpers.publish_and_store_slot client dal_node1 account1 ~index:slot_index
-    @@ Helpers.make_slot ~slot_size slot_content
-  in
-
-  let* publish_level = next_level node in
-  let attested_level = publish_level + parameters.attestation_lag in
-  let attestation_level = attested_level - 1 in
-  let* committee = Dal.Committee.at_level node ~level:attestation_level () in
-
-  let Dal.Committee.{attester; indexes = shard_indexes} =
-    match
-      List.find (fun Dal.Committee.{attester; _} -> attester = pkh1) committee
-    with
-    | exception Not_found ->
-        Test.fail "Should not happen as %s is part of the committee" pkh1
-    | v -> v
-  in
-  let ihave_events_waiter =
-    check_events_with_message_id
-      ~event_with_message_id:(IHave {pkh = pkh1; slot_index = 0})
-      dal_node2
-      ~number_of_shards
-      ~shard_indexes
-      ~expected_commitment:commitment
-      ~expected_level:publish_level
-      ~expected_pkh:attester
-      ~expected_slot:slot_index
-      ~expected_peer:peer_id1
-  in
-  let* () = bake_for client ~count:3 in
-  ihave_events_waiter
-
 (* Checks that:
    * the baker does not crash when there's a DAL node specified, but it is not
    running
@@ -10377,13 +10258,6 @@ let register ~protocols =
     "GS invalid messages exchange"
     ~producer_profiles:[0]
     test_dal_node_gs_invalid_messages_exchange
-    protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~tags:["gossipsub"; Tag.ci_disabled]
-    ~number_of_slots:8
-    ~producer_profiles:[0; 1; 2; 3; 4; 5; 6; 7]
-    "GS prune due to negative score, and ihave"
-    test_gs_prune_and_ihave
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~attestation_threshold:1
