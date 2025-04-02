@@ -107,6 +107,9 @@ let transaction_confirmed tx = emit transaction_confirmed tx
 let rpc_error (error : Rpc_encodings.JSONRPC.error) =
   emit rpc_error (Int32.of_int error.code, error.message)
 
+let callback_error__dont_wait__use_with_care (error : tztrace) =
+  emit__dont_wait__use_with_care callback_error error
+
 let callback_error (error : tztrace) = emit callback_error error
 
 let missing_tx_object tx = emit missing_tx_object tx
