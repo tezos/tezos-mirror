@@ -9945,11 +9945,22 @@ let test_describe_endpoint =
         Constant.smart_rollup_installer;
       ])
   @@ fun protocol ->
+  let l2_chains =
+    [
+      {
+        (Evm_node.default_l2_setup ~l2_chain_id:12) with
+        l2_chain_family = "Michelson";
+      };
+    ]
+  in
   let* {sequencer; client; _} =
     Setup.setup_sequencer
       ~mainnet_compat:false
       ~enable_dal:false
-      ~enable_multichain:false
+      ~enable_multichain:true
+      ~l2_chains
+      ~rpc_server:Evm_node.Resto
+      ~spawn_rpc:(Port.fresh ())
       protocol
   in
   let hooks = Tezos_regression.hooks in
@@ -9957,6 +9968,17 @@ let test_describe_endpoint =
     Client.(Foreign_endpoint (Evm_node.rpc_endpoint_record sequencer))
   in
   let* (_ : string) = Client.rpc_list ~hooks ~endpoint client in
+  let path = "/tezlink/describe?recurse=yes" in
+  (* TODO replace with a call of octez-client when it supports a non empty
+     root see !17532 *)
+  let* res =
+    (* We check that the "/tezlink/describe" RPC is available. We don't record
+       the result in the regression trace because it is already contained in
+       the call to "/describe" above. *)
+    Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
+    |> Runnable.run
+  in
+  let _ = JSON.parse ~origin:"curl_tezlink_describe" res in
   unit
 
 let test_relay_restricted_rpcs =
