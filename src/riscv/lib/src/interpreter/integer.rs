@@ -91,6 +91,23 @@ pub fn run_sub(
     icb.xregister_write_nz(rd, result)
 }
 
+/// Perform `val(rs1) - val(rs2)` but only on lowest 32 bits
+/// and store the sign-extended result in `rd`.
+///
+/// Relevant RISC-V opcodes:
+/// - SUBW
+pub fn run_sub_word(icb: &mut impl ICB, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
+    // We do not need to explicitly truncate for the lower bits since wrapping_sub
+    // has the same semantics & result on the lower 32 bits irrespective of bit width
+    let lhs = icb.xregister_read(rs1);
+    let rhs = icb.xregister_read(rs2);
+    let subtraction = lhs.sub(rhs, icb);
+
+    // Truncate result to use only the lower 32 bits, then sign-extend to 64 bits.
+    let res = icb.narrow(subtraction);
+    let res = icb.extend_signed(res);
+    icb.xregister_write_nz(rd, res)
+}
 /// Saves in `rd` the bitwise AND between the value in `rs1` and `rs2`
 ///
 /// Relevant RISC-V opcodes:
@@ -306,6 +323,10 @@ pub fn run_shift_immediate(
 
 #[cfg(test)]
 mod tests {
+    use proptest::arbitrary::any;
+    use proptest::prop_assert_eq;
+    use proptest::proptest;
+
     use super::*;
     use crate::backend_test;
     use crate::create_state;
@@ -398,6 +419,25 @@ mod tests {
             run_sub(&mut state, nz::a0, nz::a1, nz::a1);
             assert_eq!(state.hart.xregisters.read_nz(nz::a1), imm as u64);
         }
+    });
+
+    backend_test!(test_sub_word, F, {
+        proptest!(|(
+            v1 in any::<i64>(),
+            v2 in any::<i64>())|
+        {
+            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            state.hart.xregisters.write(t0, v1 as u64);
+            state.hart.xregisters.write(a0, v2 as u64);
+            run_sub_word(&mut state, t0, a0, nz::a1);
+            // check against wrapping subtraction performed on the lowest 32 bits
+            let v1_u32 = v1 as u32;
+            let v2_u32 = v2 as u32;
+            prop_assert_eq!(
+                state.hart.xregisters.read(a1),
+                v1_u32.wrapping_sub(v2_u32) as i32 as i64 as u64
+            );
+        });
     });
 
     backend_test!(test_set_less_than, F, {

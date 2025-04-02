@@ -64,6 +64,25 @@ impl Instruction {
         }
     }
 
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::SubWord`].
+    pub(crate) fn new_sub_word(
+        rd: NonZeroXRegister,
+        rs1: XRegister,
+        rs2: XRegister,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::SubWord,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
     /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the [`OpCode::Neg`].
     pub(crate) fn new_neg(rd: NonZeroXRegister, rs2: NonZeroXRegister, width: InstrWidth) -> Self {
         Self {

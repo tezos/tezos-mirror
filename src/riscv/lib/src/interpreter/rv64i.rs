@@ -46,20 +46,6 @@ where
         self.write_nz(rd, result)
     }
 
-    /// `SUBW` R-type instruction
-    ///
-    /// Perform val(rs1) - val(rs2) but only on lowest 32 bits
-    /// and store the sign-extended result in `rd`
-    pub fn run_subw(&mut self, rs1: XRegister, rs2: XRegister, rd: NonZeroXRegister) {
-        // We do not need to explicitly truncate for the lower bits since wrapping_sub
-        // has the same semantics & result on the lower 32 bits irrespective of bit width
-        let lhs = self.read(rs1);
-        let rhs = self.read(rs2);
-        // Truncate result to use only the lower 32 bits, then sign-extend to 64 bits.
-        let result = lhs.wrapping_sub(rhs) as i32 as u64;
-        self.write_nz(rd, result)
-    }
-
     /// `SLLIW` I-type instruction
     ///
     /// Shift left logically only on lower 32 bits
@@ -466,26 +452,6 @@ mod tests {
             prop_assert_eq!(
                 state.xregisters.read(a2),
                 r_val.wrapping_add(i_val) as i32 as i64 as u64
-            );
-        });
-    });
-
-    backend_test!(test_sub_w, F, {
-        proptest!(|(
-            v1 in any::<i64>(),
-            v2 in any::<i64>())|
-        {
-            let mut state = create_state!(HartState, F);
-
-            state.xregisters.write(t0, v1 as u64);
-            state.xregisters.write(a0, v2 as u64);
-            state.xregisters.run_subw(t0, a0, nz::a1);
-            // check against wrapping subtraction performed on the lowest 32 bits
-            let v1_u32 = v1 as u32;
-            let v2_u32 = v2 as u32;
-            prop_assert_eq!(
-                state.xregisters.read(a1),
-                v1_u32.wrapping_sub(v2_u32) as i32 as i64 as u64
             );
         });
     });

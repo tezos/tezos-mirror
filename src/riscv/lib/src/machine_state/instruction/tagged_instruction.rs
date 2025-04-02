@@ -414,7 +414,7 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
 
         Addiw
         | Addw
-        | Subw
+        | SubWord
         | Sllw
         | Srlw
         | Sraw

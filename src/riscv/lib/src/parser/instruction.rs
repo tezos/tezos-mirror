@@ -316,6 +316,8 @@ pub enum InstrCacheable {
     Slt(NonZeroRdRTypeArgs),
     Sltu(NonZeroRdRTypeArgs),
     Addw(NonZeroRdRTypeArgs),
+    /// `SUBW` - Perform `val(rs1) - val(rs2)` but only on lowest 32 bits
+    /// and store the sign-extended result in `rd`
     Subw(NonZeroRdRTypeArgs),
     Sllw(NonZeroRdRTypeArgs),
     Srlw(NonZeroRdRTypeArgs),
