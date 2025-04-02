@@ -401,7 +401,6 @@ pub fn fa_bridge_precompile_call_withdraw(
         &block,
         &config,
         &precompiles,
-        1_000_000_000,
         U256::from(21000),
         None,
     );

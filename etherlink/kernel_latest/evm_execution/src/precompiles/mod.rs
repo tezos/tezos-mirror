@@ -304,7 +304,6 @@ mod test_helpers {
     use tezos_evm_runtime::runtime::MockKernelHost;
 
     use super::precompile_set;
-    const DUMMY_ALLOCATED_TICKS: u64 = 100_000_000;
     pub const DUMMY_TICKETER: &str = "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5";
 
     pub fn set_balance(
@@ -376,7 +375,6 @@ mod test_helpers {
             &block,
             &config,
             &precompiles,
-            DUMMY_ALLOCATED_TICKS,
             gas_price,
             None,
         );

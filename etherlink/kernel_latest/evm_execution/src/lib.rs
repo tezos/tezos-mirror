@@ -261,7 +261,7 @@ pub fn run_transaction<'a, Host>(
     effective_gas_price: U256,
     value: U256,
     pay_for_gas: bool,
-    allocated_ticks: u64,
+    _allocated_ticks: u64,
     retriable: bool,
     tracer: Option<TracerInput>,
 ) -> Result<Option<handler::ExecutionOutcome>, EthereumError>
@@ -284,7 +284,6 @@ where
         block,
         config,
         precompiles,
-        allocated_ticks,
         effective_gas_price,
         tracer,
     );
