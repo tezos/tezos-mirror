@@ -42,7 +42,7 @@ By default, the configuration file (`config.json`) is located in your `data_dir`
 directory.
 
 - Websocket server (with Resto backend) can be configured to rate limit messages
-  with the field `experimental_features.websocket_rate_limit`. (!17510)
+  with the field `experimental_features.websocket_rate_limit`. (!17510 !17523)
 
 ## Version 0.20 (2025-03-21)
 

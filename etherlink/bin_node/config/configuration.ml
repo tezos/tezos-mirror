@@ -137,7 +137,8 @@ let tx_queue_opt_encoding =
     ]
 
 type websocket_rate_limit = {
-  max_messages : int;
+  max_frames : int;
+  max_messages : int option;
   interval : int;
   strategy : [`Wait | `Error | `Close];
 }
@@ -929,13 +930,41 @@ let websocket_rate_limit_strategy_encoding =
 
 let websocket_rate_limit_encoding =
   let open Data_encoding in
-  conv
-    (fun {max_messages; interval; strategy} ->
-      (max_messages, interval, strategy))
-    (fun (max_messages, interval, strategy) ->
-      {max_messages; interval; strategy})
-  @@ obj3
-       (req
+  conv_with_guard
+    (fun {max_frames; max_messages; interval; strategy} ->
+      (Some max_frames, max_messages, interval, strategy))
+    (fun (max_frames, max_messages, interval, strategy) ->
+      let open Result_syntax in
+      (* The "rate limit on frames" acts as a first protection against spam (the
+         check is run earlier) but is violent because it closes the connection,
+         whereas the limit on messages can be more fine tuned to allow other
+         behaviors. It must be set when rate limiting is enabled. *)
+      let+ max_frames =
+        match (max_frames, max_messages) with
+        | None, None -> fail "Specify max_frames and/or max_messages"
+        | None, Some max_messages ->
+            (* We've chosen to allow 10 x more frames than messages by default if
+               the user forgets to provide a frame limit to be on the safe side,
+               but it's recommended that users set both limits depending on their
+               setup and application. *)
+            return (10 * max_messages)
+        | Some max_frames, None -> return max_frames
+        | Some max_frames, Some max_messages ->
+            if max_messages > max_frames then
+              (* We will always get more frames than messages because of control
+                 frames and message splitting. *)
+              fail "max_messages cannot be greater than max_frames"
+            else return max_frames
+      in
+      {max_frames; max_messages; interval; strategy})
+  @@ obj4
+       (opt
+          "max_frames"
+          ~description:
+            "Max allowed websocket frames in the below interval (10x \
+             max_messages when unspecified)."
+          int31)
+       (opt
           "max_messages"
           ~description:"Max allowed websocket messages in the below interval."
           int31)

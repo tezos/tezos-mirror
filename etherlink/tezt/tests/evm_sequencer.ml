@@ -10605,6 +10605,67 @@ let test_websocket_rate_limit strategy =
       unit
   | _, [`Exn e] -> raise e
 
+let test_websocket_frames_rate_limit () =
+  let max_frames = 100 in
+  let interval = 3 in
+  let patch_config =
+    Evm_node.patch_config_with_experimental_feature
+      ~rpc_server:Resto (* The limit is not implemented for Dream *)
+      ~enable_websocket:true
+      ~monitor_websocket_heartbeat:false (* To not count ping/pong frames *)
+      ~websocket_rate_limit:
+        (`O
+          [
+            ("max_frames", `Float (float_of_int max_frames));
+            ("interval", `Float (float_of_int interval));
+          ])
+      ()
+  in
+  register_sandbox
+    ~tags:["evm"; "rpc"; "websocket"; "rate_limit"; "frames"]
+    ~title:"Websocket server limits rate of frames"
+    ~patch_config
+  @@ fun sequencer ->
+  let* websocket = Evm_node.open_websocket sequencer in
+  let*@ _ = produce_block sequencer in
+  let send_frames n =
+    List.init n Fun.id
+    |> Lwt_list.iter_p (fun _ -> Websocket.send_raw websocket "")
+  in
+  let ws_server_shutdown =
+    Evm_node.wait_for sequencer "websocket_shutdown.v0" @@ fun json ->
+    Some JSON.(json |-> "reason" |> as_string)
+  in
+  Log.info "Send frames below limit" ;
+  let* () = send_frames max_frames in
+  let* () =
+    Lwt.choose
+      [
+        (let* reason = ws_server_shutdown in
+         Test.fail ~__LOC__ "Websocket connection closed because %s." reason);
+        Lwt_unix.sleep 1.;
+      ]
+  in
+  Log.info "Wait for rate limit interval" ;
+  let* () = Lwt_unix.sleep (float_of_int interval) in
+  let* () =
+    Lwt.catch
+      (fun () -> send_frames (max_frames + 1))
+      (function Websocket.Connection_closed -> unit | e -> raise e)
+  in
+  let* reason =
+    Lwt.pick
+      [
+        ws_server_shutdown;
+        (let* () = Lwt_unix.sleep 5. in
+         Test.fail ~__LOC__ "Websocket worker did not close.");
+      ]
+  in
+  Log.info "Websocket shutdown reason: %S." reason ;
+  Check.(reason =~ rex "Rate limited by frames on websocket")
+    ~error_msg:"Expected close reason to match %R, got %L" ;
+  unit
+
 let test_websocket_heartbeat_monitoring () =
   let patch_config =
     Evm_node.patch_config_with_experimental_feature
@@ -12644,6 +12705,7 @@ let () =
   test_websocket_rate_limit `Close ;
   test_websocket_rate_limit `Error ;
   test_websocket_rate_limit `Wait ;
+  test_websocket_frames_rate_limit () ;
   test_websocket_heartbeat_monitoring () ;
   test_websocket_newPendingTransactions_event [Protocol.Alpha] ;
   test_websocket_logs_event [Protocol.Alpha] ;

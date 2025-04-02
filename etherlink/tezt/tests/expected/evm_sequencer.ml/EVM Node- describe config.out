@@ -164,7 +164,11 @@
                   considered dead and closed. */ },
       "websocket_rate_limit"?:
         { /* Rate limit for websocket server */
-          "max_messages":
+          "max_frames"?:
+            integer ∈ [-2^30, 2^30]
+            /* Max allowed websocket frames in the below interval (10x
+               max_messages when unspecified). */,
+          "max_messages"?:
             integer ∈ [-2^30, 2^30]
             /* Max allowed websocket messages in the below interval. */,
           "interval":
