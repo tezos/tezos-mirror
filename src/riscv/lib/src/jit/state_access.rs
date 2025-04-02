@@ -38,18 +38,29 @@ use cranelift_module::Module;
 use cranelift_module::ModuleResult;
 
 use super::builder::X64;
+use super::builder::stack_slots::StackSlots;
 use crate::machine_state::MachineCoreState;
+use crate::machine_state::memory::Address;
 use crate::machine_state::memory::MemoryConfig;
+use crate::machine_state::mode::Mode;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::registers::XValue;
 use crate::state_backend::ManagerReadWrite;
 use crate::state_backend::owned_backend::Owned;
+use crate::traps::EnvironException;
+use crate::traps::Exception;
 
 const PC_WRITE_SYMBOL: &str = "JSA::pc_write";
 
 const XREG_READ_SYMBOL: &str = "JSA::xreg_read";
 
 const XREG_WRITE_SYMBOL: &str = "JSA::xreg_write";
+
+const HANDLE_EXCEPTION: &str = "JSA::handle_exception";
+
+const RAISE_ILLEGAL_INSTRUCTION_EXCEPTION: &str = "JSA::raise_illegal_instruction_exception";
+
+const ECALL_FROM_MODE: &str = "JSA::ecall_from_mode";
 
 /// State Access that a JIT-compiled block may use.
 ///
@@ -72,6 +83,44 @@ pub trait JitStateAccess: ManagerReadWrite {
         reg: NonZeroXRegister,
         val: XValue,
     );
+
+    /// Handle an [`Exception`].
+    ///
+    /// If the exception is succesfully handled, the
+    /// `current_pc` is updated to the new value, and returns true.
+    ///
+    /// If the exception needs to be treated by the execution environment,
+    /// `result` is updated with the `EnvironException` and `false` is
+    /// returned.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the exception does not have `Some(_)` value.
+    ///
+    /// See [`MachineCoreState::address_on_exception`].
+    extern "C" fn handle_exception<MC: MemoryConfig>(
+        core: &mut MachineCoreState<MC, Self>,
+        current_pc: &mut Address,
+        exception: &Option<Exception>,
+        result: &mut Result<(), EnvironException>,
+    ) -> bool;
+
+    /// Raise an [`Exception::IllegalInstruction`].
+    ///
+    /// Writes the instruction to the given exception memory, after which it would be safe to
+    /// assume it is initialised.
+    extern "C" fn raise_illegal_instruction_exception(exception_out: &mut Option<Exception>) {
+        *exception_out = Some(Exception::IllegalInstruction);
+    }
+
+    /// Raise the appropriate environment-call exception given the current machine mode.
+    ///
+    /// Writes the exception to the given exception memory, after which it would be safe to
+    /// assume it is initialised.
+    extern "C" fn ecall<MC: MemoryConfig>(
+        core: &mut MachineCoreState<MC, Self>,
+        exception_out: &mut Option<Exception>,
+    );
 }
 
 impl JitStateAccess for Owned {
@@ -93,6 +142,40 @@ impl JitStateAccess for Owned {
     ) {
         core.hart.xregisters.write_nz(reg, val)
     }
+
+    extern "C" fn handle_exception<MC: MemoryConfig>(
+        core: &mut MachineCoreState<MC, Self>,
+        current_pc: &mut Address,
+        exception: &Option<Exception>,
+        result: &mut Result<(), EnvironException>,
+    ) -> bool {
+        let exception = exception.expect("handle_exception requires that the exception be set");
+        let res = core.address_on_exception(exception, *current_pc);
+
+        match res {
+            Err(e) => {
+                *result = Err(e);
+                false
+            }
+            Ok(address) => {
+                *current_pc = address;
+                true
+            }
+        }
+    }
+
+    extern "C" fn ecall<MC: MemoryConfig>(
+        core: &mut MachineCoreState<MC, Self>,
+        exception_out: &mut Option<Exception>,
+    ) {
+        let exception = match core.hart.mode.read() {
+            Mode::User => Exception::EnvCallFromUMode,
+            Mode::Supervisor => Exception::EnvCallFromSMode,
+            Mode::Machine => Exception::EnvCallFromMMode,
+        };
+
+        *exception_out = Some(exception);
+    }
 }
 
 /// Register state access symbols in the builder.
@@ -113,6 +196,21 @@ pub(super) fn register_jsa_symbols<MC: MemoryConfig, JSA: JitStateAccess>(
         XREG_WRITE_SYMBOL,
         <JSA as JitStateAccess>::xregister_write::<MC> as *const u8,
     );
+
+    builder.symbol(
+        HANDLE_EXCEPTION,
+        <JSA as JitStateAccess>::handle_exception::<MC> as *const u8,
+    );
+
+    builder.symbol(
+        RAISE_ILLEGAL_INSTRUCTION_EXCEPTION,
+        <JSA as JitStateAccess>::raise_illegal_instruction_exception as *const u8,
+    );
+
+    builder.symbol(
+        ECALL_FROM_MODE,
+        <JSA as JitStateAccess>::ecall::<MC> as *const u8,
+    );
 }
 
 /// Identifications of globally imported [`JitStateAccess`] methods.
@@ -120,6 +218,9 @@ pub(super) struct JsaImports<MC: MemoryConfig, JSA: JitStateAccess> {
     pc_write: FuncId,
     xreg_read: FuncId,
     xreg_write: FuncId,
+    handle_exception: FuncId,
+    raise_illegal_instruction_exception: FuncId,
+    ecall_from_mode: FuncId,
     _pd: PhantomData<(MC, JSA)>,
 }
 
@@ -161,10 +262,41 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JsaImports<MC, JSA> {
         let xreg_write =
             module.declare_function(XREG_WRITE_SYMBOL, Linkage::Import, &xregister_write_sig)?;
 
+        // Error Handling
+        let handle_exception_sig = Signature {
+            params: vec![ptr, ptr, ptr, ptr],
+            returns: vec![AbiParam::new(I8)],
+            call_conv,
+        };
+        let handle_exception =
+            module.declare_function(HANDLE_EXCEPTION, Linkage::Import, &handle_exception_sig)?;
+
+        let raise_illegal_exception_sig = Signature {
+            params: vec![ptr],
+            returns: vec![],
+            call_conv,
+        };
+        let raise_illegal_instruction_exception = module.declare_function(
+            RAISE_ILLEGAL_INSTRUCTION_EXCEPTION,
+            Linkage::Import,
+            &raise_illegal_exception_sig,
+        )?;
+
+        let ecall_from_mode_sig = Signature {
+            params: vec![ptr, ptr],
+            returns: vec![],
+            call_conv,
+        };
+        let ecall_from_mode =
+            module.declare_function(ECALL_FROM_MODE, Linkage::Import, &ecall_from_mode_sig)?;
+
         Ok(Self {
             pc_write,
             xreg_read,
             xreg_write,
+            handle_exception,
+            raise_illegal_instruction_exception,
+            ecall_from_mode,
             _pd: PhantomData,
         })
     }
@@ -178,6 +310,9 @@ pub(super) struct JsaCalls<'a, MC: MemoryConfig, JSA: JitStateAccess> {
     pc_write: Option<FuncRef>,
     xreg_read: Option<FuncRef>,
     xreg_write: Option<FuncRef>,
+    handle_exception: Option<FuncRef>,
+    raise_illegal_instruction_exception: Option<FuncRef>,
+    ecall_from_mode: Option<FuncRef>,
     _pd: PhantomData<(MC, JSA)>,
 }
 
@@ -190,6 +325,9 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
             pc_write: None,
             xreg_read: None,
             xreg_write: None,
+            handle_exception: None,
+            raise_illegal_instruction_exception: None,
+            ecall_from_mode: None,
             _pd: PhantomData,
         }
     }
@@ -239,4 +377,94 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> JsaCalls<'a, MC, JSA> {
         let reg = builder.ins().iconst(I8, reg as i64);
         builder.ins().call(*xreg_write, &[core_ptr, reg, value.0]);
     }
+
+    /// Emit the required IR to call `handle_exception`.
+    ///
+    /// # Panics
+    ///
+    /// The call to `handle_exception` will panic (at runtime) if no exception
+    /// has occurred so-far in the JIT-compiled function, if the error-handling
+    /// code is triggerred.
+    pub(super) fn handle_exception(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        core_ptr: Value,
+        exception_ptr: Value,
+        result_ptr: Value,
+        current_pc: X64,
+        stack_slots: &mut StackSlots,
+    ) -> ExceptionHandledOutcome {
+        let handle_exception = self.handle_exception.get_or_insert_with(|| {
+            self.module
+                .declare_func_in_func(self.imports.handle_exception, builder.func)
+        });
+
+        stack_slots.instr_pc_store(builder, current_pc);
+
+        let pc_ptr = stack_slots.instr_pc_ptr(builder);
+
+        let call = builder.ins().call(*handle_exception, &[
+            core_ptr,
+            pc_ptr,
+            exception_ptr,
+            result_ptr,
+        ]);
+
+        let handled = builder.inst_results(call)[0];
+        let new_pc = stack_slots.instr_pc_load(builder);
+
+        ExceptionHandledOutcome { handled, new_pc }
+    }
+
+    /// Emit the required IR to call `raise_illegal_exception`.
+    ///
+    /// This sets the exception to `Some(_)` with the illegal instruction exception.
+    pub(super) fn raise_illegal_instruction_exception(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        exception_ptr: Value,
+    ) {
+        let raise_illegal = self
+            .raise_illegal_instruction_exception
+            .get_or_insert_with(|| {
+                self.module.declare_func_in_func(
+                    self.imports.raise_illegal_instruction_exception,
+                    builder.func,
+                )
+            });
+
+        builder.ins().call(*raise_illegal, &[exception_ptr]);
+    }
+
+    /// Emit the required IR to call `ecall`.
+    ///
+    /// This sets the exception to `Some(_)` with the appropriate environment call exception for
+    /// the current machine mode.
+    pub(super) fn ecall(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        core_ptr: Value,
+        exception_ptr: Value,
+    ) {
+        let ecall_from_mode = self.ecall_from_mode.get_or_insert_with(|| {
+            self.module
+                .declare_func_in_func(self.imports.ecall_from_mode, builder.func)
+        });
+
+        builder
+            .ins()
+            .call(*ecall_from_mode, &[core_ptr, exception_ptr]);
+    }
+}
+
+/// Outcome of handling an exception.
+pub(super) struct ExceptionHandledOutcome {
+    /// Whether the exception was succesfully handled.
+    ///
+    /// - If true, the exception was handled and the step is completed.
+    /// - If false, the exception must be instead handled by the environment.
+    ///   The step is not complete.
+    pub handled: Value,
+    /// The new value of the instruction pc, after exception handling.
+    pub new_pc: X64,
 }

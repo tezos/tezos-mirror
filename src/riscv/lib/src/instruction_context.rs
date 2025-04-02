@@ -15,6 +15,7 @@ use crate::machine_state::MachineCoreState;
 use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::instruction::Args;
 use crate::machine_state::memory::MemoryConfig;
+use crate::machine_state::mode::Mode;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::machine_state::registers::XRegister;
 use crate::machine_state::registers::XValue;
@@ -93,6 +94,9 @@ pub trait ICB {
     /// Wrap a value as a fallible value.
     fn ok<Value>(&mut self, val: Value) -> Self::IResult<Value>;
 
+    /// Raise an [`Exception::IllegalInstruction`] error.
+    fn err_illegal_instruction<In>(&mut self) -> Self::IResult<In>;
+
     /// Map the fallible-value into a fallible-value of a different type.
     fn map<Value, Next, F>(res: Self::IResult<Value>, f: F) -> Self::IResult<Next>
     where
@@ -102,6 +106,9 @@ pub trait ICB {
     fn and_then<Value, Next, F>(res: Self::IResult<Value>, f: F) -> Self::IResult<Next>
     where
         F: FnOnce(Value) -> Self::IResult<Next>;
+
+    /// Exception to perform an ECall at the current mode
+    fn ecall(&mut self) -> Self::IResult<ProgramCounterUpdate<Self::XValue>>;
 
     // ----------------
     // Provided Methods
@@ -201,6 +208,11 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
     }
 
     #[inline(always)]
+    fn err_illegal_instruction<In>(&mut self) -> Self::IResult<In> {
+        Err(Exception::IllegalInstruction)
+    }
+
+    #[inline(always)]
     fn map<In, Out, F>(res: Self::IResult<In>, f: F) -> Self::IResult<Out>
     where
         F: FnOnce(In) -> Out,
@@ -214,6 +226,14 @@ impl<MC: MemoryConfig, M: ManagerReadWrite> ICB for MachineCoreState<MC, M> {
         F: FnOnce(In) -> Self::IResult<Out>,
     {
         res.and_then(f)
+    }
+
+    fn ecall(&mut self) -> Self::IResult<ProgramCounterUpdate<Self::XValue>> {
+        Err(match self.hart.mode.read() {
+            Mode::User => Exception::EnvCallFromUMode,
+            Mode::Supervisor => Exception::EnvCallFromSMode,
+            Mode::Machine => Exception::EnvCallFromMMode,
+        })
     }
 }
 

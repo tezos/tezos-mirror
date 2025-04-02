@@ -158,7 +158,7 @@ impl<MC: memory::MemoryConfig, M: backend::ManagerBase> MachineCoreState<MC, M> 
     ///
     /// Return the new address of the program counter, becoming the address of a trap handler.
     /// Throw [`EnvironException`] if the exception needs to be treated by the execution enviroment.
-    fn address_on_exception(
+    pub(crate) fn address_on_exception(
         &mut self,
         exception: Exception,
         current_pc: Address,

@@ -32,9 +32,16 @@ use crate::machine_state::instruction::Instruction;
 use crate::machine_state::memory::MemoryConfig;
 use crate::state_backend::hash::Hash;
 use crate::traps::EnvironException;
+use crate::traps::Exception;
 
 /// Alias for the function signature produced by the JIT compilation.
-type JitFn<MC, JSA> = unsafe extern "C" fn(&mut MachineCoreState<MC, JSA>, u64, &mut usize);
+type JitFn<MC, JSA> = unsafe extern "C" fn(
+    &mut MachineCoreState<MC, JSA>,
+    u64,
+    &mut usize,
+    &mut Option<Exception>,
+    &mut Result<(), EnvironException>,
+);
 
 /// A jit-compiled function that can be [called] over [`MachineCoreState`].
 ///
@@ -56,8 +63,11 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JCall<MC, JSA> {
         pc: u64,
         steps: &mut usize,
     ) -> Result<(), EnvironException> {
-        (self.fun)(core, pc, steps);
-        Ok(())
+        let mut res = Ok(());
+        let mut exception = None;
+        (self.fun)(core, pc, steps, &mut exception, &mut res);
+
+        res
     }
 }
 
@@ -168,6 +178,14 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
                 (lower)(i.args(), &mut builder)
             };
 
+            let Some(pc_update) = pc_update else {
+                builder.end_unconditional_exception();
+
+                let jcall = self.produce_function(hash);
+
+                return Some(jcall);
+            };
+
             if !builder.complete_step(pc_update) {
                 // We have encountered an unconditional jump, exit the block.
                 break;
@@ -175,15 +193,9 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
         }
 
         builder.end();
+        let jcall = self.produce_function(hash);
 
-        let name = hex::encode(hash);
-
-        let fun = self.finalise(&name);
-        let jcall = JCall { fun };
-
-        self.cache.insert(*hash, Some(jcall.clone()));
-
-        Some(JCall { fun })
+        Some(jcall)
     }
 
     /// Setup the builder, ensuring the entry block of the function is correct.
@@ -203,11 +215,25 @@ impl<MC: MemoryConfig, JSA: JitStateAccess> JIT<MC, JSA> {
         self.ctx.func.signature.params.push(AbiParam::new(ptr));
         self.ctx.func.signature.params.push(AbiParam::new(I64));
         self.ctx.func.signature.params.push(AbiParam::new(ptr));
+        self.ctx.func.signature.params.push(AbiParam::new(ptr));
+        self.ctx.func.signature.params.push(AbiParam::new(ptr));
 
         let builder = FunctionBuilder::new(&mut self.ctx.func, &mut self.builder_context);
         let jsa_call = JsaCalls::func_calls(&mut self.module, &self.jsa_imports);
 
         Builder::<'_, MC, JSA>::new(ptr, builder, jsa_call)
+    }
+
+    /// Finalise and cache the function under construction.
+    fn produce_function(&mut self, hash: &Hash) -> JCall<MC, JSA> {
+        let name = hex::encode(hash);
+
+        let fun = self.finalise(&name);
+        let jcall = JCall { fun };
+
+        self.cache.insert(*hash, Some(jcall.clone()));
+
+        JCall { fun }
     }
 
     /// Finalise the function currently under construction.
@@ -266,6 +292,7 @@ mod tests {
     use crate::machine_state::block_cache::bcall::InterpretedBlockBuilder;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::memory::MemoryConfig;
+    use crate::machine_state::mode::Mode;
     use crate::machine_state::registers::NonZeroXRegister;
     use crate::machine_state::registers::XRegister;
     use crate::machine_state::registers::nz;
@@ -1272,6 +1299,49 @@ mod tests {
                 -12,
             ),
         ];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
+
+    backend_test!(test_unknown, F, {
+        let scenarios: &[Scenario<F>] = &[ScenarioBuilder::default()
+            .set_expected_steps(2)
+            .set_instructions(&[
+                I::new_nop(Uncompressed),
+                I::new_unknown(Compressed),
+                I::new_nop(Uncompressed),
+            ])
+            .build()];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
+
+    backend_test!(test_ecall, F, {
+        use strum::IntoEnumIterator;
+
+        let scenarios: Vec<Scenario<F>> = Mode::iter()
+            .map(|mode| {
+                ScenarioBuilder::default()
+                    .set_expected_steps(1)
+                    .set_setup_hook(setup_hook!(core, F, { core.hart.mode.write(mode) }))
+                    .set_instructions(&[
+                        I::new_nop(Uncompressed),
+                        I::new_ecall(),
+                        I::new_nop(Uncompressed),
+                    ])
+                    .build()
+            })
+            .collect();
 
         let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
         let mut interpreted_bb = InterpretedBlockBuilder;

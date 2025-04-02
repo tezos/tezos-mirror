@@ -8,6 +8,7 @@
 
 pub(super) mod arithmetic;
 pub(super) mod block_state;
+pub(super) mod stack_slots;
 
 use cranelift::codegen::ir;
 use cranelift::codegen::ir::InstBuilder;
@@ -19,10 +20,12 @@ use cranelift::codegen::ir::types::I64;
 use cranelift::frontend::FunctionBuilder;
 
 use self::block_state::DynamicValues;
+use self::stack_slots::StackSlots;
 use super::state_access::JitStateAccess;
 use super::state_access::JsaCalls;
 use crate::instruction_context::ICB;
 use crate::instruction_context::Predicate;
+use crate::jit::builder::block_state::PCUpdate;
 use crate::machine_state::ProgramCounterUpdate;
 use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::registers::NonZeroXRegister;
@@ -48,6 +51,9 @@ pub(super) struct Builder<'a, MC: MemoryConfig, JSA: JitStateAccess> {
     /// Value representing a pointer to `steps: usize`
     steps_ptr_val: Value,
 
+    /// Value representing a pointer to `Option<Exception>`
+    exception_ptr_val: Value,
+
     /// Values that are dynamically updated throughout lowering.
     dynamic: DynamicValues,
 
@@ -58,6 +64,12 @@ pub(super) struct Builder<'a, MC: MemoryConfig, JSA: JitStateAccess> {
     /// *N.B.* the end block can be jumped-to from multiple places, for example by every branching
     /// point, and also once all instructions have been executed--if no branching took place.
     end_block: Option<ir::Block>,
+
+    /// Value representing a pointer to `result: Result<(), EnvironException>`
+    result_ptr_val: Value,
+
+    /// Stack Slots for storing temporary values on the stack during execution.
+    stack_slots: StackSlots,
 }
 
 impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
@@ -79,6 +91,10 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
         let core_ptr_val = builder.block_params(entry_block)[0];
         let pc_val = X64(builder.block_params(entry_block)[1]);
         let steps_ptr_val = builder.block_params(entry_block)[2];
+        let exception_ptr_val = builder.block_params(entry_block)[3];
+        let result_ptr_val = builder.block_params(entry_block)[4];
+
+        let stack_slots = StackSlots::new(ptr, &mut builder);
 
         Self {
             ptr,
@@ -86,7 +102,10 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
             jsa_call,
             core_ptr_val,
             steps_ptr_val,
+            exception_ptr_val,
+            result_ptr_val,
             dynamic: DynamicValues::new(pc_val),
+            stack_slots,
             end_block: None,
         }
     }
@@ -125,6 +144,11 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
     /// [`finalised`]: super::JIT::finalise
     pub(super) fn end(mut self) {
         self.jump_to_end();
+        self.builder.seal_all_blocks();
+        self.builder.finalize();
+    }
+
+    pub(super) fn end_unconditional_exception(mut self) {
         self.builder.seal_all_blocks();
         self.builder.finalize();
     }
@@ -177,11 +201,68 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> Builder<'a, MC, JSA> {
         self.builder.ins().jump(end_block, &[pc_val.0, steps_val]);
         self.finalise_end_block(end_block)
     }
+
+    /// Handle an exception that has occurred.
+    fn handle_exception(&mut self) {
+        let current_pc = self.pc_read();
+
+        let outcome = self.jsa_call.handle_exception(
+            &mut self.builder,
+            self.core_ptr_val,
+            self.exception_ptr_val,
+            self.result_ptr_val,
+            current_pc,
+            &mut self.stack_slots,
+        );
+
+        // if handled -> jump to end with updated pc_ptr. Add steps += 1
+        self.exit_on_branch(outcome.handled, |builder| {
+            builder.complete_step(PCUpdate::Absolute(outcome.new_pc));
+        });
+
+        // if !handled -> exit directly; environ needs to be consulted.
+        //                pc has been committed
+        self.jump_to_end();
+    }
+
+    /// Branch and exit if the given condition holds.
+    ///
+    /// When needing to exit the 'block-cache' block - on either a `run_branch` or due to
+    /// an exception occuring, we jump to the end of the compiled function.
+    ///
+    /// There is a little cleanup to do, before doing so, however: potentially needing to
+    /// complete the current step.
+    ///
+    /// Semantically, this function returns the caller into the context of the 'fallthrough'
+    /// block - ie, the where the branch condition fails.
+    fn exit_on_branch(&mut self, cond: Value, on_branching: impl FnOnce(&mut Self)) {
+        let on_branch = self.builder.create_block();
+        let fallthrough = self.builder.create_block();
+
+        self.builder
+            .ins()
+            .brif(cond, on_branch, &[], fallthrough, &[]);
+
+        // both IR blocks need access to the dynamic values at this point in time.
+        // These are modified by the jump to the end block below, and possibly by the
+        // `on_branching` function.
+        let snapshot = self.dynamic;
+
+        self.builder.switch_to_block(on_branch);
+
+        on_branching(self);
+        self.jump_to_end();
+        self.builder.seal_block(on_branch);
+
+        // Restore the dynamic values to the branching point, for the fallthrough block.
+        self.dynamic = snapshot;
+        self.builder.switch_to_block(fallthrough);
+    }
 }
 
 impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
     type XValue = X64;
-    type IResult<Value> = Value;
+    type IResult<Value> = Option<Value>;
 
     /// An `I8` width value.
     type Bool = Value;
@@ -235,46 +316,52 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
         offset: i64,
         instr_width: InstrWidth,
     ) -> ProgramCounterUpdate<Self::XValue> {
-        let branch_block = self.builder.create_block();
-        let fallthrough_block = self.builder.create_block();
-
-        self.builder
-            .ins()
-            .brif(condition, branch_block, &[], fallthrough_block, &[]);
-
-        let snapshot = self.dynamic;
-
-        // Handle branching block
-        self.builder.switch_to_block(branch_block);
-
-        self.complete_step(block_state::PCUpdate::Offset(offset));
-        self.jump_to_end();
-
-        self.builder.seal_block(branch_block);
-
-        // Continue on the fallthrough block
-        self.dynamic = snapshot;
-        self.builder.switch_to_block(fallthrough_block);
+        self.exit_on_branch(condition, |builder| {
+            builder.complete_step(block_state::PCUpdate::Offset(offset));
+        });
 
         ProgramCounterUpdate::Next(instr_width)
     }
 
     fn ok<Value>(&mut self, val: Value) -> Self::IResult<Value> {
-        val
+        Some(val)
     }
 
-    fn map<Value, Next, F>(_res: Self::IResult<Value>, _f: F) -> Self::IResult<Next>
+    fn err_illegal_instruction<In>(&mut self) -> Self::IResult<In> {
+        self.jsa_call
+            .raise_illegal_instruction_exception(&mut self.builder, self.exception_ptr_val);
+
+        self.handle_exception();
+
+        None
+    }
+
+    #[allow(unused)]
+    fn map<Value, Next, F>(res: Self::IResult<Value>, f: F) -> Self::IResult<Next>
     where
         F: FnOnce(Value) -> Next,
     {
-        todo!("RV-415: support fallible pathways in JIT")
+        res.map(f)
     }
 
-    fn and_then<Value, Next, F>(_res: Self::IResult<Value>, _f: F) -> Self::IResult<Next>
+    #[allow(unused)]
+    fn and_then<Value, Next, F>(res: Self::IResult<Value>, f: F) -> Self::IResult<Next>
     where
         F: FnOnce(Value) -> Self::IResult<Next>,
     {
-        todo!("RV-415: support fallible pathways in JIT")
+        match res {
+            Some(value) => f(value),
+            None => None,
+        }
+    }
+
+    fn ecall(&mut self) -> Self::IResult<ProgramCounterUpdate<Self::XValue>> {
+        self.jsa_call
+            .ecall(&mut self.builder, self.core_ptr_val, self.exception_ptr_val);
+
+        self.handle_exception();
+
+        None
     }
 }
 

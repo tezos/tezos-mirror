@@ -75,7 +75,7 @@ impl TryFrom<&Exception> for EnvironException {
 }
 
 /// RISC-V Exceptions (also known as synchronous exceptions)
-#[derive(PartialEq, Eq, thiserror::Error, strum::Display)]
+#[derive(PartialEq, Eq, thiserror::Error, strum::Display, Clone, Copy)]
 pub enum Exception {
     /// `InstructionAccessFault(addr)` where `addr` is the faulting instruction address
     InstructionAccessFault(Address),
