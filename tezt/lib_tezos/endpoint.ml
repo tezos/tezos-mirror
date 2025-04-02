@@ -25,6 +25,8 @@
 
 type t = {host : string; scheme : string; port : int}
 
+let make ~host ~scheme ~port () = {host; scheme; port}
+
 let rpc_host {host; _} = host
 
 let rpc_port {port; _} = port

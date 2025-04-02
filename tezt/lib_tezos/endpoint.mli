@@ -27,6 +27,8 @@
 
 type t = {host : string; scheme : string; port : int}
 
+val make : host:string -> scheme:string -> port:int -> unit -> t
+
 val rpc_host : t -> string
 
 val rpc_port : t -> int
