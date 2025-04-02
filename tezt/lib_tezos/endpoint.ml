@@ -23,9 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {host : string; scheme : string; port : int}
+type t = {host : string; scheme : string; port : int; path : string}
 
-let make ~host ~scheme ~port () = {host; scheme; port}
+let make ?(path = "") ~host ~scheme ~port () = {host; scheme; port; path}
 
 let rpc_host {host; _} = host
 
@@ -33,7 +33,9 @@ let rpc_port {port; _} = port
 
 let rpc_scheme {scheme; _} = scheme
 
-let as_string {scheme; host; port} =
-  Printf.sprintf "%s://%s:%d" scheme host port
+let rpc_path {path; _} = path
+
+let as_string {scheme; host; port; path} =
+  Printf.sprintf "%s://%s:%d%s" scheme host port path
 
 let to_uri v = as_string v |> Uri.of_string
