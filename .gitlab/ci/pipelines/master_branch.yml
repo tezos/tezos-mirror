@@ -454,13 +454,15 @@ documentation:manuals:
     when: on_success
   needs:
   - oc.docker:ci:amd64
+  - oc.build:static-x86_64-linux-binaries
   dependencies:
   - oc.docker:ci:amd64
+  - oc.build:static-x86_64-linux-binaries
   timeout: 60 minutes
   before_script:
   - eval $(opam env)
   script:
-  - make -C docs -j octez-gen
+  - scripts/ci/documentation:manuals_static.sh
   artifacts:
     expire_in: 1 week
     paths:
