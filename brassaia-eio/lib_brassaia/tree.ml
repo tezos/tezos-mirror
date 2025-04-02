@@ -184,7 +184,7 @@ module Make (P : Backend.S) = struct
   include Perf_counters
 
   module Path = struct
-    include P.Node.Path
+    include Path
 
     let fold_right t ~f ~init =
       let steps = map t Fun.id in
@@ -192,7 +192,7 @@ module Make (P : Backend.S) = struct
   end
 
   module Brassaia_proof = Proof
-  module Tree_proof = Proof.Make (P.Contents.Val) (P.Hash) (Path)
+  module Tree_proof = Proof.Make (P.Contents.Val) (P.Hash)
   module Env = Proof.Env (P)
 
   let merge_env x y =
@@ -230,11 +230,7 @@ module Make (P : Backend.S) = struct
         arr
   end
 
-  type path = Path.t [@@deriving brassaia ~pp]
-
   type hash = P.Hash.t [@@deriving brassaia ~pp ~equal ~compare]
-
-  type step = Path.step [@@deriving brassaia ~pp ~compare]
 
   type contents = P.Contents.Val.t [@@deriving brassaia ~equal ~pp]
 
@@ -246,11 +242,11 @@ module Make (P : Backend.S) = struct
 
   type 'a or_error = ('a, error) result
 
-  type 'a force = [`True | `False of path -> 'a -> 'a]
+  type 'a force = [`True | `False of Path.t -> 'a -> 'a]
 
   type uniq = [`False | `True | `Marks of marks]
 
-  type ('a, 'b) folder = path -> 'b -> 'a -> 'a
+  type ('a, 'b) folder = Path.t -> 'b -> 'a -> 'a
 
   type depth = [`Eq of int | `Le of int | `Lt of int | `Ge of int | `Gt of int]
   [@@deriving brassaia]
@@ -728,7 +724,7 @@ module Make (P : Backend.S) = struct
           assert false
 
     module Core_value
-        (N : Node.Generic_key.Core with type step := step and type hash := hash)
+        (N : Node.Generic_key.Core with type hash := hash)
         (To_elt : sig
           type repo
 
@@ -1416,13 +1412,13 @@ module Make (P : Backend.S) = struct
 
     let findv = findv_aux ~value_of_key
 
-    let seq_of_map ?(offset = 0) ?length m : (step * elt) Seq.t =
+    let seq_of_map ?(offset = 0) ?length m : (Path.step * elt) Seq.t =
       let take seq =
         match length with None -> seq | Some n -> Seq.take n seq
       in
       StepMap.to_seq m |> Seq.drop offset |> take
 
-    let seq ?offset ?length ~cache t : (step * elt) Seq.t or_error =
+    let seq ?offset ?length ~cache t : (Path.step * elt) Seq.t or_error =
       let env = t.info.env in
       match
         (Scan.cascade
@@ -1493,8 +1489,8 @@ module Make (P : Backend.S) = struct
         force:acc force ->
         cache:bool ->
         uniq:uniq ->
-        pre:(acc, step list) folder option ->
-        post:(acc, step list) folder option ->
+        pre:(acc, Path.step list) folder option ->
+        post:(acc, Path.step list) folder option ->
         path:Path.t ->
         ?depth:depth ->
         node:(acc, _) folder ->
@@ -1619,7 +1615,7 @@ module Make (P : Backend.S) = struct
           match Hashes.add marks h with
           | `Duplicate -> k acc
           | `Ok -> (aux [@tailcall]) ~path acc d t k
-      and step : type r. (step * elt, acc, r) cps_folder =
+      and step : type r. (Path.step * elt, acc, r) cps_folder =
        fun ~path acc d (s, v) k ->
         let path = Path.rcons path s in
         match v with
@@ -1636,7 +1632,7 @@ module Make (P : Backend.S) = struct
             | Some (`Lt depth) -> if d < depth - 1 then apply () else k acc
             | Some (`Ge depth) -> if d >= depth - 1 then apply () else k acc
             | Some (`Gt depth) -> if d >= depth then apply () else k acc)
-      and steps : type r. ((step * elt) Seq.t, acc, r) cps_folder =
+      and steps : type r. ((Path.step * elt) Seq.t, acc, r) cps_folder =
        fun ~path acc d s k ->
         match s () with
         | Seq.Nil -> k acc
@@ -1668,7 +1664,7 @@ module Make (P : Backend.S) = struct
           | Some updates -> seq_of_updates updates bindings
         in
         seq ~path acc d bindings k
-      and seq : type r. ((step * elt) Seq.t, acc, r) cps_folder =
+      and seq : type r. ((Path.step * elt) Seq.t, acc, r) cps_folder =
        fun ~path acc d bindings k ->
         let acc = pre path bindings acc in
         (steps [@tailcall]) ~path acc d bindings (fun acc ->
@@ -2006,7 +2002,7 @@ module Make (P : Backend.S) = struct
     {s with width}
 
   let err_not_found n k =
-    Fmt.kstr invalid_arg "Brassaia.Tree.%s: %a not found" n pp_path k
+    Fmt.kstr invalid_arg "Brassaia.Tree.%s: %a not found" n Path.pp k
 
   let get_tree (t : t) path =
     find_tree t path |> function
@@ -2120,7 +2116,7 @@ module Make (P : Backend.S) = struct
             | `Contents c when contents_equal c c' -> root_tree
             | _ -> new_root))
     | Some (path, file) -> (
-        let rec aux : type r. path -> node -> (node updated, r) cont_lwt =
+        let rec aux : type r. Path.t -> node -> (node updated, r) cont_lwt =
          fun path parent_node k ->
           let changed n = k (Changed n) in
           match Path.decons path with
@@ -2598,7 +2594,7 @@ module Make (P : Backend.S) = struct
       let todo = ref todo in
       let () =
         alist_iter2_lwt
-          compare_step
+          Path.compare_step
           (fun key v () ->
             let path = Path.rcons path key in
             match v with
@@ -2700,8 +2696,9 @@ module Make (P : Backend.S) = struct
               | Non_empty n -> k (Non_empty (`Node n)))
     and tree :
         type r.
-        Node.elt StepMap.t -> (step * concrete) list -> (node or_empty, r) cont
-        =
+        Node.elt StepMap.t ->
+        (Path.step * concrete) list ->
+        (node or_empty, r) cont =
      fun map t k ->
       match t with
       | [] ->
@@ -2721,7 +2718,7 @@ module Make (P : Backend.S) = struct
                      | Some _ ->
                          Fmt.invalid_arg
                            "of_concrete: duplicate bindings for step `%a`"
-                           pp_step
+                           Path.pp_step
                            s)
                    map)
                 t
@@ -2738,7 +2735,9 @@ module Make (P : Backend.S) = struct
           let m = Node.to_map ~cache:true n in
           let bindings = m |> get_ok "to_concrete" |> StepMap.bindings in
           (node [@tailcall]) [] bindings (fun n ->
-              let n = List.sort (fun (s, _) (s', _) -> compare_step s s') n in
+              let n =
+                List.sort (fun (s, _) (s', _) -> Path.compare_step s s') n
+              in
               k (`Tree n))
     and contents : type r. Contents.t -> (concrete, r) cont_lwt =
      fun c k ->
@@ -2746,9 +2745,9 @@ module Make (P : Backend.S) = struct
       k (`Contents c)
     and node :
         type r.
-        (step * concrete) list ->
-        (step * Node.elt) list ->
-        ((step * concrete) list, r) cont_lwt =
+        (Path.step * concrete) list ->
+        (Path.step * Node.elt) list ->
+        ((Path.step * concrete) list, r) cont_lwt =
      fun childs x k ->
       match x with
       | [] -> k childs
@@ -2906,7 +2905,7 @@ module Make (P : Backend.S) = struct
 
     and iproof_of_values :
         type a.
-        node -> (step * Node.pnode_value) list -> (proof_inode -> a) -> a =
+        node -> (Path.step * Node.pnode_value) list -> (proof_inode -> a) -> a =
       let findv =
         let value_of_key ~cache:_ _node _repo k =
           let h = P.Node.Key.to_hash k in
@@ -2968,7 +2967,8 @@ module Make (P : Backend.S) = struct
 
     (* Recontruct private node from [P.Node.Val.empty] *)
     and load_node_proof :
-        type a. env:_ -> (step * proof_tree) list -> (kinded_hash -> a) -> a =
+        type a.
+        env:_ -> (Path.step * proof_tree) list -> (kinded_hash -> a) -> a =
      fun ~env n k ->
       let rec aux acc = function
         | [] ->
@@ -3029,7 +3029,8 @@ module Make (P : Backend.S) = struct
       aux [] proofs
 
     and node_proof_of_node :
-        type a. env:_ -> (step * proof_tree) list -> (node_proof -> a) -> a =
+        type a. env:_ -> (Path.step * proof_tree) list -> (node_proof -> a) -> a
+        =
      fun ~env node k ->
       let rec aux acc = function
         | [] -> k (`Values (List.rev acc))

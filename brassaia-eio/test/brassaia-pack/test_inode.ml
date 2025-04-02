@@ -38,8 +38,7 @@ module Inode_modules
     end) =
 struct
   module Key = Brassaia_pack_unix.Pack_key.Make (Schema.Hash)
-  module Node =
-    Brassaia.Node.Generic_key.Make_v2 (Schema.Hash) (Schema.Path) (Key) (Key)
+  module Node = Brassaia.Node.Generic_key.Make_v2 (Schema.Hash) (Key) (Key)
   module Index = Brassaia_pack_unix.Index.Make (Schema.Hash)
   module Inter =
     Brassaia_pack.Inode.Make_internal (Conf) (Schema.Hash) (Key) (Node)
@@ -201,14 +200,12 @@ let check_int _pos ?(msg = "") ~expected actual =
 
 (* Exhaustive inode structure generator *)
 module Inode_permutations_generator = struct
-  type step = string
-
   type content = Inode.Val.value
 
   type inode = Inode.value
 
   module StepMap = Map.Make (struct
-    type t = step
+    type t = Path.step
 
     let compare = compare
   end)
@@ -226,7 +223,7 @@ module Inode_permutations_generator = struct
   end)
 
   type t = {
-    steps : step list;
+    steps : Path.step list;
     content_per_step : content StepMap.t;
     steps_per_tree : StepSet.t list;
     trees : inode list;
@@ -235,18 +232,13 @@ module Inode_permutations_generator = struct
 
   (** [gen_step Inter index_list] uses brute force to generate a step such that
       [Inter.Val.index ~depth:i] maps to the ith index in the [index_list]. *)
-  let gen_step :
-      (module Brassaia_pack.Inode.Internal with type Val.step = Path.step) ->
-      int list ->
-      Path.step =
+  let gen_step : (module Brassaia_pack.Inode.Internal) -> int list -> Path.step
+      =
     let tbl = Hashtbl.create 10 in
     let max_brute_force_iterations = 100 in
     let letters_per_step = (max_brute_force_iterations + 25) / 26 in
     fun inter indices ->
-      let module Inter =
-        (val inter
-            : Brassaia_pack.Inode.Internal with type Val.step = Path.step)
-      in
+      let module Inter = (val inter : Brassaia_pack.Inode.Internal) in
       let rec aux i =
         if i > max_brute_force_iterations then
           failwith "Could not quickly generate a step"
@@ -267,7 +259,7 @@ module Inode_permutations_generator = struct
           s
 
   (** List all the steps that would fill a tree of depth [maxdepth_of_test]. *)
-  let gen_steps entries maxdepth_of_test : step list =
+  let gen_steps entries maxdepth_of_test : Path.step list =
     let ( ** ) a b = float_of_int a ** float_of_int b |> int_of_float in
     List.init (entries ** maxdepth_of_test) (fun i ->
         List.init maxdepth_of_test (fun j ->
@@ -314,9 +306,9 @@ module Inode_permutations_generator = struct
   (** [steps t] is a list of length [entries ^ maxdepth_of_test] (8) containing
       the necessary steps to fill a tree of depth equal to [maxdepth_of_test]
       (3). *)
-  let steps : t -> step list = fun {steps; _} -> steps
+  let steps : t -> Path.step list = fun {steps; _} -> steps
 
-  let content_of_step : t -> step -> content =
+  let content_of_step : t -> Path.step -> content =
    fun {content_per_step; _} s -> StepMap.find s content_per_step
 
   (** [trees t] is a list of length [2 ^ (entries ^ maxdepth_of_test)] (256)
@@ -856,7 +848,7 @@ module Child_ordering = struct
       by the user). *)
 
   module Step = struct
-    type t = Schema.Path.step [@@deriving brassaia ~short_hash]
+    type t = Path.step [@@deriving brassaia ~short_hash]
 
     module Hash =
       Brassaia.Hash.Typed
@@ -866,7 +858,7 @@ module Child_ordering = struct
 
           let t = t
 
-          let encoding = Schema.Path.step_encoding
+          let encoding = Path.step_encoding
         end)
 
     type nonrec hash = Hash.t [@@deriving brassaia ~to_bin_string]
@@ -874,7 +866,7 @@ module Child_ordering = struct
     let hash : t -> string = fun s -> hash_to_bin_string (Hash.hash s)
   end
 
-  module type S = Brassaia_pack.Inode.Child_ordering with type step := Step.t
+  module type S = Brassaia_pack.Inode.Child_ordering
 
   let make ?entries:(entries' = Brassaia_tezos.Conf.nb_entries)
       (t : Brassaia_pack.Conf.inode_child_order) : (module S) =

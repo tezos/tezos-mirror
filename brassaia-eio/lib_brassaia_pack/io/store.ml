@@ -29,7 +29,6 @@ struct
 
   module Make (Schema : Brassaia.Schema.Extended) = struct
     open struct
-      module P = Schema.Path
       module C = Schema.Contents
       module B = Schema.Branch
     end
@@ -65,7 +64,7 @@ struct
           include Inode.Make_persistent (H) (Value) (Inter) (Pack')
         end
 
-        include Brassaia.Node.Generic_key.Store (Contents) (CA) (H) (CA.Val) (P)
+        include Brassaia.Node.Generic_key.Store (Contents) (CA) (H) (CA.Val)
       end
 
       module Node_portable = Node.CA.Val.Portable
@@ -594,10 +593,6 @@ struct
 
       let traverse_inodes ~dump_blob_paths_to commit repo =
         let module Stats = Checks.Stats (struct
-          type nonrec step = step
-
-          let step_t = step_t
-
           module Hash = Hash
         end) in
         let t = Stats.create () in

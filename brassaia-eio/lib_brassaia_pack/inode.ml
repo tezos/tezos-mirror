@@ -89,11 +89,6 @@ struct
 
     let contents_key_encoding = Node.contents_key_encoding
 
-    type step = Node.step
-    [@@deriving brassaia ~compare ~to_bin_string ~of_bin_string ~short_hash]
-
-    let step_encoding = Node.step_encoding
-
     type value = Node.value [@@deriving brassaia ~equal]
 
     let value_encoding = Node.value_encoding
@@ -117,14 +112,14 @@ struct
     Brassaia.Hash.Typed
       (H)
       (struct
-        type t = T.step
+        type t = Path.step
 
-        let t = T.step_t
+        let t = Path.step_t
 
-        let encoding = T.step_encoding
+        let encoding = Path.step_encoding
       end)
 
-  module Child_ordering : Child_ordering with type step := T.step = struct
+  module Child_ordering : Child_ordering = struct
     open T
 
     type key = bytes
@@ -147,7 +142,7 @@ struct
       | `Seeded_hash | `Custom _ ->
           (* Bytes.unsafe_of_string usage: possibly safe TODO justify safety, or switch to
              use the safe Bytes.of_string *)
-          fun s -> Bytes.unsafe_of_string (step_to_bin_string s)
+          fun s -> Bytes.unsafe_of_string (Path.step_to_bin_string s)
 
     (* Assume [k = cryto_hash(step)] (see {!key}) and [Conf.entry] can
        can represented with [n] bits. Then, [hash_bits ~depth k] is
@@ -201,9 +196,9 @@ struct
 
   module StepMap = struct
     include Map.Make (struct
-      type t = T.step
+      type t = Path.step
 
-      let compare = T.compare_step
+      let compare = Path.compare_step
     end)
 
     let of_list l = List.fold_left (fun acc (k, v) -> add k v acc) empty l
@@ -363,7 +358,7 @@ struct
           (fun (depth, length, entries) -> {depth; length; entries})
           (tup3 uint8 uint8 (list (with_index_encoding vref_encoding))))
 
-    type 'vref v = Values of (step * value) list | Tree of 'vref tree
+    type 'vref v = Values of (Path.step * value) list | Tree of 'vref tree
     [@@deriving brassaia ~pre_hash]
 
     let v_encoding vref_encoding =
@@ -373,7 +368,7 @@ struct
           case
             (Tag 1)
             ~title:"Values"
-            (list (tup2 step_encoding value_encoding))
+            (list (tup2 Path.step_encoding value_encoding))
             (function Values l -> Some l | _ -> None)
             (fun l -> Values l);
           case
@@ -419,13 +414,11 @@ struct
 
   (* Compressed binary representation *)
   module Compress = struct
-    open T
-
     type dict_key = int [@@deriving brassaia]
 
     type pack_offset = int63 [@@deriving brassaia]
 
-    type name = Indirect of dict_key | Direct of step
+    type name = Indirect of dict_key | Direct of Path.step
 
     type address = Offset of pack_offset | Hash of H.t [@@deriving brassaia]
 
@@ -456,13 +449,13 @@ struct
           (* Different payload types that can appear after packed tags: *)
           let io  = [%typ: dict_key * pack_offset]
           let ih  = [%typ: dict_key * H.t]
-          let do_ = [%typ: step * pack_offset]
-          let dh  = [%typ: step * H.t]
+          let do_ = [%typ: Path.step * pack_offset]
+          let dh  = [%typ: Path.step * H.t]
           (* As above but for contents values with non-default metadata: *)
           let x_io = [%typ: dict_key * pack_offset * unit]
           let x_ih = [%typ: dict_key * H.t * unit]
-          let x_do = [%typ: step * pack_offset * unit]
-          let x_dh = [%typ: step * H.t * unit]
+          let x_do = [%typ: Path.step * pack_offset * unit]
+          let x_dh = [%typ: Path.step * H.t * unit]
       end in
       let open Brassaia.Type in
       variant "Compress.value"
@@ -947,7 +940,7 @@ struct
             i.entries
       | Values vs -> StepMap.cardinal vs
 
-    type cont = off:int -> len:int -> (step * value) Seq.node
+    type cont = off:int -> len:int -> (Path.step * value) Seq.node
 
     let rec seq_tree layout bucket_seq ~depth ~cache : cont -> cont =
      fun k ~off ~len ->
@@ -1024,25 +1017,25 @@ struct
     let empty_continuation : cont = fun ~off:_ ~len:_ -> Seq.Nil
 
     let seq layout ?offset:(off = 0) ?length:(len = Int.max_int) ?(cache = true)
-        t : (step * value) Seq.t =
+        t : (Path.step * value) Seq.t =
       if off < 0 then invalid_arg "Invalid pagination offset" ;
       if len < 0 then invalid_arg "Invalid pagination length" ;
       if len = 0 then Seq.empty
       else fun () -> seq_v layout t.v ~cache empty_continuation ~off ~len
 
     let list layout ?offset:(off = 0) ?length:(len = Int.max_int)
-        ?(cache = true) t : (step * value) list =
+        ?(cache = true) t : (Path.step * value) list =
       if off < 0 then invalid_arg "Invalid pagination offset" ;
       if len < 0 then invalid_arg "Invalid pagination length" ;
       if len = 0 then []
       else list_v layout t.v ~cache empty_continuation ~off ~len
 
-    let seq_tree layout ?(cache = true) i : (step * value) Seq.t =
+    let seq_tree layout ?(cache = true) i : (Path.step * value) Seq.t =
       let off = 0 in
       let len = Int.max_int in
       fun () -> seq_v layout (Tree i) ~cache empty_continuation ~off ~len
 
-    let seq_v layout ?(cache = true) v : (step * value) Seq.t =
+    let seq_v layout ?(cache = true) v : (Path.step * value) Seq.t =
       let off = 0 in
       let len = Int.max_int in
       fun () -> seq_v layout v ~cache empty_continuation ~off ~len
@@ -1102,7 +1095,7 @@ struct
         |~ case1 "node" node_key_t (fun k -> Node k)
         |> sealv
 
-      type entry = {name : step; key : kinded_key} [@@deriving brassaia]
+      type entry = {name : Path.step; key : kinded_key} [@@deriving brassaia]
 
       type 'a pointer = {index : int; pointer : hash; tree : 'a}
       [@@deriving brassaia]
@@ -1795,7 +1788,7 @@ struct
 
       type t =
         [ `Blinded of hash
-        | `Values of (step * value) list
+        | `Values of (Path.step * value) list
         | `Inode of int * (int * t) list ]
       [@@deriving brassaia]
 
@@ -1886,7 +1879,7 @@ struct
             let bindings =
               seq la t |> Seq.map Concrete.to_entry |> List.of_seq
               |> List.fast_sort (fun x y ->
-                     compare_step x.Concrete.name y.Concrete.name)
+                     Path.compare_step x.Concrete.name y.Concrete.name)
             in
             Concrete.Values bindings
           else to_concrete ~force:false la t
@@ -1971,9 +1964,9 @@ struct
       type inode = {v : v; root : bool} [@@deriving brassaia]
     end
 
-    let of_entry ~index e : step * Node.value =
+    let of_entry ~index e : Path.step * Node.value =
       let step =
-        match T.step_of_bin_string e.Snapshot.step with
+        match Path.step_of_bin_string e.Snapshot.step with
         | Ok s -> s
         | Error (`Msg m) -> Fmt.failwith "step of bin error: %s" m
       in
@@ -2054,9 +2047,9 @@ struct
 
     let hash t = Bin.hash t
 
-    let step_to_bin = T.step_to_bin_string
+    let step_to_bin = Path.step_to_bin_string
 
-    let step_of_bin = T.step_of_bin_string
+    let step_of_bin = Path.step_of_bin_string
 
     let encode_compress = Brassaia.Type.(unstage (encode_bin Compress.t))
 
@@ -2101,7 +2094,7 @@ struct
         let hash = address_of_key n.vref in
         {index = n.index; hash}
       in
-      let value : T.step * T.value -> Compress.value = function
+      let value : Path.step * T.value -> Compress.value = function
         | s, `Contents c ->
             let s = step s in
             let v = address_of_key c in
@@ -2131,7 +2124,7 @@ struct
      fun ~dict ~key_of_offset ~key_of_hash t pos_ref ->
       Stats.incr_inode_decode_bin () ;
       let i = decode_compress t pos_ref in
-      let step : Compress.name -> T.step = function
+      let step : Compress.name -> Path.step = function
         | Direct n -> n
         | Indirect s -> (
             match dict s with
@@ -2150,7 +2143,7 @@ struct
         let vref = key n.hash in
         {index = n.index; vref}
       in
-      let value : Compress.value -> T.step * T.value = function
+      let value : Compress.value -> Path.step * T.value = function
         | Contents (n, h) ->
             let name = step n in
             let hash = key h in
@@ -2207,7 +2200,7 @@ struct
 
     module Snapshot = Val_impl.Snapshot
 
-    let to_entry : T.step * Node.value -> Snapshot.entry =
+    let to_entry : Path.step * Node.value -> Snapshot.entry =
      fun (name, v) ->
       let step = step_to_bin name in
       match v with
@@ -2460,7 +2453,7 @@ struct
              all the underlying values. *)
           let elts =
             I.seq la v |> List.of_seq
-            |> List.fast_sort (fun (x, _) (y, _) -> compare_step x y)
+            |> List.fast_sort (fun (x, _) (y, _) -> Path.compare_step x y)
           in
           `Node elts
         else
@@ -2538,7 +2531,7 @@ struct
         seq ?offset ?length ?cache t
         |> Seq.map (fun (k, v) -> (k, hashvalue_of_keyvalue v))
 
-      let add : t -> step -> value -> t =
+      let add : t -> Path.step -> value -> t =
        fun t s v -> add t s (unsafe_keyvalue_of_hashvalue v)
 
       let list ?offset ?length ?cache t =
@@ -2624,10 +2617,7 @@ module Make
               with type hash = H.t
                and type contents_key = Key.t
                and type node_key = Key.t)
-    (Inter : Internal
-               with type hash = H.t
-                and type key = Key.t
-                and type Val.step = Node.step)
+    (Inter : Internal with type hash = H.t and type key = Key.t)
     (Pack : Indexable.S
               with type hash = H.t
                and type key = Key.t

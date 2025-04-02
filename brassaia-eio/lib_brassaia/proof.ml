@@ -17,18 +17,10 @@
 open! Import
 include Proof_intf
 
-module Make
-    (C : Type.S)
-    (H : Type.S)
-    (S : sig
-      type step [@@deriving brassaia]
-    end) =
-struct
+module Make (C : Type.S) (H : Type.S) = struct
   type contents = C.t [@@deriving brassaia]
 
   type hash = H.t [@@deriving brassaia]
-
-  type step = S.step [@@deriving brassaia]
 
   type kinded_hash = [`Contents of hash | `Node of hash]
 
@@ -50,7 +42,7 @@ struct
   type tree =
     | Contents of contents
     | Blinded_contents of hash
-    | Node of (step * tree) list
+    | Node of (Path.step * tree) list
     | Blinded_node of hash
     | Inode of inode_tree inode
     | Extender of inode_tree inode_extender
@@ -58,7 +50,7 @@ struct
 
   and inode_tree =
     | Blinded_inode of hash
-    | Inode_values of (step * tree) list
+    | Inode_values of (Path.step * tree) list
     | Inode_tree of inode_tree inode
     | Inode_extender of inode_tree inode_extender
   [@@deriving brassaia]
@@ -80,7 +72,7 @@ struct
     |~ case1 "contents" (pair contents_t unit) (fun (c, ()) -> Contents c)
     |~ case1 "blinded-contents" (pair hash_t unit) (fun (h, ()) ->
            Blinded_contents h)
-    |~ case1 "node" (list (pair step_t tree_t)) (fun h -> Node h)
+    |~ case1 "node" (list (pair Path.step_t tree_t)) (fun h -> Node h)
     |~ case1 "blinded-node" hash_t (fun h -> Blinded_node h)
     |~ case1 "inode" (inode_t inode_tree_t) (fun i -> Inode i)
     |~ case1 "extender" (inode_extender_t inode_tree_t) (fun e -> Extender e)
@@ -88,7 +80,7 @@ struct
 
   type elt =
     | Contents of contents
-    | Node of (step * kinded_hash) list
+    | Node of (Path.step * kinded_hash) list
     | Inode of hash inode
     | Inode_extender of hash inode_extender
   [@@deriving brassaia]

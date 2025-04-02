@@ -16,5 +16,51 @@
 
 (** Tree path handling. *)
 
-(** @inline *)
-include Path_intf.Sigs
+(** {1 Path} *)
+
+(** Type type for path's steps. *)
+type step = string
+[@@deriving brassaia ~pp ~compare ~to_bin_string ~of_bin_string]
+
+(** The type for path values. *)
+type t = step list [@@deriving brassaia ~pp ~compare]
+
+(** The empty path. *)
+val empty : t
+
+(** Creates a path from a list of steps. *)
+val init : step list -> t
+
+(** Check if the path is empty. *)
+val is_empty : t -> bool
+
+(** Prepends a step to the path. *)
+val cons : step -> t -> t
+
+(** Append a step to the path. *)
+val rcons : t -> step -> t
+
+(** Deconstructs the first element of the path. Return [None] if the path is
+      empty. *)
+val decons : t -> (step * t) option
+
+(** Deconstructs the last element of the path. Return [None] if the path is
+      empty. *)
+val rdecons : t -> (t * step) option
+
+(** [map t f] maps [f] over all steps of [t]. *)
+val map : t -> (step -> 'a) -> 'a list
+
+(** {1 Value Types} *)
+
+(** [t] is the value type for {!type-t}. *)
+val t : t Type.t
+
+(** [encoding] is the data_encoding for {!type-t}. *)
+val encoding : t Data_encoding.t
+
+(** [step_t] is the value type for {!step}. *)
+val step_t : step Type.t
+
+(** [step_encoding] is the data_encoding for {!type-step}. *)
+val step_encoding : step Data_encoding.t

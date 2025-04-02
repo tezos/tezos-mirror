@@ -42,10 +42,10 @@ module Of_core (S : Core) = struct
       kvs
 
   let merge_contents merge_key =
-    Merge.alist S.step_t S.contents_key_t (fun _step -> merge_key)
+    Merge.alist Path.step_t S.contents_key_t (fun _step -> merge_key)
 
   let merge_node merge_key =
-    Merge.alist S.step_t S.node_key_t (fun _step -> merge_key)
+    Merge.alist Path.step_t S.node_key_t (fun _step -> merge_key)
 
   (* FIXME: this is very broken; do the same thing as [Tree.merge]
      instead. *)
@@ -66,11 +66,6 @@ module Brassaia_hash = Hash
    over abstract [key] types. *)
 module Make_core
     (Hash : Hash.S)
-    (Path : sig
-      type step [@@deriving brassaia]
-
-      val step_encoding : step Data_encoding.t
-    end)
     (Contents_key : Key.S with type hash = Hash.t)
     (Node_key : Key.S with type hash = Hash.t) =
 struct
@@ -81,10 +76,6 @@ struct
   type node_key = Node_key.t [@@deriving brassaia]
 
   let node_key_encoding = Node_key.encoding
-
-  type step = Path.step [@@deriving brassaia]
-
-  let step_encoding = Path.step_encoding
 
   type hash = Hash.t [@@deriving brassaia]
 
@@ -200,7 +191,7 @@ struct
     | `Node h -> Node {name = k; node = h}
     | `Contents h -> Contents {name = k; contents = h}
 
-  let inspect_nonportable_entry_exn : entry -> step * value = function
+  let inspect_nonportable_entry_exn : entry -> Path.step * value = function
     | Node n -> (n.name, `Node n.node)
     | Contents c -> (c.name, `Contents c.contents)
     | Contents_m c -> (c.name, `Contents c.contents)
@@ -208,7 +199,7 @@ struct
         (* Not reachable after [Portable.of_node]. See invariant on {!entry}. *)
         assert false
 
-  let step_of_entry : entry -> step = function
+  let step_of_entry : entry -> Path.step = function
     | Node {name; _}
     | Node_hash {name; _}
     | Contents {name; _}
@@ -217,7 +208,7 @@ struct
     | Contents_m_hash {name; _} ->
         name
 
-  let weak_of_entry : entry -> step * weak_value = function
+  let weak_of_entry : entry -> Path.step * weak_value = function
     | Node n -> (n.name, `Node (Node_key.to_hash n.node))
     | Node_hash n -> (n.name, `Node n.node)
     | Contents c -> (c.name, `Contents (Contents_key.to_hash c.contents))
@@ -372,7 +363,7 @@ module Portable = struct
 
     type proof =
       [ `Blinded of hash
-      | `Values of (step * value) list
+      | `Values of (Path.step * value) list
       | `Inode of int * (int * proof) list ]
     [@@deriving brassaia]
 
@@ -395,15 +386,10 @@ end
 
 module Make_generic_key
     (Hash : Hash.S)
-    (Path : sig
-      type step [@@deriving brassaia]
-
-      val step_encoding : step Data_encoding.t
-    end)
     (Contents_key : Key.S with type hash = Hash.t)
     (Node_key : Key.S with type hash = Hash.t) =
 struct
-  module Core = Make_core (Hash) (Path) (Contents_key) (Node_key)
+  module Core = Make_core (Hash) (Contents_key) (Node_key)
   include Core
   include Of_core (Core)
 
@@ -482,15 +468,10 @@ end
 
 module Make_generic_key_v2
     (Hash : Hash.S)
-    (Path : sig
-      type step [@@deriving brassaia]
-
-      val step_encoding : step Data_encoding.t
-    end)
     (Contents_key : Key.S with type hash = Hash.t)
     (Node_key : Key.S with type hash = Hash.t) =
 struct
-  include Make_generic_key (Hash) (Path) (Contents_key) (Node_key)
+  include Make_generic_key (Hash) (Contents_key) (Node_key)
 
   let t = t_not_prefixed
 
@@ -501,16 +482,9 @@ struct
   end
 end
 
-module Make
-    (Hash : Hash.S)
-    (Path : sig
-      type step [@@deriving brassaia]
-
-      val step_encoding : step Data_encoding.t
-    end) =
-struct
+module Make (Hash : Hash.S) = struct
   module Key = Key.Of_hash (Hash)
-  include Make_generic_key (Hash) (Path) (Key) (Key)
+  include Make_generic_key (Hash) (Key) (Key)
 end
 
 module Store_generic_key
@@ -520,8 +494,7 @@ module Store_generic_key
     (V : S_generic_key
            with type t = S.value
             and type contents_key = C.Key.t
-            and type node_key = S.Key.t)
-    (P : Path.S with type step = V.step) =
+            and type node_key = S.Key.t) =
 struct
   module Val = struct
     include V
@@ -532,7 +505,6 @@ struct
   module Contents = C
   module Key = S.Key
   module Hash = Hash.Typed (H) (Val)
-  module Path = P
 
   type 'a t = 'a C.t * 'a S.t
 
@@ -588,20 +560,14 @@ module Store
     (C : Contents.Store)
     (S : Content_addressable.S with type key = C.key)
     (H : Hash.S with type t = S.key)
-    (V : S with type t = S.value and type hash = S.key)
-    (P : Path.S with type step = V.step) =
+    (V : S with type t = S.value and type hash = S.key) =
 struct
   module S = Indexable.Of_content_addressable (H) (S)
-  include Store_generic_key (C) (S) (H) (V) (P)
+  include Store_generic_key (C) (S) (H) (V)
 end
 
 module Graph (S : Store) = struct
-  module Path = S.Path
   module Contents_key = S.Contents.Key
-
-  type step = Path.step [@@deriving brassaia]
-
-  let _step_encoding = Path.step_encoding
 
   type contents_key = Contents_key.t [@@deriving brassaia]
 
@@ -610,8 +576,6 @@ module Graph (S : Store) = struct
   type node_key = S.Key.t [@@deriving brassaia]
 
   let _node_key_encoding = S.Key.encoding
-
-  type path = Path.t [@@deriving brassaia]
 
   type 'a t = 'a S.t
 
@@ -640,7 +604,7 @@ module Graph (S : Store) = struct
 
   let pp_keys = Fmt.(Dump.list pp_key)
 
-  let pp_path = Type.pp S.Path.t
+  let pp_path = Path.pp
 
   let equal_val = Type.(unstage (equal S.Val.t))
 
@@ -750,7 +714,7 @@ module Graph (S : Store) = struct
   let value_t = S.Val.value_t
 end
 
-module V1 (N : Generic_key.S with type step = string) = struct
+module V1 (N : Generic_key.S) = struct
   module K (H : Type.S) = struct
     let h = Type.string_of `Int64
 
@@ -791,10 +755,6 @@ module V1 (N : Generic_key.S with type step = string) = struct
     let encoding = N.contents_key_encoding
   end)
 
-  type step = N.step
-
-  let step_encoding = N.step_encoding
-
   type node_key = Node_key.t [@@deriving brassaia]
 
   let node_key_encoding = Node_key.encoding
@@ -811,7 +771,7 @@ module V1 (N : Generic_key.S with type step = string) = struct
 
   let value_encoding = N.value_encoding
 
-  type t = {n : N.t; entries : (step * value) list}
+  type t = {n : N.t; entries : (Path.step * value) list}
 
   let encoding =
     Data_encoding.(
@@ -820,7 +780,7 @@ module V1 (N : Generic_key.S with type step = string) = struct
         (fun (n, entries) -> {n; entries})
         (obj2
            (req "n" N.encoding)
-           (req "entries" (list (tup2 step_encoding value_encoding)))))
+           (req "entries" (list (tup2 Path.step_encoding value_encoding)))))
 
   exception Dangling_hash = N.Dangling_hash
 
@@ -873,7 +833,7 @@ module V1 (N : Generic_key.S with type step = string) = struct
 
   let step_of_bin_string = Type.(unstage (of_bin_string v1_step))
 
-  let step_t : step Type.t =
+  let step_t : Path.step Type.t =
     let to_string p = step_to_bin_string p in
     let of_string s =
       step_of_bin_string s |> function

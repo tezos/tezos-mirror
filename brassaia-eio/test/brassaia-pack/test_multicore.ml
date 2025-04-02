@@ -254,15 +254,11 @@ let check_patch_was_applied patch tree =
       | `Add (name, contents) ->
           if not (Store.Tree.find tree name = Some contents) then
             failwith
-              (Printf.sprintf
-                 "Add %S failed"
-                 (Repr.to_string Store.path_t name))
+              (Printf.sprintf "Add %S failed" (Repr.to_string Path.t name))
       | `Remove name ->
           if Store.Tree.mem tree name then
             failwith
-              (Printf.sprintf
-                 "Remove %S failed"
-                 (Repr.to_string Store.path_t name)))
+              (Printf.sprintf "Remove %S failed" (Repr.to_string Path.t name)))
     patch
 
 let test_commit d_mgr =
