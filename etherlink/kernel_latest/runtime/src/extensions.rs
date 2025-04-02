@@ -7,4 +7,5 @@
 
 pub trait WithGas {
     fn add_execution_gas(&mut self, gas: u64);
+    fn executed_gas(&self) -> u64;
 }

@@ -312,6 +312,10 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> W
     fn add_execution_gas(&mut self, gas: u64) {
         self.execution_gas_used += gas;
     }
+
+    fn executed_gas(&self) -> u64 {
+        self.execution_gas_used
+    }
 }
 
 impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> KernelHost<R, Host, InternalHost> {

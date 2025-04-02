@@ -114,6 +114,21 @@ fn on_invalid_transaction<Host: Runtime>(
     );
 }
 
+fn max_gas_per_reboot(limits: &EvmLimits) -> u64 {
+    limits.maximum_gas_limit * 4 / 3
+}
+
+fn can_fit_in_reboot(
+    limits: &EvmLimits,
+    used_gas_in_run: U256,
+    tx_gas_limit: u64,
+) -> bool {
+    // This is arbitrary, let's accept to execute at most 4/3 of the maximum gas allowed per
+    // transaction in a single reboot
+    let max_gas_per_reboot = U256::from(max_gas_per_reboot(limits));
+    used_gas_in_run + U256::from(tx_gas_limit) <= max_gas_per_reboot
+}
+
 #[allow(clippy::too_many_arguments)]
 fn compute<Host: Runtime>(
     host: &mut Host,
@@ -141,7 +156,10 @@ fn compute<Host: Runtime>(
         let data_size: u64 = transaction.data_size();
 
         log!(host, Benchmarking, "Transaction data size: {}", data_size);
-        // The current number of ticks remaining for the current `kernel_run` is allocated for the transaction.
+        // TODO: https://gitlab.com/tezos/tezos/-/merge_requests/15079
+        // Will be removed
+        // The current number of ticks remaining for the current `kernel_run` is allocated for the
+        // transaction.
         let allocated_ticks = estimate_remaining_ticks_for_transaction_execution(
             maximum_allowed_ticks,
             block_in_progress.estimated_ticks_in_run,
@@ -149,23 +167,19 @@ fn compute<Host: Runtime>(
         );
 
         let retriable = !is_first_transaction;
-        if allocated_ticks == 0 {
-            if retriable {
-                log!(
-                    host,
-                    Debug,
-                    "There are not enough ticks left to try the\
-                    transaction, but it will be retried after reboot."
-                );
-                block_in_progress.repush_tx(transaction);
-            } else {
-                log!(
-                    host,
-                    Error,
-                    "Discarded a transaction because it couldn't\
-                    be allocated enough ticks even alone in a kernel run."
-                );
-            }
+
+        if !can_fit_in_reboot(
+            limits,
+            host.executed_gas().into(),
+            transaction.execution_gas_limit(&block_constants.block_fees)?,
+        ) {
+            log!(
+                host,
+                Debug,
+                "There are not enough gas left in the current kernel run \
+                 to try the transaction, but it will be retried after reboot."
+            );
+            block_in_progress.repush_tx(transaction);
 
             return Ok(BlockInProgressComputationResult::RebootNeeded);
         }
