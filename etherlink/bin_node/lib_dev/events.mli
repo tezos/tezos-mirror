@@ -144,6 +144,9 @@ val wasm_pvm_fallback : unit -> unit Lwt.t
     consistency of the stored chain id with the selected network. *)
 val missing_chain_id : unit -> unit Lwt.t
 
+(** [missing_block level] advertises that the node could not find the block in level despite having received an event saying it would be available. *)
+val missing_block : int32 -> unit Lwt.t
+
 (** [multichain_node_singlechain_kernel ()] warns that the node
     was configured to be executed in a multichain environment, but was given
     a kernel for a single chain environment. *)

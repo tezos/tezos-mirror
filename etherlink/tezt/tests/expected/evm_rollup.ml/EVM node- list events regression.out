@@ -1226,6 +1226,14 @@ migrations_from_the_future:
         { "applied": integer ∈ [-2^30, 2^30],
           "known": integer ∈ [-2^30, 2^30] } }
   
+missing_block:
+  description: missing block: received event saying the block for {level} would be available, but reading it from storage failed
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* missing_block version 0 */
+      "missing_block.v0": integer ∈ [-2^31-1, 2^31] }
+  
 missing_blueprints:
   description: store is missing {count} blueprints in the range [{from}; {to_}]
   level: error
