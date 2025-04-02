@@ -261,7 +261,6 @@ pub fn run_transaction<'a, Host>(
     effective_gas_price: U256,
     value: U256,
     pay_for_gas: bool,
-    retriable: bool,
     tracer: Option<TracerInput>,
 ) -> Result<Option<handler::ExecutionOutcome>, EthereumError>
 where
@@ -318,30 +317,9 @@ where
 
         match result {
             Ok(result) => {
-                if result.result == ExecutionResult::OutOfTicks && retriable {
-                    // The nonce must be incremented before the execution. Details here: https://gitlab.com/tezos/tezos/-/merge_requests/11998.
-                    // In the EVM logic, the nonce is never decremented
-                    // But with the ticks model, if the execution raises an 'out of ticks' error and if the transaction is 'retriable', the nonce must not be incremented
-                    // But we can only know that after the execution, which is why we must decrement the nonce here
-                    handler.decrement_nonce(caller)?;
-                }
-
                 if do_refund(&result, pay_for_gas) {
-                    // In case of `OutOfTicks` and the transaction can be
-                    // retried, the gas is entirely refunded as it will be
-                    // repaid in the next attempt
-                    if result.result == ExecutionResult::OutOfTicks && retriable {
-                        log!(
-                            handler.borrow_host(),
-                            Debug,
-                            "The transaction exhausted the ticks of the \
-                             current reboot and is retriable: refunding all the gas."
-                        );
-                        handler.repay_gas(caller, gas_limit, effective_gas_price)?;
-                    } else {
-                        let unused_gas = gas_limit.map(|gl| gl - result.gas_used);
-                        handler.repay_gas(caller, unused_gas, effective_gas_price)?;
-                    }
+                    let unused_gas = gas_limit.map(|gl| gl - result.gas_used);
+                    handler.repay_gas(caller, unused_gas, effective_gas_price)?;
                 }
 
                 if let Some(call_data) = call_data_for_tracing {
@@ -658,7 +636,6 @@ mod test {
             gas_price,
             transaction_value,
             true,
-            false,
             None,
         );
 
@@ -721,7 +698,6 @@ mod test {
             gas_price,
             transaction_value,
             true,
-            false,
             None,
         );
 
@@ -778,7 +754,6 @@ mod test {
             gas_price,
             transaction_value,
             true,
-            false,
             None,
         );
 
@@ -832,7 +807,6 @@ mod test {
             gas_price,
             transaction_value,
             true,
-            false,
             None,
         );
 
@@ -868,7 +842,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
         assert!(result2.is_ok(), "execution should have succeeded");
@@ -900,7 +873,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
         assert!(result3.is_ok(), "execution should have succeeded");
@@ -931,7 +903,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
         assert!(result2.is_ok(), "execution should have succeeded");
@@ -989,7 +960,6 @@ mod test {
             gas_price,
             transaction_value,
             true,
-            false,
             None,
         );
 
@@ -1040,7 +1010,6 @@ mod test {
             gas_price,
             transaction_value,
             true,
-            false,
             None,
         );
 
@@ -1091,7 +1060,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -1235,7 +1203,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -1296,7 +1263,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -1356,7 +1322,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -1411,7 +1376,6 @@ mod test {
             gas_price,
             U256::from(100),
             true,
-            false,
             None,
         );
 
@@ -1469,7 +1433,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -1527,7 +1490,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -1640,7 +1602,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -1719,7 +1680,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -1810,7 +1770,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -1923,7 +1882,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -2033,7 +1991,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -2133,7 +2090,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
         let expected_gas = 21000 // base cost
@@ -2248,7 +2204,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -2344,7 +2299,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -2427,7 +2381,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -2506,7 +2459,6 @@ mod test {
             gas_price,
             U256::from(100),
             true,
-            false,
             None,
         );
 
@@ -2556,7 +2508,6 @@ mod test {
             gas_price,
             transaction_value,
             true,
-            false,
             None,
         );
 
@@ -2615,7 +2566,6 @@ mod test {
             gas_price,
             transaction_value,
             true,
-            false,
             None,
         );
 
@@ -2688,7 +2638,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -2758,7 +2707,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -2821,7 +2769,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         )
     }
@@ -2924,7 +2871,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -3005,7 +2951,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -3113,7 +3058,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -3192,7 +3136,6 @@ mod test {
             gas_price,
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -3238,7 +3181,6 @@ mod test {
             gas_price,
             transaction_value,
             true,
-            false,
             None,
         );
 
@@ -3292,7 +3234,6 @@ mod test {
             U256::one(),
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -3380,7 +3321,6 @@ mod test {
             U256::one(),
             U256::zero(),
             true,
-            false,
             None,
         );
 
@@ -3503,7 +3443,6 @@ mod test {
             U256::one(),
             U256::zero(),
             false,
-            false,
             None,
         );
 
@@ -3587,7 +3526,6 @@ mod test {
             U256::one(),
             U256::zero(),
             false,
-            false,
             None,
         );
 
@@ -3624,7 +3562,6 @@ mod test {
             Some(u64::MAX),
             U256::one(),
             U256::zero(),
-            false,
             false,
             None,
         );
@@ -3704,7 +3641,6 @@ mod test {
             U256::from(10),
             U256::zero(),
             true,
-            false,
             None,
         )
         .unwrap()
@@ -3793,7 +3729,6 @@ mod test {
             U256::from(10),
             U256::zero(),
             true,
-            false,
             None,
         )
         .unwrap()
@@ -3851,7 +3786,6 @@ mod test {
             None,
             U256::one(),
             U256::zero(),
-            false,
             false,
             None,
         );

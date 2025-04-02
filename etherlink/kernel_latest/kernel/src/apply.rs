@@ -12,8 +12,7 @@ use evm_execution::account_storage::{EthereumAccount, EthereumAccountStorage};
 use evm_execution::fa_bridge::deposit::FaDeposit;
 use evm_execution::fa_bridge::{execute_fa_deposit, FA_DEPOSIT_PROXY_GAS_LIMIT};
 use evm_execution::handler::{
-    ExecutionOutcome, ExecutionResult as ExecutionOutcomeResult, FastWithdrawalInterface,
-    RouterInterface,
+    ExecutionOutcome, FastWithdrawalInterface, RouterInterface,
 };
 use evm_execution::precompiles::{self, PrecompileBTreeMap};
 use evm_execution::run_transaction;
@@ -306,7 +305,6 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
     transaction: &EthereumTransactionCommon,
-    retriable: bool,
     is_delayed: bool,
     tracer_input: Option<TracerInput>,
     evm_configuration: &Config,
@@ -344,7 +342,6 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         effective_gas_price,
         value,
         true,
-        retriable,
         tracer_input,
     ) {
         Ok(outcome) => outcome,
@@ -353,7 +350,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         }
     };
 
-    let (gas_used, estimated_ticks_used, out_of_ticks) = match &execution_outcome {
+    let (gas_used, estimated_ticks_used) = match &execution_outcome {
         Some(execution_outcome) => {
             log!(
                 host,
@@ -364,12 +361,11 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
             (
                 execution_outcome.gas_used.into(),
                 execution_outcome.estimated_ticks_used,
-                execution_outcome.result == ExecutionOutcomeResult::OutOfTicks,
             )
         }
         None => {
             log!(host, Benchmarking, "Transaction status: OK_UNKNOWN.");
-            (U256::zero(), 0, false)
+            (U256::zero(), 0)
         }
     };
 
@@ -380,11 +376,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         estimated_ticks_used,
     };
 
-    if out_of_ticks && retriable {
-        Ok(ExecutionResult::Retriable(transaction_result))
-    } else {
-        Ok(ExecutionResult::Valid(transaction_result))
-    }
+    Ok(ExecutionResult::Valid(transaction_result))
 }
 
 fn trace_deposit<Host: Runtime>(
@@ -511,7 +503,6 @@ pub struct ExecutionInfo {
 pub enum ExecutionResult<T> {
     Valid(T),
     Invalid,
-    Retriable(T),
 }
 
 impl<T> From<Option<T>> for ExecutionResult<T> {
@@ -602,7 +593,6 @@ pub fn apply_transaction<Host: Runtime>(
     transaction: &Transaction,
     index: u32,
     evm_account_storage: &mut EthereumAccountStorage,
-    retriable: bool,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
     evm_configuration: &Config,
@@ -615,7 +605,6 @@ pub fn apply_transaction<Host: Runtime>(
             precompiles,
             evm_account_storage,
             tx,
-            retriable,
             false,
             tracer_input,
             evm_configuration,
@@ -626,7 +615,6 @@ pub fn apply_transaction<Host: Runtime>(
             precompiles,
             evm_account_storage,
             tx,
-            retriable,
             true,
             tracer_input,
             evm_configuration,
@@ -670,22 +658,6 @@ pub fn apply_transaction<Host: Runtime>(
                 sequencer_pool_address,
             )?;
             Ok(ExecutionResult::Valid(execution_result))
-        }
-        // Note that both branch must be differentiated as the fees won't be
-        // collected yet if the transaction is retriable.
-        ExecutionResult::Retriable(tx_result) => {
-            let execution_result = handle_transaction_result(
-                host,
-                outbox_queue,
-                block_constants,
-                transaction,
-                index,
-                evm_account_storage,
-                tx_result,
-                false,
-                sequencer_pool_address,
-            )?;
-            Ok(ExecutionResult::Retriable(execution_result))
         }
         ExecutionResult::Invalid => Ok(ExecutionResult::Invalid),
     }

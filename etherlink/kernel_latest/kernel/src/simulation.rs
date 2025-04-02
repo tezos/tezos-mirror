@@ -484,7 +484,6 @@ impl Evaluation {
             gas_price,
             self.value.unwrap_or_default(),
             false,
-            false,
             tracer_input,
         ) {
             Ok(Some(outcome)) if !self.with_da_fees => {
@@ -781,7 +780,6 @@ mod tests {
             Some(gas_limit),
             gas_price,
             transaction_value,
-            false,
             false,
             None,
         );

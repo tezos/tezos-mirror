@@ -97,7 +97,6 @@ pub fn deploy_mock_wrapper(
         U256::one(),
         U256::zero(),
         false,
-        false,
         None,
     )
     .expect("Failed to deploy")
@@ -141,7 +140,6 @@ pub fn deploy_reentrancy_tester(
         Some(1_000_000),
         U256::one(),
         U256::zero(),
-        false,
         false,
         None,
     )

@@ -1563,27 +1563,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         }
     }
 
-    pub fn decrement_nonce(&mut self, address: H160) -> Result<(), EthereumError> {
-        match account_path(&address) {
-            Ok(path) => {
-                let mut account =
-                    self.evm_account_storage.get_or_create(self.host, &path)?;
-                account
-                    .decrement_nonce(self.host)
-                    .map_err(EthereumError::from)
-            }
-            Err(err) => {
-                log!(
-                    self.host,
-                    Debug,
-                    "Failed to decrement nonce for account {:?}",
-                    address
-                );
-                Err(EthereumError::from(AccountStorageError::from(err)))
-            }
-        }
-    }
-
     fn set_contract_code(
         &mut self,
         address: H160,
