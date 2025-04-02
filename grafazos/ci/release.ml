@@ -21,6 +21,15 @@ let job_datadog_pipeline_trace : tezos_job =
        pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
     ]
 
+let job_gitlab_release =
+  job
+    ~__POS__
+    ~image:Images.ci_release
+    ~stage:Stages.publish_release_gitlab
+    ~interruptible:false
+    ~name:"gitlab:release"
+    ["./grafazos/scripts/releases/create_gitlab_release.sh"]
+
 let jobs ~test () =
   (if test then [] else [job_datadog_pipeline_trace])
-  @ [Common.job_build_grafazos ()]
+  @ [Common.job_build_grafazos (); job_gitlab_release]
