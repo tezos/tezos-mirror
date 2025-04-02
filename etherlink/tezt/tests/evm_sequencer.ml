@@ -559,23 +559,19 @@ let test_tezlink_balance =
   register_tezlink_test
     ~title:"Test of the balance rpc"
     ~tags:["evm"; "rpc"; "balance"]
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; client; _} _protocol ->
   (* call the balance rpc and parse the result *)
-  let rpc_balance () =
-    let path =
-      sf
-        "/tezlink/chains/main/blocks/head/context/contracts/%s/balance"
-        Constant.bootstrap1.public_key_hash
-    in
-    let* res =
-      Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
-      |> Runnable.run
-    in
-    return @@ JSON.parse ~origin:"curl_balance" res
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
   in
 
-  let* res = rpc_balance () in
-  Check.(JSON.(res |> as_int = 1) int ~error_msg:"Expected %R but got %L") ;
+  let* res =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
+  in
+  Check.((Tez.to_mutez res = 1) int ~error_msg:"Expected %R but got %L") ;
   unit
 
 let test_tezlink_version =
