@@ -264,6 +264,8 @@ type consensus_pk = {
   delegate : Signature.Public_key_hash.t;
   consensus_pk : Signature.Public_key.t;
   consensus_pkh : Signature.Public_key_hash.t;
+  companion_pk : Bls.Public_key.t option;
+  companion_pkh : Bls.Public_key_hash.t option;
 }
 
 val consensus_pk_encoding : consensus_pk Data_encoding.t

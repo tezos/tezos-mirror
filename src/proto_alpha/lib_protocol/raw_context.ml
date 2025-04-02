@@ -60,24 +60,36 @@ type consensus_pk = {
   delegate : Signature.Public_key_hash.t;
   consensus_pk : Signature.Public_key.t;
   consensus_pkh : Signature.Public_key_hash.t;
+  companion_pk : Bls.Public_key.t option;
+  companion_pkh : Bls.Public_key_hash.t option;
 }
 
 let consensus_pk_encoding =
   let open Data_encoding in
   conv
-    (fun {delegate; consensus_pk; consensus_pkh} ->
-      if Signature.Public_key_hash.equal consensus_pkh delegate then
-        (consensus_pk, None)
-      else (consensus_pk, Some delegate))
-    (fun (consensus_pk, delegate) ->
+    (fun {
+           delegate;
+           consensus_pk;
+           consensus_pkh;
+           companion_pk;
+           companion_pkh = _;
+         } ->
+      let delegate =
+        if Signature.Public_key_hash.equal consensus_pkh delegate then None
+        else Some delegate
+      in
+      (consensus_pk, delegate, companion_pk))
+    (fun (consensus_pk, delegate, companion_pk) ->
       let consensus_pkh = Signature.Public_key.hash consensus_pk in
+      let companion_pkh = Option.map Bls.Public_key.hash companion_pk in
       let delegate =
         match delegate with None -> consensus_pkh | Some del -> del
       in
-      {delegate; consensus_pk; consensus_pkh})
-    (obj2
+      {delegate; consensus_pk; consensus_pkh; companion_pk; companion_pkh})
+    (obj3
        (req "consensus_pk" Signature.Public_key.encoding)
-       (opt "delegate" Signature.Public_key_hash.encoding))
+       (opt "delegate" Signature.Public_key_hash.encoding)
+       (opt "companion_pk" Bls.Public_key.encoding))
 
 module Raw_consensus = struct
   (** Consensus operations are indexed by their [initial slots]. Given

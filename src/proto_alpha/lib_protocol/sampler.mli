@@ -61,6 +61,9 @@ module type S = sig
 
   (** [encoding e] constructs an encoding for ['a t] given an encoding for ['a]. *)
   val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
+
+  (** [map f t] changes the return values of the sampler without changing the distribution. *)
+  val map : ('a -> 'b) -> 'a t -> 'b t
 end
 
 (**/**)

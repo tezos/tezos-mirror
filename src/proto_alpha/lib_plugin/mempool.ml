@@ -814,7 +814,15 @@ let sources_from_operation ctxt
         Stake_distribution.slot_owner ctxt level consensus_content.slot
       in
       match slot_owner with
-      | Ok (_ctxt, {delegate; consensus_pkh; consensus_pk = _}) ->
+      | Ok
+          ( _ctxt,
+            {
+              delegate;
+              consensus_pkh;
+              consensus_pk = _;
+              companion_pkh = _;
+              companion_pk = _;
+            } ) ->
           return @@ map_pkh_env [delegate; consensus_pkh]
       | Error _ -> return_nil)
   | Single (Attestations_aggregate {consensus_content; committee}) ->
@@ -824,7 +832,15 @@ let sources_from_operation ctxt
           (fun acc slot ->
             let* slot_owner = Stake_distribution.slot_owner ctxt level slot in
             match slot_owner with
-            | Ok (_ctxt, {delegate; consensus_pkh; consensus_pk = _}) ->
+            | Ok
+                ( _ctxt,
+                  {
+                    delegate;
+                    consensus_pkh;
+                    consensus_pk = _;
+                    companion_pkh = _;
+                    companion_pk = _;
+                  } ) ->
                 return (delegate :: consensus_pkh :: acc)
             | Error _ -> return acc)
           []

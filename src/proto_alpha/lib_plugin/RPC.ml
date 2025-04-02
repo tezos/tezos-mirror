@@ -3654,7 +3654,13 @@ module Baking_rights = struct
       else
         let* ( ctxt,
                _slot,
-               {Consensus_key.consensus_pkh; delegate; consensus_pk = _} ) =
+               {
+                 Consensus_key.consensus_pkh;
+                 delegate;
+                 consensus_pk = _;
+                 companion_pk = _;
+                 companion_pkh = _;
+               } ) =
           Stake_distribution.baking_rights_owner ctxt level ~round
         in
         let*? timestamp =
@@ -3866,6 +3872,8 @@ module Attestation_rights = struct
                  Consensus_key.delegate;
                  consensus_pk = _;
                  consensus_pkh = consensus_key;
+                 companion_pk = _;
+                 companion_pkh = _;
                },
                attestation_power,
                _dal_power )

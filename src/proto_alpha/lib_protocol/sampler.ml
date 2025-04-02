@@ -62,6 +62,8 @@ module type S = sig
   val sample : 'a t -> (int_bound:int -> mass_bound:mass -> int * mass) -> 'a
 
   val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
+
+  val map : ('a -> 'b) -> 'a t -> 'b t
 end
 
 module Make (Mass : SMass) : S with type mass = Mass.t = struct
@@ -174,6 +176,9 @@ module Make (Mass : SMass) : S with type mass = Mass.t = struct
          (req "support" (array_encoding enc))
          (req "p" mass_array_encoding)
          (req "alias" int_array_encoding))
+
+  let map f ({support; _} as sampler) =
+    {sampler with support = FallbackArray.map f support}
 end
 
 module Internal_for_tests = struct

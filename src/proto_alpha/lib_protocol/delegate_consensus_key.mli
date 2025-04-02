@@ -39,6 +39,8 @@ type pk = Raw_context.consensus_pk = {
   delegate : Signature.Public_key_hash.t;
   consensus_pk : Signature.Public_key.t;
   consensus_pkh : Signature.Public_key_hash.t;
+  companion_pk : Bls.Public_key.t option;
+  companion_pkh : Bls.Public_key_hash.t option;
 }
 
 (** The public key hash of a consensus key and the associated delegate. *)
@@ -88,6 +90,12 @@ val pending_updates :
   tzresult
   Lwt.t
 
+(** Returns the list of pending companion key updates in upcoming cycles. *)
+val pending_companion_updates :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  (Cycle_repr.t * Bls.Public_key_hash.t * Bls.Public_key.t) list tzresult Lwt.t
+
 (** Register a consensus-key update. *)
 val register_update :
   Raw_context.t ->
@@ -95,5 +103,12 @@ val register_update :
   Signature.Public_key.t ->
   Raw_context.t tzresult Lwt.t
 
-(** Activate consensus keys at the beginning of cycle [new_cycle]. *)
+(** Register a companion-key update. *)
+val register_update_companion :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Bls.Public_key.t ->
+  Raw_context.t tzresult Lwt.t
+
+(** Activate consensus and companion keys at the beginning of cycle [new_cycle]. *)
 val activate : Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t Lwt.t
