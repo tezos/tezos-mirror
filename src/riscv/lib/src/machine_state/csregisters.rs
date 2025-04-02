@@ -437,26 +437,26 @@ impl CSRegister {
     const WPRI_MASK_EMPTY: CSRRepr = CSRRepr::MAX;
 
     const WPRI_MASK_MSTATUS: CSRRepr =
-        !(ones(1) << 0 | ones(1) << 2 | ones(1) << 4 | ones(9) << 23 | ones(25) << 38);
+        !((ones(1) << 0) | (ones(1) << 2) | (ones(1) << 4) | (ones(9) << 23) | (ones(25) << 38));
 
-    const WPRI_MASK_MENVCFG: CSRRepr = !(ones(3) << 1 | ones(54) << 8);
+    const WPRI_MASK_MENVCFG: CSRRepr = !((ones(3) << 1) | (ones(54) << 8));
 
-    const WPRI_MASK_MSECCFG: CSRRepr = !(ones(5) << 3 | ones(CSRegister::MXLEN - 10) << 10);
+    const WPRI_MASK_MSECCFG: CSRRepr = !((ones(5) << 3) | (ones(CSRegister::MXLEN - 10) << 10));
 
-    const WPRI_MASK_SSTATUS: CSRRepr = !(ones(1) << 0
-        | ones(3) << 2
-        | ones(1) << 7
-        | ones(2) << 11
-        | ones(1) << 17
-        | ones(12) << 20
-        | ones(29) << 34);
+    const WPRI_MASK_SSTATUS: CSRRepr = !((ones(1) << 0)
+        | (ones(3) << 2)
+        | (ones(1) << 7)
+        | (ones(2) << 11)
+        | (ones(1) << 17)
+        | (ones(12) << 20)
+        | (ones(29) << 34));
 
-    const WPRI_MASK_SENVCFG: CSRRepr = !(ones(3) << 1 | ones(CSRegister::SXLEN - 8) << 8);
+    const WPRI_MASK_SENVCFG: CSRRepr = !((ones(3) << 1) | (ones(CSRegister::SXLEN - 8) << 8));
 
     const WPRI_MASK_MNCAUSE: CSRRepr = !(ones(1) << (CSRegister::MXLEN - 1));
 
     const WPRI_MASK_MNSTATUS: CSRRepr =
-        !(ones(3) << 0 | ones(3) << 4 | ones(3) << 8 | ones(CSRegister::MXLEN - 13) << 13);
+        !((ones(3) << 0) | (ones(3) << 4) | (ones(3) << 8) | (ones(CSRegister::MXLEN - 13) << 13));
 
     /// Return the mask of non reserved bits, (WPRI bits are 0)
     /// Relevant section 2.3 - privileged spec
@@ -627,10 +627,7 @@ impl CSRegister {
     /// Exception codes to delegate.
     /// If an exception can't be thrown from a lower privilege mode, set it here read-only 0
     const WARL_MASK_MEDELEG: CSRRepr = !(
-        ones(1) << 10 // reserved
-        | ones(1) << 11 // environment call from M-mode
-        | ones(1) << 14 // reserved
-        | ones(CSRegister::MXLEN - 16) << 16
+        (ones(1) << 10) | (ones(1) << 11) | (ones(1) << 14) | (ones(CSRegister::MXLEN - 16) << 16)
         // reserved & custom use
     );
 
@@ -639,14 +636,14 @@ impl CSRegister {
     /// Interrupt codes to delegate.
     /// If an interrupt can't be thrown from a lower privilege mode, set it here read-only 0
     const WARL_MASK_MIDELEG: CSRRepr = !(
-        ones(1) << 0    // reserved
-        | ones(1) << 2  // reserved
-        | ones(1) << 4  // reserved
-        | ones(1) << 6  // reserved
-        | ones(1) << 8  // reserved
-        | ones(1) << 10 // reserved
-        | ones(4) << 12 // reserved
-        | ones(CSRegister::MXLEN - 16) << 16
+        (ones(1) << 0)
+            | (ones(1) << 2)
+            | (ones(1) << 4)
+            | (ones(1) << 6)
+            | (ones(1) << 8)
+            | (ones(1) << 10)
+            | (ones(4) << 12)
+            | (ones(CSRegister::MXLEN - 16) << 16)
         // custom use
     );
 
@@ -821,7 +818,7 @@ impl CSRegister {
 
             CSRegister::fcsr => {
                 // fcsr is a combination of fflags and fcsr
-                CSRegister::fflags.default_value() & CSRegister::frm.default_value() << 5
+                CSRegister::fflags.default_value() & (CSRegister::frm.default_value() << 5)
             }
 
             CSRegister::pmpcfg0
@@ -1909,56 +1906,86 @@ mod tests {
         // write to MBE, SXL, UXL, MPP, MPIE, XS, SPP (through mstatus)
         csrs.write(
             CSRegister::mstatus,
-            1u64 << 37 | 0b01 << 34 | 0b11 << 32 | 0b11 << 15 | 0b11 << 11 | 1 << 8 | 1 << 7,
+            (1u64 << 37)
+                | (0b01 << 34)
+                | (0b11 << 32)
+                | (0b11 << 15)
+                | (0b11 << 11)
+                | (1 << 8)
+                | (1 << 7),
         );
         // SXL, UXL should be set to MXL (WARL), SD bit should be 1
         let read_mstatus: MStatus = csrs.read(CSRegister::mstatus);
         assert_eq!(
             read_mstatus.to_bits(),
-            1u64 << 63
-                | 1 << 37
-                | 0b10 << 34
-                | 0b10 << 32
-                | 0b11 << 15
-                | 0b11 << 11
-                | 1 << 8
-                | 1 << 7
+            (1u64 << 63)
+                | (1 << 37)
+                | (0b10 << 34)
+                | (0b10 << 32)
+                | (0b11 << 15)
+                | (0b11 << 11)
+                | (1 << 8)
+                | (1 << 7)
         );
         // SXL should be 0 (WPRI), MBE, MPP, MPIE should be 0 (WPRI for sstatus), SD bit also 1
         let read_sstatus: CSRValue = csrs.read(CSRegister::sstatus);
         assert_eq!(
             read_sstatus.repr(),
-            1u64 << 63 | 0b10 << 32 | 0b11 << 15 | 1 << 8
+            (1u64 << 63) | (0b10 << 32) | (0b11 << 15) | (1 << 8)
         );
 
         // write to MBE, SXL, UXL, MPP, MPIE, VS, SPP, (through sstatus, M-fields should be ignored, being WPRI)
         csrs.write(
             CSRegister::sstatus,
-            0u64 << 37 | 0b11 << 34 | 0b01 << 32 | 0b11 << 11 | 0 << 9 | 0 << 7 | 1 << 8,
+            (0u64 << 37)
+                | (0b11 << 34)
+                | (0b01 << 32)
+                | (0b11 << 11)
+                | (0 << 9)
+                | (0 << 7)
+                | (1 << 8),
         );
         // setting VS to 0, SD bit becomes 0. Otherwise, only UXL and SPP fields are non-zero.
         let second_read_sstatus: CSRValue = csrs.read(CSRegister::sstatus);
-        assert_eq!(second_read_sstatus.repr(), 0b10u64 << 32 | 1 << 8);
+        assert_eq!(second_read_sstatus.repr(), (0b10u64 << 32) | (1 << 8));
         // MBE remained 1, SXL, UXL are constant, MPP remained 0b11, VS is 0 due to the sstatus change, SPP and MPIE remained 1,
         let read_mstatus: CSRValue = csrs.read(CSRegister::mstatus);
         assert_eq!(
             read_mstatus.repr(),
-            1u64 << 37 | 0b10 << 34 | 0b10 << 32 | 0b11 << 11 | 0 << 9 | 1 << 8 | 1 << 7
+            (1u64 << 37)
+                | (0b10 << 34)
+                | (0b10 << 32)
+                | (0b11 << 11)
+                | (0 << 9)
+                | (1 << 8)
+                | (1 << 7)
         );
 
         assert_eq!(
             csrs.read::<CSRRepr>(CSRegister::sstatus),
-            0b10 << 32 | 1 << 8
+            (0b10 << 32) | (1 << 8)
         );
         assert_eq!(
             csrs.read::<CSRRepr>(CSRegister::mstatus),
-            1u64 << 37 | 0b10 << 34 | 0b10 << 32 | 0b11 << 11 | 0 << 9 | 1 << 8 | 1 << 7
+            (1u64 << 37)
+                | (0b10 << 34)
+                | (0b10 << 32)
+                | (0b11 << 11)
+                | (0 << 9)
+                | (1 << 8)
+                | (1 << 7)
         );
 
         // write to MBE, SXL, UXL, MPP, VS, SPP, MPIE (through sstatus)
         let old_sstatus: CSRValue = csrs.replace(
             CSRegister::sstatus,
-            (1u64 << 37 | 0b01 << 34 | 0b11 << 32 | 0b11 << 15 | 0b11 << 11 | 0 << 8 | 0 << 7)
+            ((1u64 << 37)
+                | (0b01 << 34)
+                | (0b11 << 32)
+                | (0b11 << 15)
+                | (0b11 << 11)
+                | (0 << 8)
+                | (0 << 7))
                 .into(),
         );
         assert_eq!(old_sstatus, second_read_sstatus);
@@ -1966,20 +1993,20 @@ mod tests {
         let read_mstatus: CSRValue = csrs.read(CSRegister::mstatus);
         assert_eq!(
             read_mstatus.repr(),
-            1u64 << 63
-                | 1 << 37
-                | 0b10 << 34
-                | 0b10 << 32
-                | 0b11 << 15
-                | 0b11 << 11
-                | 0 << 8
-                | 1 << 7
+            (1u64 << 63)
+                | (1 << 37)
+                | (0b10 << 34)
+                | (0b10 << 32)
+                | (0b11 << 15)
+                | (0b11 << 11)
+                | (0 << 8)
+                | (1 << 7)
         );
         // SXL should be 0 (WPRI), MBE, MPP, MPIE should be 0 (WPRI for sstatus), SD bit also 1
         let read_sstatus: CSRValue = csrs.read(CSRegister::sstatus);
         assert_eq!(
             read_sstatus.repr(),
-            1u64 << 63 | 0b10 << 32 | 0b11 << 15 | 0 << 8
+            (1u64 << 63) | (0b10 << 32) | (0b11 << 15) | (0 << 8)
         );
     });
 

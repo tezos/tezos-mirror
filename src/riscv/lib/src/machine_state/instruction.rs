@@ -100,7 +100,7 @@ impl Debug for Instruction {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         struct DebugArgs<'a>(&'a dyn Fn(&mut Formatter<'_>) -> fmt::Result);
 
-        impl<'a> Debug for DebugArgs<'a> {
+        impl Debug for DebugArgs<'_> {
             fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
                 (self.0)(f)
             }
@@ -759,7 +759,9 @@ impl From<NonZeroXRegister> for Register {
 impl PartialEq for Register {
     fn eq(&self, other: &Self) -> bool {
         // SAFETY: XRegister and FRegister are the same size as u8 and directly mappable to it.
-        unsafe { std::mem::transmute::<_, &u8>(self) == std::mem::transmute::<_, &u8>(other) }
+        unsafe {
+            std::mem::transmute::<&Self, &u8>(self) == std::mem::transmute::<&Self, &u8>(other)
+        }
     }
 }
 

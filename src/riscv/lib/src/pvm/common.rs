@@ -69,7 +69,7 @@ impl PvmHooks<'static> {
 
 /// The default PVM configuration prints all debug information from the kernel
 /// to the standard output.
-impl<'a> Default for PvmHooks<'a> {
+impl Default for PvmHooks<'_> {
     fn default() -> Self {
         fn putchar(char: u8) {
             stdout().lock().write_all(&[char]).unwrap();

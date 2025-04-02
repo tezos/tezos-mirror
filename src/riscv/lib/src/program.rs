@@ -30,7 +30,7 @@ pub struct Program<'a, MC> {
     pub program_headers: Option<kernel_loader::ProgramHeaders<'a>>,
 }
 
-impl<'a, MC> kernel_loader::Memory for Program<'a, MC> {
+impl<MC> kernel_loader::Memory for Program<'_, MC> {
     fn write_bytes(
         &mut self,
         mut paddr: u64,

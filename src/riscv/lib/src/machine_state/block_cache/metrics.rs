@@ -259,9 +259,9 @@ pub mod core {
                 return cmp;
             }
 
-            return Hash::blake2b_hash(self.instr.as_slice())
+            Hash::blake2b_hash(self.instr.as_slice())
                 .unwrap()
-                .cmp(&Hash::blake2b_hash(&other.instr).unwrap());
+                .cmp(&Hash::blake2b_hash(&other.instr).unwrap())
         }
     }
 }

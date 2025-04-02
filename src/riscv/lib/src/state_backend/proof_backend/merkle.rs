@@ -19,9 +19,7 @@ use crate::state_backend::proof_backend::tree::impl_modify_map_collect;
 /// Size of the Merkle leaf used for Merkleising [`DynArrays`].
 ///
 /// [`DynArrays`]: [`crate::state_backend::layout::DynArray`]
-pub const MERKLE_LEAF_SIZE: NonZeroUsize =
-    // SAFETY: This constant is non-zero.
-    unsafe { NonZeroUsize::new_unchecked(4096) };
+pub const MERKLE_LEAF_SIZE: NonZeroUsize = NonZeroUsize::new(4096).unwrap();
 
 // TODO RV-322: Choose optimal Merkleisation parameters for main memory.
 /// Arity of the Merkle tree used for Merkleising [`DynArrays`].

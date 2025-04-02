@@ -95,9 +95,9 @@ mod tests {
             ppn_3 in 0_u64..(1 << 9),
             ppn_4 in 0_u64..(1 << 8),
         )| {
-            let ppn_parts = ppn_0 | ppn_1 << 9 | ppn_2 << 18 | ppn_3 << 27 | ppn_4 << 36;
-            let flags = flag_V | flag_R << 1 | flag_W << 2 | flag_X << 3 | flag_U << 4 | flag_G << 5 | flag_A << 6 | flag_D << 7;
-            let pte = flags | ppn_parts << 10;
+            let ppn_parts = ppn_0 | (ppn_1 << 9) | (ppn_2 << 18) | (ppn_3 << 27) | (ppn_4 << 36);
+            let flags = flag_V | (flag_R << 1) | (flag_W << 2) | (flag_X << 3) | (flag_U << 4) | (flag_G << 5) | (flag_A << 6) | (flag_D << 7);
+            let pte = flags | (ppn_parts << 10);
             let pte = PageTableEntry::from_bits(pte);
 
             // Sv39
@@ -105,14 +105,14 @@ mod tests {
             prop_assert_eq!(ppn.ppn_i(SvLength::Sv39, over_3), None);
             prop_assert_eq!(ppn.ppn_i(SvLength::Sv39, 0), Some(ppn_0));
             prop_assert_eq!(ppn.ppn_i(SvLength::Sv39, 1), Some(ppn_1));
-            prop_assert_eq!(ppn.ppn_i(SvLength::Sv39, 2), Some(ppn_2 | ppn_3 << 9 | ppn_4 << 18));
+            prop_assert_eq!(ppn.ppn_i(SvLength::Sv39, 2), Some(ppn_2 | (ppn_3 << 9) | (ppn_4 << 18)));
 
             // Sv48
             prop_assert_eq!(ppn.ppn_i(SvLength::Sv48, over_3 + 1), None);
             prop_assert_eq!(ppn.ppn_i(SvLength::Sv48, 0), Some(ppn_0));
             prop_assert_eq!(ppn.ppn_i(SvLength::Sv48, 1), Some(ppn_1));
             prop_assert_eq!(ppn.ppn_i(SvLength::Sv48, 2), Some(ppn_2));
-            prop_assert_eq!(ppn.ppn_i(SvLength::Sv48, 3), Some(ppn_3 | ppn_4 << 9));
+            prop_assert_eq!(ppn.ppn_i(SvLength::Sv48, 3), Some(ppn_3 | (ppn_4 << 9)));
 
             // Sv57
             prop_assert_eq!(ppn.ppn_i(SvLength::Sv57, over_3 + 2), None);

@@ -143,15 +143,15 @@ impl Interrupt {
     pub const MACHINE_EXTERNAL_EXCEPTION_CODE: CSRRepr = 11;
 
     /// Bitmask of all supervisor interrupts
-    pub const SUPERVISOR_BIT_MASK: CSRRepr = 1
-        << Interrupt::SupervisorSoftware.exception_code_const()
-        | 1 << Interrupt::SupervisorTimer.exception_code_const()
-        | 1 << Interrupt::SupervisorExternal.exception_code_const();
+    pub const SUPERVISOR_BIT_MASK: CSRRepr = (1
+        << Interrupt::SupervisorSoftware.exception_code_const())
+        | (1 << Interrupt::SupervisorTimer.exception_code_const())
+        | (1 << Interrupt::SupervisorExternal.exception_code_const());
 
     /// Bitmask of all machine interrupts
-    pub const MACHINE_BIT_MASK: CSRRepr = 1 << Interrupt::MachineSoftware.exception_code_const()
-        | 1 << Interrupt::MachineTimer.exception_code_const()
-        | 1 << Interrupt::MachineExternal.exception_code_const();
+    pub const MACHINE_BIT_MASK: CSRRepr = (1 << Interrupt::MachineSoftware.exception_code_const())
+        | (1 << Interrupt::MachineTimer.exception_code_const())
+        | (1 << Interrupt::MachineExternal.exception_code_const());
 
     /// Exception code of interrupts
     pub const fn exception_code_const(&self) -> CSRRepr {

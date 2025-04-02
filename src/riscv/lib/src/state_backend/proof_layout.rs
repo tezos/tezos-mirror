@@ -93,13 +93,13 @@ pub enum ProofPart<'a, T: ?Sized> {
     Present(&'a T),
 }
 
-impl<'a, T> Clone for ProofPart<'a, T> {
+impl<T> Clone for ProofPart<'_, T> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<'a, T> Copy for ProofPart<'a, T> {}
+impl<T> Copy for ProofPart<'_, T> {}
 
 /// Part of a Merkle proof tree
 pub type ProofTree<'a> = ProofPart<'a, MerkleProof>;
@@ -183,6 +183,7 @@ impl<'a> ProofTree<'a> {
     ///   and no proof hash
     /// - a blinded leaf which corresponds to a node with `LEN` children,
     ///   in which case return absent branches and the proof hash
+    ///
     /// If the proof tree is absent, return absent branches and no proof hash.
     pub fn into_branches_with_hash<const LEN: usize>(
         self,

@@ -342,7 +342,7 @@ impl NonZeroXRegister {
             x0 => panic!("x0 is not a non-zero register"),
             // SAFETY: Excluding x0, XRegister is a
             // direct map to NonZeroXRegister, so safe to convert.
-            r => unsafe { std::mem::transmute(r) },
+            r => unsafe { std::mem::transmute::<XRegister, Self>(r) },
         }
     }
 }
