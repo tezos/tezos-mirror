@@ -10,14 +10,14 @@ use tezos_smart_rollup_host::path::RefPath;
 #[derive(Debug, PartialEq, Eq)]
 pub struct RefBytes<'a>(pub &'a [u8]);
 
-impl<'a> AsRef<[u8]> for RefBytes<'a> {
+impl AsRef<[u8]> for RefBytes<'_> {
     fn as_ref(&self) -> &[u8] {
         self.0
     }
 }
 
 #[allow(clippy::from_over_into)]
-impl<'a> Into<[u8; PREIMAGE_HASH_SIZE]> for RefBytes<'a> {
+impl Into<[u8; PREIMAGE_HASH_SIZE]> for RefBytes<'_> {
     fn into(self) -> [u8; PREIMAGE_HASH_SIZE] {
         self.0.try_into().unwrap()
     }

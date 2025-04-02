@@ -125,7 +125,7 @@ pub struct RefPath<'a> {
     inner: &'a str,
 }
 
-impl<'a> RefPath<'a> {
+impl RefPath<'_> {
     /// Constructs a [`RefPath`] from a byte slice.
     ///
     /// # Panics
@@ -258,7 +258,7 @@ const fn validate_path(path: &[u8]) -> Result<(), PathError> {
 impl<'a> TryFrom<&'a str> for RefPath<'a> {
     type Error = PathError;
 
-    fn try_from(slice: &'a str) -> Result<RefPath, Self::Error> {
+    fn try_from(slice: &'a str) -> Result<RefPath<'a>, Self::Error> {
         Self::try_from(slice.as_bytes())
     }
 }
@@ -266,7 +266,7 @@ impl<'a> TryFrom<&'a str> for RefPath<'a> {
 impl<'a> TryFrom<&'a [u8]> for RefPath<'a> {
     type Error = PathError;
 
-    fn try_from(slice: &'a [u8]) -> Result<RefPath, PathError> {
+    fn try_from(slice: &'a [u8]) -> Result<RefPath<'a>, PathError> {
         validate_path(slice)?;
 
         // SAFETY: we've validated that every byte is either alphanumeric or SEPARATOR
@@ -393,7 +393,7 @@ mod owned {
         }
     }
 
-    impl<'a> BinWriter for RefPath<'a> {
+    impl BinWriter for RefPath<'_> {
         fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
             let data = self.inner;
             put_bytes(data.as_bytes(), output);

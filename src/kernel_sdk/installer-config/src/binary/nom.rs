@@ -27,7 +27,7 @@ pub type NomResult<'a, T> = nom::IResult<NomInput<'a>, T>;
 // NomReader is like tezos_data_encoding::enc::NomReader,
 // but tweaked with lifetime 'a
 pub trait NomReader<'a>: Sized {
-    fn nom_read(input: &'a [u8]) -> NomResult<Self>;
+    fn nom_read(input: &'a [u8]) -> NomResult<'a, Self>;
 }
 
 pub fn size(input: NomInput) -> NomResult<u32> {
@@ -96,7 +96,7 @@ pub fn completed<T>(x: (&[u8], T)) -> Result<T, &'static str> {
 }
 
 impl<'a> NomReader<'a> for RefBytes<'a> {
-    fn nom_read(input: &'a [u8]) -> NomResult<Self> {
+    fn nom_read(input: &'a [u8]) -> NomResult<'a, Self> {
         map_res(
             complete(length_data(bounded_size(MAX_FILE_CHUNK_SIZE))),
             |bytes| Ok::<RefBytes<'_>, NomError<'_>>(RefBytes(bytes)),
@@ -105,7 +105,7 @@ impl<'a> NomReader<'a> for RefBytes<'a> {
 }
 
 impl<'a> NomReader<'a> for RevealInstruction<RefPath<'a>, RefBytes<'a>> {
-    fn nom_read(bytes: &'a [u8]) -> NomResult<Self> {
+    fn nom_read(bytes: &'a [u8]) -> NomResult<'a, Self> {
         map(
             nom::sequence::tuple((
                 <RefBytes<'a> as NomReader>::nom_read,
@@ -117,7 +117,7 @@ impl<'a> NomReader<'a> for RevealInstruction<RefPath<'a>, RefBytes<'a>> {
 }
 
 impl<'a> NomReader<'a> for MoveInstruction<RefPath<'a>> {
-    fn nom_read(bytes: &'a [u8]) -> NomResult<Self> {
+    fn nom_read(bytes: &'a [u8]) -> NomResult<'a, Self> {
         map(
             tuple((nom_read_ref_path, nom_read_ref_path)),
             |(from, to)| MoveInstruction { from, to },
@@ -126,7 +126,7 @@ impl<'a> NomReader<'a> for MoveInstruction<RefPath<'a>> {
 }
 
 impl<'a> NomReader<'a> for SetInstruction<RefPath<'a>, RefBytes<'a>> {
-    fn nom_read(bytes: &'a [u8]) -> NomResult<Self> {
+    fn nom_read(bytes: &'a [u8]) -> NomResult<'a, Self> {
         map(
             nom::sequence::tuple((
                 <RefBytes<'a> as NomReader>::nom_read,
@@ -138,7 +138,7 @@ impl<'a> NomReader<'a> for SetInstruction<RefPath<'a>, RefBytes<'a>> {
 }
 
 impl<'a> NomReader<'a> for ConfigInstruction<RefPath<'a>, RefBytes<'a>> {
-    fn nom_read(bytes: &'a [u8]) -> NomResult<Self> {
+    fn nom_read(bytes: &'a [u8]) -> NomResult<'a, Self> {
         let (input, tag) = nom::number::complete::u8(bytes)?;
         let (input, variant) = match tag {
             0 => (map(

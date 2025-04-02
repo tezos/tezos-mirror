@@ -50,7 +50,7 @@ struct StaticInputHost<'runtime, R: Runtime> {
     inbox: &'runtime mut Inbox,
 }
 
-impl<'runtime, R: Runtime> Runtime for StaticInputHost<'runtime, R> {
+impl<R: Runtime> Runtime for StaticInputHost<'_, R> {
     #[inline(always)]
     fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
         self.host.write_output(from)
