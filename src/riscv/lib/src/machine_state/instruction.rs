@@ -213,7 +213,7 @@ pub enum OpCode {
     SetLessThanSigned,
     SetLessThanUnsigned,
     Addw,
-    Subw,
+    SubWord,
     Sllw,
     Srlw,
     Sraw,
@@ -381,7 +381,6 @@ pub enum OpCode {
     /// Effects are to store the next instruction address in rd and jump to val(rs1).
     Jalr,
     CAddw,
-    CSubw,
 
     // RV64C compressed instructions
     CAddiw,
@@ -459,7 +458,7 @@ impl OpCode {
             Self::SetLessThanSigned => Args::run_set_less_than_signed,
             Self::SetLessThanUnsigned => Args::run_set_less_than_unsigned,
             Self::Addw => Args::run_addw,
-            Self::Subw => Args::run_subw,
+            Self::SubWord => Args::run_sub_word,
             Self::Sllw => Args::run_sllw,
             Self::Srlw => Args::run_srlw,
             Self::Sraw => Args::run_sraw,
@@ -624,7 +623,6 @@ impl OpCode {
             Self::Li => Args::run_li,
             Self::Mv => Args::run_mv,
             Self::CAddw => Args::run_caddw,
-            Self::CSubw => Args::run_csubw,
             Self::Nop => Args::run_nop,
             Self::CAddiw => Args::run_caddiw,
             Self::CFld => Args::run_cfld,
@@ -656,6 +654,7 @@ impl OpCode {
             Self::Nop => Some(Args::run_nop),
             Self::Add => Some(Args::run_add),
             Self::Sub => Some(Args::run_sub),
+            Self::SubWord => Some(Args::run_sub_word),
             Self::And => Some(Args::run_and),
             Self::Or => Some(Args::run_or),
             Self::Mul => Some(Args::run_mul),
@@ -1303,7 +1302,7 @@ impl Args {
         non_zero_rd
     );
     impl_r_type!(run_addw, non_zero_rd);
-    impl_r_type!(run_subw, non_zero_rd);
+    impl_r_type!(integer::run_sub_word, run_sub_word, non_zero_rd);
     impl_r_type!(run_sllw, non_zero_rd);
     impl_r_type!(run_srlw, non_zero_rd);
     impl_r_type!(run_sraw, non_zero_rd);
@@ -1595,7 +1594,6 @@ impl Args {
     // RV64C compressed instructions
     impl_ci_type!(run_caddiw, non_zero);
     impl_cr_type!(run_caddw);
-    impl_cr_type!(run_csubw);
 
     // RV64C compressed instructions
     impl_fload_type!(run_cfld);
@@ -1631,10 +1629,9 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::Addw,
                 args: args.into(),
             },
-            InstrCacheable::Subw(args) => Instruction {
-                opcode: OpCode::Subw,
-                args: args.into(),
-            },
+            InstrCacheable::Subw(args) => {
+                Instruction::new_sub_word(args.rd, args.rs1, args.rs2, InstrWidth::Uncompressed)
+            }
             InstrCacheable::Sllw(args) => Instruction {
                 opcode: OpCode::Sllw,
                 args: args.into(),
@@ -2219,10 +2216,7 @@ impl From<&InstrCacheable> for Instruction {
                 opcode: OpCode::CAddw,
                 args: args.into(),
             },
-            InstrCacheable::CSubw(args) => Instruction {
-                opcode: OpCode::CSubw,
-                args: args.into(),
-            },
+            InstrCacheable::CSubw(args) => Instruction::from_ic_csubw(args),
 
             // RV64DC compressed instructions
             InstrCacheable::CFld(args) => Instruction {

@@ -16,6 +16,7 @@ use cranelift::codegen::ir::MemFlags;
 use cranelift::codegen::ir::Type;
 use cranelift::codegen::ir::Value;
 use cranelift::codegen::ir::condcodes::IntCC;
+use cranelift::codegen::ir::types::I32;
 use cranelift::codegen::ir::types::I64;
 use cranelift::frontend::FunctionBuilder;
 
@@ -31,8 +32,13 @@ use crate::machine_state::memory::MemoryConfig;
 use crate::machine_state::registers::NonZeroXRegister;
 use crate::parser::instruction::InstrWidth;
 
+/// A newtype for wrapping [`Value`], representing a 64-bit value in the JIT context.
 #[derive(Copy, Clone, Debug)]
 pub struct X64(pub Value);
+
+/// A newtype for wrapping [`Value`], representing a 32-bit value in the JIT context.
+#[derive(Copy, Clone, Debug)]
+pub struct X32(pub Value);
 
 /// Builder context used when lowering individual instructions within a block.
 pub(super) struct Builder<'a, MC: MemoryConfig, JSA: JitStateAccess> {
@@ -266,6 +272,20 @@ impl<'a, MC: MemoryConfig, JSA: JitStateAccess> ICB for Builder<'a, MC, JSA> {
 
     /// An `I8` width value.
     type Bool = Value;
+
+    type XValue32 = X32;
+
+    fn narrow(&mut self, value: Self::XValue) -> Self::XValue32 {
+        X32(self.builder.ins().ireduce(I32, value.0))
+    }
+
+    fn extend_signed(&mut self, value: Self::XValue32) -> Self::XValue {
+        X64(self.builder.ins().sextend(I64, value.0))
+    }
+
+    fn extend_unsigned(&mut self, value: Self::XValue32) -> Self::XValue {
+        X64(self.builder.ins().uextend(I64, value.0))
+    }
 
     fn xregister_read_nz(&mut self, reg: NonZeroXRegister) -> Self::XValue {
         self.jsa_call

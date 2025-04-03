@@ -655,6 +655,48 @@ mod tests {
         }
     });
 
+    backend_test!(test_sub_word, F, {
+        use Instruction as I;
+
+        use crate::machine_state::registers::a0;
+        use crate::machine_state::registers::a1;
+        use crate::machine_state::registers::nz;
+
+        let scenarios: &[Scenario<F>] = &[
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(nz::a0, 10, Uncompressed),
+                    I::new_li(nz::a1, 1, Compressed),
+                    I::new_sub_word(nz::a2, a0, a1, Compressed),
+                ])
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(core.hart.xregisters.read_nz(nz::a2), 9);
+                }))
+                .build(),
+            // Test that we wrap around 0 and truncate before sign extending. This
+            // operation 0xFFFFFFFFFFFFFFFF - 0xFFFFFFFF00000000 should produce a
+            // different result for 32-bit (all 1s) and 64-bit operations (only lower 32-bits
+            // as 1s).
+            ScenarioBuilder::default()
+                .set_instructions(&[
+                    I::new_li(nz::a0, !0, Compressed),
+                    I::new_li(nz::a1, 0xFFFFFFFF00000000u64 as i64, Uncompressed),
+                    I::new_sub_word(nz::a2, a0, a1, Compressed),
+                ])
+                .set_assert_hook(assert_hook!(core, F, {
+                    assert_eq!(core.hart.xregisters.read_nz(nz::a2), !0);
+                }))
+                .build(),
+        ];
+
+        let mut jit = JIT::<M4K, F::Manager>::new().unwrap();
+        let mut interpreted_bb = InterpretedBlockBuilder;
+
+        for scenario in scenarios {
+            scenario.run(&mut jit, &mut interpreted_bb);
+        }
+    });
+
     backend_test!(test_and, F, {
         use crate::machine_state::registers::NonZeroXRegister::*;
 

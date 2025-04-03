@@ -175,6 +175,9 @@ impl From<NonZeroXRegister> for XRegister {
 /// Integer register value
 pub type XValue = u64;
 
+/// Integer value for 32-bit operations.
+pub type XValue32 = u32;
+
 /// Layout for [XRegisters]
 pub type XRegistersLayout = backend::Array<XValue, 31>;
 

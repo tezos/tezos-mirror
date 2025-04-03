@@ -64,6 +64,25 @@ impl Instruction {
         }
     }
 
+    /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for [`OpCode::SubWord`].
+    pub(crate) fn new_sub_word(
+        rd: NonZeroXRegister,
+        rs1: XRegister,
+        rs2: XRegister,
+        width: InstrWidth,
+    ) -> Self {
+        Self {
+            opcode: OpCode::SubWord,
+            args: Args {
+                rd: rd.into(),
+                rs1: rs1.into(),
+                rs2: rs2.into(),
+                width,
+                ..Args::DEFAULT
+            },
+        }
+    }
+
     /// Create a new [`Instruction`] with the appropriate [`super::ArgsShape`] for the [`OpCode::Neg`].
     pub(crate) fn new_neg(rd: NonZeroXRegister, rs2: NonZeroXRegister, width: InstrWidth) -> Self {
         Self {
@@ -1139,6 +1158,19 @@ impl Instruction {
             (X::X0, _) | (_, X::X0) => Instruction::new_nop(InstrWidth::Compressed),
             (X::NonZero(rd_rs1), X::NonZero(rs2)) => {
                 Instruction::new_sub(rd_rs1, rd_rs1, rs2, InstrWidth::Compressed)
+            }
+        }
+    }
+
+    /// Convert [`InstrCacheable::CSubw`] according to whether registers are non-zero.
+    ///
+    /// [`InstrCacheable::CSubw`]: crate::parser::instruction::InstrCacheable::CSubw
+    pub(super) fn from_ic_csubw(args: &CRTypeArgs) -> Instruction {
+        use XRegisterParsed as X;
+        match split_x0(args.rd_rs1) {
+            X::X0 => Instruction::new_nop(InstrWidth::Compressed),
+            X::NonZero(rd_rs1) => {
+                Instruction::new_sub_word(rd_rs1, args.rd_rs1, args.rs2, InstrWidth::Compressed)
             }
         }
     }

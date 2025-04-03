@@ -7,6 +7,7 @@
 use super::ICB;
 use super::Shift;
 use crate::machine_state::registers::XValue;
+use crate::machine_state::registers::XValue32;
 
 /// Trait for arithmetic operations on **XValues** used in the [`ICB`].
 pub trait Arithmetic<I: ICB + ?Sized>: Copy {
@@ -68,6 +69,40 @@ impl<I: ICB> Arithmetic<I> for XValue {
             Shift::Left => self << amount,
             Shift::RightUnsigned => self >> amount,
             Shift::RightSigned => (self as i64 >> amount) as XValue,
+        }
+    }
+}
+
+impl<I: ICB> Arithmetic<I> for XValue32 {
+    fn add(self, other: Self, _: &mut I) -> Self {
+        self.wrapping_add(other)
+    }
+
+    fn sub(self, other: Self, _: &mut I) -> Self {
+        self.wrapping_sub(other)
+    }
+
+    fn and(self, other: Self, _: &mut I) -> Self {
+        self & other
+    }
+
+    fn or(self, other: Self, _: &mut I) -> Self {
+        self | other
+    }
+
+    fn mul(self, other: Self, _: &mut I) -> Self {
+        self.wrapping_mul(other)
+    }
+
+    fn negate(self, _: &mut I) -> Self {
+        0_u32.wrapping_sub(self)
+    }
+
+    fn shift(self, shift: Shift, amount: Self, _: &mut I) -> Self {
+        match shift {
+            Shift::Left => self << amount,
+            Shift::RightUnsigned => self >> amount,
+            Shift::RightSigned => (self as i32 >> amount) as XValue32,
         }
     }
 }

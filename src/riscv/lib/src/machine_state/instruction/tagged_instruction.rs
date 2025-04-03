@@ -343,7 +343,7 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
         | Amoaddw | Amoxorw | Amoandw | Amoorw | Amominw | Amomaxw | Amominuw | Amomaxuw | Lrd
         | Scd | Amoswapd | Amoaddd | Amoxord | Amoandd | Amoord | Amomind | Amomaxd | Amominud
         | Amomaxud | Rem | Remu | Remw | Remuw | Div | Divu | Divw | Divuw | Mulh | Mulhsu
-        | Mulhu | Mulw | Csrrw | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci | CAddw | CSubw => {
+        | Mulhu | Mulw | Csrrw | Csrrs | Csrrc | Csrrwi | Csrrsi | Csrrci | CAddw => {
             ArgsShape::XSrcXDest
         }
 
@@ -414,7 +414,7 @@ pub fn opcode_to_argsshape(opcode: &OpCode) -> ArgsShape {
 
         Addiw
         | Addw
-        | Subw
+        | SubWord
         | Sllw
         | Srlw
         | Sraw
