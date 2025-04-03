@@ -51,7 +51,10 @@ gitlab:release:
   stage: publish_release_gitlab
   tags:
   - gcp
-  dependencies: []
+  needs:
+  - build_grafazos_dashboards
+  dependencies:
+  - build_grafazos_dashboards
   timeout: 60 minutes
   interruptible: false
   script:
