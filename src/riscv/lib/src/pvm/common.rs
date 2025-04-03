@@ -8,15 +8,20 @@ use std::io::Write;
 use std::io::stdout;
 use std::ops::Bound;
 
+use tezos_smart_rollup_constants::riscv::SbiError;
+
 #[cfg(feature = "supervisor")]
 use super::linux;
 use super::reveals::RevealRequest;
 use super::reveals::RevealRequestLayout;
 use crate::default::ConstDefault;
+use crate::instruction_context::ICB;
 use crate::machine_state;
 use crate::machine_state::block_cache::bcall;
 use crate::machine_state::memory;
+use crate::machine_state::registers::a0;
 use crate::pvm::sbi;
+use crate::range_utils::less_than_bound;
 use crate::state_backend;
 use crate::state_backend::Atom;
 use crate::state_backend::Cell;
@@ -236,6 +241,13 @@ impl<
     where
         M: state_backend::ManagerReadWrite,
     {
+        // When the status is WaitingForReveal during evaluation, we know that
+        // nothing has been returned by the rollup node and the reveal request
+        // is invalid.
+        if let PvmStatus::WaitingForReveal = self.status.read() {
+            return self.provide_reveal_error_response();
+        }
+
         if let Err(exc) = self.machine_state.step() {
             self.handle_exception(hooks, exc);
         }
@@ -261,6 +273,19 @@ impl<
     where
         M: state_backend::ManagerReadWrite,
     {
+        // Do nothing if step_bounds is less than 1
+        if !less_than_bound(0, step_bounds) {
+            return 0;
+        }
+
+        // When the status is WaitingForReveal during evaluation, we know that
+        // nothing has been returned by the rollup node and the reveal request
+        // is invalid.
+        if let PvmStatus::WaitingForReveal = self.status.read() {
+            self.provide_reveal_error_response();
+            return 1;
+        }
+
         self.machine_state
             .step_max_handle::<Infallible>(step_bounds, |machine_state, exception| {
                 #[cfg(feature = "supervisor")]
@@ -333,6 +358,17 @@ impl<
         M: state_backend::ManagerRead,
     {
         self.reveal_request.to_vec()
+    }
+
+    /// Provide a reveal error response to the pvm
+    pub fn provide_reveal_error_response(&mut self)
+    where
+        M: state_backend::ManagerReadWrite,
+    {
+        self.machine_state
+            .core
+            .xregister_write(a0, SbiError::InvalidParam as u64);
+        self.status.write(PvmStatus::Evaluating);
     }
 }
 

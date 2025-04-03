@@ -1,5 +1,5 @@
 
-./octez-client --wait none originate smart rollup rollup from bootstrap1 of kind riscv of type string with kernel kernel:src/riscv/assets/riscv-dummy.elf:71f45fec5446163519a2e7712e202b8251946b6e488a3d28e698e4546f9513db --burn-cap 9999999
+./octez-client --wait none originate smart rollup rollup from bootstrap1 of kind riscv of type string with kernel kernel:src/riscv/assets/riscv-dummy.elf:b629cdab33744e1a3de3f4185b8022b6041baf68aaf655525e624c74369692b2 --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 1933.839 units (will add 100 for safety)
 Estimated storage: 6552 bytes added (will add 20 for safety)
@@ -22,7 +22,7 @@ This sequence of operations was run:
     Smart rollup origination:
       Kind: riscv
       Parameter type: string
-      Kernel Blake2B hash: '9ab3832948915992ea8d64c3890562ff2482c1bd35596a365bde320f2afd6d9c'
+      Kernel Blake2B hash: '53a36509a578313ccbde10107ee9e6b77174c8977a6093add5bd2c00e0da5bfd'
       This smart rollup origination was successfully applied
       Consumed gas: 1933.806
       Storage size: 6552 bytes
@@ -56,26 +56,26 @@ Hello World
 I am [SMART_ROLLUP_HASH]
 RollupMetadata {
     raw_rollup_address: [
-        96,
-        64,
-        48,
-        159,
-        88,
-        177,
-        24,
-        184,
-        17,
+        253,
+        179,
         68,
+        37,
+        63,
+        102,
+        130,
+        203,
+        106,
+        247,
+        191,
+        42,
+        1,
         99,
-        110,
-        135,
-        76,
-        160,
-        57,
-        80,
-        92,
-        194,
-        94,
+        196,
+        87,
+        118,
+        179,
+        118,
+        64,
     ],
     origination_level: 2,
 }
@@ -84,10 +84,13 @@ Signature is [133, 153, 89, 165, 225, 52, 223, 180, 255, 131, 0, 136, 151, 153, 
 Reveal metadata...
 
 Reveal metadata succeeded, result: 
-Rollup address: RollupMetadata { raw_rollup_address: [96, 64, 48, 159, 88, 177, 24, 184, 17, 68, 99, 110, 135, 76, 160, 57, 80, 92, 194, 94], origination_level: 2 }
+Rollup address: RollupMetadata { raw_rollup_address: [253, 179, 68, 37, 63, 102, 130, 203, 106, 247, 191, 42, 1, 99, 196, 87, 118, 179, 118, 64], origination_level: 2 }
 Reveal preimage...
 
 Preimage: "cafebabe"
+Invalid reveal request...
+
+
 Reveals Done
 
 Internal(
@@ -1070,7 +1073,7 @@ GET http://[HOST]:[PORT]/global/block/head/status
 
 GET http://[HOST]:[PORT]/global/block/head/ticks
 200 OK
-"62130"
+"62114"
 
 GET http://[HOST]:[PORT]/global/block/head/state_hash
 200 OK

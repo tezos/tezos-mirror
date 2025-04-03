@@ -9,6 +9,9 @@ use tezos_smart_rollup::prelude::*;
 use tezos_smart_rollup::storage::path::OwnedPath;
 use tezos_smart_rollup::types::SmartRollupAddress;
 use tezos_smart_rollup_constants::core::PREIMAGE_HASH_SIZE;
+use tezos_smart_rollup_constants::riscv::SBI_FIRMWARE_TEZOS;
+use tezos_smart_rollup_constants::riscv::SBI_TEZOS_REVEAL;
+use tezos_smart_rollup_constants::riscv::SbiError;
 
 #[entrypoint::main]
 pub fn entry(host: &mut impl Runtime) {
@@ -53,8 +56,6 @@ pub fn entry(host: &mut impl Runtime) {
         assert!(sbi_crypto::ed25519_verify(&public_key, &sig, data));
     }
 
-    // TODO: RV-501: Errors during decode reveal request are not fatal
-
     host.write_debug("Reveal metadata...\n");
     let result = host.reveal_metadata();
     host.write_debug("Reveal metadata succeeded, result: \n");
@@ -76,6 +77,28 @@ pub fn entry(host: &mut impl Runtime) {
         "Preimage: {:?}\n",
         hex::encode(&buffer[..result_size])
     ));
+
+    host.write_debug("Invalid reveal request...\n");
+
+    let payload = [255u8];
+    let mut buffer = [0u8; 4096];
+
+    // An ecall is made via inline assembly to trigger the invalid reveal request.
+    let result: isize;
+    unsafe {
+        core::arch::asm!(
+            "ecall",
+            in("a0") &payload,
+            in("a1") std::mem::size_of_val(&payload),
+            in("a2") &mut buffer,
+            in("a3") std::mem::size_of_val(&buffer),
+            in("a6") SBI_TEZOS_REVEAL,
+            in("a7") SBI_FIRMWARE_TEZOS,
+            lateout("a0") result,
+        );
+    }
+
+    assert!(result == SbiError::InvalidParam as isize);
 
     debug_msg!(host, "Reveals Done\n");
 
