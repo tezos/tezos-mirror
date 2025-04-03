@@ -87,4 +87,6 @@ module For_RPC : sig
     stake. *)
   val delegate_current_baking_power :
     Raw_context.t -> Signature.public_key_hash -> int64 tzresult Lwt.t
+
+  val total_baking_power : Raw_context.t -> Cycle_repr.t -> int64 tzresult Lwt.t
 end
