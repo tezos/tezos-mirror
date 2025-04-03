@@ -774,7 +774,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"ocaml-check"
-        ~cpu:High
+        ~cpu:Very_high
         ~image:Images.CI.build
         ~stage
         ~retry:

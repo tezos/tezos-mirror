@@ -669,7 +669,7 @@ ocaml-check:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_high_cpu
+  - gcp_very_high_cpu
   rules:
   - when: always
   dependencies:
