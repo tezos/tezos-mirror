@@ -48,15 +48,11 @@ val export :
   unit ->
   string tzresult Lwt.t
 
-(** [import ~force ~data_dir ~snapshot_file] imports the snapshot at path
-    [snapshot_file] into the data directory [data_dir]. Import will fail if
-    [data_dir] is already populated unless [force] is set to [true]. *)
-val import :
-  force:bool -> data_dir:string -> snapshot_file:string -> unit tzresult Lwt.t
-
 (** [import_from ~force ~keep_alive ~data_dir ~download_path ~snapshot_file]
-    similar to [import] but also takes care of downloading the file if the
-    provided string is an url. *)
+    imports the snapshot from file [snapshot_file] (but also takes care of
+    downloading the file if [snapshot_file] is an url) at path [snapshot_file]
+    into the data directory [data_dir]. Import will fail if [data_dir] is
+    already populated unless [force] is set to [true]. *)
 val import_from :
   force:bool ->
   keep_alive:bool ->
@@ -69,7 +65,9 @@ val import_from :
 
 (** [info ~snapshot_file] returns information that can be used to inspect the
     snapshot file. *)
-val info : snapshot_file:string -> Header.t * [`Compressed | `Uncompressed]
+val info :
+  snapshot_file:string ->
+  (Header.t * [`Compressed | `Uncompressed]) tzresult Lwt.t
 
 val interpolate_snapshot_provider :
   ?rollup_address:Address.t ->

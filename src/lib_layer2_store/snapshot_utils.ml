@@ -8,6 +8,8 @@
 module type READER = sig
   type in_channel
 
+  val format : [`Compressed | `Uncompressed]
+
   val open_in : string -> in_channel
 
   val really_input : in_channel -> bytes -> int -> int -> unit
@@ -21,6 +23,8 @@ end
 
 module type WRITER = sig
   type out_channel
+
+  val format : [`Compressed | `Uncompressed]
 
   val open_out : string -> out_channel
 
@@ -43,24 +47,38 @@ module type WRITER_OUTPUT = sig
   val out_chan : out_channel
 end
 
-module Stdlib_reader : READER with type in_channel = Stdlib.in_channel = Stdlib
+module Stdlib_reader : READER with type in_channel = Stdlib.in_channel = struct
+  include Stdlib
+
+  let format = `Uncompressed
+end
 
 module Stdlib_writer : WRITER with type out_channel = Stdlib.out_channel =
 struct
   include Stdlib
 
+  let format = `Uncompressed
+
   let flush_continue = flush
 end
 
-module Gzip_reader : READER with type in_channel = Gzip.in_channel = Gzip
+module Gzip_reader : READER with type in_channel = Gzip.in_channel = struct
+  include Gzip
+
+  let format = `Compressed
+end
 
 module Gzip_writer : WRITER with type out_channel = Gzip.out_channel = struct
   include Gzip
+
+  let format = `Compressed
 
   let open_out f = open_out f
 end
 
 type reader = (module READER)
+
+type reader_input = (module READER_INPUT)
 
 type writer = (module WRITER)
 
@@ -71,6 +89,10 @@ let stdlib_writer : writer = (module Stdlib_writer)
 let gzip_reader : reader = (module Gzip_reader)
 
 let gzip_writer : writer = (module Gzip_writer)
+
+let reader_format (module Reader : READER) = Reader.format
+
+let input_format (module Reader : READER_INPUT) = Reader.format
 
 let run ~cancellable k =
   if cancellable then
@@ -109,6 +131,14 @@ let periodic_report event =
     aux ()
   in
   aux ()
+
+let create_reader_input : reader -> string -> reader_input =
+ fun (module Reader) file ->
+  (module struct
+    include Reader
+
+    let in_chan = open_in file
+  end)
 
 module Make (Header : sig
   type t
@@ -151,10 +181,10 @@ struct
                 mk_event ~progress:!progress elapsed_time);
           ]
 
-  let create (module Reader : READER) (module Writer : WRITER) header
-      ~cancellable ~display_progress ~files ~dest () =
+  let create (module Writer : WRITER) header ~cancellable ~display_progress
+      ~files ~dest () =
     let module Archive_writer = Tar.Make (struct
-      include Reader
+      include Stdlib_reader
       include Writer
     end) in
     let total =
@@ -178,21 +208,21 @@ struct
     in
     run_progress ~display_progress @@ fun count_progress ->
     let write_file file (out_chan : Writer.out_channel) =
-      let in_chan = Reader.open_in file in
+      let in_chan = open_in file in
       try
         let buffer_size = 64 * 1024 in
         let buf = Bytes.create buffer_size in
         let rec copy () =
-          let read_bytes = Reader.input in_chan buf 0 buffer_size in
+          let read_bytes = input in_chan buf 0 buffer_size in
           Writer.output out_chan buf 0 read_bytes ;
           count_progress read_bytes ;
           if read_bytes > 0 then copy ()
         in
         copy () ;
         Writer.flush_continue out_chan ;
-        Reader.close_in in_chan
+        close_in in_chan
       with e ->
-        Reader.close_in in_chan ;
+        close_in in_chan ;
         raise e
     in
     let file_stream =
@@ -227,18 +257,21 @@ struct
       Writer.close_out out_chan ;
       raise e
 
-  let extract (module Reader : READER) (module Writer : WRITER) header_check
-      ~cancellable ~display_progress ~snapshot_file ~dest =
-    let open Lwt_result_syntax in
+  let extract (reader_input : (module READER_INPUT)) ~cancellable
+      ~display_progress ~dest =
+    let open Lwt_syntax in
     let module Writer = struct
-      include Writer
+      type out_channel = Stdlib.out_channel
 
       let count_progress = ref (fun _ -> ())
 
       let output oc b p l =
         !count_progress 1 ;
         output oc b p l
+
+      let close_out = Stdlib.close_out
     end in
+    let module Reader = (val reader_input) in
     let module Archive_reader = Tar.Make (struct
       include Reader
       include Writer
@@ -246,15 +279,7 @@ struct
     let out_channel_of_header (header : Tar.Header.t) =
       let path = Filename.concat dest header.file_name in
       Tezos_stdlib_unix.Utils.create_dir (Filename.dirname path) ;
-      Writer.open_out path
-    in
-    let in_chan = Reader.open_in snapshot_file in
-    let reader_input : (module READER_INPUT) =
-      (module struct
-        include Reader
-
-        let in_chan = in_chan
-      end)
+      open_out path
     in
     let display_progress =
       match display_progress with
@@ -264,18 +289,15 @@ struct
     in
     Lwt.finalize
       (fun () ->
-        let header = read_snapshot_header reader_input in
-        let* check_result = header_check header in
         run_progress ~display_progress @@ fun count_progress ->
         Writer.count_progress := count_progress ;
-        let*! () =
-          run ~cancellable (fun () ->
-              Archive_reader.Archive.extract_gen out_channel_of_header in_chan)
-        in
-        return (header, check_result))
+        run ~cancellable (fun () ->
+            Archive_reader.Archive.extract_gen
+              out_channel_of_header
+              Reader.in_chan))
       (fun () ->
-        Reader.close_in in_chan ;
-        Lwt.return_unit)
+        Reader.close_in Reader.in_chan ;
+        return_unit)
 
   let compress ~cancellable ~display_progress ~snapshot_file () =
     let Unix.{st_size = total; _} = Unix.stat snapshot_file in
@@ -314,20 +336,18 @@ struct
       close_in in_chan ;
       raise e
 
-  let read_header (module Reader : READER) ~snapshot_file =
-    let in_chan = Reader.open_in snapshot_file in
-    let reader_input : (module READER_INPUT) =
-      (module struct
-        include Reader
-
-        let in_chan = in_chan
-      end)
+  let with_open_snapshot file f =
+    let open Lwt_result_syntax in
+    let reader =
+      if is_compressed_snapshot file then gzip_reader else stdlib_reader
     in
-    try
-      let header = read_snapshot_header reader_input in
-      Reader.close_in in_chan ;
-      header
-    with e ->
-      Reader.close_in in_chan ;
-      raise e
+    let reader_input = create_reader_input reader file in
+    protect
+      ~on_error:(fun error ->
+        let module Reader = (val reader_input) in
+        Reader.close_in Reader.in_chan ;
+        fail error)
+      (fun () ->
+        let header = read_snapshot_header reader_input in
+        f header reader_input)
 end

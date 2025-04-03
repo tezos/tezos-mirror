@@ -10,6 +10,9 @@
 (** The type of snapshot archive readers. *)
 type reader
 
+(** The type of snapshot archive readers with an input channel. *)
+type reader_input
+
 (** The type of snapshot archive writers. *)
 type writer
 
@@ -25,28 +28,30 @@ val gzip_reader : reader
 (** A writer for compressed files or snapshot archives. *)
 val gzip_writer : writer
 
-(** [is_compressed_snapshot f] returns [true] if [f] is the path of a compressed
-    snapshot file, i.e. a gzip file. *)
-val is_compressed_snapshot : string -> bool
+(** Returns whether the reader is for compressed or uncompressed files. *)
+val reader_format : reader -> [`Compressed | `Uncompressed]
+
+(** Returns whether the reader and input channel is for compressed or
+    uncompressed files. *)
+val input_format : reader_input -> [`Compressed | `Uncompressed]
 
 module Make (Header : sig
   type t
 
   val encoding : t Data_encoding.t
 end) : sig
-  (** [create reader writer header ~cancellable ~display_progress ~files ~dest]
-      creates a snapshot archive with the header [header] with the contents of
+  (** [create writer header ~cancellable ~display_progress ~files ~dest] creates
+      a snapshot archive with the header [header] with the contents of
       [files]. Each element of [files] is a pair whose first component is the
       path of the file to include and the second component is the "relative"
       path it should be registered to in the snapshot archive The archive is
-      produced in file [dest]. 
+      produced in file [dest].
 
       Setting [cancellable] to [true] ensures the promise returned by [create]
       can be canceled. How progress is advertized is controlled by the
       [display_progress] variable. Note that [`Bar] is not compatible with
       [Lwt_exit]. *)
   val create :
-    reader ->
     writer ->
     Header.t ->
     cancellable:bool ->
@@ -59,25 +64,20 @@ end) : sig
     unit ->
     unit Lwt.t
 
-  (** [extract reader writer check_header ~cancellable ~display_progress
-      ~snapshot_file ~dest] extracts the snapshot archive [snapshot_file] in the
-      directory [dest]. Existing files in [dest] with the same names are
-      overwritten. The header read from the snapshot is checked with
-      [check_header] before beginning extraction, and returned. 
+  (** [extract reader_input ~cancellable ~display_progress ~dest]
+      extracts the snapshot archive opened in [reader_input] in the directory
+      [dest]. Existing files in [dest] with the same names are overwritten.
 
       Setting [cancellable] to [true] ensures the promise returned by [extract]
       can be canceled. How progress is advertized is controlled by the
       [display_progress] variable. Note that [`Bar] is not compatible with
       [Lwt_exit]. *)
   val extract :
-    reader ->
-    writer ->
-    (Header.t -> 'a tzresult Lwt.t) ->
+    reader_input ->
     cancellable:bool ->
     display_progress:[`Bar | `Periodic_event of Ptime.span -> unit Lwt.t] ->
-    snapshot_file:string ->
     dest:string ->
-    (Header.t * 'a) tzresult Lwt.t
+    unit Lwt.t
 
   (** [compress ~cancellable ~display_progress ~snapshot_file] compresses the
       snapshot archive [snapshot_file] of the form
@@ -99,7 +99,10 @@ end) : sig
     unit ->
     string Lwt.t
 
-  (** [read_header reader ~snapshot_file] reads the header from the snapshot
-      file without extracting it. *)
-  val read_header : reader -> snapshot_file:string -> Header.t
+  (** [with_open_snapshot file f] opens the snapshot file for reading, reads its
+      header and executes [f] then finally closes the channels. *)
+  val with_open_snapshot :
+    string ->
+    (Header.t -> reader_input -> 'a tzresult Lwt.t) ->
+    'a tzresult Lwt.t
 end
