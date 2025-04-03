@@ -36,3 +36,32 @@ val parametric :
   'a #RPC_context.simple -> 'a -> Constants.Parametric.t shell_tzresult Lwt.t
 
 val register : unit -> unit
+
+module S : sig
+  val errors :
+    ( [`GET],
+      Updater.rpc_context,
+      Updater.rpc_context,
+      unit,
+      unit,
+      Data_encoding.json_schema )
+    RPC_service.t
+
+  val all :
+    ( [`GET],
+      Updater.rpc_context,
+      Updater.rpc_context,
+      unit,
+      unit,
+      Constants.t )
+    RPC_service.t
+
+  val parametric :
+    ( [`GET],
+      Updater.rpc_context,
+      Updater.rpc_context,
+      unit,
+      unit,
+      Constants.Parametric.t )
+    RPC_service.t
+end

@@ -63,3 +63,79 @@ val expected_issuance :
   'a #RPC_context.simple -> 'a -> expected_rewards list shell_tzresult Lwt.t
 
 val register : unit -> unit
+
+module S : sig
+  val q_encoding : Q.t Data_encoding.t
+
+  val total_supply :
+    ( [`GET],
+      Updater.rpc_context,
+      Updater.rpc_context,
+      unit,
+      unit,
+      Tez.t )
+    RPC_service.t
+
+  val total_frozen_stake :
+    ( [`GET],
+      Updater.rpc_context,
+      Updater.rpc_context,
+      unit,
+      unit,
+      Tez.t )
+    RPC_service.t
+
+  val current_yearly_rate :
+    ( [`GET],
+      Updater.rpc_context,
+      Updater.rpc_context,
+      unit,
+      unit,
+      string )
+    RPC_service.t
+
+  val current_yearly_rate_exact :
+    ( [`GET],
+      Updater.rpc_context,
+      Updater.rpc_context,
+      unit,
+      unit,
+      Q.t )
+    RPC_service.t
+
+  val current_yearly_rate_details :
+    ( [`GET],
+      Updater.rpc_context,
+      Updater.rpc_context,
+      unit,
+      unit,
+      Q.t * Q.t )
+    RPC_service.t
+
+  val current_issuance_per_minute :
+    ( [`GET],
+      Updater.rpc_context,
+      Updater.rpc_context,
+      unit,
+      unit,
+      Tez.t )
+    RPC_service.t
+
+  val launch_cycle :
+    ( [`GET],
+      Updater.rpc_context,
+      Updater.rpc_context,
+      unit,
+      unit,
+      Cycle.t option )
+    RPC_service.t
+
+  val expected_issuance :
+    ( [`GET],
+      Updater.rpc_context,
+      Updater.rpc_context,
+      unit,
+      unit,
+      expected_rewards list )
+    RPC_service.t
+end
