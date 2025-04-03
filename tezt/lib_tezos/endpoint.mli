@@ -25,13 +25,17 @@
 
 (** RPC endpoints. *)
 
-type t = {host : string; scheme : string; port : int}
+type t = {host : string; scheme : string; port : int; path : string}
+
+val make : ?path:string -> host:string -> scheme:string -> port:int -> unit -> t
 
 val rpc_host : t -> string
 
 val rpc_port : t -> int
 
 val rpc_scheme : t -> string
+
+val rpc_path : t -> string
 
 (** Encode the given endpoint as a string value. *)
 val as_string : t -> string

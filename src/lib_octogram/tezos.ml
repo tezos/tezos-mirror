@@ -39,11 +39,11 @@ let positive_int_of_string level =
 let parse_endpoint str =
   match str =~*** rex {|^(https?)://(.*):(\d+)|} with
   | Some (scheme, host, port_str) ->
-      Endpoint.{host; scheme; port = int_of_string port_str}
+      Endpoint.make ~host ~scheme ~port:(int_of_string port_str) ()
   | None -> (
       match str =~** rex {|^(.*):(\d+)|} with
       | Some (host, port_str) ->
-          {host; scheme = "http"; port = int_of_string port_str}
+          Endpoint.make ~host ~scheme:"http" ~port:(int_of_string port_str) ()
       | None -> raise (Invalid_argument "parse_endpoint"))
 
 type _ key += Octez_node_k : string -> Node.t key

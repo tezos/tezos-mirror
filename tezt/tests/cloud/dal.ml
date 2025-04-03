@@ -425,7 +425,7 @@ module Dal_reverse_proxy = struct
        rpc_port and never call Dal_node.run on the result.
 
        Since the DAL node never runs, it does not call it's L1 endpoint. *)
-    let l1_node_endpoint : Endpoint.t = {host = ""; scheme = ""; port = 0} in
+    let l1_node_endpoint = Endpoint.make ~host:"" ~scheme:"" ~port:0 () in
     let* dal_node =
       Dal_node.Agent.create_from_endpoint
         ~name:"bootstrap-dal-node"
@@ -1098,7 +1098,7 @@ module Monitoring_app = struct
       (* Default to https default https port. *)
       match scheme with "https" -> 443 | "http" -> 80 | _ -> 443
     in
-    Endpoint.{host; scheme; port}
+    Endpoint.make ~host ~scheme ~port ()
 
   module Format_app = struct
     (* Helper for Slack App message format block-kit
@@ -1147,7 +1147,7 @@ module Monitoring_app = struct
   let post_message ?ts ~slack_channel_id ~slack_bot_token data =
     let data = Format_app.make_payload ?ts ~slack_channel_id data in
     let slack_endpoint =
-      {Endpoint.scheme = "https"; host = "slack.com"; port = 443}
+      Endpoint.make ~scheme:"https" ~host:"slack.com" ~port:443 ()
     in
     let rpc =
       RPC_core.make
@@ -1199,7 +1199,7 @@ module Monitoring_app = struct
           (Uri.query uri)
       in
       let path = String.split_on_char '/' (Uri.path uri) in
-      let endpoint = Endpoint.{host; scheme; port} in
+      let endpoint = Endpoint.make ~host ~scheme ~port () in
       (`endpoint endpoint, `query query_string, `path path)
 
     let fetch ~origin ~query ~decoder =
@@ -1995,15 +1995,14 @@ let init_public_network cloud (configuration : configuration)
         in
         let client = Client.create ~endpoint:(Node node) () in
         let node_rpc_endpoint =
-          Endpoint.
-            {
-              scheme = "http";
-              host =
-                (match Agent.point agent with
-                | None -> "127.0.0.1"
-                | Some point -> fst point);
-              port = Node.rpc_port node;
-            }
+          Endpoint.make
+            ~scheme:"http"
+            ~host:
+              (match Agent.point agent with
+              | None -> "127.0.0.1"
+              | Some point -> fst point)
+            ~port:(Node.rpc_port node)
+            ()
         in
         let bootstrap =
           {
@@ -2281,15 +2280,14 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
   in
 
   let node_rpc_endpoint =
-    Endpoint.
-      {
-        scheme = "http";
-        host =
-          (match Agent.point agent with
-          | None -> "127.0.0.1"
-          | Some point -> fst point);
-        port = Node.rpc_port bootstrap_node;
-      }
+    Endpoint.make
+      ~scheme:"http"
+      ~host:
+        (match Agent.point agent with
+        | None -> "127.0.0.1"
+        | Some point -> fst point)
+      ~port:(Node.rpc_port bootstrap_node)
+      ()
   in
   let (bootstrap : bootstrap) =
     {

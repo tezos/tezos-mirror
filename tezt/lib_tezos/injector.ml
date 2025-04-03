@@ -54,7 +54,7 @@ let rpc_port injector = Option.get @@ Uri.port injector.persistent_state.uri
 let as_rpc_endpoint (t : t) =
   let host = rpc_host t in
   let port = rpc_port t in
-  Endpoint.{scheme = "http"; host; port}
+  Endpoint.make ~scheme:"http" ~host ~port ()
 
 let data_dir injector = injector.persistent_state.data_dir
 

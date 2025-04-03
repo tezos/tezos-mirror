@@ -31,6 +31,10 @@ type endpoint = Node of Node.t | Foreign_endpoint of Endpoint.t
 
 type media_type = Json | Binary | Any
 
+let rpc_path = function
+  | Node _ -> ""
+  | Foreign_endpoint fe -> Endpoint.rpc_path fe
+
 let rpc_port = function
   | Node n -> Node.rpc_port n
   | Foreign_endpoint fe -> Endpoint.rpc_port fe
@@ -188,7 +192,7 @@ let mode_to_endpoint = function
       Some endpoint
 
 let string_of_endpoint ?hostname e =
-  sf "%s://%s:%d" (scheme e) (address ?hostname e) (rpc_port e)
+  sf "%s://%s:%d%s" (scheme e) (address ?hostname e) (rpc_port e) (rpc_path e)
 
 (* [?endpoint] can be used to override the default node stored in the client.
    Mockup nodes do not use [--endpoint] at all: RPCs are mocked up.

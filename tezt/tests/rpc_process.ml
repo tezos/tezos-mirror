@@ -232,7 +232,7 @@ let wait_for_starting_rpc_server_event ~local ?fail node port =
 
 let make_endpoint port =
   Client.Foreign_endpoint
-    Endpoint.{host = Constant.default_host; scheme = "http"; port}
+    (Endpoint.make ~host:Constant.default_host ~scheme:"http" ~port ())
 
 let test_local_rpc_server =
   Test.register

@@ -1136,7 +1136,7 @@ let as_rpc_endpoint ?(local = false) (t : t) =
     if local || Option.is_none t.persistent_state.runner then state.rpc_host
     else Runner.address t.persistent_state.runner
   in
-  Endpoint.{scheme; host; port = state.rpc_port}
+  Endpoint.make ~scheme ~host ~port:state.rpc_port ()
 
 module RPC = struct
   module RPC_callers : RPC_core.CALLERS with type uri_provider := t = struct

@@ -707,12 +707,11 @@ module Helpers = struct
     | None -> store_slot ~slot_index (Either.Left dal_node) slot
     | Some runner ->
         let endpoint =
-          Endpoint.
-            {
-              host = runner.Runner.address;
-              scheme = "http";
-              port = Dal_node.rpc_port dal_node;
-            }
+          Endpoint.make
+            ~host:runner.Runner.address
+            ~scheme:"http"
+            ~port:(Dal_node.rpc_port dal_node)
+            ()
         in
         store_slot ~slot_index (Either.Right endpoint) slot
 
