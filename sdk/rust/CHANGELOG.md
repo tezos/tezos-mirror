@@ -7,7 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
-- Nothing.
+- Add `SecretKeySecp256k1` and `SecretKeyP256` hashes
+- Add `EncryptedSecretKeyEd25519`, `EncryptedSecretKeySecp256k1`, `EncryptedSecretKeyP256` and `EncryptedSecretKeyBls` hashes
+- Add `ScriptExprHash` hash
 
 ### Changed
 
