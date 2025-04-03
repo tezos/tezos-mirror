@@ -8,53 +8,10 @@ However, in these tutorials, daemons are just run in background or left in anoth
 
 This page shows how Octez daemons can be safely run from the official binary packages, as Unix services, which can ensure that they are started automatically and restarted in case of failures.
 
-Why Use Deb or Rpm Binary Packages?
------------------------------------
-
-When it comes to installing software, especially for critical
-applications like Tezos/Octez, it’s crucial to ensure a secure and
-stable environment. While compiling from source can provide
-customization options, it often introduces complexities and risks.
-Instead, opting for deb or rpm packages from a trusted source simplifies
-installation and enhances security.
-
-Deb or Rpm packages compiled for a specific platform should be always preferred
-over statically compiled binaries. Deb or Rpm packages can also be used to
-simplify the creation of [OCI](https://opencontainers.org/) images or simply
-deployed on bare metal using provisioning tools such as
-[Ansible](https://docs.ansible.com/).
-
-Using the official deb or rpm packages offers several advantages:
-
--  **Security**: Packages are pre-compiled and thoroughly tested,
-   reducing the risk of vulnerabilities introduced during compilation.
-   All our packages are signed and our supply chain is strictly
-   monitored to make sure the packages that we deliver only use
-   components that were vetted by our engineering team.
-
--  **Stability**: Packages from a trusted repository undergo rigorous testing,
-   ensuring stability and compatibility with the target system. We make sure to
-   compile our binaries in a clean environment and using an up-to-date software
-   distribution. We use LTS (long-term service) distributions to enhance
-   stability and reduce the attack surface.
-
--  **Ease of Installation**: Packages can be installed using standard package
-   management tools, streamlining the process. For instance, ``apt`` is
-   ubiquitous in the Debian world. These tools allow us to sign our packages
-   that can be automatically verified by the end user during installation. We
-   provide packages that allow the end user to easily tailor their installation
-   for different use cases.
-
--  **Reduced Downtime**: With reliable binaries and straightforward
-   installation, system downtime due to installation errors or
-   compatibility issues is minimized. We carefully test the upgrade
-   process of our packages to make sure that end users can enjoy a click and go
-   upgrade process with near to zero downtime.
-
 Installing Octez
 ----------------
 
-First of all, you must :ref:`install Octez from binary packages <installing_binaries>`, as explained in the installation tutorial.
+First of all, you must :ref:`install Octez from binary packages <installing_packages>`, as explained in the installation tutorial.
 
 To make things concrete, we are assuming here that you installed Octez Debian packages, but most commands should apply to other distributions.
 
@@ -102,7 +59,7 @@ Once the node is configured, we can use ``systemd`` to start the daemon:
    sudo systemctl start octez-node
 
 If configured to do so during package installation, this will automatically download a snapshot
-and import it before starting the ``octez-node`` service.
+and import it before starting the ``octez-node`` service (starting with v22 packages).
 
 We can check the status of the daemon in the logs of the node that
 are stored by default in ``/var/log/tezos/node.log``. Logs are
@@ -213,6 +170,9 @@ shipped with the package.
 
 The logs of the baker are available in ``/var/log/tezos/baker-<protocol name>.log``.
 
+
+.. _services_upgrade:
+
 Upgrading Octez
 ---------------
 
@@ -232,3 +192,7 @@ changes in governance.
 
 Mind reloading the new services using ``sudo systemctl daemon-reload`` and then
 restarting the running services using ``sudo systemctl restart <service>``.
+When doing so:
+
+- Always make sure that all binaries or packages are on the same version of Octez.
+- The restart order should follow the dependency order: (i) Octez node, (ii) DAL node, (iii) baker, (iv) accuser (if running one).

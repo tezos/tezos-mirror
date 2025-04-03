@@ -4,20 +4,19 @@ DAL overview
 
 The *Data-Availability Layer* (DAL) enables users to publish blobs
 of data outside of the Tezos Layer 1 (L1) blocks. A blob (for “binary
-large object”) is a piece of data in binary form. While the primary
-use case for these blobs is to store Layer 2 (L2) operations for Tezos
-smart rollups, it is important to note that the DAL is more generic
+large object”) is a piece of data in binary form. Currently, the primary
+use case for these blobs is to represent Layer 2 (L2) operations for Tezos
+smart rollups, but the DAL is more generic
 and could be used for other use cases in the future.
 
-In practice, the DAL employs an additional P2P protocol to publish
-blobs, enabling a better bandwidth sharing between the peers (further
-elaborated in the P2P section below). The DAL aims to support a
-bandwidth of 10 MiB/s, a stark contrast to the current situation on
+In practice, the DAL is implemented by a network of *DAL nodes*, constituting a *DAL network*.
+The DAL network employs a P2P protocol to publish blobs
+(distinct from :doc:`the P2P layer used by the Octez node <../shell/p2p>`), enabling a better bandwidth sharing between the peers (further
+elaborated in the P2P section below). The DAL currently supports a
+data bandwidth of 0.5MiB/s, a stark contrast to the current situation on
 L1, which has an approximate bandwidth of 32 KiB/s. This highlights
 the significant boost in bandwidth provided by the DAL.
-
-Thanks to the DAL, the data bandwidth constraints imposed by the L1
-block size are put back by several orders of magnitudes. This
+Furthermore, the DAL aims to put back by several orders of magnitudes the data bandwidth constraints imposed by the L1 block size, up to 100MiB/s. This
 translates into reduced fees for users when posting L2 operations
 without compromising the fundamental principle of decentralization.
 
@@ -28,7 +27,7 @@ those data through the participation of bakers.
 
 Similarly to the Tezos L1, the DAL is permissionless, enabling any
 user to effectively contribute data to it, and allowing any smart
-rollup kernel or smart rollup operator to access this data.
+rollup kernel to access this data.
 
 .. |DAL overview| image:: dal_overview.png
 
@@ -40,8 +39,8 @@ DAL as follows:
 The diagram depicts a scenario where a user intends to upload data for
 a dedicated rollup.
 
-Anyone engaging with the DAL must utilize a tool known as the *DAL
-node* (named ``octez-dal-node``). When a user decides to provide a new
+Anyone engaging with the DAL must utilize a DAL
+node, implemented by a binary named ``octez-dal-node``. When a user decides to provide a new
 blob to the DAL (depicted as step 1 in the diagram), the user
 transmits the data to the DAL node to calculate a commitment to the
 data. This commitment is then communicated to L1 via a dedicated
@@ -54,17 +53,17 @@ economic protocol. Hence, the bakers, also connected to the DAL
 network, retrieve these assigned shards (step 5). The bakers must
 download and verify these shards within a specific timeframe,
 precisely defined by the economic protocol as the ``attestation lag``
-period. At the end of the attestation lag period, bakers declare using
+period (see :ref:`dal_constants`). At the end of the attestation lag period, bakers declare using
 an optional field of the consensus attestation operation, whether they were able to download the
 shards effectively (illustrated in step 6). The economic protocol
 collates these attestations and, if a sufficient number of bakers have
-successfully obtained the shards, the data is declared as available
-(step 7). Only when the data is labeled as available can the rollup
+successfully obtained the shards, the blob is declared as available
+(step 7). Only when the blob is labeled as available can the rollup
 utilize it (represented as step 8).
 
 The rationale for having the attestation lag parameter is to give
-bakers sufficient time to download their assigned shards and to
-guarantee that the latency stays within acceptable limits (around one
+bakers sufficient time to download their assigned shards, while
+guaranteeing that the latency of publishing blobs stays within acceptable limits (around one
 minute).
 
 

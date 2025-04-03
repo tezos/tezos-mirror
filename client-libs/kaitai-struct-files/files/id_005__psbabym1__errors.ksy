@@ -4,7 +4,7 @@ meta:
 doc: ! >-
   Encoding id: 005-PsBabyM1.errors
 
-  Description: The full list of RPC errors would be too long to include.It is
+  Description: The full list of RPC errors would be too long to include. It is
 
   available through the RPC `/errors` (GET).
 types:
