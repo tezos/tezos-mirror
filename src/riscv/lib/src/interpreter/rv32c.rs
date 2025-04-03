@@ -47,13 +47,12 @@ where
 #[cfg(test)]
 mod tests {
     use crate::backend_test;
-    use crate::create_state;
     use crate::interpreter::branching::run_j;
     use crate::interpreter::branching::run_jr;
     use crate::machine_state::MachineCoreState;
-    use crate::machine_state::MachineCoreStateLayout;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::registers::nz;
+    use crate::state::NewState;
 
     backend_test!(test_run_j, F, {
         let test_case = [
@@ -64,7 +63,7 @@ mod tests {
             (u64::MAX - 1, 100, 98_i64 as u64),
         ];
         for (init_pc, imm, res_pc) in test_case {
-            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut state = MachineCoreState::<M4K, _>::new(&mut F::manager());
 
             state.hart.pc.write(init_pc);
             let new_pc = run_j(&mut state, imm);
@@ -86,7 +85,7 @@ mod tests {
             ),
         ];
         for (init_pc, init_rs1, rs1, res_pc) in scenarios {
-            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut state = MachineCoreState::<M4K, _>::new(&mut F::manager());
 
             // Test C.JR
             // save program counter and value for rs1.

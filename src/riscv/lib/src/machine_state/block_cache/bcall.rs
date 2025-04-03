@@ -540,16 +540,15 @@ pub(super) fn block_hash<MC: MemoryConfig, M: ManagerRead>(
 mod test {
     use super::Block;
     use super::BlockHash;
-    use super::BlockLayout;
     use super::InlineJit;
     use super::Interpreted;
     use crate::backend_test;
-    use crate::create_state;
     use crate::machine_state::block_cache::metrics::BlockMetrics;
     use crate::machine_state::instruction::Instruction;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::registers::nz;
     use crate::parser::instruction::InstrWidth;
+    use crate::state::NewState;
     use crate::state_backend::test_helpers::TestBackendFactory;
 
     macro_rules! run_in_block_impl {
@@ -557,8 +556,9 @@ mod test {
             type M<F> = <F as TestBackendFactory>::Manager;
 
             // use block metrics, since interpreted has no hash
-            let $block_name =
-                &mut BlockMetrics::wrap(create_state!(Interpreted, BlockLayout, $F, M4K));
+            let $block_name = &mut <BlockMetrics<Interpreted<M4K, M<$F>>> as NewState<M<$F>>>::new(
+                &mut <$F>::manager(),
+            );
             let $bb_name =
                 &mut <Interpreted<M4K, M<$F>> as Block<M4K, M<$F>>>::BlockBuilder::default();
             {
@@ -566,7 +566,7 @@ mod test {
             }
 
             // use jit, which has the hash
-            let $block_name = &mut create_state!(InlineJit, BlockLayout, $F, M4K);
+            let $block_name = &mut InlineJit::<M4K, _>::new(&mut <$F>::manager());
             let $bb_name =
                 &mut <InlineJit<M4K, M<$F>> as Block<M4K, M<$F>>>::BlockBuilder::default();
 

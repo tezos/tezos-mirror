@@ -1689,15 +1689,14 @@ mod tests {
 
     use crate::backend_test;
     use crate::bits::Bits64;
-    use crate::create_state;
     use crate::machine_state::csregisters::CSRRepr;
     use crate::machine_state::csregisters::CSRegister;
     use crate::machine_state::csregisters::CSRegisters;
-    use crate::machine_state::csregisters::CSRegistersLayout;
     use crate::machine_state::csregisters::Exception;
     use crate::machine_state::csregisters::values::CSRValue;
     use crate::machine_state::csregisters::xstatus::MStatus;
     use crate::machine_state::mode::Mode;
+    use crate::state::NewState;
     use crate::traps::Interrupt;
     use crate::traps::TrapContext;
 
@@ -1913,7 +1912,7 @@ mod tests {
     }
 
     backend_test!(test_write_read, F, {
-        let mut csrs = create_state!(CSRegisters, CSRegistersLayout, F);
+        let mut csrs = CSRegisters::new(&mut F::manager());
 
         // write to MBE, SXL, UXL, MPP, MPIE, XS, SPP (through mstatus)
         csrs.write(
@@ -2023,7 +2022,7 @@ mod tests {
     });
 
     backend_test!(test_xip_xie, F, {
-        let mut csrs = create_state!(CSRegisters, CSRegistersLayout, F);
+        let mut csrs = CSRegisters::new(&mut F::manager());
 
         let mtip: u64 = 1 << Interrupt::MachineTimer.exception_code();
         let msip: u64 = 1 << Interrupt::MachineSoftware.exception_code();
@@ -2042,7 +2041,7 @@ mod tests {
     });
 
     backend_test!(test_fcsr, F, {
-        let mut csrs = create_state!(CSRegisters, CSRegistersLayout, F);
+        let mut csrs = CSRegisters::new(&mut F::manager());
 
         // check starting values
         assert_eq!(0, csrs.read::<CSRRepr>(CSRegister::fcsr));

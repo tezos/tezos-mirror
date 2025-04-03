@@ -904,12 +904,9 @@ fn run_instr<MC: MemoryConfig, M: ManagerReadWrite>(
 mod tests {
     use super::*;
     use crate::backend_test;
-    use crate::create_state;
     use crate::default::ConstDefault;
     use crate::machine_state::MachineCoreState;
-    use crate::machine_state::MachineCoreStateLayout;
     use crate::machine_state::MachineState;
-    use crate::machine_state::MachineStateLayout;
     use crate::machine_state::TestCacheLayouts;
     use crate::machine_state::address_translation::PAGE_SIZE;
     use crate::machine_state::block_cache::bcall::Interpreted;
@@ -933,7 +930,10 @@ mod tests {
 
     // writing CACHE_INSTR to the block cache creates new block
     backend_test!(test_writing_full_block_fetchable_uncompressed, F, {
-        let mut state = create_state!(BlockCache, TestLayout, F, TestLayout, Interpreted<M4K, F::Manager>, M4K, || InterpretedBlockBuilder);
+        let mut state = BlockCache::<TestLayout, Interpreted<M4K, _>, _, _>::new(
+            &mut F::manager(),
+            InterpretedBlockBuilder,
+        );
 
         let uncompressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Sd,
@@ -959,7 +959,10 @@ mod tests {
     });
 
     backend_test!(test_writing_full_block_fetchable_compressed, F, {
-        let mut state = create_state!(BlockCache, TestLayout, F, TestLayout, Interpreted<M4K, F::Manager>, M4K, || InterpretedBlockBuilder);
+        let mut state = BlockCache::<TestLayout, Interpreted<M4K, _>, _, _>::new(
+            &mut F::manager(),
+            InterpretedBlockBuilder,
+        );
 
         let compressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Li,
@@ -987,7 +990,10 @@ mod tests {
 
     // writing instructions immediately creates block
     backend_test!(test_writing_half_block_fetchable_compressed, F, {
-        let mut state = create_state!(BlockCache, TestLayout, F, TestLayout, Interpreted<M4K, F::Manager>, M4K, || InterpretedBlockBuilder);
+        let mut state = BlockCache::<TestLayout, Interpreted<M4K, _>, _, _>::new(
+            &mut F::manager(),
+            InterpretedBlockBuilder,
+        );
 
         let compressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Li,
@@ -1014,7 +1020,10 @@ mod tests {
     });
 
     backend_test!(test_writing_two_blocks_fetchable_compressed, F, {
-        let mut state = create_state!(BlockCache, TestLayout, F, TestLayout, Interpreted<M4K, F::Manager>, M4K, || InterpretedBlockBuilder);
+        let mut state = BlockCache::<TestLayout, Interpreted<M4K, _>, _, _>::new(
+            &mut F::manager(),
+            InterpretedBlockBuilder,
+        );
 
         let compressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Li,
@@ -1046,7 +1055,10 @@ mod tests {
 
     // writing across pages offset two blocks next to each other
     backend_test!(test_crossing_page_exactly_creates_new_block, F, {
-        let mut state = create_state!(BlockCache, TestLayout, F, TestLayout, Interpreted<M4K, F::Manager>, M4K, || InterpretedBlockBuilder);
+        let mut state = BlockCache::<TestLayout, Interpreted<M4K, _>, _, _>::new(
+            &mut F::manager(),
+            InterpretedBlockBuilder,
+        );
 
         let compressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Li,
@@ -1077,8 +1089,12 @@ mod tests {
     });
 
     backend_test!(test_partial_block_executes, F, {
-        let mut core_state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
-        let mut block_state = create_state!(BlockCache, TestLayout, F, TestLayout, Interpreted<M4K, F::Manager>, M4K, || InterpretedBlockBuilder);
+        let mut manager = F::manager();
+        let mut core_state = MachineCoreState::<M4K, _>::new(&mut manager);
+        let mut block_state = BlockCache::<TestLayout, Interpreted<M4K, _>, _, _>::new(
+            &mut manager,
+            InterpretedBlockBuilder,
+        );
 
         let addiw = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::AddWordImmediate,
@@ -1150,7 +1166,10 @@ mod tests {
     });
 
     backend_test!(test_concat_blocks_suitable, F, {
-        let mut state = create_state!(BlockCache, TestLayout, F, TestLayout, Interpreted<M4K, F::Manager>, M4K, || InterpretedBlockBuilder);
+        let mut state = BlockCache::<TestLayout, Interpreted<M4K, _>, _, _>::new(
+            &mut F::manager(),
+            InterpretedBlockBuilder,
+        );
 
         let uncompressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Sd,
@@ -1188,7 +1207,10 @@ mod tests {
     });
 
     backend_test!(test_concat_blocks_too_big, F, {
-        let mut state = create_state!(BlockCache, TestLayout, F, TestLayout, Interpreted<M4K, F::Manager>, M4K, || InterpretedBlockBuilder);
+        let mut state = BlockCache::<TestLayout, Interpreted<M4K, _>, _, _>::new(
+            &mut F::manager(),
+            InterpretedBlockBuilder,
+        );
 
         let uncompressed = Instruction::try_from(TaggedInstruction {
             opcode: OpCode::Sd,
@@ -1264,7 +1286,7 @@ mod tests {
         };
 
         let mut block: BlockCache<Layout, Interpreted<M4K, Owned>, M4K, Owned> =
-            BlockCache::bind(Owned::allocate::<Layout>(), InterpretedBlockBuilder);
+            BlockCache::new(&mut Owned, InterpretedBlockBuilder);
 
         // The initial block cache should not return any blocks.
         check_block(&mut block);
@@ -1290,10 +1312,8 @@ mod tests {
     /// be empty, which causes the step function to loop indefinitely when it runs the block.
     #[test]
     fn test_run_addr_zero() {
-        type StateLayout = MachineStateLayout<M4K, TestCacheLayouts>;
-
         let mut state: MachineState<M4K, TestCacheLayouts, Interpreted<M4K, Owned>, Owned> =
-            MachineState::bind(Owned::allocate::<StateLayout>(), InterpretedBlockBuilder);
+            MachineState::new(&mut Owned, InterpretedBlockBuilder);
 
         // Encoding of ECALL instruction
         const ECALL: u32 = 0b1110011;
@@ -1317,7 +1337,7 @@ mod tests {
         type Layout = super::Layout<TEST_CACHE_BITS, TEST_CACHE_SIZE>;
 
         let mut block_cache: BlockCache<Layout, Interpreted<M4K, Owned>, M4K, Owned> =
-            BlockCache::bind(Owned::allocate::<Layout>(), InterpretedBlockBuilder);
+            BlockCache::new(&mut Owned, InterpretedBlockBuilder);
 
         // Fetching empty block fails
         assert!(block_cache.get_block(0).is_none());

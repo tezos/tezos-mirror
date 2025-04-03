@@ -279,20 +279,6 @@ pub struct BlockMetrics<B> {
     block_hash: BlockHash,
 }
 
-impl<B> BlockMetrics<B> {
-    /// Wrap a block with metrics.
-    ///
-    /// Since BlockMetrics doesn't take a `M: ManagerBase` as a type-parameter,
-    /// we can't use it with `create_state!`.
-    #[cfg(test)]
-    pub(super) fn wrap(block: B) -> Self {
-        Self {
-            block,
-            block_hash: BlockHash::Dirty,
-        }
-    }
-}
-
 impl<B: NewState<M>, M: ManagerBase> NewState<M> for BlockMetrics<B> {
     fn new(manager: &mut M) -> Self
     where

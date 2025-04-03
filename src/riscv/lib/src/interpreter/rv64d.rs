@@ -551,24 +551,22 @@ mod tests {
 
     use crate::backend_test;
     use crate::bits::Bits64;
-    use crate::create_state;
     use crate::machine_state::MachineCoreState;
-    use crate::machine_state::MachineCoreStateLayout;
     use crate::machine_state::csregisters::CSRegister;
     use crate::machine_state::csregisters::xstatus::ExtensionValue;
     use crate::machine_state::csregisters::xstatus::MStatus;
     use crate::machine_state::hart_state::HartState;
-    use crate::machine_state::hart_state::HartStateLayout;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::registers::fa2;
     use crate::machine_state::registers::fa3;
     use crate::machine_state::registers::parse_fregister;
     use crate::machine_state::registers::parse_xregister;
     use crate::machine_state::registers::t0;
+    use crate::state::NewState;
     use crate::traps::Exception;
 
     backend_test!(test_fmv_d, F, {
-        let state = create_state!(HartState, HartStateLayout, F);
+        let state = HartState::new(&mut F::manager());
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(
@@ -596,7 +594,7 @@ mod tests {
     });
 
     backend_test!(test_load_store, F, {
-        let state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+        let state = MachineCoreState::<M4K, _>::new(&mut F::manager());
         let state_cell = std::cell::RefCell::new(state);
 
         proptest!(|(

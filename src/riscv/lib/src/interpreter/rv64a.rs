@@ -228,12 +228,10 @@ mod test {
     use proptest::prelude::*;
 
     use crate::backend_test;
-    use crate::create_state;
     use crate::interpreter::atomics::SC_FAILURE;
     use crate::interpreter::atomics::SC_SUCCESS;
     use crate::interpreter::integer::run_addi;
     use crate::machine_state::MachineCoreState;
-    use crate::machine_state::MachineCoreStateLayout;
     use crate::machine_state::registers::a0;
     use crate::machine_state::registers::a1;
     use crate::machine_state::registers::a2;

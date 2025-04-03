@@ -358,10 +358,8 @@ mod tests {
 
     use super::*;
     use crate::backend_test;
-    use crate::create_state;
     use crate::instruction_context::Shift;
     use crate::machine_state::MachineCoreState;
-    use crate::machine_state::MachineCoreStateLayout;
     use crate::machine_state::memory::M4K;
     use crate::machine_state::registers::a0;
     use crate::machine_state::registers::a1;
@@ -370,6 +368,7 @@ mod tests {
     use crate::machine_state::registers::t0;
     use crate::machine_state::registers::t1;
     use crate::machine_state::registers::t3;
+    use crate::state::NewState;
 
     backend_test!(test_negate, F, {
         let rs2val_rd_res = [
@@ -379,7 +378,7 @@ mod tests {
         ];
 
         for (rs2, rd, res) in rs2val_rd_res {
-            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut state = MachineCoreState::<M4K, _>::new(&mut F::manager());
 
             state.hart.xregisters.write_nz(nz::a0, rs2);
             run_neg(&mut state, rd, nz::a0);
@@ -398,7 +397,7 @@ mod tests {
         ];
 
         for (imm, rs1, res) in imm_rs1_res {
-            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut state = MachineCoreState::<M4K, _>::new(&mut F::manager());
 
             state.hart.xregisters.write_nz(nz::a3, rs1);
             state.hart.xregisters.write_nz(nz::a4, imm as u64);
@@ -431,7 +430,7 @@ mod tests {
         ];
 
         for (imm, rs1, rd, res) in imm_rs1_rd_res {
-            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut state = MachineCoreState::<M4K, _>::new(&mut F::manager());
 
             state.hart.xregisters.write_nz(nz::a0, rs1);
             state.hart.xregisters.write_nz(nz::t0, imm as u64);
@@ -455,7 +454,7 @@ mod tests {
             v1 in any::<i64>(),
             v2 in any::<i64>())|
         {
-            let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+            let mut state = MachineCoreState::<M4K, _>::new(&mut F::manager());
             state.hart.xregisters.write(t0, v1 as u64);
             state.hart.xregisters.write(a0, v2 as u64);
             run_sub_word(&mut state, t0, a0, nz::a1);
@@ -470,7 +469,7 @@ mod tests {
     });
 
     backend_test!(test_set_less_than, F, {
-        let mut core = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+        let mut core = MachineCoreState::<M4K, _>::new(&mut F::manager());
 
         let v1_v2_exp_expu = [
             (0, 0, 0, 0),
@@ -548,7 +547,7 @@ mod tests {
     }
 
     backend_test!(test_shift, F, {
-        let mut state = create_state!(MachineCoreState, MachineCoreStateLayout<M4K>, F, M4K);
+        let mut state = MachineCoreState::<M4K, _>::new(&mut F::manager());
 
         // imm = 0
         test_both_shift_instr!(state, Shift::Left, t0, 0, a0, 0x1234_ABEF, a1, 0x1234_ABEF);
