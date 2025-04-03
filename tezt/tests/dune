@@ -133,7 +133,13 @@
   brassaia_test_brassaia_pack_tezt_lib
   brassaia_test_brassaia_mem_tezt_lib
   brassaia_test_brassaia_tezt_lib
-  brassaia_test_tezt_lib)
+  brassaia_test_tezt_lib
+  brassaia_eio_test_brassaia_generic_key_tezt_lib
+  brassaia_eio_test_brassaia_data_tezt_lib
+  brassaia_eio_test_brassaia_pack_tezt_lib
+  brassaia_eio_test_brassaia_mem_tezt_lib
+  brassaia_eio_test_brassaia_tezt_lib
+  brassaia_eio_test_tezt_lib)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))

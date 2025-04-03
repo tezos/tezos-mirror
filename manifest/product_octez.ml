@@ -40,6 +40,7 @@ include Product (struct
       "sdk/";
       "irmin/";
       "brassaia/";
+      "brassaia-eio/";
       "rust-toolchain";
     ]
     @ Product_data_encoding.product_source @ Product_cohttp.product_source
@@ -2256,6 +2257,180 @@ let brassaia_test_helpers =
     ~preprocess:(pps ppx_brassaia_internal)
     ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
 
+let ppx_brassaia_eio =
+  octez_lib
+    "ppx_brassaia_eio"
+    ~path:"brassaia-eio/lib_ppx_brassaia"
+    ~deps:[ppx_repr_lib]
+    ~ppx_kind:Ppx_deriver
+
+let ppx_brassaia_eio_internal_lib =
+  octez_lib
+    "ppx_brassaia_eio.internal_lib"
+    ~path:"brassaia-eio/lib_ppx_brassaia/internal"
+    ~modules:["ppx_brassaia_internal_lib"]
+    ~deps:[logs]
+
+let ppx_brassaia_eio_internal =
+  octez_lib
+    "ppx_brassaia_eio.internal"
+    ~path:"brassaia-eio/lib_ppx_brassaia/internal"
+    ~modules:["ppx_brassaia_internal"]
+    ~deps:[ppxlib; ppx_brassaia_eio_internal_lib; ppx_brassaia_eio]
+    ~ppx_kind:Ppx_rewriter
+    ~ppx_runtime_libraries:[logs; ppx_brassaia_eio_internal_lib]
+    ~preprocess:(pps ppxlib_metaquot)
+
+let brassaia_eio_data =
+  octez_lib
+    "brassaia_eio.data"
+    ~path:"brassaia-eio/lib_brassaia/data"
+    ~deps:[bigstringaf; fmt]
+
+let brassaia_eio =
+  octez_lib
+    "brassaia_eio"
+    ~path:"brassaia-eio/lib_brassaia"
+    ~deps:
+      [
+        octez_event_logging |> open_;
+        data_encoding;
+        brassaia_eio_data;
+        astring;
+        bheap;
+        digestif;
+        fmt;
+        jsonm;
+        logs;
+        logs_fmt;
+        eio;
+        mtime;
+        ocamlgraph;
+        uri;
+        uutf;
+        re_export repr;
+      ]
+    ~preprocess:(pps ~args:["--"; "--lib"; "Type"] ppx_brassaia_eio_internal)
+    ~flags:(Flags.standard ~disable_warnings:[66] ())
+
+let brassaia_eio_mem =
+  octez_lib
+    "brassaia_eio.mem"
+    ~path:"brassaia-eio/lib_brassaia/mem"
+    ~deps:[brassaia_eio; logs; eio]
+    ~preprocess:(pps ppx_brassaia_eio_internal)
+    ~flags:(Flags.standard ~disable_warnings:[68] ())
+
+let brassaia_eio_pack =
+  octez_lib
+    "brassaia_eio_pack"
+    ~path:"brassaia-eio/lib_brassaia_pack"
+    ~deps:
+      [
+        octez_event_logging |> open_;
+        data_encoding;
+        fmt;
+        brassaia_eio;
+        brassaia_eio_data;
+        logs;
+        eio;
+        optint;
+      ]
+    ~preprocess:(pps ppx_brassaia_eio_internal)
+    ~flags:(Flags.standard ~disable_warnings:[66] ())
+
+let brassaia_eio_pack_mem =
+  octez_lib
+    "brassaia_eio_pack.mem"
+    ~path:"brassaia-eio/lib_brassaia_pack/mem"
+    ~deps:[brassaia_eio_pack; brassaia_eio_mem; brassaia_eio]
+    ~preprocess:(pps ppx_brassaia_eio_internal)
+
+let brassaia_eio_pack_io =
+  octez_lib
+    "brassaia_eio_pack.io"
+    ~path:"brassaia-eio/lib_brassaia_pack/io"
+    ~deps:
+      [
+        octez_event_logging |> open_;
+        fmt;
+        brassaia_index;
+        brassaia_index_unix;
+        brassaia_eio;
+        brassaia_eio_pack;
+        logs;
+        eio;
+        mtime;
+        cmdliner;
+        optint;
+        checkseum;
+        checkseum_ocaml;
+        rusage;
+      ]
+    ~preprocess:(pps ppx_brassaia_eio_internal)
+    ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
+
+let brassaia_eio_pack_unix =
+  octez_lib
+    "brassaia_eio_pack.unix"
+    ~path:"brassaia-eio/lib_brassaia_pack/unix"
+    ~deps:
+      [
+        octez_event_logging |> open_;
+        fmt;
+        brassaia_index;
+        brassaia_index_unix;
+        brassaia_eio;
+        brassaia_eio_pack;
+        brassaia_eio_pack_io;
+        logs;
+        eio;
+        mtime;
+        cmdliner;
+        optint;
+        checkseum;
+        checkseum_ocaml;
+        rusage;
+      ]
+    ~preprocess:(pps ppx_brassaia_eio_internal)
+    ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
+
+let brassaia_eio_tezos =
+  octez_lib
+    "brassaia_eio_tezos"
+    ~path:"brassaia-eio/lib_brassaia_tezos"
+    ~deps:
+      [
+        fmt;
+        zarith;
+        digestif;
+        brassaia_eio;
+        brassaia_eio_pack;
+        brassaia_eio_pack_io;
+        brassaia_eio_pack_unix;
+      ]
+    ~preprocess:(pps ppx_brassaia_eio_internal)
+
+let brassaia_eio_test_helpers =
+  octez_lib
+    "brassaia_eio_test_helpers"
+    ~path:"brassaia-eio/test/helpers"
+    ~deps:
+      [
+        alcotezt;
+        astring;
+        fmt;
+        brassaia_eio;
+        octez_base_unix |> open_;
+        jsonm;
+        logs;
+        eio;
+        mtime;
+        mtime_clock_os;
+      ]
+    ~preprocess:(pps ppx_brassaia_eio_internal)
+    ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
+
 let octez_context_sigs =
   octez_lib
     "context.sigs"
@@ -2996,6 +3171,23 @@ let _brassaia_data_tests =
         tezt_lib |> open_ |> open_ ~m:"Base";
       ]
 
+let _brassaia_eio_data_tests =
+  tezt
+    ["test"; "import"; "test_fixed_size_string_set"]
+    ~path:"brassaia-eio/test/brassaia/data"
+    ~opam:"tezos_internal_brassaia_eio_tests"
+    ~synopsis:"Tezos internal brassaia tests"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        alcotezt;
+        brassaia_eio_test_helpers |> open_;
+        octez_stdlib_unix |> open_;
+        octez_test_helpers |> open_;
+        tezt_lib |> open_ |> open_ ~m:"Base";
+      ]
+
 let _irmin_generic_key_tests =
   tezt
     ["test"; "test_store_offset"; "test_inlined_contents"]
@@ -3033,6 +3225,26 @@ let _brassaia_generic_key_tests =
         tezt_lib |> open_ |> open_ ~m:"Base";
       ]
     ~preprocess:(pps ppx_brassaia_internal)
+
+let _brassaia_eio_generic_key_tests =
+  tezt
+    ["test"; "test_store_offset"; "test_inlined_contents"]
+    ~path:"brassaia-eio/test/brassaia/generic-key"
+    ~opam:"tezos_internal_brassaia_eio_tests"
+    ~synopsis:"Tezos internal brassaia tests"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        brassaia_eio_test_helpers |> open_;
+        brassaia_eio_mem;
+        eio_posix;
+        vector;
+        octez_stdlib_unix |> open_;
+        octez_test_helpers |> open_;
+        tezt_lib |> open_ |> open_ ~m:"Base";
+      ]
+    ~preprocess:(pps ppx_brassaia_eio_internal)
 
 let _irmin_tests =
   tezt
@@ -3072,6 +3284,26 @@ let _brassaia_tests =
       ]
     ~preprocess:(pps ppx_brassaia_internal)
 
+let _brassaia_eio_tests =
+  tezt
+    ["test"; "test_lru"; "test_hash"; "test_tree"; "test_conf"]
+    ~path:"brassaia-eio/test/brassaia"
+    ~opam:"tezos_internal_brassaia_eio_tests"
+    ~synopsis:"Tezos internal brassaia tests"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        brassaia_eio_test_helpers |> open_;
+        brassaia_eio_mem;
+        alcotezt;
+        octez_stdlib_unix |> open_;
+        octez_test_helpers |> open_;
+        eio;
+        tezt_lib |> open_ |> open_ ~m:"Base";
+      ]
+    ~preprocess:(pps ppx_brassaia_eio_internal)
+
 let _irmin_mem_tests =
   tezt
     ["test"; "test_mem"]
@@ -3097,6 +3329,22 @@ let _brassaia_mem_tests =
         octez_context_brassaia_memory;
         brassaia_test_helpers;
         octez_test_helpers |> open_;
+        tezt_lib |> open_ |> open_ ~m:"Base";
+      ]
+
+let _brassaia_eio_mem_tests =
+  tezt
+    ["test"; "test_mem"]
+    ~path:"brassaia-eio/test/brassaia-mem"
+    ~opam:"tezos_internal_brassaia_eio_tests"
+    ~synopsis:"Tezos internal brassaia tests"
+    ~deps:
+      [
+        octez_context_brassaia_memory;
+        brassaia_eio_mem;
+        brassaia_eio_test_helpers;
+        octez_test_helpers |> open_;
+        eio_posix;
         tezt_lib |> open_ |> open_ ~m:"Base";
       ]
 
@@ -3213,6 +3461,54 @@ let _brassaia_pack_tests =
         tezt_lib |> open_ |> open_ ~m:"Base";
       ]
     ~preprocess:(pps ppx_brassaia_internal)
+
+let _brassaia_eio_pack_tests =
+  tezt
+    [
+      "common";
+      "test";
+      "test_async";
+      "test_corrupted";
+      "test_dispatcher";
+      "test_existing_stores";
+      "test_flush_reload";
+      "test_gc";
+      "test_hashes";
+      "test_indexing_strategy";
+      "test_inode";
+      "test_lower";
+      "test_mapping";
+      "test_nearest_geq";
+      "test_pack";
+      "test_pack_version_bump";
+      "test_readonly";
+      "test_ranges";
+      "test_snapshot";
+      "test_tree";
+      "test_upgrade";
+      "test_multicore";
+    ]
+    ~path:"brassaia-eio/test/brassaia-pack"
+    ~opam:"tezos_internal_brassaia_eio_tests"
+    ~synopsis:"Tezos internal brassaia tests"
+    ~deps:
+      [
+        octez_context_memory;
+        brassaia_eio |> open_;
+        brassaia_eio_test_helpers |> open_;
+        brassaia_eio_pack |> open_;
+        brassaia_eio_pack_io |> open_;
+        brassaia_eio_pack_unix |> open_;
+        brassaia_eio_tezos |> open_;
+        brassaia_eio_pack_mem |> open_;
+        octez_test_helpers |> open_;
+        alcotezt;
+        fpath;
+        eio_posix;
+        tezt_lib |> open_ |> open_ ~m:"Base";
+      ]
+    ~preprocess:(pps ppx_brassaia_eio_internal)
+    ~flags:(Flags.standard ~disable_warnings:[66] ())
 
 (* This binding assumes that librustzcash.a is installed in the system default
    directories or in: $OPAM_SWITCH_PREFIX/lib
@@ -3534,6 +3830,23 @@ let _brassaia_tests =
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         brassaia_test_helpers;
+        octez_context_ops;
+        octez_stdlib_unix |> open_;
+        octez_test_helpers |> open_;
+        tezt_lib |> open_ |> open_ ~m:"Base";
+      ]
+
+let _brassaia_eio_tests =
+  tezt
+    ["tezt_brassaia"; "test_lib_brassaia_store"; "test_utils"]
+    ~path:"brassaia-eio/test"
+    ~opam:"tezos_internal_brassaia_eio_tests"
+    ~synopsis:"Tezos internal brassaia tests"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        brassaia_eio_test_helpers |> open_;
         octez_context_ops;
         octez_stdlib_unix |> open_;
         octez_test_helpers |> open_;

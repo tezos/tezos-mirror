@@ -1,0 +1,84 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name brassaia_eio_test_brassaia_pack_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  bls12-381.archive
+  octez-libs.tezos-context.memory
+  octez-libs.brassaia_eio
+  octez-libs.brassaia_eio_test_helpers
+  octez-libs.brassaia_eio_pack
+  octez-libs.brassaia_eio_pack.io
+  octez-libs.brassaia_eio_pack.unix
+  octez-libs.brassaia_eio_tezos
+  octez-libs.brassaia_eio_pack.mem
+  octez-libs.test-helpers
+  octez-alcotezt
+  fpath
+  eio_posix
+  tezt)
+ (preprocess (pps octez-libs.ppx_brassaia_eio.internal))
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -w -66
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Brassaia_eio
+  -open Brassaia_eio_test_helpers
+  -open Brassaia_eio_pack
+  -open Brassaia_eio_pack_io
+  -open Brassaia_eio_pack_unix
+  -open Brassaia_eio_tezos
+  -open Brassaia_eio_pack_mem
+  -open Tezos_test_helpers
+  -open Octez_alcotezt
+  -open Tezt
+  -open Tezt.Base)
+ (modules
+  common
+  test
+  test_async
+  test_corrupted
+  test_dispatcher
+  test_existing_stores
+  test_flush_reload
+  test_gc
+  test_hashes
+  test_indexing_strategy
+  test_inode
+  test_lower
+  test_mapping
+  test_nearest_geq
+  test_pack
+  test_pack_version_bump
+  test_readonly
+  test_ranges
+  test_snapshot
+  test_tree
+  test_upgrade
+  test_multicore))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  brassaia_eio_test_brassaia_pack_tezt_lib
+  tezt)
+ (flags
+  (:standard)
+  -w -66)
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package tezos_internal_brassaia_eio_tests)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))
