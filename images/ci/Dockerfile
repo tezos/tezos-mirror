@@ -372,7 +372,7 @@ ARG NPM_REGISTRY
 RUN --mount=type=secret,id=npm_token \
     if [ -n "$NPM_REGISTRY" ] ; then \
       npm set registry "$NPM_REGISTRY" && \
-      npm set //${NPM_REGISTRY_DOMAIN}:_authToken=$(cat /run/secrets/npm_token); \
+      npm set //"${NPM_REGISTRY_DOMAIN}":_authToken="$(cat /run/secrets/npm_token)"; \
     fi \
  && npm install -g "@datadog/datadog-ci@2.46.0" \
  # We need eth since e2e tests. This requires git as well.
