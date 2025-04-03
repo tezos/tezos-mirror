@@ -182,10 +182,6 @@ pub struct AddressCellLayout;
 
 impl state_backend::Layout for AddressCellLayout {
     type Allocated<M: state_backend::ManagerBase> = Cell<Address, M>;
-
-    fn allocate<M: ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-        Cell::bind(backend.allocate_region([!0]))
-    }
 }
 
 impl state_backend::CommitmentLayout for AddressCellLayout {

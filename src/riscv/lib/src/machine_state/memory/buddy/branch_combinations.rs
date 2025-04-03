@@ -97,10 +97,6 @@ macro_rules! combined_buddy_branch {
             impl<B: Layout> Layout for [<$name Layout>]<B> {
                 type Allocated<M: ManagerBase> = [<$name Alloc>]<B, M>;
 
-                fn allocate<M: ManagerAlloc>(backend: &mut M) -> Self::Allocated<M> {
-                    let inner = <[<$buddy1 Layout>]<[<$buddy2 Layout>]<B>>>::allocate(backend);
-                    [<$name Alloc>](inner)
-                }
             }
 
             impl<B: CommitmentLayout> CommitmentLayout for [<$name Layout>]<B> {
