@@ -105,6 +105,21 @@ let ticket_balances_encoding = Plugin.RPC.Contract.ticket_balances_encoding
 let get_frozen_deposits_limit (rpc : #rpc_context) ~chain ~block delegate =
   Alpha_services.Delegate.frozen_deposits_limit rpc (chain, block) delegate
 
+let is_delegate (cctxt : #full) ?chain ?block pkh =
+  let chain = match chain with None -> cctxt#chain | Some chain -> chain in
+  let block = match block with None -> cctxt#block | Some block -> block in
+  let open Lwt_result_syntax in
+  let* delegate_opt =
+    Plugin.Alpha_services.Contract.delegate_opt
+      cctxt
+      (chain, block)
+      (Contract.Implicit pkh)
+  in
+  match delegate_opt with
+  | Some address when Signature.Public_key_hash.(equal address pkh) ->
+      return true
+  | _ -> return false
+
 let parse_expression arg =
   Lwt.return
     (Micheline_parser.no_parsing_error
