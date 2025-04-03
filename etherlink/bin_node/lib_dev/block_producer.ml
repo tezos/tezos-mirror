@@ -11,6 +11,7 @@ type parameters = {
   sequencer_key : Client_keys.sk_uri;
   maximum_number_of_chunks : int;
   uses_tx_queue : bool;
+  l2_chains : Configuration.l2_chain list option;
 }
 
 (* The size of a delayed transaction is overapproximated to the maximum size
@@ -244,9 +245,9 @@ let tx_queue_pop_valid_tx (head_info : Evm_context.head)
 
 (** Produces a block if we find at least one valid transaction in the transaction
     pool or if [force] is true. *)
-let produce_block_if_needed ~cctxt ~smart_rollup_address ~sequencer_key ~force
-    ~timestamp ~delayed_hashes ~remaining_cumulative_size ~uses_tx_queue
-    head_info =
+let produce_block_if_needed ~cctxt ~l2_chains ~smart_rollup_address
+    ~sequencer_key ~force ~timestamp ~delayed_hashes ~remaining_cumulative_size
+    ~uses_tx_queue head_info =
   let open Lwt_result_syntax in
   let* transactions_and_objects =
     (* Low key optimization to avoid even checking the txpool if there is not
@@ -258,7 +259,10 @@ let produce_block_if_needed ~cctxt ~smart_rollup_address ~sequencer_key ~force
         head_info
         ~maximum_cumulative_size:remaining_cumulative_size
     else
+      (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
+      let chain_family = Configuration.retrieve_chain_family ~l2_chains in
       Tx_pool.pop_transactions
+        ~chain_family
         ~maximum_cumulative_size:remaining_cumulative_size
   in
   let n = List.length transactions_and_objects + List.length delayed_hashes in
@@ -301,8 +305,9 @@ let head_info_and_delayed_transactions ~with_delayed_transactions
   let*! head_info = Evm_context.head_info () in
   return (head_info, delayed_hashes, remaining_cumulative_size)
 
-let produce_block ~uses_tx_queue ~cctxt ~smart_rollup_address ~sequencer_key
-    ~force ~timestamp ~maximum_number_of_chunks ~with_delayed_transactions =
+let produce_block ~l2_chains ~uses_tx_queue ~cctxt ~smart_rollup_address
+    ~sequencer_key ~force ~timestamp ~maximum_number_of_chunks
+    ~with_delayed_transactions =
   let open Lwt_result_syntax in
   let* is_locked =
     if uses_tx_queue then Tx_queue.is_locked () else Tx_pool.is_locked ()
@@ -338,6 +343,7 @@ let produce_block ~uses_tx_queue ~cctxt ~smart_rollup_address ~sequencer_key
     else
       produce_block_if_needed
         ~cctxt
+        ~l2_chains
         ~sequencer_key
         ~timestamp
         ~smart_rollup_address
@@ -365,10 +371,12 @@ module Handlers = struct
           sequencer_key;
           maximum_number_of_chunks;
           uses_tx_queue;
+          l2_chains;
         } =
           state
         in
         produce_block
+          ~l2_chains
           ~uses_tx_queue
           ~cctxt
           ~smart_rollup_address

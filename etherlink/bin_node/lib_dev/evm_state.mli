@@ -77,7 +77,10 @@ val execute_and_inspect :
 val current_block_height : t -> Ethereum_types.quantity Lwt.t
 
 (** Same as {!current_block_height} for the block hash. *)
-val current_block_hash : t -> Ethereum_types.block_hash tzresult Lwt.t
+val current_block_hash :
+  chain_family:L2_types.chain_family ->
+  t ->
+  Ethereum_types.block_hash tzresult Lwt.t
 
 type apply_result =
   | Apply_success of {
@@ -99,6 +102,7 @@ val apply_blueprint :
   ?log_file:string ->
   ?profile:bool ->
   data_dir:string ->
+  chain_family:L2_types.chain_family ->
   config:Wasm_debugger.config ->
   native_execution_policy:Configuration.native_execution_policy ->
   t ->

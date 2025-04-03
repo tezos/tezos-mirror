@@ -209,6 +209,13 @@ type t = {
 
 val is_tx_queue_enabled : t -> bool
 
+(** [chain_family_from_l2_chains t] returns the chain_family in
+  the experimental feature if there's only one chain.
+
+  This function will be removed when multichain is implemented *)
+val retrieve_chain_family :
+  l2_chains:l2_chain list option -> L2_types.chain_family
+
 val history_mode_encoding : history_mode Data_encoding.t
 
 val pp_history_mode_debug : Format.formatter -> history_mode -> unit

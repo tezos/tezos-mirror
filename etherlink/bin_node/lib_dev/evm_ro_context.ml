@@ -156,7 +156,7 @@ let get_irmin_hash_from_number ctxt number =
         Ethereum_types.pp_quantity
         number
 
-let get_irmin_hash_from_block_hash ctxt hash =
+let get_irmin_hash_from_block_hash ~chain_family ctxt hash =
   let open Lwt_result_syntax in
   (* we use the latest state to read the contents of the block *)
   let* latest_hash = find_latest_hash ctxt in
@@ -166,7 +166,7 @@ let get_irmin_hash_from_block_hash ctxt hash =
   in
   match res with
   | Some block_bytes ->
-      let block = L2_types.block_from_bytes ~chain_family:EVM block_bytes in
+      let block = L2_types.block_from_bytes ~chain_family block_bytes in
       get_irmin_hash_from_number ctxt (L2_types.block_number block)
   | None -> failwith "Unknown block %a" Ethereum_types.pp_block_hash hash
 
@@ -203,7 +203,7 @@ let find_irmin_hash ctxt (block : Ethereum_types.Block_parameter.extended) =
         match context_hash_opt with
         | Some context_hash -> return context_hash
         | None -> failwith "Unknown block %a" Ethereum_types.pp_block_hash hash
-      else get_irmin_hash_from_block_hash ctxt hash
+      else get_irmin_hash_from_block_hash ~chain_family:L2_types.EVM ctxt hash
 
 module MakeBackend (Ctxt : sig
   val ctxt : t
@@ -435,6 +435,7 @@ let replay ctxt ?(log_file = "replay") ?profile
     ~log_file
     ?profile
     ~data_dir:ctxt.data_dir
+    ~chain_family:EVM
     ~config:(pvm_config ctxt)
     ~native_execution_policy:ctxt.native_execution_policy
     evm_state

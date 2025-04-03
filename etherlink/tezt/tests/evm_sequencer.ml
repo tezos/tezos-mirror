@@ -439,6 +439,7 @@ let register_upgrade_all ~title ~tags ~genesis_timestamp
 
 let register_tezlink_test ~title ~tags scenario protocols =
   register_all
+    ~kernels:[Kernel.Latest]
     ~title
     ~tags:("tezlink" :: tags)
     ~l2_setups:
@@ -995,6 +996,29 @@ let test_observer_reset =
     unit
   and* () = Evm_node.wait_for_blueprint_invalid_applied observer_victim2 in
 
+  unit
+
+let test_tezlink_produceBlock =
+  register_tezlink_test
+    ~title:"Test Tezlink production block"
+    ~tags:["kernel"; "produce_block"]
+  @@ fun {sequencer; _} _protocol ->
+  let rpc_current_level_head sequencer =
+    let path = "/tezlink/chains/main/blocks/head/helpers/current_level" in
+    let* res =
+      Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
+      |> Runnable.run
+    in
+    let json = JSON.parse ~origin:"curl_current_level" res in
+    return @@ JSON.(json |-> "level" |> as_int)
+  in
+  let* start_level = rpc_current_level_head sequencer in
+  let*@ _ = produce_block sequencer in
+  let*@ _ = produce_block sequencer in
+  let*@ _ = produce_block sequencer in
+  let* end_level = rpc_current_level_head sequencer in
+  Check.((start_level + 3 = end_level) int)
+    ~error_msg:"Expected new block number to be %L, but got: %R" ;
   unit
 
 module Protocol = struct
@@ -12732,4 +12756,5 @@ let () =
   test_block_producer_validation [Alpha] ;
   test_tezlink_current_level [Alpha] ;
   test_tezlink_protocols [Alpha] ;
-  test_tezlink_version [Alpha]
+  test_tezlink_version [Alpha] ;
+  test_tezlink_produceBlock [Alpha]

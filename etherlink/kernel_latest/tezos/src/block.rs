@@ -25,17 +25,8 @@ impl TezBlock {
     }
 
     fn hash(&self) -> H256 {
-        let Self {
-            hash: _,
-            number,
-            timestamp,
-            previous_hash,
-        } = self;
-        let mut data = number.to_string();
-        data.push_str(&timestamp.i64().to_string());
-        data.push_str(&previous_hash.to_string());
-        let encoded_data = hex::encode(&data);
-        let hashed_data = digest_256(encoded_data.as_bytes());
+        let encoded_data = self.to_bytes();
+        let hashed_data = digest_256(&encoded_data);
         H256::from_slice(&hashed_data)
     }
 

@@ -136,7 +136,7 @@ impl std::fmt::Display for ChainConfig {
             ChainConfig::Michelson(chain_config) => {
                 write!(
                     f,
-                    "{{Chain id: {}, Chain family: {}",
+                    "{{Chain id: {}, Chain family: {}}}",
                     chain_config.chain_id,
                     ChainFamily::Michelson
                 )

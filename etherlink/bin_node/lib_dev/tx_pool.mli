@@ -44,10 +44,12 @@ val add :
     if no transactions are in the pool. *)
 val nonce : Ethereum_types.Address.t -> Ethereum_types.quantity tzresult Lwt.t
 
-(** [pop_transactions maximum_cumulative_size] pops as much valid transactions
-    as possible from the pool, until their cumulative size exceeds
-    `maximum_cumulative_size`. Returns no transactions if the pool is locked. *)
+(** [pop_transactions chain_family maximum_cumulative_size] pops as much 
+    valid transactions as possible from the pool, until their cumulative 
+    size exceeds `maximum_cumulative_size`. If the pool is locked or node 
+    in tezlink mode, returns no transactions. *)
 val pop_transactions :
+  chain_family:L2_types.chain_family ->
   maximum_cumulative_size:int ->
   (string * Ethereum_types.legacy_transaction_object) list tzresult Lwt.t
 
