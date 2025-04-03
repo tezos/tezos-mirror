@@ -213,7 +213,7 @@ let orchestrator ?(alerts = []) ?(tasks = []) deployement f =
           (fun agent -> Logrotate.run ~name:"tezt-cloud" agent)
           agents
       in
-      let task = Chronos.task ~name ~tm ~action in
+      let task = Chronos.task ~name ~tm ~action () in
       task :: tasks
     else tasks
   in
