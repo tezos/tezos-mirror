@@ -10,7 +10,8 @@
   octez-smart-rollup-wasm-debugger-plugin
   octez-evm-node-libs.websocket
   re
-  uuidm)
+  uuidm
+  octez-protocol-021-PsQuebec-libs.plugin)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives))
