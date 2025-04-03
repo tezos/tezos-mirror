@@ -47,7 +47,12 @@ extensions = [
     'sphinx_copybutton',
     'sphinx_sitemap',
     'sphinx_pushfeedback',
+    'sphinxcontrib.mermaid',
 ]
+
+# mermaid_verbose = True
+# mermaid_params = ['--theme', 'forest', '--width', '300', '--backgroundColor',
+# 'transparent']
 
 # Sitemap
 sitemap_url_scheme = '{link}'

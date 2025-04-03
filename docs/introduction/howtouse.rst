@@ -674,7 +674,6 @@ A useful command to debug a node that is not syncing is:
 
 The admin client uses the same format of configuration file as the client (see :ref:`client_conf_file`).
 
-
 .. _octez-codec:
 
 Codec

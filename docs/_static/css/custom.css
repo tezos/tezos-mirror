@@ -173,3 +173,12 @@ nav[class='contents'] {
 [data-theme='dark'] button.tablinks {
     color: rgb(0, 0, 0);
 }
+
+/* Fix for Mermaid diagrams in dark mode */
+[data-theme='dark'] .mermaid .messageText {
+    fill: white!important;
+}
+[data-theme='dark'] .mermaid line,
+[data-theme='dark'] .mermaid path {
+    stroke: white!important;
+}

@@ -14,3 +14,4 @@ The following howtos are intended to facilitate different maintenance tasks by p
    protocol_playbook
    howto-freeze-protocols
    protocol_environment_upgrade
+   rpc_howto
