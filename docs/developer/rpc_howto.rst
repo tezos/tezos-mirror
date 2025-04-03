@@ -368,11 +368,6 @@ Where ``dir`` is initialised in another part of the code as
          Tezos_rpc.Service.description_service
      in
 
-Connection management bugs in cohttp / conduit and how to deal with them
-------------------------------------------------------------------------
-
-TODO (Diana)
-
 How to call RPCs
 ================
 
