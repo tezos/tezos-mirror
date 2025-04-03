@@ -6,11 +6,11 @@
 //! Tezos account state and storage
 
 use crate::context;
-use tezos_data_encoding::{enc::BinWriter, types::Narith};
+use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
 use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup::types::Contract;
+use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
-use tezos_storage::{read_optional_nom_value, store_bin};
+use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
 
 #[derive(Debug, PartialEq)]
 pub struct TezlinkImplicitAccount {
@@ -23,9 +23,25 @@ impl From<OwnedPath> for TezlinkImplicitAccount {
     }
 }
 
+// This enum is inspired of `src/proto_alpha/lib_protocol/manager_repr.ml`
+// A manager can be:
+//  - a public key, it means that the account is revealed
+//  - a public key hash, account is not yet revealed but the
+//    reveal public key will match this public key hash
+#[derive(Debug, PartialEq, Eq, BinWriter, NomReader)]
+#[encoding(tags = "u8")]
+pub enum Manager {
+    #[encoding(tag = 0)]
+    NotRevealed(PublicKeyHash),
+    #[encoding(tag = 1)]
+    Revealed(PublicKey),
+}
+
 const BALANCE_PATH: RefPath = RefPath::assert_from(b"/balance");
 
 const COUNTER_PATH: RefPath = RefPath::assert_from(b"/counter");
+
+const MANAGER_PATH: RefPath = RefPath::assert_from(b"/manager");
 
 fn account_path(contract: &Contract) -> Result<OwnedPath, tezos_storage::error::Error> {
     // uses the same encoding as in the octez node's representation of the context
@@ -91,6 +107,52 @@ impl TezlinkImplicitAccount {
     ) -> Result<(), tezos_storage::error::Error> {
         let path = concat(&self.path, &BALANCE_PATH)?;
         store_bin(balance, host, &path)
+    }
+
+    #[allow(dead_code)]
+    pub fn manager(
+        &self,
+        host: &impl Runtime,
+    ) -> Result<Manager, tezos_storage::error::Error> {
+        let path = concat(&self.path, &MANAGER_PATH)?;
+        let manager: Manager = read_nom_value(host, &path)?;
+        Ok(manager)
+    }
+
+    /// This function updates the manager with a public key hash in parameter.
+    /// Most of the time, we're dealing with references so this function is here to avoid cloning
+    /// the public key hash to build a [Manager] object
+    pub fn set_manager_public_key_hash(
+        &mut self,
+        host: &mut impl Runtime,
+        public_key_hash: &PublicKeyHash,
+    ) -> Result<(), tezos_storage::error::Error> {
+        let path = concat(&self.path, &MANAGER_PATH)?;
+        // The tag for public key hash is 0 (see the Manager enum above)
+        let mut buffer = vec![0_u8];
+        public_key_hash
+            .bin_write(&mut buffer)
+            .map_err(|_| tezos_smart_rollup::host::RuntimeError::DecodingError)?;
+        host.store_write_all(&path, &buffer)?;
+        Ok(())
+    }
+
+    /// This function updates the manager with the public key in parameter.
+    /// Most of the time, we're dealing with references so this function is here to avoid cloning
+    /// the public key hash to build a [Manager] object
+    pub fn set_manager_public_key(
+        &mut self,
+        host: &mut impl Runtime,
+        public_key: &PublicKey,
+    ) -> Result<(), tezos_storage::error::Error> {
+        let path = concat(&self.path, &MANAGER_PATH)?;
+        // The tag for public key hash is 1 (see the Manager enum above)
+        let mut buffer = vec![1_u8];
+        public_key
+            .bin_write(&mut buffer)
+            .map_err(|_| tezos_smart_rollup::host::RuntimeError::DecodingError)?;
+        host.store_write_all(&path, &buffer)?;
+        Ok(())
     }
 }
 
