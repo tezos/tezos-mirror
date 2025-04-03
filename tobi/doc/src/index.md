@@ -8,6 +8,10 @@ after each `git pull`.
 
 - [Get familiar with Tobi](get_familiar_with_tobi.md)
 
+## How-to guides
+
+- [How to compile and install Tobi](how_to_compile_and_install_Tobi.md)
+
 ## Reference
 
 ### Help pages
