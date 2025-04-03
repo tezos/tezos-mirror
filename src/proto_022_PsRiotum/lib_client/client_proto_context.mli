@@ -1017,3 +1017,10 @@ val dal_publish :
   * Kind.dal_publish_commitment Kind.manager Apply_results.contents_result)
   tzresult
   Lwt.t
+
+val is_delegate :
+  #Protocol_client_context.full ->
+  ?chain:Chain_services.chain ->
+  ?block:Block_services.block ->
+  public_key_hash ->
+  bool tzresult Lwt.t

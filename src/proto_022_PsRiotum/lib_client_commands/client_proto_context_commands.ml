@@ -2236,10 +2236,15 @@ let commands_rw () =
         in
         let amount = Tez.zero in
         let entrypoint = Some Entrypoint.set_delegate_parameters in
-        (* TODO #6162
-           (unless --force)
-              - check contract is a baker
-        *)
+        let* () =
+          let* is_delegate = is_delegate cctxt source in
+          if is_delegate || force then return_unit
+          else
+            cctxt#error
+              "The provided address is not a delegate. Only delegates can \
+               change their staking parameters. (You can use --force to inject \
+               the operation anyway)"
+        in
         transfer_command
           amount
           contract
