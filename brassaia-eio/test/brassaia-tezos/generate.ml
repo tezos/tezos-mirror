@@ -86,7 +86,12 @@ module Generator = struct
 end
 
 let register_test title f =
-  Tezt.Test.register ~__FILE__ ~tags:[Tag.layer1; "irmin"; "store"] ~title @@ f
+  let title = Format.sprintf "Brassaia_eio: %s" title in
+  Tezt.Test.register
+    ~__FILE__
+    ~tags:[Tag.layer1; "brassaia_eio"; "store"]
+    ~title
+  @@ f
 
 let register () =
   register_test "create store (minimal indexing strategy)" (fun () ->
