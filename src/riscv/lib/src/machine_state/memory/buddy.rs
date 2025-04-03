@@ -85,12 +85,6 @@ pub trait Buddy<M: ManagerBase>: NewState<M> {
     where
         M: ManagerRead;
 
-    /// Perform a deep refresh of the memory manager infos.
-    #[cfg(test)]
-    fn deep_refresh(&mut self)
-    where
-        M: ManagerReadWrite;
-
     /// Clone the memory manager state.
     fn clone(&self) -> Self
     where
@@ -130,7 +124,6 @@ mod tests {
 
         let mut manager = F::manager();
         let mut state = <BuddyHeapLayout as BuddyLayout>::Buddy::new(&mut manager);
-        state.deep_refresh();
 
         let total_pages = state.longest_free_sequence();
 
@@ -156,7 +149,6 @@ mod tests {
 
         let mut manager = F::manager();
         let mut state = <BuddyHeapLayout as BuddyLayout>::Buddy::new(&mut manager);
-        state.deep_refresh();
 
         let total_pages = state.longest_free_sequence();
 
@@ -192,7 +184,6 @@ mod tests {
 
         let mut manager = F::manager();
         let mut state = <BuddyHeapLayout as BuddyLayout>::Buddy::new(&mut manager);
-        state.deep_refresh();
 
         // Create a distribution of allocation sizes that when used together would allocate all
         // available memory

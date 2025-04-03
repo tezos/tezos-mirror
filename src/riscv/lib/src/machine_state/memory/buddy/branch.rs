@@ -9,7 +9,6 @@ use serde::Serialize;
 
 use super::Buddy;
 use super::BuddyLayout;
-use crate::default::ConstDefault;
 use crate::state::NewState;
 use crate::state_backend::Atom;
 use crate::state_backend::Cell;
@@ -44,17 +43,6 @@ pub struct FreeInfo {
 
     /// Number of free pages at the end of the right buddy
     right_free_end: u64,
-}
-
-impl ConstDefault for FreeInfo {
-    const DEFAULT: Self = FreeInfo {
-        left_longest_free_sequence: !0,
-        left_free_start: !0,
-        left_free_end: !0,
-        right_longest_free_sequence: !0,
-        right_free_start: !0,
-        right_free_end: !0,
-    };
 }
 
 struct_layout! {
@@ -113,7 +101,7 @@ impl<B: Buddy<M>, M: ManagerBase> BuddyBranch2<B, M> {
 
 impl<B, M> NewState<M> for BuddyBranch2<B, M>
 where
-    B: NewState<M>,
+    B: Buddy<M>,
     M: ManagerBase,
 {
     fn new(manager: &mut M) -> Self
@@ -121,7 +109,14 @@ where
         M: ManagerAlloc,
     {
         Self {
-            free_info: Cell::new(manager),
+            free_info: Cell::new_with(manager, FreeInfo {
+                left_longest_free_sequence: B::PAGES,
+                left_free_start: B::PAGES,
+                left_free_end: B::PAGES,
+                right_longest_free_sequence: B::PAGES,
+                right_free_start: B::PAGES,
+                right_free_end: B::PAGES,
+            }),
             left: Box::new(B::new(manager)),
             right: Box::new(B::new(manager)),
         }
@@ -281,18 +276,6 @@ where
         }
 
         self.free_info.left_free_end.saturating_add(B::PAGES)
-    }
-
-    #[cfg(test)]
-    fn deep_refresh(&mut self)
-    where
-        M: ManagerReadWrite,
-    {
-        // TODO: RV-568: `FreeInfo` of `BuddyBranch2` is incorrectly initialised
-
-        self.left.deep_refresh();
-        self.right.deep_refresh();
-        self.refresh();
     }
 
     fn clone(&self) -> Self
