@@ -5720,6 +5720,8 @@ module Protocol : sig
 
   val plugin_registerer : t -> target option
 
+  val plugin_registerer_exn : t -> target
+
   val dal : t -> target option
 
   val agnostic_baker : t -> target option
@@ -5922,6 +5924,9 @@ end = struct
   let plugin_exn p = mandatory "plugin" p p.plugin
 
   let plugin_registerer p = p.plugin_registerer
+
+  let plugin_registerer_exn p =
+    mandatory "plugin_registerer" p p.plugin_registerer
 
   let dal p = p.dal
 
@@ -9292,7 +9297,9 @@ let _docs_doc_gen =
          data_encoding;
          re;
        ]
-      @ List.map Protocol.embedded (Protocol.genesis :: Protocol.active))
+      @ List.map Protocol.embedded (Protocol.genesis :: Protocol.active)
+      @ List.map Protocol.plugin_registerer_exn Protocol.active)
+    ~linkall:true
 
 let _docs_doc_gen_errors =
   private_exe
