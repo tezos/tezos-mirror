@@ -301,14 +301,14 @@ type 'a diff = 'a Diff.t
       module Entry : sig
         include Brassaia.Type.S
 
-        val v : string -> t
+        val init : string -> t
         val timestamp : t -> int64
       end = struct
         type t = { timestamp : int64; message : string } [@@deriving brassaia]
 
         let compare x y = Int64.compare x.timestamp y.timestamp
 
-        let v message =
+        let init message =
           time := Int64.add 1L !time;
           { timestamp = !time; message }
 
@@ -381,7 +381,7 @@ type 'a diff = 'a Diff.t
           in
           Brassaia.Merge.ok (List.rev_append t3 old)
 
-        let merge = Brassaia.Merge.(option (v t merge))
+        let merge = Brassaia.Merge.(option (init t merge))
         let add t e = e :: t
       end
     ]}
@@ -418,7 +418,7 @@ type 'a diff = 'a Diff.t
         Printf.ksprintf
           (fun message ->
             all_logs t >>= fun logs ->
-            let logs = Log.add logs (Entry.v message) in
+            let logs = Log.add logs (Entry.init message) in
             Store.set_exn t ~info:(info "Adding a new entry") log_file logs)
           fmt
 
@@ -429,7 +429,7 @@ type 'a diff = 'a Diff.t
 
       let main () =
         Config.init ();
-        Store.Repo.v config >>= fun repo ->
+        Store.Repo.init config >>= fun repo ->
         Store.main repo >>= fun t ->
         (* populate the log with some random messages *)
         Lwt_list.iter_s
@@ -491,7 +491,7 @@ module Sync = Sync
           exit 1)
 
       let test () =
-        S.Repo.v config >>= S.main >>= fun t ->
+        S.Repo.init config >>= S.main >>= fun t ->
         Sync.pull_exn t upstream `Set >>= fun () ->
         S.get t [ "README.md" ] >|= fun r -> Printf.printf "%s\n%!" r
 

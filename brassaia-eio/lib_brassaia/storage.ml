@@ -30,7 +30,7 @@ functor
 
     type value = S.value
 
-    let v = S.v
+    let init = S.init
 
     let mem = S.mem
 
@@ -102,12 +102,12 @@ functor
 
     type watch = W.watch
 
-    let watches = W.v ()
+    let watches = W.create ()
 
-    let lock = L.v ()
+    let lock = L.create ()
 
-    let v config =
-      let t = S.v config in
+    let init config =
+      let t = S.init config in
       {t; w = watches; l = lock}
 
     let find {t; _} = S.find t

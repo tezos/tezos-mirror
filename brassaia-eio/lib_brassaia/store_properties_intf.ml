@@ -35,9 +35,9 @@ end
 module type Of_config = sig
   type 'a t
 
-  (** [v config] is a function returning fresh store handles, with the
+  (** [init config] is a function returning fresh store handles, with the
       configuration [config], which is provided by the backend. *)
-  val v : Conf.t -> read t
+  val init : Conf.t -> read t
 end
 
 module type Clearable = sig

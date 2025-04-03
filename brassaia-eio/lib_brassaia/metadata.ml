@@ -21,5 +21,5 @@ module None = struct
 
   let default = ()
 
-  let merge = Merge.v t (fun ~old:_ () () -> Merge.ok ())
+  let merge = Merge.init t (fun ~old:_ () () -> Merge.ok ())
 end

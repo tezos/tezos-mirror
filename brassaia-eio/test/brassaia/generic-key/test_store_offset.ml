@@ -56,7 +56,7 @@ module Slot_keyed_vector : Indexable.Maker_concrete_key1 = struct
 
     type _ t = {instance : instance option ref}
 
-    let v =
+    let init =
       (* NOTE: at time of writing, [brassaia-test] relies on the fact that the
          store constructor is memoised (modulo [close] semantics, which must be
          non-memoised), so we must use a singleton here. *)

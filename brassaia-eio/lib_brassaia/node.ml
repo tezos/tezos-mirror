@@ -503,7 +503,7 @@ struct
 
   let rec merge t =
     let merge_key =
-      Merge.v [%typ: Key.t option] (fun ~old x y ->
+      Merge.init [%typ: Key.t option] (fun ~old x y ->
           Merge.(f (merge t)) ~old x y)
     in
     let merge = Val.merge ~contents:C.(merge (fst t)) ~node:merge_key in
@@ -620,7 +620,7 @@ module Graph (S : Store) = struct
     in
     Graph.iter ~pred:(pred t) ~min ~max ~node ?edge ~skip ~rev ()
 
-  let v t xs = S.add t (S.Val.of_list xs)
+  let init t xs = S.add t (S.Val.of_list xs)
 
   let find_step t node step =
     [%log.debug "contents %a" pp_key node] ;
@@ -831,5 +831,5 @@ module V1 (N : Generic_key.S with type step = string) = struct
       let r = Merge.f merge ~old x.n y.n in
       match r with Ok r -> Ok (import r) | Error e -> Error e
     in
-    Merge.v t f
+    Merge.init t f
 end

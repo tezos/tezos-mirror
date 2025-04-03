@@ -34,8 +34,8 @@ module type Volume = sig
     | `Corrupted_control_file of string
     | `Unknown_major_pack_version of string ]
 
-  (** [v path] loads the volume at [path] in read-only. *)
-  val v : string -> (t, [> open_error]) result
+  (** [open_volume path] loads the volume at [path] in read-only. *)
+  val open_volume : string -> (t, [> open_error]) result
 
   (** [path t] is the directory that contains the volume. *)
   val path : t -> string
@@ -72,7 +72,7 @@ module type S = sig
     | `File_exists of string
     | `Invalid_parent_directory ]
 
-  (** [v ~readonly ~volume_num lower_root] loads all volumes located in the
+  (** [open_volumes ~readonly ~volume_num lower_root] loads all volumes located in the
       directory [lower_root].
 
       [volume_num] is the number of volumes that are expected in [lower_root]. 0
@@ -84,7 +84,7 @@ module type S = sig
       the volume directories has been renamed accidentally.
 
       If [readonly] is false, no write operations are allowed. *)
-  val v :
+  val open_volumes :
     readonly:bool -> volume_num:int -> string -> (t, [> open_error]) result
 
   (** [reload ~volume_num t] reloads volumes located in the root directory of

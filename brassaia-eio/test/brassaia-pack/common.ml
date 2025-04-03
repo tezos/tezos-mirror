@@ -135,7 +135,7 @@ struct
     in
     aux dirname
 
-  type d = {name : string; fm : File_manager.t; dict : Dict.t}
+  type d = {name : string; file_manager : File_manager.t; dict : Dict.t}
 
   (* TODO : test the indexing_strategy minimal. *)
   let config ~readonly ~fresh name =
@@ -147,7 +147,7 @@ struct
       name
 
   (* TODO : remove duplication with brassaia_pack/ext.ml *)
-  let get_fm config =
+  let get_file_manager config =
     let readonly = Brassaia_pack.Conf.readonly config in
     if readonly then File_manager.open_ro config |> Errs.raise_if_error
     else
@@ -160,15 +160,15 @@ struct
 
   let get_dict ?name ~readonly ~fresh () =
     let name = Option.value name ~default:(fresh_name "dict") in
-    let fm = config ~readonly ~fresh name |> get_fm in
-    let dict = File_manager.dict fm in
-    {name; dict; fm}
+    let file_manager = config ~readonly ~fresh name |> get_file_manager in
+    let dict = File_manager.dict file_manager in
+    {name; dict; file_manager}
 
-  let close_dict d = File_manager.close d.fm |> Errs.raise_if_error
+  let close_dict d = File_manager.close d.file_manager |> Errs.raise_if_error
 
   type t = {
     name : string;
-    fm : File_manager.t;
+    file_manager : File_manager.t;
     index : Index.t;
     pack : read Pack.t;
     dict : Pack.dict;
@@ -177,15 +177,15 @@ struct
   let create ~readonly ~fresh name =
     let f = ref (fun () -> ()) in
     let config = config ~readonly ~fresh name in
-    let fm = get_fm config in
-    let dispatcher = Dispatcher.v fm |> Errs.raise_if_error in
-    (* open the index created by the fm. *)
-    let index = File_manager.index fm in
-    let dict = File_manager.dict fm in
+    let file_manager = get_file_manager config in
+    let dispatcher = Dispatcher.init file_manager |> Errs.raise_if_error in
+    (* open the index created by the file_manager. *)
+    let index = File_manager.index file_manager in
+    let dict = File_manager.dict file_manager in
     let lru = Brassaia_pack_unix.Lru.create config in
-    let pack = Pack.v ~config ~fm ~dict ~dispatcher ~lru in
-    (f := fun () -> File_manager.flush fm |> Errs.raise_if_error) ;
-    {name; index; pack; dict; fm}
+    let pack = Pack.init ~config ~file_manager ~dict ~dispatcher ~lru in
+    (f := fun () -> File_manager.flush file_manager |> Errs.raise_if_error) ;
+    {name; index; pack; dict; file_manager}
 
   let get_rw_pack () =
     let name = fresh_name "" in
@@ -196,8 +196,8 @@ struct
   let reopen_rw name = create ~readonly:false ~fresh:false name
 
   let close_pack t =
-    let _ = File_manager.flush t.fm in
-    File_manager.close t.fm |> Errs.raise_if_error
+    let _ = File_manager.flush t.file_manager in
+    File_manager.close t.file_manager |> Errs.raise_if_error
 end
 
 module Alcotest = struct

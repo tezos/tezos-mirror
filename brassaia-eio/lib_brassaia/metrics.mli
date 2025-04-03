@@ -42,12 +42,13 @@ val set_state : 'a t -> 'a -> unit
     It gives the possibility to handle the same metric in different ways. *)
 type 'a update_mode = Mutate of ('a -> unit) | Replace of ('a -> 'a)
 
-(** [v ~origin ~name ~initial_state  repr ] create a new {!t}. The [origin] can
+(** [create ~origin ~name ~initial_state  repr ] creates a new {!t}. The [origin] can
     be set to give an hint about where the data are gathered. [name] is a name
     to describe this metrics. [initial_state] is the first value to store in the
     metric object. [repr] describes the type representation to allow
     serialization. *)
-val v : ?origin:origin -> name:string -> initial_state:'a -> 'a Repr.ty -> 'a t
+val create :
+  ?origin:origin -> name:string -> initial_state:'a -> 'a Repr.ty -> 'a t
 
 (** [update metrics mode] updates the metric by taking in consideration [mode]
     to define how it acts on [t] according to their specication. *)

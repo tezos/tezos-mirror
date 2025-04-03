@@ -91,7 +91,7 @@ struct
   struct
     type t = {
       store : read Inode.t;
-      fm : File_manager.t;
+      file_manager : File_manager.t;
       (* Two contents values that are guaranteed to be read by {!store}: *)
       foo : Key.t;
       bar : Key.t;
@@ -110,7 +110,7 @@ struct
         name
 
     (* TODO : remove duplication with brassaia_pack/ext.ml *)
-    let get_fm config =
+    let get_file_manager config =
       let readonly = Brassaia_pack.Conf.readonly config in
 
       if readonly then File_manager.open_ro config |> Errs.raise_if_error
@@ -137,13 +137,13 @@ struct
       [%log.app "Constructing a fresh context for use by the test"] ;
       rm_dir root ;
       let config = config ~indexing_strategy ~readonly:false ~fresh:true root in
-      let fm = get_fm config in
-      let dict = File_manager.dict fm in
-      let dispatcher = Dispatcher.v fm |> Errs.raise_if_error in
+      let file_manager = get_file_manager config in
+      let dict = File_manager.dict file_manager in
+      let dispatcher = Dispatcher.init file_manager |> Errs.raise_if_error in
       let lru = Brassaia_pack_unix.Lru.create config in
-      let store = Inode.v ~config ~fm ~dict ~dispatcher ~lru in
+      let store = Inode.init ~config ~file_manager ~dict ~dispatcher ~lru in
       let store_contents =
-        Contents_store.v ~config ~fm ~dict ~dispatcher ~lru
+        Contents_store.init ~config ~file_manager ~dict ~dispatcher ~lru
       in
       let foo, bar =
         Contents_store.batch store_contents (fun writer ->
@@ -152,9 +152,9 @@ struct
             (foo, bar))
       in
       [%log.app "Test context constructed"] ;
-      {store; fm; foo; bar}
+      {store; file_manager; foo; bar}
 
-    let close t = File_manager.close t.fm |> Errs.raise_if_error
+    let close t = File_manager.close t.file_manager |> Errs.raise_if_error
     (* closes dict, inodes and contents store. *)
   end
 
@@ -163,7 +163,7 @@ struct
 end
 
 module Conf = struct
-  let entries = 2
+  let nb_entries = 2
 
   let stable_hash = 3
 
@@ -283,7 +283,7 @@ module Inode_permutations_generator = struct
   let powerset xs =
     List.fold_left (fun acc x -> acc @ List.map (fun ys -> x :: ys) acc) [[]] xs
 
-  let v ~entries ~maxdepth_of_test =
+  let init ~entries ~maxdepth_of_test =
     let ( ** ) a b = float_of_int a ** float_of_int b |> int_of_float in
     let steps = gen_steps entries maxdepth_of_test in
     let content_per_step =
@@ -462,9 +462,9 @@ let test_remove_inodes () =
   test_remove_inodes ~indexing_strategy:`minimal
 
 (** For each of the 256 possible inode trees with [depth <= 3] and
-    [width = Conf.entries = 2] built by [Inode.Val.v], assert that
+    [width = Conf.entries = 2] built by [Inode.Contents_store.init], assert that
     independently, all the possible [Inode.Val.add]/[Inode.Val.remove]
-    operations yield a tree computable by [Inode.Val.v].
+    operations yield a tree computable by [Inode.Contents_store.init].
 
     In other words. Let [T] be the set of all possible trees (256). Let [O] be
     the set of unitary [tree -> tree] operations (8). If all the combinations of
@@ -483,9 +483,9 @@ let test_remove_inodes () =
     lazily loads subtrees, this won't be caught here. *)
 let test_representation_uniqueness_maxdepth_3 () =
   let module P = Inode_permutations_generator in
-  let p = P.v ~entries:Conf.entries ~maxdepth_of_test:3 in
+  let p = P.init ~entries:Conf.nb_entries ~maxdepth_of_test:3 in
   let f steps tree s =
-    (* [steps, tree] is one of the known pair built using [Val.v]. Let's try to
+    (* [steps, tree] is one of the known pair built using [Contents_store.init]. Let's try to
        add or remove [s] from it and see if something breaks. *)
     if P.StepSet.mem s steps then
       let steps' = P.StepSet.remove s steps in
@@ -877,12 +877,12 @@ module Child_ordering = struct
 
   module type S = Brassaia_pack.Inode.Child_ordering with type step := Step.t
 
-  let make ?entries:(entries' = Brassaia_tezos.Conf.entries)
+  let make ?entries:(entries' = Brassaia_tezos.Conf.nb_entries)
       (t : Brassaia_pack.Conf.inode_child_order) : (module S) =
     let module Conf = struct
       include Brassaia_tezos.Conf
 
-      let entries = entries'
+      let nb_entries = entries'
 
       let inode_child_order = t
     end in
@@ -918,7 +918,7 @@ module Child_ordering = struct
     chosen_bit
 
   let test_seeded_hash () =
-    let entries = Brassaia_tezos.Conf.entries in
+    let entries = Brassaia_tezos.Conf.nb_entries in
     let reference ~depth step =
       abs (Step.short_hash ~seed:depth step) mod entries
     in

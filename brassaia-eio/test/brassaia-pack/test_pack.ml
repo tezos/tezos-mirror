@@ -89,7 +89,7 @@ let suite =
   let module Index = Brassaia_pack.Indexing_strategy in
   let module Conf_small_nodes = struct
     (* Parameters chosen to be different from those in [Brassaia_tezos.Conf]: *)
-    let entries = 2
+    let nb_entries = 2
 
     let stable_hash = 3
 
@@ -109,9 +109,10 @@ module Context = Make_context (struct
   let root = test_dir
 end)
 
-let flush fm = File_manager.flush fm |> Errs.raise_if_error
+let flush file_manager = File_manager.flush file_manager |> Errs.raise_if_error
 
-let reload fm = File_manager.reload fm |> Errs.raise_if_error
+let reload file_manager =
+  File_manager.reload file_manager |> Errs.raise_if_error
 
 module Dict = struct
   let test_dict () =
@@ -128,7 +129,7 @@ module Dict = struct
     Alcotest.(check (option int)) "titiabc" (Some 3) x4 ;
     let x1 = Dict.index d.dict "foo" in
     Alcotest.(check (option int)) "foo" (Some 0) x1 ;
-    flush d.fm ;
+    flush d.file_manager ;
     let (d2 : Context.d) =
       Context.get_dict ~name:d.name ~readonly:false ~fresh:false ()
     in
@@ -177,8 +178,8 @@ module Dict = struct
     ignore_int (Dict.index d.dict "toto") ;
     ignore_int (Dict.index d.dict "titiabc") ;
     ignore_int (Dict.index d.dict "foo") ;
-    flush d.fm ;
-    reload d2.fm ;
+    flush d.file_manager ;
+    reload d2.file_manager ;
     check_index "titiabc" 3 ;
     check_index "bar" 1 ;
     check_index "toto" 2 ;
@@ -187,8 +188,8 @@ module Dict = struct
     ignore_int (Dict.index d.dict "hello") ;
     check_raise "hello" ;
     check_none "hello" 4 ;
-    flush d.fm ;
-    reload d2.fm ;
+    flush d.file_manager ;
+    reload d2.file_manager ;
     check_find "hello" 4 ;
     Context.close_dict d ;
     Context.close_dict d2
@@ -254,8 +255,8 @@ module Pack = struct
       let[@warning "-8"] [_k1; k2] = adds [(h1, x1); (h2, x2)] in
       let y2 = Pack.find t'.pack k2 in
       Alcotest.(check (option string)) "before reload" None y2 ;
-      flush t.fm ;
-      reload t'.fm ;
+      flush t.file_manager ;
+      reload t'.file_manager ;
       let y2 = Pack.find t'.pack k2 in
       Alcotest.(check (option string)) "after reload" (Some x2) y2 ;
       let x3 = "otoo" in
@@ -263,8 +264,8 @@ module Pack = struct
       let h3 = sha1_contents x3 in
       let h4 = sha1_contents x4 in
       let[@warning "-8"] [k3; _k4] = adds [(h3, x3); (h4, x4)] in
-      flush t.fm ;
-      reload t'.fm ;
+      flush t.file_manager ;
+      reload t'.file_manager ;
       let y2 = Pack.find t'.pack k2 in
       Alcotest.(check (option string)) "y2" (Some x2) y2 ;
       let y3 = Pack.find t'.pack k3 in
@@ -281,7 +282,7 @@ module Pack = struct
     let k1 =
       Pack.unsafe_append ~ensure_unique:true ~overcommit:false t.pack h1 x1
     in
-    flush t.fm ;
+    flush t.file_manager ;
     Context.close_pack t ;
     (*open and close in ro*)
     let t1 = Context.get_ro_pack t.name in
@@ -355,12 +356,12 @@ module Pack = struct
       let k1 =
         Pack.unsafe_append ~ensure_unique:true ~overcommit:false w h1 x1
       in
-      reload t'.fm ;
+      reload t'.file_manager ;
       let y1 = Pack.find t'.pack k1 in
       Alcotest.(check (option string)) "reload before filter" None y1 ;
       Index.filter t.index (fun _ -> true) ;
-      flush t.fm ;
-      reload t'.fm ;
+      flush t.file_manager ;
+      reload t'.file_manager ;
       let y1 = Pack.find t'.pack k1 in
       Alcotest.(check (option string)) "reload after filter" (Some x1) y1 ;
       let x2 = "foo" in
@@ -389,8 +390,8 @@ module Pack = struct
       let k1 =
         Pack.unsafe_append ~ensure_unique:true ~overcommit:false w h1 x1
       in
-      flush t.fm ;
-      reload t'.fm ;
+      flush t.file_manager ;
+      reload t'.file_manager ;
       check k1 x1 "find before filter" ;
       Index.filter t.index (fun _ -> true) ;
       check k1 x1 "find after filter" ;
@@ -399,8 +400,8 @@ module Pack = struct
       let k2 =
         Pack.unsafe_append ~ensure_unique:true ~overcommit:false w h2 x2
       in
-      flush t.fm ;
-      reload t'.fm ;
+      flush t.file_manager ;
+      reload t'.file_manager ;
       check k2 x2 "find before flush" ;
       let x3 = "toto" in
       let h3 = sha1_contents x3 in
@@ -409,8 +410,8 @@ module Pack = struct
       in
       Index.flush t.index ~with_fsync:false |> Errs.raise_if_error ;
       check k2 x2 "find after flush" ;
-      flush t.fm ;
-      reload t'.fm ;
+      flush t.file_manager ;
+      reload t'.file_manager ;
       check k3 x3 "find after flush new values"
     in
     test t.pack ;
@@ -454,14 +455,14 @@ module Branch = struct
       List.map check branches |> Eio.Fiber.all
     in
     let name = Context.fresh_name "branch" in
-    Branch.v ~fresh:true name |> test ;
-    Branch.v ~fresh:true name |> test ;
-    Branch.v ~fresh:true name |> test ;
-    let t = Branch.v ~fresh:false name in
+    Branch.create ~fresh:true name |> test ;
+    Branch.create ~fresh:true name |> test ;
+    Branch.create ~fresh:true name |> test ;
+    let t = Branch.create ~fresh:false name in
     test t ;
     let x = sha1 "XXX" in
     Branch.set t "foo" x ;
-    let t = Branch.v ~fresh:false name in
+    let t = Branch.create ~fresh:false name in
     let v = Branch.find t "foo" in
     Alcotest.(check (option hash)) "foo" (Some x) v ;
     let br = Branch.list t in
@@ -470,7 +471,7 @@ module Branch = struct
       branches
       br ;
     Branch.remove t "foo" ;
-    let t = Branch.v ~fresh:false name in
+    let t = Branch.create ~fresh:false name in
     let v = Branch.find t "foo" in
     Alcotest.(check (option hash)) "foo none" None v ;
     let br = Branch.list t in
@@ -496,16 +497,16 @@ module Branch = struct
       List.map check branches |> Eio.Fiber.all
     in
     let name = Context.fresh_name "branch" in
-    let t = Branch.v ~fresh:true name in
+    let t = Branch.create ~fresh:true name in
     add t ;
     test t ;
     Branch.close t ;
-    let t = Branch.v ~fresh:false ~readonly:true name in
+    let t = Branch.create ~fresh:false ~readonly:true name in
     test t ;
     Branch.close t ;
     let name = Context.fresh_name "branch" in
-    let t1 = Branch.v ~fresh:true ~readonly:false name in
-    let t2 = Branch.v ~fresh:false ~readonly:true name in
+    let t1 = Branch.create ~fresh:true ~readonly:false name in
+    let t2 = Branch.create ~fresh:false ~readonly:true name in
     add t1 ;
     Branch.close t1 ;
     test t2
@@ -523,7 +524,7 @@ module Layout = struct
     let module V4 = Brassaia_pack.Layout.V4 in
     let module Classification = Brassaia_pack.Layout.Classification.Upper in
     let c = Alcotest.(check (testable_repr Classification.t)) "" in
-    let classif = Classification.v in
+    let classif = Classification.init in
     c `V1_or_v2_pack (V1_and_v2.pack ~root:"" |> classif) ;
     c `Branch (V4.branch ~root:"" |> classif) ;
     c `Control (V4.control ~root:"" |> classif) ;
@@ -549,7 +550,7 @@ module Layout = struct
     let module V5 = Brassaia_pack.Layout.V5.Volume in
     let module Classification = Brassaia_pack.Layout.Classification.Volume in
     let c = Alcotest.(check (testable_repr Classification.t)) "" in
-    let classif = Classification.v in
+    let classif = Classification.open_volume in
     c `Control (V5.control ~root:"" |> classif) ;
     c `Mapping (V5.mapping ~root:"" |> classif) ;
     c `Data (V5.data ~root:"" |> classif) ;

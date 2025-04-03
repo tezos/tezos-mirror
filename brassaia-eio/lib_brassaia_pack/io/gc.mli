@@ -25,14 +25,14 @@ module Make
   type t
 
   (** Creates and starts a new GC process. *)
-  val v :
+  val init_and_start :
     root:string ->
     lower_root:string option ->
     output:[`External of string | `Root] ->
     generation:int ->
     unlink:bool ->
     dispatcher:Args.Dispatcher.t ->
-    fm:Args.Fm.t ->
+    file_manager:Args.File_Manager.t ->
     contents:read Args.Contents_store.t ->
     node:read Args.Node_store.t ->
     commit:read Args.Commit_store.t ->

@@ -65,7 +65,7 @@ module type S = sig
   type elt = [`Node of node | `Contents of contents * metadata]
 
   (** General-purpose constructor for trees. *)
-  val v : elt -> t
+  val init : elt -> t
 
   type kinded_hash = [`Contents of hash * metadata | `Node of hash]
   [@@deriving brassaia]

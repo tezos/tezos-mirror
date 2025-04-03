@@ -39,8 +39,8 @@ module type S = sig
       removed. *)
   val notify : t -> key -> value option -> unit
 
-  (** Create a watch state. *)
-  val v : unit -> t
+  (** Creates a watch state. *)
+  val create : unit -> t
 
   (** Clear all register listeners in the given watch state. *)
   val clear : t -> unit

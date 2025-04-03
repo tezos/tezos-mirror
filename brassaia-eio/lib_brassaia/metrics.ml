@@ -37,7 +37,7 @@ let set_state m v = Atomic.set m.state v
 
 type 'a update_mode = Mutate of ('a -> unit) | Replace of ('a -> 'a)
 
-let v :
+let create :
     type a. ?origin:origin -> name:string -> initial_state:a -> a Repr.ty -> a t
     =
  fun ?origin ~name ~initial_state repr ->

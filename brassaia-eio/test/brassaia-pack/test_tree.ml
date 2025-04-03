@@ -48,7 +48,7 @@ module Make (Conf : Brassaia_pack.Conf.S) = struct
   type context = {repo : Store.repo; tree : Store.tree}
 
   let export_tree_to_store tree =
-    let repo = Store.Repo.v (config ~fresh:true root) in
+    let repo = Store.Repo.init (config ~fresh:true root) in
     let store = Store.empty repo in
     let () = Store.set_tree_exn ~info store [] tree in
     let tree = Store.tree store in
@@ -431,7 +431,7 @@ let test_deeper_proof () =
   test_proofs ctxt ops
 
 module Binary = Make (struct
-  let entries = 2
+  let nb_entries = 2
 
   let stable_hash = 2
 
@@ -487,7 +487,7 @@ let test_large_proofs () =
     [a; b; c; d]
 
 module Custom = Make (struct
-  let entries = 2
+  let nb_entries = 2
 
   let stable_hash = 2
 
@@ -591,13 +591,13 @@ let tree_of_list ls =
 
 let test_reexport_node () =
   let tree = Store.Tree.add (Store.Tree.empty ()) ["foo"; "a"] "a" in
-  let repo1 = Store.Repo.v (config ~fresh:true root) in
+  let repo1 = Store.Repo.init (config ~fresh:true root) in
   let _ =
     Store.Backend.Repo.batch repo1 (fun c n _ -> Store.save_tree repo1 c n tree)
   in
   let () = Store.Repo.close repo1 in
   (* Re-export the same tree using a different repo. *)
-  let repo2 = Store.Repo.v (config ~fresh:false root) in
+  let repo2 = Store.Repo.init (config ~fresh:false root) in
   let _ =
     Alcotest.check_raises
       "re-export tree from another repo"
@@ -608,7 +608,7 @@ let test_reexport_node () =
   in
   let () = Store.Repo.close repo2 in
   (* Re-export a fresh tree using a different repo. *)
-  let repo2 = Store.Repo.v (config ~fresh:false root) in
+  let repo2 = Store.Repo.init (config ~fresh:false root) in
   let tree = Store.Tree.add (Store.Tree.empty ()) ["foo"; "a"] "a" in
   let _ = Store.Tree.hash tree in
   let c1 = Store.Tree.get_tree tree ["foo"] in

@@ -24,7 +24,7 @@ module type S = sig
   type key
 
   (** Create a lock manager. *)
-  val v : unit -> t
+  val create : unit -> t
 
   (** [with_lock t k f] executes [f ()] while holding the exclusive lock
       associated to the key [k]. *)

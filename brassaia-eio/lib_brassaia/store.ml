@@ -195,14 +195,14 @@ module Make (B : Backend.S) = struct
       |+ field "value" B.Commit.Val.t (fun t -> t.v)
       |> sealr
 
-    let v ?(clear = true) r ~info ~parents tree =
+    let init ?(clear = true) r ~info ~parents tree =
       let result =
         B.Repo.batch ~lock:true r @@ fun contents_t node_t commit_t ->
         match Tree.destruct tree with
         | `Contents _ -> Error "cannot add contents at the root"
         | `Node t ->
             let node = Tree.export ~clear r contents_t node_t t in
-            let v = B.Commit.Val.v ~info ~node ~parents in
+            let v = B.Commit.Val.init ~info ~node ~parents in
             let key = B.Commit.add commit_t v in
             Ok {r; key; v}
       in
@@ -278,7 +278,7 @@ module Make (B : Backend.S) = struct
   module Repo = struct
     type t = repo
 
-    let v = B.Repo.v
+    let init = B.Repo.init
 
     let config = B.Repo.config
 
@@ -772,7 +772,7 @@ module Make (B : Backend.S) = struct
     aux 0
 
   let root_tree = function
-    | `Node _ as n -> Tree.v n
+    | `Node _ as n -> Tree.init n
     | `Contents _ -> assert false
 
   let add_commit t old_head ((c, _) as tree) =
@@ -852,7 +852,7 @@ module Make (B : Backend.S) = struct
           let parents = match parents with None -> s.parents | Some p -> p in
           let parents = List.map Commit.key parents in
           Eio.Mutex.use_ro t.lock @@ fun () ->
-          let c = Commit.v ~clear (repo t) ~info ~parents root in
+          let c = Commit.init ~clear (repo t) ~info ~parents root in
           let r = add_commit t s.head (c, root_tree (Tree.destruct root)) in
           Ok (Some c, r)
 

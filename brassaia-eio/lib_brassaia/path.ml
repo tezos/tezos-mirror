@@ -37,7 +37,7 @@ module String_list = struct
 
   let map l f = List.map f l
 
-  let v x = x
+  let init x = x
 
   let pp ppf t =
     let len = List.fold_left (fun acc s -> 1 + acc + String.length s) 1 t in

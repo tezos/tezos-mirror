@@ -41,7 +41,7 @@ type 'a f = old:'a promise -> 'a -> 'a -> ('a, conflict) result
 
 type 'a t = 'a Type.t * 'a f
 
-let v t f = (t, f)
+let init t f = (t, f)
 
 let f (x : 'a t) = snd x
 
@@ -101,7 +101,7 @@ let idempotent dt =
   let equal = Type.(unstage (equal dt)) in
   let default = default dt in
   let f ~old x y = if equal x y then ok x else f default ~old x y in
-  v dt f
+  init dt f
 
 let seq = function
   | [] -> invalid_arg "nothing to merge"

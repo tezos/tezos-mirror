@@ -22,7 +22,7 @@ type inode_child_order =
   [`Seeded_hash | `Hash_bits | `Custom of depth:int -> bytes -> int]
 
 module type S = sig
-  val entries : int
+  val nb_entries : int
 
   val stable_hash : int
 
@@ -57,7 +57,7 @@ end
 
 open Brassaia.Backend.Conf
 
-let spec = Spec.v "pack"
+let spec = Spec.init "pack"
 
 type merge_throttle = [`Block_writes | `Overcommit_memory] [@@deriving brassaia]
 

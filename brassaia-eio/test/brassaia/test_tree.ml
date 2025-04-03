@@ -23,7 +23,7 @@ module Metadata = struct
   type t = Default | Left | Right [@@deriving brassaia]
 
   let merge =
-    Merge.v t (fun ~old:_ _ _ -> Merge.conflict "Can't merge metadata")
+    Merge.init t (fun ~old:_ _ _ -> Merge.conflict "Can't merge metadata")
 
   let default = Default
 end
@@ -100,7 +100,7 @@ let ( >> ) f g x = g (f x)
 let c ?(info = Metadata.default) blob = `Contents (blob, info)
 
 let invalid_tree () =
-  let repo = Store.Repo.v (Brassaia_mem.config ()) in
+  let repo = Store.Repo.init (Brassaia_mem.config ()) in
   let hash = Store.Hash.hash (fun f -> f "") in
   Tree.shallow repo (`Node hash)
 
@@ -196,7 +196,7 @@ let test_empty () =
      shared cache state and any keys obtained from [export] were discarded (to
      avoid sharing keys from different repositories). *)
   let () =
-    let repo = Store.Repo.v (Brassaia_mem.config ()) in
+    let repo = Store.Repo.init (Brassaia_mem.config ()) in
     let empty_exported = Tree.empty () and empty_not_exported = Tree.empty () in
     let () =
       Store.Backend.Repo.batch repo (fun c n _ ->
@@ -478,7 +478,7 @@ let lazy_stats = Tree.{nodes = 0; leafs = 0; skips = 1; depth = 0; width = 0}
 (* Take a tree and persist it to some underlying store, making it lazy. *)
 let persist_tree ?clear : Store.tree -> Store.tree =
  fun tree ->
-  let store = Store.Repo.v (Brassaia_mem.config ()) |> Store.empty in
+  let store = Store.Repo.init (Brassaia_mem.config ()) |> Store.empty in
   let () = Store.set_tree_exn ?clear ~info:Store.Info.none store [] tree in
   Store.tree store
 
@@ -570,7 +570,7 @@ let clear_and_assert_lazy tree =
 
 let test_fold_force () =
   let invalid_tree =
-    let repo = Store.Repo.v (Brassaia_mem.config ()) in
+    let repo = Store.Repo.init (Brassaia_mem.config ()) in
     let hash = Store.Hash.hash (fun f -> f "") in
     Tree.shallow repo (`Node hash)
   in
@@ -682,7 +682,7 @@ let test_fold_force () =
      Attempted dereferences should raise [Pruned_hash]. *)
 module Broken = struct
   let shallow_of_ptr kinded_key =
-    let repo = Store.Repo.v (Brassaia_mem.config ()) in
+    let repo = Store.Repo.init (Brassaia_mem.config ()) in
     Tree.shallow repo kinded_key
 
   let pruned_of_ptr kinded_hash = Tree.pruned kinded_hash
@@ -812,7 +812,7 @@ module Broken = struct
     let () = Tree.fold ~force:(`False (fun _ -> Fun.id)) tree () in
 
     (* Similarly, attempting to export a pruned tree should fail: *)
-    let repo = Store.Repo.v (Brassaia_mem.config ()) in
+    let repo = Store.Repo.init (Brassaia_mem.config ()) in
     check_exn_lwt ~exn_type:`Pruned_hash __POS__ (fun () ->
         Store.Backend.Repo.batch repo (fun c n _ ->
             Store.save_tree repo c n tree |> ignore))
@@ -863,7 +863,7 @@ let test_is_empty () =
     let tree = Tree.remove kv ["k"] in
     Alcotest.(check bool) "emptied tree" true (is_empty tree)
   in
-  let repo = Store.Repo.v (Brassaia_mem.config ()) in
+  let repo = Store.Repo.init (Brassaia_mem.config ()) in
   let () =
     let shallow_empty = Tree.(shallow repo (`Node (hash (empty ())))) in
     Alcotest.(check bool) "shallow empty tree" true (is_empty shallow_empty)

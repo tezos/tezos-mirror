@@ -140,7 +140,7 @@ let test_RO_no_migration () : unit =
       "open V1 store in RO"
       (Brassaia_pack_unix.Errors.Pack_error `Migration_needed)
       (fun () ->
-        let repo = S.Repo.v (config ~readonly:true) in
+        let repo = S.Repo.init (config ~readonly:true) in
         S.Repo.close repo)
   in
   (* maybe the version bump is only visible after, check again *)
@@ -154,7 +154,7 @@ let test_open_RW () =
   [%log.info "Executing test_open_RW"] ;
   let open With_existing_store () in
   assert (io_get_version ~root:tmp_dir = `V1) ;
-  let repo = S.Repo.v (config ~readonly:false) in
+  let repo = S.Repo.init (config ~readonly:false) in
   let () = S.Repo.close repo in
   alco_check_version
     ~pos:__POS__

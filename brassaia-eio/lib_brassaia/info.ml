@@ -30,7 +30,7 @@ module Default = struct
 
   let is_empty = equal empty
 
-  let v ?(author = "") ?(message = "") date =
+  let init ?(author = "") ?(message = "") date =
     let r = {date; message; author} in
     if is_empty r then empty else r
 

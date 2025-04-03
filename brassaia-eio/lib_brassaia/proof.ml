@@ -75,7 +75,7 @@ struct
 
   let state t = t.state
 
-  let v ~before ~after state = {after; before; state}
+  let init ~before ~after state = {after; before; state}
 end
 
 exception Bad_proof of {context : string}

@@ -34,7 +34,7 @@ module type S = sig
 
   module Io : Io_intf.S
 
-  val v_exn :
+  val init_exn :
     ?flush_callback:(unit -> unit) ->
     ?fresh:bool ->
     ?readonly:bool ->
@@ -49,7 +49,7 @@ module type S = sig
   type write_error :=
     [`Index_failure of string | `Io_misc of Io.misc_error | `Ro_not_allowed]
 
-  val v :
+  val init :
     ?flush_callback:(unit -> unit) ->
     ?fresh:bool ->
     ?readonly:bool ->

@@ -160,9 +160,9 @@ struct
     unsafe_remove t k ;
     W.notify t.w k None
 
-  let watches = W.v ()
+  let watches = W.create ()
 
-  let v ?(fresh = false) ?(readonly = false) file =
+  let create ?(fresh = false) ?(readonly = false) file =
     let block =
       if
         (not readonly)

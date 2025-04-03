@@ -116,6 +116,6 @@ module type S = sig
   module Remote : sig
     include Remote.S with type commit = Commit.key and type branch = Branch.key
 
-    val v : Repo.t -> t
+    val init : Repo.t -> t
   end
 end

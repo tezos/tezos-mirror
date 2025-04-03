@@ -56,7 +56,7 @@ let test_unique_when_switched () =
 
   (* 1. open store with always indexing, verify same offsets *)
   let repo =
-    Store.Repo.v
+    Store.Repo.init
     @@ config
          ~indexing_strategy:Brassaia_pack.Indexing_strategy.always
          ~fresh:true
@@ -86,7 +86,7 @@ let test_unique_when_switched () =
 
   (* 2. re-open store with minimal indexing, verify new offset *)
   let repo =
-    Store.Repo.v
+    Store.Repo.init
     @@ config
          ~indexing_strategy:Brassaia_pack.Indexing_strategy.minimal
          ~fresh:false

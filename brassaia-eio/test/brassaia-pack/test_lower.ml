@@ -39,21 +39,21 @@ module Direct_tc = struct
 
   let test_empty () =
     let lower_root = create_lower_root () in
-    let$ lower = Lower.v ~readonly:false ~volume_num:0 lower_root in
+    let$ lower = Lower.open_volumes ~readonly:false ~volume_num:0 lower_root in
     Alcotest.(check int) "0 volumes" 0 (Lower.volume_num lower) ;
     let _ = Lower.close lower in
     ()
 
   let test_volume_num () =
     let lower_root = create_lower_root () in
-    let result = Lower.v ~readonly:false ~volume_num:1 lower_root in
+    let result = Lower.open_volumes ~readonly:false ~volume_num:1 lower_root in
     match result with
     | Error (`Volume_missing _) -> ()
     | _ -> Alcotest.fail "volume_num too high should return an error"
 
   let test_add_volume () =
     let lower_root = create_lower_root () in
-    let$ lower = Lower.v ~readonly:false ~volume_num:0 lower_root in
+    let$ lower = Lower.open_volumes ~readonly:false ~volume_num:0 lower_root in
     let$ _ = Lower.add_volume lower in
     Alcotest.(check int) "1 volume" 1 (Lower.volume_num lower) ;
     let$ _ = Lower.reload ~volume_num:1 lower in
@@ -63,7 +63,7 @@ module Direct_tc = struct
 
   let test_add_volume_ro () =
     let lower_root = create_lower_root () in
-    let$ lower = Lower.v ~readonly:true ~volume_num:0 lower_root in
+    let$ lower = Lower.open_volumes ~readonly:true ~volume_num:0 lower_root in
     let result = Lower.add_volume lower in
     let () =
       match result with
@@ -75,7 +75,7 @@ module Direct_tc = struct
 
   let test_add_multiple_empty () =
     let lower_root = create_lower_root () in
-    let$ lower = Lower.v ~readonly:false ~volume_num:0 lower_root in
+    let$ lower = Lower.open_volumes ~readonly:false ~volume_num:0 lower_root in
     let$ _ = Lower.add_volume lower in
     let result = Lower.add_volume lower |> Result.get_error in
     let () =
@@ -88,7 +88,7 @@ module Direct_tc = struct
 
   let test_find_volume () =
     let lower_root = create_lower_root () in
-    let$ lower = Lower.v ~readonly:false ~volume_num:0 lower_root in
+    let$ lower = Lower.open_volumes ~readonly:false ~volume_num:0 lower_root in
     let$ volume = Lower.add_volume lower in
     let payload =
       Brassaia_pack_unix.Control_file.Payload.Volume.Latest.
@@ -113,7 +113,7 @@ module Direct_tc = struct
 
   let test_read_exn () =
     let lower_root = create_lower_root () in
-    let$ lower = Lower.v ~readonly:false ~volume_num:0 lower_root in
+    let$ lower = Lower.open_volumes ~readonly:false ~volume_num:0 lower_root in
     let$ volume = Lower.add_volume lower in
     (* Manually create mapping, data, and control file for volume.
 
@@ -191,7 +191,7 @@ module Store_tc = struct
   let init ?(readonly = false) ?(fresh = true) ?(include_lower = true) () =
     let root, lower_root = fresh_roots () in
     let lower_root = if include_lower then Some lower_root else None in
-    config ~readonly ~fresh ?lower_root root |> Store.Repo.v
+    config ~readonly ~fresh ?lower_root root |> Store.Repo.init
 
   let count_volumes repo =
     let open Store.Internal in
@@ -251,16 +251,16 @@ module Store_tc = struct
 
   let test_create_nested () =
     let root, lower_root = fresh_roots ~make_root:false () in
-    let repo = config ~fresh:true ~lower_root root |> Store.Repo.v in
+    let repo = config ~fresh:true ~lower_root root |> Store.Repo.init in
     let volume_num = count_volumes repo in
     Alcotest.(check int) "volume_num is 1" 1 volume_num ;
     Store.Repo.close repo
 
   let test_open_rw_lower () =
     let root, lower_root = fresh_roots ~make_root:false () in
-    let repo = config ~fresh:true root |> Store.Repo.v in
+    let repo = config ~fresh:true root |> Store.Repo.init in
     let () = Store.Repo.close repo in
-    let repo = config ~fresh:false ~lower_root root |> Store.Repo.v in
+    let repo = config ~fresh:false ~lower_root root |> Store.Repo.init in
     let volume_num = count_volumes repo in
     Alcotest.(check int) "volume_num is 1" 1 volume_num ;
     Store.Repo.close repo
@@ -270,7 +270,7 @@ module Store_tc = struct
     let main = Store.main repo in
     let () =
       Store.set_exn
-        ~info:(fun () -> Store.Info.v ~author:"tester" Int64.zero)
+        ~info:(fun () -> Store.Info.init ~author:"tester" Int64.zero)
         main
         ["a"]
         "a"
@@ -297,9 +297,9 @@ module Store_tc = struct
 
   let test_add_volume_reopen () =
     let root, lower_root = fresh_roots () in
-    let repo = Store.Repo.v (config ~fresh:true ~lower_root root) in
+    let repo = Store.Repo.init (config ~fresh:true ~lower_root root) in
     let main = Store.main repo in
-    let info () = Store.Info.v ~author:"test" Int64.zero in
+    let info () = Store.Info.init ~author:"test" Int64.zero in
     let () = Store.set_exn ~info main ["a"] "a" in
     let c1 = Store.Head.get main in
     let _ = Store.Gc.start_exn repo (Store.Commit.key c1) in
@@ -307,21 +307,21 @@ module Store_tc = struct
     let () = Store.add_volume repo in
     Alcotest.(check int) "two volumes" 2 (count_volumes repo) ;
     let _ = Store.Repo.close repo in
-    let repo = Store.Repo.v (config ~fresh:false ~lower_root root) in
+    let repo = Store.Repo.init (config ~fresh:false ~lower_root root) in
     Alcotest.(check int) "two volumes after re-open" 2 (count_volumes repo) ;
     Store.Repo.close repo
 
   let test_migrate () =
     let root, lower_root = fresh_roots () in
     (* Create without a lower *)
-    let repo = Store.Repo.v (config ~fresh:true root) in
+    let repo = Store.Repo.init (config ~fresh:true root) in
     Alcotest.(check int) "volume_num is 0" 0 (count_volumes repo) ;
     let main = Store.main repo in
-    let info () = Store.Info.v ~author:"test" Int64.zero in
+    let info () = Store.Info.init ~author:"test" Int64.zero in
     let () = Store.set_exn ~info main ["a"] "a" in
     let () = Store.Repo.close repo in
     (* Reopen with a lower to trigger the migration *)
-    let repo = Store.Repo.v (config ~lower_root root) in
+    let repo = Store.Repo.init (config ~lower_root root) in
     Alcotest.(check int) "volume_num is 1" 1 (count_volumes repo) ;
     let main = Store.main repo in
     let a = Store.get main ["a"] in
@@ -333,7 +333,7 @@ module Store_tc = struct
     let () = Store.set_exn ~info main ["a"] "b" in
     let () = Store.Repo.close repo in
     (* Reopen with the same lower and check reads *)
-    let repo = Store.Repo.v (config ~lower_root root) in
+    let repo = Store.Repo.init (config ~lower_root root) in
     Alcotest.(check int) "volume_num is 1" 1 (count_volumes repo) ;
     let main = Store.main repo in
     let b = Store.get main ["a"] in
@@ -358,7 +358,7 @@ module Store_tc = struct
     setup_test_env ~root_archive ~root_local_build:root ;
     let lower_root = root / "lower" in
     (* Open store and trigger migration. This should succeed. *)
-    let repo = Store.Repo.v (config ~fresh:false ~lower_root root) in
+    let repo = Store.Repo.init (config ~fresh:false ~lower_root root) in
     let _ = read_everything repo in
     Store.Repo.close repo
 
@@ -372,7 +372,7 @@ module Store_tc = struct
     setup_test_env ~root_archive ~root_local_build:root ;
     let lower_root = root / "lower" in
     (* Open store and trigger migration. This should succeed. *)
-    let repo = Store.Repo.v (config ~fresh:false ~lower_root root) in
+    let repo = Store.Repo.init (config ~fresh:false ~lower_root root) in
     let _ = read_everything repo in
     let _ = Store.Repo.close repo in
 
@@ -385,21 +385,21 @@ module Store_tc = struct
     setup_test_env ~root_archive ~root_local_build:root ;
     let lower_root = root / "lower" in
     (* Open store and trigger migration. This should succeed. *)
-    let repo = Store.Repo.v (config ~fresh:false ~lower_root root) in
+    let repo = Store.Repo.init (config ~fresh:false ~lower_root root) in
     let _ = read_everything repo in
     Store.Repo.close repo
 
   let test_migrate_then_gc () =
     let root, lower_root = fresh_roots () in
     (* Create without a lower *)
-    let repo = Store.Repo.v (config ~fresh:true root) in
+    let repo = Store.Repo.init (config ~fresh:true root) in
     Alcotest.(check int) "volume_num is 0" 0 (count_volumes repo) ;
     let main = Store.main repo in
-    let info () = Store.Info.v ~author:"test" Int64.zero in
+    let info () = Store.Info.init ~author:"test" Int64.zero in
     let () = Store.set_exn ~info main ["a"] "a" in
     let () = Store.Repo.close repo in
     (* Reopen with a lower to trigger the migration *)
-    let repo = Store.Repo.v (config ~lower_root root) in
+    let repo = Store.Repo.init (config ~lower_root root) in
     Alcotest.(check int) "volume_num is 1" 1 (count_volumes repo) ;
     (* Add two commits *)
     let main = Store.main repo in
@@ -416,16 +416,16 @@ module Store_tc = struct
   let test_migrate_then_gc_in_lower () =
     let root, lower_root = fresh_roots () in
     (* Create without a lower *)
-    let repo = Store.Repo.v (config ~fresh:true root) in
+    let repo = Store.Repo.init (config ~fresh:true root) in
     Alcotest.(check int) "volume_num is 0" 0 (count_volumes repo) ;
     let main = Store.main repo in
-    let info () = Store.Info.v ~author:"test" Int64.zero in
+    let info () = Store.Info.init ~author:"test" Int64.zero in
     let () = Store.set_exn ~info main ["a"] "a" in
     let a_commit = Store.Head.get main in
     let () = Store.set_exn ~info main ["b"] "b" in
     let () = Store.Repo.close repo in
     (* Reopen with a lower to trigger the migration *)
-    let repo = Store.Repo.v (config ~lower_root root) in
+    let repo = Store.Repo.init (config ~lower_root root) in
     Alcotest.(check int) "volume_num is 1" 1 (count_volumes repo) ;
     (* [a] is now in the lower but GC should still succeed
 
@@ -438,9 +438,9 @@ module Store_tc = struct
 
   let test_volume_data_locality () =
     let root, lower_root = fresh_roots () in
-    let repo = Store.Repo.v (config ~fresh:true ~lower_root root) in
+    let repo = Store.Repo.init (config ~fresh:true ~lower_root root) in
     let main = Store.main repo in
-    let info () = Store.Info.v ~author:"test" Int64.zero in
+    let info () = Store.Info.init ~author:"test" Int64.zero in
     [%log.debug "add c1"] ;
     let () = Store.set_exn ~info main ["c1"] "a" in
     let c1 = Store.Head.get main in
@@ -505,9 +505,9 @@ module Store_tc = struct
   let test_cleanup () =
     let root, lower_root = fresh_roots () in
     [%log.debug "create store with data and run GC"] ;
-    let repo = Store.Repo.v (config ~fresh:true ~lower_root root) in
+    let repo = Store.Repo.init (config ~fresh:true ~lower_root root) in
     let main = Store.main repo in
-    let info () = Store.Info.v ~author:"test" Int64.zero in
+    let info () = Store.Info.init ~author:"test" Int64.zero in
     let () = Store.set_exn ~info main ["a"] "a" in
     let c1 = Store.Head.get main in
     let _ = Store.Gc.start_exn repo (Store.Commit.key c1) in
@@ -525,7 +525,7 @@ module Store_tc = struct
       Brassaia_pack.Layout.V5.Volume.control ~root:volume_root
     in
     let$ () = Io.move_file ~src:volume_cf_path ~dst:volume_cf_gen_path in
-    let repo = Store.Repo.v (config ~fresh:false ~lower_root root) in
+    let repo = Store.Repo.init (config ~fresh:false ~lower_root root) in
     let () =
       match Io.classify_path volume_cf_path with
       | `File -> [%log.debug "control file exists"]

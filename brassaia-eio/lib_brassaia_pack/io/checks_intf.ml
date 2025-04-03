@@ -212,7 +212,7 @@ module type Sigs = sig
   end) : sig
     type t
 
-    val v : unit -> t
+    val create : unit -> t
 
     val visit_commit : t -> S.Hash.t -> unit
 

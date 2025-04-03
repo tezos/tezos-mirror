@@ -262,13 +262,13 @@ module type S = sig
     module Import : sig
       type process
 
-      (** [v ?on_disk repo] create a [snaphot] instance. The traversal requires
+      (** [init ?on_disk repo] create a [snaphot] instance. The traversal requires
           an index to keep track of visited elements.
 
           - if [on_disk] is not specified, the index is in memory.
           - if [on_disk] is [`Path path], a temporary index is created at path.
           - if [on_disk] is [`Reuse] the store's index is reused. *)
-      val v : ?on_disk:[`Path of string | `Reuse] -> repo -> process
+      val init : ?on_disk:[`Path of string | `Reuse] -> repo -> process
 
       (** [save_elt snapshot elt] saves [elt] to the store. *)
       val save_elt : process -> t -> node_key

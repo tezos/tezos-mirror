@@ -75,9 +75,9 @@ module Inode = struct
     in
     Metrics.set_state m v
 
-  let init () =
+  let create () =
     let initial_state = create_inode () in
-    Metrics.v ~origin:Inode_stats ~name:"inode_metric" ~initial_state t
+    Metrics.create ~origin:Inode_stats ~name:"inode_metric" ~initial_state t
 
   let export m = Metrics.state m
 
@@ -100,7 +100,7 @@ end
 
 type t = {inode : Inode.stat}
 
-let s = {inode = Inode.init ()}
+let s = {inode = Inode.create ()}
 
 let get () = s
 

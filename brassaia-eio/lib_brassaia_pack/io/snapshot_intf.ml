@@ -19,15 +19,15 @@ open! Import
 module type Args = sig
   module Hash : Brassaia.Hash.S
 
-  module Fm : File_manager.S with type Index.key = Hash.t
+  module File_Manager : File_manager.S with type Index.key = Hash.t
 
-  module Dispatcher : Dispatcher.S with module Fm = Fm
+  module Dispatcher : Dispatcher.S with module File_Manager = File_Manager
 
   module Inode :
     Inode.Persistent
       with type hash := Hash.t
        and type key = Hash.t Pack_key.t
-       and type file_manager = Fm.t
+       and type file_manager = File_Manager.t
        and type dispatcher = Dispatcher.t
 
   module Contents_pack :
@@ -46,7 +46,8 @@ module type Sigs = sig
     module Export : sig
       type t
 
-      val v : Brassaia.config -> read Contents_pack.t -> read Inode.Pack.t -> t
+      val init :
+        Brassaia.config -> read Contents_pack.t -> read Inode.Pack.t -> t
 
       val run :
         ?on_disk:[`Path of string] ->
@@ -61,7 +62,7 @@ module type Sigs = sig
         ( unit,
           [> `Double_close
           | `Index_failure of string
-          | `Io_misc of Fm.Io.misc_error
+          | `Io_misc of File_Manager.Io.misc_error
           | `Pending_flush
           | `Ro_not_allowed ] )
         result
@@ -70,7 +71,7 @@ module type Sigs = sig
     module Import : sig
       type t
 
-      val v :
+      val init :
         ?on_disk:[`Path of string | `Reuse] ->
         int ->
         read Contents_pack.t ->

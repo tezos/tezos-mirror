@@ -166,7 +166,7 @@ struct
 
   let clear t = Eio.Mutex.use_rw ~protect:true t.lock (fun () -> clear_unsafe t)
 
-  let v () =
+  let create () =
     let lock = Eio.Mutex.create () in
     let clean, enqueue = scheduler () in
     {

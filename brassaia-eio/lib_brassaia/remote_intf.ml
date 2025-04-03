@@ -63,7 +63,7 @@ module type Sigs = sig
     include
       S with type commit = H.t and type branch = R.t and type endpoint = unit
 
-    (** Create a remote store handle. *)
-    val v : 'a -> t
+    (** Creates a remote store handle. *)
+    val init : 'a -> t
   end
 end

@@ -99,7 +99,7 @@ end) : sig
   (** [fresh_name typ] is a clean directory for a resource of type [typ]. *)
   val fresh_name : string -> string
 
-  type d = {name : string; fm : File_manager.t; dict : Dict.t}
+  type d = {name : string; file_manager : File_manager.t; dict : Dict.t}
 
   val get_dict : ?name:string -> readonly:bool -> fresh:bool -> unit -> d
 
@@ -107,7 +107,7 @@ end) : sig
 
   type t = {
     name : string;
-    fm : File_manager.t;
+    file_manager : File_manager.t;
     index : Index.t;
     pack : read Pack.t;
     dict : Dict.t;
