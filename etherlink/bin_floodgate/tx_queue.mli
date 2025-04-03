@@ -62,10 +62,11 @@ val beacon : tick_interval:float -> unit tzresult Lwt.t
     {!callback}). *)
 val transfer :
   ?callback:callback ->
-  ?to_:Efunc_core.Private.address ->
-  ?value:Z.t ->
+  ?to_:Efunc_core.Eth.address ->
+  ?value:Ethereum_types.NonceMap.key ->
+  ?nonce:Ethereum_types.NonceMap.key ->
   ?data:Efunc_core.Private.b ->
-  gas_limit:Z.t ->
+  gas_limit:Ethereum_types.NonceMap.key ->
   infos:Network_info.t ->
   from:Account.t ->
   unit ->
