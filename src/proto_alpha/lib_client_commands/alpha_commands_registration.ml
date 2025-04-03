@@ -36,3 +36,4 @@ let () =
   @ Client_proto_utils_commands.commands ()
   @ Client_proto_stresstest_commands.commands network ()
   @ Client_proto_fa12_commands.commands ()
+  @ Client_bls_commands.commands ()

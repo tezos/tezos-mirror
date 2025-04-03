@@ -571,6 +571,14 @@ val post_chain_block_helpers_preapply_operations :
 val post_chain_block_helpers_forge_operations :
   ?chain:string -> ?block:string -> data:data -> unit -> JSON.t t
 
+(** RPC: [POST /chains/<chain>/blocks/<block>/helpers/forge/signed_operations]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val post_chain_block_helpers_forge_signed_operations :
+  ?chain:string -> ?block:string -> data:data -> unit -> JSON.t t
+
 (** RPC: [POST /chains/<chain>/blocks/<block>/helpers/forge/consensus_operations]
 
     [chain] defaults to ["main"].
@@ -795,6 +803,16 @@ val get_chain_block_helper_validators :
 *)
 val get_chain_block_helper_levels_in_current_cycle :
   ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [POST /bls/aggregate_signatures] *)
+val post_bls_aggregate_signatures : string list -> string t
+
+(** RPC: [POST /bls/check_proof] *)
+val post_bls_check_proof : pk:string -> proof:string -> unit -> bool t
+
+(** RPC: [POST /bls/aggregate_public_keys] *)
+val post_bls_aggregate_public_keys :
+  (string * string) list -> (string * string) t
 
 (** {2 Big maps RPC module} *)
 
