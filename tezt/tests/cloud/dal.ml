@@ -1455,7 +1455,9 @@ module Monitoring_app = struct
           let action () =
             action ~slack_bot_token ~slack_channel_id ~configuration ()
           in
-          [Chronos.task ~name:"network-overview" ~tm:"0 0-23/6 * * *" ~action]
+          [
+            Chronos.task ~name:"network-overview" ~tm:"0 0-23/6 * * *" ~action ();
+          ]
   end
 
   module Alert = struct

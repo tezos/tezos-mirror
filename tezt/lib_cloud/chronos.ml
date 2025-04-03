@@ -101,7 +101,12 @@ let parser =
 
 let parse s = Angstrom.parse_string parser ~consume:All s
 
-type task = {name : string; time : time; action : unit -> unit Lwt.t}
+type task = {
+  name : string;
+  time : time;
+  randomized_delay : int;
+  action : unit -> unit Lwt.t;
+}
 
 type t = {
   tasks : task list;
@@ -167,13 +172,20 @@ let pp_time ppf spec =
 
 let time_to_string tm = Format.asprintf "%a" pp_time tm
 
-let task ~name ~tm ~action =
+let task ~name ~tm ~action ?(randomized_delay = 0) () =
   let time = time_of_string tm in
   let is_valid = validate_time time in
   if not is_valid then
     failwith
-      (Format.asprintf "Invalid time specification: %s" (time_to_string time)) ;
-  {name; time; action}
+      (Format.asprintf
+         "chronos: invalid time specification (%s)"
+         (time_to_string time)) ;
+  if not (randomized_delay >= 0) then
+    failwith
+      (Format.asprintf
+         "chronos: randomized delay (%d) must be greater than zero"
+         randomized_delay) ;
+  {name; time; action; randomized_delay}
 
 let init ~tasks =
   let shutdown, trigger_shutdown = Lwt.task () in
@@ -207,6 +219,16 @@ let run ~now_tm t =
   Lwt_list.iter_p
     (fun task ->
       if should_run task now_tm then (
+        let* () =
+          let delay = Random.int (succ task.randomized_delay) in
+          if delay > 0 then (
+            Log.info
+              "chronos.%s: wait for a delay of %d seconds before starting"
+              task.name
+              delay ;
+            Lwt_unix.sleep (float delay))
+          else unit
+        in
         Log.info "chronos.%s: starting task" task.name ;
         Lwt.catch
           (fun () ->
