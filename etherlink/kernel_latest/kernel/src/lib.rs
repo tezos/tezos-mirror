@@ -5,7 +5,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::configuration::{fetch_configuration, Configuration, CHAIN_ID};
+use crate::configuration::{
+    fetch_chain_configuration, fetch_configuration, Configuration, CHAIN_ID,
+};
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::migration::storage_migration;
@@ -106,12 +108,14 @@ pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Err
 pub fn stage_one<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
+    chain_config: &chains::ChainConfig,
     configuration: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error> {
     log!(host, Debug, "Entering stage one.");
+    log!(host, Debug, "Chain Configuration: {}", chain_config);
     log!(host, Debug, "Configuration: {}", configuration);
 
-    fetch_blueprints(host, smart_rollup_address, configuration)
+    fetch_blueprints(host, smart_rollup_address, chain_config, configuration)
 }
 
 fn set_kernel_version<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
@@ -235,7 +239,7 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
             // in the storage.
             set_kernel_version(host)?;
             host.mark_for_reboot()?;
-            let configuration = fetch_configuration(host, chain_id);
+            let configuration = fetch_configuration(host);
             log!(
                 host,
                 Info,
@@ -269,16 +273,21 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     let smart_rollup_address = host.reveal_metadata().raw_rollup_address;
     // 2. Fetch the per mode configuration of the kernel. Returns the default
     //    configuration if it fails.
-    let mut configuration = fetch_configuration(host, chain_id);
+    let chain_configuration = fetch_chain_configuration(host, chain_id);
+    let mut configuration = fetch_configuration(host);
     let sequencer_pool_address = read_sequencer_pool_address(host);
 
     // Run the stage one, this is a no-op if the inbox was already consumed
     // by another kernel run. This ensures that if the migration does not
     // consume all reboots. At least one reboot will be used to consume the
     // inbox.
-    if let StageOneStatus::Reboot =
-        stage_one(host, smart_rollup_address, &mut configuration)
-            .context("Failed during stage 1")?
+    if let StageOneStatus::Reboot = stage_one(
+        host,
+        smart_rollup_address,
+        &chain_configuration,
+        &mut configuration,
+    )
+    .context("Failed during stage 1")?
     {
         host.mark_for_reboot()?;
         return Ok(());
@@ -290,12 +299,22 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     #[cfg(not(feature = "benchmark-bypass-stage2"))]
     {
         log!(host, Debug, "Entering stage two.");
-        if let block::ComputationResult::RebootNeeded = block::produce(
-            host,
-            &mut configuration,
-            sequencer_pool_address,
-            trace_input,
-        )
+        if let block::ComputationResult::RebootNeeded = match chain_configuration {
+            chains::ChainConfig::Evm(chain_configuration) => block::produce(
+                host,
+                &*chain_configuration,
+                &mut configuration,
+                sequencer_pool_address,
+                trace_input,
+            ),
+            chains::ChainConfig::Michelson(chain_configuration) => block::produce(
+                host,
+                &chain_configuration,
+                &mut configuration,
+                sequencer_pool_address,
+                trace_input,
+            ),
+        }
         .context("Failed during stage 2")?
         {
             host.mark_for_reboot()?;
@@ -373,7 +392,7 @@ mod tests {
 
     use crate::block_storage;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
-    use crate::chains::{ChainConfig, EvmLimits};
+    use crate::chains::test_evm_chain_config;
     use crate::configuration::Configuration;
     use crate::fees;
     use crate::main;
@@ -383,12 +402,10 @@ mod tests {
     };
     use crate::{
         blueprint::Blueprint,
-        transaction::{Transaction, TransactionContent},
+        transaction::{Transaction, TransactionContent, Transactions},
         upgrade::KernelUpgrade,
     };
-    use evm::Config;
     use evm_execution::account_storage::{self, EthereumAccountStorage};
-    use evm_execution::configuration::EVMVersion;
     use evm_execution::fa_bridge::deposit::{ticket_hash, FaDeposit};
     use evm_execution::fa_bridge::test_utils::{
         convert_h160, convert_u256, dummy_ticket, kernel_wrapper, ticket_balance_add,
@@ -429,17 +446,6 @@ mod tests {
     const DUMMY_CHAIN_ID: U256 = U256::one();
     const DUMMY_BASE_FEE_PER_GAS: u64 = 12345u64;
     const DUMMY_DA_FEE: u64 = 2_000_000_000_000u64;
-
-    fn dummy_configuration(evm_configuration: Config) -> Configuration {
-        Configuration {
-            chain_config: ChainConfig::new_evm_config(
-                DUMMY_CHAIN_ID,
-                EvmLimits::default(),
-                evm_configuration,
-            ),
-            ..Configuration::default()
-        }
-    }
 
     fn dummy_block_fees() -> BlockFees {
         BlockFees::new(
@@ -484,7 +490,7 @@ mod tests {
         }
     }
 
-    fn blueprint(transactions: Vec<Transaction>) -> Blueprint {
+    fn blueprint(transactions: Vec<Transaction>) -> Blueprint<Transactions> {
         Blueprint {
             transactions: EthTxs(transactions),
             timestamp: Timestamp::from(0i64),
@@ -607,7 +613,7 @@ mod tests {
         // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
         let mut configuration = Configuration {
             maximum_allowed_ticks: 9_000_000_000,
-            ..dummy_configuration(EVMVersion::current_test_config())
+            ..Configuration::default()
         };
 
         crate::storage::store_minimum_base_fee_per_gas(
@@ -618,9 +624,14 @@ mod tests {
         crate::storage::store_da_fee(&mut host, block_fees.da_fee_per_byte()).unwrap();
 
         // If the upgrade is started, it should raise an error
-        let computation_result =
-            crate::block::produce(&mut host, &mut configuration, None, None)
-                .expect("Should have produced");
+        let computation_result = crate::block::produce(
+            &mut host,
+            &test_evm_chain_config(),
+            &mut configuration,
+            None,
+            None,
+        )
+        .expect("Should have produced");
 
         // test there is a new block
         assert_eq!(

@@ -8,22 +8,25 @@
 use crate::apply::{
     apply_transaction, ExecutionInfo, ExecutionResult, Validity, WITHDRAWAL_OUTBOX_QUEUE,
 };
+use crate::blueprint::Blueprint;
 use crate::blueprint_storage::{
-    drop_blueprint, read_blueprint, read_current_block_header_for_family,
-    store_current_block_header, BlockHeader, ChainHeader,
+    drop_blueprint, read_blueprint, read_current_block_header,
+    store_current_block_header, BlockHeader, ChainHeader, EVMBlockHeader,
 };
-use crate::chains::{ChainConfig, EvmLimits};
+use crate::chains::{
+    BlockInProgressTrait, ChainConfigTrait, ChainHeaderTrait, EvmChainConfig, EvmLimits,
+};
 use crate::configuration::ConfigurationMode;
 use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
 use crate::event::Event;
 use crate::l2block::L2Block;
-use crate::transaction::Transaction;
+use crate::storage;
+use crate::transaction::{Transaction, Transactions};
 use crate::upgrade;
 use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
 use crate::{block_in_progress, tick_model};
-use crate::{block_storage, storage};
 use anyhow::Context;
 use block_in_progress::EthBlockInProgress;
 use evm::Config;
@@ -40,7 +43,6 @@ use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::Path;
-use tezos_tezlink::block::TezBlock;
 use tick_model::estimate_remaining_ticks_for_transaction_execution;
 
 pub const GENESIS_PARENT_HASH: H256 = H256([0xff; 32]);
@@ -49,8 +51,8 @@ pub const GAS_LIMIT: u64 = 1 << 50;
 
 /// Struct used to allow the compiler to check that the tick counter value is
 /// correctly moved and updated. Copy and Clone should NOT be derived.
-struct TickCounter {
-    c: u64,
+pub struct TickCounter {
+    pub c: u64,
 }
 
 impl TickCounter {
@@ -246,56 +248,70 @@ fn compute<Host: Runtime>(
     })
 }
 
-#[allow(clippy::large_enum_variant)]
-pub enum BlockInProgress {
-    Etherlink(EthBlockInProgress),
-    Tezlink {
-        number: U256,
-        timestamp: Timestamp,
-        previous_hash: H256,
-    },
-}
-
-impl BlockInProgress {
-    pub fn number(&self) -> U256 {
-        match self {
-            Self::Etherlink(bip) => bip.number,
-            Self::Tezlink { number, .. } => *number,
-        }
-    }
-}
-
-enum BlueprintParsing {
-    Next(Box<BlockInProgress>),
+enum BlueprintParsing<BIP> {
+    Next(Box<BIP>),
     None,
 }
 
+pub fn eth_bip_from_blueprint<Host: Runtime>(
+    host: &Host,
+    chain_config: &EvmChainConfig,
+    tick_counter: &TickCounter,
+    next_bip_number: U256,
+    header: EVMBlockHeader,
+    blueprint: Blueprint<Transactions>,
+) -> EthBlockInProgress {
+    let gas_price = crate::gas_price::base_fee_per_gas(
+        host,
+        blueprint.timestamp,
+        chain_config.get_limits().minimum_base_fee_per_gas,
+    );
+
+    let bip = EthBlockInProgress::from_blueprint(
+        blueprint,
+        next_bip_number,
+        header.hash,
+        tick_counter.c,
+        gas_price,
+        header.receipts_root,
+        header.transactions_root,
+    );
+
+    tezos_evm_logging::log!(host, tezos_evm_logging::Level::Debug, "bip: {bip:?}");
+    bip
+}
+
 #[cfg_attr(feature = "benchmark", inline(never))]
-fn next_bip_from_blueprints<Host: Runtime>(
+fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     tick_counter: &TickCounter,
+    chain_config: &ChainConfig,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
-) -> Result<BlueprintParsing, anyhow::Error> {
-    let chain_family = config.chain_config.get_chain_family();
-    let (next_bip_number, timestamp, chain_header) =
-        match read_current_block_header_for_family(host, &chain_family) {
-            Err(_) => (
-                U256::zero(),
-                Timestamp::from(0),
-                ChainHeader::genesis_header(chain_family),
-            ),
-            Ok(BlockHeader {
-                blueprint_header,
-                chain_header,
-            }) => (
-                blueprint_header.number + 1,
-                blueprint_header.timestamp,
-                chain_header,
-            ),
-        };
-    let (blueprint, size) =
-        read_blueprint(host, config, next_bip_number, timestamp, &chain_header)?;
+) -> Result<BlueprintParsing<ChainConfig::BlockInProgress>, anyhow::Error> {
+    let (next_bip_number, timestamp, chain_header) = match read_current_block_header(host)
+    {
+        Err(_) => (
+            U256::zero(),
+            Timestamp::from(0),
+            ChainConfig::ChainHeader::genesis_header(),
+        ),
+        Ok(BlockHeader {
+            blueprint_header,
+            chain_header,
+        }) => (
+            blueprint_header.number + 1,
+            blueprint_header.timestamp,
+            chain_header,
+        ),
+    };
+    let (blueprint, size) = read_blueprint::<_, ChainConfig>(
+        host,
+        config,
+        next_bip_number,
+        timestamp,
+        &chain_header,
+    )?;
     log!(host, Benchmarking, "Size of blueprint: {}", size);
     match blueprint {
         Some(blueprint) => {
@@ -307,56 +323,22 @@ fn next_bip_from_blueprints<Host: Runtime>(
                     return Ok(BlueprintParsing::None);
                 }
             }
-            match (&config.chain_config, chain_header) {
-                (ChainConfig::Evm(chain_config), ChainHeader::Eth(header)) => {
-                    let gas_price = crate::gas_price::base_fee_per_gas(
-                        host,
-                        blueprint.timestamp,
-                        chain_config.limits.minimum_base_fee_per_gas,
-                    );
-
-                    let bip = block_in_progress::EthBlockInProgress::from_blueprint(
-                        blueprint,
-                        next_bip_number,
-                        header.hash,
-                        tick_counter.c,
-                        gas_price,
-                        header.receipts_root,
-                        header.transactions_root,
-                    );
-
-                    tezos_evm_logging::log!(
-                        host,
-                        tezos_evm_logging::Level::Debug,
-                        "bip: {bip:?}"
-                    );
-                    Ok(BlueprintParsing::Next(Box::new(
-                        BlockInProgress::Etherlink(bip),
-                    )))
-                }
-                (ChainConfig::Michelson(_), ChainHeader::Tez(header)) => {
-                    Ok(BlueprintParsing::Next(Box::new(BlockInProgress::Tezlink {
-                        number: next_bip_number,
-                        timestamp: blueprint.timestamp,
-                        previous_hash: header.hash,
-                    })))
-                }
-                (_, _) => {
-                    log!(
-                        host,
-                        Fatal,
-                        "Incoherent state between the configuration and the header read in the durable storage"
-                    );
-                    Ok(BlueprintParsing::None)
-                }
-            }
+            let bip: ChainConfig::BlockInProgress = chain_config
+                .block_in_progress_from_blueprint(
+                    host,
+                    tick_counter,
+                    next_bip_number,
+                    chain_header,
+                    blueprint,
+                );
+            Ok(BlueprintParsing::Next(Box::new(bip)))
         }
         None => Ok(BlueprintParsing::None),
     }
 }
 
 #[allow(clippy::too_many_arguments)]
-fn compute_bip<Host: Runtime>(
+pub fn compute_bip<Host: Runtime>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     mut block_in_progress: EthBlockInProgress,
@@ -496,13 +478,13 @@ fn promote_block<Host: Runtime>(
     Ok(())
 }
 
-pub fn produce<Host: Runtime>(
+pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
+    chain_config: &ChainConfig,
     config: &mut Configuration,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
 ) -> Result<ComputationResult, anyhow::Error> {
-    let chain_id = config.chain_config.get_chain_id();
     let da_fee_per_byte = crate::retrieve_da_fee(host)?;
 
     let kernel_upgrade = upgrade::read_kernel_upgrade(host)?;
@@ -520,13 +502,9 @@ pub fn produce<Host: Runtime>(
 
     // Check if there's a BIP in storage to resume its execution
     let (block_in_progress_provenance, block_in_progress) =
-        match storage::read_block_in_progress(&safe_host)? {
+        match ChainConfig::read_block_in_progress(&safe_host)? {
             Some(block_in_progress) => {
-                // We don't yet support saving Tez block in progress in the durable storage and restoring them.
-                (
-                    BlockInProgressProvenance::Storage,
-                    BlockInProgress::Etherlink(block_in_progress),
-                )
+                (BlockInProgressProvenance::Storage, block_in_progress)
             }
             None => {
                 // Using `safe_host.host` allows to escape from the failsafe storage, which is necessary
@@ -537,6 +515,7 @@ pub fn produce<Host: Runtime>(
                 let block_in_progress = match next_bip_from_blueprints(
                     safe_host.host,
                     &tick_counter,
+                    chain_config,
                     config,
                     &kernel_upgrade,
                 )? {
@@ -559,66 +538,18 @@ pub fn produce<Host: Runtime>(
         };
 
     let processed_blueprint = block_in_progress.number();
-    let computation_result = match (&config.chain_config, block_in_progress) {
-        (
-            ChainConfig::Evm(chain_config),
-            BlockInProgress::Etherlink(block_in_progress),
-        ) => {
-            log!(
-                safe_host,
-                Debug,
-                "Computing the BlockInProgress for Etherlink"
-            );
-            compute_bip(
-                &mut safe_host,
-                &outbox_queue,
-                block_in_progress,
-                &precompiles,
-                &mut tick_counter,
-                sequencer_pool_address,
-                &chain_config.limits,
-                config.maximum_allowed_ticks,
-                tracer_input,
-                chain_id,
-                da_fee_per_byte,
-                coinbase,
-                &chain_config.evm_config,
-            )
-        }
-        (
-            ChainConfig::Michelson(_),
-            BlockInProgress::Tezlink {
-                number,
-                timestamp,
-                previous_hash,
-            },
-        ) => {
-            log!(
-                safe_host,
-                Debug,
-                "Computing the BlockInProgress for Tezlink at level {}",
-                number
-            );
-
-            let tezblock = TezBlock::new(number, timestamp, previous_hash);
-            let new_block = L2Block::Tezlink(tezblock);
-            block_storage::store_current(&mut safe_host, &new_block)
-                .context("Failed to store the current block")?;
-            Ok(BlockComputationResult::Finished {
-                included_delayed_transactions: vec![],
-                block: new_block,
-            })
-        }
-        (_, _) => {
-            // This case should be correctly handled by this MR https://gitlab.com/tezos/tezos/-/merge_requests/17259
-            log!(
-                safe_host,
-                Fatal,
-                "Incoherent BlockInProgress found with the Chain running in the kernel"
-            );
-            return Ok(ComputationResult::Finished);
-        }
-    };
+    let computation_result = chain_config.compute_bip(
+        &mut safe_host,
+        &outbox_queue,
+        block_in_progress,
+        &precompiles,
+        &mut tick_counter,
+        sequencer_pool_address,
+        config.maximum_allowed_ticks,
+        tracer_input,
+        da_fee_per_byte,
+        coinbase,
+    );
     match computation_result {
         Ok(BlockComputationResult::Finished {
             included_delayed_transactions,
@@ -680,8 +611,9 @@ mod tests {
     use crate::blueprint_storage::read_next_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
-    use crate::chains::ChainFamily;
-    use crate::chains::MichelsonChainConfig;
+    use crate::chains::{
+        ChainFamily, EvmChainConfig, MichelsonChainConfig, TezTransactions,
+    };
     use crate::fees::DA_FEE_PER_BYTE;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
     use crate::storage::read_block_in_progress;
@@ -710,16 +642,16 @@ mod tests {
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
     use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime;
 
-    fn blueprint(transactions: Vec<Transaction>) -> Blueprint {
+    fn blueprint(transactions: Vec<Transaction>) -> Blueprint<Transactions> {
         Blueprint {
             transactions: Transactions::EthTxs(transactions),
             timestamp: Timestamp::from(0i64),
         }
     }
 
-    fn tezlink_blueprint() -> Blueprint {
+    fn tezlink_blueprint() -> Blueprint<TezTransactions> {
         Blueprint {
-            transactions: Transactions::TezTxs,
+            transactions: TezTransactions {},
             timestamp: Timestamp::from(0i64),
         }
     }
@@ -765,24 +697,20 @@ mod tests {
     const DUMMY_BASE_FEE_PER_GAS: u64 = MINIMUM_BASE_FEE_PER_GAS;
     const DUMMY_DA_FEE: u64 = DA_FEE_PER_BYTE;
 
-    fn dummy_configuration(evm_configuration: Config) -> Configuration {
-        Configuration {
-            chain_config: ChainConfig::new_evm_config(
-                DUMMY_CHAIN_ID,
-                EvmLimits::default(),
-                evm_configuration,
-            ),
-            ..Configuration::default()
-        }
+    fn dummy_evm_config(evm_configuration: Config) -> EvmChainConfig {
+        EvmChainConfig::create_config(
+            DUMMY_CHAIN_ID,
+            EvmLimits::default(),
+            evm_configuration,
+        )
     }
 
-    fn dummy_tez_configuration() -> Configuration {
-        Configuration {
-            chain_config: ChainConfig::Michelson(MichelsonChainConfig::create_config(
-                DUMMY_CHAIN_ID,
-            )),
-            ..Configuration::default()
-        }
+    fn dummy_tez_config() -> MichelsonChainConfig {
+        MichelsonChainConfig::create_config(DUMMY_CHAIN_ID)
+    }
+
+    fn dummy_configuration() -> Configuration {
+        Configuration::default()
     }
 
     fn dummy_block_fees() -> BlockFees {
@@ -905,7 +833,10 @@ mod tests {
         )
     }
 
-    fn store_blueprints<Host: Runtime>(host: &mut Host, blueprints: Vec<Blueprint>) {
+    fn store_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
+        host: &mut Host,
+        blueprints: Vec<Blueprint<ChainConfig::Transactions>>,
+    ) {
         for (i, blueprint) in blueprints.into_iter().enumerate() {
             store_inbox_blueprint_by_number(host, blueprint, U256::from(i))
                 .expect("Should have stored blueprint");
@@ -942,7 +873,7 @@ mod tests {
             },
         ];
 
-        store_blueprints(host, vec![blueprint(transactions)]);
+        store_blueprints::<_, EvmChainConfig>(host, vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
         set_balance(
@@ -955,7 +886,8 @@ mod tests {
 
         produce(
             host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_evm_config(EVMVersion::current_test_config()),
+            &mut dummy_configuration(),
             None,
             None,
         )
@@ -976,9 +908,10 @@ mod tests {
     fn test_produce_tezlink_block() {
         let mut host = MockKernelHost::default();
 
-        let mut config = dummy_tez_configuration();
+        let chain_config = dummy_tez_config();
+        let mut config = dummy_configuration();
 
-        store_blueprints(
+        store_blueprints::<_, MichelsonChainConfig>(
             &mut host,
             vec![
                 tezlink_blueprint(),
@@ -987,13 +920,13 @@ mod tests {
             ],
         );
 
-        produce(&mut host, &mut config, None, None)
+        produce(&mut host, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
-        produce(&mut host, &mut config, None, None)
+        produce(&mut host, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
-        produce(&mut host, &mut config, None, None)
+        produce(&mut host, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
-        let computation = produce(&mut host, &mut config, None, None)
+        let computation = produce(&mut host, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
         assert_eq!(ComputationResult::Finished, computation);
         assert_eq!(U256::from(2), read_current_number(&host).unwrap());
@@ -1017,7 +950,7 @@ mod tests {
         };
 
         let transactions: Vec<Transaction> = vec![invalid_tx];
-        store_blueprints(&mut host, vec![blueprint(transactions)]);
+        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
 
         let mut evm_account_storage = init_account_storage().unwrap();
         let sender = dummy_eth_caller();
@@ -1030,7 +963,8 @@ mod tests {
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_evm_config(EVMVersion::current_test_config()),
+            &mut dummy_configuration(),
             None,
             None,
         )
@@ -1060,7 +994,7 @@ mod tests {
         };
 
         let transactions: Vec<Transaction> = vec![valid_tx];
-        store_blueprints(&mut host, vec![blueprint(transactions)]);
+        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
         let mut evm_account_storage = init_account_storage().unwrap();
@@ -1074,7 +1008,8 @@ mod tests {
 
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_evm_config(EVMVersion::current_test_config()),
+            &mut dummy_configuration(),
             None,
             None,
         )
@@ -1102,7 +1037,7 @@ mod tests {
         };
 
         let transactions: Vec<Transaction> = vec![valid_tx];
-        store_blueprints(&mut host, vec![blueprint(transactions)]);
+        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
 
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
         let mut evm_account_storage = init_account_storage().unwrap();
@@ -1116,7 +1051,8 @@ mod tests {
 
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_evm_config(EVMVersion::current_test_config()),
+            &mut dummy_configuration(),
             None,
             None,
         )
@@ -1179,7 +1115,7 @@ mod tests {
             content: Ethereum(dummy_eth_transaction_one()),
         }];
 
-        store_blueprints(
+        store_blueprints::<_, EvmChainConfig>(
             &mut host,
             vec![blueprint(transaction_0), blueprint(transaction_1)],
         );
@@ -1197,7 +1133,8 @@ mod tests {
         // Produce block for blueprint containing transaction_0
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_evm_config(EVMVersion::current_test_config()),
+            &mut dummy_configuration(),
             None,
             None,
         )
@@ -1205,7 +1142,8 @@ mod tests {
         // Produce block for blueprint containing transaction_1
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_evm_config(EVMVersion::current_test_config()),
+            &mut dummy_configuration(),
             None,
             None,
         )
@@ -1248,7 +1186,7 @@ mod tests {
             },
         ];
 
-        store_blueprints(&mut host, vec![blueprint(transactions)]);
+        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
         let mut evm_account_storage = init_account_storage().unwrap();
@@ -1262,7 +1200,8 @@ mod tests {
 
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_evm_config(EVMVersion::current_test_config()),
+            &mut dummy_configuration(),
             None,
             None,
         )
@@ -1303,7 +1242,7 @@ mod tests {
         };
 
         let transactions = vec![tx.clone(), tx];
-        store_blueprints(
+        store_blueprints::<_, EvmChainConfig>(
             &mut host,
             vec![blueprint(transactions.clone()), blueprint(transactions)],
         );
@@ -1321,7 +1260,8 @@ mod tests {
 
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_evm_config(EVMVersion::current_test_config()),
+            &mut dummy_configuration(),
             None,
             None,
         )
@@ -1356,7 +1296,7 @@ mod tests {
         let blocks_index =
             block_storage::internal_for_tests::init_blocks_index().unwrap();
 
-        store_blueprints(&mut host, vec![blueprint(vec![])]);
+        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(vec![])]);
 
         let number_of_blocks_indexed = blocks_index.length(&host).unwrap();
         let sender = dummy_eth_caller();
@@ -1370,7 +1310,8 @@ mod tests {
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_evm_config(EVMVersion::current_test_config()),
+            &mut dummy_configuration(),
             None,
             None,
         )
@@ -1524,13 +1465,17 @@ mod tests {
             tx_hash,
             content: Ethereum(tx),
         };
-        store_blueprints(&mut host, vec![blueprint(vec![transaction])]);
+        store_blueprints::<_, EvmChainConfig>(
+            &mut host,
+            vec![blueprint(vec![transaction])],
+        );
 
         // Apply the transaction
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_evm_config(EVMVersion::current_test_config()),
+            &mut dummy_configuration(),
             None,
             None,
         )
@@ -1546,7 +1491,7 @@ mod tests {
     }
 
     /// A blueprint that should produce 1 block with an invalid transaction
-    fn almost_empty_blueprint() -> Blueprint {
+    fn almost_empty_blueprint() -> Blueprint<Transactions> {
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
 
         // transaction should be invalid
@@ -1576,7 +1521,8 @@ mod tests {
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_evm_config(EVMVersion::current_test_config()),
+            &mut dummy_configuration(),
             None,
             None,
         )
@@ -1588,7 +1534,8 @@ mod tests {
         store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_evm_config(EVMVersion::current_test_config()),
+            &mut dummy_configuration(),
             None,
             None,
         )
@@ -1600,7 +1547,8 @@ mod tests {
         store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_evm_config(EVMVersion::current_test_config()),
+            &mut dummy_configuration(),
             None,
             None,
         )
@@ -1724,19 +1672,21 @@ mod tests {
             wrap_transaction(2, loop_4600_tx),
         ];
 
-        store_blueprints(&mut host, vec![blueprint(proposals)]);
+        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(proposals)]);
 
         host.reboot_left().expect("should be some reboot left");
 
         // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
+        let chain_config = dummy_evm_config(EVMVersion::current_test_config());
         let mut configuration = Configuration {
             maximum_allowed_ticks: 9_000_000_000,
-            ..dummy_configuration(EVMVersion::current_test_config())
+            ..dummy_configuration()
         };
 
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
-        let computation_result = produce(&mut host, &mut configuration, None, None)
-            .expect("Should have produced");
+        let computation_result =
+            produce(&mut host, &chain_config, &mut configuration, None, None)
+                .expect("Should have produced");
 
         // test no new block
         assert!(
@@ -1752,6 +1702,7 @@ mod tests {
     fn test_reboot_many_tx_many_proposal() {
         // init host
         let mut host = MockKernelHost::default();
+        let mut config = Configuration::default();
 
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
@@ -1801,21 +1752,24 @@ mod tests {
             ]),
         ];
 
-        store_blueprints(&mut host, proposals);
+        store_blueprints::<_, EvmChainConfig>(&mut host, proposals);
 
         // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
+        let chain_config = dummy_evm_config(EVMVersion::current_test_config());
         let mut configuration = Configuration {
             maximum_allowed_ticks: 9_000_000_000,
-            ..dummy_configuration(EVMVersion::current_test_config())
+            ..dummy_configuration()
         };
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
-        let computation_result = produce(&mut host, &mut configuration, None, None)
-            .expect("Should have produced");
+        let computation_result =
+            produce(&mut host, &chain_config, &mut configuration, None, None)
+                .expect("Should have produced");
         // test reboot is set
         matches!(computation_result, ComputationResult::RebootNeeded);
 
-        let computation_result = produce(&mut host, &mut configuration, None, None)
-            .expect("Should have produced");
+        let computation_result =
+            produce(&mut host, &chain_config, &mut configuration, None, None)
+                .expect("Should have produced");
 
         // test no new block
         assert_eq!(
@@ -1839,9 +1793,8 @@ mod tests {
             "There should be some transactions left"
         );
 
-        let _next_blueprint =
-            read_next_blueprint(&mut host, &mut Configuration::default())
-                .expect("The next blueprint should be available");
+        let _next_blueprint = read_next_blueprint(&mut host, &mut config)
+            .expect("The next blueprint should be available");
     }
 
     #[test]
@@ -1885,7 +1838,7 @@ mod tests {
 
         let transactions: Vec<Transaction> = vec![tx];
 
-        store_blueprints(&mut host, vec![blueprint(transactions)]);
+        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
 
         let sender = H160::from_str("05f32b3cc3888453ff71b01135b34ff8e41263f2").unwrap();
         let mut evm_account_storage = init_account_storage().unwrap();
@@ -1898,7 +1851,8 @@ mod tests {
 
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_evm_config(EVMVersion::current_test_config()),
+            &mut dummy_configuration(),
             None,
             None,
         )
@@ -1956,9 +1910,10 @@ mod tests {
         store_inbox_blueprint(&mut host, blueprint(proposals_first_reboot)).unwrap();
 
         // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
+        let chain_config = dummy_evm_config(EVMVersion::current_test_config());
         let mut configuration = Configuration {
             maximum_allowed_ticks: 9_000_000_000,
-            ..dummy_configuration(EVMVersion::current_test_config())
+            ..dummy_configuration()
         };
         // sanity check: no current block
         assert!(
@@ -1966,7 +1921,8 @@ mod tests {
             "Should not have found current block number"
         );
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
-        produce(&mut host, &mut configuration, None, None).expect("Should have produced");
+        produce(&mut host, &chain_config, &mut configuration, None, None)
+            .expect("Should have produced");
 
         assert!(
             block_storage::read_current_number(&host).is_ok(),
@@ -1980,7 +1936,8 @@ mod tests {
         store_inbox_blueprint(&mut host, blueprint(proposals_second_reboot)).unwrap();
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
-        produce(&mut host, &mut configuration, None, None).expect("Should have produced");
+        produce(&mut host, &chain_config, &mut configuration, None, None)
+            .expect("Should have produced");
 
         let block = block_storage::read_current(&mut host, &ChainFamily::Evm)
             .expect("Should have found a block");
@@ -2047,7 +2004,7 @@ mod tests {
 
         let transactions: Vec<Transaction> =
             vec![valid_tx, valid_tx_eip1559, valid_tx_eip2930];
-        store_blueprints(&mut host, vec![blueprint(transactions)]);
+        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
         let mut evm_account_storage = init_account_storage().unwrap();
@@ -2061,7 +2018,8 @@ mod tests {
 
         produce(
             &mut host,
-            &mut dummy_configuration(EVMVersion::current_test_config()),
+            &dummy_evm_config(EVMVersion::current_test_config()),
+            &mut dummy_configuration(),
             None,
             None,
         )
