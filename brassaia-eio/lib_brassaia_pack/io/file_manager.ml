@@ -23,7 +23,7 @@ let legacy_io_header_size = 16
 module Events = struct
   include Internal_event.Simple
 
-  let section = ["brassaia"; "brassaia_pack"; "unix"; "file_manager"]
+  let section = ["brassaia-eio"; "brassaia_pack"; "function"; "file_manager"]
 
   let flush_suffix_and_its_deps =
     declare_0

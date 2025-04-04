@@ -21,7 +21,7 @@ include Tree_intf
 module Events = struct
   include Internal_event.Simple
 
-  let section = ["brassaia"; "tree"]
+  let section = ["brassaia_eio"; "tree"]
 
   let tree_function =
     declare_2
