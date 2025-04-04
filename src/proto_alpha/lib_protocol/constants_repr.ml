@@ -189,10 +189,14 @@ let check_constants constants =
          "The minimal block delay must be greater than zero")
   in
   let* () =
+    (* Allowing [delay_increment_per_round] = 0 is intended only for test
+       environments. This value MUST be strictly positive on any actual
+       network to ensure strictly increasing round durations, as required by
+       Tenderbake. *)
     error_unless
-      Period_repr.(constants.delay_increment_per_round > zero)
+      Period_repr.(constants.delay_increment_per_round >= zero)
       (Invalid_protocol_constants
-         "The delay increment per round must be greater than zero")
+         "The delay increment per round must be non-negative")
   in
   let* () =
     error_unless

@@ -340,6 +340,8 @@ let constants_mainnet : Constants.Parametric.t =
     max_operations_time_to_live = 450;
     (* Round [k] lasts [minimal_block_delay + k * delay_increment_per_round]. *)
     minimal_block_delay = Period.of_seconds_exn (Int64.of_int block_time);
+    (* [delay_increment_per_round] must be strictly positive to ensure
+       strictly increasing round durations, as required by Tenderbake. *)
     delay_increment_per_round = Period.of_seconds_exn 4L;
     consensus_committee_size;
     consensus_threshold_size;
