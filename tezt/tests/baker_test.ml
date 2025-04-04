@@ -437,6 +437,125 @@ let force_apply_from_round =
       round ;
   unit
 
+let prequorum_check_levels =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"prequorum monitoring check operations level"
+    ~tags:[team; "prequorum"; "monitoring"; "check"]
+    ~uses:(fun protocol -> [Protocol.baker protocol])
+  @@ fun protocol ->
+  let parameter_file =
+    Protocol.parameter_file ~constants:Constants_mainnet protocol
+  in
+  (* Using custom constants to make the test run faster *)
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Left parameter_file)
+      [(["minimal_block_delay"], `String "4")]
+  in
+  let* node, client =
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~parameter_file
+      ~timestamp:Now
+      ()
+  in
+  let* _ = Node.wait_for_level node 1 in
+  let delegate = Constant.bootstrap1 in
+  let public_key_hashes =
+    List.map (fun (account : Account.key) -> account.public_key_hash)
+  in
+  let* baker =
+    Baker.init
+      ~protocol
+      ~event_level:`Debug
+      ~delegates:[Constant.activator.public_key_hash]
+      node
+      client
+  in
+  Baker.log_events ~max_length:1000 baker ;
+  let* () =
+    Client.bake_for_and_wait
+      ~node
+      ~keys:(public_key_hashes Constant.all_secret_keys)
+      ~count:3
+      client
+  in
+  let* _ = Node.wait_for_level node 4 in
+  let current_level = 4 in
+  let previous_level = current_level - 1 in
+  let next_level = current_level + 1 in
+  let* block_payload_hash =
+    let* json = Client.RPC.call client @@ RPC.get_chain_block_header () in
+    return @@ JSON.(json |-> "payload_hash" |> as_string)
+  in
+  let preattest_for level =
+    let* slots_json = Operation.Consensus.get_slots ~level client in
+    let slot = Operation.Consensus.first_slot ~slots_json delegate in
+    let preattestation =
+      Operation.Consensus.preattestation
+        ~slot
+        ~level
+        ~block_payload_hash
+        ~round:0
+    in
+    let* _ =
+      Operation.Consensus.inject
+        ~protocol
+        ~signer:delegate
+        preattestation
+        client
+    in
+    unit
+  in
+  let wait_for_preattestations_received () =
+    Baker.wait_for
+      baker
+      "preattestations_received.v0"
+      JSON.(
+        fun json ->
+          let count = json |-> "count" |> as_int in
+          let delta = json |-> "delta_power" |> as_int in
+          let voting_power = json |-> "voting_power" |> as_int in
+          let preattestations = json |-> "preattestations" |> as_int in
+          Some (count, delta, voting_power, preattestations))
+  in
+  Log.info "Injecting a preattestation for level %d round 0" current_level ;
+  (* Listen for the next preattestations_received event and inject a
+     preattestation for the current level. The preattestation is expected to be
+     accounted in the prequorum monitoring. *)
+  let waiter = wait_for_preattestations_received () in
+  let* () = preattest_for current_level in
+  let* count, delta, voting_power, preattestations = waiter in
+  if count <> 1 || delta = 0 || voting_power = 0 || preattestations <> 1 then
+    Test.fail "Prequorum is expected to progress" ;
+  Log.info "Injecting a preattestation for level %d round 0" previous_level ;
+  (* Same process but we inject a preattestation for the previous level. This
+     time, the preattestation is not expected to be accounted in the prequorum
+     monitoring. *)
+  let waiter = wait_for_preattestations_received () in
+  let* () = preattest_for previous_level in
+  let* count, delta', voting_power', preattestations' = waiter in
+  if
+    count <> 0 || delta' <> 0
+    || voting_power <> voting_power'
+    || preattestations <> preattestations'
+  then Test.fail "Prequorum is not expected to progress" ;
+  Log.info "Injecting a preattestation for level %d round 0" next_level ;
+  (* Same for next level. Again, the preattestation is not expected to be
+     accounted in the prequorum monitoring. *)
+  let waiter = wait_for_preattestations_received () in
+  let* () = preattest_for next_level in
+  let* count, delta', voting_power', preattestations' = waiter in
+  if
+    count <> 0 || delta' <> 0
+    || voting_power <> voting_power'
+    || preattestations <> preattestations'
+  then Test.fail "Prequorum is not expected to progress" ;
+  let* _ = Mempool.get_mempool client in
+  unit
+
 let register ~protocols =
   check_node_version_check_bypass_test protocols ;
   check_node_version_allowed_test protocols ;
@@ -449,4 +568,5 @@ let register ~protocols =
   no_bls_baker_test protocols ;
   baker_remote_test protocols ;
   baker_check_consensus_branch protocols ;
-  force_apply_from_round protocols
+  force_apply_from_round protocols ;
+  prequorum_check_levels protocols
