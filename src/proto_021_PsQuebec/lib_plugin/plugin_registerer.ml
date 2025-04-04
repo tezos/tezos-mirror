@@ -58,12 +58,12 @@ module Delegators_contribution_plugin = struct
   let hash = Registerer.Registered.hash
 
   let convert_pkh :
-      Tezos_crypto.Signature.public_key_hash ->
+      Tezos_crypto__.Signature.V_latest.public_key_hash ->
       Tezos_crypto__.Signature_v1.public_key_hash = function
     | Ed25519 x -> Ed25519 x
     | Secp256k1 x -> Secp256k1 x
     | P256 x -> P256 x
-    | Bls x -> Bls x
+    | Bls_aug x -> Bls x
 
   let delegated_breakdown_at_sampling context ~cycle ~delegate_pkh =
     let open Lwt_result_syntax in

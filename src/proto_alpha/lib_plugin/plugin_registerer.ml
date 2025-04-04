@@ -48,13 +48,21 @@ let () = Protocol_plugin.register_shell_helpers (module Shell_helpers)
 module Delegators_contribution_plugin = struct
   let hash = Registerer.Registered.hash
 
+  let convert_pkh :
+      Tezos_crypto__.Signature.V_latest.public_key_hash ->
+      Tezos_crypto__.Signature_v1.public_key_hash = function
+    | Ed25519 x -> Ed25519 x
+    | Secp256k1 x -> Secp256k1 x
+    | P256 x -> P256 x
+    | Bls_aug x -> Bls x
+
   let delegated_breakdown_at_sampling context ~cycle ~delegate_pkh =
     let open Lwt_result_syntax in
     let* output =
       Delegators_contribution.delegated_breakdown_at_sampling
         context
         ~cycle
-        ~delegate_pkh
+        ~delegate_pkh:(convert_pkh delegate_pkh)
     in
     match output with
     | `Ok
@@ -86,7 +94,9 @@ module Delegators_contribution_plugin = struct
            delegators_contributions;
            former_delegators_unstake_requests;
          } =
-      Delegators_contribution.min_delegated_breakdown context ~delegate_pkh
+      Delegators_contribution.min_delegated_breakdown
+        context
+        ~delegate_pkh:(convert_pkh delegate_pkh)
     in
     return
       {
