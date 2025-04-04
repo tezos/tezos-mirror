@@ -54,11 +54,6 @@ let tolerated_inactivity_period_low c =
   let constants = Raw_context.constants c in
   constants.tolerated_inactivity_period_low
 
-(* temporary, to introduce new constants incrementally  *)
-let tolerated_inactivity_period c =
-  let constants = Raw_context.constants c in
-  constants.tolerated_inactivity_period
-
 let tolerated_inactivity_period_threshold c =
   let constants = Raw_context.constants c in
   constants.tolerated_inactivity_period_threshold

@@ -1007,8 +1007,6 @@ module Constants : sig
 
   val delegate_parameters_activation_delay : context -> int
 
-  val tolerated_inactivity_period : context -> int
-
   val slashable_deposits_period : context -> int
 
   (** See {!Constants_storage.unstake_finalization_delay}. *)
