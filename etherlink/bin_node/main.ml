@@ -167,13 +167,6 @@ module Params = struct
         Lwt.return_ok
         @@ Evm_node_lib_dev_encoding.Ethereum_types.Qty (Z.of_string s))
 
-  let snapshot_file next =
-    Tezos_clic.param
-      ~name:"snapshot_file"
-      ~desc:"Snapshot archive file."
-      string
-      next
-
   let snapshot_file_or_url next =
     Tezos_clic.param
       ~name:"snapshot"
@@ -2524,9 +2517,7 @@ let import_snapshot_command =
       let* _ =
         Evm_node_lib_dev.Snapshots.import_from
           ~force
-          ~keep_alive:false
           ~data_dir
-          ~download_path:".download_"
           ~snapshot_file
           ()
       in
@@ -2538,7 +2529,7 @@ let snapshot_info_command =
     ~group:Groups.snapshot
     ~desc:"Display information about an EVM node snapshot file."
     no_options
-    (prefixes ["snapshot"; "info"] @@ Params.snapshot_file @@ stop)
+    (prefixes ["snapshot"; "info"] @@ Params.snapshot_file_or_url @@ stop)
     (fun () snapshot_file () ->
       let open Lwt_result_syntax in
       let open Evm_node_lib_dev in
@@ -2910,6 +2901,8 @@ let handle_error = function
         ~default:Error_monad.pp
         errs ;
       Stdlib.exit 1
+
+let () = Tezos_layer2_store.Snapshot_utils.add_download_command ()
 
 let () =
   Random.self_init () ;

@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>         *)
+(* SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>         *)
+(* SPDX-FileCopyrightText: 2025 Nomadic Labs, <contact@nomadic-labs.com>     *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -10,7 +11,7 @@ module type READER = sig
 
   val format : [`Compressed | `Uncompressed]
 
-  val open_in : string -> in_channel
+  val open_in_chan : Stdlib.in_channel -> in_channel
 
   val really_input : in_channel -> bytes -> int -> int -> unit
 
@@ -39,6 +40,10 @@ module type READER_INPUT = sig
   include READER
 
   val in_chan : in_channel
+
+  val source : [`Local of string | `Remote of string]
+
+  val crashed : tztrace Lwt.t
 end
 
 module type WRITER_OUTPUT = sig
@@ -51,6 +56,8 @@ module Stdlib_reader : READER with type in_channel = Stdlib.in_channel = struct
   include Stdlib
 
   let format = `Uncompressed
+
+  let open_in_chan ic = ic
 end
 
 module Stdlib_writer : WRITER with type out_channel = Stdlib.out_channel =
@@ -94,6 +101,8 @@ let reader_format (module Reader : READER) = Reader.format
 
 let input_format (module Reader : READER_INPUT) = Reader.format
 
+let input_source (module Reader : READER_INPUT) = Reader.source
+
 let run ~cancellable k =
   if cancellable then
     (* [Lwt_preemptive] does not yet provide a way to cancel a detached
@@ -106,20 +115,118 @@ let run ~cancellable k =
     Lwt.wrap_in_cancelable (Lwt_preemptive.detach k ())
   else Lwt.return (k ())
 
+let download_file_command url =
+  let open Lwt_syntax in
+  let uri = Uri.of_string url in
+  let pipe_stream stream =
+    let rec write_string offset str =
+      let len = String.length str in
+      let* written =
+        Lwt_unix.write_string Lwt_unix.stdout str offset (len - offset)
+      in
+      let reached = offset + written in
+      if reached = len then return_unit else write_string reached str
+    in
+    Lwt_stream.iter_s (write_string 0) stream
+  in
+  let* resp, body = Cohttp_lwt_unix.Client.get uri in
+  match resp.status with
+  | `OK ->
+      let stream = Cohttp_lwt.Body.to_stream body in
+      let* () = pipe_stream stream in
+      Lwt_result_syntax.return_unit
+  | #Cohttp.Code.status_code as status_code ->
+      failwith
+        "Download of snapshot %s failed with HTTP error %s@."
+        url
+        (Cohttp.Code.string_of_status status_code)
+
+let add_download_command () =
+  if Sys.argv.(0) = "download-snapshot" then
+    let url = Sys.argv.(1) in
+    match Lwt_main.run @@ download_file_command url with
+    | Ok () -> Stdlib.exit 0
+    | Error errs ->
+        Format.eprintf "%a%!" pp_print_trace errs ;
+        Stdlib.exit 1
+
+let download_file ~crash_resolver url =
+  let in_chan, pin, perr =
+    Unix.open_process_args_full
+      Sys.argv.(0)
+      [|"download-snapshot"; url|]
+      (Unix.environment ())
+  in
+  close_out_noerr pin ;
+  let notify_crash fmt =
+    Format.ksprintf (fun s -> Lwt.wakeup crash_resolver [Exn (Failure s)]) fmt
+  in
+  let open Lwt_syntax in
+  let pid = Unix.process_full_pid (in_chan, pin, perr) in
+  let canceler = Lwt_canceler.create () in
+  Lwt_canceler.on_cancel canceler (fun () ->
+      Unix.kill pid Sys.sigterm ;
+      return_unit) ;
+  Lwt.dont_wait
+    (fun () ->
+      let+ st = protect_result ~canceler @@ fun () -> Lwt_unix.waitpid [] pid in
+      match st with
+      | Error _e -> notify_crash "Error"
+      | Ok (_pid, status) -> (
+          match status with
+          | WEXITED 0 -> ()
+          | _ ->
+              let phrase, n =
+                match status with
+                | WEXITED n -> ("failed with code", n)
+                | WSIGNALED n -> ("was killed by signal", n)
+                | Unix.WSTOPPED n -> ("was stopped by signal", n)
+              in
+              notify_crash
+                "Snapshot download process %s %d: %s"
+                phrase
+                n
+                (In_channel.input_all perr)))
+    (fun exn ->
+      notify_crash
+        "Snapshot download processed crashed because %s"
+        (Printexc.to_string exn)) ;
+  Lwt_result.return in_chan
+
+let open_or_download_file file_or_url =
+  let open Lwt_result_syntax in
+  let crashed, crash_resolver = Lwt.task () in
+  if
+    String.starts_with ~prefix:"http://" file_or_url
+    || String.starts_with ~prefix:"https://" file_or_url
+  then
+    let+ chan = download_file ~crash_resolver file_or_url in
+    ((chan, crashed), `Remote file_or_url)
+  else
+    try
+      let chan = open_in_bin file_or_url in
+      return ((chan, crashed), `Local file_or_url)
+    with Sys_error s ->
+      failwith "Cannot open snapshot file %s: %s" file_or_url s
+
 (* Magic bytes for gzip files is 1f8b. *)
-let is_compressed_snapshot snapshot_file =
-  let ic = open_in snapshot_file in
+let is_compressed_snapshot ic =
+  let pos = pos_in ic in
   try
-    let ok = input_byte ic = 0x1f && input_byte ic = 0x8b in
-    close_in ic ;
+    let c1 = input_byte ic in
+    let c2 = input_byte ic in
+    let ok = c1 = 0x1f && c2 = 0x8b in
+    (* [seek_in] does not work in general for non regular file channels. However
+       we abuse it a little to rely on the IO buffer because we're only reading
+       the first two bytes so we're guaranteed to only move in this buffer (see
+       https://github.com/ocaml/ocaml/blob/trunk/runtime/caml/misc.h#L806) and
+       not actually call lseek (see
+       https://github.com/ocaml/ocaml/blob/trunk/runtime/io.c#L464.) *)
+    seek_in ic pos ;
     ok
-  with
-  | End_of_file ->
-      close_in ic ;
-      false
-  | e ->
-      close_in ic ;
-      raise e
+  with End_of_file ->
+    seek_in ic pos ;
+    false
 
 let periodic_report event =
   let open Lwt_syntax in
@@ -132,13 +239,25 @@ let periodic_report event =
   in
   aux ()
 
-let create_reader_input : reader -> string -> reader_input =
- fun (module Reader) file ->
+let create_reader_input (type a) ~src
+    (module Reader : READER with type in_channel = a)
+    (in_chan : Stdlib.in_channel) crashed :
+    (module READER_INPUT with type in_channel = a) =
   (module struct
     include Reader
 
-    let in_chan = open_in file
+    let in_chan = open_in_chan in_chan
+
+    let source = src
+
+    let crashed = crashed
   end)
+
+let create_reader_input : src:_ -> reader -> in_channel -> _ -> reader_input =
+ fun ~src (module R) s crash ->
+  let r = create_reader_input ~src (module R) s crash in
+  let module R : READER_INPUT = (val r) in
+  (module R)
 
 module Make (Header : sig
   type t
@@ -336,18 +455,39 @@ struct
       close_in in_chan ;
       raise e
 
+  let fail_on_crash (module Reader : READER_INPUT) f =
+    let open Lwt_syntax in
+    let crash =
+      let+ err = Reader.crashed in
+      `Crashed err
+    in
+    let normal =
+      let* () = Lwt.pause () in
+      let* res = protect f in
+      let* () = Lwt.pause () in
+      return (`Normal res)
+    in
+    let* res = Lwt.nchoose [crash; normal] in
+    match res with
+    | [] -> assert false
+    | `Crashed err :: _ | [_; `Crashed err] ->
+        Lwt.cancel normal ;
+        return_error err
+    | `Normal res :: _ -> return res
+
   let with_open_snapshot file f =
     let open Lwt_result_syntax in
+    let* (in_chan, crashed), src = open_or_download_file file in
     let reader =
-      if is_compressed_snapshot file then gzip_reader else stdlib_reader
+      if is_compressed_snapshot in_chan then gzip_reader else stdlib_reader
     in
-    let reader_input = create_reader_input reader file in
-    protect
-      ~on_error:(fun error ->
+    let reader_input = create_reader_input reader in_chan ~src crashed in
+    protect ~on_error:(fun error ->
         let module Reader = (val reader_input) in
-        Reader.close_in Reader.in_chan ;
+        (try Reader.close_in Reader.in_chan with _ -> ()) ;
         fail error)
-      (fun () ->
-        let header = read_snapshot_header reader_input in
-        f header reader_input)
+    @@ fun () ->
+    fail_on_crash reader_input @@ fun () ->
+    let header = read_snapshot_header reader_input in
+    f header reader_input
 end

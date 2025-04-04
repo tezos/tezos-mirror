@@ -571,9 +571,9 @@ Configuration commands:
 
 Snapshots commands:
 
-  snapshot info <snapshot_file>
+  snapshot info <snapshot>
     Display information about an EVM node snapshot file.
-    <snapshot_file>: Snapshot archive file.
+    <snapshot>: Snapshot archive file or URL.
   
   snapshot export [--data-dir <data-dir>] [--config-file <path>]
       [-s --snapshot-file <path>] [--compress-on-the-fly] [--uncompressed]

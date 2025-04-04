@@ -38,6 +38,3 @@ val interpolate :
   string ->
   (char * [`Available of string | `Disabled of string]) list ->
   string tzresult
-
-val download_file :
-  keep_alive:bool -> working_dir:string -> string -> string tzresult Lwt.t

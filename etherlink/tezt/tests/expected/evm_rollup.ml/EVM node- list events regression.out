@@ -372,42 +372,6 @@ deprecation_note:
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
-download_failed:
-  description: downloading {url} failed with {error}
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* download_failed version 0 */
-      "download_failed.v0":
-        { "url": $unistring,
-          "error":
-            { /* http_error */
-              "kind": "http_error",
-              "status_code": integer ∈ [-2^30, 2^30] }
-            || { /* exn */
-                 "kind": "exception",
-                 "description": $unistring } } }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-  
-downloading_snapshot:
-  description: downloading {url}{size}
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* downloading_snapshot version 0 */
-      "downloading_snapshot.v0":
-        { "url": $unistring,
-          "size": integer ∈ [-2^30, 2^30] /* Some */ || null /* None */ } }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-  
 dream_websocket:
   description: websocket support in Dream is known to be buggy, consider using Resto as an RPC server or disabling websockets
   level: warning
@@ -997,24 +961,6 @@ exporting_snapshot:
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
-extract_snapshot_archive_in_progress:
-  description: still extracting archive {name} after {elapsed_time}
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* extract_snapshot_archive_in_progress version 0 */
-      "extract_snapshot_archive_in_progress.v0":
-        { "name": $unistring,
-          "elapsed_time": $timespan.system } }
-    $timespan.system:
-      /* A span of time, as seen by the local computer. */
-      number
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-  
 failed_upgrade:
   description: kernel failed to upgrade to {root_hash} with blueprint {level}
   level: warning
@@ -1094,6 +1040,24 @@ import_finished:
     { /* import_finished version 0 */
       "import_finished.v0": any }
   
+import_snapshot_archive_in_progress:
+  description: still importing archive {name} after {elapsed_time}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* import_snapshot_archive_in_progress version 0 */
+      "import_snapshot_archive_in_progress.v0":
+        { "name": $unistring,
+          "elapsed_time": $timespan.system } }
+    $timespan.system:
+      /* A span of time, as seen by the local computer. */
+      number
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 importing_legacy_snapshot:
   description: Importing a legacy snapshot. Consider using a snapshot generated from a more recent node.
   level: warning
@@ -1103,12 +1067,17 @@ importing_legacy_snapshot:
       "importing_legacy_snapshot.v0": any }
   
 importing_snapshot:
-  description: importing snapshot
+  description: importing snapshot {filename}
   level: notice
   section: evm_node.dev
   json format:
     { /* importing_snapshot version 0 */
-      "importing_snapshot.v0": any }
+      "importing_snapshot.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 is_ready:
   description: the EVM node RPC server ({backend}) is listening to {addr}:{port} {websockets}
@@ -1757,30 +1726,6 @@ signal_publisher_untracking:
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
-snapshot_download_in_progress:
-  description: still downloading {url} after {elapsed_time}{progress}
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* snapshot_download_in_progress version 0 */
-      "snapshot_download_in_progress.v0":
-        { "url": $unistring,
-          "elapsed_time": $timespan.system,
-          "progress":
-            { /* Some */
-              "remaining_bytes": integer ∈ [-2^30, 2^30],
-              "percentage": number }
-            || null
-            /* None */ } }
-    $timespan.system:
-      /* A span of time, as seen by the local computer. */
-      number
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-  
 spawn_rpc_is_ready:
   description: the rpc process is ready
   level: notice
@@ -2198,27 +2143,6 @@ cannot_fetch_time_between_blocks:
         { "tbb": $time_between_blocks,
           "trace": any } }
     $time_between_blocks: number /* Some */ || null /* None */
-  
-download_failed:
-  description: downloading {url} failed with {error}
-  level: error
-  section: evm_node.dev
-  json format:
-    { /* download_failed version 0 */
-      "download_failed.v0":
-        { "url": $unistring,
-          "error":
-            { /* http_error */
-              "kind": "http_error",
-              "status_code": integer ∈ [-2^30, 2^30] }
-            || { /* exn */
-                 "kind": "exception",
-                 "description": $unistring } } }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 evm_context_get_block_failed:
   description: get block by number failed for level {level}{trace}

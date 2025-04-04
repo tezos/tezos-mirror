@@ -48,17 +48,15 @@ val export :
   unit ->
   string tzresult Lwt.t
 
-(** [import_from ~force ~keep_alive ~data_dir ~download_path ~snapshot_file]
-    imports the snapshot from file [snapshot_file] (but also takes care of
-    downloading the file if [snapshot_file] is an url) at path [snapshot_file]
-    into the data directory [data_dir]. Import will fail if [data_dir] is
-    already populated unless [force] is set to [true]. *)
+(** [import_from ~force ~data_dir ~snapshot_file] imports the snapshot from file
+    [snapshot_file] (but also takes care of downloading the file if
+    [snapshot_file] is an url) at path [snapshot_file] into the data directory
+    [data_dir]. Import will fail if [data_dir] is already populated unless
+    [force] is set to [true]. *)
 val import_from :
   force:bool ->
-  keep_alive:bool ->
   ?history_mode:Configuration.history_mode ->
   data_dir:string ->
-  download_path:string ->
   snapshot_file:string ->
   unit ->
   Configuration.history_mode option tzresult Lwt.t

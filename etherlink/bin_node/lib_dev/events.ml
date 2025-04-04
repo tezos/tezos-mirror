@@ -228,64 +228,14 @@ let missing_chain_id =
     ~msg:"missing chain id: skipping consistency check with selected network"
     ()
 
-let pp_file_size fmt size =
-  let pp unit power =
-    Format.fprintf
-      fmt
-      "%d.%d%s"
-      (size / power)
-      (size / (power / 10) mod 10)
-      unit
-  in
-  if size / 1_000_000_000 > 0 then pp "GB" 1_000_000_000
-  else if size / 1_000_000 > 0 then pp "MB" 1_000_000
-  else if size / 1_000 > 0 then pp "kB" 1_000
-  else Format.fprintf fmt "%dB" size
-
-let downloading_file =
-  Internal_event.Simple.declare_2
-    ~level:Notice
-    ~section
-    ~name:"downloading_snapshot"
-    ~msg:"downloading {url}{size}"
-    ~pp1:Format.pp_print_string (* No elapsing too long URLs. *)
-    ~pp2:
-      Format.(
-        pp_print_option (fun fmt size -> fprintf fmt " (%a)" pp_file_size size))
-    ("url", Data_encoding.string)
-    ("size", Data_encoding.(option int31))
-
-let download_in_progress =
-  Internal_event.Simple.declare_3
-    ~level:Notice
-    ~section
-    ~name:"snapshot_download_in_progress"
-    ~msg:"still downloading {url} after {elapsed_time}{progress}"
-    ~pp1:(fun fmt url -> Format.fprintf fmt "%s" (Filename.basename url))
-    ~pp2:(fun fmt elapsed_time ->
-      Format.fprintf fmt "%a" Ptime.Span.pp elapsed_time)
-    ~pp3:
-      Format.(
-        pp_print_option (fun fmt (remaining, percentage) ->
-            fprintf
-              fmt
-              " (%.1f%%, %a remaining)"
-              percentage
-              pp_file_size
-              remaining))
-    ("url", Data_encoding.string)
-    ("elapsed_time", Time.System.Span.encoding)
-    ( "progress",
-      Data_encoding.(
-        option (obj2 (req "remaining_bytes" int31) (req "percentage" float))) )
-
 let importing_snapshot =
-  Internal_event.Simple.declare_0
+  Internal_event.Simple.declare_1
     ~level:Notice
     ~section
     ~name:"importing_snapshot"
-    ~msg:"importing snapshot"
-    ()
+    ~msg:"importing snapshot {filename}"
+    ("filename", Data_encoding.string)
+    ~pp1:Format.pp_print_string
 
 let exporting_snapshot =
   Internal_event.Simple.declare_1
@@ -359,60 +309,17 @@ let import_finished =
     ~msg:"snapshot import is finished"
     ()
 
-let extract_snapshot_archive_in_progress =
+let import_snapshot_archive_in_progress =
   Internal_event.Simple.declare_2
     ~level:Notice
     ~section
-    ~name:"extract_snapshot_archive_in_progress"
-    ~msg:"still extracting archive {name} after {elapsed_time}"
+    ~name:"import_snapshot_archive_in_progress"
+    ~msg:"still importing archive {name} after {elapsed_time}"
     ~pp1:(fun fmt url -> Format.fprintf fmt "%s" (Filename.basename url))
     ~pp2:(fun fmt elapsed_time ->
       Format.fprintf fmt "%a" Ptime.Span.pp elapsed_time)
     ("name", Data_encoding.string)
     ("elapsed_time", Time.System.Span.encoding)
-
-type download_error = Http_error of Cohttp.Code.status_code | Exn of exn
-
-let download_error_encoding =
-  let open Data_encoding in
-  let status_code_encoding =
-    conv Cohttp.Code.code_of_status Cohttp.Code.status_of_code int31
-  in
-  union
-    [
-      case
-        (Tag 0)
-        ~title:"http_error"
-        (obj2
-           (req "kind" (constant "http_error"))
-           (req "status_code" status_code_encoding))
-        (function Http_error code -> Some ((), code) | _ -> None)
-        (fun ((), code) -> Http_error code);
-      case
-        (Tag 1)
-        ~title:"exn"
-        (obj2 (req "kind" (constant "exception")) (req "description" string))
-        (function Exn exn -> Some ((), Printexc.to_string exn) | _ -> None)
-        (fun ((), _) -> Stdlib.failwith "encoding should not be used to decode");
-    ]
-
-let pp_download_error fmt =
-  let open Format in
-  function
-  | Http_error code ->
-      fprintf fmt "HTTP status code '%s'" (Cohttp.Code.string_of_status code)
-  | Exn exn -> fprintf fmt "'%s'" (Printexc.to_string exn)
-
-let download_failed =
-  Internal_event.Simple.declare_2
-    ~level:Error
-    ~section
-    ~name:"download_failed"
-    ~msg:"downloading {url} failed with {error}"
-    ~pp1:Format.pp_print_string (* No elapsing too long URLs. *)
-    ~pp2:pp_download_error
-    ("url", Data_encoding.string)
-    ("error", download_error_encoding)
 
 let event_kernel_log_application_debug = event_kernel_log Application Debug
 
@@ -600,23 +507,7 @@ let missing_chain_id () = emit missing_chain_id ()
 let multichain_node_singlechain_kernel () =
   emit multichain_node_singlechain_kernel ()
 
-let downloading_file ?size url = emit downloading_file (url, size)
-
-let download_in_progress ~size ~remaining_size ~elapsed_time url =
-  let progress =
-    match (size, remaining_size) with
-    | Some size, Some remain ->
-        let percent =
-          float_of_int (size - remain) *. 100. /. float_of_int size
-        in
-        Some (remain, percent)
-    | _ -> None
-  in
-  emit download_in_progress (url, elapsed_time, progress)
-
-let download_failed url reason = emit download_failed (url, reason)
-
-let importing_snapshot () = emit importing_snapshot ()
+let importing_snapshot f = emit importing_snapshot f
 
 let importing_legacy_snapshot () = emit importing_legacy_snapshot ()
 
@@ -639,5 +530,5 @@ let still_compressing_snapshot ~total ~progress snapshot elapsed_time =
 
 let import_finished () = emit import_finished ()
 
-let extract_snapshot_archive_in_progress ~archive_name ~elapsed_time =
-  emit extract_snapshot_archive_in_progress (archive_name, elapsed_time)
+let import_snapshot_archive_in_progress ~archive_name ~elapsed_time =
+  emit import_snapshot_archive_in_progress (archive_name, elapsed_time)

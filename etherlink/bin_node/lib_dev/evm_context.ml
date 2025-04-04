@@ -1333,10 +1333,8 @@ module State = struct
           let* history_mode =
             Snapshots.import_from
               ~force:true
-              ~keep_alive:configuration.keep_alive
               ?history_mode:configuration.history_mode
               ~data_dir
-              ~download_path:".download_snapshot_"
               ~snapshot_file:snapshot_url
               ()
           in

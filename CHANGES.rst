@@ -135,6 +135,9 @@ Smart Rollup node
 
 - Add a CLI argument ``--config-file`` to allow specifying a configuration file
   outside the data directory. (MR :gl:`!17225`)
+  
+- Allow to provide a remote URL for downloading snapshots in commands ``snapshot
+  info`` and ``snapshot import``. (MR :gl:`!17407`)
 
 - Display logging levels in logs by default. (MR :gl:`!17479`)
 
