@@ -10,7 +10,6 @@ use serde::Serialize;
 use super::Buddy;
 use super::BuddyLayout;
 use crate::default::ConstDefault;
-use crate::state_backend::AllocatedOf;
 use crate::state_backend::Atom;
 use crate::state_backend::Cell;
 use crate::state_backend::FnManager;
