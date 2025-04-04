@@ -25,6 +25,10 @@ evm-evaluation-assessor:
 	@$(MAKE) -C ${KERNEL_DIR} build-evm-evaluation
 	@cp ${KERNEL_DIR}/target/release/evm-evaluation $@
 
+evm_kernel_debug.wasm::
+	@$(MAKE) -C ${KERNEL_DIR} build-debug
+	@cp ${KERNEL_DIR}/target/wasm32-unknown-unknown/release-with-debug/evm_kernel.wasm $@
+
 evm_kernel_unstripped.wasm::
 	@$(MAKE) -C ${KERNEL_DIR} build
 	@cp ${KERNEL_DIR}/target/wasm32-unknown-unknown/release/evm_kernel.wasm $@
