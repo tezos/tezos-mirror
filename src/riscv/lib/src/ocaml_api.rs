@@ -605,3 +605,15 @@ pub fn octez_riscv_mut_get_reveal_request(state: Pointer<MutState>) -> BytesWrap
     let serialised_reveal_request: Vec<u8> = state.apply_ro(NodePvm::get_reveal_request);
     BytesWrapper(serialised_reveal_request.into_boxed_slice())
 }
+
+#[ocaml::func]
+#[ocaml::sig("state -> state")]
+pub fn octez_riscv_insert_failure(state: Pointer<State>) -> Pointer<State> {
+    apply_imm(state, |pvm| pvm.insert_failure()).0
+}
+
+#[ocaml::func]
+#[ocaml::sig("mut_state -> unit")]
+pub fn octez_riscv_mut_insert_failure(state: Pointer<MutState>) {
+    apply_mut(state, |pvm| pvm.insert_failure())
+}

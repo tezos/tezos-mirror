@@ -61,11 +61,6 @@ let make_is_input_state (get_status : 'a -> Backend.status Lwt.t)
       | Ok reveal -> Sc_rollup.(Needs_reveal reveal)
       | Error _ -> Sc_rollup.No_input_required)
 
-module Insert_failure_impl = struct
-  let insert_failure _state =
-    raise (Invalid_argument "insert_failure not implemented")
-end
-
 module PVM :
   Sc_rollup.PVM.S
     with type state = tree
@@ -155,7 +150,10 @@ module PVM :
     let* level = Backend.get_current_level state in
     return (Option.map Raw_level.of_int32_exn level)
 
-  module Internal_for_tests = Insert_failure_impl
+  module Internal_for_tests = struct
+    (* TODO: RV-575 Remove unused function from pvm signature *)
+    let insert_failure state = Backend.insert_failure state
+  end
 end
 
 include PVM
@@ -226,7 +224,9 @@ module Mutable_state :
       ~max_steps
       initial_state
 
-  module Internal_for_tests = Insert_failure_impl
+  module Internal_for_tests = struct
+    let insert_failure state = Backend.Mutable_state.insert_failure state
+  end
 end
 
 let new_dissection = Game_helpers.default_new_dissection
