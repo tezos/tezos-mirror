@@ -51,6 +51,11 @@ workflow:
     variables:
       PIPELINE_TYPE: octez_release_tag_test
     when: always
+  - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
+      =~ /^grafazos-v\d+\.\d+$/
+    variables:
+      PIPELINE_TYPE: grafazos_release_tag_test
+    when: always
   - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/
     variables:
       PIPELINE_TYPE: octez_evm_node_release_tag
@@ -58,12 +63,14 @@ workflow:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-v\d+\.\d+\-beta\d*$/ && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/
+      && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
     variables:
       PIPELINE_TYPE: non_release_tag
     when: always
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-v\d+\.\d+\-beta\d*$/ && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/
+      && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
     variables:
       PIPELINE_TYPE: non_release_tag_test
     when: always
@@ -185,6 +192,11 @@ include:
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && ($CI_COMMIT_TAG
       =~ /^octez-v\d+\.\d+(?:\-rc\d+)?$/ || $CI_COMMIT_TAG =~ /^octez-v\d+\.\d+\-beta\d*$/)
     when: always
+- local: .gitlab/ci/pipelines/grafazos_release_tag_test.yml
+  rules:
+  - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
+      =~ /^grafazos-v\d+\.\d+$/
+    when: always
 - local: .gitlab/ci/pipelines/octez_evm_node_release_tag.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/
@@ -194,12 +206,14 @@ include:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-v\d+\.\d+\-beta\d*$/ && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/
+      && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
     when: always
 - local: .gitlab/ci/pipelines/non_release_tag_test.yml
   rules:
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-v\d+\.\d+\-beta\d*$/ && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/
+      && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
     when: always
 - local: .gitlab/ci/pipelines/schedule_extended_test.yml
   rules:
