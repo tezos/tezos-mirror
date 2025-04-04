@@ -4,6 +4,7 @@
 stages:
 - images
 - build
+- publish_release_gitlab
 
 oc.docker:jsonnet:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
@@ -44,3 +45,14 @@ build_grafazos_dashboards:
     paths:
     - grafazos/output/**/*.json
     when: on_success
+
+gitlab:release:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.6.0
+  stage: publish_release_gitlab
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  script:
+  - ./grafazos/scripts/releases/create_gitlab_release.sh
