@@ -252,6 +252,7 @@ pub fn apply_operation<Host: Runtime>(
         OperationContent::Transfer {
             amount,
             destination,
+            parameter: _,
         } => {
             let transfer_result = transfer(host, context, source, amount, destination)?;
             let manager_result = produce_operation_result(transfer_result);
@@ -348,6 +349,7 @@ mod tests {
             OperationContent::Transfer {
                 amount,
                 destination,
+                parameter: None,
             },
         )
     }

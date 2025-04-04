@@ -28,6 +28,7 @@ pub enum OperationContent {
     Transfer {
         amount: Narith,
         destination: Contract,
+        parameter: Option<()>,
     },
 }
 
@@ -53,13 +54,14 @@ impl OperationContent {
                 let (input, amount) = Narith::nom_read(bytes)?;
                 let (input, destination) = Contract::nom_read(input)?;
                 // TODO: parameter should be a Michelson expr, for now just use unit
-                let (input, _parameter) =
+                let (input, parameter) =
                     tezos_nom::optional_field(|input| Ok((input, ())))(input)?;
                 NomResult::Ok((
                     input,
                     Self::Transfer {
                         amount,
                         destination,
+                        parameter,
                     },
                 ))
             }
@@ -82,13 +84,14 @@ impl BinWriter for OperationContent {
             Self::Transfer {
                 amount,
                 destination,
+                parameter,
             } => {
                 amount.bin_write(data)?;
                 destination.bin_write(data)?;
                 // TODO: parameter should be a Michelson expr, for now just use unit
                 let closure: for<'a> fn(&(), &'a mut Vec<u8>) -> BinResult =
                     |_, _| Ok(());
-                tezos_enc::optional_field(closure)(&None, data)?;
+                tezos_enc::optional_field(closure)(parameter, data)?;
                 Ok(())
             }
         }
@@ -445,6 +448,7 @@ mod tests {
                         "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
                     )
                     .unwrap(),
+                    parameter: None,
                 },
                 gas_limit: 169_u64.into(),
                 storage_limit: 0_u64.into(),

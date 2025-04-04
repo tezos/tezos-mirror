@@ -715,6 +715,7 @@ mod tests {
             OperationContent::Transfer {
                 amount,
                 destination,
+                parameter: None,
             },
         )
     }
