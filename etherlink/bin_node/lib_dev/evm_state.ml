@@ -80,6 +80,7 @@ let execute ?(wasm_pvm_fallback = false) ?profile ?(kind = Events.Application)
         in
         return evm_state
     | Some Configuration.Flamegraph ->
+        let* function_symbols = Wasm_debugger.get_function_symbols evm_state in
         let* evm_state, _, _ =
           Wasm_debugger.profile
             ~migrate_to:Proto_alpha
@@ -89,7 +90,7 @@ let execute ?(wasm_pvm_fallback = false) ?profile ?(kind = Events.Application)
             0l
             inbox
             {config with flamecharts_directory = data_dir}
-            Octez_smart_rollup_wasm_debugger_lib.Custom_section.FuncMap.empty
+            function_symbols
             evm_state
         in
         return evm_state
