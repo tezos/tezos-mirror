@@ -3,25 +3,34 @@ use std::io::Seek;
 use std::io::SeekFrom;
 use std::io::Write;
 
-use derive_more::Error;
-use derive_more::From;
-use goblin::elf::Elf;
-use goblin::elf::Header;
-use goblin::elf::header::ET_DYN;
-use goblin::elf::header::ET_EXEC;
-use goblin::elf::program_header::PT_LOAD;
-use goblin::elf::program_header::ProgramHeader;
+use elf::ElfBytes;
+use elf::abi::DT_RELA;
+use elf::abi::DT_RELASZ;
+use elf::abi::ET_DYN;
+use elf::abi::ET_EXEC;
+use elf::abi::PF_R;
+use elf::abi::PF_W;
+use elf::abi::PF_X;
+use elf::abi::PT_LOAD;
+use elf::abi::R_RISCV_RELATIVE;
+use elf::endian::LittleEndian;
+use elf::file::Class::ELF64;
+use elf::file::FileHeader;
+use elf::relocation::RelaIterator;
+use elf::segment::ProgramHeader;
 
 use crate::machine_state::memory::Permissions;
 
-#[derive(Debug, From, Error, derive_more::Display)]
+/// Error when parsing and loading the user kernel ELF file
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[display(fmt = "At address {:#x}: {:?}", addr, "msg.clone()")]
-    Write {
-        msg: Option<String>,
-        addr: u64,
-    },
-    Goblin(goblin::error::Error),
+    /// Failed to write to memory
+    #[error("At address {addr:#x}: {msg:?}")]
+    Write { msg: Option<String>, addr: u64 },
+
+    /// Failed to parse the ELF file
+    #[error("Failed to parse ELF file: {0}")]
+    Elf(#[from] elf::ParseError),
 }
 
 /// Permissions for program regions in memory
@@ -45,17 +54,21 @@ impl MemoryPermissions {
             None => segment.p_paddr,
         };
 
+        let perms_read = segment.p_flags & PF_R != 0;
+        let perms_write = segment.p_flags & PF_W != 0;
+        let perms_exec = segment.p_flags & PF_X != 0;
+
         MemoryPermissions {
             start_address,
             length: segment.p_memsz,
 
             // This is a simplified version of the permissions. It is aligned with what to
             // expect in an ELF file.
-            permissions: if segment.is_executable() {
+            permissions: if perms_exec {
                 Permissions::ReadExec
-            } else if segment.is_write() {
+            } else if perms_write {
                 Permissions::ReadWrite
-            } else if segment.is_read() {
+            } else if perms_read {
                 Permissions::Read
             } else {
                 Permissions::None
@@ -106,12 +119,13 @@ pub trait Memory {
 /// Loads an executable ELF file in the memory of the virtual machine
 pub fn load_elf_nonreloc<'a>(
     mem: &mut impl Memory,
-    elf: &Elf<'a>,
+    elf: &ElfBytes<'a, LittleEndian>,
     contents: &'a [u8],
 ) -> Result<LoadResult<'a>, Error> {
     let loadable_segments = elf
-        .program_headers
-        .iter()
+        .segments()
+        .into_iter()
+        .flat_map(|headers| headers.iter())
         .filter(|header| header.p_type == PT_LOAD);
 
     let mut last_written = 0;
@@ -124,10 +138,11 @@ pub fn load_elf_nonreloc<'a>(
     let mut permissions = Vec::with_capacity(4);
 
     for segment in loadable_segments {
-        permissions.push(MemoryPermissions::from_load_segment(None, segment));
+        permissions.push(MemoryPermissions::from_load_segment(None, &segment));
 
         // Copy the region from the file to memory.
-        mem.write_bytes(segment.p_paddr, &contents[segment.file_range()])?;
+        let segment_contents = &contents[segment.p_offset as usize..][..segment.p_filesz as usize];
+        mem.write_bytes(segment.p_paddr, segment_contents)?;
 
         // If the target memory region is larger than the source region,
         // we must fill the gap with 0s.
@@ -140,10 +155,10 @@ pub fn load_elf_nonreloc<'a>(
         last_written = segment.p_paddr + segment.p_memsz;
     }
 
-    let program_headers = extract_program_headers(&elf.header, contents, permissions);
+    let program_headers = extract_program_headers(&elf.ehdr, contents, permissions);
 
     Ok(LoadResult {
-        entry: elf.entry,
+        entry: elf.ehdr.e_entry,
         last_written,
         program_headers,
     })
@@ -164,12 +179,13 @@ pub fn mem_size(phs: &[ProgramHeader]) -> usize {
 pub fn load_elf_reloc<'a>(
     mem: &mut impl Memory,
     start: u64,
-    elf: &Elf<'a>,
+    elf: &ElfBytes<'a, LittleEndian>,
     contents: &'a [u8],
 ) -> Result<LoadResult<'a>, Error> {
     let loadable_segments = elf
-        .program_headers
-        .iter()
+        .segments()
+        .into_iter()
+        .flat_map(|headers| headers.iter())
         .filter(|header| header.p_type == PT_LOAD);
 
     let mut last_written = start;
@@ -182,11 +198,12 @@ pub fn load_elf_reloc<'a>(
     let mut permissions = Vec::with_capacity(4);
 
     for segment in loadable_segments {
-        permissions.push(MemoryPermissions::from_load_segment(Some(start), segment));
+        permissions.push(MemoryPermissions::from_load_segment(Some(start), &segment));
 
         // Copy the region from the file to memory.
         let start_addr = start.wrapping_add(segment.p_vaddr);
-        mem.write_bytes(start_addr, &contents[segment.file_range()])?;
+        let segment_contents = &contents[segment.p_offset as usize..][..segment.p_filesz as usize];
+        mem.write_bytes(start_addr, segment_contents)?;
 
         // If the target memory region is larger than the source region,
         // we must fill the gap with 0s.
@@ -199,27 +216,43 @@ pub fn load_elf_reloc<'a>(
         last_written = start + segment.p_vaddr + segment.p_memsz;
     }
 
-    for r in elf.dynrelas.iter() {
-        let goblin::elf::reloc::Reloc {
-            r_offset,
-            r_addend,
-            r_sym: _,
-            r_type,
-        } = r;
-        match r_type {
-            goblin::elf64::reloc::R_RISCV_RELATIVE => {
-                let relocated = (start as i64 + r_addend.unwrap_or_default()).to_ne_bytes();
-                let buf = &relocated[..];
-                mem.write_bytes(start + r_offset, buf)?;
-            }
-            t => unimplemented!("Unsupported relocation directive {t}"),
+    let mut relas_addr = None;
+    let mut relas_size = None;
+
+    let dynamic_infos = elf
+        .find_common_data()
+        .into_iter()
+        .flat_map(|common| common.dynamic.into_iter())
+        .flat_map(|dyn_table| dyn_table.iter());
+
+    for dyn_info in dynamic_infos {
+        if dyn_info.d_tag == DT_RELA {
+            relas_addr = Some(dyn_info.d_ptr());
+        } else if dyn_info.d_tag == DT_RELASZ {
+            relas_size = Some(dyn_info.d_val());
         }
     }
 
-    let program_headers = extract_program_headers(&elf.header, contents, permissions);
+    if let Some((addr, size)) = relas_addr.zip(relas_size) {
+        let relas_data = &contents[addr as usize..][..size as usize];
+        let relas = RelaIterator::new(LittleEndian, ELF64, relas_data);
+
+        for rela in relas {
+            match rela.r_type {
+                R_RISCV_RELATIVE => {
+                    let relocated = (start as i64 + rela.r_addend).to_ne_bytes();
+                    let buf = &relocated[..];
+                    mem.write_bytes(start + rela.r_offset, buf)?;
+                }
+                unknown_type => unimplemented!("Unsupported relocation directive {unknown_type}"),
+            }
+        }
+    }
+
+    let program_headers = extract_program_headers(&elf.ehdr, contents, permissions);
 
     Ok(LoadResult {
-        entry: elf.header.e_entry + start,
+        entry: elf.ehdr.e_entry + start,
         last_written,
         program_headers,
     })
@@ -232,8 +265,9 @@ pub fn load_elf<'a>(
     start: u64,
     contents: &'a [u8],
 ) -> Result<LoadResult<'a>, Error> {
-    let elf = Elf::parse(contents)?;
-    match elf.header.e_type {
+    let elf = ElfBytes::<LittleEndian>::minimal_parse(contents)?;
+
+    match elf.ehdr.e_type {
         ET_EXEC => load_elf_nonreloc(mem, &elf, contents),
         ET_DYN => load_elf_reloc(mem, start, &elf, contents),
         t => todo!("ELF type {t} is not yet supported"),
@@ -260,7 +294,7 @@ where
 
 /// Extract the raw program headers from the ELF file.
 fn extract_program_headers<'a>(
-    header: &Header,
+    header: &FileHeader<LittleEndian>,
     contents: &'a [u8],
     permissions: Vec<MemoryPermissions>,
 ) -> ProgramHeaders<'a> {
