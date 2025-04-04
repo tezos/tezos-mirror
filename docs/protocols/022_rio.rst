@@ -43,7 +43,7 @@ Data Availability Layer
   attest trapped DAL slots lose their DAL rewards. (MRs :gl:`!15677`,
   :gl:`!15832`, :gl:`!15836`, :gl:`!16253`, :gl:`!16224`, :gl:`!16322`)
 
-- Protocal parameter ``DAL_REWARDS_WEIGHT`` was added.
+- Protocol parameter ``DAL_REWARDS_WEIGHT`` was added.
   Fields ``REWARDS_RATIO``, ``MINIMAL_PARTICIPATION_RATIO``, ``TRAPS_FRACTION``
   were added to the protocol parameter ``DAL_PARAMETRIC``.
   (MRs :gl:`!15503`, :gl:`!15832`)
