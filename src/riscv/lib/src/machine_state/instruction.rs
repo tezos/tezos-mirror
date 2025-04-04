@@ -663,6 +663,7 @@ impl OpCode {
             Self::J => Some(Args::run_j),
             Self::Jr => Some(Args::run_jr),
             Self::JrImm => Some(Args::run_jr_imm),
+            Self::Jalr => Some(Args::run_jalr),
             Self::Addi => Some(Args::run_addi),
             Self::Andi => Some(Args::run_andi),
             Self::SetLessThanSigned => Some(Args::run_set_less_than_signed),
@@ -1570,15 +1571,10 @@ impl Args {
 
     /// SAFETY: This function must only be called on an `Args` belonging
     /// to the same OpCode as the OpCode used to derive this function.
-    unsafe fn run_jalr<MC: MemoryConfig, M: ManagerReadWrite>(
-        &self,
-        core: &mut MachineCoreState<MC, M>,
-    ) -> Result<ProgramCounterUpdate<Address>, Exception> {
-        Ok(Set(core.hart.run_jalr(
-            self.rd.nzx,
-            self.rs1.nzx,
-            self.width,
-        )))
+    unsafe fn run_jalr<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {
+        let addr = branching::run_jalr(icb, self.rd.nzx, self.rs1.nzx, self.width);
+        let pcu = ProgramCounterUpdate::Set(addr);
+        icb.ok(pcu)
     }
 
     fn run_nop<I: ICB>(&self, icb: &mut I) -> IcbFnResult<I> {

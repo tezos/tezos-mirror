@@ -118,6 +118,35 @@ pub fn run_jr_imm<I: ICB>(icb: &mut I, imm: i64, rs1: NonZeroXRegister) -> <I as
     lhs.and(rhs, icb)
 }
 
+/// Performs an unconditional control transfer to the address in register `rs1`
+/// and stores the address of the instruction following the jump in register `rd`.
+///
+/// Relevant RISC-V opcodes:
+/// - JALR
+/// - C.JALR
+pub fn run_jalr<I: ICB>(
+    icb: &mut I,
+    rd: NonZeroXRegister,
+    rs1: NonZeroXRegister,
+    width: InstrWidth,
+) -> <I as ICB>::XValue {
+    // The return address to be saved in `rd` is that of the instruction following this one
+    let current_pc = icb.pc_read();
+    let width = icb.xvalue_of_imm(width as i64);
+    let return_address = current_pc.add(width, icb);
+
+    // The target address is obtained by setting the
+    // least-significant bit of the address in rs1 to zero
+    let target_address = icb.xregister_read_nz(rs1);
+    let mask = icb.xvalue_of_imm(!1);
+    let target_address = target_address.and(mask, icb);
+
+    // Store the return address in rd
+    icb.xregister_write_nz(rd, return_address);
+
+    target_address
+}
+
 /// Add the immediate `imm` to the PC and store the result in `rd`.
 ///
 /// Relevant RISC-V opcodes:
@@ -193,6 +222,7 @@ mod tests {
     use crate::backend_test;
     use crate::create_state;
     use crate::instruction_context::Predicate;
+    use crate::interpreter::branching::run_jalr;
     use crate::interpreter::branching::run_jr_imm;
     use crate::machine_state::MachineCoreState;
     use crate::machine_state::MachineCoreStateLayout;
@@ -262,6 +292,15 @@ mod tests {
 
             assert_eq!(state.hart.pc.read(), init_pc);
             assert_eq!(new_pc, res_pc);
+
+            // TEST Jalr
+            state.hart.pc.write(init_pc);
+            state.hart.xregisters.write_nz(rs1, init_rs1);
+            let new_pc = run_jalr(&mut state, rd, rs1, InstrWidth::Uncompressed);
+
+            assert_eq!(state.hart.pc.read(), init_pc);
+            assert_eq!(new_pc, init_rs1 & !1);
+            assert_eq!(state.hart.xregisters.read_nz(rd), res_rd);
         }
     });
 
