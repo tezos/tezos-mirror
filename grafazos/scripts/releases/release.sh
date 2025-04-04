@@ -12,3 +12,5 @@ release=$(echo "${CI_COMMIT_TAG}" | grep -oE '^grafazos-v([0-9]+)\.([0-9]+))?$' 
 release_no_v=$(echo "${release}" | sed -e 's/^grafazos-v//g')
 
 release_name="Grafazos version ${release_no_v}"
+
+gitlab_package_name="grafazos-${release_no_v}"
