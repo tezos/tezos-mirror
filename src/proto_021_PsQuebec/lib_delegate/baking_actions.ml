@@ -899,6 +899,7 @@ let prepare_waiting_for_quorum state =
   let candidate =
     {
       Operation_worker.hash = latest_proposal.hash;
+      level_watched = latest_proposal.shell.level;
       round_watched = latest_proposal.round;
       payload_hash_watched = latest_proposal.payload_hash;
     }
