@@ -389,7 +389,6 @@ mod test_helpers {
             &precompiles,
             DUMMY_ALLOCATED_TICKS,
             gas_price,
-            false,
             None,
         );
 
