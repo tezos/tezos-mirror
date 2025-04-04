@@ -47,9 +47,6 @@ module type S_generic_key = sig
   (** The type for store keys. A key is a sequence of {!step}s. *)
   type path = Schema.Path.t [@@deriving brassaia]
 
-  (** The type for store metadata. *)
-  type metadata = Schema.Metadata.t [@@deriving brassaia]
-
   (** The type for store contents. *)
   type contents = Schema.Contents.t [@@deriving brassaia]
 
@@ -427,7 +424,6 @@ module type S_generic_key = sig
         with type t := tree
          and type step := step
          and type path := path
-         and type metadata := metadata
          and type contents := contents
          and type contents_key := contents_key
          and type node := node
@@ -440,9 +436,8 @@ module type S_generic_key = sig
     (** {1 Import/Export} *)
 
     (** Keys in the Brassaia store are tagged with the type of the value they
-        reference (either {!contents} or {!node}). In the [contents] case, the
-        key is paired with corresponding {!metadata}. *)
-    type kinded_key = [`Contents of contents_key * metadata | `Node of node_key]
+        reference (either {!contents} or {!node}). *)
+    type kinded_key = [`Contents of contents_key | `Node of node_key]
     [@@deriving brassaia]
 
     (** [key t] is the key of tree [t] in the underlying repository, if it
@@ -468,7 +463,7 @@ module type S_generic_key = sig
 
     (** Like {!kinded_key}, but with hashes as value references rather than
         keys. *)
-    type kinded_hash = [`Contents of hash * metadata | `Node of hash]
+    type kinded_hash = [`Contents of hash | `Node of hash]
 
     (** [kinded_hash t] is [c]'s kinded hash. *)
     val kinded_hash : ?cache:bool -> tree -> kinded_hash
@@ -555,13 +550,13 @@ module type S_generic_key = sig
   val mem_tree : t -> path -> bool
 
   (** [find_all t] is {!Tree.find_all} applied to [t]'s root tree. *)
-  val find_all : t -> path -> (contents * metadata) option
+  val find_all : t -> path -> contents option
 
   (** [find t] is {!Tree.find} applied to [t]'s root tree. *)
   val find : t -> path -> contents option
 
   (** [get_all t] is {!Tree.get_all} applied on [t]'s root tree. *)
-  val get_all : t -> path -> contents * metadata
+  val get_all : t -> path -> contents
 
   (** [get t] is {!Tree.get} applied to [t]'s root tree. *)
   val get : t -> path -> contents
@@ -595,9 +590,6 @@ module type S_generic_key = sig
 
   (** [set t k ~info v] sets [k] to the value [v] in [t]. Discard any previous
       results but ensure that no operation is lost in the history.
-
-      This function always uses {!Metadata.default} as metadata. Use {!set_tree}
-      with `[Contents (c, m)] for different ones.
 
       When [clear] is set (the default), the tree cache is emptied upon the
       function's completion, mirroring the effect of invoking {!Tree.clear}.
@@ -682,9 +674,6 @@ module type S_generic_key = sig
 
   (** [test_and_set ~test ~set] is like {!set} but it atomically checks that the
       tree is [test] before modifying it to [set].
-
-      This function always uses {!Metadata.default} as metadata. Use
-      {!test_and_set_tree} with `[Contents (c, m)] for different ones.
 
       The result is [Error (`Test t)] if the current tree is [t] instead of
       [test].
@@ -803,9 +792,6 @@ module type S_generic_key = sig
 
   (** [merge ~old] is like {!set} but merge the current tree and the new tree
       using [old] as ancestor in case of conflicts.
-
-      This function always uses {!Metadata.default} as metadata. Use
-      {!merge_tree} with `[Contents (c, m)] for different ones.
 
       The result is [Error (`Conflict c)] if the merge failed with the conflict
       [c].
@@ -1048,9 +1034,6 @@ module type S_generic_key = sig
   (** [Path] provides base functions for the stores's paths. *)
   module Path : Path.S with type t = path and type step = step
 
-  (** [Metadata] provides base functions for node metadata. *)
-  module Metadata : Metadata.S with type t = metadata
-
   (** Backend functions, which might be used by the backends. *)
   module Backend :
     Backend.S
@@ -1178,8 +1161,6 @@ module type KV =
 module type KV_maker_generic_key = sig
   type endpoint
 
-  type metadata
-
   type hash
 
   type info
@@ -1189,7 +1170,6 @@ module type KV_maker_generic_key = sig
   module Make (C : Contents.S) :
     KV_generic_key
       with module Schema.Contents = C
-       and type Schema.Metadata.t = metadata
        and type Backend.Remote.endpoint = endpoint
        and type Schema.Hash.t = hash
        and type contents_key = (hash, C.t) contents_key

@@ -62,8 +62,7 @@ val line : string -> unit
 
 module Schema = Common.Schema
 
-val store :
-  (module Brassaia.Maker) -> (module Brassaia.Metadata.S) -> (module S)
+val store : (module Brassaia.Maker) -> (module S)
 
 val testable : 'a Brassaia.Type.t -> 'a Alcotest.testable
 

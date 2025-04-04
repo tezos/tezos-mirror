@@ -39,10 +39,7 @@ module Inode_modules
 struct
   module Key = Brassaia_pack_unix.Pack_key.Make (Schema.Hash)
   module Node =
-    Brassaia.Node.Generic_key.Make_v2 (Schema.Hash) (Schema.Path)
-      (Schema.Metadata)
-      (Key)
-      (Key)
+    Brassaia.Node.Generic_key.Make_v2 (Schema.Hash) (Schema.Path) (Key) (Key)
   module Index = Brassaia_pack_unix.Index.Make (Schema.Hash)
   module Inter =
     Brassaia_pack.Inode.Make_internal (Conf) (Schema.Hash) (Key) (Node)
@@ -140,7 +137,7 @@ struct
       let file_manager = get_file_manager config in
       let dict = File_manager.dict file_manager in
       let dispatcher = Dispatcher.init file_manager |> Errs.raise_if_error in
-      let lru = Brassaia_pack_unix.Lru.create config in
+      let lru = Some (Brassaia_pack_unix.Lru.create config) in
       let store = Inode.init ~config ~file_manager ~dict ~dispatcher ~lru in
       let store_contents =
         Contents_store.init ~config ~file_manager ~dict ~dispatcher ~lru
@@ -191,7 +188,7 @@ let pp_pred = Brassaia.Type.pp pred_t
 
 module H_contents = Brassaia.Hash.Typed (Hash) (Schema.Contents)
 
-let normal x = `Contents (x, Metadata.default)
+let normal x = `Contents x
 
 let node x = `Node x
 

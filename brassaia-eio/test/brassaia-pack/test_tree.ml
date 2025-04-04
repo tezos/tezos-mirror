@@ -513,7 +513,7 @@ let check_hash h s =
 let check_contents_hash h s =
   match h with
   | `Node _ -> Alcotest.failf "Expected kinded hash to be contents"
-  | `Contents (h, ()) ->
+  | `Contents h ->
       let s' = Brassaia.Type.(to_string Hash.t) h in
       Alcotest.(check string) "check hash" s s'
 
@@ -566,8 +566,8 @@ let test_hardcoded_proof () =
   let state = P.state p in
 
   let check_depth_2 = function
-    | P.Inode_values
-        [("00000", Contents ("x", ())); ("00001", Blinded_contents (h1, ()))] ->
+    | P.Inode_values [("00000", Contents "x"); ("00001", Blinded_contents h1)]
+      ->
         check_hash h1 "95cb0bfd2977c761298d9624e4b4d4c72a39974a"
     | t -> fail_with_inode_tree t
   in

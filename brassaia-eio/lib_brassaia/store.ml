@@ -37,7 +37,6 @@ module Make (B : Backend.S) = struct
   module Contents_key = B.Contents.Key
   module Node_key = B.Node.Key
   module Commit_key = B.Commit.Key
-  module Metadata = B.Node.Metadata
   module Typed = Hash.Typed (B.Hash)
   module Hash = B.Hash
   module Branch_store = B.Branch
@@ -79,10 +78,10 @@ module Make (B : Backend.S) = struct
               match B.Node.index (B.Repo.node_t r) h with
               | None -> None
               | Some k -> Some (`Node k))
-          | `Contents (h, m) -> (
+          | `Contents h -> (
               match B.Contents.index (B.Repo.contents_t r) h with
               | None -> None
-              | Some k -> Some (`Contents (k, m))))
+              | Some k -> Some (`Contents k)))
 
     let of_key r k = import r k
 
@@ -91,10 +90,10 @@ module Make (B : Backend.S) = struct
           match B.Node.index (B.Repo.node_t r) h with
           | None -> None
           | Some k -> of_key r (`Node k))
-      | `Contents (h, m) -> (
+      | `Contents h -> (
           match B.Contents.index (B.Repo.contents_t r) h with
           | None -> None
-          | Some k -> of_key r (`Contents (k, m)))
+          | Some k -> of_key r (`Contents k))
 
     let shallow r h = import_no_check r h
 
@@ -102,7 +101,7 @@ module Make (B : Backend.S) = struct
 
     let hash : ?cache:bool -> t -> hash =
      fun ?cache tr ->
-      match hash ?cache tr with `Node h -> h | `Contents (h, _) -> h
+      match hash ?cache tr with `Node h -> h | `Contents h -> h
 
     let pp = Type.pp t
   end
@@ -124,8 +123,6 @@ module Make (B : Backend.S) = struct
   type node = Tree.node [@@deriving brassaia]
 
   type contents = Contents.t [@@deriving brassaia ~equal]
-
-  type metadata = Metadata.t [@@deriving brassaia]
 
   type tree = Tree.t [@@deriving brassaia ~pp]
 
@@ -173,7 +170,7 @@ module Make (B : Backend.S) = struct
 
   let save_tree ?(clear = true) r x y (tr : Tree.t) =
     match Tree.destruct tr with
-    | `Contents (c, _) ->
+    | `Contents c ->
         let c = Tree.Contents.force_exn c in
         let k = save_contents x c in
         `Contents k
@@ -353,7 +350,7 @@ module Make (B : Backend.S) = struct
             | Some v ->
                 List.iter
                   (function
-                    | _, `Contents (c, _) ->
+                    | _, `Contents c ->
                         contents := Contents_keys.add c !contents
                     | _ -> ())
                   (B.Node.Val.list v) ;
@@ -363,8 +360,8 @@ module Make (B : Backend.S) = struct
           (fun k ->
             match B.Contents.find (contents_t t) k with
             | None -> ()
-            | Some m ->
-                B.Slice.add slice (`Contents (Contents_key.to_hash k, m)))
+            | Some c ->
+                B.Slice.add slice (`Contents (Contents_key.to_hash k, c)))
           (Contents_keys.elements !contents) ;
         slice
 
@@ -423,8 +420,7 @@ module Make (B : Backend.S) = struct
       | None -> []
       | Some v ->
           List.rev_map
-            (function
-              | _, `Node n -> `Node n | _, `Contents (c, _) -> `Contents c)
+            (function _, `Node n -> `Node n | _, `Contents c -> `Contents c)
             (B.Node.Val.list v)
 
     let default_pred_commit t c =
@@ -1030,7 +1026,7 @@ module Make (B : Backend.S) = struct
     | None -> None
     | Some tree -> (
         match Tree.key tree with
-        | Some (`Contents (key, _)) -> Some (`Contents key)
+        | Some (`Contents key) -> Some (`Contents key)
         | Some (`Node key) -> Some (`Node key)
         | None -> None)
 
@@ -1366,11 +1362,7 @@ struct
           match Type.of_string Store.Path.step_t k with
           | Ok key -> obj l ((key, node v []) :: acc)
           | _ -> obj l acc)
-    and node j acc =
-      match j with
-      | `O j -> obj j acc
-      | _ -> `Contents (j, Store.Metadata.default)
-    in
+    and node j acc = match j with `O j -> obj j acc | _ -> `Contents j in
     node j []
 
   let of_concrete_tree c : json =
@@ -1380,7 +1372,7 @@ struct
       | [] -> `O acc
       | (k, v) :: l -> tree l ((step k, contents v []) :: acc)
     and contents t acc =
-      match t with `Contents (c, _) -> c | `Tree c -> tree c acc
+      match t with `Contents c -> c | `Tree c -> tree c acc
     in
     contents c []
 

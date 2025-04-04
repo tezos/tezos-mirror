@@ -70,20 +70,43 @@ module Make (Args : Gc_args.S) = struct
       objects and parent commits from [commit_key] in [commit_store] and
       [node_store].
 
-      - If [parents] is true, then parents commits and their tree objects are
+      - If [recurse] is true, then parents commits and their tree objects are
         traversed recursively. Otherwise, only the immediate parent are included
         (but not their tree objects).
       - [min_offset] restricts the traversal to objects/commits with a larger or
         equal offset. *)
-  let iter_reachable ~parents ~min_offset commit_key commit_store node_store =
+  let iter_reachable ~recurse ~min_offset commit_key commit_store node_store =
     let live = Ranges.make () in
     let todos = Priority_queue.create 1024 in
-    let rec loop () =
-      if not (Priority_queue.is_empty todos) then (
-        let offset, kind = Priority_queue.pop todos in
-        iter_node offset kind ;
-        loop ())
-    and iter_node off = function
+    let schedule ~offset kind =
+      if offset >= min_offset then Priority_queue.add todos offset kind
+    in
+    let schedule_commit key =
+      match Commit_store.get_offset commit_store key with
+      | offset ->
+          let kind =
+            if recurse then Commit
+            else
+              (* Include the commit parents in the reachable file, but not their children.
+                 The parent(s) of [commit] must be included in the iteration
+                 because, when decoding the [Commit_value.t] at [commit], the
+                 parents will have to be read in order to produce a key for them. *)
+              Contents
+          in
+          schedule ~offset kind
+      | exception Pack_store.Dangling_hash -> ()
+    in
+    let schedule_kinded kinded_key =
+      let key, kind =
+        match kinded_key with
+        | `Contents key -> (key, Contents)
+        | `Inode key | `Node key -> (key, Node)
+      in
+      match Node_store.get_offset node_store key with
+      | offset -> schedule ~offset kind
+      | exception Pack_store.Dangling_hash -> ()
+    in
+    let iter_node off = function
       | (Contents | Node) as kind -> (
           let node_key = Node_store.key_of_offset node_store off in
           let len = Node_store.get_length node_store node_key in
@@ -111,31 +134,12 @@ module Make (Args : Gc_args.S) = struct
           | Some commit ->
               List.iter schedule_commit (Commit_value.parents commit) ;
               schedule_kinded (`Node (Commit_value.node commit)))
-    and schedule_kinded kinded_key =
-      let key, kind =
-        match kinded_key with
-        | `Contents key -> (key, Contents)
-        | `Inode key | `Node key -> (key, Node)
-      in
-      match Node_store.get_offset node_store key with
-      | offset -> schedule ~offset kind
-      | exception Pack_store.Dangling_hash -> ()
-    and schedule_commit key =
-      match Commit_store.get_offset commit_store key with
-      | offset ->
-          let kind =
-            if parents then Commit
-            else
-              (* Include the commit parents in the reachable file, but not their children.
-                 The parent(s) of [commit] must be included in the iteration
-                 because, when decoding the [Commit_value.t] at [commit], the
-                 parents will have to be read in order to produce a key for them. *)
-              Contents
-          in
-          schedule ~offset kind
-      | exception Pack_store.Dangling_hash -> ()
-    and schedule ~offset kind =
-      if offset >= min_offset then Priority_queue.add todos offset kind
+    in
+    let rec loop () =
+      if not (Priority_queue.is_empty todos) then (
+        let offset, kind = Priority_queue.pop todos in
+        iter_node offset kind ;
+        loop ())
     in
     let offset = Commit_store.get_offset commit_store commit_key in
     schedule ~offset Commit ;
@@ -147,7 +151,7 @@ module Make (Args : Gc_args.S) = struct
       parent commits. *)
   let snapshot_commit commit_key commit_store node_store =
     iter_reachable
-      ~parents:false
+      ~recurse:false
       ~min_offset:Int63.zero
       commit_key
       commit_store
@@ -157,7 +161,7 @@ module Make (Args : Gc_args.S) = struct
       the list of compacted [(offset, length)] of the recursively reachable tree
       objects and parent commits, such that [offset >= min_offset]. *)
   let traverse_range ~min_offset commit_key commit_store node_store =
-    iter_reachable ~parents:true ~min_offset commit_key commit_store node_store
+    iter_reachable ~recurse:true ~min_offset commit_key commit_store node_store
 
   (* Dangling_parent_commit are the parents of the gced commit. They are kept on
      disk in order to correctly deserialised the gced commit. *)
@@ -245,12 +249,11 @@ module Make (Args : Gc_args.S) = struct
     @@ fun () ->
     let dict = File_Manager.dict file_manager in
     let dispatcher = Dispatcher.init file_manager |> Errs.raise_if_error in
-    let lru = Lru.create config in
     let node_store =
-      Node_store.init ~config ~file_manager ~dict ~dispatcher ~lru
+      Node_store.init ~config ~file_manager ~dict ~dispatcher ~lru:None
     in
     let commit_store =
-      Commit_store.init ~config ~file_manager ~dict ~dispatcher ~lru
+      Commit_store.init ~config ~file_manager ~dict ~dispatcher ~lru:None
     in
 
     (* Step 2. Load commit which will make [commit_key] [Direct] if it's not

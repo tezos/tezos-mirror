@@ -57,7 +57,7 @@ module type S = sig
       file_manager:File_Manager.t ->
       dict:File_Manager.Dict.t ->
       dispatcher:Dispatcher.t ->
-      lru:Lru.t ->
+      lru:Lru.t option ->
       read t
 
     val unsafe_find :

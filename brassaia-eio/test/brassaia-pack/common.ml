@@ -49,12 +49,11 @@ module Conf = Brassaia_tezos.Conf
 
 module Schema = struct
   open Brassaia
-  module Metadata = Metadata.None
   module Contents = Contents.String_v2
   module Path = Path.String_list
   module Branch = Branch.String
   module Hash = Hash.SHA1
-  module Node = Node.Generic_key.Make_v2 (Hash) (Path) (Metadata)
+  module Node = Node.Generic_key.Make_v2 (Hash) (Path)
   module Commit = Commit.Generic_key.Make_v2 (Hash)
   module Info = Info.Default
 end
@@ -184,7 +183,7 @@ struct
     (* open the index created by the file_manager. *)
     let index = File_manager.index file_manager in
     let dict = File_manager.dict file_manager in
-    let lru = Brassaia_pack_unix.Lru.create config in
+    let lru = Some (Brassaia_pack_unix.Lru.create config) in
     let pack = Pack.init ~config ~file_manager ~dict ~dispatcher ~lru in
     (f := fun () -> File_manager.flush file_manager |> Errs.raise_if_error) ;
     {name; index; pack; dict; file_manager}

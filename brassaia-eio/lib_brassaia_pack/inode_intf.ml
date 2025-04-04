@@ -29,10 +29,7 @@ end
 module type Snapshot = sig
   type hash
 
-  type metadata
-
-  type kinded_hash = Contents of hash * metadata | Node of hash
-  [@@deriving brassaia]
+  type kinded_hash = Contents of hash | Node of hash [@@deriving brassaia]
 
   type entry = {step : string; hash : kinded_hash} [@@deriving brassaia]
 
@@ -64,7 +61,6 @@ module type Value = sig
       with type node := t
        and type hash = hash
        and type step := step
-       and type metadata := metadata
 
   val nb_children : t -> int
 
@@ -113,8 +109,6 @@ module type Compress = sig
 
   type hash
 
-  type metadata
-
   type dict_key = int
 
   type pack_offset = int63
@@ -127,7 +121,7 @@ module type Compress = sig
 
   type tree = {depth : dict_key; length : dict_key; entries : ptr list}
 
-  type value = Contents of name * address * metadata | Node of name * address
+  type value = Contents of name * address | Node of name * address
 
   type v = Values of value list | Tree of tree
 
@@ -156,11 +150,7 @@ module type Internal = sig
   module Raw : Raw with type hash = hash and type key = key
 
   module Val : sig
-    include
-      Value
-        with type hash = hash
-         and type key = key
-         and type metadata = Snapshot.metadata
+    include Value with type hash = hash and type key = key
 
     val of_raw : (expected_depth:int -> key -> Raw.t option) -> Raw.t -> t
 
@@ -189,7 +179,7 @@ module type Internal = sig
       (** The type for pointer kinds. *)
       type kinded_key =
         | Contents of contents_key
-        | Contents_x of metadata * contents_key
+        | Contents_x of contents_key
         | Node of node_key
       [@@deriving brassaia]
 
@@ -258,11 +248,7 @@ module type Internal = sig
 
   val to_snapshot : Raw.t -> Snapshot.inode
 
-  module Compress :
-    Compress
-      with type hash := hash
-       and type step := Val.step
-       and type metadata := Val.metadata
+  module Compress : Compress with type hash := hash and type step := Val.step
 
   module Child_ordering : Child_ordering with type step := Val.step
 end
@@ -295,7 +281,6 @@ module type Sigs = sig
     Internal
       with type hash = H.t
        and type key = Key.t
-       and type Snapshot.metadata = Node.metadata
        and type Val.step = Node.step
 
   module Make
@@ -308,7 +293,6 @@ module type Sigs = sig
       (Inter : Internal
                  with type hash = H.t
                   and type key = Key.t
-                  and type Snapshot.metadata = Node.metadata
                   and type Val.step = Node.step)
       (Pack : Indexable.S
                 with type key = Key.t
@@ -318,7 +302,6 @@ module type Sigs = sig
       with type 'a t = 'a Pack.t
        and type key = Key.t
        and type hash = H.t
-       and type Val.metadata = Node.metadata
        and type Val.step = Node.step
        and type value = Inter.Val.t
 end

@@ -31,7 +31,6 @@ struct
   module Make (Schema : Brassaia.Schema.Extended) = struct
     open struct
       module P = Schema.Path
-      module M = Schema.Metadata
       module C = Schema.Contents
       module B = Schema.Branch
     end
@@ -68,8 +67,7 @@ struct
           include Inode.Make_persistent (H) (Value) (Inter) (Pack')
         end
 
-        include
-          Brassaia.Node.Generic_key.Store (Contents) (CA) (H) (CA.Val) (M) (P)
+        include Brassaia.Node.Generic_key.Store (Contents) (CA) (H) (CA.Val) (P)
       end
 
       module Node_portable = Node.CA.Val.Portable
@@ -195,13 +193,23 @@ struct
           in
           let lru = Lru.create config in
           let contents =
-            Contents.CA.init ~config ~file_manager ~dict ~dispatcher ~lru
+            Contents.CA.init
+              ~config
+              ~file_manager
+              ~dict
+              ~dispatcher
+              ~lru:(Some lru)
           in
           let node =
-            Node.CA.init ~config ~file_manager ~dict ~dispatcher ~lru
+            Node.CA.init ~config ~file_manager ~dict ~dispatcher ~lru:(Some lru)
           in
           let commit =
-            Commit.CA.init ~config ~file_manager ~dict ~dispatcher ~lru
+            Commit.CA.init
+              ~config
+              ~file_manager
+              ~dict
+              ~dispatcher
+              ~lru:(Some lru)
           in
           let branch =
             let root = Conf.root config in

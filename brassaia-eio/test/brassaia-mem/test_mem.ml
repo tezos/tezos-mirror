@@ -16,10 +16,7 @@
 
 module Brassaia_mem = Brassaia_eio_mem.Brassaia_mem
 
-let store =
-  Brassaia_eio_test_helpers.Brassaia_test.store
-    (module Brassaia_mem)
-    (module Brassaia_eio.Brassaia.Metadata.None)
+let store = Brassaia_eio_test_helpers.Brassaia_test.store (module Brassaia_mem)
 
 let config = Brassaia_mem.config ()
 

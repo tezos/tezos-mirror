@@ -38,9 +38,6 @@ struct
 
   include Pack_key.Store_spec
   module Maker = Store.Maker (Io) (Index_io) (Async) (Config)
-
-  type metadata = Brassaia.Metadata.None.t
-
   module Make (C : Brassaia.Contents.S) = Maker.Make (Brassaia.Schema.KV (C))
 end
 
