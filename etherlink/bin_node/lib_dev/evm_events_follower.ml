@@ -177,7 +177,7 @@ let fetch_events =
                  future. *)
               always_fallback := true
           | _ -> ()) ;
-          let*! () = Evm_events_follower_events.fallback () in
+          let*! () = Evm_events_follower_events.fallback e in
           fetch_events_one_by_one state rollup_block_lvl
 
 let apply_events state rollup_block_lvl =

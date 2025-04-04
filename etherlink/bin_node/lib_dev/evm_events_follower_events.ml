@@ -135,14 +135,15 @@ module Event = struct
       ("level", Data_encoding.int32)
 
   let fallback =
-    declare_0
+    declare_1
       ~section
       ~name:"evm_events_follower_fallback"
       ~msg:
         "rollup node does not support fetching all events, falling back to \
-         multiple RPCs fetching"
+         fetching one event per RPC because of {error}"
       ~level:Warning
-      ()
+      ("error", Events.trace_encoding)
+      ~pp1:pp_print_top_error_of_trace
 
   let event_flush_delayed_inbox =
     declare_2
@@ -191,7 +192,7 @@ let unexpected_number_of_events ~expected ~fetched =
 let rollup_level_is_already_processed rollup_level =
   Internal_event.Simple.emit Event.rollup_level_already_processed rollup_level
 
-let fallback () = Internal_event.Simple.emit Event.fallback ()
+let fallback e = Internal_event.Simple.emit Event.fallback e
 
 let flush_delayed_inbox ~timestamp Ethereum_types.(Qty level) =
   Internal_event.Simple.emit Event.event_flush_delayed_inbox (timestamp, level)
