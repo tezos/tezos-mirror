@@ -785,6 +785,7 @@ dependencies = [
  "softfloat",
  "tezos-evm-logging-latest",
  "tezos-evm-runtime-latest",
+ "tezos-execution-latest",
  "tezos-indexable-storage-latest",
  "tezos-smart-rollup",
  "tezos-smart-rollup-core",
@@ -2218,6 +2219,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "tezos-execution-latest"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "primitive-types",
+ "tezos-evm-runtime-latest",
+ "tezos-smart-rollup",
+ "tezos-smart-rollup-host",
+ "tezos-storage-latest",
+ "tezos_crypto_rs",
+ "tezos_data_encoding",
+]
+
+[[package]]
 name = "tezos-indexable-storage-latest"
 version = "0.1.0"
 dependencies = [
@@ -2473,10 +2488,8 @@ version = "0.1.0"
 dependencies = [
  "hex",
  "primitive-types",
- "rlp",
  "tezos-smart-rollup",
  "tezos_crypto_rs",
- "tezos_ethereum_latest",
 ]
 
 [[package]]

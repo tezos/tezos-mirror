@@ -39,6 +39,7 @@ ethbloom.workspace = true
 
 evm.workspace = true
 evm-execution.workspace = true
+tezos-execution.workspace = true
 tezos_ethereum.workspace = true
 tezos_tezlink.workspace = true
 tezos-evm-logging.workspace = true
