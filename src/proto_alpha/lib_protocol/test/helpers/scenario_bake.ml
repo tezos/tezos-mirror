@@ -293,12 +293,16 @@ let bake ?baker : t -> t tzresult Lwt.t =
   in
   let current_cycle = Block.current_cycle block in
   let* level = Plugin.RPC.current_level Block.rpc_ctxt block in
+  let* next_level =
+    let* ctxt = Context.get_alpha_ctxt (B block) in
+    return (Protocol.Alpha_context.Level.succ ctxt level)
+  in
   assert (Protocol.Alpha_context.Cycle.(level.cycle = Block.current_cycle block)) ;
   Log.info
     ~color:time_color
     "Baking level %d (cycle %ld) with %s"
     (Int32.to_int (Int32.succ Block.(block.header.shell.level)))
-    (Protocol.Alpha_context.Cycle.to_int32 level.cycle)
+    (Protocol.Alpha_context.Cycle.to_int32 next_level.cycle)
     baker_name ;
   let adaptive_issuance_vote =
     if state.force_ai_vote_yes then
