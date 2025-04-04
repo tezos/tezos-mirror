@@ -2252,7 +2252,10 @@ struct
       | Partial of I.partial_ptr I.layout * I.partial_ptr I.t
       | Truncated of I.truncated_ptr I.t
 
-    let encoding = failwith "TODO"
+    (* FIXME: TODO *)
+    let encoding : t Data_encoding.encoding =
+      let open Data_encoding in
+      conv (fun _ -> failwith "TODO") (fun _ -> failwith "TODO") null
 
     type 'b apply_fn = {f : 'a. 'a I.layout -> 'a I.t -> 'b} [@@unboxed]
 
