@@ -62,6 +62,18 @@ for dashboard in ${dashboards}; do
   gitlab_upload "${dashboard}" "$(basename "${dashboard}")"
 done
 
+ret=$(curl -fsSL -X GET \
+  -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+  "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?sort=desc&package_name=${gitlab_package_name}" |
+  jq -r ".[] | select(.version==\"${release_no_v}\") | ._links.web_path")
+
+if [ -z "${ret}" ]; then
+  echo "Error: ${gitlab_package_name} could not find package matching version ${release_no_v}"
+  exit 1
+else
+  dashboards_url="https://${CI_SERVER_HOST}${ret}"
+fi
+
 # GitLab Release command-line tool
 # https://gitlab.com/gitlab-org/release-cli
 
@@ -70,4 +82,5 @@ export DEBUG='true'
 
 release-cli create \
   --name="${release_name}" \
-  --tag-name="${CI_COMMIT_TAG}"
+  --tag-name="${CI_COMMIT_TAG}" \
+  --assets-link="{\"name\":\"Dashboards\",\"url\":\"${dashboards_url}\",\"link_type\":\"package\"}"
