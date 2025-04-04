@@ -184,7 +184,7 @@ impl<'a> ProofTree<'a> {
     /// - a blinded leaf which corresponds to a node with `LEN` children,
     ///   in which case return absent branches and the proof hash
     /// If the proof tree is absent, return absent branches and no proof hash.
-    fn into_branches_with_hash<const LEN: usize>(
+    pub fn into_branches_with_hash<const LEN: usize>(
         self,
     ) -> Result<(Box<[ProofTree<'a>; LEN]>, Option<Hash>), PartialHashError> {
         let ProofTree::Present(proof) = self else {
@@ -855,7 +855,12 @@ where
     }
 }
 
-fn combine_partial_hashes(
+/// Attempt to compute the partial hash of a node from its children's partial
+/// hashes if they are present. If none of the children hashes can be computed
+/// due to absent data, this node is either a blinded leaf in the proof, in which
+/// case its hash can be recovered from the proof, or it is part of a blinded
+/// subtree whose hash cannot be computed as this point.
+pub fn combine_partial_hashes(
     hash_results: impl AsRef<[Result<Hash, PartialHashError>]>,
     proof_hash: Option<Hash>,
 ) -> Result<Hash, PartialHashError> {

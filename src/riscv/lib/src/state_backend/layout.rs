@@ -221,17 +221,20 @@ macro_rules! struct_layout {
                     })
                 }
 
+                #[inline]
                 fn partial_state_hash(
-                    _state: $crate::state_backend::RefVerifierAlloc<Self>,
-                    _proof: $crate::state_backend::ProofTree,
+                    state: $crate::state_backend::RefVerifierAlloc<Self>,
+                    proof: $crate::state_backend::ProofTree,
                 ) -> Result<$crate::storage::Hash, $crate::state_backend::PartialHashError> {
-                    // TODO RV-503: Compute the final state hash of a Verifier-bound struct layout
-                    // This does not currently limit obtaining final hashes of Verifier states
-                    // because the only struct layout in the PVM state, `MStatusLayout`,
-                    // is handled by the implementation of `partial_state_hash` for `CSRValuesLayout`.
-                    todo!("Hashing of partial generic struct layouts not yet supported")
-                }
+                    let (branches, proof_hash) = proof.into_branches_with_hash()?;
+                    let [ $($field_name),+ ] = *branches;
 
+                    $(
+                        let $field_name = [<$field_name:camel>]::partial_state_hash(state.$field_name, $field_name);
+                    )+
+
+                    $crate::state_backend::combine_partial_hashes([$($field_name),+], proof_hash)
+                }
             }
         }
     };
@@ -429,7 +432,7 @@ mod tests {
             };
             let hash = Foo::state_hash(refs).unwrap();
 
-            // Obtain the Merkle tree
+            // Obtain the Merkle tree via the `ProofGen` backend
             let mut proof_foo = FooF {
                 bar: foo.bar.struct_ref::<ProofWrapper>(),
                 qux: foo.qux.struct_ref::<ProofWrapper>(),
@@ -447,7 +450,7 @@ mod tests {
             proof_foo.bar.write(bar.wrapping_add(1));
             proof_foo.qux.write_all(&qux.map(|x| x.wrapping_add(1)));
 
-            // Obtain the Merkle tree, again, to make sure nothing changed
+            // Obtain the Merkle tree, again, to make sure the root hash has not changed
             let proof_foo_refs = FooF {
                 bar: proof_foo.bar.struct_ref::<FnManagerIdent>(),
                 qux: proof_foo.qux.struct_ref::<FnManagerIdent>(),
@@ -462,11 +465,35 @@ mod tests {
             let proof_hash = proof.root_hash().unwrap();
             assert_eq!(hash, proof_hash);
 
-            // Verify the proof
+            // Apply the same modification on the `Owned` state in order to obtain
+            // the final state hash
+            foo.bar.write(bar.wrapping_add(1));
+            foo.qux.write_all(&qux.map(|x| x.wrapping_add(1)));
+            let refs = FooF {
+                bar: foo.bar.struct_ref::<FnManagerIdent>(),
+                qux: foo.qux.struct_ref::<FnManagerIdent>(),
+            };
+            let final_hash = Foo::state_hash(refs).unwrap();
+
+            // Verify the proof and check the final hash
             handle_stepper_panics(|| {
-                let verify_foo = Foo::from_proof(ProofPart::Present(&proof)).unwrap();
+                let mut verify_foo = Foo::from_proof(ProofPart::Present(&proof)).unwrap();
                 assert_eq!(bar, verify_foo.bar.read());
                 assert_eq!(qux, verify_foo.qux.read_all().as_slice());
+
+                // Apply the same modification on the `Verifier` state and check
+                // that the final hash is correct
+                verify_foo.bar.write(bar.wrapping_add(1));
+                verify_foo.qux.write_all(&qux.map(|x| x.wrapping_add(1)));
+
+                let verify_foo_refs = FooF {
+                    bar: verify_foo.bar.struct_ref::<FnManagerIdent>(),
+                    qux: verify_foo.qux.struct_ref::<FnManagerIdent>(),
+                };
+
+                let verify_hash =
+                    Foo::partial_state_hash(verify_foo_refs, ProofPart::Present(&proof)).unwrap();
+                assert_eq!(verify_hash, final_hash)
             })
             .unwrap();
         }

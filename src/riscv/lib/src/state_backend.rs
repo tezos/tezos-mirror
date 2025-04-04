@@ -77,7 +77,7 @@ pub mod hash;
 mod layout;
 pub mod owned_backend;
 pub mod proof_backend;
-mod proof_layout;
+pub mod proof_layout;
 mod region;
 mod trans;
 pub mod verify_backend;
