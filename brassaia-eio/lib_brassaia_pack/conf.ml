@@ -167,8 +167,12 @@ let root config =
   match find_root config with
   | None ->
       failwith
-        "unintialised root, call [Brassaia_pack.Conf.init root] before opening \
-         the store"
+        (Format.asprintf
+           "uninitialized root, call [Brassaia_pack.Conf.init root] before \
+            opening the store with config %s: %a"
+           (Spec.name (Brassaia.Backend.Conf.spec config))
+           pp
+           config)
   | Some root -> root
 
 let lower_root config = get config Key.lower_root

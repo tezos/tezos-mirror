@@ -3176,7 +3176,7 @@ let _brassaia_eio_data_tests =
     ["test"; "import"; "test_fixed_size_string_set"]
     ~path:"brassaia-eio/test/brassaia/data"
     ~opam:"tezos_internal_brassaia_eio_tests"
-    ~synopsis:"Tezos internal brassaia tests"
+    ~synopsis:"Tezos internal brassaia eio tests"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -3231,7 +3231,7 @@ let _brassaia_eio_generic_key_tests =
     ["test"; "test_store_offset"; "test_inlined_contents"]
     ~path:"brassaia-eio/test/brassaia/generic-key"
     ~opam:"tezos_internal_brassaia_eio_tests"
-    ~synopsis:"Tezos internal brassaia tests"
+    ~synopsis:"Tezos internal brassaia eio tests"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -3289,7 +3289,7 @@ let _brassaia_eio_tests =
     ["test"; "test_lru"; "test_hash"; "test_tree"; "test_conf"]
     ~path:"brassaia-eio/test/brassaia"
     ~opam:"tezos_internal_brassaia_eio_tests"
-    ~synopsis:"Tezos internal brassaia tests"
+    ~synopsis:"Tezos internal brassaia eio tests"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -3337,7 +3337,7 @@ let _brassaia_eio_mem_tests =
     ["test"; "test_mem"]
     ~path:"brassaia-eio/test/brassaia-mem"
     ~opam:"tezos_internal_brassaia_eio_tests"
-    ~synopsis:"Tezos internal brassaia tests"
+    ~synopsis:"Tezos internal brassaia eio tests"
     ~deps:
       [
         octez_context_brassaia_memory;
@@ -3372,6 +3372,20 @@ let _brassaia_tezos_tests =
       [
         brassaia_test_helpers;
         brassaia_tezos;
+        octez_test_helpers |> open_;
+        tezt_lib |> open_ |> open_ ~m:"Base";
+      ]
+
+let _brassaia_eio_tezos_tests =
+  tezt
+    ["tezt_main"; "generate"]
+    ~path:"brassaia-eio/test/brassaia-tezos"
+    ~opam:"tezos_internal_brassaia_eio_tests"
+    ~synopsis:"Tezos internal brassaia eio tests"
+    ~deps:
+      [
+        brassaia_eio_test_helpers;
+        brassaia_eio_tezos;
         octez_test_helpers |> open_;
         tezt_lib |> open_ |> open_ ~m:"Base";
       ]
@@ -3490,7 +3504,7 @@ let _brassaia_eio_pack_tests =
     ]
     ~path:"brassaia-eio/test/brassaia-pack"
     ~opam:"tezos_internal_brassaia_eio_tests"
-    ~synopsis:"Tezos internal brassaia tests"
+    ~synopsis:"Tezos internal brassaia eio tests"
     ~deps:
       [
         octez_context_memory;
@@ -3841,7 +3855,7 @@ let _brassaia_eio_tests =
     ["tezt_brassaia"; "test_lib_brassaia_store"; "test_utils"]
     ~path:"brassaia-eio/test"
     ~opam:"tezos_internal_brassaia_eio_tests"
-    ~synopsis:"Tezos internal brassaia tests"
+    ~synopsis:"Tezos internal brassaia eio tests"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";

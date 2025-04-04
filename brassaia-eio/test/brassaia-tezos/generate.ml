@@ -14,6 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+module Brassaia = Brassaia_eio.Brassaia
+module Brassaia_pack = Brassaia_eio_pack.Brassaia_pack
+module Brassaia_pack_unix = Brassaia_eio_pack_unix.Brassaia_pack_unix
+
 let rm_dir data_dir =
   if Sys.file_exists data_dir then
     let cmd = Printf.sprintf "rm -rf %s" data_dir in
@@ -22,7 +26,7 @@ let rm_dir data_dir =
 
 module Generator = struct
   module Conf = struct
-    include Brassaia_tezos.Conf
+    include Brassaia_eio_tezos.Brassaia_tezos.Conf
 
     let entries = 2
 
@@ -46,18 +50,18 @@ module Generator = struct
       path =
     rm_dir path ;
     let large_contents = String.make 4096 'Z' in
-    let rw = Store.Repo.v (config ~indexing_strategy path) in
+    let rw = Store.Repo.init (config ~indexing_strategy path) in
     let tree = Store.Tree.singleton ["a"; "b1"; "c1"; "d1"; "e1"] "x1" in
     let tree = Store.Tree.add tree ["a"; "b1"; "c1"; "d2"; "e2"] "x2" in
     let tree = Store.Tree.add tree ["a"; "b1"; "c1"; "d3"; "e3"] "x2" in
     let tree = Store.Tree.add tree ["a"; "b2"; "c2"; "e3"] "x2" in
-    let c1 = Store.Commit.v rw ~parents:[] ~info tree in
+    let c1 = Store.Commit.init rw ~parents:[] ~info tree in
 
     let tree = Store.Tree.add tree ["a"; "b3"] large_contents in
-    let c2 = Store.Commit.v rw ~parents:[Store.Commit.key c1] ~info tree in
+    let c2 = Store.Commit.init rw ~parents:[Store.Commit.key c1] ~info tree in
 
     let tree = Store.Tree.remove tree ["a"; "b1"; "c1"] in
-    let c3 = Store.Commit.v rw ~parents:[Store.Commit.key c2] ~info tree in
+    let c3 = Store.Commit.init rw ~parents:[Store.Commit.key c2] ~info tree in
 
     let () = before_closing rw (Store.Commit.key c3) in
 
@@ -81,25 +85,36 @@ module Generator = struct
     create_store ~before_closing Brassaia_pack.Indexing_strategy.minimal src
 end
 
-let ensure_data_dir () =
-  if not (Sys.file_exists "data") then Unix.mkdir "data" 0o755
+let register_test title f =
+  let title = Format.sprintf "Brassaia_eio: %s" title in
+  Tezt.Test.register
+    ~__FILE__
+    ~tags:[Tag.layer1; Tag.flaky; "brassaia_eio"; "store"]
+    ~title
+    f
 
-let generate () =
-  ensure_data_dir () ;
-  let _ =
-    Generator.create_store
-      Brassaia_pack.Indexing_strategy.minimal
-      "data/minimal"
-  in
-  let _ =
-    Generator.create_store Brassaia_pack.Indexing_strategy.always "data/always"
-  in
-  let _ = Generator.create_gced_store "data/gced" in
-  let _ =
-    Generator.create_snapshot_store
-      ~src:"data/snapshot_src"
-      ~dest:"data/snapshot"
-  in
-  ()
-
-let () = Eio_main.run @@ fun _env -> generate ()
+let register () =
+  register_test "create store (minimal indexing strategy)" (fun () ->
+      let _ =
+        Generator.create_store
+          Brassaia_pack.Indexing_strategy.always
+          "data/minimal"
+      in
+      unit) ;
+  register_test "create store (always indexing strategy)" (fun () ->
+      let _ =
+        Generator.create_store
+          Brassaia_pack.Indexing_strategy.always
+          "data/always"
+      in
+      unit) ;
+  register_test "create gced store" (fun () ->
+      let _ = Generator.create_gced_store "data/gced" in
+      unit) ;
+  register_test "create snapshot store" (fun () ->
+      let _ =
+        Generator.create_snapshot_store
+          ~src:"data/snapshot_src"
+          ~dest:"data/snapshot"
+      in
+      unit)
