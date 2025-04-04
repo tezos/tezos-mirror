@@ -175,6 +175,7 @@ end
 
 type candidate = {
   hash : Block_hash.t;
+  level_watched : Int32.t;
   round_watched : Round.t;
   payload_hash_watched : Block_payload_hash.t;
 }
@@ -182,12 +183,13 @@ type candidate = {
 let candidate_encoding =
   let open Data_encoding in
   conv
-    (fun {hash; round_watched; payload_hash_watched} ->
-      (hash, round_watched, payload_hash_watched))
-    (fun (hash, round_watched, payload_hash_watched) ->
-      {hash; round_watched; payload_hash_watched})
-    (obj3
+    (fun {hash; level_watched; round_watched; payload_hash_watched} ->
+      (hash, level_watched, round_watched, payload_hash_watched))
+    (fun (hash, level_watched, round_watched, payload_hash_watched) ->
+      {hash; level_watched; round_watched; payload_hash_watched})
+    (obj4
        (req "hash" Block_hash.encoding)
+       (req "level_watched" int32)
        (req "round_watched" Round.encoding)
        (req "payload_hash_watched" Block_payload_hash.encoding))
 
@@ -339,8 +341,11 @@ let make_initial_state ?(monitor_node_operations = true) ~constants () =
   }
 
 let is_valid_consensus_content (candidate : candidate) consensus_content =
-  let {hash = _; round_watched; payload_hash_watched} = candidate in
-  Round.equal consensus_content.round round_watched
+  let {hash = _; level_watched; round_watched; payload_hash_watched} =
+    candidate
+  in
+  Int32.equal (Raw_level.to_int32 consensus_content.level) level_watched
+  && Round.equal consensus_content.round round_watched
   && Block_payload_hash.equal
        consensus_content.block_payload_hash
        payload_hash_watched
