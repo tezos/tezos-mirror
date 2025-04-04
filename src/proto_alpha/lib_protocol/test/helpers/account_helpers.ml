@@ -26,6 +26,7 @@ module CycleMap = Map.Make (Cycle)
 type account_state = {
   pkh : Signature.Public_key_hash.t;
   contract : Protocol.Alpha_context.Contract.t;
+  revealed : bool;
   delegate : string option;
   parameters : staking_parameters;
   liquid : Tez.t;
@@ -64,7 +65,7 @@ type account_state = {
 }
 
 let init_account ~name ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
-    ?(bonds = Tez.zero) ?frozen_deposits
+    ?(bonds = Tez.zero) ?frozen_deposits ?(revealed = false)
     ?(unstaked_frozen = Unstaked_frozen.zero)
     ?(unstaked_finalizable = Unstaked_finalizable.zero)
     ?(staking_delegator_numerator = Z.zero)
@@ -76,6 +77,7 @@ let init_account ~name ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
   {
     pkh;
     contract;
+    revealed;
     delegate;
     parameters;
     liquid;
@@ -123,6 +125,7 @@ let balance_of_account account_name (account_map : account_map) =
       {
         pkh = _;
         contract = _;
+        revealed = _;
         delegate;
         parameters = _;
         liquid;

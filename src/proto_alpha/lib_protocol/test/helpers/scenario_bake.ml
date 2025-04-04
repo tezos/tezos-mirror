@@ -55,12 +55,14 @@ let check_all_balances block state : unit tzresult Lwt.t =
   let*! r1 =
     String.Map.fold_s
       (fun name account acc ->
-        log_debug_balance name account_map ;
-        let* () = log_debug_rpc_balance name (Implicit account.pkh) block in
-        let*! r =
-          assert_balance_check ~loc:__LOC__ (B block) name account_map
-        in
-        Assert.join_errors r acc)
+        if account.revealed then (
+          log_debug_balance name account_map ;
+          let* () = log_debug_rpc_balance name (Implicit account.pkh) block in
+          let*! r =
+            assert_balance_check ~loc:__LOC__ (B block) name account_map
+          in
+          Assert.join_errors r acc)
+        else return_unit)
       account_map
       Result.return_unit
   in
@@ -82,7 +84,7 @@ let check_misc block state : unit tzresult Lwt.t =
   String.Map.fold_s
     (fun name account acc ->
       match account.delegate with
-      | Some x when String.equal x name ->
+      | Some x when String.equal x name && account.revealed ->
           let ufd_state =
             List.map
               (fun ({cycle; current; _} : Unstaked_frozen.r) ->

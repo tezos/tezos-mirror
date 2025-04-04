@@ -93,6 +93,9 @@ let reveal name : (t, t) scenarios =
       let* operation =
         Op.revelation ~fee:Protocol.Alpha_context.Tez.zero (B block) acc.pk
       in
+      let state =
+        State.update_account name {account with revealed = true} state
+      in
       return (state, [operation]))
 
 (** Transfer from src to dst *)

@@ -108,6 +108,7 @@ let begin_test ?(burn_rewards = false) ?(force_attest_all = false)
             let account =
               init_account
                 ~name
+                ~revealed:true
                 ~delegate:name
                 ~pkh
                 ~contract
