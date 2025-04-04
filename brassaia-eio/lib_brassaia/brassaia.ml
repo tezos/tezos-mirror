@@ -15,7 +15,7 @@
  *)
 
 open! Import
-module Type = Repr
+module Type = Type
 module Metrics = Metrics
 module Diff = Diff
 module Read_only = Read_only

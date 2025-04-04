@@ -21,6 +21,11 @@ module type S = sig
   type hash
 
   val to_hash : t -> hash
+
+  (** [encoding] is the data_encoding for {!type-t}. *)
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
 end
 
 module type Hash_like = sig

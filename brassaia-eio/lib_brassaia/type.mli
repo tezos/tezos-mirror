@@ -17,8 +17,19 @@
 (** @inline *)
 include module type of Repr
 
+module type S = sig
+  include Repr.S
+
+  val encoding : t Data_encoding.t
+end
+
 module type Defaultable = sig
   include S
 
   val default : t
 end
+
+(** [of_string_exn ~path t s] tries to convert [s] in a value of type [t].
+
+    Raises a [Stdlib.Failure] with the path leading to the call *)
+val of_string_exn : path:string -> 'a t -> string -> 'a

@@ -28,6 +28,9 @@ module type S = sig
       one of the two merging points. The merge function returns [None] when the
       key's value should be deleted. *)
   val merge : t option Merge.t
+
+  (** [encoding] is the data_encoding value for {!type-t}. *)
+  val encoding : t Data_encoding.t
 end
 
 module type Store = sig

@@ -23,6 +23,8 @@ module String = struct
 
   let main = "main"
 
+  let encoding = Data_encoding.string
+
   let is_valid s =
     let ok = ref true in
     let n = String.length s in

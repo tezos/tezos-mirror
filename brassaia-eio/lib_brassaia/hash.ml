@@ -49,11 +49,16 @@ module Make (H : Digestif.S) = struct
       H.of_raw_string
       H.to_raw_string
 
+  let encoding =
+    Data_encoding.conv H.to_raw_string H.of_raw_string Data_encoding.string
+
   let hash s = H.digesti_string s
 
   let to_raw_string s = H.to_raw_string s
 
   let unsafe_of_raw_string s = H.of_raw_string s
+
+  let pp ppf t = Format.pp_print_string ppf (to_raw_string t)
 end
 
 module Make_BLAKE2B (D : sig
@@ -111,6 +116,10 @@ module V1 (K : S) : S with type t = K.t = struct
   let size_of = Type.Size.custom_static (8 + hash_size)
 
   let t = Type.like K.t ~bin:(encode_bin, decode_bin, size_of)
+
+  let encoding = K.encoding
+
+  let pp ppf t = Format.pp_print_string ppf (to_raw_string t)
 end
 
 module Set = struct

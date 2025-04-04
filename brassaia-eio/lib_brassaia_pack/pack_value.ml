@@ -16,6 +16,7 @@
 
 open! Import
 include Pack_value_intf
+module Brassaia = Brassaia_eio.Brassaia
 
 module Kind = struct
   type t =
@@ -156,6 +157,14 @@ struct
   let weight =
     let size = Mem.repr_size t in
     fun v -> Immediate (size v)
+
+  let encoding =
+    Data_encoding.conv
+      (Repr.to_string t)
+      (Brassaia.Type.of_string_exn
+         ~path:"lib_brassaia_pack/pack_value.ml/Of_contents/of_string"
+         t)
+      Data_encoding.string
 end
 
 module Of_commit
@@ -182,6 +191,15 @@ struct
   let hash = Hash.hash
 
   let kind _ = Kind.Commit_v2
+
+  let encoding =
+    Data_encoding.conv
+      Repr.(to_string t)
+      Brassaia.Type.(
+        of_string_exn
+          ~path:"lib_brassaia_pack/pack_value.ml/Of_commit/of_string"
+          t)
+      Data_encoding.string
 
   let weight =
     let size = Mem.repr_size t in

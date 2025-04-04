@@ -56,7 +56,7 @@ end
     type definitions via [[@@deriving brassaia]] (see the
     {{:https://github.com/mirage/brassaia/blob/main/README_PPX.md} documentation
       for [ppx_brassaia]})*)
-module Type = Repr
+module Type = Type
 
 (** Hashing functions.
 

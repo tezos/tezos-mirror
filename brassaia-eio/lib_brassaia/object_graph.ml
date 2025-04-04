@@ -17,6 +17,51 @@
 open! Import
 include Object_graph_intf
 
+module Events = struct
+  include Internal_event.Simple
+
+  let section = ["brassaia-eio"; "object_graph"]
+
+  let object_graph_iter =
+    declare_5
+      ~section
+      ~level:Debug
+      ~name:"object_graph_iter"
+      ~msg:
+        "iter: depth: {depth}; rev: {rev}; min: {min}; max: {max}; cache_size: \
+         {cache_size}"
+      ("depth", Data_encoding.int64)
+      ("rev", Data_encoding.bool)
+      ("min", Data_encoding.(list string))
+      ("max", Data_encoding.(list string))
+      ("cache_size", Data_encoding.(option int64))
+
+  let treat_key =
+    declare_1
+      ~section
+      ~level:Debug
+      ~name:"treat_key"
+      ~msg:"Treat key {key}"
+      ("key", Data_encoding.string)
+
+  let visit_key_level =
+    declare_2
+      ~section
+      ~level:Debug
+      ~name:"visit_key_level"
+      ~msg:"Visit key {key} at level {level}"
+      ("key", Data_encoding.string)
+      ("level", Data_encoding.int64)
+
+  let output =
+    declare_1
+      ~section
+      ~level:Debug
+      ~name:"output"
+      ~msg:"Output {name}"
+      ("name", Data_encoding.string)
+end
+
 let src = Logs.Src.create "brassaia.graph" ~doc:"Brassaia graph support"
 
 module Log = (val Logs.src_log src : Logs.LOG)
@@ -44,6 +89,36 @@ struct
       | `Commit of Commit_key.t
       | `Branch of Branch.t ]
     [@@deriving brassaia]
+
+    let encoding =
+      let open Data_encoding in
+      union
+        [
+          case
+            (Tag 1)
+            ~title:"`Contents"
+            Contents_key.encoding
+            (function `Contents k -> Some k | _ -> None)
+            (fun k -> `Contents k);
+          case
+            (Tag 2)
+            ~title:"`Node"
+            Node_key.encoding
+            (function `Node k -> Some k | _ -> None)
+            (fun k -> `Node k);
+          case
+            (Tag 3)
+            ~title:"`Commit"
+            Commit_key.encoding
+            (function `Commit c -> Some c | _ -> None)
+            (fun c -> `Commit c);
+          case
+            (Tag 4)
+            ~title:"`Branch "
+            Branch.encoding
+            (function `Branch b -> Some b | _ -> None)
+            (fun b -> `Branch b);
+        ]
 
     let equal = Type.(unstage (equal t))
 
@@ -104,31 +179,25 @@ struct
      to save space. *)
   module Dump = struct
     type t = X.t list * (X.t * X.t) list [@@deriving brassaia]
+
+    let encoding =
+      Data_encoding.(tup2 (list X.encoding) (list (tup2 X.encoding X.encoding)))
   end
 
   let vertex g = G.fold_vertex (fun k set -> k :: set) g []
 
   let edges g = G.fold_edges (fun k1 k2 list -> (k1, k2) :: list) g []
 
-  let pp_vertices = Fmt.Dump.list (Type.pp X.t)
-
-  let pp_depth ppf d = if d <> max_int then Fmt.pf ppf "depth=%d,@ " d
-
   type action = Visit of (X.t * int) | Treat of X.t
 
   let iter ?cache_size ?(depth = max_int) ~pred ~min ~max ~node ?edge ~skip ~rev
       () =
-    [%log.debug
-      "@[<2>iter:@ %arev=%b,@ min=%a,@ max=%a@, cache=%a@]"
-        pp_depth
-        depth
-        rev
-        pp_vertices
-        min
-        pp_vertices
-        max
-        Fmt.(Dump.option int)
-        cache_size] ;
+    Events.(emit__dont_wait__use_with_care object_graph_iter)
+      ( Int64.of_int depth,
+        rev,
+        List.map (Logging.to_string_exn X.encoding) min,
+        List.map (Logging.to_string_exn X.encoding) max,
+        Option.map Int64.of_int cache_size ) ;
     let marks = Table.create cache_size in
     let mark key level = Table.add marks key level in
     let todo = Stack.create () in
@@ -145,7 +214,8 @@ struct
     let has_mark key = Table.mem marks key in
     List.iter (fun k -> Stack.push (Visit (k, 0)) todo) max ;
     let treat key =
-      [%log.debug "TREAT %a" Type.(pp X.t) key] ;
+      Events.(emit_at_top_level treat_key)
+        (Logging.to_string_exn X.encoding key) ;
       node key ;
       if not (Set.mem key min) then
         (* the edge function is optional to prevent an unnecessary computation
@@ -175,7 +245,8 @@ struct
         | true -> ()
         | false ->
             let () =
-              [%log.debug "VISIT %a %d" Type.(pp X.t) key level] ;
+              Events.(emit_at_top_level visit_key_level)
+                (Logging.to_string_exn X.encoding key, Int64.of_int level) ;
               mark key level ;
               if rev then Stack.push (Treat key) todo ;
               match key with
@@ -202,7 +273,8 @@ struct
     let has_mark key = Table.mem marks key in
     List.iter (fun k -> Queue.push (Visit (k, 0)) todo) max ;
     let treat key =
-      [%log.debug "TREAT %a" Type.(pp X.t) key] ;
+      Events.(emit__dont_wait__use_with_care treat_key)
+        (Logging.to_string_exn X.encoding key) ;
       node key
     in
     let visit_predecessors key level =
@@ -212,7 +284,8 @@ struct
     let visit key level =
       if has_mark key then ()
       else (
-        [%log.debug "VISIT %a" Type.(pp X.t) key] ;
+        Events.(emit__dont_wait__use_with_care visit_key_level)
+          (Logging.to_string_exn X.encoding key, Int64.of_int level) ;
         mark key level ;
         treat key ;
         visit_predecessors key level)
@@ -289,7 +362,7 @@ struct
     g
 
   let output ppf vertex edges name =
-    [%log.debug "output %s" name] ;
+    Events.(emit__dont_wait__use_with_care output) name ;
     let g = G.create ~size:(List.length vertex) () in
     List.iter (fun (v, _) -> G.add_vertex g v) vertex ;
     List.iter (fun (v1, _, v2) -> G.add_edge g v1 v2) edges ;

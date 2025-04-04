@@ -22,6 +22,30 @@ open Brassaia
 module Metadata = struct
   type t = Default | Left | Right [@@deriving brassaia]
 
+  let encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          (Tag 1)
+          ~title:"Default"
+          empty
+          (function Default -> Some () | _ -> None)
+          (fun () -> Default);
+        case
+          (Tag 2)
+          ~title:"Left"
+          empty
+          (function Left -> Some () | _ -> None)
+          (fun () -> Left);
+        case
+          (Tag 3)
+          ~title:"Right"
+          empty
+          (function Right -> Some () | _ -> None)
+          (fun () -> Right);
+      ]
+
   let merge =
     Merge.init t (fun ~old:_ _ _ -> Merge.conflict "Can't merge metadata")
 
@@ -908,7 +932,7 @@ let suite =
     Alcotest.test_case_eio "add" `Quick test_add;
     Alcotest.test_case_eio "remove" `Quick test_remove;
     Alcotest.test_case_eio "update" `Quick test_update;
-    Alcotest.test_case_eio "clear" `Quick test_clear;
+    Alcotest.test_case_eio "clear" `Slow test_clear;
     Alcotest.test_case_eio "minimal_reads" `Quick test_minimal_reads;
     Alcotest.test_case_eio "fold" `Quick test_fold_force;
     Alcotest.test_case_eio "Broken.hashes" `Quick Broken.test_hashes;
