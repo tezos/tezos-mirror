@@ -383,6 +383,26 @@ module S = struct
   end
 end
 
+module Implem = struct
+  let unstake_requests ctxt contract =
+    let open Lwt_result_syntax in
+    let open Unstake_requests.For_RPC in
+    let* result =
+      (* This function applies slashing to finalizable requests. *)
+      prepare_finalize_unstake ctxt contract
+    in
+    match result with
+    | None -> return_none
+    | Some {finalizable; unfinalizable} ->
+        let* unfinalizable =
+          (* Apply slashing to unfinalizable requests too. *)
+          apply_slash_to_unstaked_unfinalizable_stored_requests
+            ctxt
+            unfinalizable
+        in
+        return_some {finalizable; unfinalizable}
+end
+
 let register () =
   let open Lwt_result_syntax in
   register0 ~chunked:true S.list (fun ctxt () () ->
@@ -521,17 +541,7 @@ let register () =
     Contract.For_RPC.get_unstaked_finalizable_balance ;
   register_field ~chunked:false S.full_balance Contract.For_RPC.get_full_balance ;
   register1 ~chunked:false S.unstake_requests (fun ctxt contract () () ->
-      let open Unstake_requests.For_RPC in
-      let* result = prepare_finalize_unstake ctxt contract in
-      match result with
-      | None -> return_none
-      | Some {finalizable; unfinalizable} ->
-          let* unfinalizable =
-            apply_slash_to_unstaked_unfinalizable_stored_requests
-              ctxt
-              unfinalizable
-          in
-          return_some {finalizable; unfinalizable}) ;
+      Implem.unstake_requests ctxt contract) ;
   opt_register1 ~chunked:false S.manager_key (fun ctxt contract () () ->
       match contract with
       | Originated _ -> return_none

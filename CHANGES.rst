@@ -37,6 +37,12 @@ Node
 - Added RPC ``POST /bls/check_proof`` to check a BLS proof. (MR
   :gl:`!17461`)
 
+- Added RPC ``GET
+  /chains/<chain>/delegators_contribution/<cycle>/<baker_pkh>``, which
+  provides a breakdown of all the contributions to the delegation
+  portion of the baking power of the baker for the given cycle. (MR
+  :gl:`!17406`)
+
 Client
 ------
 
@@ -135,7 +141,7 @@ Smart Rollup node
 
 - Add a CLI argument ``--config-file`` to allow specifying a configuration file
   outside the data directory. (MR :gl:`!17225`)
-  
+
 - Allow to provide a remote URL for downloading snapshots in commands ``snapshot
   info`` and ``snapshot import``. (MR :gl:`!17407`)
 
