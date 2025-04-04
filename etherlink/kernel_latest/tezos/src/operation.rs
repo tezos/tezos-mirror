@@ -11,19 +11,15 @@ use nom::{bytes::complete::take, Finish};
 use primitive_types::H256;
 use rlp::Decodable;
 use tezos_crypto_rs::blake2b::digest_256;
-use tezos_crypto_rs::hash::{HashType, UnknownSignature};
+use tezos_crypto_rs::hash::UnknownSignature;
 use tezos_data_encoding::types::Narith;
 use tezos_data_encoding::{
-    enc::{self as tezos_enc, BinError, BinResult, BinWriter},
-    nom::{self as tezos_nom, error::DecodeError, NomError, NomReader, NomResult},
+    enc::{BinError, BinResult, BinWriter},
+    nom::{error::DecodeError, NomError, NomReader},
 };
-use tezos_smart_rollup::types::PublicKeyHash;
-use tezos_smart_rollup::types::{Contract, PublicKey};
+use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 
-pub const REVEAL_TAG: u8 = 107_u8;
-pub const TRANSFER_TAG: u8 = 108_u8;
-
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct RevealContent {
     pub pk: PublicKey,
 }
@@ -32,84 +28,21 @@ pub struct RevealContent {
 /// to consistently call them transfers to avoid confusion with the
 /// Ethereum notion of transaction which is more generic as it also
 /// encompasses the case of originations.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct TransferContent {
     pub amount: Narith,
     pub destination: Contract,
     pub parameter: Option<()>,
 }
 
-#[derive(PartialEq, Debug, Clone)]
 pub enum OperationContent {
     Reveal(RevealContent),
     Transfer(TransferContent),
 }
 
-impl OperationContent {
-    pub fn tag(&self) -> u8 {
-        match self {
-            Self::Reveal(_) => REVEAL_TAG,
-            Self::Transfer(_) => TRANSFER_TAG,
-        }
-    }
-
-    pub fn from_bytes(tag: u8, bytes: &[u8]) -> NomResult<Self> {
-        match tag {
-            REVEAL_TAG => {
-                let (array, pk) = PublicKey::nom_read(bytes)?;
-                NomResult::Ok((array, Self::Reveal(RevealContent { pk })))
-            }
-            TRANSFER_TAG => {
-                let (input, amount) = Narith::nom_read(bytes)?;
-                let (input, destination) = Contract::nom_read(input)?;
-                // TODO: parameter should be a Michelson expr, for now just use unit
-                let (input, parameter) =
-                    tezos_nom::optional_field(|input| Ok((input, ())))(input)?;
-                NomResult::Ok((
-                    input,
-                    Self::Transfer(TransferContent {
-                        amount,
-                        destination,
-                        parameter,
-                    }),
-                ))
-            }
-            _ => Err(nom::Err::Error(tezos_nom::NomError::invalid_tag(
-                bytes,
-                tag.to_string(),
-            ))),
-        }
-    }
-}
-
-// TODO: !17672, derive all NomReader and BinWriter implementations in this module.
-impl BinWriter for OperationContent {
-    fn bin_write(&self, data: &mut Vec<u8>) -> BinResult {
-        match self {
-            Self::Reveal(RevealContent { pk }) => {
-                pk.bin_write(data)?;
-                Ok(())
-            }
-            Self::Transfer(TransferContent {
-                amount,
-                destination,
-                parameter,
-            }) => {
-                amount.bin_write(data)?;
-                destination.bin_write(data)?;
-                // TODO: parameter should be a Michelson expr, for now just use unit
-                let closure: for<'a> fn(&(), &'a mut Vec<u8>) -> BinResult =
-                    |_, _| Ok(());
-                tezos_enc::optional_field(closure)(parameter, data)?;
-                Ok(())
-            }
-        }
-    }
-}
-
 // In Tezlink, we'll only support ManagerOperation so we don't
 // have to worry about other operations
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct ManagerOperation<C> {
     pub source: PublicKeyHash,
     pub fee: Narith,
@@ -119,122 +52,11 @@ pub struct ManagerOperation<C> {
     pub operation: C,
 }
 
-// TODO: !17672, derive all NomReader and BinWriter implementations in this module.
-impl BinWriter for ManagerOperation<OperationContent> {
-    fn bin_write(&self, data: &mut Vec<u8>) -> BinResult {
-        let Self {
-            source,
-            fee,
-            counter,
-            operation,
-            gas_limit,
-            storage_limit,
-        } = self;
-
-        // Push the tag of the operation
-        data.push(operation.tag());
-
-        // Push data related to the operation
-        source.bin_write(data)?;
-
-        fee.bin_write(data)?;
-
-        counter.bin_write(data)?;
-
-        gas_limit.bin_write(data)?;
-
-        storage_limit.bin_write(data)?;
-
-        // Append the operation
-        operation.bin_write(data)?;
-
-        Ok(())
-    }
-}
-
-// TODO: !17672, derive all NomReader and BinWriter implementations in this module.
-impl NomReader<'_> for ManagerOperation<OperationContent> {
-    fn nom_read(bytes: &[u8]) -> tezos_data_encoding::nom::NomResult<Self> {
-        // Retrieve the tag of the operation, it will be used to decode the OperationContent
-        let (bytes, tag) = nom::number::complete::u8(bytes)?;
-
-        let (bytes, source) = PublicKeyHash::nom_read(bytes)?;
-
-        let (bytes, fee) = Narith::nom_read(bytes)?;
-
-        let (bytes, counter) = Narith::nom_read(bytes)?;
-
-        let (bytes, gas_limit) = Narith::nom_read(bytes)?;
-
-        let (bytes, storage_limit) = Narith::nom_read(bytes)?;
-
-        let (bytes, operation) = OperationContent::from_bytes(tag, bytes)?;
-
-        Ok((
-            bytes,
-            Self {
-                source,
-                fee,
-                counter,
-                operation,
-                gas_limit,
-                storage_limit,
-            },
-        ))
-    }
-}
-
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, NomReader, BinWriter)]
 pub struct Operation {
     pub branch: BlockHash,
     pub content: ManagerOperationContent,
     pub signature: UnknownSignature,
-}
-
-// TODO: !17672, derive all NomReader and BinWriter implementations in this module.
-impl BinWriter for Operation {
-    fn bin_write(&self, data: &mut Vec<u8>) -> BinResult {
-        // Encode branch field
-        self.branch.bin_write(data)?;
-
-        let content: ManagerOperation<OperationContent> = self.content.clone().into();
-        content.bin_write(data)?;
-
-        // In an operation, the signature is always encoded as an UnknownSignature
-        // 'bin_write' function for signature adds 4 bytes for the size which
-        // makes the decoding fail
-        let b58_repr = self.signature.to_base58_check();
-
-        let encoded_sig = HashType::UnknownSignature
-            .b58check_to_hash(&b58_repr)
-            .map_err(|b58_err| BinError::custom(format!("{:?}", b58_err)))?;
-
-        data.extend_from_slice(&encoded_sig);
-        Ok(())
-    }
-}
-
-// TODO: !17672, derive all NomReader and BinWriter implementations in this module.
-impl NomReader<'_> for Operation {
-    fn nom_read(bytes: &[u8]) -> NomResult<Self> {
-        let (bytes, branch) = BlockHash::nom_read(bytes)?;
-
-        // We'll use the returned slice to decode the signature
-        let (bytes, content) = ManagerOperation::nom_read(bytes)?;
-
-        // Can't use Signature 'nom_read' function because it expect 4 bytes for the size
-        // which is not the case in an operation (it's always an Unknown signature)
-        let (bytes, signature) = UnknownSignature::nom_read(bytes)?;
-
-        Ok((
-            bytes,
-            Operation {
-                branch,
-                content: content.into(),
-                signature,
-            },
-        ))
-    }
 }
 
 impl Operation {
@@ -315,9 +137,12 @@ with the operation-kind tag, then the generic fields, and finally the
 kind-specific fields.
 
 */
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+#[encoding(tags = "u8")]
 pub enum ManagerOperationContent {
+    #[encoding(tag = 107)]
     Reveal(ManagerOperation<RevealContent>),
+    #[encoding(tag = 108)]
     Transfer(ManagerOperation<TransferContent>),
 }
 
