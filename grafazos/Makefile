@@ -16,8 +16,7 @@ clean:
 	rm output/*.json
 
 fmt:
-	jsonnetfmt -i src/*.jsonnet
-	jsonnetfmt -i src/dal/*.jsonnet
+	find src -name '*.jsonnet' -exec jsonnetfmt -i {} \;
 
 basic: octez-basic.jsonnet
 
