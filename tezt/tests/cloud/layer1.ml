@@ -302,16 +302,20 @@ module Node = struct
     Lwt.return (client, accounts)
 end
 
+(** Stresstest parameters
+    - [pkh]: public key hash of the account to use as a faucet
+    - [pk]: public key of the account to use as a faucet
+    - [tps]: targeted number of transactions per second
+    - [seed]: seed used for stresstest traffic generation
+ *)
 type stresstest_conf = {pkh : string; pk : string; tps : int; seed : int}
 
-(** Parameterized version of the [configuration]. Used to make it easier to
-    re-use [--network] cli option which is common to all test scenarios, as
-    network set supported by this scenario and others is different.
+(** Scenario configuration
 
-    - [snapshot] local path or URL of the snapshot to use for the experiment.
+    - [snapshot]: local path or URL of the snapshot to use for the experiment.
       local path implies to [scp] the snapshot to all the vms.
 
-    - [stake] stake repartition between baking node, numbers are relatives.
+    - [stake]: stake repartition between baking node, numbers are relatives.
 
       e.g.: [2,1,1] runs 3 bakers, aggregate delegates from the network,
       spreading them in 3 pools representing roughly 50%, 25% and 25% of the
@@ -332,17 +336,75 @@ type stresstest_conf = {pkh : string; pk : string; tps : int; seed : int}
 
     - [migration_offset]: offset that dictates after how many levels a protocol
       upgrade will be performed via a UAU.
+
+    - [stresstest]: See the description of [stresstest_conf]
   *)
-type 'network configuration0 = {
+type configuration = {
   stake : int list;
-  network : 'network;
+  network : Network.t;
   snapshot : string;
   stresstest : stresstest_conf option;
   maintenance_delay : int;
   migration_offset : int option;
 }
 
-type configuration = Network.t configuration0
+(** A version of the [configuration] partially defined. *)
+type partial_configuration = {
+  stake : int list option;
+  network : Network.t option;
+  snapshot : string option;
+  stresstest : stresstest_conf option;
+  maintenance_delay : int option;
+  migration_offset : int option;
+}
+
+let network_encoding =
+  Data_encoding.string_enum [("Mainnet", `Mainnet); ("Ghostnet", `Ghostnet)]
+
+let stresstest_encoding =
+  let open Data_encoding in
+  conv
+    (fun {pkh; pk; tps; seed} -> (pkh, pk, tps, seed))
+    (fun (pkh, pk, tps, seed) -> {pkh; pk; tps; seed})
+    (obj4
+       (req "pkh" string)
+       (req "pk" string)
+       (req "tps" int31)
+       (req "seed" int31))
+
+let configuration_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           stake;
+           network;
+           snapshot;
+           stresstest;
+           maintenance_delay;
+           migration_offset;
+         } ->
+      (stake, network, snapshot, stresstest, maintenance_delay, migration_offset))
+    (fun ( stake,
+           network,
+           snapshot,
+           stresstest,
+           maintenance_delay,
+           migration_offset ) ->
+      {
+        stake;
+        network;
+        snapshot;
+        stresstest;
+        maintenance_delay;
+        migration_offset;
+      })
+    (obj6
+       (opt "stake" @@ list int31)
+       (opt "network" network_encoding)
+       (opt "snapshot" string)
+       (opt "stresstest" stresstest_encoding)
+       (opt "maintenance_delay" int31)
+       (opt "migration_offset" int31))
 
 type bootstrap = {
   agent : Agent.t;
@@ -422,8 +484,8 @@ let fund_stresstest_accounts ~source client =
     ~initial_amount:(Tez.of_mutez_int64 1_000_000_000L)
     client
 
-let init_stresstest_i i configuration ~pkh ~pk ~peers (agent, node, name) tps :
-    stresstester Lwt.t =
+let init_stresstest_i i (configuration : configuration) ~pkh ~pk ~peers
+    (agent, node, name) tps : stresstester Lwt.t =
   let delay = i * configuration.maintenance_delay in
   let* client, accounts =
     toplog "init_stresstest: Initialize node" ;
@@ -911,38 +973,61 @@ let parse_conf encoding file =
         in
         exit 1)
 
+let yes_wallet_exe = Uses.path Constant.yes_wallet
+
 let register (module Cli : Scenarios_cli.Layer1) =
-  let configuration =
-    let stake = Option.value ~default:[] Cli.stake in
-    let network : Network.t option =
-      match Cli.network with
-      | `Mainnet -> Some `Mainnet
-      | `Ghostnet -> Some `Ghostnet
-    in
+  let configuration0 : partial_configuration =
+    let stake = Cli.stake in
+    let network = Cli.network in
     let stresstest =
       Option.map
         (fun (pkh, pk, tps, seed) -> {pkh; pk; tps; seed})
         Cli.stresstest
     in
-    let maintenance_delay = Option.value ~default:0 Cli.maintenance_delay in
-    let snapshot = Option.value ~default:"" Cli.snapshot in
+    let maintenance_delay = Cli.maintenance_delay in
+    let snapshot = Cli.snapshot in
     let migration_offset = Cli.migration_offset in
-    {stake; network; stresstest; maintenance_delay; snapshot; migration_offset}
+    match Cli.config with
+    | Some filename ->
+        let conf = parse_conf configuration_encoding filename in
+        {
+          stake = (if stake <> None then stake else conf.stake);
+          network = (if network <> None then network else conf.network);
+          snapshot = (if snapshot <> None then snapshot else conf.snapshot);
+          stresstest =
+            (if stresstest <> None then stresstest else conf.stresstest);
+          maintenance_delay =
+            (if maintenance_delay <> None then maintenance_delay
+             else conf.maintenance_delay);
+          migration_offset =
+            (if migration_offset <> None then migration_offset
+             else conf.migration_offset);
+        }
+    | None ->
+        {
+          stake;
+          network;
+          stresstest;
+          maintenance_delay;
+          snapshot;
+          migration_offset;
+        }
   in
   let vms_conf = Option.map (parse_conf vms_conf_encoding) Cli.vms_config in
   toplog "Parsing CLI done" ;
   let vms =
     `Bootstrap
     ::
-    (match configuration.stake with
-    | [n] -> List.init n (fun i -> `Baker i)
-    | stake -> List.mapi (fun i _ -> `Baker i) stake)
+    (match configuration0.stake with
+    | Some [n] -> List.init n (fun i -> `Baker i)
+    | Some stake -> List.mapi (fun i _ -> `Baker i) stake
+    | None -> [])
     @
-    match configuration.stresstest with
+    match configuration0.stresstest with
     | None -> []
     | Some {tps; _} ->
         let n =
-          match configuration.network with
+          match configuration0.network with
           | Some network -> nb_stresstester network tps
           | None -> tps / stresstest_max_tps_pre_node
         in
@@ -994,20 +1079,28 @@ let register (module Cli : Scenarios_cli.Layer1) =
   (* Docker images are pushed before executing the test in case binaries
      are modified locally. This way we always use the latest ones. *)
     ~vms
-    ~proxy_files:[Uses.path Constant.yes_wallet; configuration.snapshot]
+    ~proxy_files:
+      ([yes_wallet_exe]
+      @
+      match configuration0.snapshot with Some snapshot -> [snapshot] | _ -> [])
     ~__FILE__
     ~title:"L1 simulation"
     ~tags:[]
   @@ fun cloud ->
   let configuration : configuration =
-    (* Some checks for mandatory options defined as optional because CLI
-       argument definitions are shared amongst all other tests and we don't
-       want to force other test to define these arguments. *)
-    (* FIXME: Do better than these assert *)
-    assert (configuration.stake <> []) ;
-    assert (configuration.snapshot <> "") ;
-    let network = Option.get configuration.network in
-    {configuration with network}
+    let stake = Option.get configuration0.stake in
+    let network = Option.get configuration0.network in
+    let snapshot = Option.get configuration0.snapshot in
+    let stresstest = configuration0.stresstest in
+    let maintenance_delay =
+      Option.value
+        ~default:Cli.default_maintenance_delay
+        configuration0.maintenance_delay
+    in
+    let migration_offset = configuration0.migration_offset in
+    if stake = [] then Test.fail "stake parameter can not be empty" ;
+    if snapshot = "" then Test.fail "snapshot parameter can not be empty" ;
+    {stake; network; snapshot; stresstest; maintenance_delay; migration_offset}
   in
   toplog "Creating the agents" ;
   let agents = Cloud.agents cloud in
