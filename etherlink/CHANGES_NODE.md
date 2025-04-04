@@ -19,6 +19,9 @@
 - `replay blueprint` can disable data availability fees with `--disable-da-fees`. (!17441)
 - Adds `replay blueprints from <l1> to <l2>` to replay a range of blocks.
   (!17441 !17598)
+- Fixes a bug (which negatively impacted performance) in the EVM events batch
+  fetching in case the rollup node has ACL filtering for the required RPC.
+  (!17572)
 
 ### Storage changes
 
