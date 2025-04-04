@@ -98,17 +98,17 @@ impl BinWriter for OperationContent {
 // In Tezlink, we'll only support ManagerOperation so we don't
 // have to worry about other operations
 #[derive(PartialEq, Debug)]
-pub struct ManagerOperation {
+pub struct ManagerOperation<C> {
     pub source: PublicKeyHash,
     pub fee: Narith,
     pub counter: Narith,
     pub gas_limit: Narith,
     pub storage_limit: Narith,
-    pub operation: OperationContent,
+    pub operation: C,
 }
 
 // TODO: !17672, derive all NomReader and BinWriter implementations in this module.
-impl BinWriter for ManagerOperation {
+impl BinWriter for ManagerOperation<OperationContent> {
     fn bin_write(&self, data: &mut Vec<u8>) -> BinResult {
         let Self {
             source,
@@ -141,7 +141,7 @@ impl BinWriter for ManagerOperation {
 }
 
 // TODO: !17672, derive all NomReader and BinWriter implementations in this module.
-impl NomReader<'_> for ManagerOperation {
+impl NomReader<'_> for ManagerOperation<OperationContent> {
     fn nom_read(bytes: &[u8]) -> tezos_data_encoding::nom::NomResult<Self> {
         // Retrieve the tag of the operation, it will be used to decode the OperationContent
         let (bytes, tag) = nom::number::complete::u8(bytes)?;
@@ -175,7 +175,7 @@ impl NomReader<'_> for ManagerOperation {
 #[derive(PartialEq, Debug)]
 pub struct Operation {
     pub branch: H256,
-    pub content: ManagerOperation,
+    pub content: ManagerOperation<OperationContent>,
     pub signature: UnknownSignature,
 }
 
