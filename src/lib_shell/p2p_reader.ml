@@ -83,7 +83,7 @@ let may_handle state chain_id f =
 
 (* performs [f chain_db] if [chain_id] is active and [chain_db] is the
    chain_db corresponding to this chain id. *)
-let may_handle_global state chain_id f =
+let may_handle_global (state : t) chain_id f =
   match Chain_id.Table.find state.active_chains chain_id with
   | None -> Lwt.return_unit
   | Some chain_db -> f chain_db
@@ -100,7 +100,7 @@ let find_pending_operation {peer_active_chains; _} h =
   |> Seq.find (fun chain_db ->
          Distributed_db_requester.Raw_operation.pending chain_db.operation_db h)
 
-let read_operation state h =
+let read_operation (state : t) h =
   let open Lwt_syntax in
   Seq_s.of_seq (Chain_id.Table.to_seq state.active_chains)
   |> Seq_s.S.find_map (fun (chain_id, chain_db) ->
@@ -111,7 +111,7 @@ let read_operation state h =
          in
          Option.map (fun bh -> (chain_id, bh)) v)
 
-let read_block {disk; _} h =
+let read_block ({disk; _} : t) h =
   let open Lwt_syntax in
   let* chain_stores = Store.all_chain_stores disk in
   List.find_map_s
@@ -133,7 +133,7 @@ let read_block_header db h =
   | Some (chain_id, block) ->
       Lwt.return_some (chain_id, Store.Block.header block)
 
-let read_predecessor_header {disk; _} h offset =
+let read_predecessor_header ({disk; _} : t) h offset =
   Option.catch_os (fun () ->
       let open Lwt_syntax in
       let offset = Int32.to_int offset in
@@ -168,9 +168,9 @@ let activate state chain_id chain_db =
       P2p_peer.Table.add chain_db.active_connections state.gid state.conn ;
       Chain_id.Table.add state.peer_active_chains chain_id chain_db
 
-let my_peer_id state = P2p.peer_id state.p2p
+let my_peer_id (state : t) = P2p.peer_id state.p2p
 
-let handle_msg state msg =
+let handle_msg (state : t) msg =
   let open Lwt_syntax in
   let open Message in
   let meta = P2p.get_peer_metadata state.p2p state.gid in
@@ -507,23 +507,82 @@ let handle_msg state msg =
        Lwt.return_unit)
       [@profiler.span_s {verbosity = Notice} ["Predecessor_header"]]
 
-let rec worker_loop state =
-  let open Lwt_syntax in
-  let* o =
-    protect ~canceler:state.canceler (fun () -> P2p.recv state.p2p state.conn)
-  in
-  match o with
-  | Ok msg ->
-      let* () = handle_msg state msg in
-      worker_loop state
-  | Error _ ->
-      Chain_id.Table.iter
-        (fun _ -> deactivate state.gid)
-        state.peer_active_chains ;
-      state.unregister () ;
-      Lwt.return_unit
+let on_error state =
+  Chain_id.Table.iter (fun _ -> deactivate state.gid) state.peer_active_chains ;
+  state.unregister () ;
+  Lwt_result.return `Shutdown
 
-let run ~register ~unregister p2p disk protocol_db active_chains gid conn =
+type (_, _) req = Message : Message.t tzresult -> (unit, tztrace) req
+[@@ocaml.unboxed]
+
+type view = View : ('a, 'b) req -> view
+
+module Request :
+  Worker_intf.REQUEST with type ('a, 'b) t = ('a, 'b) req and type view = view =
+struct
+  type ('a, 'b) t = ('a, 'b) req =
+    | Message : Message.t tzresult -> (unit, tztrace) t
+  [@@ocaml.unboxed]
+
+  type nonrec view = view
+
+  let make_encoding (p2p_cases : 'msg P2p_params.app_message_encoding list) =
+    let to_data_encoding_case
+        (P2p_params.Encoding {tag; title; encoding; wrap; unwrap; _}) =
+      Data_encoding.case ~title (Tag tag) encoding unwrap wrap
+    in
+    Data_encoding.union @@ List.map to_data_encoding_case p2p_cases
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun (View (Message msg)) -> msg)
+      (fun msg -> View (Message msg))
+      (Error_monad.result_encoding (make_encoding Message.encoding))
+
+  let pp ppf (View (Message msg)) =
+    match msg with
+    | Ok msg -> Message.pp_json ppf msg
+    | Error trace -> Error_monad.pp_print_trace ppf trace
+
+  let view msg = View msg
+end
+
+type parameters = {
+  p2p : p2p;
+  conn : connection;
+  disk : Store.t;
+  protocol_db : Distributed_db_requester.Raw_protocol.t;
+  active_chains : chain_db Chain_id.Table.t;
+  unregister : unit -> unit;
+}
+
+module Types :
+  Worker_intf.TYPES with type state = t and type parameters = parameters =
+struct
+  type state = t
+
+  type nonrec parameters = parameters
+end
+
+module Name : Worker_intf.NAME with type t = P2p_peer.Id.t = struct
+  let base = ["db_network_reader"]
+
+  type t = P2p_peer.Id.t
+
+  let encoding = P2p_peer.Id.encoding
+
+  let pp = P2p_peer.Id.pp
+
+  let equal = P2p_peer.Id.equal
+end
+
+module Worker = Worker.MakeSingle (Name) (Request) (Types)
+
+type worker = Worker.callback Worker.t
+
+let on_launch (_ : worker) gid
+    {p2p; conn; disk; protocol_db; active_chains; unregister} =
   if not !profiler_init then (
     () [@profiler.record {verbosity = Notice} "start"] ;
     profiler_init := true) ;
@@ -557,12 +616,59 @@ let run ~register ~unregister p2p disk protocol_db active_chains gid conn =
         (fun exc ->
           Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)))
     active_chains ;
-  state.worker <-
-    Lwt_utils.worker
-      (Format.asprintf "db_network_reader.%a" P2p_peer.Id.pp_short gid)
-      ~on_event:Internal_event.Lwt_worker_logger.on_event
-      ~run:(fun () -> worker_loop state)
-      ~cancel:(fun () -> Error_monad.cancel_with_exceptions canceler) ;
-  register state
+  state
 
-let shutdown s = Error_monad.cancel_with_exceptions s.canceler
+(* Temporarily disable warning *)
+[@@@ocaml.warning "-32"]
+
+module Handlers = struct
+  type self = worker
+
+  type launch_error = error trace
+
+  let on_launch (self : self) gid parameters : (t, launch_error) result Lwt.t =
+    Lwt_result.return @@ on_launch self gid parameters
+
+  let on_request :
+      type res err. self -> (res, err) req -> (res, err) result Lwt.t =
+   fun self (Message msg) ->
+    let open Lwt_result_syntax in
+    match msg with
+    | Ok msg ->
+        let*! () = handle_msg (Worker.state self) msg in
+        return_unit
+    | Error trace -> fail trace
+
+  let on_no_request _ = Lwt.return_unit
+
+  let on_close _ = Lwt.return_unit
+
+  let on_error :
+      type res err.
+      self -> _ -> (res, err) req -> err -> [> `Shutdown] tzresult Lwt.t =
+   fun self _ (Message _) _ -> on_error (Worker.state self)
+
+  let on_completion _ _ _ _ = Lwt.return_unit
+end
+
+let run_worker ~register ~unregister p2p disk protocol_db active_chains gid conn
+    =
+  let open Lwt_result_syntax in
+  let table =
+    Worker.create_table
+      (Callback
+         (fun () ->
+           let*! parsed_message_result = P2p.recv p2p conn in
+           Lwt.return
+             (Worker.Any_request (Message parsed_message_result, {scope = None}))))
+  in
+  let* worker =
+    Worker.launch
+      table
+      gid
+      {p2p; conn; disk; protocol_db; active_chains; unregister}
+      (module Handlers)
+  in
+  return (register worker)
+
+let shutdown_worker w = Worker.shutdown w
