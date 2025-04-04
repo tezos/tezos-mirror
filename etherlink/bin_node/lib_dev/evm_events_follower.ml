@@ -170,6 +170,12 @@ let fetch_events =
               (* 404, Rollup node is too old to support fetching all at
                  once. Always fallback in the future. *)
               always_fallback := true
+          | RPC_client_errors.Request_failed
+              {error = Unauthorized_uri | Forbidden; _}
+            :: _ ->
+              (* Rollup node forbids this RPC due to ACL. Always fallback in the
+                 future. *)
+              always_fallback := true
           | _ -> ()) ;
           let*! () = Evm_events_follower_events.fallback () in
           fetch_events_one_by_one state rollup_block_lvl
