@@ -60,9 +60,10 @@ let check_grace_period ~loc src_name =
   let open Lwt_result_syntax in
   exec_unit @@ fun (block, state) ->
   let src = State.find_account src_name state in
+  let last_seen_activity = Stdlib.Option.get src.last_seen_activity in
   let grace =
     Cycle.add
-      src.last_seen_activity
+      last_seen_activity
       state.State.constants.tolerated_inactivity_period
   in
   let* rpc_grace = Context.Delegate.grace_period (B block) src.pkh in

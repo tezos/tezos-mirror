@@ -59,7 +59,7 @@ type account_state = {
      When a delegate is initialized or reactivated, we lie on this and
      put extra [consensus_rights_delay] cycles in the future to
      account for its extended grace period *)
-  last_seen_activity : Cycle.t;
+  last_seen_activity : Cycle.t option;
   consensus_keys : Signature.public_key_hash CycleMap.t;
   companion_keys : Signature.Bls.Public_key_hash.t CycleMap.t;
 }
@@ -70,7 +70,7 @@ let init_account ~name ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
     ?(unstaked_finalizable = Unstaked_finalizable.zero)
     ?(staking_delegator_numerator = Z.zero)
     ?(staking_delegate_denominator = Z.zero) ?(frozen_rights = CycleMap.empty)
-    ?(slashed_cycles = []) ?(last_seen_activity = Cycle.root) () =
+    ?(slashed_cycles = []) ?last_seen_activity () =
   let frozen_deposits =
     Option.value frozen_deposits ~default:(Frozen_tez.init Tez.zero name name)
   in
@@ -561,23 +561,50 @@ let current_total_frozen_deposits_with_limits account_state =
     account_state.frozen_deposits
 
 let update_activity account constants current_cycle =
-  if Cycle.(account.last_seen_activity >= current_cycle) then account
-  else if
-    (* When a delegate is initialized or reactivated (either from
-       [set_delegate] or participating in the consensus again), we put
-       extra [consensus_rights_delay] cycles in the future to account
-       for its extended grace period *)
-    Cycle.(succ account.last_seen_activity < current_cycle)
-  then
-    {
-      account with
-      last_seen_activity =
-        Cycle.add
-          current_cycle
-          constants
-            .Protocol.Alpha_context.Constants.Parametric.consensus_rights_delay;
-    }
-  else {account with last_seen_activity = current_cycle}
+  match account.last_seen_activity with
+  | None ->
+      {
+        account with
+        last_seen_activity =
+          Some
+            (Cycle.add
+               current_cycle
+               constants
+                 .Protocol.Alpha_context.Constants.Parametric
+                  .consensus_rights_delay);
+      }
+  | Some activity_cycle ->
+      if
+        (* When a delegate is initialized or reactivated (either from
+           [set_delegate] or participating in the consensus again), we put
+           extra [consensus_rights_delay] cycles in the future to account
+           for its extended grace period *)
+        Cycle.(
+          add
+            activity_cycle
+            constants
+              .Protocol.Alpha_context.Constants.Parametric
+               .tolerated_inactivity_period
+          < current_cycle)
+      then
+        {
+          account with
+          last_seen_activity =
+            Some
+              Cycle.(
+                max
+                  activity_cycle
+                  (add
+                     current_cycle
+                     constants
+                       .Protocol.Alpha_context.Constants.Parametric
+                        .consensus_rights_delay));
+        }
+      else
+        {
+          account with
+          last_seen_activity = Some Cycle.(max activity_cycle current_cycle);
+        }
 
 let assert_balance_evolution ~loc ~for_accounts ~part ~name ~old_balance
     ~new_balance compare =
