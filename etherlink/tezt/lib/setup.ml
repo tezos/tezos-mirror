@@ -553,6 +553,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       | None -> Enable true
     in
     Evm_node.patch_config_with_experimental_feature
+      ?l2_chains:(if enable_multichain then Some l2_chains else None)
       ~drop_duplicate_when_injection
       ~blueprints_publisher_order_enabled
       ?next_wasm_runtime
