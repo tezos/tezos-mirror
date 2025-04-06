@@ -37,12 +37,6 @@ Node
 - Added RPC ``POST /bls/check_proof`` to check a BLS proof. (MR
   :gl:`!17461`)
 
-- Added RPC ``GET
-  /chains/<chain>/delegators_contribution/<cycle>/<baker_pkh>``, which
-  provides a breakdown of all the contributions to the delegation
-  portion of the baking power of the baker for the given cycle. (MR
-  :gl:`!17406`)
-
 Client
 ------
 
