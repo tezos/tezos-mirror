@@ -948,9 +948,11 @@ let contract_stake ctxt ~delegator_contract ~delegate =
     return @@ Some (delegator_pkh, staked_balance)
   else return_none
 
+let delegators ctxt pkh = Delegate.delegated_contracts ctxt pkh
+
 let stakers ctxt pkh =
   let open Lwt_result_syntax in
-  let*! delegators = Delegate.delegated_contracts ctxt pkh in
+  let*! delegators = delegators ctxt pkh in
   List.filter_map_es
     (fun delegator_contract ->
       contract_stake ctxt ~delegator_contract ~delegate:pkh)
@@ -1105,7 +1107,7 @@ let f_baking_power ctxt pkh () () =
 let f_delegators ctxt pkh () () =
   let open Lwt_result_syntax in
   let* () = check_delegate_registered ctxt pkh in
-  let*! contracts = Delegate.delegated_contracts ctxt pkh in
+  let*! contracts = delegators ctxt pkh in
   return contracts
 
 let f_total_currently_staked ctxt =
@@ -1188,7 +1190,7 @@ let info ctxt pkh =
   let* consensus_key = consensus_key ctxt pkh in
   (* Chunked RPCs *)
   let* stakers = stakers ctxt pkh in
-  let*! delegators = Delegate.delegated_contracts ctxt pkh in
+  let*! delegators = delegators ctxt pkh in
   return
     {
       (* General baking information *)
@@ -1228,6 +1230,16 @@ let wrap_check_registered ~chunked s f =
       let open Lwt_result_syntax in
       let* () = check_delegate_registered ctxt pkh in
       f ctxt pkh)
+
+module Implem = struct
+  let check_delegate_registered = check_delegate_registered
+
+  let total_delegated = total_delegated
+
+  let own_delegated = own_delegated
+
+  let delegators = delegators
+end
 
 let register () =
   let open Lwt_result_syntax in

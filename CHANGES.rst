@@ -57,6 +57,12 @@ Node
   Linux). Users can opt out by setting the value to ``0``. (MR
   :gl:`!16907`)
 
+- Added RPC ``GET
+  /chains/<chain>/delegators_contribution/<cycle>/<baker_pkh>``, which
+  provides a breakdown of all the contributions to the delegation
+  portion of the baking power of the baker for the given cycle. (MR
+  :gl:`!17406`)
+
 Client
 ------
 
@@ -251,6 +257,11 @@ Smart Rollup node
 - Add a new RPC ``/local/outbox/pending`` to fetch all known outbox messages
   with their status. (MR :gl:`!16831`)
 
+- Add a CLI argument ``--config-file`` to allow specifying a configuration file
+  outside the data directory. (MR :gl:`!17225`)
+
+- Allow to provide a remote URL for downloading snapshots in commands ``snapshot
+  info`` and ``snapshot import``. (MR :gl:`!17407`)
 
 - Use correct constant to determine executable or lost outbox messages for RPCs
   ``/local/outbox/pending`` and ``/local/outbox/pending/executable``. (MR

@@ -103,6 +103,116 @@ let active_peers_info_encoding =
 let active_peers_heads_encoding =
   obj1 (req "active_peers_heads" (list active_peers_info_encoding))
 
+type delegators_contribution = {
+  own_delegated : int64;
+  delegators_contributions : (string * int64) list;
+  former_delegators_unstake_requests : int64;
+  overstaked : int64;
+  total_delegated_including_overdelegated : int64;
+  total_delegated_after_limits : int64;
+  overdelegated : int64;
+}
+
+let delegators_contribution_encoding =
+  conv
+    (fun {
+           own_delegated;
+           delegators_contributions;
+           former_delegators_unstake_requests;
+           overstaked;
+           total_delegated_including_overdelegated;
+           total_delegated_after_limits;
+           overdelegated;
+         } ->
+      ( own_delegated,
+        delegators_contributions,
+        former_delegators_unstake_requests,
+        overstaked,
+        total_delegated_including_overdelegated,
+        total_delegated_after_limits,
+        overdelegated ))
+    (fun ( own_delegated,
+           delegators_contributions,
+           former_delegators_unstake_requests,
+           overstaked,
+           total_delegated_including_overdelegated,
+           total_delegated_after_limits,
+           overdelegated ) ->
+      {
+        own_delegated;
+        delegators_contributions;
+        former_delegators_unstake_requests;
+        overstaked;
+        total_delegated_including_overdelegated;
+        total_delegated_after_limits;
+        overdelegated;
+      })
+  @@ obj7
+       (req "own_delegated" int64)
+       (req
+          "external_delegators"
+          (list
+             (obj2
+                (req "delegator_contract_hash" string)
+                (req "contribution" int64))))
+       (req "former_delegators_unstake_requests" int64)
+       (req "overstaked" int64)
+       (req "total_delegated_including_overdelegated" int64)
+       (req "total_delegated_after_limits" int64)
+       (req "overdelegated" int64)
+
+module Delegators_contribution_errors = struct
+  type error +=
+    | Cycle_too_far_in_future
+    | Cycle_too_far_in_past
+    | Protocol_not_supported of {protocol_hash : Protocol_hash.t}
+
+  let () =
+    let open Data_encoding in
+    register_error_kind
+      `Temporary
+      ~id:"delegators_contribution.cycle_too_far_in_future"
+      ~title:"Cycle too far in future"
+      ~description:
+        "Requested cycle is too far in the future: its baking rights have not \
+         been determined yet."
+      unit
+      (function Cycle_too_far_in_future -> Some () | _ -> None)
+      (function () -> Cycle_too_far_in_future) ;
+    register_error_kind
+      `Temporary
+      ~id:"delegators_contribution.cycle_too_far_in_past"
+      ~title:"Cycle too far in past"
+      ~description:
+        "The data needed for the computation is too far in the past: the node \
+         no longer has the data (block or context) required to compute the \
+         delegators' contribution. Either you are in rolling mode and didn't \
+         keep enough cycles, or you recently imported a fresh snapshot, which \
+         is missing the relevant contexts"
+      unit
+      (function Cycle_too_far_in_past -> Some () | _ -> None)
+      (function () -> Cycle_too_far_in_past) ;
+    register_error_kind
+      `Temporary
+      ~id:"delegators_contribution.protocol_not_supported"
+      ~title:"Protocol not supported by delegators_contribution"
+      ~description:
+        "This RPC call involves a protocol that does not support \
+         delegators_contribution."
+      ~pp:(fun fmt protocol_hash ->
+        Format.fprintf
+          fmt
+          "This RPC call involves protocol %a which does not support \
+           delegators_contribution."
+          Protocol_hash.pp
+          protocol_hash)
+      (obj1 (req "protocol_hash" Protocol_hash.encoding))
+      (function
+        | Protocol_not_supported {protocol_hash} -> Some protocol_hash
+        | _ -> None)
+      (function protocol_hash -> Protocol_not_supported {protocol_hash})
+end
+
 module S = struct
   let path : prefix Tezos_rpc.Path.context = Tezos_rpc.Path.open_root
 
@@ -138,6 +248,17 @@ module S = struct
       ~query:Tezos_rpc.Query.empty
       ~output:active_peers_heads_encoding
       Tezos_rpc.Path.(path / "active_peers_heads")
+
+  let delegators_contribution =
+    Tezos_rpc.Service.get_service
+      ~description:
+        "A breakdown of all the contributions to the delegation portion of the \
+         baking power of the given delegate for the given cycle."
+      ~query:Tezos_rpc.Query.empty
+      ~output:delegators_contribution_encoding
+      Tezos_rpc.Path.(
+        path / "delegators_contribution" /: Tezos_rpc.Arg.int32
+        /: Signature.Public_key_hash.rpc_arg)
 
   module Levels = struct
     let path = Tezos_rpc.Path.(path / "levels")
