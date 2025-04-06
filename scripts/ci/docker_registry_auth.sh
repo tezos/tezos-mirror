@@ -51,7 +51,8 @@ if [ -n "${GCP_REGISTRY:-}" ]; then
     echo "### Logging into standard GCP Artifact Registry for pushing images"
     gcp_service_account=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email)
   fi
-   # Specify the timeout duration (in seconds) before the token is deprecated.
+  # Specify the timeout duration (in seconds) before the token is deprecated.
+  # The default is 3600 seconds (1 hour) and below is set to 10800 seconds (3 hours) 
   GCP_REGISTRY_TOKEN_TIMEOUT=10800 # 3 hours
   echo "GCP Service Account in use: ${gcp_service_account}"
   gcloud auth configure-docker us.gcr.io
