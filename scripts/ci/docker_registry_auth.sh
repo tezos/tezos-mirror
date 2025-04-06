@@ -41,7 +41,7 @@ if [ -n "${GCP_REGISTRY:-}" ]; then
   # registries are publicly accessible for pulls.
   # Initialize GCP service account variable with an empty value
   gcp_service_account=""
-  if [ "${CI_COMMIT_REF_PROTECTED:-false}" = true ]; then
+  if [ ! "${CI_COMMIT_REF_PROTECTED:-false}" = true ]; then
     echo "### Logging into protected GCP Artifact Registry for pushing images"
     echo "${GCP_PROTECTED_SERVICE_ACCOUNT}" | base64 -d > protected_sa.json
     gcloud auth activate-service-account --key-file=protected_sa.json
