@@ -39,18 +39,23 @@ if [ -n "${GCP_REGISTRY:-}" ]; then
   # Tezos CI jobs on unprotected branches. The second is accessible for push
   # operation only from protected branches for security reasons. Finally, both
   # registries are publicly accessible for pulls.
+  # Initialize GCP service account variable with an empty value
+  gcp_service_account=""
   if [ "${CI_COMMIT_REF_PROTECTED:-false}" = true ]; then
     echo "### Logging into protected GCP Artifact Registry for pushing images"
     echo "${GCP_PROTECTED_SERVICE_ACCOUNT}" | base64 -d > protected_sa.json
     gcloud auth activate-service-account --key-file=protected_sa.json
-    gcloud auth configure-docker us.gcr.io
-    gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev
+    gcp_service_account=$(cat protected_sa.json | jq -r '.client_email')
     rm protected_sa.json
   else
     echo "### Logging into standard GCP Artifact Registry for pushing images"
-    GCP_ARTIFACT_REGISTRY_TOKEN=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token | cut -d'"' -f4)
-    echo "${GCP_ARTIFACT_REGISTRY_TOKEN}" | docker login us-central1-docker.pkg.dev -u oauth2accesstoken --password-stdin
+    gcp_service_account=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email)
   fi
+   # Specify the timeout duration (in seconds) before the token is deprecated.
+  GCP_REGISTRY_TOKEN_TIMEOUT=10800 # 3 hours
+  echo "GCP Service Account in use: ${gcp_service_account}"
+  gcloud auth configure-docker us.gcr.io
+  gcloud auth print-access-token --lifetime=${GCP_REGISTRY_TOKEN_TIMEOUT} --impersonate-service-account=${gcp_service_account} | docker login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev
   docker_image_name="${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/"
   logged_in=true
 fi
