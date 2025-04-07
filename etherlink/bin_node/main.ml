@@ -318,13 +318,6 @@ let profile_arg =
     ~doc:"Profile the execution of the WASM PVM."
     ()
 
-let upto_arg =
-  Tezos_clic.arg
-    ~long:"up-to"
-    ~doc:"Replay the successors until 'UPTO_LEVEL' is reached."
-    ~placeholder:"UPTO_LEVEL"
-    Params.l2_level
-
 let disable_da_fees_arg =
   Tezos_clic.switch
     ~long:"disable-da-fees"
@@ -1538,22 +1531,24 @@ let reset_command =
           "You must provide the `--force` switch in order to use this command \
            and not accidentally delete data.")
 
-let replay_command =
+let replay_args =
+  Tezos_clic.args9
+    data_dir_arg
+    config_path_arg
+    preimages_arg
+    preimages_endpoint_arg
+    native_execution_policy_arg
+    (kernel_arg ())
+    kernel_verbosity_arg
+    profile_arg
+    disable_da_fees_arg
+
+let replay_many_command =
   let open Tezos_clic in
   command
     ~group:Groups.debug
     ~desc:"Replay a specific block level."
-    (args10
-       data_dir_arg
-       config_path_arg
-       preimages_arg
-       preimages_endpoint_arg
-       native_execution_policy_arg
-       (kernel_arg ())
-       kernel_verbosity_arg
-       profile_arg
-       upto_arg
-       disable_da_fees_arg)
+    replay_args
     (prefixes ["replay"; "blueprint"]
     @@ Tezos_clic.param ~name:"level" ~desc:"Level to replay." Params.l2_level
     @@ stop)
@@ -1565,7 +1560,6 @@ let replay_command =
            kernel,
            kernel_verbosity,
            profile,
-           upto,
            disable_da_fees )
          l2_level
          () ->
@@ -1587,7 +1581,56 @@ let replay_command =
         ?kernel_verbosity
         ~data_dir
         ~number:l2_level
-        ?upto
+        configuration)
+
+let replay_command =
+  let open Tezos_clic in
+  command
+    ~group:Groups.debug
+    ~desc:"Replay a range of block levels."
+    replay_args
+    (prefixes ["replay"; "blueprints"; "from"]
+    @@ Tezos_clic.param
+         ~name:"level"
+         ~desc:"First block to replay."
+         Params.l2_level
+    @@ prefix "to"
+    @@ Tezos_clic.param
+         ~name:"level"
+         ~desc:"Last block to replay."
+         Params.l2_level
+    @@ stop)
+    (fun ( data_dir,
+           config_file,
+           preimages,
+           preimages_endpoint,
+           native_execution_policy,
+           kernel,
+           kernel_verbosity,
+           profile,
+           disable_da_fees )
+         l2_level
+         upto
+         () ->
+      let open Lwt_result_syntax in
+      let config_file = config_filename ~data_dir config_file in
+      let* configuration =
+        Cli.create_or_read_config
+          ~data_dir
+          ?preimages
+          ?preimages_endpoint
+          ?native_execution_policy
+          config_file
+      in
+      let*! () = init_logs ~daily_logs:false ~data_dir configuration in
+      Evm_node_lib_dev.Replay.main
+        ~profile
+        ~disable_da_fees
+        ?kernel
+        ?kernel_verbosity
+        ~data_dir
+        ~number:l2_level
+        ~upto
         configuration)
 
 let patch_kernel_command =
@@ -2843,6 +2886,7 @@ let commands =
     init_from_rollup_node_command;
     reset_command;
     replay_command;
+    replay_many_command;
     patch_kernel_command;
     check_config_command;
     describe_config_command;
