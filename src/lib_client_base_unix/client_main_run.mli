@@ -95,6 +95,18 @@ val register_default_signer :
   Client_context.io_wallet ->
   unit
 
+(** [init_logging (module M) ?parsed_args ?parsed_config_file ~base_dir ()]
+    starts the logging process based on optional parsed arguments [?parse_args],
+    optional configuration file [?parsed_config_file], with output in the
+    [~base_dir] directory. *)
+val init_logging :
+  (module M) ->
+  ?parsed_args:Client_config.cli_args ->
+  ?parsed_config_file:Client_config.Cfg_file.t ->
+  base_dir:string ->
+  unit ->
+  unit Lwt.t
+
 val run :
   (module M) ->
   select_commands:

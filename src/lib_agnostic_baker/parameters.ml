@@ -6,6 +6,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Default parameter values *)
+
 let default_node_endpoint =
   Format.sprintf
     "http://localhost:%d"
@@ -13,15 +15,9 @@ let default_node_endpoint =
 
 let default_daily_logs_path = Some "octez-experimental-agnostic-baker"
 
-let log_config ~base_dir =
-  let daily_logs_path =
-    default_daily_logs_path
-    |> Option.map Filename.Infix.(fun logdir -> base_dir // "logs" // logdir)
-  in
-  Tezos_base_unix.Internal_event_unix.make_with_defaults
-    ?enable_default_daily_logs_at:daily_logs_path
-    ~log_cfg:Tezos_base_unix.Logs_simple_config.default_cfg
-    ()
+let extra_levels_for_old_baker = 3
+
+(* Protocol status *)
 
 type status = Active | Frozen
 
@@ -42,9 +38,7 @@ let status_encoding =
        [
          case
            ~title:"active"
-           ~description:
-             "Active protocols are currently used on a network, and thus, they \
-              have dedicated delegate binaries."
+           ~description:"Active protocols are currently used on a network."
            (Tag 0)
            (constant "active")
            (function Active -> Some () | _ -> None)
@@ -52,48 +46,54 @@ let status_encoding =
          case
            ~title:"frozen"
            ~description:
-             "Frozen protocols are currently unused on any network, and thus, \
-              they do not have dedicated delegate binaries."
+             "Frozen protocols are not currently used on any network."
            (Tag 1)
            (constant "frozen")
            (function Frozen -> Some () | _ -> None)
            (fun () -> Frozen);
        ])
 
-(* From Manifest/Product_octez/Protocol*)
-let protocol_info = function
-  | ( "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
-    | "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
-    | "PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY"
-    | "PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt"
-    | "PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP"
-    | "Pt24m4xiPbLDhVgVfABUjirbmda3yohdN82Sp9FeuAXJ4eV9otd"
-    | "PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU"
-    | "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS"
-    | "PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb"
-    | "PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo"
-    | "PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq"
-    | "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA"
-    | "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i"
-    | "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV"
-    | "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
-    | "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
-    | "PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY"
-    | "PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg"
-    | "PtLimaPtLMwfNinJi9rCfDPWea8dFgTZ1MeJ9f1m2SRic6ayiwW"
-    | "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
-    | "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
-    | "ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH"
-    | "PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ" ) as full_hash ->
-      (String.sub full_hash 0 8, Frozen)
-  | ( "PsParisCZo7KAh1Z1smVd9ZMZ1HHn5gkzbM94V3PLCpknFWhUAi"
-    | "PsQuebecnLByd3JwTiGadoG4nGWi3HYiLXUjkibeFV8dCFeVMUg" ) as full_hash ->
-      (String.sub full_hash 0 8, Active)
-  | "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" -> ("alpha", Active)
-  | "PsRiotumaAMotcRoDWW1bysEhQy2n1M5fy8JgRp8jjRfHGmfeA7" as full_hash ->
-      (String.sub full_hash 0 8, Active)
-  | _ -> (*We assume that unmatched protocols are next ones*) ("next", Active)
+(** Lists of known protocol hashes for [Frozen] and [Active] protocols, corresponding
+    to [Manifest/Product_octez/Protocol] module. *)
+let frozen_protocols =
+  [
+    "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im";
+    "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
+    "PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY";
+    "PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt";
+    "PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP";
+    "Pt24m4xiPbLDhVgVfABUjirbmda3yohdN82Sp9FeuAXJ4eV9otd";
+    "PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU";
+    "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS";
+    "PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb";
+    "PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo";
+    "PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq";
+    "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA";
+    "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i";
+    "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV";
+    "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx";
+    "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A";
+    "PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY";
+    "PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg";
+    "PtLimaPtLMwfNinJi9rCfDPWea8dFgTZ1MeJ9f1m2SRic6ayiwW";
+    "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1";
+    "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf";
+    "ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH";
+    "PtParisBxoLz5gzMmn3d9WBQNoPSZakgnkMC2VNuQ3KXfUtUQeZ";
+    "PsParisCZo7KAh1Z1smVd9ZMZ1HHn5gkzbM94V3PLCpknFWhUAi";
+  ]
 
-let protocol_short_hash h = fst (protocol_info (Protocol_hash.to_b58check h))
+(** If this list format is modified, subsequent modifications must be carried onto
+    the agnostic baker section from [scripts/proto_manager.sh]. *)
+let active_protocols =
+  [
+    "PsQuebecnLByd3JwTiGadoG4nGWi3HYiLXUjkibeFV8dCFeVMUg";
+    "PsRiotumaAMotcRoDWW1bysEhQy2n1M5fy8JgRp8jjRfHGmfeA7";
+    "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK";
+  ]
 
-let protocol_status h = snd (protocol_info (Protocol_hash.to_b58check h))
+let protocol_status proto_hash =
+  match Protocol_hash.to_b58check proto_hash with
+  | hash when List.mem ~equal:String.equal hash active_protocols -> Active
+  | hash when List.mem ~equal:String.equal hash frozen_protocols -> Frozen
+  | _ -> (* We assume that unmatched protocols are "next" ones *) Active

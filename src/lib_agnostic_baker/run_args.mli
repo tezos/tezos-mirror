@@ -19,6 +19,6 @@ val is_man_cmd : string list -> bool
     amongst [args], and in its absence using the default node RPC port. *)
 val get_endpoint : string list -> string
 
-(** [get_base_dir] returns the value associated to the [--base-dir] argument
-        amonsgst [args]. *)
+(** [get_base_dir args] returns the value associated to the [--base-dir] argument
+    amongst [args]. *)
 val get_base_dir : string list -> string option

@@ -2,18 +2,21 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2025 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
 open Cohttp_lwt_unix
 open Agnostic_baker_errors
 
+(* RPC helper functions *)
+
 let request_uri ~node_addr ~uri =
   let open Lwt_result_syntax in
   Lwt.catch
     (fun () ->
-      let*! r = Client.get (Uri.of_string uri) in
-      return r)
+      let*! resp = Client.get (Uri.of_string uri) in
+      return resp)
     (function
       | Unix.(Unix_error (ECONNREFUSED, _, _)) ->
           tzfail (Cannot_connect_to_node node_addr)
@@ -43,103 +46,60 @@ let call_and_wrap_rpc ~node_addr ~uri ~f =
       in
       raise Not_found
 
-let get_level ~node_addr =
+(* Field extraction helpers *)
+
+(** [get_field ~name json] extracts the field [~name] from the JSON object [json].
+    It fails if [json] is not an object or if the field is missing. *)
+let get_field ~name =
   let open Lwt_result_syntax in
-  let f json =
-    (* Level field in the RPC result *)
-    let name = "level" in
-    let* v =
-      match json with
-      | `O fields -> (
-          match List.assoc_opt ~equal:( = ) name fields with
-          | None -> tzfail (Cannot_decode_node_data ("missing field " ^ name))
-          | Some node -> return node)
-      | _ -> tzfail (Cannot_decode_node_data "not an object")
-    in
-    let level = Ezjsonm.get_int v in
-    return level
-  in
+  function
+  | `O fields -> (
+      match List.assoc_opt ~equal:( = ) name fields with
+      | None -> tzfail (Cannot_decode_node_data ("missing field " ^ name))
+      | Some v -> return v)
+  | _ -> tzfail (Cannot_decode_node_data "not an object")
+
+(** [get_int_field ~name json] extracts an integer field named [~name] from [json]. *)
+let get_int_field ~name json =
+  let open Lwt_result_syntax in
+  let+ v = get_field ~name json in
+  Ezjsonm.get_int v
+
+(** [get_string_field ~name json] extracts a string field named [~name] from [json]. *)
+let get_string_field ~name json =
+  let open Lwt_result_syntax in
+  let+ v = get_field ~name json in
+  Ezjsonm.get_string v
+
+(* RPC specific functions *)
+
+let get_level ~node_addr =
   let uri =
     Format.sprintf "%s/chains/main/blocks/head/header/shell" node_addr
   in
-  call_and_wrap_rpc ~node_addr ~uri ~f
+  call_and_wrap_rpc ~node_addr ~uri ~f:(get_int_field ~name:"level")
 
 let get_block_hash ~node_addr =
   let open Lwt_result_syntax in
-  let f json =
-    (* Hash field in the RPC result *)
-    let name = "hash" in
-    let* v =
-      match json with
-      | `O fields -> (
-          match List.assoc_opt ~equal:( = ) name fields with
-          | None -> tzfail (Cannot_decode_node_data ("missing field " ^ name))
-          | Some node -> return node)
-      | _ -> tzfail (Cannot_decode_node_data "not an object")
-    in
-    let block_hash = Block_hash.of_b58check_exn @@ Ezjsonm.get_string v in
-    return block_hash
-  in
   let uri = Format.sprintf "%s/chains/main/blocks/head/header" node_addr in
-  call_and_wrap_rpc ~node_addr ~uri ~f
+  call_and_wrap_rpc ~node_addr ~uri ~f:(fun json ->
+      let+ block_hash = get_string_field ~name:"hash" json in
+      Block_hash.of_b58check_exn block_hash)
 
 let get_next_protocol_hash ~node_addr =
   let open Lwt_result_syntax in
-  let f json =
-    (* Next_protocol hash field in the RPC result *)
-    let name = "next_protocol" in
-    let* v =
-      match json with
-      | `O fields -> (
-          match List.assoc_opt ~equal:( = ) name fields with
-          | None -> tzfail (Cannot_decode_node_data ("missing field " ^ name))
-          | Some node -> return node)
-      | _ -> tzfail (Cannot_decode_node_data "not an object")
-    in
-    let hash = Protocol_hash.of_b58check_exn (Ezjsonm.get_string v) in
-    return hash
-  in
   let uri = Format.sprintf "%s/chains/main/blocks/head/metadata" node_addr in
-  call_and_wrap_rpc ~node_addr ~uri ~f
+  call_and_wrap_rpc ~node_addr ~uri ~f:(fun json ->
+      let+ next_protocol = get_string_field ~name:"next_protocol" json in
+      Protocol_hash.of_b58check_exn next_protocol)
 
 let get_current_period ~node_addr =
   let open Lwt_result_syntax in
-  let voting_period_field = "voting_period" in
-  let kind_field = "kind" in
-  let remaining_field = "remaining" in
-  let f json =
-    let* kind =
-      match json with
-      | `O fields -> (
-          match List.assoc_opt ~equal:( = ) voting_period_field fields with
-          | None ->
-              tzfail
-                (Cannot_decode_node_data ("missing field " ^ voting_period_field))
-          | Some node -> (
-              match node with
-              | `O fields -> (
-                  match List.assoc_opt ~equal:( = ) kind_field fields with
-                  | None ->
-                      tzfail
-                        (Cannot_decode_node_data
-                           ("missing field " ^ voting_period_field))
-                  | Some node -> return @@ Ezjsonm.get_string node)
-              | _ -> tzfail (Cannot_decode_node_data "not an object")))
-      | _ -> tzfail (Cannot_decode_node_data "not an object")
-    in
-    let* remaining =
-      match json with
-      | `O fields -> (
-          match List.assoc_opt ~equal:( = ) remaining_field fields with
-          | None ->
-              tzfail
-                (Cannot_decode_node_data ("missing field " ^ remaining_field))
-          | Some node -> return @@ Ezjsonm.get_int node)
-      | _ -> tzfail (Cannot_decode_node_data "not an object")
-    in
-    return (kind, remaining)
-  in
   let uri =
     Format.sprintf "%s/chains/main/blocks/head/votes/current_period" node_addr
   in
-  call_and_wrap_rpc ~node_addr ~uri ~f
+  call_and_wrap_rpc ~node_addr ~uri ~f:(fun json ->
+      let* voting_period = get_field ~name:"voting_period" json in
+      let* kind = get_string_field ~name:"kind" voting_period in
+      let+ remaining = get_int_field ~name:"remaining" json in
+      (kind, remaining))
