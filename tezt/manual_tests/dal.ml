@@ -401,7 +401,8 @@ let baker_scenario ?baker_sk ~airdropper_alias client dal_node l1_node =
   (* Manually stake a part of the baker's balance
      after it is declared as delegate. *)
   let* () = stake_or_unstake_half_balance client ~baker_alias in
-  let baker = Agnostic_baker.create ~dal_node l1_node client in
+  let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint dal_node in
+  let baker = Agnostic_baker.create ~dal_node_rpc_endpoint l1_node client in
   let* () = Agnostic_baker.run baker in
   Lwt_unix.sleep Float.max_float
 

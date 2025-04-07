@@ -124,11 +124,10 @@ let handle_event node ({name; _} : event) =
 
 let create ?runner ?path ?name ?color ?event_pipe ?(delegates = []) ?votefile
     ?(liquidity_baking_toggle_vote = Some Pass) ?force_apply_from_round
-    ?(remote_mode = false) ?operations_pool ?dal_node
+    ?(remote_mode = false) ?operations_pool ?dal_node_rpc_endpoint
     ?dal_node_timeout_percentage ?(state_recorder = false)
     ?(node_version_check_bypass = false) ?node_version_allowed ?keep_alive node
     client =
-  let dal_node_rpc_endpoint = Option.map Dal_node.as_rpc_endpoint dal_node in
   let agnostic_baker =
     create_from_uris
       ?runner
@@ -291,8 +290,9 @@ let wait_for_ready agnostic_baker =
 let init ?env ?runner ?(path = Uses.path Constant.octez_agnostic_baker) ?name
     ?color ?event_level ?event_pipe ?event_sections_levels ?(delegates = [])
     ?votefile ?liquidity_baking_toggle_vote ?force_apply_from_round ?remote_mode
-    ?operations_pool ?dal_node ?dal_node_timeout_percentage ?state_recorder
-    ?node_version_check_bypass ?node_version_allowed ?keep_alive node client =
+    ?operations_pool ?dal_node_rpc_endpoint ?dal_node_timeout_percentage
+    ?state_recorder ?node_version_check_bypass ?node_version_allowed ?keep_alive
+    node client =
   let* () = Node.wait_for_ready node in
   let agnostic_baker =
     create
@@ -306,7 +306,7 @@ let init ?env ?runner ?(path = Uses.path Constant.octez_agnostic_baker) ?name
       ?force_apply_from_round
       ?remote_mode
       ?operations_pool
-      ?dal_node
+      ?dal_node_rpc_endpoint
       ?dal_node_timeout_percentage
       ?state_recorder
       ?node_version_check_bypass

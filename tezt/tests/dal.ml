@@ -2968,9 +2968,10 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
   in
   let run_baker delegates target_level =
     let* baker =
+      let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint dal_node in
       Agnostic_baker.init
         ~event_sections_levels:[(Protocol.name protocol ^ ".baker", `Debug)]
-        ~dal_node
+        ~dal_node_rpc_endpoint
         ~delegates
         ~state_recorder:true
         node
@@ -3464,7 +3465,8 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
   Log.info
     "[e2e.start_baker] spawn a baker daemon with all bootstrap accounts@." ;
   let* _baker =
-    Agnostic_baker.init ~dal_node:baker_dal_node l1_node l1_client
+    let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint baker_dal_node in
+    Agnostic_baker.init ~dal_node_rpc_endpoint l1_node l1_client
   in
 
   (* To be sure that we just moved to [start_dal_slots_level], we wait and extra
@@ -4233,7 +4235,10 @@ let test_baker_registers_profiles _protocol _parameters _cryptobox l1_node
     "Terminate the DAL node and then start the baker; the baker cannot attest \
      but can advance" ;
   let* () = Dal_node.terminate dal_node in
-  let baker = Agnostic_baker.create ~dal_node l1_node client ~delegates in
+  let baker =
+    let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint dal_node in
+    Agnostic_baker.create ~dal_node_rpc_endpoint l1_node client ~delegates
+  in
   let wait_for_attestation_event =
     Agnostic_baker.wait_for baker "failed_to_get_attestations.v0" (fun _json ->
         Some ())
@@ -4561,8 +4566,10 @@ let test_migration_accuser_issue ~migrate_from ~migrate_to =
     in
     Log.info "Start bakers for the current and the next protocols" ;
 
-    let baker = Agnostic_baker.create ~dal_node node client in
-
+    let baker =
+      let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint dal_node in
+      Agnostic_baker.create ~dal_node_rpc_endpoint node client
+    in
     let* () = Agnostic_baker.run baker in
 
     let* _level = Node.wait_for_level node migration_level in
@@ -4793,12 +4800,13 @@ let test_restart_dal_node _protocol dal_parameters _cryptobox node client
       3 * blocks_per_cycle
   in
   let* baker =
+    let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint dal_node in
     Agnostic_baker.init
       ~delegates:all_pkhs
       ~liquidity_baking_toggle_vote:(Some On)
       ~state_recorder:true
       ~force_apply_from_round:0
-      ~dal_node
+      ~dal_node_rpc_endpoint
       node
       client
   in
@@ -7530,9 +7538,10 @@ let scenario_tutorial_dal_baker =
       in
       Log.info "Step 5: Run an Octez baking daemon" ;
       let* _baker =
+        let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint dal_node in
         Agnostic_baker.init
           ~event_sections_levels:[(Protocol.name protocol ^ ".baker", `Debug)]
-          ~dal_node
+          ~dal_node_rpc_endpoint
           ~delegates:all_delegates
           ~liquidity_baking_toggle_vote:(Some On)
           ~state_recorder:true
