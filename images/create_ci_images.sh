@@ -197,7 +197,7 @@ build() {
   cd "${images_dir}/ci" &&
     tar -cvh . |
     docker build --network host \
-      --target="$f_LAYER_TARGET" \
+      -f "Dockerfile.$f_LAYER_TARGET" \
       --build-arg BUILDKIT_INLINE_CACHE=1 \
       $(if [ -n "$tag_cache_suffix" ]; then echo "--cache-from=$f_image_name_cache"; fi) \
       $(if [ -n "$tag_extra" ]; then echo "--cache-from=$f_image_name_extra"; fi) \
@@ -210,6 +210,9 @@ build() {
       $(if [ -n "$tag_extra" ]; then echo "-t $f_image_name_extra"; fi) \
       "$@" \
       "-"
+
+  # add a local tag ( not pushed )
+  docker image tag "$f_image_name" "$f_LAYER_TARGET"
 }
 
 for target in $layer_targets; do
