@@ -10102,6 +10102,69 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
     bootstrap_accounts_participation ;
   unit
 
+let use_mockup_node_for_getting_attestable_slots _protocol dal_parameters
+    cryptobox l1_node client _bootstrap_key =
+  let number_of_slots = dal_parameters.Dal.Parameters.number_of_slots in
+  let attestation_lag = dal_parameters.attestation_lag in
+
+  Log.info "Start the mocked DAL node" ;
+  let dal_node_mockup =
+    let attesters =
+      Account.Bootstrap.keys |> Array.to_list
+      |> List.map (fun b -> b.Account.public_key_hash)
+    in
+    let attestable_slots ~attester:_ ~attested_level:_ =
+      List.init number_of_slots (fun _0 -> true)
+    in
+    Dal_node.Mockup_for_baker.make
+      ~name:"mock-dal-node"
+      ~attestation_lag
+      ~attesters
+      ~attestable_slots
+  in
+  let port = Port.fresh () in
+  let () = Dal_node.Mockup_for_baker.run dal_node_mockup ~port in
+  let dal_node_rpc_endpoint =
+    Endpoint.make ~host:"localhost" ~scheme:"http" ~port ()
+  in
+  let baker = Agnostic_baker.create ~dal_node_rpc_endpoint l1_node client in
+
+  Log.info "Publish a slot" ;
+  let* (`OpHash _op_hash) =
+    publish_dummy_slot
+      ~source:Constant.bootstrap1
+      ~index:0
+      ~message:"a"
+      cryptobox
+      client
+  in
+  let* publish_level =
+    let* op_level = Node.get_level l1_node in
+    return @@ (op_level + 1)
+  in
+
+  Log.info "Start the baker" ;
+  let* () = Agnostic_baker.run baker in
+
+  (* +2 blocks for the attested block to be final, +1 for some slack *)
+  let* _ = Node.wait_for_level l1_node (publish_level + attestation_lag + 3) in
+  let* () = Agnostic_baker.terminate baker in
+  let () = Dal_node.Mockup_for_baker.stop dal_node_mockup in
+
+  let attested_level = publish_level + attestation_lag in
+  Log.info
+    "Check that the slot published at level %d was attested at level %d"
+    publish_level
+    attested_level ;
+  let* {dal_attestation; _} =
+    Node.RPC.(
+      call l1_node
+      @@ get_chain_block_metadata ~block:(string_of_int attested_level) ())
+  in
+  Check.((Some [|true|] = dal_attestation) (option (array bool)))
+    ~error_msg:"Unexpected DAL attestation: expected %L, got %R" ;
+  unit
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -10513,7 +10576,13 @@ let register ~protocols =
 
   (* Register end-to-end tests *)
   register_end_to_end_tests ~protocols ;
-  dal_crypto_benchmark ()
+  dal_crypto_benchmark () ;
+  scenario_with_layer1_node
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+    ~activation_timestamp:Now
+    "mockup get_attestable_slots"
+    use_mockup_node_for_getting_attestable_slots
+    protocols
 
 let tests_start_dal_node_around_migration ~migrate_from ~migrate_to =
   let offsets = [-2; -1; 0; 1; 2] in

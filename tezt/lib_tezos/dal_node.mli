@@ -306,7 +306,7 @@ module Mockup_for_baker : sig
   (** [make ~name ~attestation_lag ~attesters ~attestable_slots] creates a new
       instance of the mockup server with name [name].
 
-      It responds to the 'GET \profiles' RPC with the an attester profile based
+      It responds to the 'GET /profiles' RPC with an attester profile based
       on the provided [attesters].
 
       It responds to the 'GET
