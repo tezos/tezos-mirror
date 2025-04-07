@@ -91,7 +91,8 @@ val register_test :
   ?delayed_inbox_timeout:int ->
   ?delayed_inbox_min_levels:int ->
   ?max_number_of_chunks:int ->
-  ?bootstrap_accounts:string list ->
+  ?eth_bootstrap_accounts:string list ->
+  ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer:Account.key ->
   ?sequencer_pool_address:string ->
   kernel:Kernel.t ->
@@ -140,7 +141,8 @@ val register_multichain_test :
   ?delayed_inbox_timeout:int ->
   ?delayed_inbox_min_levels:int ->
   ?max_number_of_chunks:int ->
-  ?bootstrap_accounts:string list ->
+  ?eth_bootstrap_accounts:string list ->
+  ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer:Account.key ->
   ?sequencer_pool_address:string ->
   kernel:Kernel.t ->
@@ -192,7 +194,8 @@ val register_test_for_kernels :
   ?delayed_inbox_timeout:int ->
   ?delayed_inbox_min_levels:int ->
   ?max_number_of_chunks:int ->
-  ?bootstrap_accounts:string list ->
+  ?eth_bootstrap_accounts:string list ->
+  ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer:Account.key ->
   ?sequencer_pool_address:string ->
   ?kernels:Kernel.t list ->
@@ -243,7 +246,8 @@ val setup_sequencer :
   ?max_number_of_chunks:int ->
   ?commitment_period:int ->
   ?challenge_window:int ->
-  ?bootstrap_accounts:string list ->
+  ?eth_bootstrap_accounts:string list ->
+  ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer:Account.key ->
   ?sequencer_pool_address:string ->
   ?kernel:Uses.t ->

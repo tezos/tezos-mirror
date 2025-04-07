@@ -20,14 +20,16 @@
 open Setup
 open Test_helpers
 
-let register ?genesis_timestamp ?bootstrap_accounts ?(kernels = Kernel.all)
-    ?preimages_dir ?maximum_allowed_ticks ?enable_fa_bridge ?rollup_history_mode
-    ?additional_uses ~title ~tags body protocols =
+let register ?genesis_timestamp ?eth_bootstrap_accounts ?tez_bootstrap_accounts
+    ?(kernels = Kernel.all) ?preimages_dir ?maximum_allowed_ticks
+    ?enable_fa_bridge ?rollup_history_mode ?additional_uses ~title ~tags body
+    protocols =
   register_test_for_kernels
     ~__FILE__
     ~time_between_blocks:Nothing
     ?genesis_timestamp
-    ?bootstrap_accounts
+    ?eth_bootstrap_accounts
+    ?tez_bootstrap_accounts
     ~kernels
     ?preimages_dir
     ?maximum_allowed_ticks
