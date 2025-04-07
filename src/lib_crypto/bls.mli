@@ -32,6 +32,13 @@ include
      and type t = Bls12_381_signature.MinPk.signature
      and type watermark = Bytes.t
 
+include
+  S.THRESHOLD_SIGNATURE
+    with type Public_key.t = Public_key.t
+     and type Secret_key.t = Secret_key.t
+     and type t = t
+     and type watermark = watermark
+
 include S.RAW_DATA with type t := t
 
 (** Module to access/expose the primitives of BLS12-381 *)

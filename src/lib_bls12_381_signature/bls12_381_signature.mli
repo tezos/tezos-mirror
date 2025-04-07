@@ -29,6 +29,16 @@ val sk_to_bytes : sk -> Bytes.t
     default value of [key_info] is the empty bytes sequence. *)
 val generate_sk : ?key_info:Bytes.t -> Bytes.t -> sk
 
+(** [share_secret_key [s_0;...;s_{m-1}] n] shares a secret key [s_0]
+    between [n] participants so that any [m] participants can
+    collaboratively sign messages, while fewer than [m] participants
+    cannot produce a valid signature. Other coefficients [s_i] are
+    random secrets. Each participant is assigned a unique identifier
+    [id_i] in range [1; n].
+
+    Precondition: 1 < m and m <= n. *)
+val share_secret_key : sk list -> n:int -> (int * sk) list
+
 (** BLS signatures instantiation minimizing the size of the public keys (48
     bytes) but use longer signatures (96 bytes). *)
 module MinPk : sig
@@ -126,6 +136,11 @@ module MinPk : sig
       function also checks if the points are in G2. *)
   val aggregate_signature_weighted_opt :
     ?subgroup_check:bool -> (Z.t * signature) list -> signature option
+
+  (** [threshold_signature_opt [(id_x, s_x);(id_y, s_y);...] ]
+      reconstructs a signature if at least [m] valid signatures [s_i]
+      produced by a participant [id_i] are provided. *)
+  val threshold_signature_opt : (int * signature) list -> signature option
 
   (** [aggregate_public_key_opt ?subgroup_check pks] aggregates the public keys
       [pks]. If [subgroup_check] is set, the function also checks if the
@@ -329,6 +344,11 @@ module MinSig : sig
       function also checks if the points are in G1. *)
   val aggregate_signature_weighted_opt :
     ?subgroup_check:bool -> (Z.t * signature) list -> signature option
+
+  (** [threshold_signature_opt [(id_x, s_x);(id_y, s_y);...] ]
+      reconstructs a signature if at least [m] valid signatures [s_i]
+      produced by a participant [id_i] are provided. *)
+  val threshold_signature_opt : (int * signature) list -> signature option
 
   (** [aggregate_public_key_opt ?subgroup_check pks] aggregates the public keys
       [pks]. If [subgroup_check] is set, the function also checks if the

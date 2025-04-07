@@ -31,6 +31,14 @@ module CommonStubs = struct
     Unsigned.Size_t.t ->
     unit = "caml_bls12_381_signature_blst_signature_keygen_stubs"
 
+  external polynomial_evaluation :
+    scalar -> scalar array -> int -> Bls12_381.Fr.t -> int
+    = "caml_bls12_381_signature_blst_polynomial_evaluation"
+
+  external lagrange_coeff_zero :
+    Bls12_381.Fr.t array -> Bls12_381.Fr.t array -> int -> int
+    = "caml_bls12_381_signature_blst_lagrange_coeff_zero"
+
   external pairing_init : bool -> Bytes.t -> Unsigned.Size_t.t -> ctxt
     = "caml_bls12_381_signature_blst_pairing_init_stubs"
 
@@ -113,6 +121,21 @@ let generate_sk ?(key_info = Bytes.empty) ikm =
       key_info
       (Unsigned.Size_t.of_int key_info_length) ;
   buffer_scalar
+
+let share_secret_key secret_polynomial ~n =
+  let poly_s = Array.of_list secret_polynomial in
+  let len = Array.length poly_s in
+  assert (len > 1) ;
+  let polynomial_evaluation x =
+    let res_scalar = CommonStubs.allocate_scalar () in
+    ignore @@ CommonStubs.polynomial_evaluation res_scalar poly_s len x ;
+    res_scalar
+  in
+  (* Secret polynomial s(x) is evaluated at n distinct points called
+     ids. Note: they cannot be equal to 0 because s(0) = s_0 is the secret. *)
+  List.init n (fun i ->
+      let id = i + 1 in
+      (id, polynomial_evaluation (Bls12_381.Fr.of_int id)))
 
 module MinPk = struct
   module Stubs = struct
@@ -254,6 +277,21 @@ module MinPk = struct
       ~subgroup_check
       (Array.of_list signatures)
       scalars
+
+  let threshold_signature_opt ids_signatures : signature option =
+    let len = List.length ids_signatures in
+    if len <= 1 then None
+    else
+      let ids, signatures = List.split ids_signatures in
+      let scalars = List.map Bls12_381.Fr.of_int ids |> Array.of_list in
+      let scalars_res = Array.init len (fun _i -> Bls12_381.Fr.(copy zero)) in
+      let b = CommonStubs.lagrange_coeff_zero scalars_res scalars len in
+      if b = 0 then
+        Bls12_381.G2.pippenger_with_compressed_bytes_array_opt
+          ~subgroup_check:true
+          (Array.of_list signatures)
+          scalars_res
+      else None
 
   let aggregate_public_key_opt ?(subgroup_check = true) pks =
     Bls12_381.G1.add_bulk_with_compressed_bytes_array_opt
@@ -569,6 +607,21 @@ module MinSig = struct
       ~subgroup_check
       (Array.of_list signatures)
       scalars
+
+  let threshold_signature_opt ids_signatures : signature option =
+    let len = List.length ids_signatures in
+    if len <= 1 then None
+    else
+      let ids, signatures = List.split ids_signatures in
+      let scalars = List.map Bls12_381.Fr.of_int ids |> Array.of_list in
+      let scalars_res = Array.init len (fun _i -> Bls12_381.Fr.(copy zero)) in
+      let b = CommonStubs.lagrange_coeff_zero scalars_res scalars len in
+      if b = 0 then
+        Bls12_381.G1.pippenger_with_compressed_bytes_array_opt
+          ~subgroup_check:true
+          (Array.of_list signatures)
+          scalars_res
+      else None
 
   let aggregate_public_key_opt ?(subgroup_check = true) pks =
     Bls12_381.G2.add_bulk_with_compressed_bytes_array_opt
