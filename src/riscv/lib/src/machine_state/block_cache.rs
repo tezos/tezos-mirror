@@ -879,7 +879,6 @@ mod tests {
     use crate::machine_state::instruction::tagged_instruction::TaggedRegister;
     use crate::machine_state::memory;
     use crate::machine_state::memory::M4K;
-    use crate::machine_state::memory::Memory;
     use crate::machine_state::mode::Mode;
     use crate::machine_state::registers::XRegister;
     use crate::machine_state::registers::a1;
@@ -1259,7 +1258,11 @@ mod tests {
 
         state.core.hart.mode.write(Mode::Machine);
         state.core.hart.pc.write(0);
-        state.core.main_memory.write(0, ECALL).unwrap();
+        state
+            .core
+            .main_memory
+            .write_instruction_unchecked(0, ECALL)
+            .unwrap();
 
         let result = state.step();
         assert_eq!(result, Err(EnvironException::EnvCallFromMMode));

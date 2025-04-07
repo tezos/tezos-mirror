@@ -96,6 +96,7 @@ mod tests {
         {
             let mut state = state_cell.borrow_mut();
             state.reset();
+            state.main_memory.set_all_readable_writeable();
 
             let mut perform_test = |offset: u64| -> Result<(), Exception> {
 
