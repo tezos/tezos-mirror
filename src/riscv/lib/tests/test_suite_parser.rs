@@ -17,7 +17,8 @@ fn compute_offset(src: &str, dest: &str) -> i64 {
 /// For most instructions, the objdump output can be directly compared with
 /// the pretty-printed parsed instructions. For branching instructions, objdump
 /// prints the computed branching address, rather than the offset, which is what
-/// these instructions actually encode in their immediate field.
+/// these instructions actually encode in their immediate field. We also replace CSR numeric
+/// identifiers with their symbolic name equivalent.
 fn transform_objdump_instr<'a>(address: &'a str, instr: &'a str, args: &'a str) -> String {
     let op = instr.trim();
     let args = args.split(' ').next().unwrap().trim();
@@ -63,6 +64,30 @@ fn transform_objdump_instr<'a>(address: &'a str, instr: &'a str, args: &'a str) 
             let branch_address = args.next().unwrap();
             let offset = compute_offset(address, branch_address);
             format!("{} {},{}", op, rs1, offset)
+        }
+        instr if instr.starts_with("csr") => {
+            let mut args = args.split(',').collect::<Vec<_>>();
+
+            let name_replacement = try_blocks::try_block! {
+                let &second_arg = args.get(1)?;
+
+                // Translate numeric CSR names to symbolic ones
+                match second_arg {
+                    "0x740" => "mnscratch",
+                    "0x741" => "mnepc",
+                    "0x742" => "mncause",
+                    "0x744" => "mnstatus",
+                    _ => None?,
+                }
+            };
+
+            // Replace the second argument with the symbolic name if one was found
+            if let Some(name) = name_replacement {
+                args[1] = name;
+            }
+
+            let args = args.join(",");
+            format!("{} {}", op, args)
         }
         _ => {
             if args.is_empty() {
