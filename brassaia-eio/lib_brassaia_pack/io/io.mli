@@ -1,5 +1,5 @@
 (*
- * Copyright (c) 2022-2023 Tarides <contact@tarides.com>
+ * Copyright (c) 2022-2022 Tarides <contact@tarides.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,7 +16,7 @@
 
 open Import
 
-module type S = sig
+module Unix : sig
   (** Low level IO abstraction. A typical implementation is unix. This
       abstraction is meant to be dead simple. Not a lot of documentation is
       required.
@@ -25,7 +25,7 @@ module type S = sig
       modifications of the files.
 
       These functions are essentially invoking the underlying functions from
-      [Stdlib.Unix] directly; there is no buffering for example. *)
+      {!Unix} directly; there is no buffering for example. *)
 
   type t
 

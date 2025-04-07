@@ -21,10 +21,9 @@ open Brassaia
 
 module Schema = struct
   module Contents = Contents.String
-  module Path = Path.String_list
   module Branch = Branch.String
   module Hash = Hash.BLAKE2B
-  module Node = Node.Generic_key.Make (Hash) (Path)
+  module Node = Node.Generic_key.Make (Hash)
   module Commit = Commit.Make (Hash)
   module Info = Info.Default
 end
@@ -449,7 +448,7 @@ let persist_tree ?clear : Store.tree -> Store.tree =
   let () = Store.set_tree_exn ?clear ~info:Store.Info.none store [] tree in
   Store.tree store
 
-type path = Store.Path.t [@@deriving brassaia ~pp ~equal]
+type path = Path.t [@@deriving brassaia ~pp ~equal]
 
 let test_clear () =
   (* 1. Build a tree *)

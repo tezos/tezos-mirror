@@ -17,6 +17,7 @@
 module Brassaia = Brassaia_eio.Brassaia
 module Brassaia_pack = Brassaia_eio_pack.Brassaia_pack
 include Brassaia.Export_for_backends
+module Path = Brassaia.Path
 
 let src = Logs.Src.create "brassaia-pack.unix" ~doc:"brassaia-pack unix backend"
 

@@ -14,8 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-module Brassaia_pack_io = Brassaia_eio_pack_io.Brassaia_pack_io
-open! Brassaia_pack_io.Import
+open! Import
 
 module Unix = struct
   let kill_no_err pid =

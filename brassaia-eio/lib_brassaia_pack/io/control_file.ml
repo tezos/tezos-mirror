@@ -336,8 +336,8 @@ module Serde = struct
   end
 end
 
-module Make (Serde : Serde.S) (Io : Io_intf.S) = struct
-  module Io = Io
+module Make (Serde : Serde.S) = struct
+  module Io = Io.Unix
 
   type payload = Serde.payload
 

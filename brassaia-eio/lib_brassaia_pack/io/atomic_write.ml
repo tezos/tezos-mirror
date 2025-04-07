@@ -42,11 +42,10 @@ module Table (K : Brassaia.Type.S) = struct
     Eio.Mutex.use_rw ~protect:true lock @@ fun () -> Unsafe.fold f data init
 end
 
-module Make_persistent (Io : Io_intf.S) (K : Brassaia.Type.S) (V : Value.S) =
-struct
+module Make_persistent (K : Brassaia.Type.S) (V : Value.S) = struct
+  module Io = Io.Unix
   module Tbl = Table (K)
   module W = Brassaia.Backend.Watch.Make (K) (V)
-  module Io_errors = Io_errors.Make (Io)
 
   type key = K.t [@@deriving brassaia ~pp ~to_bin_string ~of_bin_string]
 

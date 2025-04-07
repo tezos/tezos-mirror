@@ -16,27 +16,22 @@
 
 module Brassaia = Brassaia_eio.Brassaia
 module Brassaia_pack = Brassaia_eio_pack.Brassaia_pack
-module Brassaia_pack_unix = Brassaia_eio_pack_unix.Brassaia_pack_unix
+module Brassaia_pack_unix = Brassaia_eio_pack_io.Brassaia_pack_unix
 open Brassaia.Perms
 module Int63 = Optint.Int63
-
-module Dict : Brassaia_pack_unix.Dict.S
-
+module Dict = Brassaia_pack_unix.Dict
 module I = Brassaia_pack_unix.Index
 
 module Conf : Brassaia_pack.Conf.S
 
-module File_manager :
-  Brassaia_pack_unix.File_manager.S with module Io = Brassaia_pack_unix.Io.Unix
+module File_manager : Brassaia_pack_unix.File_manager.S
 
-module Errs :
-  Brassaia_pack_unix.Io_errors.S with module Io = Brassaia_pack_unix.Io.Unix
+module Io_errors = Brassaia_pack_unix.Io_errors
+module Lower = Brassaia_pack_unix.Lower
 
 module Schema :
   Brassaia.Schema.Extended
     with type Hash.t = Brassaia.Hash.SHA1.t
-     and type Path.step = string
-     and type Path.t = string list
      and type Branch.t = string
      and type Contents.t = string
 

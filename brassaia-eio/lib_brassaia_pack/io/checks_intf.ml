@@ -135,13 +135,9 @@ module type Sigs = sig
 
   module type S = S
 
-  module Make
-      (Io : Io_intf.S)
-      (Io_index : Brassaia_index.Index.Platform.S)
-      (_ : Store) : S
+  module Make (_ : Store) : S
 
   module Integrity_checks
-      (Io : Io_intf.S)
       (XKey : Pack_key.S)
       (X : Brassaia.Backend.S
              with type Commit.key = XKey.t
@@ -166,7 +162,7 @@ module type Sigs = sig
       ?ppf:Format.formatter ->
       pred:
         (X.Node.value ->
-        (X.Node.Path.step option
+        (Path.step option
         * [< `Contents of XKey.t | `Inode of XKey.t | `Node of XKey.t])
         list) ->
       iter:
@@ -204,10 +200,6 @@ module type Sigs = sig
   end
 
   module Stats (S : sig
-    type step
-
-    val step_t : step Brassaia.Type.t
-
     module Hash : Brassaia.Hash.S
   end) : sig
     type t
@@ -221,7 +213,7 @@ module type Sigs = sig
     val visit_node :
       t ->
       S.Hash.t ->
-      (S.step option
+      (Path.step option
       * [`Contents of S.Hash.t | `Inode of S.Hash.t | `Node of S.Hash.t])
       list ->
       nb_children:int ->

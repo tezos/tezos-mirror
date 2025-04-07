@@ -121,7 +121,7 @@ module Make (S : Generic_key) = struct
       let check_hash = check B.Hash.t in
       let check_key = check B.Node.Key.t in
       let check_val = check [%typ: Graph.value option] in
-      let check_list = checks [%typ: S.step * B.Node.Val.value] in
+      let check_list = checks [%typ: Path.step * B.Node.Val.value] in
       let check_node msg v =
         let h' = B.Node.Hash.hash v in
         let key = with_node repo (fun n -> B.Node.add n v) in
@@ -963,7 +963,7 @@ module Make (S : Generic_key) = struct
   let test_stores x () =
     let test repo =
       let check_val = check [%typ: S.contents option] in
-      let check_list = checks [%typ: S.Path.step * S.tree] in
+      let check_list = checks [%typ: Path.step * S.tree] in
       let t = S.main repo in
       S.set_exn t ~info:(infof "init") ["a"; "b"] v1 ;
       let b0 = S.mem t ["a"; "b"] in
@@ -1154,15 +1154,15 @@ module Make (S : Generic_key) = struct
 
   let pp_depth = Brassaia.Type.pp S.Tree.depth_t
 
-  let pp_key = Brassaia.Type.pp S.Path.t
+  let pp_key = Path.pp
 
   let contents_t = S.contents_t
 
-  let diff_t = T.(pair S.path_t (Brassaia.Diff.t contents_t))
+  let diff_t = T.(pair Path.t (Brassaia.Diff.t contents_t))
 
   let check_diffs = checks diff_t
 
-  let check_ls = checks T.(pair S.step_t S.tree_t)
+  let check_ls = checks T.(pair Path.step_t S.tree_t)
 
   let test_trees x () =
     let test repo =
@@ -1205,7 +1205,7 @@ module Make (S : Generic_key) = struct
             ~node:(fun path _ (cs, ns) -> (cs, path :: ns))
             ([], [])
         in
-        let paths = slist (testable S.Path.t) compare in
+        let paths = slist (testable Path.t) compare in
         Alcotest.(check paths)
           (Fmt.str "contents depth=%a" Fmt.(Dump.option pp_depth) depth)
           ecs
@@ -1266,10 +1266,10 @@ module Make (S : Generic_key) = struct
 
       (* Testing [Tree.diff] *)
       let contents_t = S.contents_t in
-      let diff = T.(pair S.path_t (Brassaia.Diff.t contents_t)) in
+      let diff = T.(pair Path.t (Brassaia.Diff.t contents_t)) in
       let check_diffs = checks diff in
       let check_val = check T.(option contents_t) in
-      let check_ls = checks T.(pair S.step_t S.tree_t) in
+      let check_ls = checks T.(pair Path.step_t S.tree_t) in
       let normal c = Some c in
       let v0 = S.Tree.empty () in
       let v1 = S.Tree.empty () in
@@ -1846,10 +1846,7 @@ module Make (S : Generic_key) = struct
           i + 1)
         ~node:(fun k _ i ->
           if not (List.length k = 0 || List.length k = 1) then
-            Alcotest.failf
-              "nodes should be at [] and [foo], got %a"
-              (Brassaia.Type.pp S.path_t)
-              k ;
+            Alcotest.failf "nodes should be at [] and [foo], got %a" Path.pp k ;
           i)
         0
       |> fun nb_contents ->

@@ -16,6 +16,7 @@
 
 open! Import
 include Checks_intf
+module Io = Io.Unix
 
 let setup_log =
   let init _style_renderer level =
@@ -55,13 +56,9 @@ let ppf_or_null = function
   | Some p -> p
   | None -> Format.make_formatter (fun _ _ _ -> ()) (fun () -> ())
 
-module Make
-    (Io : Io_intf.S)
-    (Io_index : Brassaia_index.Index.Platform.S)
-    (Store : Store) =
-struct
+module Make (Store : Store) = struct
   module Hash = Store.Hash
-  module Index = Pack_index.Make_io (Io) (Io_index) (Hash)
+  module Index = Pack_index.Make_io (Hash)
   module Object_counter = Utils.Object_counter (Io.Progress)
 
   (** Read basic metrics from an existing store. *)
@@ -392,7 +389,6 @@ struct
 end
 
 module Integrity_checks
-    (Io : Io_intf.S)
     (XKey : Pack_key.S)
     (X : Brassaia.Backend.S
            with type Commit.key = XKey.t
@@ -573,14 +569,10 @@ struct
 end
 
 module Stats (S : sig
-  type step
-
-  val step_t : step Brassaia.Type.t
-
   module Hash : Brassaia.Hash.S
 end) =
 struct
-  type step = Node of S.step | Inode
+  type step = Node of Path.step | Inode
 
   type path = step list
 
@@ -705,7 +697,7 @@ struct
 
     let pp_step ppf = function
       | Inode -> Fmt.pf ppf "-"
-      | Node x -> Fmt.pf ppf "%a" (Brassaia.Type.pp S.step_t) x
+      | Node x -> Fmt.pf ppf "%a" (Brassaia.Type.pp Path.step_t) x
 
     let pp_path = Fmt.list ~sep:(Fmt.any "/") pp_step
 

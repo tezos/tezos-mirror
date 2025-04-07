@@ -17,11 +17,9 @@
 open! Import
 
 module type Child_ordering = sig
-  type step
-
   type key
 
-  val key : step -> key
+  val key : Path.step -> key
 
   val index : depth:int -> key -> int
 end
@@ -52,15 +50,12 @@ module type Value = sig
 
   val pred :
     t ->
-    (step option
+    (Path.step option
     * [`Node of node_key | `Inode of node_key | `Contents of contents_key])
     list
 
   module Portable :
-    Brassaia.Node.Portable.S
-      with type node := t
-       and type hash = hash
-       and type step := step
+    Brassaia.Node.Portable.S with type node := t and type hash = hash
 
   val nb_children : t -> int
 
@@ -105,15 +100,13 @@ module type S = sig
 end
 
 module type Compress = sig
-  type step
-
   type hash
 
   type dict_key = int
 
   type pack_offset = int63
 
-  type name = Indirect of dict_key | Direct of step
+  type name = Indirect of dict_key | Direct of Path.step
 
   type address = Offset of pack_offset | Hash of hash
 
@@ -168,7 +161,7 @@ module type Internal = sig
 
     val length : t -> int
 
-    val index : depth:int -> step -> int
+    val index : depth:int -> Path.step -> int
 
     (** Checks the integrity of an inode. *)
     val integrity_check : t -> bool
@@ -184,7 +177,7 @@ module type Internal = sig
       [@@deriving brassaia]
 
       (** The type of entries. *)
-      type entry = {name : step; key : kinded_key} [@@deriving brassaia]
+      type entry = {name : Path.step; key : kinded_key} [@@deriving brassaia]
 
       (** The type for internal pointers between concrete {!type-tree}s. *)
       type 'a pointer = {index : int; pointer : hash; tree : 'a}
@@ -248,9 +241,9 @@ module type Internal = sig
 
   val to_snapshot : Raw.t -> Snapshot.inode
 
-  module Compress : Compress with type hash := hash and type step := Val.step
+  module Compress : Compress with type hash := hash
 
-  module Child_ordering : Child_ordering with type step := Val.step
+  module Child_ordering : Child_ordering
 end
 
 module type Sigs = sig
@@ -278,10 +271,7 @@ module type Sigs = sig
                 with type hash = H.t
                  and type contents_key = Key.t
                  and type node_key = Key.t) :
-    Internal
-      with type hash = H.t
-       and type key = Key.t
-       and type Val.step = Node.step
+    Internal with type hash = H.t and type key = Key.t
 
   module Make
       (H : Brassaia.Hash.S)
@@ -290,10 +280,7 @@ module type Sigs = sig
                 with type hash = H.t
                  and type contents_key = Key.t
                  and type node_key = Key.t)
-      (Inter : Internal
-                 with type hash = H.t
-                  and type key = Key.t
-                  and type Val.step = Node.step)
+      (Inter : Internal with type hash = H.t and type key = Key.t)
       (Pack : Indexable.S
                 with type key = Key.t
                  and type hash = H.t
@@ -302,6 +289,5 @@ module type Sigs = sig
       with type 'a t = 'a Pack.t
        and type key = Key.t
        and type hash = H.t
-       and type Val.step = Node.step
        and type value = Inter.Val.t
 end

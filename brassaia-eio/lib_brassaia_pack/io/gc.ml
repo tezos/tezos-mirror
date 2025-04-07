@@ -20,10 +20,8 @@ open! Import
 module Make (Args : Gc_args.S) = struct
   module Args = Args
   open Args
-  module Io = File_Manager.Io
-  module Ao = Append_only_file.Make (Io) (Errs)
+  module Io = Io.Unix
   module Worker = Gc_worker.Make (Args)
-  module Gc_stats_main = Gc_stats.Main (Io)
 
   type t = {
     root : string;
@@ -31,10 +29,10 @@ module Make (Args : Gc_args.S) = struct
     task : Async.t;
     unlink : bool;
     new_suffix_start_offset : int63;
-    mutable on_finalise : (Stats.Latest_gc.stats, Args.Errs.t) result -> unit;
+    mutable on_finalise : (Stats.Latest_gc.stats, Io_errors.t) result -> unit;
     dispatcher : Dispatcher.t;
     file_manager : File_Manager.t;
-    partial_stats : Gc_stats_main.t;
+    partial_stats : Gc_stats.Main.t;
     mutable resulting_stats : Stats.Latest_gc.stats option;
     latest_gc_target_offset : int63;
   }
@@ -91,7 +89,7 @@ module Make (Args : Gc_args.S) = struct
         Dispatcher.suffix_start_offset dispatcher
       in
       let before_suffix_end_offset = Dispatcher.end_offset dispatcher in
-      Gc_stats_main.create
+      Gc_stats.Main.create
         "worker startup"
         ~commit_offset
         ~generation
@@ -127,7 +125,7 @@ module Make (Args : Gc_args.S) = struct
             ~new_files_path)
     in
     let partial_stats =
-      Gc_stats_main.finish_current_step partial_stats "before finalise"
+      Gc_stats.Main.finish_current_step partial_stats "before finalise"
     in
     Ok
       {
@@ -248,16 +246,19 @@ module Make (Args : Gc_args.S) = struct
       Ok string
     in
     let read_error err =
-      `Corrupted_gc_result_file (Brassaia.Type.to_string Errs.t err)
+      `Corrupted_gc_result_file (Brassaia.Type.to_string Io_errors.t err)
     in
-    let gc_error err = `Gc_process_error (Brassaia.Type.to_string Errs.t err) in
+    let gc_error err =
+      `Gc_process_error (Brassaia.Type.to_string Io_errors.t err)
+    in
     let* s = read_file () |> Result.map_error read_error in
     match Brassaia.Type.of_json_string Worker.gc_output_t s with
     | Error (`Msg error) -> Error (`Corrupted_gc_result_file error)
     | Ok ok -> ok |> Result.map_error gc_error
 
   let clean_after_abort t =
-    File_Manager.cleanup t.file_manager |> Errs.log_if_error "clean_after_abort"
+    File_Manager.cleanup t.file_manager
+    |> Io_errors.log_if_error "clean_after_abort"
 
   let finalise ~wait t =
     match t.resulting_stats with
@@ -265,11 +266,11 @@ module Make (Args : Gc_args.S) = struct
     | None -> (
         let partial_stats = t.partial_stats in
         let partial_stats =
-          Gc_stats_main.finish_current_step partial_stats "worker wait"
+          Gc_stats.Main.finish_current_step partial_stats "worker wait"
         in
         let go status =
           let partial_stats =
-            Gc_stats_main.finish_current_step partial_stats "read output"
+            Gc_stats.Main.finish_current_step partial_stats "read output"
           in
 
           let gc_output =
@@ -281,13 +282,13 @@ module Make (Args : Gc_args.S) = struct
             match (status, gc_output) with
             | `Success, Ok gc_results ->
                 let partial_stats =
-                  Gc_stats_main.finish_current_step
+                  Gc_stats.Main.finish_current_step
                     partial_stats
                     "swap and purge"
                 in
                 let* () = swap_and_purge t gc_results in
                 let partial_stats =
-                  Gc_stats_main.finish_current_step partial_stats "unlink"
+                  Gc_stats.Main.finish_current_step partial_stats "unlink"
                 in
                 if t.unlink then unlink_all t gc_results.removable_chunk_idxs ;
 
@@ -295,7 +296,7 @@ module Make (Args : Gc_args.S) = struct
                   let after_suffix_end_offset =
                     Dispatcher.end_offset t.dispatcher
                   in
-                  Gc_stats_main.finalise
+                  Gc_stats.Main.finalise
                     partial_stats
                     gc_results.stats
                     ~after_suffix_end_offset
@@ -338,7 +339,7 @@ module Make (Args : Gc_args.S) = struct
           suffix_dead_bytes = Int63.zero;
           mapping_end_poff = Some gc_results.mapping_size;
         }
-    | _ -> gc_errors status gc_output |> Errs.raise_if_error
+    | _ -> gc_errors status gc_output |> Io_errors.raise_if_error
 
   let on_finalise t f =
     (* TODO: finaliser should be defined on GC creation, not set later *)

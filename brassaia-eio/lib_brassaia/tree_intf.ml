@@ -18,10 +18,6 @@
 open! Import
 
 module type S = sig
-  type path [@@deriving brassaia]
-
-  type step [@@deriving brassaia]
-
   type contents [@@deriving brassaia]
 
   type contents_key [@@deriving brassaia]
@@ -51,7 +47,7 @@ module type S = sig
 
   (** [singleton k c] is the tree with a single binding mapping the key [k] to
       the contents [c]. *)
-  val singleton : path -> contents -> t
+  val singleton : Path.t -> contents -> t
 
   (** [of_contents c] is the subtree built from the contents [c]. *)
   val of_contents : contents -> t
@@ -79,7 +75,7 @@ module type S = sig
 
   (** [kind t k] is the type of [s] in [t]. It could either be a tree node or
       some file contents. It is [None] if [k] is not present in [t]. *)
-  val kind : t -> path -> [`Contents | `Node] option
+  val kind : t -> Path.t -> [`Contents | `Node] option
 
   (** [is_empty t] is true iff [t] is {!val-empty} (i.e. a tree node with no
       children). Trees with {!kind} = [`Contents] are never considered empty. *)
@@ -88,7 +84,7 @@ module type S = sig
   (** {1 Diffs} *)
 
   (** [diff x y] is the difference of contents between [x] and [y]. *)
-  val diff : t -> t -> (path * contents Diff.t) list
+  val diff : t -> t -> (Path.t * contents Diff.t) list
 
   (** {1 Manipulating Contents} *)
 
@@ -146,11 +142,11 @@ module type S = sig
   end
 
   (** [mem t k] is true iff [k] is associated to some contents in [t]. *)
-  val mem : t -> path -> bool
+  val mem : t -> Path.t -> bool
 
   (** [find_all t k] is [Some (b, m)] if [k] is associated to the contents [b]
       in [t] and [None] if [k] is not present in [t]. *)
-  val find_all : t -> path -> contents option
+  val find_all : t -> Path.t -> contents option
 
   (** [length t key] is the number of files and sub-nodes stored under [key] in
       [t].
@@ -160,13 +156,13 @@ module type S = sig
 
       [cache] defaults to [true], see {!caching} for an explanation of the
       parameter.*)
-  val length : t -> ?cache:bool -> path -> int
+  val length : t -> ?cache:bool -> Path.t -> int
 
   (** [find] is similar to {!find_all}. *)
-  val find : t -> path -> contents option
+  val find : t -> Path.t -> contents option
 
   (** Same as {!find_all} but raise [Invalid_arg] if [k] is not present in [t]. *)
-  val get_all : t -> path -> contents
+  val get_all : t -> Path.t -> contents
 
   (** [list t key] is the list of files and sub-nodes stored under [k] in [t].
       The result order is not specified but is stable.
@@ -176,48 +172,58 @@ module type S = sig
       [cache] defaults to [true], see {!Contents.caching} for an explanation of
       the parameter. *)
   val list :
-    t -> ?offset:int -> ?length:int -> ?cache:bool -> path -> (step * t) list
+    t ->
+    ?offset:int ->
+    ?length:int ->
+    ?cache:bool ->
+    Path.t ->
+    (Path.step * t) list
 
   (** [seq t key] follows the same behavior as {!list} but returns a sequence. *)
   val seq :
-    t -> ?offset:int -> ?length:int -> ?cache:bool -> path -> (step * t) Seq.t
+    t ->
+    ?offset:int ->
+    ?length:int ->
+    ?cache:bool ->
+    Path.t ->
+    (Path.step * t) Seq.t
 
   (** Same as {!get_all} *)
-  val get : t -> path -> contents
+  val get : t -> Path.t -> contents
 
   (** [add t k c] is the tree where the key [k] is bound to the contents [c] but
       is similar to [t] for other bindings. *)
-  val add : t -> path -> contents -> t
+  val add : t -> Path.t -> contents -> t
 
   (** [update t k f] is the tree [t'] that is the same as [t] for all keys
       except [k], and whose binding for [k] is determined by [f (find t k)].
 
       If [k] refers to an internal node of [t], [f] is called with [None] to
       determine the value with which to replace it. *)
-  val update : t -> path -> (contents option -> contents option) -> t
+  val update : t -> Path.t -> (contents option -> contents option) -> t
 
   (** [remove t k] is the tree where [k] bindings has been removed but is
       similar to [t] for other bindings. *)
-  val remove : t -> path -> t
+  val remove : t -> Path.t -> t
 
   (** {1 Manipulating Subtrees} *)
 
   (** [mem_tree t k] is false iff [find_tree k = None]. *)
-  val mem_tree : t -> path -> bool
+  val mem_tree : t -> Path.t -> bool
 
   (** [find_tree t k] is [Some v] if [k] is associated to [v] in [t]. It is
       [None] if [k] is not present in [t]. *)
-  val find_tree : t -> path -> t option
+  val find_tree : t -> Path.t -> t option
 
   (** [get_tree t k] is [v] if [k] is associated to [v] in [t]. Raise
       [Invalid_arg] if [k] is not present in [t].*)
-  val get_tree : t -> path -> t
+  val get_tree : t -> Path.t -> t
 
   (** [add_tree t k v] is the tree where the key [k] is bound to the non-empty
       tree [v] but is similar to [t] for other bindings.
 
       If [v] is empty, this is equivalent to [remove t k]. *)
-  val add_tree : t -> path -> t -> t
+  val add_tree : t -> Path.t -> t -> t
 
   (** [update_tree t k f] is the tree [t'] that is the same as [t] for all
       subtrees except under [k], and whose subtree at [k] is determined by
@@ -225,7 +231,7 @@ module type S = sig
 
       [f] returning either [None] or [Some empty] causes the subtree at [k] to
       be unbound (i.e. it is equivalent to [remove t k]). *)
-  val update_tree : t -> path -> (t option -> t option) -> t
+  val update_tree : t -> Path.t -> (t option -> t option) -> t
 
   (** [merge] is the 3-way merge function for trees. *)
   val merge : t Merge.t
@@ -244,7 +250,7 @@ module type S = sig
   (** The type for {!fold}'s [force] parameter. [`True] forces the fold to read
       the objects of the lazy nodes and contents. [`False f] is applying [f] on
       every lazy node and content value instead. *)
-  type 'a force = [`True | `False of path -> 'a -> 'a]
+  type 'a force = [`True | `False of Path.t -> 'a -> 'a]
 
   (** The type for {!fold}'s [uniq] parameters. [`False] folds over all the
       nodes. [`True] does not recurse on nodes already seen. [`Marks m] uses the
@@ -254,7 +260,7 @@ module type S = sig
 
   (** The type for {!fold}'s folders: [pre], [post], [contents], [node], and
       [tree], where ['a] is the accumulator and ['b] is the item folded. *)
-  type ('a, 'b) folder = path -> 'b -> 'a -> 'a
+  type ('a, 'b) folder = Path.t -> 'b -> 'a -> 'a
 
   (** The type for fold depths.
 
@@ -304,8 +310,8 @@ module type S = sig
     ?force:'a force ->
     ?cache:bool ->
     ?uniq:uniq ->
-    ?pre:('a, step list) folder ->
-    ?post:('a, step list) folder ->
+    ?pre:('a, Path.step list) folder ->
+    ?post:('a, Path.step list) folder ->
     ?depth:depth ->
     ?contents:('a, contents) folder ->
     ?node:('a, node) folder ->
@@ -333,7 +339,7 @@ module type S = sig
   (** {1 Concrete Trees} *)
 
   (** The type for concrete trees. *)
-  type concrete = [`Tree of (step * concrete) list | `Contents of contents]
+  type concrete = [`Tree of (Path.step * concrete) list | `Contents of contents]
   [@@deriving brassaia]
 
   (** [of_concrete c] is the subtree equivalent of the concrete tree [c].
@@ -348,11 +354,7 @@ module type S = sig
   (** {1 Proofs} *)
 
   module Proof : sig
-    include
-      Proof.S
-        with type contents := contents
-         and type hash := hash
-         and type step := step
+    include Proof.S with type contents := contents and type hash := hash
 
     type brassaia_tree
 
@@ -431,9 +433,7 @@ module type Sigs = sig
   module Make (B : Backend.S) : sig
     include
       S
-        with type path = B.Node.Path.t
-         and type step = B.Node.Path.step
-         and type contents = B.Contents.value
+        with type contents = B.Contents.value
          and type contents_key = B.Contents.Key.t
          and type hash = B.Hash.t
 

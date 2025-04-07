@@ -41,12 +41,6 @@ module type S_generic_key = sig
   (** The type for Brassaia stores. *)
   type t
 
-  (** The type for {!type-key} steps. *)
-  type step = Schema.Path.step [@@deriving brassaia]
-
-  (** The type for store keys. A key is a sequence of {!step}s. *)
-  type path = Schema.Path.t [@@deriving brassaia]
-
   (** The type for store contents. *)
   type contents = Schema.Contents.t [@@deriving brassaia]
 
@@ -422,8 +416,6 @@ module type S_generic_key = sig
     include
       Tree.S
         with type t := tree
-         and type step := step
-         and type path := path
          and type contents := contents
          and type contents_key := contents_key
          and type node := node
@@ -538,42 +530,42 @@ module type S_generic_key = sig
   (** {1 Reads} *)
 
   (** [kind] is {!Tree.kind} applied to [t]'s root tree. *)
-  val kind : t -> path -> [`Contents | `Node] option
+  val kind : t -> Path.t -> [`Contents | `Node] option
 
   (** [list t] is {!Tree.list} applied to [t]'s root tree. *)
-  val list : t -> path -> (step * tree) list
+  val list : t -> Path.t -> (Path.step * tree) list
 
   (** [mem t] is {!Tree.mem} applied to [t]'s root tree. *)
-  val mem : t -> path -> bool
+  val mem : t -> Path.t -> bool
 
   (** [mem_tree t] is {!Tree.mem_tree} applied to [t]'s root tree. *)
-  val mem_tree : t -> path -> bool
+  val mem_tree : t -> Path.t -> bool
 
   (** [find_all t] is {!Tree.find_all} applied to [t]'s root tree. *)
-  val find_all : t -> path -> contents option
+  val find_all : t -> Path.t -> contents option
 
   (** [find t] is {!Tree.find} applied to [t]'s root tree. *)
-  val find : t -> path -> contents option
+  val find : t -> Path.t -> contents option
 
   (** [get_all t] is {!Tree.get_all} applied on [t]'s root tree. *)
-  val get_all : t -> path -> contents
+  val get_all : t -> Path.t -> contents
 
   (** [get t] is {!Tree.get} applied to [t]'s root tree. *)
-  val get : t -> path -> contents
+  val get : t -> Path.t -> contents
 
   (** [find_tree t] is {!Tree.find_tree} applied to [t]'s root tree. *)
-  val find_tree : t -> path -> tree option
+  val find_tree : t -> Path.t -> tree option
 
   (** [get_tree t k] is {!Tree.get_tree} applied to [t]'s root tree. *)
-  val get_tree : t -> path -> tree
+  val get_tree : t -> Path.t -> tree
 
   type kinded_key := [`Contents of contents_key | `Node of node_key]
 
   (** [id t k] *)
-  val key : t -> path -> kinded_key option
+  val key : t -> Path.t -> kinded_key option
 
   (** [hash t k] *)
-  val hash : t -> path -> hash option
+  val hash : t -> Path.t -> hash option
 
   (** {1 Updates} *)
 
@@ -604,7 +596,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     contents ->
     (unit, write_error) result
 
@@ -617,7 +609,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     contents ->
     unit
 
@@ -629,7 +621,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     tree ->
     (unit, write_error) result
 
@@ -641,7 +633,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     tree ->
     unit
 
@@ -657,7 +649,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     (unit, write_error) result
 
   (** [remove_exn] is like {!remove} but raise [Failure _] instead of a using
@@ -669,7 +661,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     unit
 
   (** [test_and_set ~test ~set] is like {!set} but it atomically checks that the
@@ -688,7 +680,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     test:contents option ->
     set:contents option ->
     (unit, write_error) result
@@ -702,7 +694,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     test:contents option ->
     set:contents option ->
     unit
@@ -715,7 +707,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     test:tree option ->
     set:tree option ->
     (unit, write_error) result
@@ -728,7 +720,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     test:tree option ->
     set:tree option ->
     unit
@@ -744,7 +736,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:(unit -> info) ->
     t ->
-    path ->
+    Path.t ->
     test:contents option ->
     set:contents option ->
     (commit option, write_error) result
@@ -758,7 +750,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:(unit -> info) ->
     t ->
-    path ->
+    Path.t ->
     test:contents option ->
     set:contents option ->
     commit option
@@ -771,7 +763,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:(unit -> info) ->
     t ->
-    path ->
+    Path.t ->
     test:tree option ->
     set:tree option ->
     (commit option, write_error) result
@@ -785,7 +777,7 @@ module type S_generic_key = sig
     ?parents:commit list ->
     info:(unit -> info) ->
     t ->
-    path ->
+    Path.t ->
     test:tree option ->
     set:tree option ->
     commit option
@@ -807,7 +799,7 @@ module type S_generic_key = sig
     info:Info.f ->
     old:contents option ->
     t ->
-    path ->
+    Path.t ->
     contents option ->
     (unit, write_error) result
 
@@ -821,7 +813,7 @@ module type S_generic_key = sig
     info:Info.f ->
     old:contents option ->
     t ->
-    path ->
+    Path.t ->
     contents option ->
     unit
 
@@ -834,7 +826,7 @@ module type S_generic_key = sig
     info:Info.f ->
     old:tree option ->
     t ->
-    path ->
+    Path.t ->
     tree option ->
     (unit, write_error) result
 
@@ -847,7 +839,7 @@ module type S_generic_key = sig
     info:Info.f ->
     old:tree option ->
     t ->
-    path ->
+    Path.t ->
     tree option ->
     unit
 
@@ -882,7 +874,7 @@ module type S_generic_key = sig
     ?strategy:[`Set | `Test_and_set | `Merge] ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     (tree option -> tree option) ->
     (unit, write_error) result
 
@@ -896,7 +888,7 @@ module type S_generic_key = sig
     ?strategy:[`Set | `Test_and_set | `Merge] ->
     info:Info.f ->
     t ->
-    path ->
+    Path.t ->
     (tree option -> tree option) ->
     unit
 
@@ -922,7 +914,7 @@ module type S_generic_key = sig
       removed or updated. If the current branch is deleted, no signal is sent to
       the watcher. *)
   val watch_key :
-    t -> path -> ?init:commit -> ((commit * tree) Diff.t -> unit) -> watch
+    t -> Path.t -> ?init:commit -> ((commit * tree) Diff.t -> unit) -> watch
 
   (** [unwatch w] disable [w]. Return once the [w] is fully disabled. *)
   val unwatch : watch -> unit
@@ -982,7 +974,7 @@ module type S_generic_key = sig
       modified [path], in ascending order of date. [depth] is the maximum depth
       to be explored in the commit graph, if any. Default value for [number] is
       1. *)
-  val last_modified : ?depth:int -> ?n:int -> t -> path -> commit list
+  val last_modified : ?depth:int -> ?n:int -> t -> Path.t -> commit list
 
   (** Manipulate branches. *)
   module Branch : sig
@@ -1031,9 +1023,6 @@ module type S_generic_key = sig
     include Branch.S with type t = branch
   end
 
-  (** [Path] provides base functions for the stores's paths. *)
-  module Path : Path.S with type t = path and type step = step
-
   (** Backend functions, which might be used by the backends. *)
   module Backend :
     Backend.S
@@ -1041,7 +1030,6 @@ module type S_generic_key = sig
       with type Slice.t = slice
        and type Repo.t = repo
        and module Hash = Hash
-       and module Node.Path = Path
        and type Contents.key = contents_key
        and type Node.key = node_key
        and type Commit.key = commit_key
@@ -1134,29 +1122,21 @@ module type Json_tree = functor
   val of_concrete_tree : Store.Tree.concrete -> t
 
   (** Extract a [json] value from tree at the given key. *)
-  val get_tree : Store.tree -> Store.path -> t
+  val get_tree : Store.tree -> Path.t -> t
 
   (** Project a [json] value onto a tree at the given key. *)
-  val set_tree : Store.tree -> Store.path -> t -> Store.tree
+  val set_tree : Store.tree -> Path.t -> t -> Store.tree
 
   (** Extract a [json] value from a store at the given key. *)
-  val get : Store.t -> Store.path -> t
+  val get : Store.t -> Path.t -> t
 
   (** Project a [json] value onto a store at the given key. *)
-  val set : Store.t -> Store.path -> t -> info:(unit -> Store.info) -> unit
+  val set : Store.t -> Path.t -> t -> info:(unit -> Store.info) -> unit
 end
 
-module type KV_generic_key =
-  S_generic_key
-    with type Schema.Path.step = string
-     and type Schema.Path.t = string list
-     and type Schema.Branch.t = string
+module type KV_generic_key = S_generic_key with type Schema.Branch.t = string
 
-module type KV =
-  S
-    with type Schema.Path.step = string
-     and type Schema.Path.t = string list
-     and type Schema.Branch.t = string
+module type KV = S with type Schema.Branch.t = string
 
 module type KV_maker_generic_key = sig
   type endpoint

@@ -21,12 +21,10 @@ exception Pack_error = Errors.Pack_error
 
 module Make (Args : Gc_args.S) = struct
   open Args
-  module Io = File_Manager.Io
-  module Lower = File_Manager.Lower
+  module Io = Io.Unix
   module Dict = File_Manager.Dict
   module Sparse = File_Manager.Sparse
-  module Ao = Append_only_file.Make (File_Manager.Io) (Errs)
-  module Gc_stats_worker = Gc_stats.Worker (Io)
+  module Ao = Append_only_file
 
   let string_of_key = Brassaia.Type.to_string key_t
 
@@ -196,14 +194,14 @@ module Make (Args : Gc_args.S) = struct
   let report_old_file_sizes ~root ~generation stats =
     let open Result_syntax in
     let+ mapping_size, prefix_size = prefix_file_sizes ~root ~generation in
-    stats := Gc_stats_worker.add_file_size !stats "old_prefix" prefix_size ;
-    stats := Gc_stats_worker.add_file_size !stats "old_mapping" mapping_size
+    stats := Gc_stats.Worker.add_file_size !stats "old_prefix" prefix_size ;
+    stats := Gc_stats.Worker.add_file_size !stats "old_mapping" mapping_size
 
   let report_new_file_sizes ~root ~generation stats =
     let open Result_syntax in
     let+ mapping_size, prefix_size = prefix_file_sizes ~root ~generation in
-    stats := Gc_stats_worker.add_file_size !stats "prefix" prefix_size ;
-    stats := Gc_stats_worker.add_file_size !stats "mapping" mapping_size
+    stats := Gc_stats.Worker.add_file_size !stats "prefix" prefix_size ;
+    stats := Gc_stats.Worker.add_file_size !stats "mapping" mapping_size
 
   type suffix_params = {
     start_offset : int63;
@@ -221,7 +219,7 @@ module Make (Args : Gc_args.S) = struct
   }
   [@@deriving brassaia]
 
-  type gc_output = (gc_results, Args.Errs.t) result [@@deriving brassaia]
+  type gc_output = (gc_results, Io_errors.t) result [@@deriving brassaia]
 
   let run ~lower_root ~generation ~new_files_path root commit_key
       new_suffix_start_offset =
@@ -237,18 +235,20 @@ module Make (Args : Gc_args.S) = struct
 
     (* Step 1. Open the files *)
     [%log.debug "GC: opening files in RO mode"] ;
-    let stats = ref (Gc_stats_worker.create "open files") in
+    let stats = ref (Gc_stats.Worker.create "open files") in
     let () =
       report_old_file_sizes ~root ~generation:(generation - 1) stats |> ignore
     in
 
-    let file_manager = File_Manager.open_ro config |> Errs.raise_if_error in
+    let file_manager =
+      File_Manager.open_ro config |> Io_errors.raise_if_error
+    in
     Errors.finalise_exn (fun _outcome ->
         File_Manager.close file_manager
-        |> Errs.log_if_error "GC: Close File_manager")
+        |> Io_errors.log_if_error "GC: Close File_manager")
     @@ fun () ->
     let dict = File_Manager.dict file_manager in
-    let dispatcher = Dispatcher.init file_manager |> Errs.raise_if_error in
+    let dispatcher = Dispatcher.init file_manager |> Io_errors.raise_if_error in
     let node_store =
       Node_store.init ~config ~file_manager ~dict ~dispatcher ~lru:None
     in
@@ -258,31 +258,32 @@ module Make (Args : Gc_args.S) = struct
 
     (* Step 2. Load commit which will make [commit_key] [Direct] if it's not
        already the case. *)
-    stats := Gc_stats_worker.finish_current_step !stats "load commit" ;
+    stats := Gc_stats.Worker.finish_current_step !stats "load commit" ;
     let commit =
       match
         Commit_store.unsafe_find ~check_integrity:false commit_store commit_key
       with
       | None ->
-          Errs.raise_error (`Commit_key_is_dangling (string_of_key commit_key))
+          Io_errors.raise_error
+            (`Commit_key_is_dangling (string_of_key commit_key))
       | Some commit -> commit
     in
 
     (* Step 3. Compute the list of [offset, length] ranges of live objects
        reachable from the GC commit. *)
     let live_entries =
-      stats := Gc_stats_worker.finish_current_step !stats "mapping: start" ;
+      stats := Gc_stats.Worker.finish_current_step !stats "mapping: start" ;
       let live_entries = snapshot_commit commit_key commit_store node_store in
       stats :=
-        Gc_stats_worker.finish_current_step !stats "mapping: of reachable" ;
+        Gc_stats.Worker.finish_current_step !stats "mapping: of reachable" ;
       stats :=
-        Gc_stats_worker.set_objects_traversed !stats (Ranges.count live_entries) ;
+        Gc_stats.Worker.set_objects_traversed !stats (Ranges.count live_entries) ;
       live_entries
     in
 
     let mapping_size =
       (* Step 4. Create the new prefix. *)
-      stats := Gc_stats_worker.finish_current_step !stats "prefix: start" ;
+      stats := Gc_stats.Worker.finish_current_step !stats "prefix: start" ;
       let mapping =
         Brassaia_pack.Layout.V4.mapping ~root:new_files_path ~generation
       in
@@ -290,14 +291,16 @@ module Make (Args : Gc_args.S) = struct
         Brassaia_pack.Layout.V4.prefix ~root:new_files_path ~generation
       in
       let mapping_size =
-        let prefix = Sparse.Ao.create ~mapping ~data |> Errs.raise_if_error in
+        let prefix =
+          Sparse.Ao.create ~mapping ~data |> Io_errors.raise_if_error
+        in
         (* Step 5. Transfer to the new prefix, flush and close. *)
         [%log.debug "GC: transfering to the new prefix"] ;
-        stats := Gc_stats_worker.finish_current_step !stats "prefix: transfer" ;
+        stats := Gc_stats.Worker.finish_current_step !stats "prefix: transfer" ;
         Errors.finalise_exn (fun _ ->
             Sparse.Ao.flush prefix
             >>= (fun _ -> Sparse.Ao.close prefix)
-            |> Errs.log_if_error "GC: Close prefix after data copy")
+            |> Io_errors.log_if_error "GC: Close prefix after data copy")
         @@ fun () ->
         (* Step 5.1. Transfer all. *)
         Ranges.iter
@@ -312,16 +315,17 @@ module Make (Args : Gc_args.S) = struct
            prefix, this time in write-only as we have to
            modify data inside the file. *)
         stats :=
-          Gc_stats_worker.finish_current_step
+          Gc_stats.Worker.finish_current_step
             !stats
             "prefix: rewrite commit parents" ;
         let prefix =
-          Sparse.Wo.open_wo ~mapping_size ~mapping ~data |> Errs.raise_if_error
+          Sparse.Wo.open_wo ~mapping_size ~mapping ~data
+          |> Io_errors.raise_if_error
         in
         Errors.finalise_exn (fun _outcome ->
             Sparse.Wo.fsync prefix
             >>= (fun _ -> Sparse.Wo.close prefix)
-            |> Errs.log_if_error "GC: Close prefix after parent rewrite")
+            |> Io_errors.log_if_error "GC: Close prefix after parent rewrite")
         @@ fun () ->
         let write_exn = Sparse.Wo.write_exn prefix in
         List.iter
@@ -335,7 +339,7 @@ module Make (Args : Gc_args.S) = struct
     (* Step 6. Calculate post-GC suffix parameters. *)
     let suffix_params, mapping_size, removable_chunk_idxs =
       stats :=
-        Gc_stats_worker.finish_current_step
+        Gc_stats.Worker.finish_current_step
           !stats
           "suffix: calculate new values" ;
       let suffix = File_Manager.suffix file_manager in
@@ -407,7 +411,7 @@ module Make (Args : Gc_args.S) = struct
       | `Archive lower ->
           [%log.debug "GC: archiving into lower"] ;
           stats :=
-            Gc_stats_worker.finish_current_step !stats "archive: iter reachable" ;
+            Gc_stats.Worker.finish_current_step !stats "archive: iter reachable" ;
           let min_offset = Dispatcher.suffix_start_offset dispatcher in
           let to_archive = ref [] in
           Ranges.iter
@@ -418,7 +422,7 @@ module Make (Args : Gc_args.S) = struct
             (traverse_range ~min_offset commit_key commit_store node_store) ;
           let to_archive = List.rev !to_archive in
           stats :=
-            Gc_stats_worker.finish_current_step !stats "archive: copy to lower" ;
+            Gc_stats.Worker.finish_current_step !stats "archive: copy to lower" ;
           Lower.set_readonly lower false ;
           let vol =
             Lower.archive_seq_exn ~upper_root:root ~generation ~to_archive lower
@@ -428,7 +432,7 @@ module Make (Args : Gc_args.S) = struct
     in
 
     (* Step 8. Finalise stats and return. *)
-    let stats = Gc_stats_worker.finalise !stats in
+    let stats = Gc_stats.Worker.finalise !stats in
     {suffix_params; mapping_size; removable_chunk_idxs; modified_volume; stats}
 
   let write_gc_output ~root ~generation output =
@@ -445,7 +449,7 @@ module Make (Args : Gc_args.S) = struct
   let run_and_output_result ~lower_root ~generation ~new_files_path root
       commit_key new_suffix_start_offset =
     let result =
-      Errs.catch (fun () ->
+      Io_errors.catch (fun () ->
           run
             ~lower_root
             ~generation
@@ -454,9 +458,9 @@ module Make (Args : Gc_args.S) = struct
             commit_key
             new_suffix_start_offset)
     in
-    Errs.log_if_error "gc run" result ;
+    Io_errors.log_if_error "gc run" result ;
     let write_result = write_gc_output ~root ~generation result in
-    write_result |> Errs.log_if_error "writing gc output"
+    write_result |> Io_errors.log_if_error "writing gc output"
   (* No need to raise or log if [result] is [Error _], we've written it in
      the file. *)
 end

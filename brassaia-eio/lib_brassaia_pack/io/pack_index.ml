@@ -18,11 +18,7 @@
 open! Import
 include Pack_index_intf
 
-module Make_io
-    (Io : Io_intf.S)
-    (Io_index : Brassaia_index.Index.Platform.S)
-    (K : Brassaia.Hash.S) =
-struct
+module Make_io (K : Brassaia.Hash.S) = struct
   module Key = struct
     type t = K.t
     [@@deriving brassaia ~short_hash ~equal ~to_bin_string ~decode_bin]
@@ -68,15 +64,15 @@ struct
 
   module Stats = Brassaia_index.Index.Stats
   module I = Brassaia_index.Index
-  module Index_raw =
-    Brassaia_index.Index.Make (Key) (Val) (Io_index)
-      (Brassaia_index.Index.Cache.Unbounded)
-  include Index_raw
-  module Io = Io
+  open Brassaia_index_unix
+  module Index =
+    Index_unix.Make (Key) (Val) (Brassaia_index.Index.Cache.Unbounded)
+  include Index
+  module Io = Io.Unix
 
   let init_exn =
     let cache = None in
-    Index_raw.v ?cache
+    Index.v ?cache
 
   let init ?flush_callback ?fresh ?readonly ?throttle ?lru_size ~log_size root =
     try
@@ -108,7 +104,7 @@ struct
 
   let find t k = match find t k with exception Not_found -> None | h -> Some h
 
-  let close_exn t = Index_raw.close t
+  let close_exn t = Index.close t
 
   let close t =
     try
@@ -122,7 +118,7 @@ struct
 
   let reload t =
     try
-      Index_raw.sync t ;
+      Index.sync t ;
       Ok ()
     with
     | I.RO_not_allowed -> Error `Ro_not_allowed
@@ -132,7 +128,7 @@ struct
 
   let flush t ~with_fsync =
     try
-      Index_raw.flush ~no_callback:() ~with_fsync t ;
+      Index.flush ~no_callback:() ~with_fsync t ;
       Ok ()
     with
     | I.RO_not_allowed -> Error `Ro_not_allowed

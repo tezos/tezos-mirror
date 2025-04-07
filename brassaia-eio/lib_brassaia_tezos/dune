@@ -11,6 +11,5 @@
   digestif
   octez-libs.brassaia_eio
   octez-libs.brassaia_eio_pack
-  octez-libs.brassaia_eio_pack.io
-  octez-libs.brassaia_eio_pack.unix)
+  octez-libs.brassaia_eio_pack.io)
  (preprocess (pps octez-libs.ppx_brassaia_eio.internal)))

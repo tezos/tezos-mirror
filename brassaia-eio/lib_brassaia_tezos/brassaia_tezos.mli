@@ -16,7 +16,7 @@
 
 module Schema = Schema
 module Brassaia_pack = Brassaia_eio_pack.Brassaia_pack
-module Brassaia_pack_unix = Brassaia_eio_pack_unix.Brassaia_pack_unix
+module Brassaia_pack_unix = Brassaia_eio_pack_io.Brassaia_pack_unix
 
 module Conf : Brassaia_pack.Conf.S
 
@@ -24,8 +24,6 @@ module Store :
   Brassaia_pack_unix.S
     with type Schema.Hash.t = Schema.Hash.t
      and type Schema.Branch.t = Schema.Branch.t
-     and type Schema.Path.t = Schema.Path.t
-     and type Schema.Path.step = Schema.Path.step
      and type Schema.Contents.t = Schema.Contents.t
      and type Backend.Remote.endpoint = unit
      and type contents_key = Schema.Hash.t Brassaia_pack_unix.Pack_key.t

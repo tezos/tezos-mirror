@@ -40,7 +40,6 @@ module Make (B : Backend.S) = struct
   module Typed = Hash.Typed (B.Hash)
   module Hash = B.Hash
   module Branch_store = B.Branch
-  module Path = B.Node.Path
   module Commits = Commit.History (B.Commit)
   module Backend = B
   module T = Tree.Make (B)
@@ -125,10 +124,6 @@ module Make (B : Backend.S) = struct
   type contents = Contents.t [@@deriving brassaia ~equal]
 
   type tree = Tree.t [@@deriving brassaia ~pp]
-
-  type path = Path.t [@@deriving brassaia ~pp]
-
-  type step = Path.step [@@deriving brassaia]
 
   type info = Info.t [@@deriving brassaia]
 
@@ -547,7 +542,7 @@ module Make (B : Backend.S) = struct
   let of_commit c = of_ref c.r (`Head (ref (Some c)))
 
   let skip_key key =
-    [%log.debug "[watch-key] key %a has not changed" pp_path key]
+    [%log.debug "[watch-key] key %a has not changed" Path.pp key]
 
   let changed_key key old_t new_t =
     [%log.debug
@@ -557,7 +552,7 @@ module Make (B : Backend.S) = struct
         let new_h = Option.map Tree.hash new_t in
         l
           "[watch-key] key %a has changed: %a -> %a"
-          pp_path
+          Path.pp
           key
           pp
           old_h
@@ -664,7 +659,7 @@ module Make (B : Backend.S) = struct
         fun () -> Branch_store.unwatch (branch_store t) key
 
   let watch_key t key ?init fn =
-    [%log.debug "watch-key %a" pp_path key] ;
+    [%log.debug "watch-key %a" Path.pp key] ;
     let tree c = Tree.find_tree (Commit.tree c) key in
     watch t ?init (lift_tree_diff ~key tree fn)
 
@@ -867,7 +862,7 @@ module Make (B : Backend.S) = struct
     Result.map (fun _ -> ()) c
 
   let set_tree ?clear ?(retries = 13) ?allow_empty ?parents ~info t k v =
-    [%log.debug "set %a" pp_path k] ;
+    [%log.debug "set %a" Path.pp k] ;
     ignore_commit @@ retry ~retries
     @@ fun () ->
     update t k ?clear ?allow_empty ?parents ~info set_tree_once @@ fun _tree ->
@@ -877,7 +872,7 @@ module Make (B : Backend.S) = struct
     set_tree ?clear ?retries ?allow_empty ?parents ~info t k v |> fail "set_exn"
 
   let remove ?clear ?(retries = 13) ?allow_empty ?parents ~info t k =
-    [%log.debug "debug %a" pp_path k] ;
+    [%log.debug "debug %a" Path.pp k] ;
     ignore_commit @@ retry ~retries
     @@ fun () ->
     update t k ?clear ?allow_empty ?parents ~info set_tree_once @@ fun _tree ->
@@ -903,7 +898,7 @@ module Make (B : Backend.S) = struct
 
   let test_set_and_get_tree ?clear ?(retries = 13) ?allow_empty ?parents ~info t
       k ~test ~set =
-    [%log.debug "test-and-set %a" pp_path k] ;
+    [%log.debug "test-and-set %a" Path.pp k] ;
     retry ~retries @@ fun () ->
     update t k ?clear ?allow_empty ?parents ~info (test_and_set_tree_once ~test)
     @@ fun _tree -> set
@@ -944,7 +939,7 @@ module Make (B : Backend.S) = struct
 
   let test_and_set_tree ?clear ?(retries = 13) ?allow_empty ?parents ~info t k
       ~test ~set =
-    [%log.debug "test-and-set %a" pp_path k] ;
+    [%log.debug "test-and-set %a" Path.pp k] ;
     ignore_commit
     @@ test_set_and_get_tree
          ~retries
@@ -988,7 +983,7 @@ module Make (B : Backend.S) = struct
 
   let merge_tree ?clear ?(retries = 13) ?allow_empty ?parents ~info ~old t k
       tree =
-    [%log.debug "merge %a" pp_path k] ;
+    [%log.debug "merge %a" Path.pp k] ;
     ignore_commit @@ retry ~retries
     @@ fun () ->
     update t k ?clear ?allow_empty ?parents ~info (merge_once ~old)
@@ -1043,7 +1038,7 @@ module Make (B : Backend.S) = struct
       ?(strategy = `Test_and_set) ~info t key f =
     let done_once = ref false in
     let rec aux n old_tree =
-      [%log.debug "with_tree %a (%d/%d)" pp_path key n retries] ;
+      [%log.debug "with_tree %a (%d/%d)" Path.pp key n retries] ;
       if !done_once && n > retries then write_error (`Too_many_retries retries)
       else
         let new_tree = f old_tree in
@@ -1241,7 +1236,7 @@ module Make (B : Backend.S) = struct
         Fmt.(Dump.option pp_int)
         depth
         n
-        pp_path
+        Path.pp
         key] ;
     let repo = repo t in
     let commit = Head.get t in
@@ -1359,14 +1354,14 @@ struct
       match j with
       | [] -> `Tree acc
       | (k, v) :: l -> (
-          match Type.of_string Store.Path.step_t k with
+          match Type.of_string Path.step_t k with
           | Ok key -> obj l ((key, node v []) :: acc)
           | _ -> obj l acc)
     and node j acc = match j with `O j -> obj j acc | _ -> `Contents j in
     node j []
 
   let of_concrete_tree c : json =
-    let step = Type.to_string Store.Path.step_t in
+    let step = Type.to_string Path.step_t in
     let rec tree t acc =
       match t with
       | [] -> `O acc
@@ -1387,12 +1382,12 @@ struct
     of_concrete_tree c
 
   let set t key j ~info =
-    match set_tree (Store.Tree.empty ()) Store.Path.empty j with
+    match set_tree (Store.Tree.empty ()) Path.empty j with
     | tree -> Store.set_tree_exn ~info t key tree
 
   let get t key =
     let tree = Store.get_tree t key in
-    get_tree tree Store.Path.empty
+    get_tree tree Path.empty
 end
 
 type Remote.t +=

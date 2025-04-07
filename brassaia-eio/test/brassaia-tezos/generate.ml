@@ -16,7 +16,7 @@
 
 module Brassaia = Brassaia_eio.Brassaia
 module Brassaia_pack = Brassaia_eio_pack.Brassaia_pack
-module Brassaia_pack_unix = Brassaia_eio_pack_unix.Brassaia_pack_unix
+module Brassaia_pack_unix = Brassaia_eio_pack_io.Brassaia_pack_unix
 
 let rm_dir data_dir =
   if Sys.file_exists data_dir then

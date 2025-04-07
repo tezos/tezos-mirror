@@ -14,54 +14,46 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-(** The [brassaia-pack-unix] package provides an implementation of {!Brassaia_pack}
-    for Unix systems.
-
-    [brassaia-pack-unix] provides advanced features such as garbage collection,
-    snapshoting, integrity checks. *)
-
 (** {1 Store} *)
 
 module Brassaia = Brassaia_eio.Brassaia
-module Brassaia_pack_io = Brassaia_eio_pack_io.Brassaia_pack_io
-open Brassaia_pack_io
+module Brassaia_pack = Brassaia_eio_pack.Brassaia_pack
 
-module type S = Brassaia_pack_io.S
+module type S = Store_intf.S
 
-module Maker (Config : Brassaia_pack.Conf.S) : Store_intf.Maker
+module Maker (Config : Brassaia_pack.Conf.S) =
+  Store.Maker (Brassaia_index_unix.Index_unix.Private.Platform) (Async.Unix)
+    (Config)
 
-module KV (Config : Brassaia_pack.Conf.S) : Store_intf.KV
+module KV (Config : Brassaia_pack.Conf.S) = struct
+  type endpoint = unit
+
+  type hash = Brassaia.Schema.default_hash
+
+  include Pack_key.Store_spec
+  module Maker =
+    Store.Maker (Brassaia_index_unix.Index_unix.Private.Platform) (Async.Unix)
+      (Config)
+  module Make (C : Brassaia.Contents.S) = Maker.Make (Brassaia.Schema.KV (C))
+end
 
 (** {1 Key and Values} *)
 
-(* module Pack_store = Pack_store *)
 module Pack_key = Pack_key
 module Pack_value = Pack_value
 
 (** {1 Integrity Checks} *)
 
-module Checks : sig
-  module Make (_ : Checks_intf.Store) : Checks_intf.S
-end
+module Checks = Checks
 
-(** {1 Statistics} *)
+(** {1 Internal} *)
 
 module Stats = Stats
 
-(** {1 Internal Functors and Utilities} *)
+module Index = struct
+  module type S = Brassaia_index.Index.S
 
-(** Following functors and modules are instantiated automatically or used
-    internally when creating a store with {!Maker} or {!KV}.*)
-
-module Index : sig
-  module type S = Index.S
-
-  module Make (K : Brassaia.Hash.S) :
-      module type of
-        Index.Make_io
-          (Io.Unix)
-          (Brassaia_index_unix.Index_unix.Private.Platform)
-          (K)
+  module Make (K : Brassaia.Hash.S) = Pack_index.Make_io (K)
 end
 
 module Inode = Inode

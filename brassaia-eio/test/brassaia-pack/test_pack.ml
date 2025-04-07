@@ -27,7 +27,7 @@ module Brassaia_pack_store (Config : Brassaia_pack.Conf.S) :
 
   include Make (struct
     include Brassaia_test.Schema
-    module Node = Brassaia.Node.Generic_key.Make (Hash) (Path)
+    module Node = Brassaia.Node.Generic_key.Make (Hash)
     module Commit_maker = Brassaia.Commit.Generic_key.Maker (Info)
     module Commit = Commit_maker.Make (Hash)
   end)
@@ -69,7 +69,7 @@ module Brassaia_pack_mem_maker : Brassaia_test.Generic_key = struct
 
   include Make (struct
     include Brassaia_test.Schema
-    module Node = Brassaia.Node.Generic_key.Make (Hash) (Path)
+    module Node = Brassaia.Node.Generic_key.Make (Hash)
     module Commit_maker = Brassaia.Commit.Generic_key.Maker (Info)
     module Commit = Commit_maker.Make (Hash)
   end)
@@ -109,10 +109,11 @@ module Context = Make_context (struct
   let root = test_dir
 end)
 
-let flush file_manager = File_manager.flush file_manager |> Errs.raise_if_error
+let flush file_manager =
+  File_manager.flush file_manager |> Io_errors.raise_if_error
 
 let reload file_manager =
-  File_manager.reload file_manager |> Errs.raise_if_error
+  File_manager.reload file_manager |> Io_errors.raise_if_error
 
 module Dict = struct
   let test_dict () =
@@ -369,7 +370,7 @@ module Pack = struct
       let k2 =
         Pack.unsafe_append ~ensure_unique:true ~overcommit:false w h2 x2
       in
-      Index.flush t.index ~with_fsync:false |> Errs.raise_if_error ;
+      Index.flush t.index ~with_fsync:false |> Io_errors.raise_if_error ;
       let y2 = Pack.find t'.pack k2 in
       Alcotest.(check (option string)) "reload after flush" (Some x2) y2
     in
@@ -408,7 +409,7 @@ module Pack = struct
       let k3 =
         Pack.unsafe_append ~ensure_unique:true ~overcommit:false w h3 x3
       in
-      Index.flush t.index ~with_fsync:false |> Errs.raise_if_error ;
+      Index.flush t.index ~with_fsync:false |> Io_errors.raise_if_error ;
       check k2 x2 "find after flush" ;
       flush t.file_manager ;
       reload t'.file_manager ;
@@ -438,7 +439,6 @@ end
 module Branch = struct
   module Branch =
     Brassaia_pack_unix.Atomic_write.Make_persistent
-      (Brassaia_pack_unix.Io.Unix)
       (Brassaia.Branch.String)
       (Brassaia_pack.Atomic_write.Value.Of_hash (Brassaia.Hash.SHA1))
 

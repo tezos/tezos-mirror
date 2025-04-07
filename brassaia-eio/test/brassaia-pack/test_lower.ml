@@ -28,10 +28,9 @@ module Io = Brassaia_pack_unix.Io.Unix
 let ( let$ ) res f = f @@ Result.get_ok res
 
 module Direct_tc = struct
-  module Control = Brassaia_pack_unix.Control_file.Volume (Io)
-  module Errs = Brassaia_pack_unix.Io_errors.Make (Io)
-  module Lower = Brassaia_pack_unix.Lower.Make (Io) (Errs)
-  module Sparse = Brassaia_pack_unix.Sparse_file.Make (Io)
+  module Control = Brassaia_pack_unix.Control_file.Volume
+  module Lower = Brassaia_pack_unix.Lower
+  module Sparse_file = Brassaia_pack_unix.Sparse_file
 
   let create_control volume_path payload =
     let path = Brassaia_pack.Layout.V5.Volume.control ~root:volume_path in
@@ -126,16 +125,16 @@ module Direct_tc = struct
     let test_str = "hello" in
     let len = String.length test_str in
     let$ sparse =
-      Sparse.Ao.open_ao
+      Sparse_file.Ao.open_ao
         ~mapping_size:Int63.zero
         ~mapping:mapping_path
         ~data:data_path
     in
     let seq = List.to_seq [test_str] in
-    Sparse.Ao.append_seq_exn sparse ~off:Int63.zero seq ;
-    let end_offset = Sparse.Ao.end_off sparse in
-    let$ _ = Sparse.Ao.flush sparse in
-    let$ _ = Sparse.Ao.close sparse in
+    Sparse_file.Ao.append_seq_exn sparse ~off:Int63.zero seq ;
+    let end_offset = Sparse_file.Ao.end_off sparse in
+    let$ _ = Sparse_file.Ao.flush sparse in
+    let$ _ = Sparse_file.Ao.close sparse in
     let$ mapping_end_poff = Io.size_of_path mapping_path in
     let payload =
       Brassaia_pack_unix.Control_file.Payload.Volume.Latest.
@@ -196,7 +195,7 @@ module Store_tc = struct
   let count_volumes repo =
     let open Store.Internal in
     file_manager repo |> File_manager.lower
-    |> Option.map File_manager.Lower.volume_num
+    |> Option.map Lower.volume_num
     |> Option.value ~default:0
 
   let volume_path repo offset =
@@ -205,11 +204,11 @@ module Store_tc = struct
     let volume =
       match lower with
       | None -> Alcotest.fail "expected lower"
-      | Some l -> File_manager.Lower.find_volume ~off:offset l
+      | Some l -> Lower.find_volume ~off:offset l
     in
     match volume with
     | None -> Alcotest.fail "expected volume"
-    | Some v -> File_manager.Lower.Volume.path v
+    | Some v -> Lower.Volume.path v
 
   let generation repo =
     let open Store.Internal in

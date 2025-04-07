@@ -2370,31 +2370,6 @@ let brassaia_eio_pack_io =
     ~preprocess:(pps ppx_brassaia_eio_internal)
     ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
 
-let brassaia_eio_pack_unix =
-  octez_lib
-    "brassaia_eio_pack.unix"
-    ~path:"brassaia-eio/lib_brassaia_pack/unix"
-    ~deps:
-      [
-        octez_event_logging |> open_;
-        fmt;
-        brassaia_index;
-        brassaia_index_unix;
-        brassaia_eio;
-        brassaia_eio_pack;
-        brassaia_eio_pack_io;
-        logs;
-        eio;
-        mtime;
-        cmdliner;
-        optint;
-        checkseum;
-        checkseum_ocaml;
-        rusage;
-      ]
-    ~preprocess:(pps ppx_brassaia_eio_internal)
-    ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
-
 let brassaia_eio_tezos =
   octez_lib
     "brassaia_eio_tezos"
@@ -2407,7 +2382,6 @@ let brassaia_eio_tezos =
         brassaia_eio;
         brassaia_eio_pack;
         brassaia_eio_pack_io;
-        brassaia_eio_pack_unix;
       ]
     ~preprocess:(pps ppx_brassaia_eio_internal)
 
@@ -3512,7 +3486,6 @@ let _brassaia_eio_pack_tests =
         brassaia_eio_test_helpers |> open_;
         brassaia_eio_pack |> open_;
         brassaia_eio_pack_io |> open_;
-        brassaia_eio_pack_unix |> open_;
         brassaia_eio_tezos |> open_;
         brassaia_eio_pack_mem |> open_;
         octez_test_helpers |> open_;

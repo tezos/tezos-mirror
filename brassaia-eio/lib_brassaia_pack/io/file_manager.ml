@@ -136,22 +136,17 @@ module Events = struct
       ("chunk_num", Data_encoding.int64)
 end
 
-module Make
-    (Io : Io_intf.S)
-    (Index : Pack_index.S with module Io = Io)
-    (Errs : Io_errors.S with module Io = Io) =
-struct
-  module Io = Errs.Io
+module Make (Index : Pack_index.S) = struct
+  module Io = Io.Unix
   module Index = Index
-  module Errs = Io_errors.Make (Io)
-  module Ao = Append_only_file.Make (Io) (Errs)
-  module Control = Control_file.Upper (Io)
-  module Dict = Dict.Make (Io)
-  module Suffix = Chunked_suffix.Make (Io) (Errs)
-  module Sparse = Sparse_file.Make (Io)
-  module Lower = Lower.Make (Io) (Errs)
+  module Control = Control_file.Upper
+  module Dict = Dict
+  module Suffix = Chunked_suffix
+  module Sparse = Sparse_file
 
-  type after_reload_consumer = {after_reload : unit -> (unit, Errs.t) result}
+  type after_reload_consumer = {
+    after_reload : unit -> (unit, Io_errors.t) result;
+  }
 
   type after_flush_consumer = {after_flush : unit -> unit}
 
@@ -209,7 +204,7 @@ struct
       (fun acc {after_reload} -> Result.bind acc after_reload)
       (Ok ())
       consumers
-    |> Result.map_error (fun err -> (err : Errs.t :> [> Errs.t]))
+    |> Result.map_error (fun err -> (err : Io_errors.t :> [> Io_errors.t]))
 
   (** Flush stages *************************************************************
 
@@ -299,7 +294,7 @@ struct
       index will flush itself. *)
   let index_is_about_to_auto_flush_exn _t =
     Stats.incr_fm_field Auto_index ;
-    (* TODO: remove? flush_suffix_and_its_deps t |> Errs.raise_if_error *)
+    (* TODO: remove? flush_suffix_and_its_deps t |> Io_errors.raise_if_error *)
     ()
 
   (* Explicit flush ********************************************************* *)
@@ -571,7 +566,7 @@ struct
                   Please manually remove %s."
                  path)
         | `No_such_file_or_directory, _ -> Io.mkdir path
-        | (`File | `Other), _ -> Errs.raise_error (`Not_a_directory path))
+        | (`File | `Other), _ -> Io_errors.raise_error (`Not_a_directory path))
 
   let create_rw ~overwrite config =
     let open Result_syntax in
@@ -800,7 +795,7 @@ struct
     (* Bytes 0-7 contains the offset. Bytes 8-15 contain the version. *)
     let* io = Io.open_ ~path ~readonly:true in
     Errors.finalise (fun _ ->
-        Io.close io |> Errs.log_if_error "FM: read_offset_from_legacy_file")
+        Io.close io |> Io_errors.log_if_error "FM: read_offset_from_legacy_file")
     @@ fun () ->
     let* s = Io.read_to_string io ~off:Int63.zero ~len:8 in
     let x = Int63.decode ~off:0 s in
@@ -811,7 +806,8 @@ struct
     (* Bytes 0-7 contains the offset. Bytes 8-15 contain the version. *)
     let* io = Io.open_ ~path ~readonly:true in
     Errors.finalise (fun _ ->
-        Io.close io |> Errs.log_if_error "FM: read_version_from_legacy_file")
+        Io.close io
+        |> Io_errors.log_if_error "FM: read_version_from_legacy_file")
     @@ fun () ->
     let off = Int63.of_int 8 in
     let* s = Io.read_to_string io ~off ~len:8 in
@@ -1139,7 +1135,7 @@ struct
     let* () = Suffix.close suffix in
     (* Step 3. Create the control file and close it. *)
     let status = Payload.Gced gced in
-    let dict_end_poff = Io.size_of_path dst_dict |> Errs.raise_if_error in
+    let dict_end_poff = Io.size_of_path dst_dict |> Io_errors.raise_if_error in
     let pl =
       {
         Payload.dict_end_poff;

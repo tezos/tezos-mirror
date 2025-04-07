@@ -24,8 +24,6 @@ module Make (File_Manager : File_manager.S) :
   module Io = File_Manager.Io
   module Suffix = File_Manager.Suffix
   module Sparse = File_Manager.Sparse
-  module Lower = File_Manager.Lower
-  module Errs = File_Manager.Errs
   module Control = File_Manager.Control
 
   type t = {file_manager : File_Manager.t}

@@ -79,8 +79,8 @@ let check_hex msg buf expected =
 
 let test_read () =
   let config = setup_store () in
-  let fm = File_manager.open_ro config |> Errs.raise_if_error in
-  let dsp = Dispatcher.init fm |> Errs.raise_if_error in
+  let fm = File_manager.open_ro config |> Io_errors.raise_if_error in
+  let dsp = Dispatcher.init fm |> Io_errors.raise_if_error in
   let _ =
     Alcotest.check_raises
       "cannot read node_1"
@@ -100,6 +100,6 @@ let test_read () =
   test_accessor "commit_2" commit_2 ;
   test_accessor "node_3" node_3 ;
 
-  File_manager.close fm |> Errs.raise_if_error
+  File_manager.close fm |> Io_errors.raise_if_error
 
 let tests = [Alcotest.test_case_eio "read" `Quick test_read]

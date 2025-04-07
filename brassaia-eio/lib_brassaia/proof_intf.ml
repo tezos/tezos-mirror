@@ -37,8 +37,6 @@ module type S = sig
 
   type hash
 
-  type step
-
   type kinded_hash = [`Contents of hash | `Node of hash] [@@deriving brassaia]
 
   (** The type for (internal) inode proofs.
@@ -98,7 +96,7 @@ module type S = sig
   type tree =
     | Contents of contents
     | Blinded_contents of hash
-    | Node of (step * tree) list
+    | Node of (Path.step * tree) list
     | Blinded_node of hash
     | Inode of inode_tree inode
     | Extender of inode_tree inode_extender
@@ -115,7 +113,7 @@ module type S = sig
       [Inode_extender e] is similar to trees' [Extender]. *)
   and inode_tree =
     | Blinded_inode of hash
-    | Inode_values of (step * tree) list
+    | Inode_values of (Path.step * tree) list
     | Inode_tree of inode_tree inode
     | Inode_extender of inode_tree inode_extender
   [@@deriving brassaia]
@@ -259,25 +257,14 @@ module type Proof = sig
 
   val bad_proof_exn : string -> 'a
 
-  module Make
-      (C : Type.S)
-      (H : Hash.S)
-      (P : sig
-        type step [@@deriving brassaia]
-      end) : sig
-    include
-      S with type contents := C.t and type hash := H.t and type step := P.step
+  module Make (C : Type.S) (H : Hash.S) : sig
+    include S with type contents := C.t and type hash := H.t
   end
 
-  module Env
-      (B : Backend.S)
-      (P : S
-             with type contents := B.Contents.Val.t
-              and type hash := B.Hash.t
-              and type step := B.Node.Val.step) :
+  module Env (Backend : Backend.S) :
     Env
-      with type hash := B.Hash.t
-       and type contents := B.Contents.Val.t
-       and type node := B.Node.Val.t
-       and type pnode := B.Node_portable.t
+      with type hash := Backend.Hash.t
+       and type contents := Backend.Contents.Val.t
+       and type node := Backend.Node.Val.t
+       and type pnode := Backend.Node_portable.t
 end
