@@ -831,11 +831,40 @@ Debug commands:
     -f --force: Force suppression of data to reset state of sequencer to a
       specified l2 level.
   
+  replay blueprints from <level> to <level> [--data-dir <data-dir>]
+      [--config-file <path>] [--preimages-dir <_evm_installer_preimages>]
+      [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
+      [--kernel <evm_kernel.wasm>] [--kernel-verbosity <info>] [--profile]
+      [--disable-da-fees]
+    Replay a range of block levels.
+    <level>: First block to replay.
+    <level>: Last block to replay.
+    --data-dir <data-dir>: The path to the EVM node data directory.
+      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
+      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --config-file <path>: Path to a configuration file. Defaults to
+      `config.json` inside the data directory of the node.
+      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+    --preimages-dir <_evm_installer_preimages>: Path to the preimages
+      directory.
+    --preimages-endpoint <url>: The address of a service which provides
+      pre-images for the rollup. Missing pre-images will be downloaded
+      remotely if they are not already present on disk.
+    -n --native-execution-policy <policy>: Policy regarding the use of native
+      execution for supported kernels. Can be `never`, `rpcs_only` or
+      `always`.
+    --kernel <evm_kernel.wasm>: Path to the EVM kernel used to launch the
+      PVM, it will be loaded from storage afterward.
+    --kernel-verbosity <info>: Sets kernel's logging verbosity, either
+      `fatal`, `error`, `info`, `debug`.
+    --profile: Profile the execution of the WASM PVM.
+    --disable-da-fees: Disable DA fees for this replay.
+  
   replay blueprint <level> [--data-dir <data-dir>] [--config-file <path>]
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
       [--kernel <evm_kernel.wasm>] [--kernel-verbosity <info>] [--profile]
-      [--up-to <UPTO_LEVEL>] [--disable-da-fees]
+      [--disable-da-fees]
     Replay a specific block level.
     <level>: Level to replay.
     --data-dir <data-dir>: The path to the EVM node data directory.
@@ -857,8 +886,6 @@ Debug commands:
     --kernel-verbosity <info>: Sets kernel's logging verbosity, either
       `fatal`, `error`, `info`, `debug`.
     --profile: Profile the execution of the WASM PVM.
-    --up-to <UPTO_LEVEL>: Replay the successors until 'UPTO_LEVEL' is
-      reached.
     --disable-da-fees: Disable DA fees for this replay.
   
   transform dump <dump.json> to rlp <dump.rlp> [-k --keep-everything]

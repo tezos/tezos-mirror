@@ -96,4 +96,4 @@ let main ~profile ~disable_da_fees ?kernel ?kernel_verbosity ~data_dir ~number
             Ethereum_types.pp_quantity
             current
   in
-  replay_upto up_to_level
+  replay_upto number
