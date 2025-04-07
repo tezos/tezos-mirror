@@ -12,6 +12,11 @@
 
 ### Execution changes
 
+- `--profile` now has two different modes; `minimal` and `flamegraph`.
+  `minimal` provides a file to which it streamlines tick and gas
+  consumption, `flamegraph` creates a flamegraph indexed on tick
+  consumption (!17608)
+
 ### Storage changes
 
 ### Documentation changes

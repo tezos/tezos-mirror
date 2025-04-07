@@ -62,7 +62,7 @@ val ro_backend :
 val replay :
   t ->
   ?log_file:string ->
-  ?profile:bool ->
+  ?profile:Configuration.profile_mode ->
   ?alter_evm_state:
     (Irmin_context.tree -> (Irmin_context.tree, tztrace) result Lwt.t) ->
   Ethereum_types.quantity ->

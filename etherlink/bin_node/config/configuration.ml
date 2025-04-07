@@ -58,6 +58,8 @@ let history_mode_partial_eq h1 h2 =
 
 type rpc_server = Resto | Dream
 
+type profile_mode = Minimal | Flamegraph
+
 type monitor_websocket_heartbeat = {ping_interval : float; ping_timeout : float}
 
 let chain_id network =

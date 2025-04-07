@@ -834,8 +834,8 @@ Debug commands:
   replay blueprints from <level> to <level> [--data-dir <data-dir>]
       [--config-file <path>] [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
-      [--kernel <evm_kernel.wasm>] [--kernel-verbosity <info>] [--profile]
-      [--disable-da-fees]
+      [--kernel <evm_kernel.wasm>] [--kernel-verbosity <info>]
+      [--profile [minimal|flamegraph]] [--disable-da-fees]
     Replay a range of block levels.
     <level>: First block to replay.
     <level>: Last block to replay.
@@ -857,14 +857,18 @@ Debug commands:
       PVM, it will be loaded from storage afterward.
     --kernel-verbosity <info>: Sets kernel's logging verbosity, either
       `fatal`, `error`, `info`, `debug`.
-    --profile: Profile the execution of the WASM PVM.
+    --profile [minimal|flamegraph]: Profile the execution of the WASM PVM;
+      'minimal' provides a file to which it streamlines tick and gas
+      consumption, 'flamegraph' creates a flamegraph indexed on tick
+      consumption
+      Defaults to `flamegraph`.
     --disable-da-fees: Disable DA fees for this replay.
   
   replay blueprint <level> [--data-dir <data-dir>] [--config-file <path>]
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
-      [--kernel <evm_kernel.wasm>] [--kernel-verbosity <info>] [--profile]
-      [--disable-da-fees]
+      [--kernel <evm_kernel.wasm>] [--kernel-verbosity <info>]
+      [--profile [minimal|flamegraph]] [--disable-da-fees]
     Replay a specific block level.
     <level>: Level to replay.
     --data-dir <data-dir>: The path to the EVM node data directory.
@@ -885,7 +889,11 @@ Debug commands:
       PVM, it will be loaded from storage afterward.
     --kernel-verbosity <info>: Sets kernel's logging verbosity, either
       `fatal`, `error`, `info`, `debug`.
-    --profile: Profile the execution of the WASM PVM.
+    --profile [minimal|flamegraph]: Profile the execution of the WASM PVM;
+      'minimal' provides a file to which it streamlines tick and gas
+      consumption, 'flamegraph' creates a flamegraph indexed on tick
+      consumption
+      Defaults to `flamegraph`.
     --disable-da-fees: Disable DA fees for this replay.
   
   transform dump <dump.json> to rlp <dump.rlp> [-k --keep-everything]
