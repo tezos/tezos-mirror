@@ -8,8 +8,7 @@
 open Tezos_services
 
 let current_level (module Backend : Services_backend_sig.S)
-    (constants :
-      Imported_protocol.Protocol.Alpha_context.Constants.Parametric.t) chain
+    (constants : Imported_protocol.Alpha_context.Constants.Parametric.t) chain
     block level_query =
   let open Lwt_result_syntax in
   let* offset =
@@ -58,4 +57,7 @@ let michelson_services_methods backend constants =
         (* TODO: #7857 need proper implementation *)
         Lwt_result_syntax.return Tezlink_version.mock);
     protocols = (fun () -> Lwt_result_syntax.return Tezlink_protocols.current);
+    balance =
+      (fun _ _ _ ->
+        Lwt_result_syntax.return @@ Ethereum_types.quantity_of_z Z.one);
   }
