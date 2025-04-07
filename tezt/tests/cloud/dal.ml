@@ -2709,7 +2709,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
   (* A configuration is generated locally by the orchestrator. The resulting
      kernel will be pushed to Etherlink. *)
   let output_config = Temp.file "config.yaml" in
-  let bootstrap_accounts =
+  let eth_bootstrap_accounts =
     Tezt_etherlink.Eth_account.bootstrap_accounts |> Array.to_list
     |> List.map (fun account -> account.Tezt_etherlink.Eth_account.address)
   in
@@ -2718,7 +2718,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
     let () = toplog "Init Etherlink: configuring the kernel" in
     Tezt_etherlink.Evm_node.make_kernel_installer_config
       ?sequencer
-      ~bootstrap_accounts
+      ~eth_bootstrap_accounts
       ~output:output_config
       ~enable_dal:(Option.is_some dal_slots)
       ?chain_id:etherlink_configuration.chain_id
@@ -2879,7 +2879,7 @@ let init_etherlink_producer_setup operator name ~bootstrap ~rpc_external cloud
   (* A configuration is generated locally by the orchestrator. The resulting
      kernel will be pushed to Etherlink. *)
   let output_config = Temp.file "config.yaml" in
-  let bootstrap_accounts =
+  let eth_bootstrap_accounts =
     Tezt_etherlink.Eth_account.bootstrap_accounts |> Array.to_list
     |> List.map (fun account -> account.Tezt_etherlink.Eth_account.address)
   in
@@ -2889,7 +2889,7 @@ let init_etherlink_producer_setup operator name ~bootstrap ~rpc_external cloud
     in
     Tezt_etherlink.Evm_node.make_kernel_installer_config
       ?sequencer
-      ~bootstrap_accounts
+      ~eth_bootstrap_accounts
       ~output:output_config
       ()
   in

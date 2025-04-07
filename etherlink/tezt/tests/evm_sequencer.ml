@@ -244,12 +244,13 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
     ?sequencer_private_rpc_port ?genesis_timestamp ?time_between_blocks
     ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
     ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
-    ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
-    ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?rollup_history_mode
-    ?commitment_period ?challenge_window ?additional_uses ?rpc_server
-    ?websockets ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?history_mode
+    ?max_number_of_chunks ?eth_bootstrap_accounts ?tez_bootstrap_accounts
+    ?sequencer ?sequencer_pool_address ?(kernels = Kernel.all) ?da_fee
+    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
+    ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
+    ?additional_uses ?rpc_server ?websockets ?enable_fast_withdrawal
+    ?enable_fast_fa_withdrawal ?history_mode
     ?(use_threshold_encryption = default_threshold_encryption_registration)
     ?(use_dal = default_dal_registration)
     ?(use_multichain = default_multichain_registration) ?enable_tx_queue
@@ -306,7 +307,8 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
                 ?delayed_inbox_timeout
                 ?delayed_inbox_min_levels
                 ?max_number_of_chunks
-                ?bootstrap_accounts
+                ?eth_bootstrap_accounts
+                ?tez_bootstrap_accounts
                 ?sequencer
                 ?sequencer_pool_address
                 ~kernels
@@ -344,12 +346,13 @@ let register_multichain_all ?max_delayed_inbox_blueprint_length
     ?sequencer_rpc_port ?sequencer_private_rpc_port ?genesis_timestamp
     ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
     ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
-    ?delayed_inbox_min_levels ?max_number_of_chunks ?bootstrap_accounts
-    ?sequencer ?sequencer_pool_address ?da_fee ?minimum_base_fee_per_gas
-    ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?rollup_history_mode
-    ?commitment_period ?challenge_window ?additional_uses ?rpc_server
-    ?websockets ?enable_fast_withdrawal ?history_mode
+    ?delayed_inbox_min_levels ?max_number_of_chunks ?eth_bootstrap_accounts
+    ?tez_bootstrap_accounts ?sequencer ?sequencer_pool_address ?da_fee
+    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
+    ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
+    ?additional_uses ?rpc_server ?websockets ?enable_fast_withdrawal
+    ?history_mode
     ?(use_threshold_encryption = default_threshold_encryption_registration)
     ?(use_dal = default_dal_registration) ~l2_setups ~title ~tags body protocols
     =
@@ -389,7 +392,8 @@ let register_multichain_all ?max_delayed_inbox_blueprint_length
             ?delayed_inbox_timeout
             ?delayed_inbox_min_levels
             ?max_number_of_chunks
-            ?bootstrap_accounts
+            ?eth_bootstrap_accounts
+            ?tez_bootstrap_accounts
             ?sequencer
             ?sequencer_pool_address
             ?da_fee
@@ -679,7 +683,7 @@ let test_make_l2_kernel_installer_config chain_family =
       ~chain_id:chain_id_1
       ~chain_family
       ~world_state_path
-      ~bootstrap_accounts:[address]
+      ~eth_bootstrap_accounts:[address]
       ~output:l2_config_1
       ()
   in
@@ -687,7 +691,7 @@ let test_make_l2_kernel_installer_config chain_family =
     Evm_node.make_l2_kernel_installer_config
       ~chain_id:chain_id_2
       ~chain_family
-      ~bootstrap_accounts:[address]
+      ~eth_bootstrap_accounts:[address]
       ~output:l2_config_2
       ()
   in
@@ -5939,7 +5943,7 @@ let test_external_transaction_to_delayed_inbox_fails =
   register_all
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~time_between_blocks:Nothing
-    ~bootstrap_accounts:Eth_account.lots_of_address
+    ~eth_bootstrap_accounts:Eth_account.lots_of_address
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "external"]
     ~title:"Sending an external transaction to the delayed inbox fails"
   @@ fun {client; sequencer; proxy; sc_rollup_node; _} _protocol ->
@@ -5967,7 +5971,7 @@ let test_proxy_node_can_forward_to_evm_endpoint =
   register_all
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~time_between_blocks:Nothing
-    ~bootstrap_accounts:Eth_account.lots_of_address
+    ~eth_bootstrap_accounts:Eth_account.lots_of_address
     ~tags:["proxy"; "evm_node_endpoint"]
     ~title:"Proxy node can forward transactions to another EVM node"
   @@ fun {sequencer; proxy; sc_rollup_node; client; _} _protocol ->
@@ -6906,7 +6910,7 @@ let test_blueprint_is_limited_in_size =
     ~time_between_blocks:Nothing
     ~max_number_of_chunks:2
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~bootstrap_accounts:Eth_account.lots_of_address
+    ~eth_bootstrap_accounts:Eth_account.lots_of_address
     ~tags:["evm"; "sequencer"; "blueprint"; "limit"]
     ~title:
       "Checks the sequencer doesn't produce blueprint bigger than the given \
@@ -6982,7 +6986,7 @@ let test_blueprint_is_limited_in_size =
 
 let test_blueprint_limit_with_delayed_inbox =
   register_all
-    ~bootstrap_accounts:Eth_account.lots_of_address
+    ~eth_bootstrap_accounts:Eth_account.lots_of_address
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~max_number_of_chunks:2
@@ -10197,7 +10201,7 @@ let test_rpc_mode_while_block_are_produced =
 
 let test_batch_limit_size_rpc =
   register_all
-    ~bootstrap_accounts:Eth_account.lots_of_address
+    ~eth_bootstrap_accounts:Eth_account.lots_of_address
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~title:"Test batch size limit"
     ~tags:["rpc"; "batch_limit"]
@@ -10338,7 +10342,7 @@ let test_describe_endpoint =
 
 let test_relay_restricted_rpcs =
   register_all
-    ~bootstrap_accounts:Eth_account.lots_of_address
+    ~eth_bootstrap_accounts:Eth_account.lots_of_address
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~time_between_blocks:Nothing
     ~kernels:[Latest]
@@ -10664,7 +10668,7 @@ let test_websocket_rpcs =
     ~tags:["evm"; "rpc"; "websocket"]
     ~title:"RPC methods over websocket"
     ~time_between_blocks:Nothing
-    ~bootstrap_accounts:
+    ~eth_bootstrap_accounts:
       ((Array.to_list Eth_account.bootstrap_accounts
        |> List.map (fun a -> a.Eth_account.address))
       @ Eth_account.lots_of_address)
@@ -10738,7 +10742,7 @@ let test_websocket_subscription_rpcs_cant_be_called_via_http_requests =
     ~title:
       "Check that subscriptions rpcs can't be called via regular http requests"
     ~time_between_blocks:Nothing
-    ~bootstrap_accounts:
+    ~eth_bootstrap_accounts:
       ((Array.to_list Eth_account.bootstrap_accounts
        |> List.map (fun a -> a.Eth_account.address))
       @ Eth_account.lots_of_address)
@@ -10797,7 +10801,7 @@ let test_websocket_newHeads_event =
     ~tags:["evm"; "rpc"; "websocket"; "new_heads"]
     ~title:"Check that websocket event `newHeads` is behaving correctly"
     ~time_between_blocks:Nothing
-    ~bootstrap_accounts:
+    ~eth_bootstrap_accounts:
       ((Array.to_list Eth_account.bootstrap_accounts
        |> List.map (fun a -> a.Eth_account.address))
       @ Eth_account.lots_of_address)
@@ -10833,7 +10837,7 @@ let test_websocket_cleanup =
     ~tags:["evm"; "rpc"; "websocket"; "cleanup"]
     ~title:"Check that websocket subscriptions are cleaned up on close"
     ~time_between_blocks:Nothing
-    ~bootstrap_accounts:
+    ~eth_bootstrap_accounts:
       ((Array.to_list Eth_account.bootstrap_accounts
        |> List.map (fun a -> a.Eth_account.address))
       @ Eth_account.lots_of_address)
@@ -11110,7 +11114,7 @@ let test_websocket_newPendingTransactions_event =
       "Check that websocket event `newPendingTransactions` is behaving \
        correctly"
     ~time_between_blocks:Nothing
-    ~bootstrap_accounts:
+    ~eth_bootstrap_accounts:
       ((Array.to_list Eth_account.bootstrap_accounts
        |> List.map (fun a -> a.Eth_account.address))
       @ Eth_account.lots_of_address)
@@ -11160,7 +11164,7 @@ let test_websocket_logs_event =
     ~tags:["evm"; "rpc"; "websocket"; "logs"]
     ~title:"Check that websocket event `logs` is behaving correctly"
     ~time_between_blocks:Nothing
-    ~bootstrap_accounts:
+    ~eth_bootstrap_accounts:
       ((Array.to_list Eth_account.bootstrap_accounts
        |> List.map (fun a -> a.Eth_account.address))
       @ Eth_account.lots_of_address)
