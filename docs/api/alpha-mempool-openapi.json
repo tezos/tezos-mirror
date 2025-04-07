@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Mempool RPC",
     "description": "The RPC API for the mempool served by the Octez node.",
-    "version": "Octez 21.0~rc3+dev (2cd0ffe3)"
+    "version": "Octez 22.0 (TBD)"
   },
   "paths": {
     "/ban_operation": {
@@ -1353,43 +1353,6 @@
       "alpha.operation.alpha.contents": {
         "oneOf": [
           {
-            "title": "Preattestation",
-            "type": "object",
-            "properties": {
-              "kind": {
-                "type": "string",
-                "enum": [
-                  "preattestation"
-                ]
-              },
-              "slot": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 65535
-              },
-              "level": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 2147483647
-              },
-              "round": {
-                "type": "integer",
-                "minimum": -2147483648,
-                "maximum": 2147483647
-              },
-              "block_payload_hash": {
-                "$ref": "#/components/schemas/value_hash"
-              }
-            },
-            "required": [
-              "kind",
-              "slot",
-              "level",
-              "round",
-              "block_payload_hash"
-            ]
-          },
-          {
             "title": "Attestation",
             "type": "object",
             "properties": {
@@ -1465,6 +1428,91 @@
               "round",
               "block_payload_hash",
               "dal_attestation"
+            ]
+          },
+          {
+            "title": "Preattestation",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "preattestation"
+                ]
+              },
+              "slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "level": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "round": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "block_payload_hash": {
+                "$ref": "#/components/schemas/value_hash"
+              }
+            },
+            "required": [
+              "kind",
+              "slot",
+              "level",
+              "round",
+              "block_payload_hash"
+            ]
+          },
+          {
+            "title": "Attestations_aggregate",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "attestations_aggregate"
+                ]
+              },
+              "consensus_content": {
+                "type": "object",
+                "properties": {
+                  "level": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "round": {
+                    "type": "integer",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                  },
+                  "block_payload_hash": {
+                    "$ref": "#/components/schemas/value_hash"
+                  }
+                },
+                "required": [
+                  "level",
+                  "round",
+                  "block_payload_hash"
+                ]
+              },
+              "committee": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "consensus_content",
+              "committee"
             ]
           },
           {
@@ -1591,6 +1639,63 @@
               "kind",
               "bh1",
               "bh2"
+            ]
+          },
+          {
+            "title": "Dal_entrapment_evidence",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "dal_entrapment_evidence"
+                ]
+              },
+              "attestation": {
+                "$ref": "#/components/schemas/alpha.inlined.attestation"
+              },
+              "slot_index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "shard_with_proof": {
+                "type": "object",
+                "properties": {
+                  "shard": {
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -1073741824,
+                          "maximum": 1073741823
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "proof": {
+                    "$ref": "#/components/schemas/DAL_commitment"
+                  }
+                },
+                "required": [
+                  "shard",
+                  "proof"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "attestation",
+              "slot_index",
+              "shard_with_proof"
             ]
           },
           {
@@ -1974,6 +2079,9 @@
               },
               "pk": {
                 "$ref": "#/components/schemas/Signature.Public_key"
+              },
+              "proof": {
+                "$ref": "#/components/schemas/Signature.V1"
               }
             },
             "required": [

@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez RPC",
     "description": "The RPC API served by the Octez node.",
-    "version": "Octez 21.4 (b8278e10)"
+    "version": "Octez 22.0 (TBD)"
   },
   "paths": {
     "/chains/{chain_id}": {
@@ -222,6 +222,108 @@
                     {
                       "$ref": "#/components/schemas/unistring"
                     }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/{chain_id}/delegators_contribution/{int32}/{pkh}": {
+      "get": {
+        "description": "A breakdown of all the contributions to the delegation portion of the baking power of the given delegate for the given cycle.",
+        "parameters": [
+          {
+            "name": "chain_id",
+            "in": "path",
+            "description": "A chain identifier. This is either a chain hash in Base58Check notation or a one the predefined aliases: 'main', 'test'.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "int32",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pkh",
+            "in": "path",
+            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "own_delegated": {
+                      "$ref": "#/components/schemas/int64"
+                    },
+                    "external_delegators": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "delegator_contract_hash": {
+                            "$ref": "#/components/schemas/unistring"
+                          },
+                          "contribution": {
+                            "$ref": "#/components/schemas/int64"
+                          }
+                        },
+                        "required": [
+                          "delegator_contract_hash",
+                          "contribution"
+                        ]
+                      }
+                    },
+                    "former_delegators_unstake_requests": {
+                      "$ref": "#/components/schemas/int64"
+                    },
+                    "overstaked": {
+                      "$ref": "#/components/schemas/int64"
+                    },
+                    "total_delegated_including_overdelegated": {
+                      "$ref": "#/components/schemas/int64"
+                    },
+                    "total_delegated_after_limits": {
+                      "$ref": "#/components/schemas/int64"
+                    },
+                    "overdelegated": {
+                      "$ref": "#/components/schemas/int64"
+                    }
+                  },
+                  "required": [
+                    "own_delegated",
+                    "external_delegators",
+                    "former_delegators_unstake_requests",
+                    "overstaked",
+                    "total_delegated_including_overdelegated",
+                    "total_delegated_after_limits",
+                    "overdelegated"
                   ]
                 }
               }

@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez DAL Node RPC",
     "description": "The RPC API for the Octez DAL node.",
-    "version": "Octez 21.4 (b8278e10)"
+    "version": "Octez 22.0 (TBD)"
   },
   "paths": {
     "/health": {
@@ -2605,6 +2605,101 @@
                     "dal_attested_slots_validity_lag",
                     "blocks_per_cycle"
                   ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/published_levels/{int32}/known_traps": {
+      "get": {
+        "description": "For a given published level, return all the traps known by the node. Optional arguments allow to restrict the output to a given delegate or slot index.",
+        "parameters": [
+          {
+            "name": "int32",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "delegate",
+            "in": "query",
+            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slot_index",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "delegate": {
+                        "$ref": "#/components/schemas/Signature.Public_key_hash"
+                      },
+                      "slot_index": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      },
+                      "shard": {
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -1073741824,
+                              "maximum": 1073741823
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "proof": {
+                        "$ref": "#/components/schemas/DAL_commitment"
+                      }
+                    },
+                    "required": [
+                      "delegate",
+                      "slot_index",
+                      "shard",
+                      "proof"
+                    ]
+                  }
                 }
               }
             }

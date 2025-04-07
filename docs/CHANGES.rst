@@ -3,6 +3,30 @@
 Changelog
 '''''''''
 
+Version 22.0
+============
+
+Node
+----
+
+- Added RPC ``GET
+  /chains/<chain>/delegators_contribution/<cycle>/<baker_pkh>``, which
+  provides a breakdown of all the contributions to the delegation
+  portion of the baking power of the baker for the given cycle. (MR
+  :gl:`!17406`)
+
+DAL node
+--------
+
+- **Deprecation** The CLI experimental flag ``--sqlite3-backend`` and its
+  corresponding configuration file field have been deprecated since
+  SQLite is now the default storage backend for storing skip list
+  cells for DAL slots.
+
+- Aliases have been added to the command line. ``--operator-profiles`` is now
+  equivalent to ``--operator`` and ``-E`` is equivalent to ``--endpoint``.
+  (MR :gl:`!17496`)
+
 Version 22.0~rc3
 ================
 
@@ -227,10 +251,6 @@ DAL node
 - Added a new RPC ``GET /protocol_parameters/`` that retrieve the protocol
   parameters that the DAL node uses for a given level, which by default is the
   last finalized level the node is aware of. (MR :gl:`!16704`)
-
-- Aliases have been added to the command line. ``--operator-profiles`` is now
-  equivalent to ``--operator`` and ``-E`` is equivalent to ``--endpoint``.
-  (MR :gl:`!17496`)
 
 Miscellaneous
 -------------
