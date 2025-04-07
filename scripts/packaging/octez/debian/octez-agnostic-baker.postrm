@@ -12,18 +12,18 @@ debsystemctl=$(command -v deb-systemd-invoke || echo systemctl)
 
 case "${1}" in
 remove)
-  rm -Rf /run/octez-baker
+  rm -Rf /run/octez-agnostic-baker
   ;;
 purge)
-  rm -Rf /run/octez-baker
+  rm -Rf /run/octez-agnostic-baker
   # Purge debconf data for the package in any case
   # shellcheck disable=SC2119
   db_purge || true
-  echo "Octez baker purged"
+  echo "Octez agnostic baker purged"
   ;;
 upgrade)
-  echo "Restarting Octez baker daemon: octez-baker"
-  $debsystemctl "start octez-baker.service"
+  echo "Restarting Octez agnostic baker daemon: octez-agnostic-baker"
+  $debsystemctl "start octez-agnostic-baker.service"
   ;;
 failed-upgrade | abort-install | abort-upgrade | disappear) ;;
 *)
@@ -33,6 +33,6 @@ failed-upgrade | abort-install | abort-upgrade | disappear) ;;
 esac
 
 # Clean up the temporary file
-rm -f /run/octez-baker/*daemon_was_running
+rm -f /run/octez-agnostic-baker/*daemon_was_running
 
 #DEBHELPER#

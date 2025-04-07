@@ -1,13 +1,4 @@
-/var/log/tezos/baker-next.log{
-    daily
-    # we use copytruncate to avoid stopping node.
-    copytruncate
-    rotate 5
-    compress
-    minsize 1M
-}
-
-/var/log/tezos/baker-active.log{
+/var/log/tezos/agnostic-baker.log{
     daily
     # we use copytruncate to avoid stopping node.
     copytruncate

@@ -1,13 +1,13 @@
-# Octez Baker
+# Octez Agnostic Baker
 
-The octez baker should be configured to run along side a remote signer.
+The octez agnostic baker should be configured to run along side a remote signer.
 
 This package provides systemd services for both the baker and the accuser
 and for the active and next protocol. For example, you can start the
 baker using
 
 ```
-$ sudo systemctl start octez-baker
+$ sudo systemctl start octez-agnostic-baker
 ```
 
 All services are enabled but not started by default. It's up to the user

@@ -10,7 +10,7 @@ set -e
 debsystemctl=$(command -v deb-systemd-invoke || echo systemctl)
 
 # Check if the old daemon is active before stopping it
-if systemctl is-active --quiet "octez-baker.service"; then
-  echo "Stopping old octez-baker"
-  $debsystemctl stop "octez-baker.service"
+if systemctl is-active --quiet "octez-agnostic-baker.service"; then
+  echo "Stopping old octez-agnostic-baker"
+  $debsystemctl stop "octez-agnostic-baker.service"
 fi

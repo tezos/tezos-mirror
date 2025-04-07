@@ -10,17 +10,7 @@ echoerr() { echo "$@" 1>&2; }
 db_version 2.0
 
 # work directory to store temporary files associated to this package
-mkdir -p /run/octez-baker
-
-for file in /usr/bin/octez-baker-*; do
-  file=$(basename "$file")
-  suffix=$(echo "$file" | sed 's/^octez-baker-//')
-  if [ -z "$PROTO_CHOICES" ]; then
-    PROTO_CHOICES="$suffix"
-  else
-    PROTO_CHOICES="$PROTO_CHOICES $suffix"
-  fi
-done
+mkdir -p /run/octez-agnostic-baker
 
 case "${1}" in
 configure)
@@ -28,19 +18,19 @@ configure)
   # if $DPKG_RUNNING_VERSION" is empty a reconfigure
   # Otherwise we're upgrading
   if [ -z "${2:-}" ] || [ -z "$DPKG_RUNNING_VERSION" ]; then
-    echoerr "Fresh installation (or reconfigure) of the Octez baker"
+    echoerr "Fresh installation (or reconfigure) of the Octez agnostic baker"
 
-    db_get octez-baker/liquidity-vote
+    db_get octez-agnostic-baker/liquidity-vote
     echo "LQVOTE=${RET}" > /etc/default/octez-baker
 
-    db_get octez-baker/baker-key
+    db_get octez-agnostic-baker/baker-key
     echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker
 
-    db_get octez-baker/dal-node
+    db_get octez-agnostic-baker/dal-node
     DAL=${RET}
     case "$DAL" in
     true)
-      db_get octez-baker/dal-node-url
+      db_get octez-agnostic-baker/dal-node-url
       DALURL=${RET}
       echo "RUNTIME_OPTS=\"--keep-alive --dal-node $DALURL\"" >> /etc/default/octez-baker
       ;;
@@ -52,7 +42,7 @@ configure)
     mkdir -p /var/tezos/.tezos-client
     chown tezos:tezos /var/tezos/.tezos-client
   else
-    echoerr "Upgrading octez-baker from version $2 ( postinst )"
+    echoerr "Upgrading octez-agnostic-baker from version $2 ( postinst )"
     # the configure script is called with the version of the old
     # package in case of upgrade. We display a message to the user
     # in this case. See octez-node.postinst for a detailed explanation.
@@ -61,22 +51,22 @@ configure)
       : noop
       ;;
     *)
-      echoerr "Setting defaults in /etc/default/octez-baker-*"
+      echoerr "Setting defaults in /etc/default/octez-baker"
       echoerr "Migrating values when possible"
 
-      db_get octez-baker/liquidity-vote
+      db_get octez-agnostic-baker/liquidity-vote
       echo "LQVOTE=${RET}" >> /etc/default/octez-baker
       echoerr "LQVOTE=${RET}"
 
-      db_get octez-baker/baker-key
+      db_get octez-agnostic-baker/baker-key
       echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker
       echoerr "BAKER_KEY=${RET}"
 
-      db_get octez-baker/dal-node
+      db_get octez-agnostic-baker/dal-node
       DAL=${RET}
       case "$DAL" in
       true)
-        db_get octez-baker/dal-node-url
+        db_get octez-agnostic-baker/dal-node-url
         DALURL=${RET}
         echo "RUNTIME_OPTS=\" --keep-alive --dal-node $DALURL\"" >> /etc/default/octez-baker
         echoerr "RUNTIME_OPTS=--keep-alive --dal-node $DALURL"
@@ -87,7 +77,7 @@ configure)
         ;;
       esac
 
-      db_input high octez-baker/upgrade_note_current || true
+      db_input high octez-agnostic-baker/upgrade_note_current || true
       #shellcheck disable=SC2119
       db_go || true
       ;;

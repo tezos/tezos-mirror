@@ -8,7 +8,7 @@ set -e
 db_version 2.0
 
 # work directory to store temporary files associated to this package
-mkdir -p /run/octez-baker
+mkdir -p /run/octez-agnostic-baker
 
 case "${1}" in
 install | upgrade)
@@ -18,48 +18,48 @@ install | upgrade)
     # the configure script is called with the version of the old
     # package in case of upgrade. We display a message to the user
     # in this case
-    echo "Upgrading Octez baker from version $2 ( preinst )"
+    echo "Upgrading Octez agnostic baker from version $2 ( preinst )"
     case "$2" in
     1:*)
       if [ -e /etc/default/octez-baker ]; then
         #shellcheck disable=SC1091
         . /etc/default/octez-baker
-        db_set octez-baker/liquidity-vote "$LQVOTE"
-        db_set octez-baker/baker-key "$BAKER_KEY"
+        db_set octez-agnostic-baker/liquidity-vote "$LQVOTE"
+        db_set octez-agnostic-baker/baker-key "$BAKER_KEY"
       fi
       ;;
     *)
-      if [ -e /etc/octez/baker.conf ]; then
-        echo "Updating baker configuration from old /etc/octez/baker.conf"
+      if [ -e /etc/octez/agnostic-baker.conf ]; then
+        echo "Updating baker configuration from old /etc/octez/agnostic-baker.conf"
         # the values set here in debconf are going to be used in the
         # postinst script to write the /etc/default/ files for this
         # package
         #shellcheck disable=SC1091
-        . /etc/octez/baker.conf
+        . /etc/octez/agnostic-baker.conf
 
         if [ -n "${lq_vote:-}" ]; then
           echo "set lq_vote=$lq_vote"
           #shellcheck disable=SC2154
-          db_set octez-baker/liquidity-vote "$lq_vote"
+          db_set octez-agnostic-baker/liquidity-vote "$lq_vote"
         fi
 
         if [ -n "${baking_key:-}" ]; then
           echo "set baking_key=$baking_key"
           #shellcheck disable=SC2154
-          db_set octez-baker/baker-key "$baking_key"
+          db_set octez-agnostic-baker/baker-key "$baking_key"
         fi
 
         if [ -n "${dalurl:-}" ]; then
           echo "set dalurl=$dalurl"
           if [ "$dalurl" = "" ]; then
             #shellcheck disable=SC2154
-            db_set octez-baker/dal-node false
+            db_set octez-agnostic-baker/dal-node false
           else
-            db_set octez-baker/dal-node true
-            db_set octez-baker/dal-node-url "$dalurl"
+            db_set octez-agnostic-baker/dal-node true
+            db_set octez-agnostic-baker/dal-node-url "$dalurl"
           fi
         else
-          db_set octez-baker/dal-node true
+          db_set octez-agnostic-baker/dal-node true
         fi
 
         #shellcheck disable=SC2119
