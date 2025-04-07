@@ -265,3 +265,35 @@ module Proxy : sig
   (** Stops the proxy server. *)
   val stop : proxy -> unit
 end
+
+(** This module provides a mock HTTP server for selected RPCs.
+    It responds to registered routes with mock data and fails all other requests.
+    It is similar with the {!Proxy} module. *)
+module Mockup : sig
+  (** An instance of the mockup server. *)
+  type t
+
+  (** Represents a possible response from a mocked-up route. *)
+  type answer = [`Response of string]
+
+  (** A route definition. *)
+  type route
+
+  (** Creates a route for the mockup, containing a [path_pattern] pattern and a
+      [callback].
+      The [callback] is provided with the [path] actually matched and is used to
+      retrieve the DAL node answer for the given [path]. *)
+  val route :
+    path_pattern:string ->
+    callback:(path:string -> answer option Lwt.t) ->
+    route
+
+  (** Creates a new mockup instance. *)
+  val make : name:string -> routes:route list -> t
+
+  (** Starts the mockup server. *)
+  val run : t -> port:int -> unit
+
+  (** Stops the mockup server. *)
+  val stop : t -> unit
+end

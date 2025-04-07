@@ -540,3 +540,62 @@ module Proxy = struct
 
   let stop t = Lwt.wakeup t.trigger_shutdown ()
 end
+
+module Mockup = struct
+  type answer = [`Response of string]
+
+  type route = {
+    path_pattern : Re.Pcre.regexp;
+    callback : path:string -> answer option Lwt.t;
+  }
+
+  type t = {
+    name : string;
+    routes : route list;
+    shutdown : unit Lwt.t;
+    trigger_shutdown : unit Lwt.u;
+  }
+
+  let make ~name ~routes =
+    let shutdown, trigger_shutdown = Lwt.task () in
+    {name; routes; shutdown; trigger_shutdown}
+
+  let route ~path_pattern ~callback =
+    {path_pattern = Re.Pcre.regexp path_pattern; callback}
+
+  let find_mocked_action t ~path =
+    List.find_opt
+      (fun act -> Re.Pcre.pmatch ~rex:act.path_pattern path)
+      t.routes
+
+  let run t ~port =
+    let callback _conn req _body =
+      let uri = Cohttp.Request.uri req in
+      let uri_str = Uri.to_string uri in
+      let path = Uri.path uri in
+      match find_mocked_action t ~path with
+      | Some action -> (
+          Log.debug "[%s] mocking request: '%s'" t.name uri_str ;
+          let* res = action.callback ~path in
+          match res with
+          | None -> Cohttp_lwt_unix.Server.respond_not_found ()
+          | Some (`Response body) ->
+              Log.debug "[%s] responding with mock: '%s'" t.name body ;
+              Cohttp_lwt_unix.Server.respond_string ~status:`OK ~body ())
+      | None ->
+          Log.warn "[%s] no mock route for: '%s', failing." t.name uri_str ;
+          Cohttp_lwt_unix.Server.respond_error
+            ~status:`Not_implemented
+            ~body:"Unmocked RPC"
+            ()
+    in
+    let start () =
+      Cohttp_lwt_unix.Server.create
+        ~mode:(`TCP (`Port port))
+        ~stop:t.shutdown
+        (Cohttp_lwt_unix.Server.make ~callback ())
+    in
+    Lwt.async start
+
+  let stop t = Lwt.wakeup t.trigger_shutdown ()
+end
