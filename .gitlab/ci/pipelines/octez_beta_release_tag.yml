@@ -795,7 +795,7 @@ oc.docker-build-rockylinux-dependencies:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
       - gcp_arm64
 
 oc.docker-systemd-tests-rpm-rockylinux:
@@ -822,7 +822,7 @@ oc.docker-systemd-tests-rpm-rockylinux:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
       - gcp_arm64
 
 oc.build-rockylinux:
@@ -866,7 +866,7 @@ oc.build-rockylinux:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
       - gcp_arm64
 
 oc.build-rockylinux-data:
@@ -910,7 +910,7 @@ oc.build-rockylinux-data:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
       - gcp_arm64
 
 rpm_repo_rockylinux:
@@ -973,7 +973,7 @@ oc.docker-build-fedora-dependencies:
       - "39"
       - "42"
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
       - gcp_arm64
 
 oc.docker-systemd-tests-rpm-fedora:
@@ -1001,7 +1001,7 @@ oc.docker-systemd-tests-rpm-fedora:
       - "39"
       - "42"
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
       - gcp_arm64
 
 oc.build-fedora:
@@ -1046,7 +1046,7 @@ oc.build-fedora:
       - "39"
       - "42"
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
       - gcp_arm64
 
 oc.build-fedora-data:
@@ -1091,7 +1091,7 @@ oc.build-fedora-data:
       - "39"
       - "42"
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
       - gcp_arm64
 
 rpm_repo_fedora:

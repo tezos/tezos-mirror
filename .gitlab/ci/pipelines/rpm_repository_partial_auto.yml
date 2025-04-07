@@ -57,7 +57,7 @@ oc.docker-build-rockylinux-dependencies:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
 
 oc.docker-systemd-tests-rpm-rockylinux:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
@@ -83,7 +83,7 @@ oc.docker-systemd-tests-rpm-rockylinux:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
 
 oc.build-rockylinux:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
@@ -126,7 +126,7 @@ oc.build-rockylinux:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
 
 oc.build-rockylinux-data:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
@@ -169,7 +169,7 @@ oc.build-rockylinux-data:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
 
 rpm_repo_rockylinux:
   image: rockylinux:9.3
