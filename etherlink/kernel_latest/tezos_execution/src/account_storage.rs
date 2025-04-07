@@ -8,7 +8,10 @@
 use crate::context;
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
 use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
+use tezos_smart_rollup::{
+    host::ValueType,
+    types::{Contract, PublicKey, PublicKeyHash},
+};
 use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
 use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
 
@@ -152,6 +155,36 @@ impl TezlinkImplicitAccount {
             .bin_write(&mut buffer)
             .map_err(|_| tezos_smart_rollup::host::RuntimeError::DecodingError)?;
         host.store_write_all(&path, &buffer)?;
+        Ok(())
+    }
+
+    /// Verify if an account is allocated by attempting to read its balance
+    pub fn allocated(
+        &self,
+        host: &impl Runtime,
+    ) -> Result<bool, tezos_storage::error::Error> {
+        let path = concat(&self.path, &BALANCE_PATH)?;
+        Ok(Some(ValueType::Value) == host.store_has(&path)?)
+    }
+
+    /// Allocate an account in the durable storage. Does nothing if account was
+    /// already allocated.
+    pub fn allocate(
+        host: &mut impl Runtime,
+        context: &context::Context,
+        contract: &Contract,
+    ) -> Result<(), tezos_storage::error::Error> {
+        let mut account = Self::from_contract(context, contract)?;
+        if account.allocated(host)? {
+            return Ok(());
+        }
+        account.set_balance(host, &0_u64.into())?;
+        // Only implicit accounts have counter and manager keys
+        if let Contract::Implicit(pkh) = contract {
+            // TODO: use a global counter instead of initializing counter at 0
+            account.set_counter(host, &0u64.into())?;
+            account.set_manager_public_key_hash(host, pkh)?;
+        }
         Ok(())
     }
 }
@@ -377,5 +410,53 @@ mod test {
             .expect("read_manager should have succeed");
 
         assert_eq!(manager, read_manager);
+    }
+
+    #[test]
+    fn test_account_initialization() {
+        let mut host = MockKernelHost::default();
+
+        // Initalize path for Tezlink context at /tezlink/context
+        let context = context::Context::init_context();
+
+        // Create an account for tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+        let pkh = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+            .expect("PublicKeyHash base58 conversion should succeeded");
+
+        let contract = Contract::Implicit(pkh);
+        let mut account = TezlinkImplicitAccount::from_contract(&context, &contract)
+            .expect("Account creation should have succeeded");
+
+        let exist = account
+            .allocated(&host)
+            .expect("Exist account should have succeeded");
+
+        assert!(!exist);
+
+        TezlinkImplicitAccount::allocate(&mut host, &context, &contract)
+            .expect("Account initialization should have succeeded");
+
+        let exist = account
+            .allocated(&host)
+            .expect("Exist account should have succeeded");
+
+        assert!(exist);
+
+        let test_balance = 1999_u64.into();
+
+        account
+            .set_balance(&mut host, &test_balance)
+            .expect("Set balance should have succeeded");
+
+        // Calling init on a contract already initialized will do nothing
+        // So the balance should not change and still be 1999
+        TezlinkImplicitAccount::allocate(&mut host, &context, &contract)
+            .expect("Account initialization should have succeeded");
+
+        let read_balance = account
+            .balance(&host)
+            .expect("Read balance should have succeeded");
+
+        assert_eq!(test_balance, read_balance);
     }
 }
