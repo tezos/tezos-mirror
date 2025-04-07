@@ -16,7 +16,6 @@ cranelift-native.workspace = true
 derive_more.workspace = true
 ed25519-dalek.workspace = true
 enum-tag.workspace = true
-goblin.workspace = true
 hex.workspace = true
 ieee-apsqrt.workspace = true
 num_enum.workspace = true
@@ -34,6 +33,7 @@ try-blocks.workspace = true
 vm-fdt.workspace = true
 itertools.workspace = true
 range-collections.workspace = true
+elf.workspace = true
 
 [dependencies.ocaml]
 workspace = true
