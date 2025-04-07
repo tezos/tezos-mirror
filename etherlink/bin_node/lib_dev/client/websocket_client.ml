@@ -12,18 +12,42 @@ type response =
   | Response of JSONRPC.response
   | Notification of Subscription.notification
 
+module Request_table = Hashtbl.Make (struct
+  type t = JSONRPC.id
+
+  let equal = ( = )
+
+  let hash = Hashtbl.hash
+end)
+
+module Subscription_table = Hashtbl.Make (struct
+  type t = Ethereum_types.Subscription.id
+
+  let equal (Ethereum_types.Subscription.Id (Hex id1))
+      (Ethereum_types.Subscription.Id (Hex id2)) =
+    String.equal id1 id2
+
+  let hash = Hashtbl.hash
+end)
+
 type t = {
   media : Media_type.t;
   conn : Websocket_lwt_unix.conn;
-  response_stream : response Lwt_stream.t;
+  pending_requests : ((JSONRPC.value, exn) result -> unit) Request_table.t;
+  subscriptions : (Data_encoding.json option -> unit) Subscription_table.t;
   binary : bool;
   mutable id : int;
+  process : unit Lwt.t;
 }
 
 type 'a subscription = {
   stream : 'a Lwt_stream.t;
   unsubscribe : unit -> bool tzresult Lwt.t;
 }
+
+exception Timeout of float
+
+exception Connection_closed
 
 module Event = struct
   include Internal_event.Simple
@@ -106,6 +130,15 @@ module Event = struct
       ~level:Debug
       ("frame", Websocket_encodings.frame_encoding)
       ~pp1:Websocket.Frame.pp
+
+  let ignored_message =
+    declare_1
+      ~section
+      ~name:"websocket_client_ignored_message"
+      ~msg:"websocket client ignored message {message}"
+      ~level:Warning
+      ("message", Data_encoding.string)
+      ~pp1:Format.pp_print_string
 end
 
 type error +=
@@ -172,7 +205,7 @@ let new_id client =
   client.id <- client.id + 1 ;
   JSONRPC.Id_float (float_of_int id)
 
-let handle_message (media : Media_type.t) message =
+let parse_message (media : Media_type.t) message =
   let open Lwt_syntax in
   match media.destruct JSONRPC.response_encoding message with
   | Ok resp -> return_some (Response resp)
@@ -182,6 +215,29 @@ let handle_message (media : Media_type.t) message =
       | Error e2 ->
           let* () = Event.(emit decoding_error) (e1, e2) in
           return_none)
+
+let handle_response pending_requests subscriptions message =
+  let open Lwt_syntax in
+  function
+  | Response {id; value} -> (
+      match Request_table.find pending_requests id with
+      | None -> Event.(emit ignored_message) message
+      | Some callback ->
+          callback (Ok value) ;
+          return_unit)
+  | Notification {params = {result; subscription}} -> (
+      match Subscription_table.find subscriptions subscription with
+      | None -> Event.(emit ignored_message) message
+      | Some callback ->
+          callback (Some result) ;
+          return_unit)
+
+let handle_message media pending_requests subscriptions message =
+  let open Lwt_syntax in
+  let* response = parse_message media message in
+  Option.iter_s
+    (handle_response pending_requests subscriptions message)
+    response
 
 let disconnect ?(status = Websocket_encodings.Normal_closure) conn =
   let open Lwt_syntax in
@@ -200,8 +256,6 @@ let disconnect ?(status = Websocket_encodings.Normal_closure) conn =
     (fun e ->
       let* () = Event.(emit disconnection_error) e in
       return_unit)
-
-exception Timeout of float
 
 let monitor_connection ~ping_timeout ~ping_interval conn monitor_mbox =
   let open Lwt_syntax in
@@ -262,76 +316,102 @@ let connect ?monitoring media uri =
         in
         Some (monitor_mbox, monitor)
   in
-  let frame_stream =
-    Lwt_stream.from (fun () ->
-        Lwt.catch
-          (fun () ->
-            let read = Websocket_lwt_unix.read conn in
-            let* frame =
-              match monitor with
-              | None -> read
-              | Some (_, timeout) -> Lwt.choose [read; timeout]
-            in
-            match frame.opcode with
-            | Close ->
-                let* () = disconnect conn in
-                return_none
-            | _ -> return_some frame)
-          (fun e ->
-            let* () = Event.(emit connection_closed) e in
-            let* () = disconnect ~status:Going_away conn in
-            return_none))
-  in
-  let response_stream =
-    Lwt_stream.filter_map_s
-      (function
-        | {Websocket.Frame.opcode = Ping; content; _} ->
-            (* We must answer ping frames from the server with a pong frame
-               with the same content. *)
-            let* () =
-              Websocket_lwt_unix.write
-                conn
-                (Websocket.Frame.create ~opcode:Pong ~content ())
-            in
+  let get_frame () =
+    Lwt.catch
+      (fun () ->
+        (* We need to pause explicitly here to allow for the subscription to
+           register its callback after the initial request and before we process
+           the next frame. *)
+        let* () = Lwt.pause () in
+        let read = Websocket_lwt_unix.read conn in
+        let* frame =
+          match monitor with
+          | None -> read
+          | Some (_, timeout) -> Lwt.choose [read; timeout]
+        in
+        match frame.opcode with
+        | Close ->
+            let* () = disconnect conn in
             return_none
-        | {opcode = Pong; content; _} ->
-            let* () =
-              match monitor with
+        | _ -> return_some frame)
+      (fun e ->
+        let* () = Event.(emit connection_closed) e in
+        let* () = disconnect ~status:Going_away conn in
+        return_none)
+  in
+  let subscriptions = Subscription_table.create 7 in
+  let pending_requests = Request_table.create 7 in
+  let process_frame = function
+    | {Websocket.Frame.opcode = Ping; content; _} ->
+        (* We must answer ping frames from the server with a pong frame
+           with the same content. *)
+        let* () =
+          Websocket_lwt_unix.write
+            conn
+            (Websocket.Frame.create ~opcode:Pong ~content ())
+        in
+        return_unit
+    | {opcode = Pong; content; _} ->
+        let* () =
+          match monitor with
+          | None -> return_unit
+          | Some (mbox, _) -> (
+              match int_of_string_opt content with
               | None -> return_unit
-              | Some (mbox, _) -> (
-                  match int_of_string_opt content with
-                  | None -> return_unit
-                  | Some i -> Lwt_mvar.put mbox i)
-            in
-            return_none
-        | {opcode = Close; _} ->
-            (* Cannot happen because frame_stream is closed when we receive this
-               opcode. *)
-            return_none
-        | {opcode = Text | Binary; content; final = false; _} ->
-            (* New fragmented message *)
-            Buffer.clear message_buffer ;
-            Buffer.add_string message_buffer content ;
-            return_none
-        | {opcode = Continuation; content; final = false; _} ->
-            (* Non final fragment of message, we add the content to the
-               buffer *)
-            Buffer.add_string message_buffer content ;
-            return_none
-        | {opcode = Text | Binary; content; final = true; _} ->
-            (* Complete message in frame *)
-            handle_message media content
-        | {opcode = Continuation; content; final = true; _} ->
-            (* Final data frame of fragmented message, the complete message is
-               the buffer + new content *)
-            let message = Buffer.contents message_buffer ^ content in
-            handle_message media message
-        | {opcode = Ctrl _ | Nonctrl _; _} ->
-            (* Ignore other frames *)
-            return_none)
-      frame_stream
+              | Some i -> Lwt_mvar.put mbox i)
+        in
+        return_unit
+    | {opcode = Close; _} ->
+        (* Cannot happen because frame_stream is closed when we receive
+           this opcode. *)
+        return_unit
+    | {opcode = Text | Binary; content; final = false; _} ->
+        (* New fragmented message *)
+        Buffer.clear message_buffer ;
+        Buffer.add_string message_buffer content ;
+        return_unit
+    | {opcode = Continuation; content; final = false; _} ->
+        (* Non final fragment of message, we add the content to the
+           buffer *)
+        Buffer.add_string message_buffer content ;
+        return_unit
+    | {opcode = Text | Binary; content; final = true; _} ->
+        (* Complete message in frame *)
+        handle_message media pending_requests subscriptions content
+    | {opcode = Continuation; content; final = true; _} ->
+        (* Final data frame of fragmented message, the complete message is
+           the buffer + new content *)
+        let message = Buffer.contents message_buffer ^ content in
+        handle_message media pending_requests subscriptions message
+    | {opcode = Ctrl _ | Nonctrl _; _} ->
+        (* Ignore other frames *)
+        return_unit
   in
-  return {media; conn; response_stream; id = 0; binary = is_binary media}
+  let process =
+    let rec loop () =
+      let* frame = get_frame () in
+      match frame with
+      | None -> return_unit
+      | Some frame ->
+          let* () = process_frame frame in
+          loop ()
+    in
+    let+ () = loop () in
+    Request_table.iter
+      (fun _ callback -> callback (Error Connection_closed))
+      pending_requests ;
+    Subscription_table.iter (fun _ callback -> callback None) subscriptions
+  in
+  return
+    {
+      media;
+      conn;
+      process;
+      id = 0;
+      binary = is_binary media;
+      pending_requests;
+      subscriptions;
+    }
 
 let disconnect {conn; _} = disconnect conn
 
@@ -339,22 +419,21 @@ let send_jsonrpc_request_helper client (request : JSONRPC.request) =
   let open Lwt_result_syntax in
   let message = client.media.construct JSONRPC.request_encoding request in
   let opcode = if client.binary then Websocket.Frame.Opcode.Binary else Text in
+  let response, resolver = Lwt.task () in
+  Request_table.replace
+    client.pending_requests
+    request.id
+    (Lwt.wakeup_later_result resolver) ;
   let*! () =
     Websocket_lwt_unix.write
       client.conn
       (Websocket.Frame.create ~opcode ~content:message ())
   in
-  let stream = Lwt_stream.clone client.response_stream in
-  let*! response =
-    Lwt_stream.find_map
-      (function
-        | Response {id; value} when id = request.id -> Some value | _ -> None)
-      stream
-  in
+  let*! response in
+  Request_table.remove client.pending_requests request.id ;
   match response with
-  | None -> tzfail (No_response request)
-  | Some (Error e) -> tzfail (Request_failed (request, e))
-  | Some (Ok resp) -> return resp
+  | Error e -> tzfail (Request_failed (request, e))
+  | Ok resp -> return resp
 
 type (_, _) call =
   | Call :
@@ -380,71 +459,27 @@ let send_jsonrpc :
 
 let subscribe client (kind : Ethereum_types.Subscription.kind) =
   let open Lwt_result_syntax in
-  let id = new_id client in
-  let request =
-    JSONRPC.
-      {
-        method_ = Subscribe.method_;
-        parameters =
-          Some (Data_encoding.Json.construct Subscribe.input_encoding kind);
-        id = Some id;
-      }
+  let* subscription_id =
+    send_jsonrpc client (Call ((module Subscribe), kind))
   in
-  let message = client.media.construct JSONRPC.request_encoding request in
-  let opcode = if client.binary then Websocket.Frame.Opcode.Binary else Text in
-  let*! () =
-    Websocket_lwt_unix.write
-      client.conn
-      (Websocket.Frame.create ~opcode ~content:message ())
+  let stream, push = Lwt_stream.create () in
+  let push x =
+    push
+      (Option.map
+         (Data_encoding.Json.destruct
+            (Ethereum_types.Subscription.output_encoding
+               Transaction_object.encoding))
+         x)
   in
-  let stream = Lwt_stream.clone client.response_stream in
-  let stop, stop_resolver = Lwt.task () in
-  let stream =
-    Lwt_stream.from (fun () -> Lwt.choose [stop; Lwt_stream.get stream])
-  in
-  let*! subscription_repsonse =
-    Lwt_stream.find_map
-      (function
-        | Response {id; value} when id = request.id -> (
-            match value with
-            | Ok json ->
-                Some
-                  (Ok
-                     (Data_encoding.Json.destruct
-                        Subscribe.output_encoding
-                        json))
-            | Error e -> Some (Error e))
-        | _ -> None)
-      stream
-  in
-  let+ (subscription_id : Ethereum_types.Subscription.id) =
-    match subscription_repsonse with
-    | None -> tzfail (No_response request)
-    | Some (Error e) -> tzfail (Request_failed (request, e))
-    | Some (Ok id) -> return id
-  in
+  Subscription_table.replace client.subscriptions subscription_id push ;
   let unsubscribe () =
     let* r =
       send_jsonrpc client (Call ((module Unsubscribe), subscription_id))
     in
-    Lwt.wakeup_later stop_resolver None ;
+    push None ;
     return r
   in
-  let stream =
-    Lwt_stream.filter_map
-      (function
-        | Notification notif when notif.params.subscription = subscription_id ->
-            let event =
-              Data_encoding.Json.destruct
-                (Ethereum_types.Subscription.output_encoding
-                   Transaction_object.encoding)
-                notif.params.result
-            in
-            Some event
-        | _ -> None)
-      stream
-  in
-  {stream; unsubscribe}
+  return {stream; unsubscribe}
 
 let subscribe_filter client kind filter =
   let open Lwt_result_syntax in
