@@ -12,6 +12,9 @@ Available services:
         Fetch the contents of a blueprint 
     - GET /evm/blueprints
         Watch for new blueprints 
+    - GET /evm/blueprints/range
+        Fetch a sequence of consecutive blueprints, starting from (and
+        containing at least the blueprint for) a given level 
     - GET /evm/messages
         Watch for new messages 
     - GET /evm/smart_rollup_address
