@@ -625,12 +625,13 @@ let with_dal_node ?peers ?attester_profiles ?producer_profiles
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
 let scenario_with_layer1_node ?attestation_threshold ?regression ?(tags = [])
-    ?additional_bootstrap_accounts ?attestation_lag ?number_of_shards
-    ?number_of_slots ?custom_constants ?commitment_period ?challenge_window
-    ?(dal_enable = true) ?incentives_enable ?traps_fraction ?dal_rewards_weight
-    ?event_sections_levels ?node_arguments ?activation_timestamp
-    ?consensus_committee_size ?minimal_block_delay ?delay_increment_per_round
-    ?blocks_per_cycle ?blocks_per_commitment variant scenario =
+    ?(uses = fun _ -> []) ?additional_bootstrap_accounts ?attestation_lag
+    ?number_of_shards ?number_of_slots ?custom_constants ?commitment_period
+    ?challenge_window ?(dal_enable = true) ?incentives_enable ?traps_fraction
+    ?dal_rewards_weight ?event_sections_levels ?node_arguments
+    ?activation_timestamp ?consensus_committee_size ?minimal_block_delay
+    ?delay_increment_per_round ?blocks_per_cycle ?blocks_per_commitment variant
+    scenario =
   let description = "Testing DAL L1 integration" in
   let tags = if List.mem team tags then tags else team :: tags in
   let tags =
@@ -640,6 +641,7 @@ let scenario_with_layer1_node ?attestation_threshold ?regression ?(tags = [])
   test
     ?regression
     ~__FILE__
+    ~uses
     ~tags
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
