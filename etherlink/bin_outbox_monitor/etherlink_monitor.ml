@@ -353,10 +353,78 @@ module Fast_withdrawal = struct
     return {receiver; withdrawal_id; amount; sender}
 end
 
+module Fast_FA_withdrawal = struct
+  type event = {
+    sender : Ethereum_types.Address.t;
+    ticket_hash : Ethereum_types.hash;
+    ticket_owner : Ethereum_types.Address.t;
+    receiver : Contract.t;
+    proxy : Contract.t;
+    amount : Ethereum_types.quantity;
+    withdrawal_id : Ethereum_types.quantity;
+  }
+
+  let address = FA_withdrawal.address
+
+  let topic =
+    kecack_topic
+      "FastFaWithdrawal(address,address,bytes22,bytes22,uint256,uint256,uint256,bytes)"
+
+  let filter = mk_filter address topic
+
+  let decode_event_log Ethereum_types.{topics; data = Hex hex_data; _} =
+    let open Result_syntax in
+    let* ticket_hash =
+      match topics with
+      | [_addr; th] -> return th
+      | _ -> error_with "Missing ticket hash from Fast FA withdrawal topics"
+    in
+    let data = Hex.to_bytes (`Hex hex_data) in
+    let* data =
+      match data with
+      | None -> error_with "Invalid hex data in Fast FA withdrawal event"
+      | Some d -> return d
+    in
+    let* () =
+      if Bytes.length data < 7 * 32 then
+        error_with "Invalid length for data of Fast FA withdrawal event"
+      else return_unit
+    in
+    let sender =
+      extract_32 0 data ~padding:(`Left_padded 20)
+      |> Ethereum_types.decode_address
+    in
+    let ticket_owner =
+      extract_32 1 data ~padding:(`Left_padded 20)
+      |> Ethereum_types.decode_address
+    in
+    let receiver =
+      extract_32 2 data ~padding:(`Right_padded 22)
+      |> Data_encoding.Binary.of_bytes_exn Contract.encoding
+    in
+    let proxy =
+      extract_32 3 data ~padding:(`Right_padded 22)
+      |> Data_encoding.Binary.of_bytes_exn Contract.encoding
+    in
+    let amount = extract_32 4 data |> Ethereum_types.decode_number_be in
+    let withdrawal_id = extract_32 5 data |> Ethereum_types.decode_number_be in
+    return
+      {
+        sender;
+        ticket_hash;
+        ticket_owner;
+        receiver;
+        proxy;
+        amount;
+        withdrawal_id;
+      }
+end
+
 type parsed =
   | Withdrawal of Withdrawal.data
   | FA_withdrawal of FA_withdrawal.event
   | Fast_withdrawal of Fast_withdrawal.event
+  | Fast_FA_withdrawal of Fast_FA_withdrawal.event
 
 let parsed_to_db = function
   | Withdrawal {amount; sender; receiver; withdrawal_id} ->
@@ -374,6 +442,17 @@ let parsed_to_db = function
       Db.{kind = FA ticket_owner; amount; sender; receiver; withdrawal_id}
   | Fast_withdrawal {amount; sender; receiver; withdrawal_id} ->
       Db.{kind = Fast_xtz; amount; sender; receiver; withdrawal_id}
+  | Fast_FA_withdrawal
+      {
+        sender;
+        ticket_hash = _;
+        ticket_owner;
+        receiver;
+        proxy = _;
+        amount;
+        withdrawal_id;
+      } ->
+      Db.{kind = Fast_FA ticket_owner; amount; sender; receiver; withdrawal_id}
 
 let parsed_log_to_db (log : Ethereum_types.transaction_log) event =
   match log with
@@ -415,7 +494,17 @@ let parse_log (log : Ethereum_types.transaction_log) =
           | Some _ ->
               let* withdraw_data = Fast_withdrawal.decode_event_data log.data in
               return (parsed_log_to_db log (Fast_withdrawal withdraw_data))
-          | None -> return_none))
+          | None -> (
+              match
+                Filter_helpers.filter_one_log Fast_FA_withdrawal.filter log
+              with
+              | Some _ ->
+                  let* withdraw_data =
+                    Fast_FA_withdrawal.decode_event_log log
+                  in
+                  return
+                    (parsed_log_to_db log (Fast_FA_withdrawal withdraw_data))
+              | None -> return_none)))
 
 let handle_one_log ws_client db (log : Ethereum_types.transaction_log) =
   let open Lwt_result_syntax in
@@ -461,7 +550,12 @@ let filter_topics =
   [
     Some
       (Ethereum_types.Filter.Or
-         [Withdrawal.topic; FA_withdrawal.topic; Fast_withdrawal.topic]);
+         [
+           Withdrawal.topic;
+           FA_withdrawal.topic;
+           Fast_withdrawal.topic;
+           Fast_FA_withdrawal.topic;
+         ]);
   ]
 
 let monitor_withdrawals db ws_client =

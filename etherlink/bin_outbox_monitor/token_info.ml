@@ -109,6 +109,9 @@ let get ws_client =
       let* info = get_fa_info ws_client token_addr in
       return (info, false)
   | Fast_xtz -> return ({symbol = "XTZ"; decimals = Some 18}, true)
+  | Fast_FA token_addr ->
+      let* info = get_fa_info ws_client token_addr in
+      return (info, true)
 
 let get_for_display ws_client token amount =
   let open Lwt_result_syntax in
