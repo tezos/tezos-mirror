@@ -674,19 +674,22 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     ?drop_duplicate_when_injection ?blueprints_publisher_order_enabled
     ?rollup_history_mode ~enable_dal ?dal_slots ~enable_multichain ?rpc_server
     ?websockets ?history_mode ?enable_tx_queue ?spawn_rpc
-    ?periodic_snapshot_path protocol =
+    ?periodic_snapshot_path ?l2_chains protocol =
   (* Note that the chain_id is not important (it will become important later) *)
   let l2_chains =
-    [
-      {
-        (Evm_node.default_l2_setup ~l2_chain_id:1) with
-        sequencer_pool_address;
-        bootstrap_accounts = Some bootstrap_accounts;
-        da_fee_per_byte = da_fee;
-        minimum_base_fee_per_gas;
-        maximum_gas_per_transaction;
-      };
-    ]
+    Option.value
+      ~default:
+        [
+          {
+            (Evm_node.default_l2_setup ~l2_chain_id:1) with
+            sequencer_pool_address;
+            bootstrap_accounts = Some bootstrap_accounts;
+            da_fee_per_byte = da_fee;
+            minimum_base_fee_per_gas;
+            maximum_gas_per_transaction;
+          };
+        ]
+      l2_chains
   in
   let* sequencer_setup =
     setup_sequencer_internal

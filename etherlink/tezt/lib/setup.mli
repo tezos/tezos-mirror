@@ -269,5 +269,6 @@ val setup_sequencer :
   ?enable_tx_queue:Evm_node.tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
+  ?l2_chains:Evm_node.l2_setup list ->
   Protocol.t ->
   sequencer_setup Lwt.t

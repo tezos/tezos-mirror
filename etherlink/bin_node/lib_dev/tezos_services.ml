@@ -264,5 +264,10 @@ let tezlink_root = Tezos_rpc.Path.(open_root / "tezlink")
 (* module entrypoint *)
 let register_tezlink_services impl =
   let directory = build_dir impl in
+  let directory =
+    Tezos_rpc.Directory.register_describe_directory_service
+      directory
+      Tezos_rpc.Service.description_service
+  in
   let tezlink_directory = Tezos_rpc.Directory.prefix tezlink_root directory in
   Evm_directory.init_from_resto_directory tezlink_directory
