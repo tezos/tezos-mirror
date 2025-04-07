@@ -10319,21 +10319,17 @@ let test_describe_endpoint =
       protocol
   in
   let hooks = Tezos_regression.hooks in
-  let endpoint =
-    Client.(Foreign_endpoint (Evm_node.rpc_endpoint_record sequencer))
+  let sequencer_endpoint = Evm_node.rpc_endpoint_record sequencer in
+  (* List all the endpoint of the sequencer *)
+  let root_endpoint = Client.(Foreign_endpoint sequencer_endpoint) in
+  let* (_ : string) = Client.rpc_list ~hooks ~endpoint:root_endpoint client in
+  (* List the endpoints of the /tezlink directory *)
+  let tezlink_endpoint =
+    Client.(Foreign_endpoint {sequencer_endpoint with path = "/tezlink"})
   in
-  let* (_ : string) = Client.rpc_list ~hooks ~endpoint client in
-  let path = "/tezlink/describe?recurse=yes" in
-  (* TODO replace with a call of octez-client when it supports a non empty
-     root see !17532 *)
-  let* res =
-    (* We check that the "/tezlink/describe" RPC is available. We don't record
-       the result in the regression trace because it is already contained in
-       the call to "/describe" above. *)
-    Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
-    |> Runnable.run
+  let* (_ : string) =
+    Client.rpc_list ~hooks ~endpoint:tezlink_endpoint client
   in
-  let _ = JSON.parse ~origin:"curl_tezlink_describe" res in
   unit
 
 let test_relay_restricted_rpcs =

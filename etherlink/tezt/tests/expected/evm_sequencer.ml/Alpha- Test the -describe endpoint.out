@@ -72,3 +72,47 @@ Warning:
   Failed to acquire the protocol version from the node
   Did not find service: GET http://[HOST]:[PORT]/chains/main/blocks/head/protocols
 
+
+./octez-client rpc list
+
+Available services:
+  
+  + chains/<chain_id>/blocks/<block_id>/
+    - GET /chains/<chain_id>/blocks/<block_id>/context/constants
+        All constants
+    - GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/balance
+        The spendable balance of a contract (in mutez), also known as liquid
+        balance. Corresponds to tez owned by the contract that are neither
+        staked, nor in unstaked requests, nor in frozen bonds. Identical to
+        the 'spendable' RPC. 
+    - GET /chains/<chain_id>/blocks/<block_id>/helpers/current_level
+        Returns the level of the interrogated block, or the one of a block
+        located `offset` blocks after it in the chain. For instance, the next
+        block if `offset` is 1. The offset cannot be negative. 
+    - GET /chains/<chain_id>/blocks/<block_id>/protocols
+        Current and next protocol. 
+  - GET /version
+      Get information on the node version 
+
+
+Dynamic parameter description:
+  
+  <contract_id>
+      A contract identifier encoded in b58check. 
+  <block_id>
+      A block identifier. This can take one of the following
+      values:
+	1.Block-hash - Hash in Base58Check notation.
+	2.Alias - One of
+      the following:'genesis/ head/ caboose/ savepoint/
+      checkpoint'.
+	3.Block-level - index(integer) in the chain.
+	One can
+      also specify the relative positions of block with respect to above
+      three block identifiers. For ex. 'checkpoint~N' or checkpoint+N, where
+      N is an integer, denotes the Nth block before(~) or after (+) the
+      checkpoint. 
+  <chain_id>
+      A chain identifier. This is either a chain hash in Base58Check notation
+      or a one the predefined aliases: 'main', 'test'. 
+
