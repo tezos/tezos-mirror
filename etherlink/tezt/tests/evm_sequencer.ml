@@ -8892,6 +8892,32 @@ let test_multichain_feature_flag =
       "Multichain feature flag in the durable storage is %L, expected %R" ;
   unit
 
+let test_tezlink_bootstrap_accounts =
+  register_tezlink_test
+    ~tags:["bootstrap_accounts"]
+    ~title:"Check the tezlink bootstrap accounts are set in storage"
+  @@ fun {sequencer; _} _protocol ->
+  let* () =
+    Lwt_list.iter_p
+      (fun account ->
+        let addr =
+          Evm_node_lib_dev_encoding.Tezos_types.address_of_b58exn
+            account.Account.public_key_hash
+        in
+        let path =
+          sf
+            "/tezlink/context/contracts/index/%s/balance"
+            (Evm_node_lib_dev_encoding.Tezos_types.address_to_hex_exn addr)
+        in
+        let*@ balance = Rpc.state_value sequencer path in
+        Check.(Option.is_some balance = true)
+          Check.bool
+          ~error_msg:(sf "Expected to have a value at %s" path) ;
+        unit)
+      Evm_node.tez_default_bootstrap_accounts
+  in
+  unit
+
 let test_fast_withdrawal_feature_flag =
   register_all
     ~tags:["fast_withdrawal"; "feature_flag"]
@@ -13208,4 +13234,5 @@ let () =
   test_tezlink_protocols [Alpha] ;
   test_tezlink_version [Alpha] ;
   test_tezlink_constants [Alpha] ;
-  test_tezlink_produceBlock [Alpha]
+  test_tezlink_produceBlock [Alpha] ;
+  test_tezlink_bootstrap_accounts [Alpha]
